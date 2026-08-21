@@ -18,7 +18,7 @@ from .upload import state as _upload_state
 from .upload import ocr_client as _ocr_client
 from .upload import thumbs as _thumbs
 from .upload import import_work as _import_work
-from .utils import generate_nanoid
+from .utils import generate_nanoid, derive_year_fields
 from .heartbeat import mark_error, mark_success, register_job
 
 
@@ -230,11 +230,15 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
     """Uuendab staging uploadi metaandmeid. Slug ei muutu."""
     if not _valid_upload_id(upload_id):
         return False
+    # NB: allow-list peab katma KÕIK väljad, mida UploadMetaForm PATCH-ib —
+    # tundmatu väli visatakse vaikselt ära (vastus on ikka 200 OK) ja kaob
+    # impordil. external_url ja ester_id jäid varem just nii salvestumata.
     allowed = {
         'title', 'year', 'year_display', 'collections', 'languages',
         'type', 'genre',
         'creators', 'location',
         'publisher', 'tags',
+        'ester_id', 'external_url',
         'archive_refs',
     }
     lock = _get_upload_lock(upload_id)
@@ -701,10 +705,13 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
         updates = {}
         if upload_meta.get('title'):
             updates['title'] = upload_meta['title']
-        try:
-            updates['year'] = int(str(upload_meta.get('year', '')))
-        except (ValueError, TypeError):
-            pass
+        year_val, year_display_val = derive_year_fields(
+            upload_meta.get('year'), upload_meta.get('year_display')
+        )
+        if year_val is not None:
+            updates['year'] = year_val
+        if year_display_val:
+            updates['year_display'] = year_display_val
         if upload_meta.get('collections') is not None:
             updates['collections'] = upload_meta.get('collections') or []
         if upload_meta.get('languages') is not None:

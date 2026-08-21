@@ -158,6 +158,52 @@ def parse_year_range(year, year_display) -> Optional[Tuple[int, int]]:
     return None
 
 
+# Puhas aastanumber (3–4 kohaline) — varauusaja aastad. 1–2 kohaline langeb
+# tuletamata reeglile, sest VUTT korpus on 4-kohalised aastad.
+_PURE_YEAR_RE = re.compile(r'^\d{3,4}$')
+
+
+def derive_year_fields(raw_year, existing_display=None) -> Tuple[Optional[int], Optional[str]]:
+    """Tuletab ühest kasutaja sisestatud aastastringist `(year, year_display)`.
+
+    Kasutatakse upload-viisardi impordil: samm 1 aastalahter on vabatekst
+    ("1634-1653", "ca. 1650", "17. saj") ja `int()` sellel kukub — varem läks
+    aasta sellisel juhul vaikselt kaotsi (teos sai aastaks 0).
+
+    Reeglid:
+      * `existing_display` olemas → seda EI tuletata üle (samm 4 vorm on selle
+        juba paika pannud); number võetakse `raw_year`-ist või kuvast.
+      * puhas 3–4-kohaline number → `(n, None)` — kuva pole vaja
+      * parsitav kuvastring → `(vahemiku keskpaik, kuvastring)`
+      * ei parsi → `(None, kuvastring)` — toores tekst säilib, aasta jääb tühjaks
+      * tühi → `(None, None)`
+
+    NB: peegelloogika frontendis: src/utils/yearDisplayUtils.ts deriveYearFields
+    """
+    display = (str(existing_display).strip() if existing_display else '')
+    value = ('' if raw_year is None else str(raw_year).strip())
+
+    if display:
+        try:
+            year = int(value)
+        except (TypeError, ValueError):
+            rng = parse_year_range(None, display)
+            year = (rng[0] + rng[1]) // 2 if rng else None
+        return (year, display)
+
+    if not value:
+        return (None, None)
+
+    if _PURE_YEAR_RE.match(value):
+        return (int(value), None)
+
+    rng = parse_year_range(None, value)
+    if rng:
+        return ((rng[0] + rng[1]) // 2, value)
+
+    return (None, value)
+
+
 def build_work_id_cache():
     """Ehitab mälu-cache'i work_id -> directory_path vastavustest.
     
