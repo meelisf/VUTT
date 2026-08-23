@@ -135,7 +135,12 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str) -> str:
         return (
             "Vasteid ei leitud.\n"
             "Otsing on vaikimisi range (kõik päringu sõnad peavad esinema). "
-            "Proovi relax_matching=true või vähem sõnu."
+            "Proovi relax_matching=true või vähem sõnu.\n"
+            "Kontrolli ka päringu KEELT: korpus on ladina-, saksa-, rootsi- ja "
+            "kreekakeelne, eestikeelset teksti on ainult ~440 lk. Eestikeelne "
+            "termin jääb tühjaks ka siis, kui teemat on rohkelt käsitletud — "
+            "otsi ladina või saksa tüve ja arvesta kõikuvat ortograafiat "
+            "(u/v, i/j, ß/ss)."
         )
 
     blocks = [f"Vasteid kokku: {total} (kuvatud {len(hits)})", STATUS_LEGEND, ""]

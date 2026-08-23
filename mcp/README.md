@@ -88,6 +88,18 @@ esinema). `relax_matching=true` lülitab Meili vaikekäitumisele.
 Lehekülje­numeratsioon on VUTT-i sisemine 1-põhine skaneeringute järjestus —
 mitte trükise paginatsioon ega foliatsioon.
 
+### Serveri juhend (`instructions`)
+
+`vutt_mcp/instructions.py` sisaldab teksti, mille klient süstib mudeli konteksti
+juba ühendumisel — enne esimest tööriistakutset. Sinna kuulub see, mida ükski
+üksik tööriista kirjeldus ei ütle: korpuse **keelekihid** (allikad ladina/saksa/
+rootsi/kreeka, sekundaarkirjandus saksa/eesti), tööriistade järjekord ja
+`work_id` tähendus.
+
+**Claude Code lõikab juhendi 2048 märgi pealt** (logib „Server instructions
+truncated from N to 2048 chars") — teksti pikendades jälgi seda piiri;
+`mcp/tests/test_instructions.py` valvab.
+
 ## Kirjanduskogu (valikuline, lokaalne)
 
 Lokaalne sekundaarkirjanduse kogu Zotero põhjal. **Tööriistad tekivad ainult

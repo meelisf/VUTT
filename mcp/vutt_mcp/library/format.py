@@ -58,7 +58,9 @@ def format_hits(hits: list, parent_keys: dict) -> str:
             'NB: kogu tekst pärineb skaneeringute OCR-ist, mis on kohati '
             'lagunenud (nt „M atthias" asemel „Matthias"). Tühi tulemus EI '
             'tõesta, et teemat pole käsitletud — proovi teist sõnastust või '
-            'relax_matching=true.'
+            'relax_matching=true. Kogu on peamiselt saksa- ja eestikeelne: '
+            'ladinakeelne allikatermin ei pruugi siin esineda, otsi saksa- või '
+            'eestikeelset vastet.'
         )
     read = [f"Leidsin {len(hits)} vastet.", ""]
     for h in hits:

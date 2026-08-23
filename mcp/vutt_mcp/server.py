@@ -15,6 +15,7 @@ from . import queries
 from .client import VuttClient
 from .config import load_settings
 from .errors import VuttError, VuttNotFound
+from .instructions import SERVER_INSTRUCTIONS
 
 MAX_PAGE_SPAN = 20
 
@@ -25,7 +26,7 @@ def build_server(client=None, base_url: str | None = None) -> MCPServer:
         settings = load_settings()
         client = VuttClient(settings)
         base_url = settings.base_url
-    mcp = MCPServer("vutt")
+    mcp = MCPServer("vutt", instructions=SERVER_INSTRUCTIONS)
     _register_text_tools(mcp, client, base_url)
     _register_person_tools(mcp, client, base_url)
 
