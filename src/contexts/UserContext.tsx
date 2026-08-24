@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { setSessionExpiredHandler } from '../services/apiClient';
 import i18n from '../i18n';
 import { useMeilisearch } from './MeilisearchContext';
 
@@ -132,6 +133,29 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, [applySettings]);
 
+  // Sessiooni aegumise ÜKS käsitleja: degradeeri anonüümseks, aga jäta UI-le
+  // teadmine, et põhjus oli aegumine.
+  // NB: sessionExpired EI TOHI avada globaalset blokeerivat modaali; vaated
+  // kasutavad seda kontekstipõhiselt (piiratud teose juures "logi uuesti sisse",
+  // avalik sisu jääb kättesaadavaks).
+  const markSessionExpired = useCallback(() => {
+    setSessionExpired(true);
+    setUser(null);
+    setAuthToken(null);
+    clearUserToken();
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+  }, [clearUserToken]);
+
+  // Iga 401 tokeniga päring toidab sama mehhanismi KOHE. Ilma selleta ootas
+  // kasutaja kuni 5 minutit (pollimise samm) ja nägi vahepeal valdkonna
+  // veateateid ("Salvestamine ebaõnnestus"), mis viitasid valele põhjusele.
+  // Backend hoiab sessioone mälus, seega iga deploy tekitab täpselt selle akna.
+  useEffect(() => {
+    setSessionExpiredHandler(markSessionExpired);
+    return () => setSessionExpiredHandler(null);
+  }, [markSessionExpired]);
+
   // Perioodiline tokeni kontroll (iga 5 min)
   useEffect(() => {
     // Puhasta eelmine intervall
@@ -151,17 +175,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
       if (!result) {
-        // Server kinnitas, et token on aegunud — degradeeri anonüümseks,
-        // kuid jäta UI-le teadmine, et põhjus oli sessiooni aegumine.
-        // NB: sessionExpired EI tohi avada globaalset blokeerivat modaali;
-        // vaated kasutavad seda kontekstipõhiselt (nt piiratud teose juures
-        // näidatakse "logi uuesti sisse", avalik sisu jääb kättesaadavaks).
-        setSessionExpired(true);
-        setUser(null);
-        setAuthToken(null);
-        clearUserToken();
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(STORAGE_KEY);
+        // Server kinnitas, et token on aegunud
+        markSessionExpired();
       }
     }, 5 * 60 * 1000); // 5 minutit
 
@@ -171,7 +186,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         tokenCheckRef.current = null;
       }
     };
-  }, [authToken, user]);
+  }, [authToken, user, markSessionExpired]);
 
   const clearSessionExpired = useCallback(() => {
     setSessionExpired(false);

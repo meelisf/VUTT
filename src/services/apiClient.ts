@@ -22,6 +22,26 @@ export interface ApiRequestOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Sessiooni aegumise teavitaja.
+ *
+ * Backend hoiab sessioone MÄLUS (`server/auth.py`), seega iga restart (nt deploy)
+ * tapab kõik sessioonid. `UserContext` küsib `verify-token`-it iga 5 minuti järel,
+ * mis tähendas, et kuni viis minutit kukkusid kõik tegevused oma valdkonna
+ * veateatega ("Salvestamine ebaõnnestus") ja kasutaja otsis viga valest kohast.
+ *
+ * Siin toidame sama mehhanismi kohe, kui server ütleb 401. UserContext registreerib
+ * käsitleja; ilma selleta on see no-op (nt testides ja tööriistades).
+ */
+type SessionExpiredHandler = () => void;
+
+let sessionExpiredHandler: SessionExpiredHandler | null = null;
+
+export function setSessionExpiredHandler(handler: SessionExpiredHandler | null): void {
+  sessionExpiredHandler = handler;
+}
+
+
 function getStoredToken(): string | null {
   if (typeof localStorage === 'undefined') return null;
   return localStorage.getItem('vutt_token');
@@ -91,6 +111,13 @@ async function apiRequest<T>(
     timeout: options.timeout,
     signal: options.signal,
   });
+
+  // 401 KAASA ANTUD tokeniga = sessioon on surnud (mitte "ligipääs puudub").
+  // Ilma tokenita 401 on tavaline anonüümne keeld ja login'i vale parool käib
+  // hoopis fetchWithTimeout'iga otse — kumbagi ei tohi sessiooni aegumiseks lugeda.
+  if (response.status === 401 && token) {
+    sessionExpiredHandler?.();
+  }
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
