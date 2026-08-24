@@ -12,6 +12,8 @@ export interface PollResult {
   ready: number;
   /** Lehed, mille OCR lõplikult ebaõnnestus (#250). */
   failed?: number[];
+  /** Mitu lehte OCR-i LÄHEB (poolitusplaani järgi) — kohatäidete arv viisardis. */
+  planned_pages?: number | null;
   total: number;
   expected_pages: number | null;
   files: FileEntry[];

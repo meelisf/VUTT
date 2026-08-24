@@ -136,6 +136,8 @@ def test_admin_upload_status_returns_staged_state(client, login, make_upload):
     assert response.json() == {
         "status": "pending",
         "expected_pages": 3,
+        # Kohatäidete arv viisardile: ilma poolitusplaanita = expected_pages.
+        "planned_pages": 3,
         "files": state["files"],
         "ready": 0,
         "total": 0,

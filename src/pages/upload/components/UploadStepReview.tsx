@@ -5,6 +5,16 @@ import { FILE_API_URL } from '../../../config';
 import type { Collections } from '../../../services/collectionService';
 import type { FileEntry, PollResult } from '../types';
 
+/** Kohatäide lehele, mille pilti veel ei ole — näitab töö KUJU kohe. */
+const PlaceholderCard: React.FC<{ page: number }> = ({ page }) => (
+  <div className="relative rounded-lg overflow-hidden border-2 border-gray-200">
+    <div className="aspect-[3/4] bg-gray-100 animate-pulse" />
+    <div className="px-2 py-1 text-xs font-medium flex items-center justify-between bg-gray-50 text-gray-400">
+      <span>Lk {page}</span>
+    </div>
+  </div>
+);
+
 const ThumbCard: React.FC<{
   entry: FileEntry;
   uploadId: string;
@@ -70,6 +80,7 @@ interface UploadStepReviewProps {
   status: string;
   pollResult: PollResult | null;
   readyCount: number;
+  placeholderPages: number[];
   filesWithLocalDeleted: FileEntry[];
   uploadId: string | null;
   authToken: string | null;
@@ -97,6 +108,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
   status,
   pollResult,
   readyCount,
+  placeholderPages,
   filesWithLocalDeleted,
   uploadId,
   authToken,
@@ -223,7 +235,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
     )}
 
     {/* Pisipiltide ruudustik */}
-    {filesWithLocalDeleted.length === 0 ? (
+    {filesWithLocalDeleted.length === 0 && placeholderPages.length === 0 ? (
       status === 'error' ? null : (
       <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
         <Loader2 size={20} className="animate-spin mr-2" />
@@ -243,6 +255,9 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
             />
           ) : null
         )}
+        {/* Kohatäited lehtedele, mida server pole veel avaldanud (#255 arutelu):
+            kasutaja näeb töö kuju kohe, mitte alles esimeste valmis lehtede järel. */}
+        {placeholderPages.map((page) => <PlaceholderCard key={`ph-${page}`} page={page} />)}
       </div>
     )}
 

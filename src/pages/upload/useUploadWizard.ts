@@ -591,6 +591,7 @@ export function useUploadWizard() {
     // Tuletatud (samm 3)
     filesWithLocalDeleted: review.filesWithLocalDeleted,
     readyCount: review.readyCount,
+    placeholderPages: review.placeholderPages,
     progress: review.progress,
     progressPct: review.progressPct,
     status: review.status,

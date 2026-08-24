@@ -107,6 +107,40 @@ describe('computeReviewDerived', () => {
     { page: 3, filename: '3.jpg', has_ocr: false, deleted: false },
   ];
 
+  // --- kohatäited: töö KUJU nähtavaks kohe, mitte alles esimeste lehtede järel ---
+
+  it('teeb kohatäited lehtedele, mida server pole veel avaldanud', () => {
+    const poll: PollResult = {
+      status: 'processing', ready: 1, total: 2, expected_pages: 33,
+      planned_pages: 60,                    // 33 lähtelehte + 27 poolitust
+      files: [
+        { page: 1, filename: '1.jpg', has_ocr: true, deleted: false },
+        { page: 2, filename: '2.jpg', has_ocr: false, deleted: false },
+      ],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false);
+    expect(out.placeholderPages).toHaveLength(58);
+    expect(out.placeholderPages[0]).toBe(3);
+    expect(out.placeholderPages).not.toContain(1);
+  });
+
+  it('kasutab expected_pages, kui planned_pages puudub (ilma poolitamiseta)', () => {
+    const poll: PollResult = {
+      status: 'processing', ready: 0, total: 0, expected_pages: 4, files: [],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false);
+    expect(out.placeholderPages).toEqual([1, 2, 3, 4]);
+  });
+
+  it('imporditud tööl kohatäiteid ei ole', () => {
+    const poll: PollResult = {
+      status: 'imported', ready: 1, total: 1, expected_pages: 10,
+      files: [{ page: 1, filename: '1.jpg', has_ocr: true, deleted: false }],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false);
+    expect(out.placeholderPages).toEqual([]);
+  });
+
   it('liidab lokaalselt kustutatud serveri kustutatutega ja loeb valmis-arvu', () => {
     const poll: PollResult = {
       status: 'done', ready: 2, total: 3, expected_pages: 3, files: baseFiles,

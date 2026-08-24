@@ -251,6 +251,7 @@ const UploadPage: React.FC = () => {
             status={wizard.status}
             pollResult={wizard.pollResult}
             readyCount={wizard.readyCount}
+            placeholderPages={wizard.placeholderPages}
             filesWithLocalDeleted={wizard.filesWithLocalDeleted}
             uploadId={wizard.uploadId}
             authToken={authToken}
