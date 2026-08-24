@@ -60,13 +60,35 @@ def _planned_pages(state: dict, expected_pages) -> Optional[int]:
     on igast poolitatavast lehest kaks. Ilma selleta näeks kasutaja vale kuju
     (33 kohatäidet 60 asemel) või mitte midagi, kuni esimesed lehed valmivad.
     """
+    # AINULT enne apply lõppu: pärast seda on `expected_pages` juba väljundi arv
+    # ja plaani uuesti rakendamine loeks poolitused KAKS korda (62 → 89).
     plaan = state.get("prepress")
-    if plaan and expected_pages:
+    if plaan and expected_pages and state.get("status") in upload_state.PREPRESS_IDLE_STATUSES:
         try:
             return prepress_plan.output_page_count(plaan, int(expected_pages))
         except Exception as e:
             logger.warning(f"planned_pages arvutus ebaõnnestus: {e}")
     return expected_pages
+
+
+def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -> dict:
+    """Staatuse-vastuse ÜKS kuju.
+
+    Iga uus väli tuleb lisada AINULT siia: `poll_and_sync_thumbs`-il on viis
+    väljumisteed ja käsitsi lisamisel jäid neist kaks maha (`planned_pages`
+    puudus vigase PDF-i ja „töökaust pole veel loodud" harudest).
+    """
+    payload = {
+        "status": status,
+        "ready": 0,
+        "total": 0,
+        "expected_pages": expected_pages,
+        "planned_pages": _planned_pages(state, expected_pages),
+        "files": state.get("files", []),
+        "progress": upload_state.upload_progress.get(upload_id, {}),
+    }
+    payload.update(lisa)
+    return payload
 
 
 def poll_and_sync_thumbs(
@@ -95,16 +117,8 @@ def poll_and_sync_thumbs(
     if current_status in (
         "pending", "uploading", "error", "imported", "collecting_images",
     ) + upload_state.PREPRESS_IDLE_STATUSES:
-        return {
-            "status": current_status,
-            "ready": 0,
-            "total": 0,
-            "expected_pages": expected_pages,
-            "planned_pages": _planned_pages(state, expected_pages),
-            "files": state.get("files", []),
-            "progress": upload_state.upload_progress.get(upload_id, {}),
-            "error": state.get("error_message"),
-        }
+        return _payload(state, upload_id, current_status, expected_pages,
+                        error=state.get("error_message"))
 
     slug = state["meta"]["slug"]
     remote_work = f"{ocr_server_path}/{state['remote_work_path']}"
@@ -126,15 +140,7 @@ def poll_and_sync_thumbs(
                     s["status"] = "error"
                     s["error_message"] = err_msg
                     upload_state.write_state(upload_id, s)
-            return {
-                "status": "error",
-                "error": err_msg,
-                "ready": 0,
-                "total": 0,
-                "expected_pages": expected_pages,
-                "files": state.get("files", []),
-                "progress": upload_state.upload_progress.get(upload_id, {}),
-            }
+            return _payload(state, upload_id, "error", expected_pages, error=err_msg)
         except FileNotFoundError:
             pass  # OK — PDF pole vigane
 
@@ -143,14 +149,7 @@ def poll_and_sync_thumbs(
             remote_files = sftp.listdir(remote_work)
         except FileNotFoundError:
             # Töökaust pole veel loodud (OCR pole alustanud)
-            return {
-                "status": "processing",
-                "ready": 0,
-                "total": 0,
-                "expected_pages": expected_pages,
-                "files": state.get("files", []),
-                "progress": upload_state.upload_progress.get(upload_id, {}),
-            }
+            return _payload(state, upload_id, "processing", expected_pages)
 
         # --- Leia JPG-d ja TXT-d ---
         jpg_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith(".jpg")}
@@ -250,29 +249,17 @@ def poll_and_sync_thumbs(
                     s["status"] = new_status
                 upload_state.write_state(upload_id, s)
 
-        return {
-            "status": new_status,
-            "ready": ready_count,
-            "failed": sorted(failed_page_nums),
-            "total": len(all_page_nums),
-            "expected_pages": expected_pages,
-            "planned_pages": _planned_pages(state, expected_pages),
-            "files": new_files,
-            "progress": upload_state.upload_progress.get(upload_id, {}),
-            "stalled": upload_state.is_stalled(resolved_count, expected_pages, last_progress_at, now_ts),
-        }
+        return _payload(
+            state, upload_id, new_status, expected_pages,
+            ready=ready_count,
+            failed=sorted(failed_page_nums),
+            total=len(all_page_nums),
+            files=new_files,
+            stalled=upload_state.is_stalled(resolved_count, expected_pages, last_progress_at, now_ts),
+        )
 
     except Exception as e:
         logger.error(f"poll_and_sync_thumbs {upload_id}: {e}")
-        return {
-            "status": current_status,
-            "ready": 0,
-            "total": 0,
-            "expected_pages": expected_pages,
-            "planned_pages": _planned_pages(state, expected_pages),
-            "files": state.get("files", []),
-            "error": str(e),
-            "progress": upload_state.upload_progress.get(upload_id, {}),
-        }
+        return _payload(state, upload_id, current_status, expected_pages, error=str(e))
     finally:
         _close_quietly(sftp)
