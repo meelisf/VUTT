@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any, Callable
 
 from ..config import OCR_SERVER_PATH, get_logger
+from .. import ocr_err
 from . import file_detection, state as upload_state
 from .ocr_client import sftp_open
 
@@ -191,8 +192,11 @@ def poll_and_sync_thumbs(
             if pn in failed_page_nums:
                 # Põhjus loetakse ÜKS kord ja jääb state'i — .err failid on
                 # pisikesed, aga poll käib iga 60 s.
-                entry["ocr_error"] = existing_errors.get(pn) or _read_err_reason(
+                sisu = existing_errors.get(pn) or _read_err_reason(
                     sftp, remote_work, failed_bases, pn)
+                entry["ocr_error"] = sisu
+                # Kategooria otsustab, kas lehte saab tühjana importida (#250).
+                entry["ocr_error_kind"] = ocr_err.parse_err(sisu)[0]
             new_files.append(entry)
 
         # --- Uus staatus ---
