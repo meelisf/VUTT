@@ -60,6 +60,7 @@
     "title": "Review",
     "ocrReady": "OCR ready",
     "ocrProcessing": "Processing...",
+    "ocrFailed": "OCR failed",
     "deleted": "Deleted",
     "restore": "Restore",
     "delete": "Delete",

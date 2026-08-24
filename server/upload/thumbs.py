@@ -3,6 +3,7 @@
 Moodul küsib OCR-serveri SFTP kaustast valmis JPG+TXT paare, loob lokaalsed
 pisipildid ning uuendab uploadi state.json-i.
 """
+import io
 import os
 from datetime import datetime
 from typing import Any, Callable
@@ -32,6 +33,23 @@ def _create_thumbnail(sftp, remote_jpg: str, tmp_thumb: str, thumb_path: str):
         img.thumbnail((400, 600), Image.LANCZOS)
         img.save(thumb_path, "JPEG", quality=85)
     os.unlink(tmp_thumb)
+
+
+def _read_err_reason(sftp, remote_work: str, failed_bases: set, page_num: int) -> str:
+    """Loeb ebaõnnestunud lehe .err märgendi sisu (lühike põhjus OCR-serverist)."""
+    for base in failed_bases:
+        if file_detection.extract_page_num(base) != page_num:
+            continue
+        try:
+            buf = io.BytesIO()
+            sftp.getfo(f"{remote_work}/{base}.err", buf)
+            msg = buf.getvalue().decode("utf-8", errors="replace").strip()
+            if msg:
+                return msg[:500]
+        except Exception as e:
+            logger.warning(f".err lugemine ebaõnnestus {base}: {e}")
+        break
+    return "OCR ebaõnnestus (põhjus teadmata)"
 
 
 def poll_and_sync_thumbs(
@@ -119,7 +137,12 @@ def poll_and_sync_thumbs(
         # --- Leia JPG-d ja TXT-d ---
         jpg_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith(".jpg")}
         txt_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith(".txt")}
+        # .err = OCR-server märkis lehe LÕPLIKULT vigaseks (#250). Ilma selleta
+        # ei saaks upload kunagi valmis: vigane leht ei jõua ready_bases'i ega
+        # kao järjekorrast, ja viisard jääks igavesti "töötleb" seisu.
+        err_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith(".err")}
         ready_bases = jpg_bases & txt_bases  # Mõlemad olemas = OCR valmis
+        failed_bases = (jpg_bases & err_bases) - ready_bases
 
         # --- Laadi alla UUED valmis JPG-d (ainult mille jaoks on ka TXT) ---
         os.makedirs(thumbs_dir, exist_ok=True)
@@ -153,32 +176,43 @@ def poll_and_sync_thumbs(
             {file_detection.extract_page_num(b) for b in jpg_bases if file_detection.extract_page_num(b) > 0}
         )
         ready_page_nums = {file_detection.extract_page_num(b) for b in ready_bases if file_detection.extract_page_num(b) > 0}
+        failed_page_nums = {file_detection.extract_page_num(b) for b in failed_bases if file_detection.extract_page_num(b) > 0}
         existing_deleted = {f["page"]: f.get("deleted", False) for f in state.get("files", [])}
+        existing_errors = {f["page"]: f.get("ocr_error") for f in state.get("files", [])}
 
-        new_files = [
-            {
+        new_files = []
+        for pn in all_page_nums:
+            entry = {
                 "page": pn,
                 "filename": f"{pn:03d}.jpg",
                 "has_ocr": pn in ready_page_nums,
                 "deleted": existing_deleted.get(pn, False),
             }
-            for pn in all_page_nums
-        ]
+            if pn in failed_page_nums:
+                # Põhjus loetakse ÜKS kord ja jääb state'i — .err failid on
+                # pisikesed, aga poll käib iga 60 s.
+                entry["ocr_error"] = existing_errors.get(pn) or _read_err_reason(
+                    sftp, remote_work, failed_bases, pn)
+            new_files.append(entry)
 
         # --- Uus staatus ---
         ready_count = len(ready_page_nums)
+        # Lahendatud = valmis VÕI lõplikult ebaõnnestunud. Ainult ready_count'i
+        # lugemine jätaks vigase lehega upload'i igavesti pooleli (#250).
+        resolved_count = ready_count + len(failed_page_nums)
         new_status = current_status
-        if expected_pages and ready_count >= expected_pages:
+        if expected_pages and resolved_count >= expected_pages:
             new_status = "done"
         elif all_page_nums:
             new_status = "reviewing"
 
         # --- Stall-indikaator: jälgi millal viimati uus valmis leht tekkis ---
         now_ts = datetime.now().timestamp()
-        prev_ready = sum(1 for f in state.get("files", []) if f.get("has_ocr"))
+        prev_resolved = sum(1 for f in state.get("files", [])
+                            if f.get("has_ocr") or f.get("ocr_error"))
         last_progress_at = state.get("last_progress_at")
-        # Edenes (uusi valmis lehti) VÕI puudub baseline (esimene poll) → uuenda ajatempel
-        if ready_count > prev_ready or last_progress_at is None:
+        # Edenes (uusi lahendatud lehti) VÕI puudub baseline (esimene poll) → uuenda ajatempel
+        if resolved_count > prev_resolved or last_progress_at is None:
             last_progress_at = now_ts
 
         # --- Uuenda state.json ---
@@ -194,11 +228,12 @@ def poll_and_sync_thumbs(
         return {
             "status": new_status,
             "ready": ready_count,
+            "failed": sorted(failed_page_nums),
             "total": len(all_page_nums),
             "expected_pages": expected_pages,
             "files": new_files,
             "progress": upload_state.upload_progress.get(upload_id, {}),
-            "stalled": upload_state.is_stalled(ready_count, expected_pages, last_progress_at, now_ts),
+            "stalled": upload_state.is_stalled(resolved_count, expected_pages, last_progress_at, now_ts),
         }
 
     except Exception as e:

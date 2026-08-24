@@ -243,6 +243,14 @@ KOGU teenuse (#225). Tühja kataloogi eemaldab `server/ocr_reaper.py` armuaja
 Eduka impordi järgne koristus tohib jääda `rm -rf`-iks — seal ei ole ühtki pilti, millest
 batch tekiks.
 
+**OCR vea-märgend (ADR 0025)** — OCR-server kirjutab ebaõnnestunud lehe kõrvale
+`{tüvi}.err` (üks rida: `ErandiTüüp: sõnum`). Märgend on **lõplik**: `main_loop` ei võta
+`.err`-iga lehte enam ette, kordus = märgendi kustutamine. Iga uus lugemistee peab `.err`-i
+käsitlema nagu `.txt`-d: leht on **lahendatud**, mitte ootel — see puudutab ka
+seisaku-tuvastust (`last_progress_at`, `is_stalled`) ja upload'i `done`-üleminekut.
+Tühi väljund EI ole viga. Lugemiskohad: `reocr_ops` (üksik + batch poll),
+`reocr_recovery`, `upload/thumbs.py`, `upload/import_work.py`.
+
 **z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
 (nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob
 väikesel ekraanil ära. Tegevusribad (`PageActionBar`, `DashboardBulkActionBar`) on `z-[1100]`

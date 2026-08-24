@@ -520,6 +520,36 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
     return job_id
 
 
+def _err_path(txt_abs: str) -> str:
+    """Vea-märgendi tee .txt tee järgi — OCR-server kirjutab `{tüvi}.err` (#250)."""
+    return os.path.splitext(txt_abs)[0] + ".err"
+
+
+def _read_err_marker(sftp, txt_abs: str) -> Optional[str]:
+    """Tagastab .err märgendi sisu, kui OCR-server selle lehe kohta vea kirjutas.
+
+    None = märgendit ei ole (leht on endiselt järjekorras). Märgend on LÕPLIK:
+    OCR-server ei võta .err-iga lehte enam ette. Ilma selle lugemiseta ootaks
+    tellija 12 h absoluuttaimerini (#250).
+    """
+    err_abs = _err_path(txt_abs)
+    try:
+        sftp.stat(err_abs)
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        logger.warning(f"Re-OCR .err kontroll ebaõnnestus {err_abs}: {e}")
+        return None
+    try:
+        buf = io.BytesIO()
+        sftp.getfo(err_abs, buf)
+        msg = buf.getvalue().decode("utf-8", errors="replace").strip()
+    except Exception as e:
+        logger.warning(f"Re-OCR .err lugemine ebaõnnestus {err_abs}: {e}")
+        msg = ""
+    return msg or "OCR ebaõnnestus (põhjus teadmata)"
+
+
 def _download_txt_if_ready(sftp, txt_abs: str) -> Optional[str]:
     """Tagastab .txt sisu kui fail eksisteerib, muidu None."""
     try:
@@ -578,6 +608,28 @@ def _poll_batch_job(job_id: str) -> None:
                 logger.warning(f"Re-OCR batch {job_id} {entry['page_filename']} laadimisviga: {e}")
                 continue
             if text is None:
+                err_msg = _read_err_marker(sftp, txt_abs)
+                if err_msg is None:
+                    continue
+                # Leht on OCR-serveris lõplikult ebaõnnestunud (#250). Vigane leht
+                # ON edenemine — muidu lööb stall-indikaator valehäire.
+                with _reocr_batch_jobs_lock:
+                    current = _reocr_batch_jobs.get(job_id)
+                    if not current or current.get("status") != "processing":
+                        return
+                    for cur_entry in current.get("pages", []):
+                        if (cur_entry.get("remote_txt_name") == entry["remote_txt_name"]
+                                and cur_entry.get("status") == "processing"):
+                            cur_entry["status"] = "error"
+                            cur_entry["error"] = err_msg
+                            current["last_progress_at"] = datetime.now().timestamp()
+                            break
+                logger.warning(f"Re-OCR batch {job_id} {entry['page_filename']}: {err_msg}")
+                for f in (_err_path(txt_abs), f"{work_abs}/{entry['remote_img_name']}"):
+                    try:
+                        sftp.remove(f)
+                    except Exception:
+                        pass
                 continue
             # Olek võis allalaadimise ajal muutuda (DELETE käib teises lõimes).
             # Poll on JAGATUD singleton-lõim — teda ei saa peatada, seega on see
@@ -1010,8 +1062,37 @@ def poll_reocr_job(job_id: str) -> dict:
         try:
             sftp.stat(txt_abs)
         except FileNotFoundError:
+            err_msg = _read_err_marker(sftp, txt_abs)
+            if err_msg is None:
+                sftp.close()
+                return {"status": "processing", "text": None, "error": None}
+            # OCR-server märkis lehe vigaseks — see on LÕPLIK, mitte ootamine (#250)
+            for f in (_err_path(txt_abs), f"{OCR_SERVER_PATH}/{snapshot['remote_img']}"):
+                try:
+                    sftp.remove(f)
+                except Exception:
+                    pass
+            for d in (f"{OCR_SERVER_PATH}/{snapshot['remote_work']}",
+                      f"{OCR_SERVER_PATH}/{snapshot['remote_staging']}"):
+                try:
+                    sftp.rmdir(d)
+                except Exception:
+                    pass      # mitte-tühi või puuduv kaust ei ole viga
             sftp.close()
-            return {"status": "processing", "text": None, "error": None}
+            close_ssh(job_id)
+            log_job = None
+            with _reocr_jobs_lock:
+                current_job = _reocr_jobs.get(job_id)
+                if current_job and current_job.get("status") == "processing":
+                    current_job["status"] = "error"
+                    current_job["error"] = err_msg
+                    current_job["finished_at"] = datetime.now().timestamp()
+                    log_job = dict(current_job)
+            if log_job:
+                logger.warning(f"Re-OCR {job_id} ebaõnnestus OCR-serveris: {err_msg}")
+                _append_to_log(log_job, job_id)
+                _persist_active_jobs()
+            return {"status": "error", "text": None, "error": err_msg}
 
         # TXT on valmis — laadi sisu alla
         buf = io.BytesIO()

@@ -44,3 +44,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0022](0022-valise-id-kanooniline-kuju.md) | Välise identifikaatori kanooniline kuju on paljas ID; normaliseeritakse nii kirjutus- kui lugemisteel | kehtib |
 | [0023](0023-vutt-mcp-lokaalne-olek.md) | `vutt_mcp` tohib hoida lokaalset olekut, kui see on valikuline | kehtib |
 | [0024](0024-kaugkoristus-failid-kohe-kataloog-hiljem.md) | Katkestamine kustutab kaugfailid kohe, kataloogi eemaldab reaper armuaja järel | kehtib |
+| [0025](0025-ocr-vea-margend-err.md) | OCR-server märgib ebaõnnestunud lehe `.err` failiga; märgend on lõplik | kehtib |

@@ -3,11 +3,15 @@ export interface FileEntry {
   filename: string;
   has_ocr: boolean;
   deleted: boolean;
+  /** OCR-serveri .err märgendi sisu — leht kukkus lõplikult läbi (#250). */
+  ocr_error?: string;
 }
 
 export interface PollResult {
   status: string;
   ready: number;
+  /** Lehed, mille OCR lõplikult ebaõnnestus (#250). */
+  failed?: number[];
   total: number;
   expected_pages: number | null;
   files: FileEntry[];

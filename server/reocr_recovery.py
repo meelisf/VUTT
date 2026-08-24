@@ -127,6 +127,44 @@ def _remote_img_name(txt_name: str, info: Optional[dict]) -> str:
     return stem + ext
 
 
+def _recover_batch_err(sftp, work_dir: str, job_id: str, fname: str, pages: dict,
+                       slug: Optional[str], work_id: Optional[str]) -> None:
+    """Orb .err märgend → veakirje logisse ja kaugfailid maha (#250).
+
+    Ilma selleta jääks leht igavesti `unresolved`-iks: mapping ei kustuks, kaust
+    ei koristuks ja kasutaja ei saaks kunagi teada, MIKS leht valmis ei saanud.
+    """
+    txt_name = fname[:-4] + ".txt"
+    info = pages.get(txt_name)
+    if not info:
+        return
+    key = (job_id, fname)
+    if not _claim(key):
+        return
+    try:
+        try:
+            buf = io.BytesIO()
+            sftp.getfo(f"{work_dir}/{fname}", buf)
+            msg = buf.getvalue().decode("utf-8", errors="replace").strip()
+        except Exception as e:
+            msg = f"OCR ebaõnnestus (.err lugemine ebaõnnestus: {e})"
+        now = datetime.now().timestamp()
+        reocr_ops._append_to_log(
+            {"work_id": work_id, "slug": slug, "page_filename": info["page_filename"],
+             "page_number": info.get("page_number"), "status": "error",
+             "error": msg or "OCR ebaõnnestus (põhjus teadmata)",
+             "started_at": None, "finished_at": now,
+             "recovered": True, "original_status": "processing", "recovered_at": now}, job_id)
+        for name in (fname, _remote_img_name(txt_name, info)):
+            try:
+                sftp.remove(f"{work_dir}/{name}")
+            except Exception:
+                pass
+        logger.warning(f"Reaper: {job_id}/{txt_name} ebaõnnestus OCR-serveris: {msg[:200]}")
+    finally:
+        _release(key)
+
+
 def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[str], skipped: List[str]) -> None:
     slug = mapping.get("slug")
     work_id = mapping.get("work_id")
@@ -139,6 +177,9 @@ def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[
         reocr_state.remove_batch_mapping(job_id)  # staging kadunud → mapping aegunud
         return
     for fname in files:
+        if fname.endswith(".err"):
+            _recover_batch_err(sftp, work_dir, job_id, fname, pages, slug, work_id)
+            continue
         if not fname.endswith(".txt"):
             continue
         info = pages.get(fname)
@@ -191,6 +232,9 @@ def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[
     unresolved = []
     for txt_name, info in pages.items():
         img_name = _remote_img_name(txt_name, info)
+        err_name = os.path.splitext(txt_name)[0] + ".err"
+        if err_name in remaining_files:
+            continue      # .err = leht on lõplikult lahendatud, viga juba logitud (#250)
         if txt_name in remaining_files or img_name in remaining_files:
             unresolved.append(txt_name)
 
