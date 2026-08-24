@@ -101,3 +101,46 @@ def test_pisipilt_tommatakse_ka_ilma_txt_ita(upload):
     assert lehed[1]["has_ocr"] is True
     assert lehed[2]["has_ocr"] is False, "has_ocr jääb OCR-i märgiks, mitte pildi märgiks"
     assert res["ready"] == 1
+
+
+# =========================================================
+# „OCR seisab" ei tohi ilmuda valmis tööl (#250 järelleid)
+# =========================================================
+
+def test_valmis_too_ei_ole_seisnud(tmp_path, monkeypatch):
+    """48 valmis + 12 lõplikult ebaõnnestunud = 60 lahendatud ehk VALMIS.
+
+    `list_upload_states` luges ainult `has_ocr` lehti, seega vigadega töö jäi
+    igaveseks „OCR seisab" märgi alla — kõrvuti teatega „Valmis". Sama viga, mis
+    poll'is juba parandatud (ready + failed), aga teises kohas.
+    """
+    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(tmp_path))
+    (tmp_path / "u9").mkdir()
+    failid = ([{"page": n, "has_ocr": True, "deleted": False} for n in range(1, 49)]
+              + [{"page": n, "has_ocr": False, "deleted": False,
+                  "ocr_error": "mudel: KordusLoop: periood 2 sõna, 16 kordust"}
+                 for n in range(49, 61)])
+    (tmp_path / "u9" / "state.json").write_text(json.dumps({
+        "id": "u9", "status": "done", "expected_pages": 60,
+        "created_at": "2026-08-24T10:00:00",
+        "last_progress_at": 1.0,          # ammu
+        "files": failid,
+    }), encoding="utf-8")
+
+    seis = upload_state.list_upload_states()[0]
+
+    assert seis["stalled"] is False, "lõplikult ebaõnnestunud leht ON lahendatud"
+
+
+def test_pooleliolev_too_on_endiselt_seisnud(tmp_path, monkeypatch):
+    """Regressioon: päris seisak peab endiselt nähtav olema."""
+    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(tmp_path))
+    (tmp_path / "u8").mkdir()
+    (tmp_path / "u8" / "state.json").write_text(json.dumps({
+        "id": "u8", "status": "processing", "expected_pages": 60,
+        "created_at": "2026-08-24T10:00:00",
+        "last_progress_at": 1.0,
+        "files": [{"page": n, "has_ocr": True, "deleted": False} for n in range(1, 10)],
+    }), encoding="utf-8")
+
+    assert upload_state.list_upload_states()[0]["stalled"] is True

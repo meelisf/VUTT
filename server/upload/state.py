@@ -132,9 +132,13 @@ def list_upload_states() -> list:
             with open(state_file, "r", encoding="utf-8") as f:
                 state = json.load(f)
             if state.get("status") != "imported":
-                ready = sum(1 for fl in state.get("files", []) if fl.get("has_ocr"))
+                # Lahendatud = valmis VÕI lõplikult ebaõnnestunud (#250). Ainult
+                # `has_ocr` lugemine jättis vigadega töö igaveseks „OCR seisab"
+                # märgi alla — kõrvuti teatega „Valmis", mis on vastuoluline.
+                resolved = sum(1 for fl in state.get("files", [])
+                               if fl.get("has_ocr") or fl.get("ocr_error"))
                 state["stalled"] = is_stalled(
-                    ready, state.get("expected_pages"),
+                    resolved, state.get("expected_pages"),
                     state.get("last_progress_at"), datetime.now().timestamp(),
                 )
                 result.append(state)
