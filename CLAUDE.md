@@ -154,6 +154,9 @@ Neli asja, mis on juba korra katki läinud:
 - **`mcp` sõltuvus AINULT `requirements-dev.txt`-is** — Docker on Python 3.9, SDK v2 ei mahu.
 - **Iga tööriist `@mcp.tool(structured_output=False)`** — vaikimisi tuleks kaasa
   `structured_content`, mille klienditugi on ebaühtlane.
+- **`VuttError` PEAB olema SDK `ToolError` alamtüüp** — alates `mcp` 2.1.0-st
+  jõuab mudelini ainult `ToolError`-i sõnum, muu asendub tekstiga
+  „Error executing tool X" ja agent kaotab juhise („kasuta `search_works`").
 
 Indeksiseadete leping: `server/meili_settings.py` (ÜKS allikas, mida kasutavad nii
 seed-skript kui `meilisearch_ops`) + `mcp/tests/test_meili_contract.py`.
