@@ -73,6 +73,8 @@ export function formatEta(seconds: number): string {
 export interface ReviewDerived {
   filesWithLocalDeleted: FileEntry[];
   readyCount: number;
+  /** Lehed, mida server pole veel avaldanud — ruudustik näitab neid kohatäitena. */
+  placeholderPages: number[];
   progress: PollResult['progress'];
   progressPct: number;
   status: string;
@@ -119,5 +121,18 @@ export function computeReviewDerived(
     ocrStartedAt !== null && now - ocrStartedAt > ocrTimeoutMs && status !== 'done';
   const canImport = (status === 'done' || ocrTimedOut) && readyCount > 0 && !importLoading;
 
-  return { filesWithLocalDeleted, readyCount, progress, progressPct, status, ocrTimeoutMs, ocrTimedOut, canImport };
+  // Kohatäited: lehed 1..planned, mida failide loendis veel ei ole. `planned_pages`
+  // tuleb poolitusplaanist (33 lähtelehte + 27 poolitust = 60), sest `expected_pages`
+  // on poolitamise ajal veel LÄHTE-lehtede arv. Valmis/imporditud tööl kohatäiteid
+  // ei ole — siis on tegelikkus see, mis ta on.
+  const planned = pollResult?.planned_pages ?? pollResult?.expected_pages ?? 0;
+  const teadaolevad = new Set(files.map((f) => f.page));
+  const placeholderPages: number[] = [];
+  if (status !== 'imported' && status !== 'error') {
+    for (let p = 1; p <= planned; p += 1) {
+      if (!teadaolevad.has(p)) placeholderPages.push(p);
+    }
+  }
+
+  return { filesWithLocalDeleted, readyCount, placeholderPages, progress, progressPct, status, ocrTimeoutMs, ocrTimedOut, canImport };
 }

@@ -6,11 +6,11 @@ pisipildid ning uuendab uploadi state.json-i.
 import io
 import os
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from ..config import OCR_SERVER_PATH, get_logger
 from .. import ocr_err
-from . import file_detection, state as upload_state
+from . import file_detection, prepress_plan, state as upload_state
 from .ocr_client import sftp_open
 
 logger = get_logger(__name__)
@@ -53,6 +53,22 @@ def _read_err_reason(sftp, remote_work: str, failed_bases: set, page_num: int) -
     return "OCR ebaõnnestus (põhjus teadmata)"
 
 
+def _planned_pages(state: dict, expected_pages) -> Optional[int]:
+    """Mitu lehte OCR-i LÄHEB — viisardi kohatäidete arv.
+
+    Poolitamise ajal on `expected_pages` veel LÄHTE-PDF-i lehtede arv; väljundis
+    on igast poolitatavast lehest kaks. Ilma selleta näeks kasutaja vale kuju
+    (33 kohatäidet 60 asemel) või mitte midagi, kuni esimesed lehed valmivad.
+    """
+    plaan = state.get("prepress")
+    if plaan and expected_pages:
+        try:
+            return prepress_plan.output_page_count(plaan, int(expected_pages))
+        except Exception as e:
+            logger.warning(f"planned_pages arvutus ebaõnnestus: {e}")
+    return expected_pages
+
+
 def poll_and_sync_thumbs(
     upload_id: str,
     *,
@@ -84,6 +100,7 @@ def poll_and_sync_thumbs(
             "ready": 0,
             "total": 0,
             "expected_pages": expected_pages,
+            "planned_pages": _planned_pages(state, expected_pages),
             "files": state.get("files", []),
             "progress": upload_state.upload_progress.get(upload_id, {}),
             "error": state.get("error_message"),
@@ -149,7 +166,11 @@ def poll_and_sync_thumbs(
         os.makedirs(thumbs_dir, exist_ok=True)
         existing_thumbs = set(os.listdir(thumbs_dir))
 
-        for base in sorted(ready_bases):
+        # Pisipilt tõmmatakse iga JPG-ga: pilt ilmub avaldamise tempos ja OCR-i
+        # valmimine liigub üle nende eraldi (ready_bases jääb ainult has_ocr
+        # märgiks). Varem ootas pisipilt lehe .txt-d ja kasutaja nägi minuteid
+        # tühja ekraani.
+        for base in sorted(jpg_bases):
             page_num = file_detection.extract_page_num(base)
             if page_num <= 0:
                 continue
@@ -235,6 +256,7 @@ def poll_and_sync_thumbs(
             "failed": sorted(failed_page_nums),
             "total": len(all_page_nums),
             "expected_pages": expected_pages,
+            "planned_pages": _planned_pages(state, expected_pages),
             "files": new_files,
             "progress": upload_state.upload_progress.get(upload_id, {}),
             "stalled": upload_state.is_stalled(resolved_count, expected_pages, last_progress_at, now_ts),
@@ -247,6 +269,7 @@ def poll_and_sync_thumbs(
             "ready": 0,
             "total": 0,
             "expected_pages": expected_pages,
+            "planned_pages": _planned_pages(state, expected_pages),
             "files": state.get("files", []),
             "error": str(e),
             "progress": upload_state.upload_progress.get(upload_id, {}),
