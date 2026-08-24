@@ -42,3 +42,5 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0020](0020-uleslaadimine-seisak-mitte-kogulagi.md) | Üleslaadimist piirab seisak, mitte kogupäringu lagi; UI räägib faasist, mitte serveri staatusest | kehtib |
 | [0021](0021-uks-nimi-uhe-saladuse-kohta.md) | Üks nimi ühe seade kohta; aegunud keskkonnamuutuja nimi peatab käivituse | kehtib |
 | [0022](0022-valise-id-kanooniline-kuju.md) | Välise identifikaatori kanooniline kuju on paljas ID; normaliseeritakse nii kirjutus- kui lugemisteel | kehtib |
+| [0023](0023-vutt-mcp-lokaalne-olek.md) | `vutt_mcp` tohib hoida lokaalset olekut, kui see on valikuline | kehtib |
+| [0024](0024-kaugkoristus-failid-kohe-kataloog-hiljem.md) | Katkestamine kustutab kaugfailid kohe, kataloogi eemaldab reaper armuaja järel | kehtib |

@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from .config import OCR_SERVER_PATH, get_logger
+from . import ocr_reaper
 from . import reocr_ops
 from . import reocr_state
 from .heartbeat import mark_error, mark_success, register_job
@@ -104,6 +105,11 @@ def _cleanup_staging(sftp, job_dir: str, slug: str) -> None:
 
 def _recover_one(sftp, base: str, job_id: str, recovered: List[str], skipped: List[str]) -> None:
     if _is_actively_tracked(job_id):
+        return
+    if ocr_reaper.is_scheduled(f"{base}/{job_id}"):
+        # Katkestatud töö jäänuk (#225): failid on juba kustutatud ja kataloogi
+        # eemaldab ocr_reaper armuaja järel. Sinna vahepeal maandunud .txt on
+        # katkestamise hetkel lennus olnud batchi oma — mitte orb, keda taastada.
         return
     mapping = reocr_state.load_batch_mapping(job_id)
     if mapping is not None:

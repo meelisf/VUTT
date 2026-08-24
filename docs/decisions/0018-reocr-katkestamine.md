@@ -62,7 +62,10 @@ VUTT ei oota katkestamisel kinnitust — kinnitust ei ole kellelt küsida.
 ## Tagajärjed
 
 - Teos vabaneb kohe, mitte 12 h pärast.
-- Kuni 4 lehte võib LOSSis lõpuni joosta; nende `.txt` kaob koos kataloogiga.
+- Kuni 4 lehte võib LOSSis lõpuni joosta. **PARANDATUD ADR 0024-ga (#225):** nende
+  `.txt` EI kadunud vaikselt koos kataloogiga — kataloogi kustutamine lennusoleva batchi
+  alt kukutas kogu OCR-teenuse. Koristus kustutab nüüd ainult failid; tühja kataloogi
+  eemaldab reaper armuaja järel.
 - Katkestamine ei ole HTTP mõttes idempotentne: korduv `DELETE` annab 404, sest töö on
   aktiivregistrist eemaldatud.
 - `_write_ocr_file` võtab nüüd `job_id` argumendi — kutsekohti on neli, sh

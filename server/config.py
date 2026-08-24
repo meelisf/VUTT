@@ -172,6 +172,14 @@ NOTIFICATIONS_DIR = os.path.join(_STATE_DIR, "notifications")
 # nimi ei vastaks mustrile ja ilmuks git status'isse (#217).
 REOCR_BACKUPS_DIR = os.path.join(_STATE_DIR, "reocr_backups")
 
+# OCR-jooksude kaugkataloogide HILINE eemaldamine (#225). Katkestamise koristus
+# kustutab failid kohe (see peatab GPU-töö), aga kataloogi ennast mitte: kui
+# batch on juba GPU-s, kirjutab OCR-valvur .txt ilma veakäsitluseta ja kadunud
+# kataloog kukutaks kogu teenuse. Kataloog eemaldatakse alles siis, kui ükski
+# batch ei saa enam lennus olla.
+OCR_RUN_REAPS_FILE = os.path.join(_STATE_DIR, "ocr_run_reaps.json")
+RUN_DIR_REAP_GRACE = 600   # s; mõõdetud batch (4 lk) ≈ 100 s, varu on tahtlik
+
 # Prosopograafia: ÜKS juur, selle all varatüübid (#221).
 # Kaardid on gitis, pildid mitte (data/.gitignore → *.jpg), aga MÕLEMAD elavad
 # siin — pildid olid varem state/-is ja see lahknemine tekitas kolm koopiat.

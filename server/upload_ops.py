@@ -20,6 +20,7 @@ from .upload import thumbs as _thumbs
 from .upload import import_work as _import_work
 from .utils import generate_nanoid, derive_year_fields
 from .heartbeat import mark_error, mark_success, register_job
+from . import ocr_reaper
 
 
 def _normalize_txt_file(path: str):
@@ -808,11 +809,27 @@ def cancel_upload(upload_id: str) -> bool:
     # SSH koristus OCR serveris (kui oli juba kaugemale jõutud kui 'pending')
     if state and state.get('status') not in ('pending', 'error'):
         remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+        remote_work = state.get('remote_work_path')
+        remote_work_abs = f"{OCR_SERVER_PATH}/{remote_work}" if remote_work else ""
         try:
-            _ssh_rm_rf(upload_id, remote_staging)
-            logger.info(f"OCR serveri kaust koristatud: {remote_staging}")
+            # Failid kohe, kataloog hiljem reaperiga (#225): `rm -rf` lennusoleva
+            # batchi alt kukutab OCR-teenuse (.txt kirjutus on veakäsitluseta).
+            sftp = _sftp_open(upload_id)
+            try:
+                if remote_work_abs:
+                    _ocr_client.cleanup_run_files(sftp, remote_work_abs)
+                _ocr_client.cleanup_run_files(sftp, remote_staging)
+            finally:
+                try:
+                    sftp.close()
+                except Exception:
+                    pass
+            if remote_work_abs:
+                ocr_reaper.schedule_reap(remote_work_abs)
+            ocr_reaper.schedule_reap(remote_staging)
+            logger.info(f"OCR serveri kausta failid koristatud: {remote_staging}")
         except Exception as e:
-            logger.warning(f"cancel_upload SSH koristus ebaõnnestus {upload_id}: {e}")
+            logger.warning(f"cancel_upload kaugkoristus ebaõnnestus {upload_id}: {e}")
 
     close_ssh(upload_id)
 
@@ -879,6 +896,15 @@ def _upload_sync_loop():
             mark_error("upload_sync", f"{errors} uploadi poll ebaõnnestus", detail={"active_uploads": len(ids), "errors": errors})
         else:
             mark_success("upload_sync", detail={"active_uploads": len(ids)})
+
+        # Katkestamisel alles jäetud kaugkataloogid (#225): eemalda need, kui
+        # armuaeg on täis ja ükski batch ei saa enam lennus olla.
+        try:
+            reaped = ocr_reaper.reap_due(lambda p: _ssh_rm_rf("reaper", p))
+            if reaped:
+                close_ssh("reaper")
+        except Exception as e:
+            logger.warning(f"OCR-kataloogide reaper: {e}")
 
 
 def start_upload_sync_loop():

@@ -117,6 +117,36 @@ def ssh_rm_rf(upload_id: str, remote_path: str, *, get_ssh_func: Callable[[str],
         chan.close()
 
 
+def cleanup_run_files(sftp, remote_dir: str) -> bool:
+    """Kustutab kaugkataloogi FAILID, jättes kataloogi ise alles. True = õnnestus.
+
+    Kataloogi EI TOHI siin eemaldada (#225): kui katkestamise hetkel on batch
+    juba GPU-s, kirjutab OCR-valvur tulemuse `open(txt_path, "w")`-ga ilma
+    veakäsitluseta. Kadunud kataloog annab FileNotFoundError, mis propageerub
+    main_loop'ist mooduli tasemele, kus on sys.exit(1) — terve teenus sureb.
+
+    Piltide kustutamine peatab GPU-töö endiselt: process_batch väljub enne
+    mudeli kutsumist, kui ükski pilt ei avane. Tühja kataloogi eemaldab hiljem
+    server.ocr_reaper, kui ükski batch ei saa enam lennus olla.
+    """
+    try:
+        names = sftp.listdir(remote_dir)
+    except FileNotFoundError:
+        return True          # juba kadunud — mitte viga
+    except Exception as e:
+        logger.warning(f"Kaugkoristus {remote_dir}: listdir ebaõnnestus: {e}")
+        return False
+
+    ok = True
+    for name in names:
+        try:
+            sftp.remove(f"{remote_dir}/{name}")
+        except Exception as e:
+            logger.warning(f"Kaugkoristus {remote_dir}/{name}: {e}")
+            ok = False
+    return ok
+
+
 def sftp_open(
     upload_id: str,
     *,
