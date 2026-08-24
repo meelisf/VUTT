@@ -75,6 +75,20 @@ def test_planned_pages_poolitamise_ajal_on_valjundi_arv(upload):
     assert res["planned_pages"] == 36, "33 lehte, 3 poolitust → 36 väljundlehte"
 
 
+def test_planned_pages_EI_topeltloe_poolitusi_parast_apply_d(upload):
+    """Pärast apply'd ON `expected_pages` juba väljundi arv — plaani ei tohi uuesti rakendada.
+
+    Tootmises 2026-08-24: 62-leheline töö sai planned_pages=89 ja viisard
+    renderdas 27 fantoomkohatäidet, mis ei täitunud kunagi.
+    """
+    uid = upload(status="reviewing", expected_pages=62, prepress=_plaan(44, {1, 2, 3}))
+
+    res = upload_thumbs.poll_and_sync_thumbs(uid, ocr_server_path="/srv",
+                                             sftp_open_func=lambda i: _SFTP({}))
+
+    assert res["planned_pages"] == 62
+
+
 def test_planned_pages_ilma_plaanita_on_expected_pages(upload):
     uid = upload(status="applying", expected_pages=12, prepress=None)
 
