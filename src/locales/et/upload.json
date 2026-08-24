@@ -60,6 +60,7 @@
     "title": "Ülevaatus",
     "ocrReady": "OCR valmis",
     "ocrProcessing": "Töötleb...",
+    "ocrFailed": "OCR ebaõnnestus",
     "deleted": "Kustutatud",
     "restore": "Taasta",
     "delete": "Kustuta",

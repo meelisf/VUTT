@@ -48,12 +48,22 @@ def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
         if pn in jpg_map
         and os.path.splitext(jpg_map[pn])[0] + '.txt' not in remote_set
     )
-    if missing_jpg or missing_txt:
+    # .err = OCR-server märkis lehe lõplikult vigaseks (#250). „TXT puudub" oleks
+    # siin eksitav: leht ei ole teel, vaid kukkus — kasutaja peab teadma, et
+    # ootamisest ei ole abi.
+    failed_ocr = [pn for pn in missing_txt
+                  if os.path.splitext(jpg_map[pn])[0] + '.err' in remote_set]
+    missing_txt = [pn for pn in missing_txt if pn not in failed_ocr]
+    if missing_jpg or missing_txt or failed_ocr:
         problems = []
         if missing_jpg:
             problems.append(f"JPG puudub lehtedel {', '.join(map(str, missing_jpg))}")
         if missing_txt:
             problems.append(f"TXT puudub lehtedel {', '.join(map(str, missing_txt))}")
+        if failed_ocr:
+            problems.append(
+                f"OCR ebaõnnestus lehtedel {', '.join(map(str, failed_ocr))} "
+                "(kustuta need lehed või proovi uuesti)")
         raise ValueError(
             "OCR tulemus pole täielik: " + "; ".join(problems) +
             ". Toiming katkestati ja OCR staging säilitati."

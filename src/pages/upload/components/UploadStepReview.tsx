@@ -12,14 +12,20 @@ const ThumbCard: React.FC<{
   t: (key: string) => string;
 }> = ({ entry, uploadId, authToken, t }) => {
   const thumbUrl = `${FILE_API_URL}/admin/upload/${uploadId}/thumb/${entry.page}?token=${authToken}`;
+  // Ebaõnnestunud leht EI ole ootel: OCR-server ei võta .err-iga lehte enam ette
+  // (#250). Ilma selle haruta keerleks spinner igavesti ja valetaks kasutajale.
+  const failed = !entry.has_ocr && !!entry.ocr_error;
 
   return (
     <div
       className={`relative rounded-lg overflow-hidden border-2 transition-all ${
         entry.has_ocr
           ? 'border-green-400'
-          : 'border-yellow-300'
+          : failed
+            ? 'border-red-300'
+            : 'border-yellow-300'
       }`}
+      title={entry.ocr_error || undefined}
     >
       {/* Pisipilt */}
       <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
@@ -30,6 +36,8 @@ const ThumbCard: React.FC<{
             className="w-full h-full object-contain"
             loading="lazy"
           />
+        ) : failed ? (
+          <AlertTriangle size={24} className="text-red-500" />
         ) : (
           <Loader2 size={24} className="text-yellow-500 animate-spin" />
         )}
@@ -40,14 +48,18 @@ const ThumbCard: React.FC<{
         className={`px-2 py-1 text-xs font-medium flex items-center justify-between ${
           entry.has_ocr
             ? 'bg-green-50 text-green-700'
-            : 'bg-yellow-50 text-yellow-700'
+            : failed
+              ? 'bg-red-50 text-red-700'
+              : 'bg-yellow-50 text-yellow-700'
         }`}
       >
         <span>Lk {entry.page}</span>
         <span>
           {entry.has_ocr
             ? t('step3.ocrReady')
-            : t('step3.ocrProcessing')}
+            : failed
+              ? t('step3.ocrFailed')
+              : t('step3.ocrProcessing')}
         </span>
       </div>
     </div>
