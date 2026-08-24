@@ -89,7 +89,7 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `user_settings/`, `notifications/` | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `user_settings/`, `notifications/` | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
 `labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`prosopography/{nanoid}.json`**
@@ -234,6 +234,14 @@ stabiilsuskontrolli. `prepress` alamvälju muudetakse AINULT `mutate_prepress`
 kaudu (`set_upload_state(**extra)` seab terve ülemise taseme võtme ja pühiks
 paralleelse muudatuse). `apply` on ühekordne (`awaiting_split → applying` CAS,
 kordus = 409). Tindiskoor on hoiataja, mitte pakkuja.
+
+**Kaugkoristus (ADR 0024)** — katkestamine kustutab OCR-serveris ainult **failid**
+(`ocr_client.cleanup_run_files`), kataloog jääb alles: `rm -rf`/`rmdir` lennusoleva batchi
+alt annab OCR-valvuri veakäsitluseta `.txt`-kirjutusele `FileNotFoundError`, mis kukutab
+KOGU teenuse (#225). Tühja kataloogi eemaldab `server/ocr_reaper.py` armuaja
+(`RUN_DIR_REAP_GRACE` = 600 s) järel; `reocr_recovery` jätab ajastatud kataloogi vahele.
+Eduka impordi järgne koristus tohib jääda `rm -rf`-iks — seal ei ole ühtki pilti, millest
+batch tekiks.
 
 **z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
 (nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob

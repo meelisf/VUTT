@@ -15,7 +15,8 @@ from .config import (
 )
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
-from .upload.ocr_client import publish_atomic
+from .upload.ocr_client import cleanup_run_files, publish_atomic
+from . import ocr_reaper
 from . import reocr_state
 from .heartbeat import mark_error, mark_success, register_job
 
@@ -277,6 +278,9 @@ def _cleanup_remote_job(job_id: str, job: dict) -> bool:
     Piltide kustutamine ON peatamismehhanism: valvuri process_batch väljub enne
     mudeli kutsumist, kui ükski pilt ei avane. Kuni üks lennusolev batch
     (BATCH_SIZE = 4) jõuab siiski lõpuni — teadlik piir, vt spekki (#217).
+
+    Kataloogid jäävad alles ja lähevad ocr_reaper nimekirja (#225): lennusolev
+    batch peab saama oma .txt kuhugi kirjutada, muidu sureb kogu OCR-teenus.
     """
     remote_work = job.get("remote_work")
     if not remote_work:
@@ -290,23 +294,13 @@ def _cleanup_remote_job(job_id: str, job: dict) -> bool:
     work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
     ok = True
     try:
-        try:
-            for name in sftp.listdir(work_abs):
-                try:
-                    sftp.remove(f"{work_abs}/{name}")
-                except Exception as e:
-                    logger.warning(f"Re-OCR {job_id} {name} kustutus: {e}")
-                    ok = False
-        except FileNotFoundError:
-            pass          # kaust on juba kadunud — intsidendi kuju, mitte viga
+        # Failid kohe (see peatab GPU), kataloog hiljem reaperiga (#225): rmdir
+        # lennusoleva batchi alt kukutab OCR-teenuse.
+        ok = cleanup_run_files(sftp, work_abs)
+        ocr_reaper.schedule_reap(work_abs)
         remote_staging = job.get("remote_staging") or ""
-        for d in (work_abs, f"{OCR_SERVER_PATH}/{remote_staging}" if remote_staging else ""):
-            if not d:
-                continue
-            try:
-                sftp.rmdir(d)
-            except Exception:
-                pass      # mitte-tühi või puuduv kaust ei ole katkestamise viga
+        if remote_staging:
+            ocr_reaper.schedule_reap(f"{OCR_SERVER_PATH}/{remote_staging}")
     finally:
         try:
             sftp.close()
