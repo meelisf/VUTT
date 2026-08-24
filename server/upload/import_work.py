@@ -9,6 +9,7 @@ import os
 import shutil
 
 from ..config import BASE_DIR, OCR_SERVER_PATH, get_logger
+from .. import ocr_err
 from ..marginalia_normalize import normalize_marginalia_tags
 from ..utils import generate_nanoid, derive_year_fields
 from .file_detection import extract_page_num, page_base_name
@@ -31,8 +32,23 @@ def normalize_txt_file(path: str):
         pass  # normaliseerimise tõrge ei tohi importi katkestada
 
 
+def blank_import_pages(importable):
+    """Lehed, mis imporditakse TÜHJA tekstiga: mudeli viga, skaneering korras (#250).
+
+    Tühi lehekülg on osa raamatust ja kordusloopi saanud leht on käsitsi
+    täidetav — kumbagi ei tohi impordist välja jätta, muidu lehed nihkuvad.
+    """
+    return {e['page'] for e in importable
+            if not e.get('has_ocr') and ocr_err.on_imporditav_tuhjana(e.get('ocr_error'))}
+
+
 def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
-    """Kontrollib enne importi, et igal oodatud lehel on remote JPG+TXT paar."""
+    """Kontrollib enne importi, et igal oodatud lehel on remote JPG (+ TXT või .err).
+
+    Mudeli veaga leht (`.err` kategooriaga `mudel`) EI vaja TXT-d — ta imporditakse
+    tühjana. Pildi- või kirjutusviga blokeerib impordi: esimesel juhul puudub
+    skaneering, teisel viskaks tühi import valmis transkriptsiooni ära.
+    """
     remote_set = set(remote_items)
     jpg_map = {}
     for item in remote_items:
@@ -42,15 +58,16 @@ def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
                 jpg_map[pn] = item
 
     expected_pages = {entry['page'] for entry in importable}
+    tuhjad = blank_import_pages(importable)
     missing_jpg = sorted(expected_pages - set(jpg_map))
     missing_txt = sorted(
         pn for pn in expected_pages
-        if pn in jpg_map
+        if pn in jpg_map and pn not in tuhjad
         and os.path.splitext(jpg_map[pn])[0] + '.txt' not in remote_set
     )
-    # .err = OCR-server märkis lehe lõplikult vigaseks (#250). „TXT puudub" oleks
-    # siin eksitav: leht ei ole teel, vaid kukkus — kasutaja peab teadma, et
-    # ootamisest ei ole abi.
+    # .err ilma „mudel" kategooriata: leht ei ole teel, vaid kukkus nii, et
+    # tühjana importimine oleks vale (#250). Kasutaja peab teadma, et ootamisest
+    # ei ole abi.
     failed_ocr = [pn for pn in missing_txt
                   if os.path.splitext(jpg_map[pn])[0] + '.err' in remote_set]
     missing_txt = [pn for pn in missing_txt if pn not in failed_ocr]
@@ -63,7 +80,7 @@ def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
         if failed_ocr:
             problems.append(
                 f"OCR ebaõnnestus lehtedel {', '.join(map(str, failed_ocr))} "
-                "(kustuta need lehed või proovi uuesti)")
+                "(skaneering ei ole kasutatav — kustuta need lehed või lae uuesti)")
         raise ValueError(
             "OCR tulemus pole täielik: " + "; ".join(problems) +
             ". Toiming katkestati ja OCR staging säilitati."
@@ -126,7 +143,12 @@ def import_as_work(
     )
 
     # Filtreeri: ainult OCR-iga, mitte-kustutatud lehed
-    importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]
+    # Mudeli veaga leht kuulub teosesse: tühi lehekülg on osa raamatust ja
+    # skaneering on olemas, nii et inimene täidab teksti Workspace'is (#250).
+    # Ilma selleta kukkus leht vaikselt välja ja järgnevad lehed nihkusid.
+    importable = [f for f in state.get('files', [])
+                  if not f.get('deleted')
+                  and (f.get('has_ocr') or ocr_err.on_imporditav_tuhjana(f.get('ocr_error')))]
     if not importable:
         raise ValueError("Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
     importable.sort(key=lambda f: f['page'])
@@ -156,6 +178,8 @@ def import_as_work(
         # Täielikkuse preflight ENNE allalaadimist: osalist teost ei impordita.
         jpg_map = validate_remote_ocr_files(importable, remote_items, extract_page_num_func)
 
+        tuhjad = blank_import_pages(importable)
+
         # Lae alla iga soovitud leht
         downloaded = 0
         for entry in importable:
@@ -171,11 +195,19 @@ def import_as_work(
             sftp.get(f"{remote_work}/{jpg_name}", local_jpg)
             os.chmod(local_jpg, 0o644)
 
-            try:
-                sftp.get(f"{remote_work}/{txt_name}", local_txt)
-                normalize_txt_file_func(local_txt)
-            except FileNotFoundError:
-                raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); import katkestati")
+            if pn in tuhjad:
+                # Mudel ei andnud teksti (tühi leht, kordusloop) — leht luuakse
+                # TÜHJA tekstiga ja inimene täidab selle Workspace'is (#250).
+                with open(local_txt, 'w', encoding='utf-8') as f:
+                    f.write('')
+                logger.info(f"import {upload_id}: lk {pn} imporditi tühja tekstiga "
+                            f"({entry.get('ocr_error', '')[:120]})")
+            else:
+                try:
+                    sftp.get(f"{remote_work}/{txt_name}", local_txt)
+                    normalize_txt_file_func(local_txt)
+                except FileNotFoundError:
+                    raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); import katkestati")
             os.chmod(local_txt, 0o644)
 
             page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
