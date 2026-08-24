@@ -67,6 +67,50 @@ Praegu on täisvaates ainult „Lähtesta üldjoonele" ja „Ära poolita", ning
 
 „Vali kõik" / „Vali poolitatud" ja pisipildi suuruse liugur — mõlemad on lehekülgede halduses olemas ja 143-lehelise töö juures vajalikud. Valikuabid **ei kuulu tegevusribale**: nad valivad, ei muuda midagi.
 
+## Kaks olemasolevat viga, mis tulid spekki kirjutades välja
+
+Mõlemad on **täna tootmises** ja mõlemad puudutavad otse seda, mida see töö lubab.
+
+### A. `mode: "default"` TÄHENDAB „poolita üldjoonelt"
+
+`default_plan()` loob kõik lehed `mode: "default"`-iga ja `effective_split_x` tõlgendab seda kui „poolita `default_split_x` pealt". Ainus, mis seda kinni hoiab, on `enabled: False`:
+
+```python
+if not plan or not plan.get("enabled"):
+    return None          # ← ainus pidur
+```
+
+Seega **„vaikimisi ei poolitata" ei ole praeguse mudeliga saavutatav** lihtsalt lüliti eemaldamisega: ülevaatuse alati-nähtavaks tegemine (ehk `enabled` sisuliselt alati tõene) poolitaks kohe kõik lehed 50% pealt.
+
+**Lahendus:** `default_plan()` loob lehed `mode: "nosplit"`-iga; „Poolita kõik" seab valitud/kõik lehed `mode: "default"`-i (= järgi üldjoont, nii et joone hilisem muutmine liigutab neid kõiki). `effective_split_x` ise ei muutu. `enabled` lakkab poolitamist väravamast — see väravab edaspidi ainult eelvaadet.
+
+### B. Väljajätmine EI TÖÖTA, kui midagi ei poolitata
+
+`is_trivial_plan` jätab väljajätmised teadlikult arvestamata (dokumenteeritud: „ainult-väljajätmise plaan on triviaalne ja originaalfail saadetakse muutmata edasi"). Tagajärg:
+
+```
+väljajätmisi on, poolitusi ei ole  →  plaan on „triviaalne"
+                                   →  originaal-PDF läheb muutmata OCR-serverisse
+                                   →  OCR-server pakib lahti KÕIK lehed
+                                   →  väljajäetud leht OCR-itakse ja imporditakse ikka
+```
+
+Väljajätmine toimib **ainult** siis, kui vähemalt üks leht on poolitatud (siis läheb töö `_transfer_pages` teele, kus `is_excluded` kontrollitakse).
+
+See on täpselt see stsenaarium, mille pärast #255 üldse tekkis: **tühjad lehed, mis lähevad loopi**. Kasutaja jätaks nad välja, ei poolitaks midagi — ja väljajätmine ei teeks mitte midagi.
+
+**Kolm teed, mõõdetud numbritega:**
+
+| Tee | Hind 143-lehelisel tööl | Märkus |
+|---|---|---|
+| a) väljajätmine muudab plaani mitte-triviaalseks | ~6 min (300 DPI, ~2,5 s/lk) | koodi ei lisandu, aga kallis |
+| b) **ehita PDF ilma väljajäetud lehtedeta** | ~36 s + ~800 MB ajutist | poppler on olemas (`pdfseparate`/`pdfunite`) |
+| c) jätta nagu on | 0 | väljajätmine on vaikne no-op — **vastuvõetamatu** |
+
+**Soovitus: (b).** Algne otsus võrdles PDF-i ümberehitust *eelvaatega* („kallim kui eelvaade") — aga õige võrdlus on täieliku rasteriseerimisega, mille kõrval on ta 10× odavam. (a) jääb varutee'ks, kui ümberehitus mingil failil ebaõnnestub.
+
+**See on eraldi otsus, mille saab teha enne UI-tööd** — ja mis tasub teha enne, sest UI lubab kasutajale midagi, mida backend praegu ei täida.
+
 ## Mõju ADR 0017-le
 
 ADR 0017 ütleb: **„puutumata lülitiga upload ei renderda ühtki pikslit ja käib tänast PDF-teed."** Alati nähtav ülevaatus tähendab, et **100 DPI eelvaade renderdatakse iga upload'i puhul**. See osa ADR-ist muutub ja vajab uut ADR-i.
@@ -111,7 +155,8 @@ Mudeli vahetamine ülevaatuses peab need ümber arvutama. Kaks nõuet:
 
 Plaani kuju ei muutu (`prepress_plan.default_plan`): `{enabled, default_split_x, preview_status, preview_done, pages[{n, mode, split_x, excluded}]}`.
 
-- `enabled` **kaotab tähenduse „kasutaja lülitas sisse"** ja tähendab edaspidi „eelvaade on tellitud" — sisuliselt alati `True`. Kaaluda välja eemaldamist eraldi koristusena, mitte selle töö sees.
+- **Vaikeplaani lehed on `mode: "nosplit"`** (vt viga A). „Poolita kõik" seab need `"default"`-i.
+- `enabled` **kaotab tähenduse „kasutaja lülitas sisse"** ja väravab edaspidi ainult eelvaadet, MITTE poolitamist. `effective_split_x` ja `is_trivial_plan` ei tohi enam `enabled`-ist sõltuda. Kaaluda välja eemaldamist eraldi koristusena.
 - Uusi välju ei tule. Valik (`selected`) on **puhtalt kliendi olek**, nagu lehekülgede halduses — serverisse ei salvestata.
 
 ## Liides
@@ -162,3 +207,5 @@ Hulgikäsk on **üks plaani salvestus**, mitte N päringut: klient koostab uue `
 - Valik + „Ära OCR-i" → valitud lehed muutuvad hallideks, kokkuvõte väheneb
 - Mudeli vahetus enne apply't muudab kaugteed; pärast apply't tagastab 409
 - Täisvaates saab lehe välja jätta ilma ülevaatesse naasmata
+- **Väljajätmine ILMA poolitamiseta:** väljajäetud leht EI jõua OCR-serverisse (viga B) — kontrolli kaugkausta sisu, mitte ainult UI-d
+- Puutumata plaan (ei poolitusi ega väljajätmisi) läheb endiselt originaal-PDF-ina, ilma 300 DPI renderduseta
