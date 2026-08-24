@@ -38,6 +38,8 @@ Mudel saab state'is **oma välja** ega muuda `meta.type`-i — vt „Mudeli vahe
 
 Klõps pisipildil valib, Shift+klõps vahemiku, märkeruut nurgas on eraldi klõpsatav (klaviatuur). See on **täpselt `PageCard` muster lehekülgede haldusest** — sama žest, sama koht, sama välimus.
 
+**Täisvaate avab all paremas nurgas suurendus-ikoon.** Klõps pisipildil on valik, seega vajab avamine oma nuppu. Nurka mahub kolm ikooni kõrvuti: **[silm] [|] [suurenda]** — OCR, poolitus, ava.
+
 ### 5. Hulgitegevused hõljuval alumisel ribal
 
 Karkass tuleb `PageActionBar`-ist **muutmata** (vt „Visuaalne keel"): `fixed bottom-0 left-0 right-0 z-[1100]`, tsentreeritud `max-w-4xl`, `rounded-xl border-gray-200 bg-white shadow-lg`, rühmad `border-l border-gray-200 pl-3` vahedega, loendur `text-primary-800`, „Tühista valik" punase tekstina `X`-ikooniga. Ilmub ainult valiku korral.
@@ -128,10 +130,17 @@ Kolm asja, mis siit järelduvad ja mockup'ist erinevad:
   text-white` sama geomeetriaga kui hall kest. Mockup'i must `Poolita kõik`
   oli skitsi lihtsustus.
 
-**Ikoonid on oma, kest on ühine** (lucide-react, `size={14}`): OCR-ist
-väljajätmine `EyeOff`/`Eye` (juba kasutuses), poolitus `Columns2`. `Maximize2`
-ei tohi tähendada „ära poolita" — lucide'is tähendab ta „suurenda" ja loeb siin
-valesti.
+**Ikoonid on oma, kest on ühine** (lucide-react, `size={14}`). All paremas
+nurgas kolm tükki kõrvuti, vasakult paremale:
+
+| Ikoon | Tähendus | Lucide |
+|---|---|---|
+| silm | OCR-ist välja / tagasi | `EyeOff` / `Eye` (juba kasutuses) |
+| püstjoon | poolita / ära poolita | `Columns2` |
+| suurenda | ava täisvaade (§4) | `Maximize2` |
+
+`Maximize2` praegune roll „ära poolita" tähenduses kaob — lucide'is tähendab ta
+„suurenda" ja saab nüüd oma õige töö tagasi.
 
 ### Ruudustik ja paneel (`WorkManage` → `UploadStepSplit`)
 
@@ -367,7 +376,7 @@ Nimi `applyDefaultSplitTo` on tahtlik — „Poolita kõik" tähendab tegelikult
 | Fail | Muutus |
 |---|---|
 | `UploadStepSplit.tsx` | opt-in kaob; päis (mudel, joon, „Poolita kõik" + „Ära poolita ühtki"); paneeli päis; ruudustik + `−`/liugur/`+` `WorkManage` eeskujul |
-| `SplitContactSheet.tsx` | kaardi karkass `PageCard` keelde; valik (klõps, Shift+klõps, märkeruut); ikoonisüsteem (`Columns2` asendab `Maximize2`); väljajäetu tuhmub pildist |
+| `SplitContactSheet.tsx` | kaardi karkass `PageCard` keelde; valik (klõps, Shift+klõps, märkeruut); kolm nurgaikooni [silm] [\|] [suurenda]; väljajäetu tuhmub pildist |
 | `SplitPageDetail.tsx` | „Ära OCR-i", tegevusriba ümberjärjestus, samad ikoonid |
 | uus `SplitActionBar.tsx` | hõljuv alumine riba — `PageActionBar` karkass 1:1 |
 | `src/locales/{et,en}/upload.json` | uus mikrotekst mõlemas keeles korraga (ADR 0011) |
@@ -396,10 +405,6 @@ Nimi `applyDefaultSplitTo` on tahtlik — „Poolita kõik" tähendab tegelikult
 
 - **Kaardi nurgatoimingud: alati nähtaval või hoveril?** Täna on `PageCard`-il **alati**. Kui liigume hoverile, tuleb see teha **mõlemas kohas korraga**, muidu tekib uus ebaühtlus.
 - **Segane valik.** Käsud on ühemõttelised, aga riba võiks öelda, mitut lehte päriselt muudeti.
-- **Kuidas täisvaade avaneb, kui klõps pisipildil valib (§4)?** Täna ongi pisipilt
-  ise avamisnupp. Variandid: oma ikoon kaardi nurgas, topeltklõps, või Enter
-  fokuseeritud kaardil. Ülevaatuse töövoog on hulgipõhine, seega täisvaade on
-  erandi-tee — see ei pea olema kõige kergem žest, aga peab olemas olema.
 - **PDF-i ümberehituse varutee.** (b) ebaõnnestumisel on varuvariant (a) — plaan
   muutub mitte-triviaalseks ja töö läheb 300 DPI teele. Kas langeda vaikselt tagasi
   või näidata kasutajale, et OCR läheb kallimat teed?
@@ -410,6 +415,7 @@ Nimi `applyDefaultSplitTo` on tahtlik — „Poolita kõik" tähendab tegelikult
 - „Poolita kõik" → 143 lehte saavad joone; käsitsi seatud joon jääb puutumata ja riba ütleb selle välja
 - Valik + „Ära OCR-i" → valitud lehed muutuvad hallideks, kokkuvõte väheneb
 - Mudeli vahetus enne apply't muudab kaugteed; pärast apply't tagastab 409
+- Täisvaade avaneb kaardi nurgaikoonist; klõps pisipildil ainult valib
 - Täisvaates saab lehe välja jätta ilma ülevaatesse naasmata
 - Kõrvuti avatud `/work/{id}/manage` ja ülevaatus näevad välja nagu üks süsteem: sama kaardi kest, sama märkeruut, sama alumine riba
 - Väljajäetud kaardil on ikoonid loetavad ja klõpsatavad (tuhmub pilt, mitte kaart)
