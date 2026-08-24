@@ -566,6 +566,30 @@ def _batch_inactive(job: Dict, now: float, timeout: int) -> bool:
     return (now - job.get("last_progress_at", job["started_at"])) > timeout
 
 
+def _log_batch_page_error(job: Dict, job_id: str, entry: Dict, error: str) -> None:
+    """Kirjutab batch-lehe VEA püsivasse logisse (#227 järelleid).
+
+    Batch-tee ei logi õnnestumisi: `REOCR_LOG_MAX` on 500 ja üks 100-leheline
+    batch pühiks terve ajaloo. Vead on väike maht ja kogu väärtus — ilma nendeta
+    kaob põhjus („periood 1 sõna, 21 kordust") koos tööga mälust ja Review-vaade
+    ei näita batch-lehtedest midagi, vastuolus ADR 0018-ga.
+    """
+    try:
+        _append_to_log({
+            "work_id": job.get("work_id"),
+            "slug": job.get("slug"),
+            "page_filename": entry.get("page_filename"),
+            "page_number": entry.get("page_number"),
+            "username": job.get("username"),
+            "status": "error",
+            "error": error,
+            "started_at": job.get("started_at"),
+            "finished_at": datetime.now().timestamp(),
+        }, job_id)
+    except Exception as e:
+        logger.warning(f"Re-OCR batch {job_id} vealogi kirjutamine ebaõnnestus: {e}")
+
+
 def _finalize_batch_if_complete(job: Dict, job_id: Optional[str] = None) -> None:
     """Kui kõik lehed ready/error → märgi job done.
 
@@ -625,6 +649,7 @@ def _poll_batch_job(job_id: str) -> None:
                             current["last_progress_at"] = datetime.now().timestamp()
                             break
                 logger.warning(f"Re-OCR batch {job_id} {entry['page_filename']}: {err_msg}")
+                _log_batch_page_error(job, job_id, entry, err_msg)
                 for f in (_err_path(txt_abs), f"{work_abs}/{entry['remote_img_name']}"):
                     try:
                         sftp.remove(f)
@@ -654,6 +679,7 @@ def _poll_batch_job(job_id: str) -> None:
                                 ready = True
                                 break
             except Exception as e:
+                logitav = False
                 with _reocr_batch_jobs_lock:
                     current = _reocr_batch_jobs.get(job_id)
                     if current and current.get("status") == "processing":
@@ -661,7 +687,10 @@ def _poll_batch_job(job_id: str) -> None:
                             if cur_entry.get("remote_txt_name") == entry["remote_txt_name"] and cur_entry.get("status") == "processing":
                                 cur_entry["status"] = "error"
                                 cur_entry["error"] = str(e)
+                                logitav = True
                                 break
+                if logitav:
+                    _log_batch_page_error(job, job_id, entry, str(e))
             # Korista remote pilt+txt AINULT õnnestunud kirjutuse ja endiselt kehtiva
             # processing→ready ülemineku korral. Vea korral jäetakse .txt alles.
             if ready:
@@ -714,6 +743,7 @@ def _batch_poll_iteration(now: float) -> None:
                 _poll_batch_job(jid)
             except Exception as e:
                 logger.warning(f"Re-OCR batch {jid} viimane kontroll ebaõnnestus: {e}")
+            aegunud = []
             with _reocr_batch_jobs_lock:
                 j = _reocr_batch_jobs.get(jid)
                 if j and j["status"] == "processing":
@@ -721,9 +751,12 @@ def _batch_poll_iteration(now: float) -> None:
                         if e["status"] in ("uploading", "processing"):
                             e["status"] = "error"
                             e["error"] = "Aegumine: OCR-tulemust ei saabunud absoluutse aja jooksul."
+                            aegunud.append(dict(e))
                     j["status"] = "done"
                     j["finished_at"] = now
                     changed = True
+            for e in aegunud:      # logi väljaspool lukku (#227)
+                _log_batch_page_error(j, jid, e, e["error"])
             continue
         if _batch_inactive(job, now, REOCR_BATCH_INACTIVITY_TIMEOUT) and not job.get("slow"):
             with _reocr_batch_jobs_lock:
