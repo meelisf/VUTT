@@ -24,9 +24,11 @@ Opt-in kastike kaob. Samm 3 on alati lehtede ülevaatus, ka siis, kui midagi ei 
 
 ### 2. Vaikimisi ei poolitata; „Poolita kõik" on primaarnupp
 
-Poolitamine on erand. Vaikeplaan jääb `mode: "default"` + `default_split_x` rakendamata — ükski leht ei kanna joont enne, kui kasutaja ütleb. **„Poolita kõik" on primaarnupp poolitusjoone välja kõrval** (mitte eraldi tegevusribal): joon ja selle rakendamine kuuluvad kokku.
+Poolitamine on erand. **Vaikeplaanis on kõik lehed `mode: "nosplit"`; `default_split_x` on olemas üldjoone väärtusena, kuid rakendub alles käsuga „Poolita kõik".** See on kogu disaini keskne semantiline muudatus — miks praegune mudel seda ei võimalda, vt viga A. **„Poolita kõik" on primaarnupp poolitusjoone välja kõrval** (mitte eraldi tegevusribal): joon ja selle rakendamine kuuluvad kokku.
 
-Kõrvale tuleb **„Ära poolita ühtki"** sekundaarnupuna (mockup, artboard 2): üldjoon peab olema sama žestiga tagasi võetav, muidu on ainus tee 143 kaardi läbiklõpsimine. Ta ei puutu `custom`-lehti, nagu „Poolita kõik"gi (§7).
+Kõrvale tuleb **„Eemalda üldpoolitus"** sekundaarnupuna (mockup, artboard 2): üldjoon peab olema sama žestiga tagasi võetav, muidu on ainus tee 143 kaardi läbiklõpsimine. Ta viib `default`-lehed tagasi `nosplit`-i ega puutu `custom`-lehti, nagu „Poolita kõik"gi (§7).
+
+**Nimi on tahtlik.** Varasem „Ära poolita ühtki" lubas rohkem, kui teeb: custom-leht jääb ka pärast seda poolitatuks, ainult teise joone järgi — nupp ei täidaks oma teksti. „Eemalda üldpoolitus" ütleb täpselt selle, mis juhtub: üldjoon võetakse maha, käsitsi seatud jooned jäävad.
 
 ### 3. OCR-mudelit saab ülevaatuses muuta
 
@@ -50,11 +52,13 @@ Karkass tuleb `PageActionBar`-ist **muutmata** (vt „Visuaalne keel"): `fixed b
 
 Valikul on **„Poolita" ja „Ära poolita" kaks eraldi käsku**, mitte üks toggle: segase valiku (osa poolitatud, osa mitte) korral ei ole toggle ühemõtteline — kas ta pöörab igaühe eraldi või viib kõik ühele küljele? Ühe kaardi peal on toggle loomulik ja töötab juba täna.
 
-Sama kehtib „Ära OCR-i" kohta: valikul käsk, kaardil toggle.
+Sama kehtib OCR-ist väljajätmise kohta, aga **käske on kaks: „Ära OCR-i" ja „Lisa OCR-i"**. Ühesuunaline käsk on lõks: kogemata valitud 80 lehte saaks korraga välja jätta, aga tagasi ainult ükshaaval. Põhimõte on sümmeetriline — **valikul alati mõlemasuunalised idempotentsed käsud, kaardil toggle.**
 
 ### 7. „Poolita kõik" ei kirjuta üle käsitsi seatud jooni
 
-Käsitsi seatud joon (`mode: "custom"`) jääb puutumata ja riba ütleb selle välja: „27 lehte sai üldjoone, 3 käsitsi seatut jäi puutumata". Käsitsi tehtud töö on väärtuslikum kui hulgikäsk.
+Käsitsi seatud joon (`mode: "custom"`) jääb puutumata ja riba ütleb selle välja: „27 lehte sai üldjoone, 3 käsitsi seatut jäi puutumata". Käsitsi tehtud töö on väärtuslikum kui hulgikäsk. Sama kaitse kehtib „Eemalda üldpoolitus" kohta (§2).
+
+**Kaitse kehtib GLOBAALSETELE nuppudele, mitte valikule.** Tegevusriba „Poolita" / „Ära poolita" (§6) on otsene ja puudutab ka `custom`-lehti: kasutaja näitas need lehed nimeliselt kätte. Kaitse on olemas nende lehtede jaoks, mida kasutaja ei näidanud.
 
 ### 8. Üks ikoonisüsteem kõikjal
 
@@ -78,9 +82,32 @@ ei ütle klaviatuurikasutajale, mis klõpsust juhtub.
 
 Praegu on täisvaates ainult „Lähtesta üldjoonele" ja „Ära poolita", ning `‹ ›` on riba vastasservas. Uus järjestus: `Ülevaatesse | ‹ › | Ära poolita · Ära OCR-i · Lähtesta üldjoonele`.
 
+Ühe lehe peal on need **toggle'id** (§6), seega silt pöördub oleku järgi:
+väljajäetud lehel „Lisa OCR-i", poolitamata lehel „Poolita" (§8).
+
 ### 10. Paneeli päises valikuabid, all suuruse juhtnupp
 
 „Vali kõik" / „Vali poolitatud" päises, ruudustiku kohal `−` · liugur · `+` — täpselt nii, nagu lehekülgede halduses (seal on kõik kolm koos, mitte kas-või). 143-lehelise töö juures on mõlemad vajalikud. Valikuabid **ei kuulu tegevusribale**: nad valivad, ei muuda midagi.
+
+### 11. `excluded` ja `mode` on risti, mitte sama telje otsad
+
+OCR-ist väljajätmine ja poolitamata jätmine on **kaks eri asja**. `mode: "custom"` +
+`excluded: true` on täiesti mõistlik olek ja peab säilima.
+
+**Invariant:** `excluded` domineerib **väljundi koostamisel**, aga ei kustuta
+poolitusolekut. Väljajäetud leht ei lähe OCR-serverisse ega loe
+`output_page_count`-i; tema `mode` ja `split_x` jäävad plaani alles ja hakkavad
+uuesti kehtima hetkel, kui kasutaja ta OCR-i tagasi lisab. Kasutaja ei kaota
+käsitsi seatud joont ühe kogemata klõpsuga.
+
+Sellest järeldub kokkuvõtte semantika: **„poolitatakse N" loeb ainult OCR-i
+minevaid poolitatud lehti** (`!excluded && mode !== "nosplit"`), „välja jäetud M"
+loeb kõiki väljajäetuid sõltumata poolitusolekust. Nii käitub `summarizePlan`
+(ja serveri `output_page_count`) juba täna — spekk fikseerib selle, ei muuda seda.
+
+Ka visuaalselt: **tuhmub ainult OCR-ist väljajätmine.** Poolitamata leht ei ole
+„välja jäetud" ega tohi välja näha nagu väljajäetu — tema erinevust vaikeolekust
+kannab poolitusikoon (§8).
 
 ## Visuaalne keel — eeskuju on lehekülgede haldus
 
@@ -122,9 +149,10 @@ Kolm asja, mis siit järelduvad ja mockup'ist erinevad:
   merevaigus number kaob — merevaik tähendab `manage`-is „salvestamata muudatus".
   Ülevaatuses salvestamata olekut ei ole (plaan salvestub kohe), seega jääb
   merevaik kasutamata ega tohi tähendust vahetada.
-- **Väljajäetud leht tuhmub PILDIST, mitte kaardist.** Täna `opacity-35` kogu
-  kaardil, mis tuhmib ka ikoonid — vastuolus §8 nõudega, et väljajätmine peab
-  olema kaardilt tagasi võetav. Tuhmi ainult `<img>`.
+- **OCR-ist väljajäetud leht tuhmub PILDIST, mitte kaardist.** Täna `opacity-35`
+  kogu kaardil, mis tuhmib ka ikoonid — vastuolus §8 nõudega, et väljajätmine peab
+  olema kaardilt tagasi võetav. Tuhmi ainult `<img>`. **Poolitamata leht EI tuhmu**
+  — tuhmus tähendab täpselt üht asja: „ei lähe OCR-i" (§11).
 - **Primaarnupp on `bg-primary-600`, mitte must.** Must jääb AINULT ikooni
   olekumärgiks („see leht erineb vaikest", §8): `bg-gray-900 border-gray-900
   text-white` sama geomeetriaga kui hall kest. Mockup'i must `Poolita kõik`
@@ -160,8 +188,10 @@ border border-gray-200 bg-white shadow-lg`. Loendur `text-sm font-medium
 text-primary-800`, rühmad `border-l border-gray-200 pl-3`, „Tühista valik"
 `text-red-600` + `X size={15}`.
 
-Sisu (mockup, artboard 2): `Valitud: 3 | Poolita · Ära poolita · Ära OCR-i | Tühista valik`,
-all vihjerida „Shift+klõps valib vahemiku".
+Sisu: `Valitud: 3 | Poolita · Ära poolita | Ära OCR-i · Lisa OCR-i | Tühista valik`,
+all vihjerida „Shift+klõps valib vahemiku". Poolitus- ja OCR-rühm on eraldi
+`border-l`-iga. Mockup (artboard 2) näitab kolme käsku — „Lisa OCR-i" lisandus
+sümmeetria pärast (§6) ja mockup jääb selle võrra maha.
 
 ### Mikrotekst (mockup'ist, i18n `upload` nimeruumi mõlemas keeles — ADR 0011)
 
@@ -213,7 +243,19 @@ See on täpselt see stsenaarium, mille pärast #255 üldse tekkis: **tühjad leh
 | b) **ehita PDF ilma väljajäetud lehtedeta** | ~36 s + ~800 MB ajutist | poppler on olemas (`pdfseparate`/`pdfunite`) |
 | c) jätta nagu on | 0 | väljajätmine on vaikne no-op — **vastuvõetamatu** |
 
+**Miks üldse PDF, kui OCR-server võtab ka üksikpilte vastu?** Võtab — see ongi
+tee (a). Aga siis peame lehed ise 300 DPI-l välja renderdama ja üle SFTP saatma
+(~6 min, tee (a) hind). PDF-i ümberehitus jätab rasterdamise OCR-serveri poolele, kus
+see niikuinii toimub; meie pool teeb ainult lehtede kopeerimise.
+
 **Soovitus: (b).** Algne otsus võrdles PDF-i ümberehitust *eelvaatega* („kallim kui eelvaade") — aga õige võrdlus on täieliku rasteriseerimisega, mille kõrval on ta 10× odavam. (a) jääb varutee'ks, kui ümberehitus mingil failil ebaõnnestub.
+
+**Varutee on vaikne, aga logitud.** Kui `pdfseparate`/`pdfunite` mingil veidral
+failil läbi kukub, langeb töö vaikselt teele (a) — kasutajat ei ole mõtet tüüdata
+otsusega, mille ainus tagajärg on ooteaeg. Serverilogisse läheb aga `warning`:
+`exclusion-only PDF fast path failed; falling back to raster path` + `upload_id` +
+algne erand. Ilma selleta ei ole hiljem võimalik aru saada, miks üks 143-leheline
+töö võttis 36 sekundi asemel kuus minutit.
 
 **See on eraldi otsus, mille saab teha enne UI-tööd** — ja mis tasub teha enne, sest UI lubab kasutajale midagi, mida backend praegu ei täida.
 
@@ -291,6 +333,12 @@ tähendaks see ~5 minutit, mille jooksul „Edasi" lihtsalt ei tööta — ja lu
    põimub apply'ga lehe kaupa ja ligi kahekordistab selle aja.
 5. Sama lipp sulgeb ka koristusvõistluse: `cleanup_prepress_artifacts` teeb
    impordil `preview/`-le `rmtree`, elus renderdaja kirjutaks kausta tagasi.
+6. **`preview_cancel` on ühe tsükli lipp, mitte püsiv olek:** `prepress/start`
+   seab ta käivitamisel `false`-iks. Restart on päriselt jõutav tee — endpoint
+   lubab täna ka `prepping`-ut ja `start_preview` on idempotentne
+   (`preview_status == "rendering"` → tagasi), nii et katkestatud eelvaate saab
+   uuesti käivitada. Persistentne `true` annaks järgmisel korral vea „miks
+   eelvaade läheb kohe `cancelled`-iks?", mille põhjust on hiljem raske näha.
 
 ## Mudeli vahetamine — backend-mõju
 
@@ -309,7 +357,7 @@ ocr_model = 'hand' if work_type.get('id') == 'Q87167' else 'print'
 bibliograafiline väide teose kohta, ja tüübi vaikne muutmine jõuaks impordiga
 `_metadata.json`-i ja sealt Meilisse.
 
-Neli nõuet:
+Viis nõuet:
 
 1. **Ainult enne apply't.** Üldine reegel, mis ka staatuste loendit põhjendab:
    **mudelit tohib muuta seni, kuni ükski OCR-input fail ei ole kaugserverisse
@@ -325,6 +373,13 @@ Neli nõuet:
    nimeliselt — `external_url` ja `ester_id` jäid varem just nii salvestumata),
    ning mudel ei ole ka `meta` väli. Vahetus läheb omaenda endpointi:
    `POST /admin/upload/{id}/ocr-model`.
+5. **Staatusekontroll ja kõik kolm kirjutust käivad ÜHE luku all.** Mitte
+   „kontrolli, siis `set_upload_state`" — see on kaks eraldi luku-akent ja apply
+   mahub nende vahele: kontroll näeks `awaiting_split`-i, apply asuks tööle ja
+   kaugteed kirjutataks ümber juba lennus oleva saatmise alt. Vaja on
+   `try_begin_applying` moodi CAS-i (`upload/state.py`): sama `get_upload_lock`
+   all loe olek, kontrolli staatust, sea `ocr_model` + mõlemad kaugteed, kirjuta
+   — ja tagasta `False`, kui staatus ei sobi (→ 409).
 
 **Tasub teha koos run-isolatsiooniga** (sama plaani Task 2: iga apply saab oma `run_id`). Mõlemad muudavad kaugtee arvutamist; eraldi tehes tuleb sama koht kaks korda lahti võtta.
 
@@ -348,12 +403,14 @@ Plaani kuju: `{default_split_x, preview_status, preview_done, preview_cancel, pa
   sees) ja salvestus kirjutab ainult nimetatud välju; `enabled` oli ainus erand,
   mille kaudu aegunud kliendikoopia oleks saanud renderduse oleku ümber lükata,
   ja see kaob.
+- **`excluded` ja `mode` on risti** (§11): väljajätmine ei kirjuta `mode`-i ega `split_x`-i üle, vaid domineerib ainult väljundi koostamisel. Ka OCR-i tagasi lisamine ei taasta midagi — poolitusolek ei ole vahepeal kuhugi kadunud.
 - Uusi LEHE-välju ei tule. Valik (`selected`) on **puhtalt kliendi olek**, nagu lehekülgede halduses — serverisse ei salvestata.
 - `state["ocr_model"]` on plaanist väljaspool (vt „Mudeli vahetamine").
 
 ## Liides
 
-Uus endpoint ei ole vajalik. Olemasolevad kannavad kõik:
+Prepress-plaani tegevused mahuvad olemasolevatesse endpointidesse; OCR-mudeli
+vahetusele tuleb üks uus endpoint.
 
 | Tegevus | Endpoint |
 |---|---|
@@ -366,27 +423,35 @@ Hulgikäsk on **üks plaani salvestus**, mitte N päringut: klient koostab uue `
 
 **Semantika elab kliendis, mitte serveris.** `src/pages/upload/prepressPlan.ts` on
 juba olemas puhta peegelmoodulina koos testidega — sinna lisanduvad
-`applyDefaultSplitTo`, `setNoSplit`, `setExcluded`. Serverisse hulgi-abifunktsioone
-EI lisandu: server valideerib lehekirjed ja liidab need plaani, nagu täna.
-Nimi `applyDefaultSplitTo` on tahtlik — „Poolita kõik" tähendab tegelikult
-„rakenda üldjoont kõigile peale `custom`-i" ja funktsiooni nimi peab seda ütlema.
+`applyDefaultSplitTo`, `clearDefaultSplit`, `setNoSplit`, `setExcluded`.
+Serverisse hulgi-abifunktsioone EI lisandu: server valideerib lehekirjed ja liidab
+need plaani, nagu täna.
+
+Nimed kannavad §7 vahet ja on tahtlikud:
+
+| Funktsioon | Kutsuja | Mida teeb |
+|---|---|---|
+| `applyDefaultSplitTo` | „Poolita kõik" | `nosplit` → `default`; `custom` jääb puutumata |
+| `clearDefaultSplit` | „Eemalda üldpoolitus" | `default` → `nosplit`; `custom` jääb puutumata |
+| `setNoSplit` | tegevusriba „Ära poolita" | valitud lehed → `nosplit`, ka `custom` |
+| `setExcluded(…, true/false)` | „Ära OCR-i" / „Lisa OCR-i" | ainult `excluded`; `mode` ja `split_x` jäävad (§11) |
 
 ## Puudutatud failid
 
 | Fail | Muutus |
 |---|---|
-| `UploadStepSplit.tsx` | opt-in kaob; päis (mudel, joon, „Poolita kõik" + „Ära poolita ühtki"); paneeli päis; ruudustik + `−`/liugur/`+` `WorkManage` eeskujul |
+| `UploadStepSplit.tsx` | opt-in kaob; päis (mudel, joon, „Poolita kõik" + „Eemalda üldpoolitus"); paneeli päis; ruudustik + `−`/liugur/`+` `WorkManage` eeskujul |
 | `SplitContactSheet.tsx` | kaardi karkass `PageCard` keelde; valik (klõps, Shift+klõps, märkeruut); kolm nurgaikooni [silm] [\|] [suurenda]; väljajäetu tuhmub pildist |
 | `SplitPageDetail.tsx` | „Ära OCR-i", tegevusriba ümberjärjestus, samad ikoonid |
-| uus `SplitActionBar.tsx` | hõljuv alumine riba — `PageActionBar` karkass 1:1 |
+| uus `SplitActionBar.tsx` | hõljuv alumine riba — `PageActionBar` karkass 1:1; neli käsku (Poolita · Ära poolita \| Ära OCR-i · Lisa OCR-i) |
 | `src/locales/{et,en}/upload.json` | uus mikrotekst mõlemas keeles korraga (ADR 0011) |
-| `prepressPlan.ts` | `enabled` maha (3 funktsiooni); hulgioperatsioonid `applyDefaultSplitTo`, `setNoSplit`, `setExcluded` + testid |
+| `prepressPlan.ts` | `enabled` maha (3 funktsiooni); hulgioperatsioonid `applyDefaultSplitTo`, `clearDefaultSplit`, `setNoSplit`, `setExcluded` + testid |
 | `prepress_plan.py` | `default_plan` → `nosplit`; `enabled` maha; `is_trivial_plan` jääb poolituspõhiseks, aga selle põhjendav kommentaar („PDF-i ümberehitus on kallim kui eelvaade") tuleb ümber kirjutada — väljajätmist käsitleb nüüd edastustee |
 | `prepress.py` | `preview_cancel` kontroll renderdustsüklis, `preview_status: "cancelled"` |
-| `store_source.py` | väljajätmine MÕLEMAL triviaalteel (PDF ümberehitus, piltide vahelejätmine) + `expected_pages` plaanist |
-| `upload/state.py` | `APPLY_START_STATUSES` + `"prepping"` |
+| `store_source.py` | väljajätmine MÕLEMAL triviaalteel (PDF ümberehitus, piltide vahelejätmine) + `expected_pages` plaanist; ümberehituse ebaõnnestumisel `warning` + langemine 300 DPI teele |
+| `upload/state.py` | `APPLY_START_STATUSES` + `"prepping"`; uus CAS mudelivahetusele (staatus + `ocr_model` + kaugteed ühe luku all) |
 | `upload_ops.py` | `state["ocr_model"]` väli; kaugteed sellest |
-| `routers/upload.py` | `enabled` salvestusest maha; uus `POST .../ocr-model`; apply seab `preview_cancel` |
+| `routers/upload.py` | `enabled` salvestusest maha; uus `POST .../ocr-model`; apply seab `preview_cancel`; `prepress/start` nullib `preview_cancel` |
 | `page_source.py` | eelvaate kiiruse kommentaar (0,05 → 0,58 s/lk) |
 
 ## Riskid
@@ -394,26 +459,27 @@ Nimi `applyDefaultSplitTo` on tahtlik — „Poolita kõik" tähendab tegelikult
 | Risk | Käsitlus |
 |---|---|
 | Iga upload maksab eelvaate renderduse | Mõõdetud 0,58 s/lk; voogab, ekraan kasutatav kohatäidetega. 300 DPI kiirtee jääb alles. |
-| Mudeli vahetus pärast apply't | Keelatud (409); UI peidab valiku pärast apply't |
+| Mudeli vahetus pärast apply't | Keelatud (409); UI peidab valiku pärast apply't. Võistlus apply'ga on suletud CAS-iga (kontroll + kirjutus ühe luku all) |
 | Kaks paralleelset upload'i | `RENDER_SEMAPHORE(1)` põimib lehe kaupa (#219) — juba lahendatud |
 | Hulgikäsk suurel valikul | Üks salvestus, mitte N päringut |
 | Staging kasvab (26 MB / 143 lk eelvaateid) | Koristatakse impordil, nagu praegu |
 | „Edasi" renderduse ajal | Apply lubatud `prepping`-ust; `preview_cancel` peatab renderdaja, muidu jagavad nad semafori ja apply aeglustub ~2× |
-| PDF-i ümberehitus ebaõnnestub | Varutee (a): plaan läheb 300 DPI teele (vt Lahtised) |
+| PDF-i ümberehitus ebaõnnestub | Vaikne varutee (a): plaan läheb 300 DPI teele. Kasutajat ei teavitata (tagajärg on ainult ooteaeg), aga logisse läheb `warning` — muidu on aeglane töö hiljem seletamatu |
 
 ## Lahtised
 
 - **Kaardi nurgatoimingud: alati nähtaval või hoveril?** Täna on `PageCard`-il **alati**. Kui liigume hoverile, tuleb see teha **mõlemas kohas korraga**, muidu tekib uus ebaühtlus.
 - **Segane valik.** Käsud on ühemõttelised, aga riba võiks öelda, mitut lehte päriselt muudeti.
-- **PDF-i ümberehituse varutee.** (b) ebaõnnestumisel on varuvariant (a) — plaan
-  muutub mitte-triviaalseks ja töö läheb 300 DPI teele. Kas langeda vaikselt tagasi
-  või näidata kasutajale, et OCR läheb kallimat teed?
 
 ## Kontroll
 
 - 143-leheline töö: ülevaatus avaneb kohe, kohatäidetega; eelvaated voogavad ~83 s jooksul
 - „Poolita kõik" → 143 lehte saavad joone; käsitsi seatud joon jääb puutumata ja riba ütleb selle välja
-- Valik + „Ära OCR-i" → valitud lehed muutuvad hallideks, kokkuvõte väheneb
+- „Eemalda üldpoolitus" → üldjoonelt poolitatud lehed lähevad `nosplit`-i, käsitsi seatud jooned jäävad alles (nupp teeb täpselt seda, mida silt lubab)
+- Valik + „Ära OCR-i" → valitud lehtede PILT tuhmub (mitte kaart), kokkuvõte väheneb
+- Sama valik + „Lisa OCR-i" → kõik tuleb tagasi ühe žestiga; hulgiviga on hulgi parandatav
+- Käsitsi joon + „Ära OCR-i" + „Lisa OCR-i" → käsitsi seatud joon on ikka alles (§11)
+- Poolitamata leht EI näe välja väljajäetu moodi
 - Mudeli vahetus enne apply't muudab kaugteed; pärast apply't tagastab 409
 - Täisvaade avaneb kaardi nurgaikoonist; klõps pisipildil ainult valib
 - Täisvaates saab lehe välja jätta ilma ülevaatesse naasmata
@@ -423,5 +489,6 @@ Nimi `applyDefaultSplitTo` on tahtlik — „Poolita kõik" tähendab tegelikult
 - **Väljajätmine ILMA poolitamiseta, pildikaustast:** sama kontroll teisel harul
 - Väljajätmisega töö jõuab sammus 4 `done`-i (st `expected_pages` tuli plaanist, mitte lähtefailist)
 - „Edasi" eelvaate renderduse ajal: apply käivitub kohe (ei 409), eelvaade lõpetab ja apply ei jookse poole kiirusega
+- Katkestatud eelvaate saab uuesti käivitada ja ta ei lähe kohe `cancelled`-iks (`prepress/start` nullis `preview_cancel`-i)
 - Mudeli vahetus enne apply't ei muuda `meta.type`-i — imporditud teose tüüp jääb selleks, mis metaandmete sammus valiti
 - Puutumata plaan (ei poolitusi ega väljajätmisi) läheb endiselt originaal-PDF-ina, ilma 300 DPI renderduseta
