@@ -62,9 +62,11 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         SÕNAOSA: ühesõnaline päring otsib sõnaosana, nii et "orati" leiab
         "orationem", "orationes" jne — käändelõpuga täissõna leiab VÄHEM.
         Mitmesõnalises päringus tohib ainult VIIMANE sõna olla poolik:
-        "oratio panegyr" ei leia "orationem panegyricam" (mõõdetud: 21 lehest
-        2). Vaste algab alati sõna algusest — "gyricus" ei leia sõna
-        "panegyricus".
+        "oratio panegyr" ei leia "orationem panegyricam". Vaste algab alati
+        sõna algusest — "gyricus" ei leia sõna "panegyricus".
+
+        Lehekülgitakse tabamusi, mitte teoseid: sama teos võib ilmuda kahel
+        järjestikusel lehel, kui ta tabamused jäävad lehepiiri peale.
 
         Tulemus on rühmitatud teose kaupa ja laotatud korpuse peale: ühest
         teosest näidatakse kuni 3 lehekülge, et üks teos ei täidaks kogu
