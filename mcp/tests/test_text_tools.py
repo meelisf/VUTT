@@ -7,6 +7,8 @@ Originaalsõnum jääb ToolError-i teksti sisse, nii et sisu saab kontrollida.
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
+from vutt_mcp.errors import VuttTemporaryError
+
 from vutt_mcp.server import build_server
 
 BASE = "https://vutt.utlib.ut.ee"
@@ -23,7 +25,19 @@ class FakeClient:
         self.bodies.append(body)
         return self.responses.pop(0)
 
+    #: Q-kood → sildid; `None` matkib endpointi tõrget.
+    entity_labels = {
+        "Q1123131": {"et": "disputatsioon", "en": "disputation", "de": "Disputation"},
+        "Q60797": {"en": "sermon", "de": "Predigt"},
+    }
+
     def api_get(self, path, params=None):
+        # Sildiregister on AINUS FastAPI-tee, mida tekstitööriistad tohivad
+        # kasutada — muu peab endiselt kukkuma.
+        if path == "/entity-labels":
+            if self.entity_labels is None:
+                raise VuttTemporaryError("VUTT ei vasta.")
+            return self.entity_labels
         raise AssertionError("tekstitööriistad ei tohi FastAPI-t kutsuda")
 
 
@@ -250,3 +264,59 @@ async def test_search_pages_ei_luba_tuhja_jarelparingut(server_with):
     server, _ = server_with([{"hits": hits, "totalHits": 5}])
     out = await _call(server, "search_pages", {"query": "x", "limit": 5})
     assert "offset=" not in out
+
+
+async def test_list_filter_values_lisab_q_koodile_sildi(server_with):
+    """Paljas Q-kood paneb mudeli oletama („Q609697? Actually…")."""
+    server, _ = server_with([
+        {"facetDistribution": {"genre_ids": {"Q1123131": 7454, "Q60797": 367}}}
+    ])
+    out = await _call(server, "list_filter_values", {"field": "genres"})
+    assert "Q1123131" in out                    # kood jääb, seda vajab filter
+    assert "disputatsioon" in out               # et-silt
+    assert "disputation" in out                 # en-silt
+    assert "sermon" in out                      # et puudub → langeb en peale
+
+
+async def test_list_filter_values_tundmatu_kood_jaab_paljaks(server_with):
+    server, _ = server_with([
+        {"facetDistribution": {"genre_ids": {"Q999999": 5}}}
+    ])
+    out = await _call(server, "list_filter_values", {"field": "genres"})
+    assert "Q999999 — 5 lk" in out
+
+
+async def test_list_filter_values_tootab_ka_sildita(server_with):
+    """Sildiregistri tõrge EI TOHI filtriväärtusi kättesaamatuks teha."""
+    server, client = server_with([
+        {"facetDistribution": {"genre_ids": {"Q1123131": 7454}}}
+    ])
+    client.entity_labels = None
+    out = await _call(server, "list_filter_values", {"field": "genres"})
+    assert "Q1123131" in out and "7454" in out
+
+
+async def test_list_filter_values_ei_kysi_silte_keeltele(server_with):
+    """ISO-koodid ei ole Q-koodid — asjatut päringut ei tehta."""
+    server, client = server_with([
+        {"facetDistribution": {"languages": {"lat": 15579, "deu": 4528}}}
+    ])
+    client.entity_labels = None   # kui küsitaks, kukuks vastus sildita režiimi
+    out = await _call(server, "list_filter_values", {"field": "languages"})
+    assert "lat — 15579 lk" in out
+
+
+async def test_get_work_naitab_zanri_q_koodi(server_with):
+    """Sild → kood on ainus tee filtrini; ilma selleta peab mudel loendit
+    skannima ja oletama („Oratsioon — likely Q609697?")."""
+    hit = _hit(page=1, genre="Oratsioon", genre_ids=["Q861911"])
+    server, client = server_with([{"hits": [hit], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "žanr: Oratsioon (Q861911)" in out
+    assert "genre_ids" in client.bodies[0]["attributesToRetrieve"]
+
+
+async def test_get_work_zanr_ilma_koodita_ei_saa_rippuvat_sulgu(server_with):
+    server, _ = server_with([{"hits": [_hit(page=1, genre="Oratsioon")], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "žanr: Oratsioon" in out and "(" not in out.split("žanr:")[1].split("\n")[0]

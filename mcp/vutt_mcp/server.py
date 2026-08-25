@@ -7,6 +7,8 @@ ebaühtlane (Codex CLI, Gemini CLI, Antigravity).
 Tööriistade kirjeldused on tahtlikult iseseletavad: mudel, kes VUTT-ist midagi
 ei tea, peab kirjeldusest aru saama, mis on work_id ja mida „Toores" tähendab.
 """
+import re
+
 from mcp.server.mcpserver import MCPServer
 
 from . import format as fmt
@@ -18,6 +20,8 @@ from .errors import VuttError, VuttNotFound
 from .instructions import SERVER_INSTRUCTIONS
 
 MAX_PAGE_SPAN = 20
+
+_QKOOD = re.compile(r"^Q\d+$")
 
 
 def build_server(client=None, base_url: str | None = None) -> MCPServer:
@@ -39,6 +43,23 @@ def build_server(client=None, base_url: str | None = None) -> MCPServer:
 
 
 def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
+    # Sildiregister (Q-kood → {et, en, de, la}) tuleb avalikust
+    # /entity-labels endpointist. Kaader elab serveri-eksemplari kohta;
+    # tõrget EI kaadrita, et mööduv katkestus ise paraneks.
+    _sildid: dict = {}
+
+    def entity_labels() -> dict:
+        if not _sildid:
+            try:
+                laetud = client.api_get("/entity-labels")
+            except VuttError:
+                # Sildid on mugavus, mitte tingimus: filtriväärtused peavad
+                # tulema ka siis, kui register ei vasta.
+                return {}
+            if isinstance(laetud, dict):
+                _sildid.update(laetud)
+        return _sildid
+
     @mcp.tool(structured_output=False)
     async def search_pages(
         query: str,
@@ -207,7 +228,12 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
 
         Lubatud väljad: collections, languages, genres, types.
         Keeled on ISO-koodid (lat, deu, grc, est…), žanrid ja tüübid Wikidata
-        Q-koodid.
+        Q-koodid — need tulevad koos eesti- ja ingliskeelse sildiga, nii et
+        koodi tähendust ei pea oletama. Filtrisse anna KOOD, mitte silt.
+
+        Sildid on Wikidatast ja võivad teose juures kuvatavast erineda:
+        Q861911 on siin „kõne / oration", teose väljal `žanr` aga
+        „Oratsioon". Sama žanr, eri sildistus — ühendav lüli on kood.
         """
         attribute = queries.FACET_FIELDS.get(field)
         if attribute is None:
@@ -221,8 +247,14 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             return f"Väljal „{field}\" ei ole indeksis ühtki väärtust."
 
         rows = sorted(values.items(), key=lambda kv: (-kv[1], kv[0]))
+        # Sildiregistrit küsime ainult siis, kui väärtused ON Q-koodid:
+        # keeled (ISO) ja kollektsioonid seletavad end ise.
+        sildid = entity_labels() if any(_QKOOD.match(n) for n, _ in rows) else {}
         lines = [f"{field} ({len(rows)} väärtust):"]
-        lines += [f"  {name} — {count} lk" for name, count in rows]
+        lines += [
+            f"  {fmt.format_facet_value(name, sildid)} — {count} lk"
+            for name, count in rows
+        ]
         if len(rows) >= queries.FACET_VALUE_CAP:
             # Meili maxValuesPerFacet piirab tagastust; loend võib olla poolik.
             lines.append(
@@ -230,6 +262,20 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
                 f"{queries.FACET_VALUE_CAP} facet-väärtust."
             )
         return "\n".join(lines)
+
+
+def _zanr_koodiga(hit: dict) -> str:
+    """„Oratsioon (Q861911)" — silt kuvamiseks, kood filtri jaoks.
+
+    Sildistus lahkneb teadlikult (ADR 0014: inline silt võidab, register
+    täidab augud), nii et kood on ainus kindel lüli `list_filter_values`
+    loendini.
+    """
+    silt = hit.get("genre") or ""
+    koodid = [k for k in (hit.get("genre_ids") or []) if k]
+    if not silt:
+        return ", ".join(koodid)
+    return f"{silt} ({', '.join(koodid)})" if koodid else silt
 
 
 def _format_work(hits: list[dict], *, base_url: str) -> str:
@@ -245,7 +291,7 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
         ("pealkiri", first.get("title")),
         ("aasta", first.get("aasta") or first.get("year_display")),
         ("koht", first.get("location")),
-        ("žanr", first.get("genre")),
+        ("žanr", _zanr_koodiga(first)),
         ("keeled", first.get("languages")),
         ("kollektsioonid", first.get("collections")),
         ("work_id", work_id),

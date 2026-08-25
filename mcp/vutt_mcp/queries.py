@@ -54,6 +54,9 @@ WORK_OVERVIEW_RETRIEVE_FIELDS = [
     "location",
     "publisher",
     "genre",
+    # Kood kõrvuti sildiga: list_filter_values kõneleb koodides, teose väli
+    # sildis („Oratsioon" vs Q861911) — ilma koodita ei jõua mudel filtrini.
+    "genre_ids",
     "languages",
     "collections",
     "notes",
