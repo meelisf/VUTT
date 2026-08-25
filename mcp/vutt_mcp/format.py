@@ -134,7 +134,62 @@ def _snippet(hit: dict) -> str:
     return ""
 
 
-def format_search_hits(hits: list[dict], total: int, *, base_url: str) -> str:
+# Mudeli silmus OCR-is: leheküljel kordub sama plokk kümneid kuni tuhandeid
+# kordi. Mõõdetud 2026-08-25: 494 lehte (2,0 %) 127 teoses, unikaalset teksti
+# mediaanina 27 %, maht 846 sõna vs tavalise lehe 255. Re-OCR ei aita — silmus
+# on mudelis. Kärbe on NÄHTAV: agent näeb, mis ja mitu korda kordus, ning saab
+# originaali lehe lingilt.
+COLLAPSE_MIN_KORDUSI = 4      # vähem = ehtne retoorika, mitte silmus
+COLLAPSE_MIN_SONU = 12        # kokkusurutav jooks peab olema sisuline
+COLLAPSE_MAX_PERIOOD = 30     # pikem plokk ei ole enam silmus, vaid tekst
+
+
+def collapse_repeats(text: str) -> str:
+    """Surub järjestikused korduvad plokid kokku, jättes nähtava märgendi.
+
+    EI muuda teksti vaikselt: märgend ütleb ploki, korduste arvu ja selle, et
+    midagi jäi välja. Agent, kes tahab originaali, läheb lehe lingile.
+    """
+    sonad = (text or "").split()
+    if len(sonad) < COLLAPSE_MIN_SONU:
+        return text
+
+    valjund: list[str] = []
+    i = 0
+    muudetud = False
+    while i < len(sonad):
+        parim = None
+        for periood in range(1, COLLAPSE_MAX_PERIOOD + 1):
+            if i + periood * COLLAPSE_MIN_KORDUSI > len(sonad):
+                break
+            plokk = sonad[i:i + periood]
+            kordusi = 1
+            j = i + periood
+            while sonad[j:j + periood] == plokk:
+                kordusi += 1
+                j += periood
+            if kordusi >= COLLAPSE_MIN_KORDUSI and periood * kordusi >= COLLAPSE_MIN_SONU:
+                # Lühim periood võidab: „S. S." on kaks korda „S.", mitte üks plokk.
+                parim = (periood, kordusi, j)
+                break
+        if parim:
+            periood, kordusi, jargmine = parim
+            valjund.append(" ".join(sonad[i:i + periood]))
+            valjund.append(
+                f"[sama {periood}-sõnaline lõik kordub veel {kordusi - 1}× "
+                f"— välja jäetud]"
+            )
+            i = jargmine
+            muudetud = True
+        else:
+            valjund.append(sonad[i])
+            i += 1
+    return " ".join(valjund) if muudetud else text
+
+
+def format_search_hits(hits: list[dict], total: int, *, base_url: str,
+                       compact: bool = False,
+                       next_offset: int | None = None) -> str:
     if not hits:
         return (
             "Vasteid ei leitud.\n"
@@ -188,16 +243,30 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str) -> str:
             meta.append(f"kollektsioon={collection}")
 
         block = [head, "    " + " · ".join(meta)]
-        for hit in lehed:
-            page = hit.get("lehekylje_number")
-            rida = f"    lk {page} ·" if page is not None else "    lk ? ·"
-            if hit.get("status"):
-                rida += f" seisund={hit['status']} ·"
-            block.append(rida + " " + work_url(work_id, page, base_url=base_url))
-            snippet = _snippet(hit)
-            if snippet:
-                block.append(f"      {snippet}")
+        if compact:
+            # Avastusrežiim: lehed ühele reale, link mustrina üks kord.
+            # Katked on mahult ~2/3 vastusest (limit=50 → 17,5 kB).
+            osad = []
+            for hit in lehed:
+                page = hit.get("lehekylje_number")
+                seisund = hit.get("status")
+                osad.append(f"lk {page}" + (f" ({seisund})" if seisund else ""))
+            block.append("    " + " · ".join(osad))
+            block.append("    lehe link: "
+                         + work_url(work_id, base_url=base_url) + "/{lk}")
+        else:
+            for hit in lehed:
+                page = hit.get("lehekylje_number")
+                rida = f"    lk {page} ·" if page is not None else "    lk ? ·"
+                if hit.get("status"):
+                    rida += f" seisund={hit['status']} ·"
+                block.append(rida + " " + work_url(work_id, page, base_url=base_url))
+                snippet = _snippet(hit)
+                if snippet:
+                    block.append(f"      {snippet}")
         blocks.append("\n".join(block))
+    if next_offset is not None:
+        blocks.append(f"\nJärgmine leht: offset={next_offset}")
     return "\n".join(blocks)
 
 
@@ -224,7 +293,7 @@ def format_pages(pages: list[dict], *, base_url: str, work_id: str) -> str:
             f"── lk {num} · seisund={page.get('status', '?')} · "
             + work_url(work_id, num, base_url=base_url)
         )
-        blocks.append((page.get("lehekylje_tekst") or "").strip())
+        blocks.append(collapse_repeats((page.get("lehekylje_tekst") or "").strip()))
         marginalia = (page.get("marginaalia_tekst") or "").strip()
         if marginalia:
             # Marginaalia on füüsiliselt eraldi tekstikiht, mitte põhiteksti osa.

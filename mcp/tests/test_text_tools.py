@@ -227,3 +227,26 @@ async def test_search_works_otsib_ka_pealkirjast(server_with):
     await _call(server, "search_works", {"query": "Dorpat"})
     valjad = client.bodies[0]["attributesToSearchOn"]
     assert "title" in valjad and "authors_text" in valjad
+
+
+async def test_search_pages_compact_joudb_vormistusse(server_with):
+    hits = [_hit(page=n, work_id="aaa") for n in (1, 2)]
+    server, _ = server_with([{"hits": hits, "totalHits": 2}])
+    out = await _call(server, "search_pages", {"query": "x", "compact": True})
+    assert "/work/aaa/{lk}" in out
+    assert "respublica" not in out
+
+
+async def test_search_pages_next_offset_kui_aken_sai_taide(server_with):
+    hits = [_hit(page=n, work_id=f"w{n}") for n in range(1, 6)]
+    server, _ = server_with([{"hits": hits, "totalHits": 519}])
+    out = await _call(server, "search_pages", {"query": "x", "limit": 5})
+    assert "offset=5" in out
+
+
+async def test_search_pages_ei_luba_tuhja_jarelparingut(server_with):
+    """Aken sai täis, aga rohkem vasteid ei ole — vihje eksitaks."""
+    hits = [_hit(page=n, work_id=f"w{n}") for n in range(1, 6)]
+    server, _ = server_with([{"hits": hits, "totalHits": 5}])
+    out = await _call(server, "search_pages", {"query": "x", "limit": 5})
+    assert "offset=" not in out

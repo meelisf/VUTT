@@ -49,6 +49,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         genre_id: str | None = None,
         work_id: str | None = None,
         relax_matching: bool = False,
+        compact: bool = False,
         limit: int = 10,
         offset: int = 0,
     ) -> str:
@@ -68,6 +69,11 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         Tulemus on rühmitatud teose kaupa ja laotatud korpuse peale: ühest
         teosest näidatakse kuni 3 lehekülge, et üks teos ei täidaks kogu
         akent. KÕIK ühe teose vasted saad, kui annad work_id.
+
+        compact=true jätab tekstikatked välja ja annab ainult teose, lehed ja
+        lingimustri — laia tüve-otsingu avastusrežiim, kus katked (~2/3
+        vastuse mahust) ainult ujutavad üle. Katkeid vaata siis sihitud
+        järelpäringuga.
 
         work_id on teose püsiv lühikood (nanoid, nt "v7Kq2mXp") — kasuta seda
         otsingu piiramiseks ühe teosega. Filtriväärtusi saad list_filter_values'ist.
@@ -100,8 +106,13 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             # Kärpimine käib enne offsetit, muidu ei oleks lehekülgede
             # järjestus lehelt lehele sama.
             hits = hits[offset:offset + limit]
+        total = data.get("totalHits", len(hits))
+        # Järgmise lehe vihje ainult siis, kui aken sai täis JA vasteid on veel.
+        # Muidu lubaks see tühja järelpäringut.
+        edasi = offset + len(hits)
         return fmt.format_search_hits(
-            hits, data.get("totalHits", len(hits)), base_url=base_url
+            hits, total, base_url=base_url, compact=compact,
+            next_offset=edasi if len(hits) == limit and total > edasi else None,
         )
 
     @mcp.tool(structured_output=False)

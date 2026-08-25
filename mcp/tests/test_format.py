@@ -312,3 +312,73 @@ def test_search_hits_loendur_nimetab_teoste_arvu():
         [_vaste("aaa", 1), _vaste("bbb", 2)], total=99, base_url=BASE
     )
     assert "99" in out and "2 teosest" in out
+
+
+# ── korduste kokkusurumine (mudeli silmus OCR-is) ─────────────────────────
+
+def test_collapse_kokku_surub_korduva_ploki():
+    """„S. S. S. …" × 679 — mudel läks sõlme, 1366-sõnalisest lehest on
+    unikaalset teksti 8 sõna. Kärbe peab olema NÄHTAV, mitte vaikne."""
+    tekst = "Algus siin. " + "S. " * 400 + "Lõpp siin."
+    out = fmt.collapse_repeats(tekst)
+    assert "Algus siin." in out and "Lõpp siin." in out
+    assert out.count("S.") < 10
+    assert "kordub" in out and "välja jäetud" in out
+
+
+def test_collapse_sailitab_korduse_algupära():
+    """Agent peab nägema, MIS kordus — muidu ei saa ta otsustada, kas see oli
+    tabeli tühjad lahtrid või mudeli silmus."""
+    out = fmt.collapse_repeats("irae 371 " * 200)
+    assert "irae 371" in out
+    assert "199" in out or "200" in out
+
+
+def test_collapse_ei_puutu_tavalist_teksti():
+    tekst = ("Disputatio politica de republica, quam consentiente amplissima "
+             "facultate philosophica publice ventilandam sistit auctor.")
+    assert fmt.collapse_repeats(tekst) == tekst
+
+
+def test_collapse_ei_puutu_luhikest_kordust():
+    """Kolm korda „non est" on ehtne retoorika, mitte silmus."""
+    tekst = "Non est non est non est vera causa rerum naturalium."
+    assert fmt.collapse_repeats(tekst) == tekst
+
+
+def test_format_pages_surub_kordused_kokku():
+    lehed = [{"lehekylje_number": 42, "status": "Toores",
+              "lehekylje_tekst": "Algus. " + "S. " * 400}]
+    out = fmt.format_pages(lehed, base_url=BASE, work_id="mhs5bw")
+    assert len(out) < 400
+    assert "kordub" in out
+
+
+# ── compact-režiim ja next_offset ─────────────────────────────────────────
+
+def test_compact_jätab_katked_välja():
+    # Tootmises on katke ~300 märki (CROP_LENGTH = 40 sõna) — fixture peab
+    # seda peegeldama, muidu mõõdab test valet suhet.
+    pikk = {"_formatted": {"lehekylje_tekst": "…quod respublica Suecorum… " * 12}}
+    hits = [dict(_vaste("aaa", n), **pikk) for n in (1, 2, 3)]
+    taielik = fmt.format_search_hits(hits, total=3, base_url=BASE)
+    lyhike = fmt.format_search_hits(hits, total=3, base_url=BASE, compact=True)
+    assert "quod respublica Suecorum" in taielik
+    assert "quod respublica Suecorum" not in lyhike
+    # teose ja lehe tuvastus peab alles jääma
+    assert "work_id=aaa" in lyhike
+    for n in (1, 2, 3):
+        assert f"lk {n}" in lyhike
+    assert f"{BASE}/work/aaa/{{lk}}" in lyhike   # link mustrina, mitte lehe kaupa
+    assert len(lyhike) < len(taielik) / 3
+
+
+def test_next_offset_naitab_kuidas_edasi():
+    out = fmt.format_search_hits([_vaste("aaa", 1)], total=519, base_url=BASE,
+                                 next_offset=10)
+    assert "offset=10" in out
+
+
+def test_next_offset_puudub_kui_rohkem_ei_ole():
+    out = fmt.format_search_hits([_vaste("aaa", 1)], total=1, base_url=BASE)
+    assert "offset=" not in out
