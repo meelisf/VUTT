@@ -11,7 +11,6 @@ import type { PrepressPlan } from '../types';
 
 function plan(overrides: Partial<PrepressPlan> = {}): PrepressPlan {
   return {
-    enabled: true,
     default_split_x: 0.5,
     preview_status: 'ready',
     preview_done: 3,
@@ -62,8 +61,9 @@ describe('countOutputPages', () => {
     expect(countOutputPages(p)).toBe(3);
   });
 
-  it('enabled=false → iga leht üks', () => {
-    expect(countOutputPages(plan({ enabled: false }))).toBe(3);
+  it('läbivalt nosplit plaan → iga leht üks', () => {
+    const p = plan({ pages: plan().pages.map((x) => ({ ...x, mode: 'nosplit' as const, split_x: null })) });
+    expect(countOutputPages(p)).toBe(3);
   });
 });
 
@@ -74,8 +74,9 @@ describe('summarizePlan', () => {
     expect(summarizePlan(p)).toEqual({ split: 1, excluded: 1, output: 3 });
   });
 
-  it('enabled=false → ühtki lehte ei poolitata', () => {
-    expect(summarizePlan(plan({ enabled: false })).split).toBe(0);
+  it('läbivalt nosplit plaan → ühtki lehte ei poolitata', () => {
+    const p = plan({ pages: plan().pages.map((x) => ({ ...x, mode: 'nosplit' as const, split_x: null })) });
+    expect(summarizePlan(p).split).toBe(0);
   });
 });
 
@@ -125,9 +126,33 @@ describe('isPreviewReady', () => {
     expect(isPreviewReady(p, 3)).toBe(false);
   });
 
-  it('idle: enne opt-in-i pole ühtki pikslit renderdatud', () => {
+  it('idle: enne eelvaate käivitumist pole ühtki pikslit renderdatud', () => {
     const p = plan({ preview_status: 'idle', preview_done: 0 });
     expect(isPreviewReady(p, 1)).toBe(false);
+  });
+});
+
+describe('vaikeplaani semantika', () => {
+  it('vaikeplaani lehed ei poolitu', () => {
+    const p = plan({
+      page_count: 2,
+      pages: [
+        { n: 1, mode: 'nosplit', split_x: null, excluded: false },
+        { n: 2, mode: 'nosplit', split_x: null, excluded: false },
+      ],
+    });
+    expect(willSplit(p, 1)).toBe(false);
+    expect(countOutputPages(p)).toBe(2);
+    expect(summarizePlan(p).split).toBe(0);
+  });
+
+  it('default-moodis leht poolitub ilma igasuguse lülitita', () => {
+    const p = plan({
+      page_count: 1,
+      pages: [{ n: 1, mode: 'default', split_x: null, excluded: false }],
+    });
+    expect(willSplit(p, 1)).toBe(true);
+    expect(countOutputPages(p)).toBe(2);
   });
 });
 
@@ -150,8 +175,9 @@ describe('willSplit', () => {
     expect(willSplit(p, 1)).toBe(false);
   });
 
-  it('enabled=false → ühtki lehte ei poolitata', () => {
-    expect(willSplit(plan({ enabled: false }), 1)).toBe(false);
+  it('nosplit on vaikeväärtus, mitte lüliti tagajärg', () => {
+    const p = plan({ pages: [{ n: 1, mode: 'nosplit', split_x: null, excluded: false }] });
+    expect(willSplit(p, 1)).toBe(false);
   });
 
   it('custom ilma split_x-ita ei poolita (sama loogika mis countOutputPages)', () => {

@@ -14,12 +14,11 @@ export interface PlanSummary {
   output: number;
 }
 
-/** Kokkuvõtteriba arvud. Puhas — komponent ainult vormindab. */
+/** Kokkuvõtteriba arvud. Puhas — komponent ainult vormindab.
+ *  „poolitatakse N" loeb AINULT OCR-i minevaid poolitatud lehti (§11). */
 export function summarizePlan(plan: PrepressPlan): PlanSummary {
   return {
-    split: plan.enabled
-      ? plan.pages.filter((p) => !p.excluded && p.mode !== 'nosplit').length
-      : 0,
+    split: plan.pages.filter((p) => !p.excluded && p.mode !== 'nosplit').length,
     excluded: plan.pages.filter((p) => p.excluded).length,
     output: countOutputPages(plan),
   };
@@ -29,7 +28,7 @@ export function summarizePlan(plan: PrepressPlan): PlanSummary {
 export function countOutputPages(plan: PrepressPlan): number {
   return plan.pages.reduce((total, page) => {
     if (page.excluded) return total;
-    if (!plan.enabled || page.mode === 'nosplit') return total + 1;
+    if (page.mode === 'nosplit') return total + 1;
     if (page.mode === 'custom' && page.split_x == null) return total + 1;
     return total + 2;
   }, 0);
@@ -69,7 +68,6 @@ export function isPreviewReady(plan: PrepressPlan, n: number): boolean {
  * loogikat (server/upload/prepress_plan.py).
  */
 export function willSplit(plan: PrepressPlan, n: number): boolean {
-  if (!plan.enabled) return false;
   const page = plan.pages.find((p) => p.n === n);
   if (!page || page.excluded) return false;
   if (page.mode === 'nosplit') return false;

@@ -78,7 +78,7 @@ def test_plaani_salvestamine_ei_luba_vigast_mode_i(client_admin):
     client, headers, upload_id = client_admin
     resp = client.post(
         "/admin/upload/{}/prepress".format(upload_id),
-        json={"enabled": True, "default_split_x": 0.5,
+        json={"default_split_x": 0.5,
               "pages": [{"n": 1, "mode": "kustuta_koik"}]},
         headers=headers,
     )
@@ -89,7 +89,7 @@ def test_plaani_salvestamine_ei_luba_vigast_split_x_i(client_admin):
     client, headers, upload_id = client_admin
     resp = client.post(
         "/admin/upload/{}/prepress".format(upload_id),
-        json={"enabled": True, "default_split_x": 1.5, "pages": []},
+        json={"default_split_x": 1.5, "pages": []},
         headers=headers,
     )
     assert resp.status_code == 400
@@ -99,7 +99,7 @@ def test_plaani_salvestamine_uuendab_ainult_plaani_valju(client_admin):
     client, headers, upload_id = client_admin
     resp = client.post(
         "/admin/upload/{}/prepress".format(upload_id),
-        json={"enabled": True, "default_split_x": 0.48, "pages": [
+        json={"default_split_x": 0.48, "pages": [
             {"n": 1, "mode": "custom", "split_x": 0.46},
             {"n": 2, "mode": "nosplit"},
             {"n": 3, "mode": "default", "excluded": True},
@@ -149,5 +149,6 @@ def test_get_prepress_annab_kokkuvotte(client_admin):
     data = client.get(
         "/admin/upload/{}/prepress".format(upload_id), headers=headers
     ).json()
-    assert set(["enabled", "default_split_x", "preview_status", "preview_done",
+    assert set(["default_split_x", "preview_status", "preview_done",
                 "pages", "page_count", "output_page_count", "trivial"]) <= set(data)
+    assert "enabled" not in data

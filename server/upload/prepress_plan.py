@@ -7,34 +7,53 @@ page_source.py-s.
 Plaani kuju (state.json → "prepress"):
 
     {
-      "enabled": False,
       "default_split_x": 0.5,
-      "preview_status": "idle",     # idle | rendering | ready | error
+      "preview_status": "idle",     # idle | rendering | ready | error | cancelled
       "preview_done": 0,
       "pages": [
-        {"n": 1, "mode": "default", "split_x": None, "excluded": False}
+        {"n": 1, "mode": "nosplit", "split_x": None, "excluded": False}
       ]
     }
 
 mode: "default" = kasuta globaalset joont, "custom" = oma joon,
-"nosplit" = ära poolita.
+"nosplit" = ära poolita (VAIKEVÄÄRTUS).
 """
 from typing import List, Optional, Tuple
 
 
 def default_plan(page_count: int) -> dict:
-    """Uue uploadi vaikeplaan. enabled=False — poolitamine on destruktiivne
-    teisendus ja seda ei tohi saada kogemata 'Edasi' vajutusega."""
+    """Uue uploadi vaikeplaan: ükski leht ei poolitu.
+
+    default_split_x on üldjoone VÄÄRTUS, mitte rakendatud joon — ta hakkab
+    kehtima alles siis, kui kasutaja vajutab „Poolita kõik" ja lehed saavad
+    mode: "default". Poolitamine on destruktiivne teisendus ja seda ei tohi
+    saada kogemata 'Edasi' vajutusega (§2, viga A).
+    """
     return {
-        "enabled": False,
         "default_split_x": 0.5,
         "preview_status": "idle",
         "preview_done": 0,
         "pages": [
-            {"n": n, "mode": "default", "split_x": None, "excluded": False}
+            {"n": n, "mode": "nosplit", "split_x": None, "excluded": False}
             for n in range(1, page_count + 1)
         ],
     }
+
+
+def normalize_legacy_plan(plan: dict) -> None:
+    """Viib vana kujuga plaani (`enabled`) uude semantikasse. KOHAPEAL.
+
+    Vana mudelis tähendas `mode: "default"` + `enabled: False` „ei poolita".
+    Uues mudelis tähendaks sama kirje „poolita üldjoonelt" — st ilma selle
+    teisenduseta hakkaks pooleliolev upload äkki kõiki lehti poolitama.
+    Idempotentne: võtme puudumisel ei tee midagi.
+    """
+    if "enabled" not in plan:
+        return
+    if not plan.pop("enabled"):
+        for entry in plan.get("pages", []):
+            if entry.get("mode") == "default":
+                entry["mode"] = "nosplit"
 
 
 def _page_entry(plan: Optional[dict], n: int) -> Optional[dict]:
@@ -49,22 +68,20 @@ def _page_entry(plan: Optional[dict], n: int) -> Optional[dict]:
 def effective_split_x(plan: Optional[dict], n: int) -> Optional[float]:
     """Kas ja kus leht n poolitatakse. None = ei poolitata.
 
-    enabled=False → alati None, sõltumata mode väärtusest. custom väärtused
-    jäävad plaani alles inertsena, et lüliti välja-sisse lülitamine ei
-    kustutaks admini tehtud tööd.
+    custom väärtused jäävad plaani alles ka siis, kui leht on väljundist väljas
+    — `excluded` domineerib väljundi koostamisel, aga ei kustuta poolitusolekut
+    (§11).
     """
-    if not plan or not plan.get("enabled"):
-        return None
     entry = _page_entry(plan, n)
     if entry is None:
         return None
-    mode = entry.get("mode", "default")
+    mode = entry.get("mode", "nosplit")
     if mode == "nosplit":
         return None
     if mode == "custom":
         x = entry.get("split_x")
         return float(x) if x is not None else None
-    return float(plan.get("default_split_x", 0.5))
+    return float((plan or {}).get("default_split_x", 0.5))
 
 
 def is_excluded(plan: Optional[dict], n: int) -> bool:
@@ -80,7 +97,7 @@ def is_trivial_plan(plan: Optional[dict]) -> bool:
     (store_source: PDF-i alamhulk või piltide vahelejätmine). Triviaalne
     tähendab siin ainult „meie pool ei pea ühtki pikslit renderdama".
     """
-    if not plan or not plan.get("enabled"):
+    if not plan:
         return True
     return all(
         effective_split_x(plan, entry.get("n")) is None

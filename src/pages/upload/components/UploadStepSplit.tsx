@@ -55,15 +55,14 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
     saveTimer.current = setTimeout(() => {
       savePrepress(
         uploadId,
-        { enabled: next.enabled, default_split_x: next.default_split_x, pages: next.pages },
+        { default_split_x: next.default_split_x, pages: next.pages },
         token,
       ).catch(() => setError(t('errors.networkError')));
     }, 400);
   }, [uploadId, token, t]);
 
-  const handleOptIn = async () => {
+  const handleStartPreview = async () => {
     if (!plan) return;
-    persist({ ...plan, enabled: true });
     try {
       await startPrepress(uploadId, token);
       setPlan(await getPrepress(uploadId, token));
@@ -92,10 +91,10 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
     setError('');
     try {
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (plan?.enabled) {
+      if (plan) {
         await savePrepress(
           uploadId,
-          { enabled: plan.enabled, default_split_x: plan.default_split_x, pages: plan.pages },
+          { default_split_x: plan.default_split_x, pages: plan.pages },
           token,
         );
       }
@@ -116,24 +115,15 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
     <div>
       <h2 className="text-lg font-semibold mb-1">{t('step3split.title')}</h2>
 
-      <label className="flex items-start gap-3 p-4 mb-6 rounded border border-gray-200 bg-gray-50">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={plan.enabled}
-          onChange={(e) => (e.target.checked
-            ? handleOptIn()
-            : persist({ ...plan, enabled: false }))}
-        />
-        <span>
-          <span className="font-medium block">{t('step3split.optIn')}</span>
-          <span className="text-sm text-gray-600 block">{t('step3split.optInHint')}</span>
-          <span className="text-sm text-gray-600 block mt-1">{t('step3split.optInHintModel')}</span>
-        </span>
-      </label>
+      <button
+        type="button"
+        className="mb-6 px-3 py-1.5 text-sm border rounded"
+        onClick={handleStartPreview}
+      >
+        {t('step3split.optIn')}
+      </button>
 
-      {plan.enabled && (
-        <>
+      <>
           {rendering && (
             <div className="mb-4 text-sm text-gray-600">
               {t('step3split.rendering', {
@@ -176,8 +166,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
             onPageChange={handlePageChange}
             onOpenPage={setDetailPage}
           />
-        </>
-      )}
+      </>
 
       {error && <div className="mt-4 text-sm text-red-700">{error}</div>}
 

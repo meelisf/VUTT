@@ -73,13 +73,22 @@ async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require
 # =========================================================
 
 def _load_prepress(upload_id: str) -> tuple:
-    """Ühine eeltöö: valideeri upload_id, loe state ja plaan."""
+    """Ühine eeltöö: valideeri upload_id, loe state ja plaan.
+
+    Normaliseerib vana kujuga plaani (`enabled`) ja KIRJUTAB tulemuse tagasi —
+    muidu näeks apply endiselt legacy-kuju ja poolitaks kõik lehed.
+    """
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
     state = upload_state.read_state(upload_id)
     if not state:
         raise HTTPException(status_code=404, detail="Uploadi ei leitud")
-    return state, state.get("prepress")
+    plan = state.get("prepress")
+    if plan is not None and "enabled" in plan:
+        plan = upload_state.mutate_prepress(
+            upload_id, prepress_plan.normalize_legacy_plan
+        )
+    return state, plan
 
 
 def _validate_split_x(value) -> float:
@@ -107,14 +116,10 @@ def admin_prepress_get(upload_id: str, user=Depends(require_role("admin"))):
 
 @router.post("/admin/upload/{upload_id}/prepress/start")
 def admin_prepress_start(upload_id: str, user=Depends(require_role("admin"))):
-    """Lülitab prepressi sisse ja käivitab 100 DPI eelvaate.
-
-    Kuni seda ei kutsuta, EI renderdata ühtki pikslit — kogu prepress on opt-in.
-    """
+    """Käivitab 100 DPI eelvaate. Idempotentne (juba renderdav → no-op)."""
     state, plan = _load_prepress(upload_id)
     if state.get("status") not in ("awaiting_split", "prepping"):
         raise HTTPException(status_code=409, detail="Upload ei ole poolitamise ootel")
-    upload_state.mutate_prepress(upload_id, lambda p: p.update(enabled=True))
     prepress.start_preview(upload_id)
     return {"status": "started"}
 
@@ -158,10 +163,7 @@ async def admin_prepress_save(upload_id: str, request: Request,
             "excluded": bool(entry.get("excluded")),
         }
 
-    enabled = bool(data.get("enabled"))
-
     def _apply(plan):
-        plan["enabled"] = enabled
         plan["default_split_x"] = default_x
         for page in plan.get("pages", []):
             update = clean.get(page.get("n"))

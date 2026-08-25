@@ -84,7 +84,6 @@ export interface PrepressPage {
 }
 
 export interface PrepressPlan {
-  enabled: boolean;
   default_split_x: number;
   preview_status: PreviewStatus;
   preview_done: number;
