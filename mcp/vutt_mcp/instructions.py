@@ -9,38 +9,41 @@ on, MIS KEELES tuleb otsida ja mis järjekorras tööriistu kasutada. Tööriist
 enda semantika (parameetrid, tagastus) jääb tööriista docstringi.
 """
 
-# Keelte lehekülgede arvud pärinevad list_filter_values("languages")-ist
-# (mõõdetud 2026-08-23). Suurusjärk on siin oluline, mitte täpne number.
+# ARVE SIIA EI PANDA. Lehekülgede ja kaartide hulgad muutuvad iga upload'iga,
+# aga juhend elab koodis — iga number siin vananeb vaikselt. Suurusjärgu ütle
+# sõnadega („valdavalt ladina", „väga vähe"); täpse arvu saab agent ise
+# list_filter_values'ist.
 SERVER_INSTRUCTIONS = """\
-VUTT = Tartu ülikooli varauusaegse (1632-1710) trükikorpuse transkriptsioonid
-(vutt.utlib.ut.ee). Kõik tööriistad on read-only.
+VUTT = ajalooliste tekstide transkriptsioonitöölaud (vutt.utlib.ut.ee).
+Tuum on 17. sajandi Tartu trükised, aga kogu ulatub sellest mõlemas suunas
+välja ja sisaldab ka sekundaarkirjandust - ÄRA eelda kitsast ajapiiri,
+ulatust piira kollektsiooniga. Kõik tööriistad on read-only.
 
 KEELED - arvesta neid, muidu otsid tühja:
-- Alliktekstid: ladina ~15600 lk, saksa ~4500, rootsi ~2100, kreeka ~2100;
-  eestikeelset teksti on ainult ~440 lk. Otsi seega ladina- või saksakeelse
-  sõnaga, MITTE eestikeelse terminiga ("disputatio", mitte "väitluskiri").
-  Varauusaegne ortograafia kõigub (u/v, i/j, ß/ss, ae/æ) - otsi lühikest tüve.
+- Alliktekstid on valdavalt ladina- ja saksakeelsed, kõrval rootsi ja kreeka;
+  eestikeelset teksti on väga vähe. Otsi seega ladina- või saksakeelse sõnaga,
+  MITTE eestikeelse terminiga ("disputatio", mitte "väitluskiri").
+  Ortograafia kõigub (u/v, i/j, ß/ss, ae/æ) - otsi lühikest tüve.
 - Ühesõnaline päring toimib sõnaosa otsinguna: "orati" leiab "orationem",
   "orationes" jne. Mitmesõnalises päringus tohib ainult VIIMANE sõna olla
   poolik: "oratio panegyr" ei leia "orationem panegyricam".
-- Sekundaarkirjandus (list_literature, search_literature) on peamiselt saksa-
-  ja eestikeelne, osalt rootsi ja inglise. Sama mõiste on kahes kihis eri
-  keeles: allikast otsi "typographus", sekundaarist "trükkal" / "Buchdrucker".
+- Sekundaarkirjandus on peamiselt saksa- ja eestikeelne. Sama mõiste on kahes
+  kihis eri keeles: allikast otsi "typographus", sekundaarist "trükkal" /
+  "Buchdrucker".
 
 TÖÖKÄIK:
-1. list_filter_values (collections, languages, genres, types) - filtriväärtused
-   on suletud loend, ära oleta neid.
+1. list_filter_values (collections, languages, genres, types) - suletud loend,
+   ära oleta väärtusi.
 2. search_works = MILLISED teosed teemat käsitlevad; search_pages = KUS midagi
    mainitakse.
 3. get_pages(work_id, from_page, to_page) = täistekst.
-4. Isikud: search_persons / get_person (prosopograafia, ~2350 kaarti).
+4. Isikud: search_persons / get_person (prosopograafia).
 5. Sekundaarkirjandus on ERALDI kogu, mitte korpuse osa: list_literature
    näitab, mis seal on; get_literature_pages nõuab page_ref="printed" (trükise
    number) või "pdf" (faili leht).
 
 REEGLID:
-- work_id on nanoid ("v7Kq2mXp"), mitte pealkiri ega kaustanimi; tuleb iga
-  tulemusega kaasa, anna edasi järgmisele tööriistale.
+- work_id on nanoid ("v7Kq2mXp"), mitte pealkiri; tuleb iga tulemusega kaasa.
 - Otsing on vaikimisi range (kõik sõnad peavad leheküljel esinema). Tühja
   tulemuse järel proovi lühemat päringut ja relax_matching=true.
 - Tekst on masinlugemine. Lehe seisund kasvavas usaldusväärsuses: Toores
