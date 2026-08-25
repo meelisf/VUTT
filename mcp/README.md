@@ -191,10 +191,19 @@ diagnoosiv — programm ei suudaks silmust ehtsast kordusest eristada.
 
 ### Avastusrežiim ja pagineerimine
 
-`search_pages(compact=true)` jätab katked välja ja annab teose, lehenumbrid ja
-lingimustri: `limit=50` puhul 17 584 → 4657 märki (−74 %). Vastuse lõpus on
-`Järgmine leht: offset=N`, aga ainult siis, kui aken sai täis JA vasteid on
-veel — muidu lubaks vihje tühja järelpäringut.
+`compact=true` (mõlemal otsingutööriistal) jätab katked välja: `search_pages`
+`limit=50` puhul 17 584 → 4657 märki (−74 %), `search_works` `limit=10` puhul
+5916 → 3284. Vastuse lõpus on `Järgmine leht: offset=N`, aga ainult siis, kui
+aken sai täis JA vasteid on veel — muidu lubaks vihje tühja järelpäringut.
+
+**Loenduri ühik on välja öeldud**, sest „Vasteid kokku" üksi luges üks agent
+teoste arvuks ja teine lehekülgedeks:
+
+- `search_pages` → `Vasteid kokku: 1929 lehekülge (kuvatud 10 lk 4 teosest)`
+- `search_works` → `Teoseid kokku: 571 (kuvatud 10)`
+
+`distinct: work_id` puhul ONGI `totalHits` teoste arv (kontrollitud: `oratio`
+571 = 571 eri teost) — vale oli ainult silt, mitte arvutus.
 
 ### Seisund
 
