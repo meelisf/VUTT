@@ -147,35 +147,53 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str) -> str:
             "(u/v, i/j, ß/ss)."
         )
 
-    blocks = [f"Vasteid kokku: {total} (kuvatud {len(hits)})", ""]
-    for i, hit in enumerate(hits, start=1):
-        work_id = hit.get("work_id", "")
-        page = hit.get("lehekylje_number")
+    # Rühmitamine teose kaupa: mõõdetuna oli 26 % vastuse mahust märk-märgilt
+    # korduv päis (10 vastet tulid tihti ühest teosest). Sama loogika nagu
+    # töölaua otsingul — teos on rühm, leheküljed selle sees.
+    ruhmad: dict[str, list[dict]] = {}
+    for hit in hits:
+        ruhmad.setdefault(hit.get("work_id", ""), []).append(hit)
+
+    blocks = [
+        f"Vasteid kokku: {total} "
+        f"(kuvatud {len(hits)} lk {len(ruhmad)} teosest)",
+        "",
+    ]
+    for i, (work_id, lehed) in enumerate(ruhmad.items(), start=1):
+        esimene = lehed[0]
         # Eelista rolliga märgitud loojaid: „autor" on tuletatud väli, mis
         # disputatsiooni puhul on tegelikult praeses — märgistamata eksitav.
-        author = _primary_creators(hit.get("creators") or []) or hit.get("autor") or ""
-        year = hit.get("aasta") or hit.get("year_display") or ""
-        place = hit.get("location") or ""
-        title = f'"{_short_title(hit.get("title", ""))}"'
+        author = (
+            _primary_creators(esimene.get("creators") or [])
+            or esimene.get("autor")
+            or ""
+        )
+        year = esimene.get("aasta") or esimene.get("year_display") or ""
+        place = esimene.get("location") or ""
+        title = f'"{_short_title(esimene.get("title", ""))}"'
         # Ilma loojata teosel ei tohi jääda rippuvat eraldajat („[2]  · ...").
         head = f"[{i}] " + (f"{author} · {title}" if author else title)
         if year or place:
             head += f" ({', '.join(str(x) for x in (year, place) if x)})"
 
         meta = [f"work_id={work_id}"]
-        if page is not None:
-            meta.append(f"lk {page}/{hit.get('teose_lehekylgede_arv', '?')}")
-        if hit.get("status"):
-            meta.append(f"seisund={hit['status']}")
-        collection = _first(hit.get("collections"))
+        lehti = esimene.get("teose_lehekylgede_arv")
+        if lehti:
+            meta.append(f"{lehti} lk")
+        collection = _first(esimene.get("collections"))
         if collection:
             meta.append(f"kollektsioon={collection}")
 
         block = [head, "    " + " · ".join(meta)]
-        snippet = _snippet(hit)
-        if snippet:
-            block.append(f"    {snippet}")
-        block.append("    vaata: " + work_url(work_id, page, base_url=base_url))
+        for hit in lehed:
+            page = hit.get("lehekylje_number")
+            rida = f"    lk {page} ·" if page is not None else "    lk ? ·"
+            if hit.get("status"):
+                rida += f" seisund={hit['status']} ·"
+            block.append(rida + " " + work_url(work_id, page, base_url=base_url))
+            snippet = _snippet(hit)
+            if snippet:
+                block.append(f"      {snippet}")
         blocks.append("\n".join(block))
     return "\n".join(blocks)
 

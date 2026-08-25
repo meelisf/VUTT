@@ -152,6 +152,18 @@ need elavad ainult `creators`-is.
 Otsingutulemuse päises näidatakse ainult peamine looja rolliga + respondens;
 täisnimekiri tuleb `get_work`-ist.
 
+### Otsinguulatus ja rühmitamine
+
+`search_pages` otsib **ainult lehetekstist** (`PAGE_SEARCH_FIELDS`), `search_works`
+ka pealkirjast ja autoritest (`WORK_SEARCH_FIELDS`). Teose metaandmed on
+dubleeritud igale lehe-dokumendile, nii et ilma selle piiranguta andis üks
+pealkirjavaste kõik teose leheküljed „vasteks" — „Buchdrucker" 469 vastet,
+millest 380 ei sisaldanud sõna, ja top-10 ühest teosest. Vt ADR 0027.
+
+Vastus on rühmitatud teose kaupa (päis üks kord) ja teoseülene otsing laotatakse
+teoste peale: kuni `PAGES_PER_WORK` (3) lehte teose kohta. `work_id`-ga piiratud
+otsingus kappi ei ole — seal ongi küsimus „kus SELLES teoses".
+
 ### Seisund
 
 Lehekülje seisundeid on **viis**: `Toores`, `Töös`, `Parandatud`,

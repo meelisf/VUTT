@@ -20,7 +20,8 @@ HIT = {
 def test_hit_sisaldab_koiki_votmeandmeid():
     out = fmt.format_search_hits([HIT], total=1, base_url=BASE)
     assert "v7Kq2mXp" in out
-    assert "lk 12/48" in out
+    assert "48 lk" in out       # teose maht teose real
+    assert "lk 12 ·" in out     # vaste lehekülg omal real
     assert "seisund=Valmis" in out
     assert "Disputatio politica" in out
     assert "quod respublica Suecorum" in out
@@ -276,3 +277,38 @@ def test_page_index_puuduv_seisund_ei_kao():
         [{"lehekylje_number": 1}], base_url=BASE, work_id="abc"
     )
     assert "seisund=?" in out
+
+
+# ── otsingutulemuse rühmitamine teose kaupa ───────────────────────────────
+
+def _vaste(work_id, page, title="Disputatio politica", **extra):
+    return dict(HIT, work_id=work_id, lehekylje_number=page, title=title, **extra)
+
+
+def test_search_hits_paise_ei_kordu_sama_teose_lehtedel():
+    """Mõõdetud: 26 % vastuse mahust oli märk-märgilt korduv päis."""
+    out = fmt.format_search_hits(
+        [_vaste("zhdry4", n) for n in (1, 2, 3)], total=3, base_url=BASE
+    )
+    assert out.count("Disputatio politica") == 1
+    assert out.count("work_id=zhdry4") == 1
+    for n in (1, 2, 3):
+        assert f"lk {n} ·" in out
+
+
+def test_search_hits_iga_teos_oma_numbri_all():
+    out = fmt.format_search_hits(
+        [_vaste("aaa", 1), _vaste("bbb", 5, title="Oratio"), _vaste("aaa", 2)],
+        total=3, base_url=BASE,
+    )
+    assert "[1]" in out and "[2]" in out and "[3]" not in out
+    # sama teose lehed koonduvad ühte rühma, ka kui Meili järjestus vaheldub
+    assert out.index("work_id=aaa") < out.index("work_id=bbb")
+    assert out.count("work_id=aaa") == 1
+
+
+def test_search_hits_loendur_nimetab_teoste_arvu():
+    out = fmt.format_search_hits(
+        [_vaste("aaa", 1), _vaste("bbb", 2)], total=99, base_url=BASE
+    )
+    assert "99" in out and "2 teosest" in out

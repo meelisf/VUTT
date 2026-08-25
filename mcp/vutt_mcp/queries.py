@@ -79,7 +79,15 @@ FILTER_FIELDS = [
 SORT_FIELDS = ["lehekylje_number"]
 
 # Väljad, mida OTSIME (peavad olema searchableAttributes hulgas)
-SEARCH_FIELDS = ["lehekylje_tekst", "marginaalia_tekst", "title", "authors_text"]
+# Väljad, millest otsitakse. Teose metaandmed (title, authors_text) on
+# dubleeritud IGALE lehe-dokumendile, nii et ilma selle piiranguta andis üks
+# pealkirjavaste kõik teose leheküljed „vasteks": „Buchdrucker" 469 vastet,
+# millest 380 ei sisaldanud sõna üldse, ja top-10 tuli ühest teosest.
+# Sama jaotus nagu töölaual (searchService.ts, scope='original').
+PAGE_SEARCH_FIELDS = ["lehekylje_tekst", "marginaalia_tekst"]
+WORK_SEARCH_FIELDS = PAGE_SEARCH_FIELDS + ["title", "authors_text"]
+# Lepingutesti jaoks: kõik, mida kuskil otsime, peab olema searchable.
+SEARCH_FIELDS = WORK_SEARCH_FIELDS
 
 # Kasutajale nähtav filtrinimi → Meili atribuut
 FACET_FIELDS = {
@@ -90,6 +98,50 @@ FACET_FIELDS = {
 }
 
 MAX_LIMIT = 50
+
+# Mitu lehekülge ühest teosest mahub teoseülesesse otsingutulemusse ja mitu
+# korda üle tõmmatakse, et kapp saaks midagi kärpida. Ilma kapita täitis üks
+# teos kogu akna: „typographus", limit=10 → sama teose leheküljed 1–10, ehkki
+# vasteid oli 258. Agent sai vaikselt vale pildi korpusest.
+PAGES_PER_WORK = 3
+# Ületõmbetegur ja lagi. Kapp saab kärpida ainult seda, mis aknasse mahub.
+# Mõõdetud 2026-08-25 pärast PAGE_SEARCH_FIELDS-i parandust: aken 30 annab
+# 8–10 eri teost (~85 ms), aken 60 ega 200 ei lisa ühtki teost, aga latents
+# kasvab 200 juures 250–360 ms-ni. Enne välja-parandust oleks sama tulemuse
+# jaoks vaja olnud akent 200 — juur oli otsinguulatuses, mitte aknas.
+OVERFETCH = 3
+MAX_FETCH = 60
+
+
+def apply_spread_window(body: dict, *, offset: int, limit: int) -> dict:
+    """Vahetab kuvatava akna ületõmbeakna vastu (teoseülene otsing).
+
+    Kärpimine peab käima ENNE offsetit, seega tõmbame alati esimesest
+    vastest alates ja lõikame ise.
+    """
+    body["hitsPerPage"] = min(max((offset + limit) * OVERFETCH, offset + limit),
+                              MAX_FETCH)
+    body["page"] = 1
+    return body
+
+
+def cap_pages_per_work(hits: list[dict], cap: int) -> list[dict]:
+    """Kärbib iga teose osakaalu, säilitades Meili relevantsusjärjekorra.
+
+    `cap <= 0` → ei kärbi (teosesisene otsing, kus kapp oleks vale: seal ongi
+    küsimus „kus SELLES teoses").
+    """
+    if cap <= 0:
+        return list(hits)
+    loetud: dict[str, int] = {}
+    valitud = []
+    for hit in hits:
+        wid = hit.get("work_id", "")
+        if loetud.get(wid, 0) >= cap:
+            continue
+        loetud[wid] = loetud.get(wid, 0) + 1
+        valitud.append(hit)
+    return valitud
 
 
 def normalize_query(text: str) -> str:
@@ -119,6 +171,7 @@ def build_search_body(
     genre_id: str | None = None,
     work_id: str | None = None,
     relax_matching: bool = False,
+    search_fields: list[str] | None = None,
     limit: int = 10,
     offset: int = 0,
 ) -> dict:
@@ -155,6 +208,8 @@ def build_search_body(
         "hitsPerPage": per_page,
         "page": (int(offset) // per_page) + 1,
     }
+    if search_fields:
+        body["attributesToSearchOn"] = list(search_fields)
     if distinct_works:
         body["distinct"] = "work_id"
     if clauses:

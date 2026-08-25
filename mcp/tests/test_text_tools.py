@@ -59,7 +59,7 @@ def server_with():
 async def test_search_pages_tagastab_katked(server_with):
     server, client = server_with([{"hits": [_hit()], "totalHits": 1}])
     out = await _call(server, "search_pages", {"query": "respublica"})
-    assert "v7Kq2mXp" in out and "lk 12/48" in out
+    assert "v7Kq2mXp" in out and "48 lk" in out and "lk 12 ·" in out
     assert client.bodies[0]["matchingStrategy"] == "all"
     assert "distinct" not in client.bodies[0]
 
@@ -81,7 +81,7 @@ async def test_search_works_kasutab_distincti_ja_naitab_esindavat_lehte(server_w
     out = await _call(server, "search_works", {"query": "respublica"})
     assert client.bodies[0]["distinct"] == "work_id"
     # Esindav lehekülg vastab küsimusele "miks see teos vaste oli"
-    assert "lk 7/48" in out
+    assert "48 lk" in out and "lk 7 ·" in out
 
 
 async def test_get_pages_keeldub_ule_kahekumne_lehe(server_with):
@@ -189,3 +189,41 @@ async def test_get_work_jatab_rollilegendi_ara_kui_ainult_autor(server_with):
     out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
     assert "auctor: Johannes Gezelius" in out
     assert "eessõna" not in out.lower()  # legendi ei ole
+
+
+async def test_search_pages_laotab_vasted_teoste_peale(server_with):
+    """Enne: 10 vastet tulid ühest teosest (lk 1–10) — vaikne vale pilt."""
+    hits = [_hit(page=n, work_id="aaa") for n in range(1, 11)] + [
+        _hit(page=1, work_id="bbb"), _hit(page=1, work_id="ccc")]
+    server, client = server_with([{"hits": hits, "totalHits": 99}])
+    out = await _call(server, "search_pages", {"query": "x", "limit": 5})
+    # Meilist tõmmatakse rohkem, kui kuvatakse
+    assert client.bodies[0]["hitsPerPage"] > 5
+    assert "work_id=aaa" in out and "work_id=bbb" in out and "work_id=ccc" in out
+    assert out.count("lk ") <= 6  # 3 lehte aaa-st + 1 + 1
+
+
+async def test_search_pages_teosesiseselt_ei_kärbita(server_with):
+    """work_id-ga piiratud otsing on „kus selles teoses" — kapp oleks vale."""
+    hits = [_hit(page=n, work_id="aaa") for n in range(1, 11)]
+    server, client = server_with([{"hits": hits, "totalHits": 10}])
+    out = await _call(server, "search_pages", {"query": "x", "work_id": "aaa", "limit": 10})
+    assert client.bodies[0]["hitsPerPage"] == 10
+    for n in range(1, 11):
+        assert f"lk {n} ·" in out
+
+
+async def test_search_pages_ei_otsi_teose_metaandmetest(server_with):
+    """„KUS mainitakse" = lehekülje tekstis, mitte teose pealkirjas."""
+    server, client = server_with([{"hits": [], "totalHits": 0}])
+    await _call(server, "search_pages", {"query": "Dorpat"})
+    assert client.bodies[0]["attributesToSearchOn"] == [
+        "lehekylje_tekst", "marginaalia_tekst"]
+
+
+async def test_search_works_otsib_ka_pealkirjast(server_with):
+    """„MILLISED teosed" = ka pealkiri ja autorid."""
+    server, client = server_with([{"hits": [], "totalHits": 0}])
+    await _call(server, "search_works", {"query": "Dorpat"})
+    valjad = client.bodies[0]["attributesToSearchOn"]
+    assert "title" in valjad and "authors_text" in valjad

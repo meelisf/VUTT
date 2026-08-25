@@ -58,12 +58,20 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         Otsing on vaikimisi range: kõik päringu sõnad peavad leheküljel esinema.
         Kui tulemusi ei tule, proovi relax_matching=true.
 
+        Tulemus on rühmitatud teose kaupa ja laotatud korpuse peale: ühest
+        teosest näidatakse kuni 3 lehekülge, et üks teos ei täidaks kogu
+        akent. KÕIK ühe teose vasted saad, kui annad work_id.
+
         work_id on teose püsiv lühikood (nanoid, nt "v7Kq2mXp") — kasuta seda
         otsingu piiramiseks ühe teosega. Filtriväärtusi saad list_filter_values'ist.
 
         Tulemuse `seisund` ütleb, kui usaldusväärne transkriptsioon on
         (skaala serveri juhendis).
         """
+        # Teoseülene otsing laotatakse teoste peale: tõmbame üle ja kärbime
+        # kuni PAGES_PER_WORK lehte teose kohta. Teosesiseses otsingus
+        # (work_id antud) on kapp vale — seal ongi küsimus „kus SELLES teoses".
+        kapp = 0 if work_id else queries.PAGES_PER_WORK
         body = queries.build_search_body(
             query,
             collection=collection,
@@ -73,11 +81,18 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             genre_id=genre_id,
             work_id=work_id,
             relax_matching=relax_matching,
+            search_fields=queries.PAGE_SEARCH_FIELDS,
             limit=limit,
-            offset=offset,
+            offset=offset if work_id else 0,
         )
+        if not work_id:
+            queries.apply_spread_window(body, offset=offset, limit=limit)
         data = client.meili_search(body)
-        hits = data.get("hits", [])
+        hits = queries.cap_pages_per_work(data.get("hits", []), kapp)
+        if not work_id:
+            # Kärpimine käib enne offsetit, muidu ei oleks lehekülgede
+            # järjestus lehelt lehele sama.
+            hits = hits[offset:offset + limit]
         return fmt.format_search_hits(
             hits, data.get("totalHits", len(hits)), base_url=base_url
         )
@@ -109,6 +124,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             language=language,
             genre_id=genre_id,
             relax_matching=relax_matching,
+            search_fields=queries.WORK_SEARCH_FIELDS,
             limit=limit,
             offset=offset,
         )

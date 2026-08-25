@@ -102,3 +102,39 @@ def test_facets_paring_ei_kysi_hitte():
     body = queries.build_facets_body("collections_hierarchy")
     assert body["limit"] == 0
     assert body["facets"] == ["collections_hierarchy"]
+
+
+# ── vastete laotamine teoste peale ────────────────────────────────────────
+
+def _h(work_id, page):
+    return {"work_id": work_id, "lehekylje_number": page}
+
+
+def test_cap_pages_per_work_piirab_teose_osakaalu():
+    """Ilma kapita täitis üks teos kogu akna: 10 vastet → 1 teos."""
+    hits = [_h("aaa", n) for n in range(1, 11)] + [_h("bbb", 1), _h("ccc", 1)]
+    valitud = queries.cap_pages_per_work(hits, 3)
+    assert [h["work_id"] for h in valitud] == ["aaa", "aaa", "aaa", "bbb", "ccc"]
+
+
+def test_cap_pages_per_work_sailitab_relevantsuse_jarjekorra():
+    hits = [_h("aaa", 1), _h("bbb", 1), _h("aaa", 2)]
+    assert [h["work_id"] for h in queries.cap_pages_per_work(hits, 3)] == \
+        ["aaa", "bbb", "aaa"]
+
+
+def test_cap_pages_per_work_kapp_null_ei_kärbi():
+    hits = [_h("aaa", n) for n in range(1, 5)]
+    assert queries.cap_pages_per_work(hits, 0) == hits
+
+
+def test_search_pages_otsib_ainult_lehetekstist():
+    """Teose metaandmed on dubleeritud igale lehe-dokumendile: pealkirjavaste
+    andis KÕIK teose leheküljed „vasteks" (Buchdrucker: 469 → 89 tegelikku)."""
+    body = queries.build_search_body("x", search_fields=queries.PAGE_SEARCH_FIELDS)
+    assert body["attributesToSearchOn"] == ["lehekylje_tekst", "marginaalia_tekst"]
+    assert "title" not in body["attributesToSearchOn"]
+
+
+def test_search_body_ilma_valjadeta_ei_pane_atribuuti():
+    assert "attributesToSearchOn" not in queries.build_search_body("x")
