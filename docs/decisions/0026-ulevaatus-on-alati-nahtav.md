@@ -70,6 +70,22 @@ alamhulga-ehitust (`pdfseparate` + `pdfunite`).
 - **Ebaõnnestunud PDF-alamhulk langeb vaikselt rasterteele ja logib `warning`-u.**
   Kasutajat ei tüüdata — ainus tagajärg on ooteaeg —, aga ilma selle logireata ei ole
   hiljem võimalik aru saada, miks 143-leheline töö võttis 36 sekundi asemel kuus minutit.
+- **Ülevaatuse värvileping: must = VÄLJAJÄTMINE.** Nii kontaktlehe nurgaikoon kui
+  täisvaate nupp on must täpselt siis, kui seda lehte EI poolitata või EI OCR-ita;
+  silt nimetab TEGEVUSE („Ära poolita"), värv ja `aria-pressed` näitavad OLEKUT.
+  Esimeses versioonis olid suunad vastandlikud (poolitusnupp must siis, kui leht
+  poolitub; OCR-nupp must siis, kui leht jääb välja) — kaks vastassuunalist signaali
+  kõrvuti tähendas, et kumbagi ei saanud usaldada.
+- **Väljajätmine peab ütlema TAGAJÄRJE, mitte ainult oleku.** Väljajäetud lehte ei
+  teki teosesse üldse; poolitusnupp jääb klõpsatavaks (olek säilib, vt „risti"), aga
+  on tuhm ja vihjega. Ilma selleta jäi õhku, kas väljajäetud leht ehk siiski
+  imporditakse poolitamata kujul.
+- **Pisipilt on `object-contain`, joon käib PILDI järgi.** Poolitamist vajav leht on
+  lapiti avaus; `object-cover` lõikas selle 3/4 kasti portreeks ja peitis just selle
+  tunnuse, mille pärast ülevaatus üldse olemas on. Kuna `contain` letterboxib, ei ole
+  `left: x%` kasti servast enam õige — laiuse suhe arvutatakse pildi loomulikust
+  kuvasuhtest (`imageWidthRatio`, `SplitContactSheet.tsx`). Kastikuju `BOX_RATIO` ja
+  `aspect-[3/4]` klass PEAVAD kokku langema.
 
 ## Tagajärjed
 

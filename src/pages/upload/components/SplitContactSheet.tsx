@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Columns2, Eye, EyeOff, Loader2, Maximize2 } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
@@ -17,13 +17,32 @@ interface Props {
 }
 
 /** Nurgaikooni kest — sama geomeetria kui PageCard tegevusnupul.
- *  must = see leht erineb vaikeolekust (§8); hall = vaikeolek. */
+ *  must = VÄLJAJÄTMINE: seda lehte ei OCR-ita / ei poolitata; hall = tehakse.
+ *  Mõlemad nurgaikoonid ja täisvaate nupud kannavad SAMA signaali — segased
+ *  suunad (must = „poolitatakse" ühes, „ei poolitata" teises) olid varem
+ *  peamine arusaamatuse allikas. */
 const cornerBtn = (active: boolean) =>
   `p-1 rounded shadow-sm border transition-colors ${
     active
       ? 'bg-gray-900 border-gray-900 text-white'
       : 'bg-white/90 border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-800'
   }`;
+
+/** Pisipildi kasti kuvasuhe (laius/kõrgus). PEAB vastama `aspect-[3/4]`
+ *  klassile allpool — joone asukoht arvutatakse sellest. */
+const BOX_RATIO = 3 / 4;
+
+/**
+ * Kui suure osa kasti laiusest pilt `object-contain`-iga tegelikult katab.
+ *
+ * Lapiti skann (kaheleheline avaus — just see, mida poolitatakse) on kastist
+ * laiem ja letterboxitakse: pilt katab kogu laiuse (1) või, portree korral,
+ * ainult osa. Joon `left: x%` kasti servast oleks siis VALES kohas — x käib
+ * PILDI laiuse kohta. Enne `object-cover`-i ajal oli sama viga vastupidi:
+ * lapiti pildi küljed lõigati ära ja joon näitas lõigatud kasti keskkohta.
+ */
+const imageWidthRatio = (aspect: number | undefined): number =>
+  (aspect === undefined ? 1 : Math.min(1, aspect / BOX_RATIO));
 
 /**
  * Lehtede ülevaatuse ruudustik. Karkass on `manage/PageCard`-ist (sama kest,
@@ -34,6 +53,8 @@ const SplitContactSheet: React.FC<Props> = ({
   uploadId, token, plan, gridCols, selected, onToggleSelect, onPageChange, onOpenPage,
 }) => {
   const { t } = useTranslation(['upload']);
+  // Pildi loomulik kuvasuhe lehe kaupa — teada alles pärast laadimist.
+  const [aspects, setAspects] = useState<Record<number, number>>({});
 
   return (
     <div
@@ -48,6 +69,9 @@ const SplitContactSheet: React.FC<Props> = ({
         const x = page.mode === 'custom' && page.split_x != null
           ? page.split_x
           : plan.default_split_x;
+        // Joon pildi, mitte kasti järgi (vt imageWidthRatio).
+        const wRatio = imageWidthRatio(aspects[page.n]);
+        const lineLeft = ((1 - wRatio) / 2 + x * wRatio) * 100;
         return (
           <div
             key={page.n}
@@ -69,10 +93,23 @@ const SplitContactSheet: React.FC<Props> = ({
                   src={prepressPreviewUrl(uploadId, page.n, token)}
                   alt={`${page.n}`}
                   loading="lazy"
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    if (!img.naturalHeight) return;
+                    const ratio = img.naturalWidth / img.naturalHeight;
+                    setAspects((prev) => (prev[page.n] === ratio
+                      ? prev
+                      : { ...prev, [page.n]: ratio }));
+                  }}
                   /* Tuhmub PILT, mitte kaart — muidu tuhmuvad ka ikoonid ja
                      väljajätmist ei saa kaardilt tagasi võtta (§8). Tuhmus
-                     tähendab täpselt üht asja: ei lähe OCR-i (§11). */
-                  className={`w-full h-full object-cover ${page.excluded ? 'opacity-35' : ''}`}
+                     tähendab täpselt üht asja: ei lähe OCR-i (§11).
+
+                     `object-contain`, MITTE `cover` (sama kuju nagu
+                     UploadStepReview pisipiltidel): poolitamist vajav leht ON
+                     lapiti ja peab ka ruudustikus lapiti välja nägema. `cover`
+                     lõikas avause küljed portreeks ja peitis just selle. */
+                  className={`w-full h-full object-contain ${page.excluded ? 'opacity-35' : ''}`}
                 />
               ) : (
                 <div
@@ -87,7 +124,7 @@ const SplitContactSheet: React.FC<Props> = ({
                 <div
                   data-testid={`line-${page.n}`}
                   className="absolute top-0 bottom-0 w-px bg-rose-600 pointer-events-none"
-                  style={{ left: `${x * 100}%` }}
+                  style={{ left: `${lineLeft}%` }}
                 />
               )}
 
@@ -133,9 +170,9 @@ const SplitContactSheet: React.FC<Props> = ({
                       split_x: null,
                     });
                   }}
-                  aria-pressed={page.mode !== 'nosplit'}
+                  aria-pressed={page.mode === 'nosplit'}
                   title={page.mode === 'nosplit' ? t('step3split.card.split') : t('step3split.card.noSplit')}
-                  className={cornerBtn(page.mode !== 'nosplit')}
+                  className={cornerBtn(page.mode === 'nosplit')}
                 >
                   <Columns2 size={14} />
                 </button>

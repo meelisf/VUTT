@@ -102,7 +102,8 @@
       "include": "Lisa OCR-i",
       "split": "Poolita",
       "noSplit": "Ära poolita",
-      "open": "Ava täisvaade"
+      "open": "Ava täisvaade",
+      "splitKeptWhileExcluded": "Poolitusolek säilib, aga hakkab kehtima alles siis, kui leht OCR-i tagasi lisada"
     },
     "bar": {
       "count": "Valitud: {{count}}",
@@ -133,8 +134,10 @@
       "header": "Lk {{n}} · {{total}}-st · poolitatakse joonelt {{percent}}%",
       "headerNoSplit": "Lk {{n}} · {{total}}-st · ei poolitata",
       "arrowHint": "← → liigub lehtede vahel",
-      "resetToGlobal": "Lähtesta üldjoonele"
-    }
+      "resetToGlobal": "Lähtesta üldjoonele",
+      "headerExcluded": "Lk {{n}} · {{total}}-st · jäetakse välja"
+    },
+    "excludedExplain": "Ei OCR-ita ega poolitata — seda lehte teosesse ei teki"
   },
   "notice": {
     "title": "Üleslaadimine käib kahes järgus",

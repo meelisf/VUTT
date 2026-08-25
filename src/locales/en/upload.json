@@ -102,7 +102,8 @@
       "include": "Include in OCR",
       "split": "Split",
       "noSplit": "Don't split",
-      "open": "Open full view"
+      "open": "Open full view",
+      "splitKeptWhileExcluded": "The split setting is kept, but only takes effect once the page is added back to OCR"
     },
     "bar": {
       "count": "Selected: {{count}}",
@@ -133,8 +134,10 @@
       "header": "Page {{n}} of {{total}} · split at {{percent}}%",
       "headerNoSplit": "Page {{n}} of {{total}} · not split",
       "arrowHint": "← → moves between pages",
-      "resetToGlobal": "Reset to global line"
-    }
+      "resetToGlobal": "Reset to global line",
+      "headerExcluded": "Page {{n}} of {{total}} · excluded"
+    },
+    "excludedExplain": "Not OCR’d and not split — this page will not appear in the work"
   },
   "notice": {
     "title": "Uploading happens in two stages",
