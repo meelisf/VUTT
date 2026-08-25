@@ -270,6 +270,22 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str,
     return "\n".join(blocks)
 
 
+def format_facet_value(value: str, labels: dict) -> str:
+    """Q-koodile sildid juurde. Kood JÄÄB — filter vajab teda, mitte silti.
+
+    Paljas „Q609697" paneb mudeli oletama („Q1813927 might be…"), sest
+    Wikidata identifikaator ei kanna tähendust. Eelistus et → en; kui
+    registris koodi ei ole, jääb kood paljaks.
+    """
+    sildid = labels.get(value) or {}
+    nimed: list[str] = []
+    for keel in ("et", "en"):
+        nimi = sildid.get(keel)
+        if nimi and nimi.lower() not in {n.lower() for n in nimed}:
+            nimed.append(nimi)
+    return f"{value} ({' / '.join(nimed)})" if nimed else value
+
+
 def format_fields(pairs: list[tuple[str, object]]) -> str:
     """Sildistatud väljad. Tühjad väärtused jäetakse välja — müra maksab tokeneid."""
     lines = []
