@@ -114,7 +114,22 @@
       "clear": "Clear selection",
       "shiftHint": "Shift+click selects a range",
       "splitResult": "{{applied}} pages got the global line, {{kept}} manual lines left untouched"
-    }
+    },
+    "splitAll": "Split all",
+    "clearGlobalSplit": "Remove global split",
+    "model": {
+      "label": "OCR model",
+      "print": "Print",
+      "hand": "Handwriting",
+      "locked": "The model can only be changed before sending to OCR"
+    },
+    "selectAll": "Select all",
+    "selectSplit": "Select split",
+    "summaryNoSplit": "no splits · {{output}} pages go to OCR · {{excluded}} excluded",
+    "summarySplit": "{{split}} will be split · {{output}} pages go to OCR · {{excluded}} excluded",
+    "gridSmaller": "Smaller thumbnails",
+    "gridLarger": "Larger thumbnails",
+    "gridColumns": "Thumbnail size"
   },
   "notice": {
     "title": "Uploading happens in two stages",
