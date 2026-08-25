@@ -16,11 +16,13 @@ VUTT = Tartu ülikooli varauusaegse (1632-1710) trükikorpuse transkriptsioonid
 (vutt.utlib.ut.ee). Kõik tööriistad on read-only.
 
 KEELED - arvesta neid, muidu otsid tühja:
-- Alliktekstid on ladina (~15600 lk), saksa (~4500), rootsi (~2100) ja kreeka
-  (~2100) keeles; eestikeelset teksti on korpuses ainult ~440 lk. Otsi seega
-  ladina- või saksakeelse sõnaga, MITTE eestikeelse terminiga ("disputatio",
-  mitte "väitluskiri"). Varauusaegne ortograafia kõigub (u/v, i/j, ß/ss,
-  ae/æ) - otsi lühikest tüve, mitte täpset fraasi ega käändelõpuga sõna.
+- Alliktekstid: ladina ~15600 lk, saksa ~4500, rootsi ~2100, kreeka ~2100;
+  eestikeelset teksti on ainult ~440 lk. Otsi seega ladina- või saksakeelse
+  sõnaga, MITTE eestikeelse terminiga ("disputatio", mitte "väitluskiri").
+  Varauusaegne ortograafia kõigub (u/v, i/j, ß/ss, ae/æ) - otsi lühikest tüve.
+- Ühesõnaline päring toimib sõnaosa otsinguna: "orati" leiab "orationem",
+  "orationes" jne. Mitmesõnalises päringus tohib ainult VIIMANE sõna olla
+  poolik: "oratio panegyr" ei leia "orationem panegyricam".
 - Sekundaarkirjandus (list_literature, search_literature) on peamiselt saksa-
   ja eestikeelne, osalt rootsi ja inglise. Sama mõiste on kahes kihis eri
   keeles: allikast otsi "typographus", sekundaarist "trükkal" / "Buchdrucker".
@@ -30,19 +32,19 @@ TÖÖKÄIK:
    on suletud loend, ära oleta neid.
 2. search_works = MILLISED teosed teemat käsitlevad; search_pages = KUS midagi
    mainitakse.
-3. get_pages(work_id, from_page, to_page) = lehekülje täistekst.
+3. get_pages(work_id, from_page, to_page) = täistekst.
 4. Isikud: search_persons / get_person (prosopograafia, ~2350 kaarti).
 5. Sekundaarkirjandus on ERALDI kogu, mitte korpuse osa: list_literature
-   näitab, mis seal üldse on; get_literature_pages nõuab page_ref="printed"
-   (trükise leheküljenumber) või "pdf" (faili lehe number).
+   näitab, mis seal on; get_literature_pages nõuab page_ref="printed" (trükise
+   number) või "pdf" (faili leht).
 
 REEGLID:
-- work_id on nanoid ("v7Kq2mXp"), mitte pealkiri ega kaustanimi. See tuleb iga
-  tulemusega kaasa - anna edasi get_work'ile, get_pages'ile, search_pages'ile.
+- work_id on nanoid ("v7Kq2mXp"), mitte pealkiri ega kaustanimi; tuleb iga
+  tulemusega kaasa, anna edasi järgmisele tööriistale.
 - Otsing on vaikimisi range (kõik sõnad peavad leheküljel esinema). Tühja
   tulemuse järel proovi lühemat päringut ja relax_matching=true.
 - Tekst on masinlugemine. Lehe seisund kasvavas usaldusväärsuses: Toores
   (kontrollimata OCR) < Töös < Parandatud < Annoteeritud < Valmis (inimese
-  kinnitatud). Vastustes seda skaalat ei korrata.
+  kinnitatud).
 - Tühi tulemus EI tõesta, et teemat pole - kontrolli enne list_filter_values'i
   ja list_literature'iga, kas õige allikas on kogus üldse olemas."""
