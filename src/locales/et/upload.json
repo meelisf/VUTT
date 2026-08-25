@@ -87,24 +87,24 @@
     "backToSplit": "Tagasi poolitamise juurde"
   },
   "step3split": {
-    "title": "Topeltlehtede poolitamine",
-    "optIn": "Poolita topeltlehed enne OCR-i",
-    "optInHint": "Lülita sisse ainult siis, kui skaneeringul on kaks lehekülge ühel pildil. Muidu vajuta lihtsalt Edasi — kõik käib nagu tavaliselt.",
-    "optInHintModel": "Käsikirja tuvastav mudel töötab paremini üksikute lehtedega — topeltlehe puhul võib see segadusse sattuda ja hakata sama teksti lõputult kordama.",
+    "title": "Lehtede ülevaatus",
     "rendering": "Eelvaadet valmistatakse: {{done}} / {{total}}",
     "renderError": "Eelvaate valmistamine ebaõnnestus",
     "globalLine": "Poolitusjoon (% laiusest)",
-    "summary": "{{pages}} lehest {{split}} poolitatakse, {{excluded}} jäetakse välja → OCR-i läheb {{output}} lehte",
-    "exclude": "Jäta välja",
-    "include": "Võta tagasi",
-    "noSplit": "Ära poolita",
     "resetToGlobal": "Kasuta üldist joont",
-    "openPage": "Ava leht",
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
     "willNotSplit": "Seda lehte ei poolitata",
     "isExcluded": "See leht jäetakse OCR-ist välja",
-    "backToOverview": "Tagasi ülevaatesse"
+    "backToOverview": "Tagasi ülevaatesse",
+    "card": {
+      "select": "Vali leht",
+      "exclude": "Jäta OCR-ist välja",
+      "include": "Lisa OCR-i",
+      "split": "Poolita",
+      "noSplit": "Ära poolita",
+      "open": "Ava täisvaade"
+    }
   },
   "notice": {
     "title": "Üleslaadimine käib kahes järgus",

@@ -87,24 +87,24 @@
     "backToSplit": "Back to splitting"
   },
   "step3split": {
-    "title": "Split double pages",
-    "optIn": "Split double pages before OCR",
-    "optInHint": "Turn this on only if a single scan holds two book pages. Otherwise just press Continue — everything works as before.",
-    "optInHintModel": "The handwriting recognition model works better on single pages — on a double page it can get confused and start repeating the same text endlessly.",
+    "title": "Review pages",
     "rendering": "Preparing preview: {{done}} / {{total}}",
     "renderError": "Preview generation failed",
     "globalLine": "Split line (% of width)",
-    "summary": "{{split}} of {{pages}} pages will be split, {{excluded}} excluded → {{output}} pages go to OCR",
-    "exclude": "Exclude",
-    "include": "Restore",
-    "noSplit": "Don't split",
     "resetToGlobal": "Use the global line",
-    "openPage": "Open page",
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
     "willNotSplit": "This page will not be split",
     "isExcluded": "This page is excluded from OCR",
-    "backToOverview": "Back to overview"
+    "backToOverview": "Back to overview",
+    "card": {
+      "select": "Select page",
+      "exclude": "Exclude from OCR",
+      "include": "Include in OCR",
+      "split": "Split",
+      "noSplit": "Don't split",
+      "open": "Open full view"
+    }
   },
   "notice": {
     "title": "Uploading happens in two stages",
