@@ -58,6 +58,13 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         Otsing on vaikimisi range: kõik päringu sõnad peavad leheküljel esinema.
         Kui tulemusi ei tule, proovi relax_matching=true.
 
+        SÕNAOSA: ühesõnaline päring otsib sõnaosana, nii et "orati" leiab
+        "orationem", "orationes" jne — käändelõpuga täissõna leiab VÄHEM.
+        Mitmesõnalises päringus tohib ainult VIIMANE sõna olla poolik:
+        "oratio panegyr" ei leia "orationem panegyricam" (mõõdetud: 21 lehest
+        2). Vaste algab alati sõna algusest — "gyricus" ei leia sõna
+        "panegyricus".
+
         Tulemus on rühmitatud teose kaupa ja laotatud korpuse peale: ühest
         teosest näidatakse kuni 3 lehekülge, et üks teos ei täidaks kogu
         akent. KÕIK ühe teose vasted saad, kui annad work_id.

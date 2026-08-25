@@ -41,3 +41,11 @@ def test_juhend_nimetab_tooriistad_toojarjekorras():
                      "get_pages", "search_persons", "list_literature",
                      "get_literature_pages"):
         assert tööriist in SERVER_INSTRUCTIONS
+
+
+def test_juhend_selgitab_sonaosa_reeglit():
+    """Mõõdetud: „oratio panegyr" leiab 21 lehest 2 — esimene sõna peab olema
+    terve. Ilma selle reeglita otsivad agendid käändelõpuga täissõnu."""
+    assert "sõnaosa" in SERVER_INSTRUCTIONS
+    assert "VIIMANE" in SERVER_INSTRUCTIONS
+    assert "orati" in SERVER_INSTRUCTIONS
