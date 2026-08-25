@@ -91,7 +91,6 @@
     "rendering": "Eelvaadet valmistatakse: {{done}} / {{total}}",
     "renderError": "Eelvaate valmistamine ebaõnnestus",
     "globalLine": "Poolitusjoon (% laiusest)",
-    "resetToGlobal": "Kasuta üldist joont",
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
     "willNotSplit": "Seda lehte ei poolitata",
@@ -129,7 +128,13 @@
     "summarySplit": "poolitatakse {{split}} · OCR-i läheb {{output}} lehte · välja jäetud {{excluded}}",
     "gridSmaller": "Väiksemad pisipildid",
     "gridLarger": "Suuremad pisipildid",
-    "gridColumns": "Pisipiltide suurus"
+    "gridColumns": "Pisipiltide suurus",
+    "detail": {
+      "header": "Lk {{n}} · {{total}}-st · poolitatakse joonelt {{percent}}%",
+      "headerNoSplit": "Lk {{n}} · {{total}}-st · ei poolitata",
+      "arrowHint": "← → liigub lehtede vahel",
+      "resetToGlobal": "Lähtesta üldjoonele"
+    }
   },
   "notice": {
     "title": "Üleslaadimine käib kahes järgus",

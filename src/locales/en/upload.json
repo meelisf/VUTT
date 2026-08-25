@@ -91,7 +91,6 @@
     "rendering": "Preparing preview: {{done}} / {{total}}",
     "renderError": "Preview generation failed",
     "globalLine": "Split line (% of width)",
-    "resetToGlobal": "Use the global line",
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
     "willNotSplit": "This page will not be split",
@@ -129,7 +128,13 @@
     "summarySplit": "{{split}} will be split · {{output}} pages go to OCR · {{excluded}} excluded",
     "gridSmaller": "Smaller thumbnails",
     "gridLarger": "Larger thumbnails",
-    "gridColumns": "Thumbnail size"
+    "gridColumns": "Thumbnail size",
+    "detail": {
+      "header": "Page {{n}} of {{total}} · split at {{percent}}%",
+      "headerNoSplit": "Page {{n}} of {{total}} · not split",
+      "arrowHint": "← → moves between pages",
+      "resetToGlobal": "Reset to global line"
+    }
   },
   "notice": {
     "title": "Uploading happens in two stages",
