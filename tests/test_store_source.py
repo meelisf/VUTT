@@ -174,3 +174,89 @@ def test_expected_pages_tuleb_plaanist_mitte_lahtefailist(upload, monkeypatch):
     store_source.transfer_stored_source(uid)
 
     assert upload_state.read_state(uid)["expected_pages"] == 3
+
+
+def test_pdf_teel_ehitatakse_alamhulk_ilma_valjajaetud_lehtedeta(upload, monkeypatch):
+    """Viga B, PDF-i haru: originaal läks muutmata edasi ja väljajätt oli no-op."""
+    uid, base = upload
+    from tests.test_pdf_subset import _make_pdf, _page_count
+    _make_pdf(base / "source.pdf", 4)
+    upload_state.init_prepress(uid, 4)
+    upload_state.mutate_prepress(uid, lambda p: p["pages"][2].update(excluded=True))
+
+    put = []
+
+    class _Sftp:
+        def put(self, src, dst):
+            put.append((src, dst))
+
+        def rename(self, a, b):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(store_source.ocr_client, "sftp_open", lambda i: _Sftp())
+    monkeypatch.setattr(store_source.ocr_client, "ensure_remote_dirs",
+                        lambda sftp, dirs: None)
+    _fake_thread(monkeypatch)
+
+    store_source.transfer_stored_source(uid)
+
+    assert len(put) == 1
+    assert _page_count(put[0][0]) == 3                       # saadeti alamhulk
+    assert put[0][0] != str(base / "source.pdf")             # MITTE originaal
+    assert upload_state.read_state(uid)["expected_pages"] == 3
+
+
+def test_pdf_teel_ilma_valjajatmiseta_laheb_originaal(upload, monkeypatch):
+    """Puutumata plaan peab endiselt käima kõige odavamat teed."""
+    uid, base = upload
+    from tests.test_pdf_subset import _make_pdf
+    _make_pdf(base / "source.pdf", 3)
+    upload_state.init_prepress(uid, 3)
+
+    put = []
+
+    class _Sftp:
+        def put(self, src, dst):
+            put.append(src)
+
+        def rename(self, a, b):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(store_source.ocr_client, "sftp_open", lambda i: _Sftp())
+    monkeypatch.setattr(store_source.ocr_client, "ensure_remote_dirs",
+                        lambda sftp, dirs: None)
+    _fake_thread(monkeypatch)
+
+    store_source.transfer_stored_source(uid)
+
+    assert put == [str(base / "source.pdf")]
+
+
+def test_alamhulga_ebaonnestumine_langeb_rasterteele_ja_logib(upload, monkeypatch, caplog):
+    """Kasutajat ei tüüdata; logi PEAB ütlema, miks töö läks kalli tee peale."""
+    uid, base = upload
+    from tests.test_pdf_subset import _make_pdf
+    _make_pdf(base / "source.pdf", 3)
+    upload_state.init_prepress(uid, 3)
+    upload_state.mutate_prepress(uid, lambda p: p["pages"][0].update(excluded=True))
+
+    def _kukub(*a, **kw):
+        raise RuntimeError("pdfunite exit=1")
+
+    monkeypatch.setattr(store_source.pdf_subset, "build_subset_pdf", _kukub)
+    rastered = []
+    monkeypatch.setattr(store_source.prepress_apply, "apply_and_transfer",
+                        lambda i: rastered.append(i))
+    _fake_thread(monkeypatch)
+
+    with caplog.at_level("WARNING"):
+        store_source.transfer_stored_source(uid)
+
+    assert rastered == [uid]
+    assert "falling back to raster path" in caplog.text

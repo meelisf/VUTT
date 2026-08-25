@@ -13,7 +13,7 @@ import shutil
 import threading
 
 from ..config import get_logger
-from . import file_detection, ocr_client
+from . import file_detection, ocr_client, pdf_subset, prepress_apply, prepress_plan
 from . import state as upload_state
 
 logger = get_logger(__name__)
@@ -123,14 +123,51 @@ def _transfer_pdf_thread(upload_id: str, state: dict, pdf: str) -> None:
     remote_tmp = "{}/{}.pdf.tmp".format(staging, slug)
     remote_dst = "{}/{}.pdf".format(staging, slug)
 
+    plan = state.get("prepress")
+    page_count = len((plan or {}).get("pages", []))
+    keep = [n for n in range(1, page_count + 1)
+            if not prepress_plan.is_excluded(plan, n)]
+    needs_subset = page_count > 0 and len(keep) < page_count
+
     def _run():
+        send_path, expected = pdf, None
+        if needs_subset:
+            try:
+                subset = os.path.join(
+                    upload_state.upload_dir(upload_id), "apply_tmp", "subset.pdf"
+                )
+                os.makedirs(os.path.dirname(subset), exist_ok=True)
+                expected = pdf_subset.build_subset_pdf(pdf, keep, subset)
+                send_path = subset
+            except Exception as e:
+                # Varutee (a): plaan läheb 300 DPI teele, kus page_cuts
+                # väljajätmist juba arvestab. Kasutajat ei tüüdata — ainus
+                # tagajärg on ooteaeg —, aga ilma selle logireata ei ole
+                # hiljem võimalik aru saada, miks 143-leheline töö võttis
+                # 36 sekundi asemel kuus minutit.
+                logger.warning(
+                    "exclusion-only PDF fast path failed; falling back to "
+                    "raster path: upload=%s: %s", upload_id, e
+                )
+                # apply_and_transfer eeldab, et CAS on juba loa andnud —
+                # try_begin_applying jooksis apply endpointis. Uut CAS-i ei
+                # tohi teha: staatus on praegu "uploading", mitte
+                # "awaiting_split", ja start_apply ütleks lihtsalt ei.
+                prepress_apply.apply_and_transfer(upload_id)
+                return
+
         sftp = None
         try:
             sftp = ocr_client.sftp_open(upload_id)
             ocr_client.ensure_remote_dirs(sftp, (staging,))
-            sftp.put(pdf, remote_tmp)
+            sftp.put(send_path, remote_tmp)
             sftp.rename(remote_tmp, remote_dst)
-            upload_state.set_upload_state(upload_id, status="processing")
+            if expected is not None:
+                upload_state.set_upload_state(
+                    upload_id, status="processing", expected_pages=expected
+                )
+            else:
+                upload_state.set_upload_state(upload_id, status="processing")
             logger.info("Lähte-PDF edastatud OCR-serverisse: {}".format(upload_id))
         except Exception as e:
             logger.error("PDF edastus {}: {}".format(upload_id, e))
@@ -152,7 +189,6 @@ def _transfer_pdf_thread(upload_id: str, state: dict, pdf: str) -> None:
 
 def _transfer_images_thread(upload_id: str, state: dict, directory: str) -> None:
     from ..config import OCR_SERVER_PATH
-    from . import prepress_plan
     from .prepress_apply import publish_atomic
 
     slug = state["meta"]["slug"]
