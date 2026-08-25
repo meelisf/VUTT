@@ -104,6 +104,16 @@
       "split": "Split",
       "noSplit": "Don't split",
       "open": "Open full view"
+    },
+    "bar": {
+      "count": "Selected: {{count}}",
+      "split": "Split",
+      "noSplit": "Don't split",
+      "exclude": "Skip OCR",
+      "include": "Include in OCR",
+      "clear": "Clear selection",
+      "shiftHint": "Shift+click selects a range",
+      "splitResult": "{{applied}} pages got the global line, {{kept}} manual lines left untouched"
     }
   },
   "notice": {

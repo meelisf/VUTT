@@ -104,6 +104,16 @@
       "split": "Poolita",
       "noSplit": "Ära poolita",
       "open": "Ava täisvaade"
+    },
+    "bar": {
+      "count": "Valitud: {{count}}",
+      "split": "Poolita",
+      "noSplit": "Ära poolita",
+      "exclude": "Ära OCR-i",
+      "include": "Lisa OCR-i",
+      "clear": "Tühista valik",
+      "shiftHint": "Shift+klõps valib vahemiku",
+      "splitResult": "{{applied}} lehte sai üldjoone, {{kept}} käsitsi seatut jäi puutumata"
     }
   },
   "notice": {
