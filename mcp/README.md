@@ -164,6 +164,38 @@ Vastus on rühmitatud teose kaupa (päis üks kord) ja teoseülene otsing laotat
 teoste peale: kuni `PAGES_PER_WORK` (3) lehte teose kohta. `work_id`-ga piiratud
 otsingus kappi ei ole — seal ongi küsimus „kus SELLES teoses".
 
+### Korduste kokkusurumine (`collapse_repeats`)
+
+OCR-mudel läheb mõnel leheküljel sõlme ja kordab sama plokki kümneid kuni
+tuhandeid kordi. Mõõdetud 2026-08-25: **494 lehte (2,0 %) 127 teoses**,
+unikaalset teksti mediaanina 27 %, maht 846 sõna vs tavalise lehe 255.
+493 neist on seisundis „Toores". **Re-OCR ei aita — silmus on mudelis**,
+mitte andmetes; parandus tuleb koos uue mudeliga.
+
+`get_pages` surub järjestikused kordused kokku, aga **NÄHTAVALT**:
+
+```
+— [sama 1-sõnaline lõik kordub veel 1819× — välja jäetud]
+```
+
+Märgend ütleb ploki, korduste arvu ja selle, et midagi jäi välja; originaal on
+lehe lingi taga. **Vaikne kokkusurumine on keelatud** — agent tsiteeriks siis
+transkriptsiooni, mida failis ei ole. Läved: ≥4 kordust JA ≥12 sõna
+(vähem = ehtne retoorika), periood kuni 30 sõna.
+
+Kokkusurumine EI puuduta otsingukatkeid — need on niikuinii 40 sõnaga piiratud.
+
+Kordus ei ole alati viga: `g194aj` (Album Academicum) lk 53 on statistikatabel,
+kus tühje lahtreid märgib kriips. Seepärast on märgend kirjeldav, mitte
+diagnoosiv — programm ei suudaks silmust ehtsast kordusest eristada.
+
+### Avastusrežiim ja pagineerimine
+
+`search_pages(compact=true)` jätab katked välja ja annab teose, lehenumbrid ja
+lingimustri: `limit=50` puhul 17 584 → 4657 märki (−74 %). Vastuse lõpus on
+`Järgmine leht: offset=N`, aga ainult siis, kui aken sai täis JA vasteid on
+veel — muidu lubaks vihje tühja järelpäringut.
+
 ### Seisund
 
 Lehekülje seisundeid on **viis**: `Toores`, `Töös`, `Parandatud`,
