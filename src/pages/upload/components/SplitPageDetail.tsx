@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronLeft, ChevronRight, Ban, EyeOff, LayoutGrid } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Columns2, Eye, EyeOff, LayoutGrid } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
 import { clampSplitX, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
@@ -111,13 +111,15 @@ const SplitPageDetail: React.FC<Props> = ({
       <div className="my-auto flex max-h-[calc(100vh-1rem)] w-full max-w-6xl flex-col rounded bg-white sm:max-h-[calc(100vh-2rem)]">
         <div className="flex flex-shrink-0 items-center justify-between gap-2 rounded-t border-b border-gray-200 bg-white px-4 py-3">
           <h3 className="font-semibold">
-            {pageNum}
-            <span className="ml-1 text-sm font-normal text-gray-400">
-              / {plan.pages.length}
-            </span>
-            <span className="ml-3 text-sm font-normal text-gray-500">
-              {splits ? `${Math.round(liveX * 1000) / 10}%` : '—'}
-            </span>
+            {splits
+              ? t('step3split.detail.header', {
+                n: pageNum,
+                total: plan.pages.length,
+                percent: Math.round(liveX * 1000) / 10,
+              })
+              : t('step3split.detail.headerNoSplit', {
+                n: pageNum, total: plan.pages.length,
+              })}
           </h3>
           <button
             type="button"
@@ -169,7 +171,7 @@ const SplitPageDetail: React.FC<Props> = ({
                   className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-6"
                 >
                   <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
-                    {excluded ? <EyeOff size={15} /> : <Ban size={15} />}
+                    {excluded ? <EyeOff size={15} /> : <Columns2 size={15} />}
                     {excluded ? t('step3split.isExcluded') : t('step3split.willNotSplit')}
                   </span>
                 </div>
@@ -178,11 +180,13 @@ const SplitPageDetail: React.FC<Props> = ({
           </div>
         </div>
 
-        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 rounded-b border-t border-gray-200 bg-white px-4 py-3">
-            {/* Väljapääs on tegevusribal SÕNADEGA. Päise X ja Escape üksi ei
-                ütle, KUHU nad viivad — kontaktleht ei ole ilmne sihtkoht.
-                Lehe vahetus — sama kuju ja klahvid nagu Manage pildiredaktoris.
-                Joont nihutab kasutaja AINULT hiirega (käepide või klõps pildil). */}
+        <div className="flex-shrink-0 rounded-b border-t border-gray-200 bg-white px-4 py-3">
+          {/* Üks rühm, järjestuses: Ülevaatesse | ‹ › | Ära poolita · Ära OCR-i
+              · Lähtesta üldjoonele (§9). Väljapääs on SÕNADEGA — päise X ja
+              Escape üksi ei ütle, KUHU nad viivad. Lehe vahetus järgib Manage
+              pildiredaktori kuju ja klahve; joont nihutab kasutaja AINULT
+              hiirega (käepide või klõps pildil). */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-1">
               <button
                 type="button"
@@ -216,6 +220,37 @@ const SplitPageDetail: React.FC<Props> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* Toggle: silt pöördub oleku järgi, olekut kannab aria-pressed (§8) */}
+              <button
+                type="button"
+                data-testid="detail-nosplit"
+                aria-pressed={!noSplitMode}
+                className={`flex items-center gap-1.5 rounded border px-3 py-1 text-sm ${
+                  !noSplitMode
+                    ? 'border-gray-900 bg-gray-900 font-medium text-white'
+                    : 'border-gray-300'
+                }`}
+                onClick={() => onPageChange(pageNum, {
+                  mode: noSplitMode ? 'default' : 'nosplit', split_x: null,
+                })}
+              >
+                <Columns2 size={15} />
+                {noSplitMode ? t('step3split.card.split') : t('step3split.card.noSplit')}
+              </button>
+              <button
+                type="button"
+                data-testid="detail-exclude"
+                aria-pressed={excluded}
+                className={`flex items-center gap-1.5 rounded border px-3 py-1 text-sm ${
+                  excluded
+                    ? 'border-gray-900 bg-gray-900 font-medium text-white'
+                    : 'border-gray-300'
+                }`}
+                onClick={() => onPageChange(pageNum, { excluded: !excluded })}
+              >
+                {excluded ? <EyeOff size={15} /> : <Eye size={15} />}
+                {excluded ? t('step3split.card.include') : t('step3split.card.exclude')}
+              </button>
               <button
                 type="button"
                 className={`rounded border px-3 py-1 text-sm ${
@@ -225,23 +260,11 @@ const SplitPageDetail: React.FC<Props> = ({
                 }`}
                 onClick={() => onPageChange(pageNum, { mode: 'default', split_x: null })}
               >
-                {t('step3split.resetToGlobal')}
-              </button>
-              <button
-                type="button"
-                aria-pressed={noSplitMode}
-                className={`rounded border px-3 py-1 text-sm ${
-                  noSplitMode
-                    ? 'border-gray-900 bg-gray-900 font-medium text-white'
-                    : 'border-gray-300'
-                }`}
-                onClick={() => onPageChange(pageNum, {
-                  mode: noSplitMode ? 'default' : 'nosplit', split_x: null,
-                })}
-              >
-                {t('step3split.noSplit')}
+                {t('step3split.detail.resetToGlobal')}
               </button>
             </div>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">{t('step3split.detail.arrowHint')}</p>
         </div>
       </div>
     </div>

@@ -87,24 +87,54 @@
     "backToSplit": "Tagasi poolitamise juurde"
   },
   "step3split": {
-    "title": "Topeltlehtede poolitamine",
-    "optIn": "Poolita topeltlehed enne OCR-i",
-    "optInHint": "Lülita sisse ainult siis, kui skaneeringul on kaks lehekülge ühel pildil. Muidu vajuta lihtsalt Edasi — kõik käib nagu tavaliselt.",
-    "optInHintModel": "Käsikirja tuvastav mudel töötab paremini üksikute lehtedega — topeltlehe puhul võib see segadusse sattuda ja hakata sama teksti lõputult kordama.",
+    "title": "Lehtede ülevaatus",
     "rendering": "Eelvaadet valmistatakse: {{done}} / {{total}}",
     "renderError": "Eelvaate valmistamine ebaõnnestus",
     "globalLine": "Poolitusjoon (% laiusest)",
-    "summary": "{{pages}} lehest {{split}} poolitatakse, {{excluded}} jäetakse välja → OCR-i läheb {{output}} lehte",
-    "exclude": "Jäta välja",
-    "include": "Võta tagasi",
-    "noSplit": "Ära poolita",
-    "resetToGlobal": "Kasuta üldist joont",
-    "openPage": "Ava leht",
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
     "willNotSplit": "Seda lehte ei poolitata",
     "isExcluded": "See leht jäetakse OCR-ist välja",
-    "backToOverview": "Tagasi ülevaatesse"
+    "backToOverview": "Tagasi ülevaatesse",
+    "card": {
+      "select": "Vali leht",
+      "exclude": "Jäta OCR-ist välja",
+      "include": "Lisa OCR-i",
+      "split": "Poolita",
+      "noSplit": "Ära poolita",
+      "open": "Ava täisvaade"
+    },
+    "bar": {
+      "count": "Valitud: {{count}}",
+      "split": "Poolita",
+      "noSplit": "Ära poolita",
+      "exclude": "Ära OCR-i",
+      "include": "Lisa OCR-i",
+      "clear": "Tühista valik",
+      "shiftHint": "Shift+klõps valib vahemiku",
+      "splitResult": "{{applied}} lehte sai üldjoone, {{kept}} käsitsi seatut jäi puutumata"
+    },
+    "splitAll": "Poolita kõik",
+    "clearGlobalSplit": "Eemalda üldpoolitus",
+    "model": {
+      "label": "OCR-mudel",
+      "print": "Trükis",
+      "hand": "Käsikiri",
+      "locked": "Mudelit saab muuta ainult enne OCR-i saatmist"
+    },
+    "selectAll": "Vali kõik",
+    "selectSplit": "Vali poolitatud",
+    "summaryNoSplit": "poolitusi pole · OCR-i läheb {{output}} lehte · välja jäetud {{excluded}}",
+    "summarySplit": "poolitatakse {{split}} · OCR-i läheb {{output}} lehte · välja jäetud {{excluded}}",
+    "gridSmaller": "Väiksemad pisipildid",
+    "gridLarger": "Suuremad pisipildid",
+    "gridColumns": "Pisipiltide suurus",
+    "detail": {
+      "header": "Lk {{n}} · {{total}}-st · poolitatakse joonelt {{percent}}%",
+      "headerNoSplit": "Lk {{n}} · {{total}}-st · ei poolitata",
+      "arrowHint": "← → liigub lehtede vahel",
+      "resetToGlobal": "Lähtesta üldjoonele"
+    }
   },
   "notice": {
     "title": "Üleslaadimine käib kahes järgus",

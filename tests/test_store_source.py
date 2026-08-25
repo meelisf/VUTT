@@ -42,7 +42,7 @@ def test_pdf_salvestatakse_lokaalselt_ja_ei_saadeta_kohe(upload, monkeypatch):
     assert state["status"] == "awaiting_split"
     assert state["expected_pages"] == 12
     assert len(state["prepress"]["pages"]) == 12
-    assert state["prepress"]["enabled"] is False       # opt-in
+    assert all(p["mode"] == "nosplit" for p in state["prepress"]["pages"])
 
 
 def test_pdf_salvestamine_kustutab_ajutise_faili(upload, monkeypatch):

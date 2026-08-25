@@ -41,7 +41,7 @@ def test_koik_prepress_teed_on_admin_all(client_admin):
     from server.routers import upload as upload_router
     prepress_routes = [
         r.path for r in upload_router.router.routes if "prepress" in r.path
-        or "/preview/" in r.path
+        or "/preview/" in r.path or "ocr-model" in r.path
     ]
     assert prepress_routes, "prepress-endpointe ei leitud"
     assert all(p.startswith("/admin/") for p in prepress_routes)
@@ -53,6 +53,33 @@ def test_prepress_noual_admin_rolli(client_admin, login):
     editor = {"Authorization": "Bearer {}".format(login("editor", "editorpass"))}
     resp = client.get("/admin/upload/{}/prepress".format(upload_id), headers=editor)
     assert resp.status_code in (401, 403)
+
+
+def test_ocr_mudeli_vahetus_noual_admin_rolli(client_admin, login):
+    client, _headers, upload_id = client_admin
+    editor = {"Authorization": "Bearer {}".format(login("editor", "editorpass"))}
+    resp = client.post("/admin/upload/{}/ocr-model".format(upload_id),
+                       json={"model": "hand"}, headers=editor)
+    assert resp.status_code in (401, 403)
+
+
+def test_ocr_mudeli_vahetus_muudab_kaugteed_ja_kajastub_plaanis(client_admin):
+    client, headers, upload_id = client_admin
+    resp = client.post("/admin/upload/{}/ocr-model".format(upload_id),
+                       json={"model": "hand"}, headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["ocr_model"] == "hand"
+
+    plan = client.get("/admin/upload/{}/prepress".format(upload_id),
+                      headers=headers).json()
+    assert plan["ocr_model"] == "hand"
+
+
+def test_ocr_mudeli_vahetus_ei_luba_tundmatut_vaartust(client_admin):
+    client, headers, upload_id = client_admin
+    resp = client.post("/admin/upload/{}/ocr-model".format(upload_id),
+                       json={"model": "kuutõbi"}, headers=headers)
+    assert resp.status_code == 400
 
 
 def test_apply_teine_kutse_annab_409(client_admin, monkeypatch):
@@ -78,7 +105,7 @@ def test_plaani_salvestamine_ei_luba_vigast_mode_i(client_admin):
     client, headers, upload_id = client_admin
     resp = client.post(
         "/admin/upload/{}/prepress".format(upload_id),
-        json={"enabled": True, "default_split_x": 0.5,
+        json={"default_split_x": 0.5,
               "pages": [{"n": 1, "mode": "kustuta_koik"}]},
         headers=headers,
     )
@@ -89,7 +116,7 @@ def test_plaani_salvestamine_ei_luba_vigast_split_x_i(client_admin):
     client, headers, upload_id = client_admin
     resp = client.post(
         "/admin/upload/{}/prepress".format(upload_id),
-        json={"enabled": True, "default_split_x": 1.5, "pages": []},
+        json={"default_split_x": 1.5, "pages": []},
         headers=headers,
     )
     assert resp.status_code == 400
@@ -99,7 +126,7 @@ def test_plaani_salvestamine_uuendab_ainult_plaani_valju(client_admin):
     client, headers, upload_id = client_admin
     resp = client.post(
         "/admin/upload/{}/prepress".format(upload_id),
-        json={"enabled": True, "default_split_x": 0.48, "pages": [
+        json={"default_split_x": 0.48, "pages": [
             {"n": 1, "mode": "custom", "split_x": 0.46},
             {"n": 2, "mode": "nosplit"},
             {"n": 3, "mode": "default", "excluded": True},
@@ -149,5 +176,6 @@ def test_get_prepress_annab_kokkuvotte(client_admin):
     data = client.get(
         "/admin/upload/{}/prepress".format(upload_id), headers=headers
     ).json()
-    assert set(["enabled", "default_split_x", "preview_status", "preview_done",
+    assert set(["default_split_x", "preview_status", "preview_done",
                 "pages", "page_count", "output_page_count", "trivial"]) <= set(data)
+    assert "enabled" not in data

@@ -166,6 +166,13 @@ def check_slug_conflict(year, slug: str) -> bool:
 # PÕHIFUNKTSIOONID
 # =========================================================
 
+def remote_paths(ocr_model: str, upload_id: str, slug: str) -> tuple:
+    """OCR-serveri staging- ja work-tee. ÜKS valem: create_upload ja
+    mudelivahetus peavad andma sama vastuse."""
+    staging = f"AUTO-OCR/{ocr_model}/{upload_id}"
+    return staging, f"{staging}/{slug}"
+
+
 def create_upload(meta: dict, username: Optional[str] = None) -> dict:
     """
     Loob uue upload staging'u ja tagastab state.json sisu.
@@ -188,6 +195,7 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
     slug = f"{base_slug}-{work_id}"
     work_type = meta.get('type') or {}
     ocr_model = 'hand' if work_type.get('id') == 'Q87167' else 'print'
+    staging_path, work_path = remote_paths(ocr_model, upload_id, slug)
 
     # Loo uploads/{id}/thumbs/ kaustad
     thumbs_dir = os.path.join(_upload_dir(upload_id), 'thumbs')
@@ -212,8 +220,11 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
             "tags": meta.get('tags', []),
         },
         "expected_pages": None,
-        "remote_staging_path": f"AUTO-OCR/{ocr_model}/{upload_id}",
-        "remote_work_path": f"AUTO-OCR/{ocr_model}/{upload_id}/{slug}",
+        # Töötlusotsus, mitte bibliograafiline väide — vaikeväärtus tuletatakse
+        # tüübist, aga edaspidi elab ta oma väljas ja meta.type ei muutu (§3).
+        "ocr_model": ocr_model,
+        "remote_staging_path": staging_path,
+        "remote_work_path": work_path,
         "files": [],
         "created_at": datetime.now().isoformat(),
         "replace_work_id": meta.get('replace_work_id') or None,

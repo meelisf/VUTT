@@ -2,6 +2,7 @@
 
 **Kuupäev:** 2026-08-07
 **Staatus:** vastu võetud
+**Osaliselt asendatud:** ADR 0026 — opt-in-põhimõte kehtib ainult 300 DPI läbikäigule.
 
 ## Kontekst
 

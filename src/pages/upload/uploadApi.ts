@@ -198,10 +198,18 @@ export function startPrepress(uploadId: string, token: string | null): Promise<{
 
 export function savePrepress(
   uploadId: string,
-  plan: Pick<PrepressPlan, 'enabled' | 'default_split_x' | 'pages'>,
+  plan: Pick<PrepressPlan, 'default_split_x' | 'pages'>,
   token: string | null,
 ): Promise<PrepressSaveResult> {
   return apiPost<PrepressSaveResult>(`/admin/upload/${uploadId}/prepress`, plan, { token });
+}
+
+export function setOcrModel(
+  uploadId: string,
+  model: 'print' | 'hand',
+  token: string | null,
+): Promise<{ status: string; ocr_model: string }> {
+  return apiPost(`/admin/upload/${uploadId}/ocr-model`, { model }, { token });
 }
 
 export function applyPrepress(

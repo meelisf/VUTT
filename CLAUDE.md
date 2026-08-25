@@ -228,15 +228,25 @@ Rea alguses olev `N.` on CommonMarkis nummerdatud loendi marker — „1759. aas
 renderdusel markeri, kui number on ≥ 3-kohaline (aastaarv) VÕI kui plokis on ainult üks
 loendirida (kuupäev). **Allikteksti EI muudeta** — teisendus elab ainult `MarkdownView`-s.
 
-**Poolitamine enne OCR-i (ADR 0017)** — prepress on tervikuna **opt-in**:
-puutumata lülitiga upload ei renderda ühtki pikslit ja käib tänast PDF-teed.
+**Poolitamine enne OCR-i (ADR 0017, 0026)** — **opt-in on ainult 300 DPI läbikäik.**
+100 DPI ülevaatus renderdatakse igal upload'il; poolitusteta plaan ei renderda ühtki
+300 DPI pikslit (originaal-PDF, või ainult-väljajätmistel `pdf_subset` alamhulk).
 `FULL_DPI`/`JPEG_QUALITY` (`server/upload/page_source.py`) PEAVAD kattuma
 OCR-serveri `PDF_DPI = 300` / `quality=95` väärtustega. OCR-serverisse
 avaldatakse **failipõhise `.tmp`+rename-ga** — valvuril pole piltidele
 stabiilsuskontrolli. `prepress` alamvälju muudetakse AINULT `mutate_prepress`
 kaudu (`set_upload_state(**extra)` seab terve ülemise taseme võtme ja pühiks
-paralleelse muudatuse). `apply` on ühekordne (`awaiting_split → applying` CAS,
-kordus = 409). Tindiskoor on hoiataja, mitte pakkuja.
+paralleelse muudatuse). `apply` on ühekordne CAS
+(`awaiting_split | prepping | error → applying`, kordus = 409).
+
+Plaani semantika: vaikimisi on kõik lehed `mode: "nosplit"`; `default_split_x` on
+üldjoone VÄÄRTUS, mis rakendub alles „Poolita kõik" käsuga. `excluded` ja `mode` on
+**risti** — väljajätmine domineerib väljundi koostamisel, aga EI kustuta poolitusolekut.
+`ocr_model` on töötlusotsus omas state-väljas; `meta.type` on bibliograafiline väide ja
+seda EI muudeta vaikselt. `preview_cancel` on ühe tsükli lipp (apply seab, `prepress/start`
+nullib) ja seda kontrollitakse IGA lehe alguses — apply ja eelvaade jagavad
+`RENDER_SEMAPHORE(1)`-i. Renderdaja tohib staatust lähtestada ainult siis, kui ta on
+selle omanik (`_reset_status_if_prepping`), muidu lubaks ta teise apply CAS-i sisse.
 
 **Kaugkoristus (ADR 0024)** — katkestamine kustutab OCR-serveris ainult **failid**
 (`ocr_client.cleanup_run_files`), kataloog jääb alles: `rm -rf`/`rmdir` lennusoleva batchi

@@ -29,16 +29,16 @@ def _read(upload, key):
 
 def test_init_prepress_loob_vaikeplaani(upload):
     plan = upload_state.init_prepress(upload, 3)
-    assert plan["enabled"] is False
+    assert all(p["mode"] == "nosplit" for p in plan["pages"])
     assert len(plan["pages"]) == 3
     assert _read(upload, "prepress")["default_split_x"] == 0.5
 
 
 def test_init_prepress_on_idempotentne(upload):
     upload_state.init_prepress(upload, 3)
-    upload_state.mutate_prepress(upload, lambda p: p.update(enabled=True))
+    upload_state.mutate_prepress(upload, lambda p: p.update(default_split_x=0.42))
     again = upload_state.init_prepress(upload, 3)
-    assert again["enabled"] is True   # ei lähtesta olemasolevat
+    assert again["default_split_x"] == 0.42   # ei lähtesta olemasolevat
 
 
 def test_mutate_prepress_ilma_plaanita_tagastab_none(upload):
@@ -51,7 +51,6 @@ def test_eelvaate_edenemine_ei_kaota_samal_ajal_salvestatud_custom_plaani(upload
     upload_state.init_prepress(upload, 3)
 
     def set_custom(plan):
-        plan["enabled"] = True
         plan["pages"][1].update(mode="custom", split_x=0.459)
 
     def bump_progress(plan):

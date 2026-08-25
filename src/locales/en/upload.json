@@ -87,24 +87,54 @@
     "backToSplit": "Back to splitting"
   },
   "step3split": {
-    "title": "Split double pages",
-    "optIn": "Split double pages before OCR",
-    "optInHint": "Turn this on only if a single scan holds two book pages. Otherwise just press Continue — everything works as before.",
-    "optInHintModel": "The handwriting recognition model works better on single pages — on a double page it can get confused and start repeating the same text endlessly.",
+    "title": "Review pages",
     "rendering": "Preparing preview: {{done}} / {{total}}",
     "renderError": "Preview generation failed",
     "globalLine": "Split line (% of width)",
-    "summary": "{{split}} of {{pages}} pages will be split, {{excluded}} excluded → {{output}} pages go to OCR",
-    "exclude": "Exclude",
-    "include": "Restore",
-    "noSplit": "Don't split",
-    "resetToGlobal": "Use the global line",
-    "openPage": "Open page",
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
     "willNotSplit": "This page will not be split",
     "isExcluded": "This page is excluded from OCR",
-    "backToOverview": "Back to overview"
+    "backToOverview": "Back to overview",
+    "card": {
+      "select": "Select page",
+      "exclude": "Exclude from OCR",
+      "include": "Include in OCR",
+      "split": "Split",
+      "noSplit": "Don't split",
+      "open": "Open full view"
+    },
+    "bar": {
+      "count": "Selected: {{count}}",
+      "split": "Split",
+      "noSplit": "Don't split",
+      "exclude": "Skip OCR",
+      "include": "Include in OCR",
+      "clear": "Clear selection",
+      "shiftHint": "Shift+click selects a range",
+      "splitResult": "{{applied}} pages got the global line, {{kept}} manual lines left untouched"
+    },
+    "splitAll": "Split all",
+    "clearGlobalSplit": "Remove global split",
+    "model": {
+      "label": "OCR model",
+      "print": "Print",
+      "hand": "Handwriting",
+      "locked": "The model can only be changed before sending to OCR"
+    },
+    "selectAll": "Select all",
+    "selectSplit": "Select split",
+    "summaryNoSplit": "no splits · {{output}} pages go to OCR · {{excluded}} excluded",
+    "summarySplit": "{{split}} will be split · {{output}} pages go to OCR · {{excluded}} excluded",
+    "gridSmaller": "Smaller thumbnails",
+    "gridLarger": "Larger thumbnails",
+    "gridColumns": "Thumbnail size",
+    "detail": {
+      "header": "Page {{n}} of {{total}} · split at {{percent}}%",
+      "headerNoSplit": "Page {{n}} of {{total}} · not split",
+      "arrowHint": "← → moves between pages",
+      "resetToGlobal": "Reset to global line"
+    }
   },
   "notice": {
     "title": "Uploading happens in two stages",

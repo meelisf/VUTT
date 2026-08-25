@@ -389,7 +389,7 @@ class TestDispatch:
         s = _read_state(uploads_dir, upload_id)
         assert s['status'] == 'awaiting_split'
         assert s['expected_pages'] == 1
-        assert s['prepress']['enabled'] is False   # opt-in
+        assert all(p['mode'] == 'nosplit' for p in s['prepress']['pages'])
 
     def test_liiga_suur_pilt_katkestab_enne_salvestamist(self, make_state, monkeypatch,
                                                          fake_file, capture_threads, uploads_dir):

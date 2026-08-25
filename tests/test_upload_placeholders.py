@@ -58,7 +58,7 @@ def upload(tmp_path, monkeypatch):
 
 
 def _plaan(lehti, poolitatavad):
-    return {"enabled": True, "pages": [
+    return {"pages": [
         {"n": n, "mode": "split" if n in poolitatavad else "nosplit",
          "split_x": 0.5 if n in poolitatavad else None, "excluded": False}
         for n in range(1, lehti + 1)

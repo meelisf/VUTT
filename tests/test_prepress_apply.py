@@ -87,9 +87,16 @@ def upload(tmp_path, monkeypatch):
 
 
 def _plan(**over):
+    """Kolme lehega plaan, kus KÕIK lehed poolituvad üldjoonelt.
+
+    Vaikeplaan ei poolita enam ühtki lehte (ADR 0026) — poolitusteed testiv
+    fixture peab lehed ise `default`-moodi seadma.
+    """
     from server.upload import prepress_plan
     plan = prepress_plan.default_plan(3)
     plan.update(over)
+    for page in plan["pages"]:
+        page["mode"] = "default"
     return plan
 
 
@@ -98,7 +105,7 @@ def test_poolitatud_lehed_saadetakse_vasak_parem_jarjekorras(upload, monkeypatch
     sftp = FakeSftp(existing=["/remote"])
     monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
     prepress_apply._transfer_pages(
-        uid, "kirik-abc", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True))
+        uid, "kirik-abc", ("/remote", "/remote/w"), "/remote/w", _plan())
 
     assert sftp.renames == [
         ("/remote/w/kirik-abc_pg_001.jpg.tmp", "/remote/w/kirik-abc_pg_001.jpg"),
@@ -114,7 +121,7 @@ def test_valjajaetud_lehte_ei_renderdata_ega_saadeta(upload, monkeypatch):
     uid, base = upload
     sftp = FakeSftp(existing=["/remote"])
     monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
-    plan = _plan(enabled=True)
+    plan = _plan()
     plan["pages"][1]["excluded"] = True
     prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", plan)
     assert len(sftp.renames) == 4     # lehed 1 ja 3 poolitatud, leht 2 välja
@@ -125,7 +132,7 @@ def test_ajutised_failid_kustutatakse_kohe(upload, monkeypatch):
     uid, base = upload
     sftp = FakeSftp(existing=["/remote"])
     monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
-    prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True))
+    prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan())
     work = base / "apply_tmp"
     assert not work.exists() or os.listdir(str(work)) == []
 
@@ -143,7 +150,7 @@ def test_poolituse_laius_tuleb_iga_lehe_enda_moodust(upload, monkeypatch):
         return orig(src_img, x0, x1, dst)
 
     monkeypatch.setattr(prepress_apply, "_write_cut", spy)
-    prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True))
+    prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan())
     assert widths[:4] == [200, 200, 250, 250]
 
 
@@ -157,7 +164,7 @@ def test_loob_koik_vanemkaustad_enne_saatmist(upload, monkeypatch):
 
     prepress_apply._transfer_pages(
         uid, "s", ("/o/AUTO-OCR/hand/u1", "/o/AUTO-OCR/hand/u1/s"),
-        "/o/AUTO-OCR/hand/u1/s", _plan(enabled=True),
+        "/o/AUTO-OCR/hand/u1/s", _plan(),
     )
 
     assert "/o/AUTO-OCR/hand/u1" in sftp.dirs      # vanem loodi esimesena
@@ -208,7 +215,7 @@ def test_semafor_vabaneb_lehtede_vahel(upload, monkeypatch):
     monkeypatch.setattr(prepress_apply, "publish_atomic", spy_publish)
 
     prepress_apply._transfer_pages(
-        uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True)
+        uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan()
     )
 
     assert renderdamise_ajal == [False, False, False], "renderduse ajal peab kinni olema"
