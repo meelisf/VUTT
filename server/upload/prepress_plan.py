@@ -74,11 +74,11 @@ def is_excluded(plan: Optional[dict], n: int) -> bool:
 
 
 def is_trivial_plan(plan: Optional[dict]) -> bool:
-    """Kas plaan taandub tänasele PDF-teele (ükski leht ei poolitu).
+    """Kas plaan taandub PDF-teele (ükski leht ei poolitu).
 
-    Väljajätmised EI mõjuta triviaalsust: ainult-väljajätmise plaan on
-    triviaalne ja originaalfail saadetakse muutmata edasi. Põhjus mõõdetud
-    spetsis — PDF-i ümberehitus maksab ~36 s ja ~800 MB, kallim kui eelvaade.
+    Väljajätmised EI mõjuta triviaalsust — nendega tegeleb edastustee ise
+    (store_source: PDF-i alamhulk või piltide vahelejätmine). Triviaalne
+    tähendab siin ainult „meie pool ei pea ühtki pikslit renderdama".
     """
     if not plan or not plan.get("enabled"):
         return True
