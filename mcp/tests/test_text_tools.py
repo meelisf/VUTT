@@ -123,12 +123,15 @@ async def test_get_work_tundmatu_id_soovitab_search_works(server_with):
     assert "search_works" in str(exc.value)
 
 
-async def test_get_work_lehekuljed_on_jarjestuses(server_with):
+async def test_get_work_lehekuljed_vahemikena(server_with):
+    """Rida lehe kohta oli 706-leheküljelisel teosel ~18 000 tokenit."""
     pages = [_hit(page=n) for n in (1, 2, 3)]
     server, client = server_with([{"hits": pages, "totalHits": 3}])
     out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
     assert client.bodies[0]["sort"] == ["lehekylje_number:asc"]
-    assert out.index("lk 1 ") < out.index("lk 2 ") < out.index("lk 3 ")
+    assert "Leheküljed: 1–3" in out
+    assert "/work/v7Kq2mXp/{lk}" in out
+    assert "lk 2" not in out  # üksikuid lehti ei loetleta
 
 
 async def test_get_work_naitab_metaandmed(server_with):
@@ -170,3 +173,19 @@ async def test_search_pages_kysib_creatorsit(server_with):
     server, client = server_with([{"hits": [], "totalHits": 0}])
     await _call(server, "search_pages", {"query": "x"})
     assert "creators" in client.bodies[0]["attributesToRetrieve"]
+
+
+async def test_get_work_ei_korda_seisundi_legendi(server_with):
+    """Seisundite seletus tuleb serveri juhendist, mitte igast vastusest."""
+    server, _ = server_with([{"hits": [_hit(page=1)], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "usaldusväärsus" not in out
+    assert "seisund=" in out
+
+
+async def test_get_work_jatab_rollilegendi_ara_kui_ainult_autor(server_with):
+    creators = [{"name": "Johannes Gezelius", "role": "auctor", "id": "vutt:P1"}]
+    server, _ = server_with([{"hits": [_hit(page=1, creators=creators)], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "auctor: Johannes Gezelius" in out
+    assert "eessõna" not in out.lower()  # legendi ei ole

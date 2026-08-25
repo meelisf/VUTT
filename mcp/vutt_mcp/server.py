@@ -61,9 +61,8 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         work_id on teose püsiv lühikood (nanoid, nt "v7Kq2mXp") — kasuta seda
         otsingu piiramiseks ühe teosega. Filtriväärtusi saad list_filter_values'ist.
 
-        Tulemuse `seisund` ütleb, kas tekst on kontrollitud: Toores = puutumata
-        masinlugemine (võib sisaldada vigu), Töös = osaliselt üle vaadatud,
-        Valmis = inimese kinnitatud.
+        Tulemuse `seisund` ütleb, kui usaldusväärne transkriptsioon on
+        (skaala serveri juhendis).
         """
         body = queries.build_search_body(
             query,
@@ -200,8 +199,9 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
 def _format_work(hits: list[dict], *, base_url: str) -> str:
     """Teose metaandmed esimesest hitist + lehekülgede loend kanoonilises korras.
 
-    Invariant: hitid tulevad juba lehekylje_number:asc järjestuses
-    (build_work_pages_body sorteerib).
+    Päring sorteerib lehekylje_number:asc (build_work_pages_body), aga
+    `format_page_index` järjestab igaks juhuks ise — vahemike kodeering
+    annaks vales järjekorras sisendil vaikselt vale tulemuse.
     """
     first = hits[0]
     work_id = first.get("work_id", "")
@@ -220,22 +220,20 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
 
     # Loojad rollidega: praeses, gratulandid ja eessõna autor (aui) elavad
     # AINULT `creators`-massiivis — tuletatud `autor`/`respondens` neid ei kata.
-    creators = fmt.format_creators(first.get("creators") or [])
+    creator_list = first.get("creators") or []
+    creators = fmt.format_creators(creator_list)
     if creators:
-        lines += ["", "Isikud:", creators, "", fmt.CREATOR_ROLE_LEGEND]
+        lines += ["", "Isikud:", creators]
+        # Legend ainult siis, kui on midagi seletada — vt needs_role_legend.
+        if fmt.needs_role_legend(creator_list):
+            lines += ["", fmt.CREATOR_ROLE_LEGEND]
     elif first.get("autor") or first.get("respondens"):
         lines += ["", fmt.format_fields([
             ("autor", first.get("autor")),
             ("respondens", first.get("respondens")),
         ])]
 
-    lines += ["", fmt.STATUS_LEGEND, "", "Leheküljed:"]
-    for hit in hits:
-        num = hit.get("lehekylje_number")
-        lines.append(
-            f"  lk {num} · seisund={hit.get('status', '?')} · "
-            + fmt.work_url(work_id, num, base_url=base_url)
-        )
+    lines += ["", fmt.format_page_index(hits, base_url=base_url, work_id=work_id)]
     return "\n".join(lines)
 
 

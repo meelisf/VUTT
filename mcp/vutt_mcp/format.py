@@ -4,17 +4,11 @@ Vorming on tahtlikult tihe: pikk agentne jooks teeb kümneid päringuid ja
 JSON-i korduvad võtmenimed sööksid konteksti enne, kui töö algab.
 """
 
-# Lehekülje seisundeid on VIIS (src/types.ts PageStatus). Kolmene
-# Toores/Töös/Valmis on `WorkStatus` — teose koondstaatus, eri asi.
-# `test_meili_contract.py` valvab, et see legend types.ts-ist maha ei jääks.
-STATUS_LEGEND = (
-    "Seisund (lehekülje transkriptsiooni usaldusväärsus): "
-    "Toores = puutumata masinlugemine, võib sisaldada OCR-vigu; "
-    "Töös = parandamisel; "
-    "Parandatud = tekst inimese poolt üle käidud; "
-    "Annoteeritud = parandatud ja märgendatud; "
-    "Valmis = inimese kinnitatud lõplik transkriptsioon."
-)
+# Seisundite seletust vastuses EI OLE: see elab `instructions.py`-s, mille
+# klient süstib konteksti üks kord seansi kohta. Igas vastuses kordamine
+# maksis ~100 tokenit päringu kohta ja agent tegi neid kümneid.
+# `test_meili_contract.py` valvab, et juhend kõiki `src/types.ts` PageStatus'i
+# väärtusi nimetaks. (Kolmene Toores/Töös/Valmis on `WorkStatus` — eri asi.)
 
 # Pealkiri otsingutulemuses: varauusaegse teose kirje on sageli terve
 # tiitellehe tekst (500+ märki). Loendis piisab algusest; get_work näitab kogu.
@@ -38,6 +32,16 @@ CREATOR_ROLE_LEGEND = (
     "autor; dedicator = pühendaja; gratulator = õnnitleja (gratulatsiooniluuletuse "
     "autor); editor = toimetaja."
 )
+
+
+def needs_role_legend(creators: list[dict]) -> bool:
+    """Kas rollilegend väärib vastuses ruumi?
+
+    „auctor" seletab end ise; enamikul teostest ongi ainult tema. Legendi
+    hind on ~90 tokenit, seega väljasta ta ainult siis, kui vastuses on
+    mõni läbipaistmatum roll (praeses, aui, gratulator …).
+    """
+    return any((c.get("role") or "auctor") != "auctor" for c in creators)
 
 
 def work_url(work_id: str, page: int | None = None, *, base_url: str) -> str:
@@ -143,7 +147,7 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str) -> str:
             "(u/v, i/j, ß/ss)."
         )
 
-    blocks = [f"Vasteid kokku: {total} (kuvatud {len(hits)})", STATUS_LEGEND, ""]
+    blocks = [f"Vasteid kokku: {total} (kuvatud {len(hits)})", ""]
     for i, hit in enumerate(hits, start=1):
         work_id = hit.get("work_id", "")
         page = hit.get("lehekylje_number")
@@ -192,7 +196,7 @@ def format_pages(pages: list[dict], *, base_url: str, work_id: str) -> str:
     if not pages:
         return "Selles vahemikus lehekülgi ei ole."
 
-    blocks = [STATUS_LEGEND, ""]
+    blocks = []
     for page in pages:
         num = page.get("lehekylje_number")
         blocks.append(
@@ -206,3 +210,59 @@ def format_pages(pages: list[dict], *, base_url: str, work_id: str) -> str:
             blocks.append(f"[marginaalia] {marginalia}")
         blocks.append("")
     return "\n".join(blocks)
+
+
+def format_page_index(pages: list[dict], *, base_url: str, work_id: str) -> str:
+    """Lehekülgede ülevaade vahemikena, mitte rida iga lehe kohta.
+
+    Korpuses (mõõdetud 2026-08-25) on mediaanteoses 9 lehte ja 89 % teostest
+    kannab kõigil lehtedel sama seisundit. Rida lehe kohta kordas seetõttu
+    URL-i mustrit ja sama sõna kümneid kordi: 706-leheküljeline teos maksis
+    ~18 000 tokenit, vahemikena ~33. Kogu korpuse peale −93 %.
+
+    Kodeering käib TEGELIKE lehenumbrite peale (praegu on kõik teosed
+    katkematud 1..N, aga see ei ole kuskil jõustatud) — auk numbrites annab
+    eraldi vahemiku, ei kao vaikselt ära.
+    """
+    if not pages:
+        return "Lehekülgi ei ole."
+
+    paarid = [(p.get("lehekylje_number"), p.get("status") or "?") for p in pages]
+    numbriga = sorted(
+        ((n, s) for n, s in paarid if isinstance(n, int)), key=lambda x: x[0]
+    )
+    numbrita = len(paarid) - len(numbriga)
+
+    # Seisundi-jooksud: kõrvutine number JA sama seisund.
+    jooksud: list[list] = []
+    for n, s in numbriga:
+        if jooksud and jooksud[-1][2] == s and jooksud[-1][1] + 1 == n:
+            jooksud[-1][1] = n
+        else:
+            jooksud.append([n, n, s])
+
+    # Numbrivahemikud seisundist sõltumata — need näitavad auke.
+    vahemikud: list[list] = []
+    for n, _ in numbriga:
+        if vahemikud and vahemikud[-1][1] + 1 == n:
+            vahemikud[-1][1] = n
+        else:
+            vahemikud.append([n, n])
+
+    def _vahemik(algus: int, lopp: int) -> str:
+        return str(algus) if algus == lopp else f"{algus}–{lopp}"
+
+    pais = "Leheküljed: " + " · ".join(_vahemik(a, b) for a, b in vahemikud)
+    seisundid = {s for _, _, s in jooksud}
+    if len(seisundid) == 1:
+        pais += f" · kõik seisund={jooksud[0][2]}"
+    if numbrita:
+        pais += f" · lisaks {numbrita} lehenumbrita kirjet"
+
+    read = [pais]
+    if len(seisundid) > 1:
+        read.append("  seisund: " + " · ".join(
+            f"lk {_vahemik(a, b)} {s}" for a, b, s in jooksud
+        ))
+    read.append("  lehe link: " + work_url(work_id, base_url=base_url) + "/{lk}")
+    return "\n".join(read)

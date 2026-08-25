@@ -41,7 +41,8 @@ REEGLID:
   tulemusega kaasa - anna edasi get_work'ile, get_pages'ile, search_pages'ile.
 - Otsing on vaikimisi range (kõik sõnad peavad leheküljel esinema). Tühja
   tulemuse järel proovi lühemat päringut ja relax_matching=true.
-- Tekst on masinlugemine: seisund "Toores" = kontrollimata OCR, "Valmis" =
-  inimese kinnitatud.
+- Tekst on masinlugemine. Lehe seisund kasvavas usaldusväärsuses: Toores
+  (kontrollimata OCR) < Töös < Parandatud < Annoteeritud < Valmis (inimese
+  kinnitatud). Vastustes seda skaalat ei korrata.
 - Tühi tulemus EI tõesta, et teemat pole - kontrolli enne list_filter_values'i
   ja list_literature'iga, kas õige allikas on kogus üldse olemas."""
