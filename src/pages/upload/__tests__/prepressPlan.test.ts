@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyDefaultSplitTo,
   applyGlobalSplit,
   clampSplitX,
+  clearDefaultSplit,
+  countByMode,
   countOutputPages,
   isPreviewReady,
+  setExcluded,
+  setNoSplit,
   summarizePlan,
   willSplit,
 } from '../prepressPlan';
@@ -193,3 +198,77 @@ describe('willSplit', () => {
   });
 });
 
+
+// --- Hulgioperatsioonid (§2, §6, §7, §11) ---
+
+const mixed = () => plan({
+  page_count: 4,
+  pages: [
+    { n: 1, mode: 'nosplit', split_x: null, excluded: false },
+    { n: 2, mode: 'custom', split_x: 0.42, excluded: false },
+    { n: 3, mode: 'nosplit', split_x: null, excluded: true },
+    { n: 4, mode: 'default', split_x: null, excluded: false },
+  ],
+});
+
+describe('applyDefaultSplitTo', () => {
+  it('viib nosplit-lehed default-i ega puutu custom-i (§7)', () => {
+    const next = applyDefaultSplitTo(mixed());
+    expect(next.pages.map((p) => p.mode)).toEqual(['default', 'custom', 'default', 'default']);
+    expect(next.pages[1].split_x).toBe(0.42);
+  });
+
+  it('valikuga puudutab ainult nimetatud lehti', () => {
+    const next = applyDefaultSplitTo(mixed(), [1]);
+    expect(next.pages.map((p) => p.mode)).toEqual(['default', 'custom', 'nosplit', 'default']);
+  });
+
+  it('ei muuda algset plaani', () => {
+    const original = mixed();
+    applyDefaultSplitTo(original);
+    expect(original.pages[0].mode).toBe('nosplit');
+  });
+});
+
+describe('clearDefaultSplit', () => {
+  it('võtab maha ainult üldjoone; käsitsi seatu jääb (§2)', () => {
+    const next = clearDefaultSplit(mixed());
+    expect(next.pages.map((p) => p.mode)).toEqual(['nosplit', 'custom', 'nosplit', 'nosplit']);
+    expect(next.pages[1].split_x).toBe(0.42);
+  });
+});
+
+describe('setNoSplit', () => {
+  it('valikul on otsene: puudutab ka custom-lehti (§7)', () => {
+    const next = setNoSplit(mixed(), [2, 4]);
+    expect(next.pages.map((p) => p.mode)).toEqual(['nosplit', 'nosplit', 'nosplit', 'nosplit']);
+    expect(next.pages[1].split_x).toBeNull();
+  });
+});
+
+describe('setExcluded', () => {
+  it('EI kustuta poolitusolekut (§11 invariant)', () => {
+    const out = setExcluded(mixed(), [2], true);
+    expect(out.pages[1].excluded).toBe(true);
+    expect(out.pages[1].mode).toBe('custom');
+    expect(out.pages[1].split_x).toBe(0.42);
+
+    const back = setExcluded(out, [2], false);
+    expect(back.pages[1].mode).toBe('custom');
+    expect(back.pages[1].split_x).toBe(0.42);
+  });
+
+  it('väljajäetud leht ei loe kokkuvõttes (§11)', () => {
+    const p = setExcluded(applyDefaultSplitTo(mixed()), [1], true);
+    // lk 1 ja lk 3 väljas; lk 2 custom → 2 lehte; lk 4 default → 2 lehte
+    expect(countOutputPages(p)).toBe(4);
+    expect(summarizePlan(p).split).toBe(2);      // väljajäetut EI loeta
+    expect(summarizePlan(p).excluded).toBe(2);
+  });
+});
+
+describe('countByMode', () => {
+  it('annab tegevusriba teate arvud', () => {
+    expect(countByMode(mixed(), [1, 2, 3, 4])).toEqual({ applied: 3, keptCustom: 1 });
+  });
+});
