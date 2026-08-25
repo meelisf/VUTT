@@ -52,3 +52,19 @@ def test_juhend_selgitab_sonaosa_reeglit():
     assert "sõnaosa" in SERVER_INSTRUCTIONS
     assert "VIIMANE" in SERVER_INSTRUCTIONS
     assert "orati" in SERVER_INSTRUCTIONS
+
+
+def test_juhend_ei_luba_kitsast_ajapiiri():
+    """Vana sõnastus „varauusaegse (1632-1710) trükikorpuse" pani agendi
+    hilisemat materjali veaks pidama — matusetrükised, vennastekoguduse
+    materjalid ja sekundaarkirjandus jäävad sellest vahemikust välja."""
+    assert "1632" not in SERVER_INSTRUCTIONS
+    assert "sekundaarkirjandust" in SERVER_INSTRUCTIONS
+
+
+def test_juhend_ei_sisalda_arve():
+    """Lehekülgede ja kaartide hulgad muutuvad iga upload'iga; juhend elab
+    koodis ja vananeks vaikselt. Suurusjärk öeldakse sõnadega."""
+    import re
+    kahtlased = re.findall(r"~\s*\d[\d\s]*", SERVER_INSTRUCTIONS)
+    assert not kahtlased, f"juhendis on vananevad arvud: {kahtlased}"
