@@ -152,6 +152,7 @@ def _transfer_pdf_thread(upload_id: str, state: dict, pdf: str) -> None:
 
 def _transfer_images_thread(upload_id: str, state: dict, directory: str) -> None:
     from ..config import OCR_SERVER_PATH
+    from . import prepress_plan
     from .prepress_apply import publish_atomic
 
     slug = state["meta"]["slug"]
@@ -160,18 +161,32 @@ def _transfer_images_thread(upload_id: str, state: dict, directory: str) -> None
     remote_staging = "{}/{}".format(OCR_SERVER_PATH, state["remote_staging_path"])
     remote_work = "{}/{}".format(OCR_SERVER_PATH, state["remote_work_path"])
 
+    plan = state.get("prepress")
+    names = sorted(os.listdir(directory))
+    # Väljajäetud leht ei tohi OCR-serverisse jõuda (viga B). enumerate annab
+    # ülejäänutele uue järjenumbri — lehenumbrid nihkuvad ja see on õige:
+    # imporditud teoses on täpselt need lehed, mis saadeti.
+    kept = [name for i, name in enumerate(names, start=1)
+            if not prepress_plan.is_excluded(plan, i)]
+
     def _run():
         sftp = None
         try:
             sftp = ocr_client.sftp_open(upload_id)
             ocr_client.ensure_remote_dirs(sftp, (remote_staging, remote_work))
-            for i, name in enumerate(sorted(os.listdir(directory)), start=1):
+            for i, name in enumerate(kept, start=1):
                 publish_atomic(
                     sftp,
                     os.path.join(directory, name),
                     "{}/{}_pg_{:03d}.jpg".format(remote_work, slug, i),
                 )
-            upload_state.set_upload_state(upload_id, status="processing")
+            # expected_pages PEAB tulema plaanist, mitte lähtefailist: muidu
+            # ootab is_stalled lehti, mida ei tule, ja sammu 4 done-üleminek
+            # jääb rippuma. Triviaalteel poolitusi ei ole, seega see arv on
+            # sama mis prepress_plan.output_page_count(plan, len(names)).
+            upload_state.set_upload_state(
+                upload_id, status="processing", expected_pages=len(kept)
+            )
         except Exception as e:
             logger.error("Piltide edastus {}: {}".format(upload_id, e))
             upload_state.set_upload_state(

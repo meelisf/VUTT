@@ -105,3 +105,72 @@ def test_png_konverteeritakse_jpeg_iks(upload, monkeypatch):
     store_source.store_image_page(uid, str(tmp), 1, 1)
     with Image.open(str(base / "source" / "pg_001.jpg")) as im:
         assert im.format == "JPEG"
+
+
+def _fake_thread(monkeypatch):
+    """Käivitab lõimefunktsiooni sünkroonselt.
+
+    staticmethod on vajalik: paljas funktsioon klassi dikti sees seotaks
+    meetodiks ja `start()` annaks talle instantsi argumendiks.
+    """
+    monkeypatch.setattr(
+        store_source.threading, "Thread",
+        lambda target, **kw: type("T", (), {"start": staticmethod(target)})(),
+    )
+
+
+def _fake_sftp(monkeypatch, published):
+    """Asendab SFTP-kihi listiga, kuhu publish_atomic kirjutab sihtteed."""
+    from server.upload import prepress_apply
+
+    class _Sftp:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(store_source.ocr_client, "sftp_open", lambda i: _Sftp())
+    monkeypatch.setattr(store_source.ocr_client, "ensure_remote_dirs",
+                        lambda sftp, dirs: None)
+    monkeypatch.setattr(prepress_apply, "publish_atomic",
+                        lambda sftp, src, dst: published.append(dst))
+
+
+def test_valjajaetud_pilt_ei_joua_ocr_serverisse(upload, monkeypatch):
+    """Viga B, pildikausta haru: enumerate(listdir) laadis üles KÕIK failid."""
+    uid, base = upload
+    directory = base / "source"
+    directory.mkdir()
+    for n in range(1, 5):
+        Image.new("RGB", (10, 14), "white").save(directory / "pg_{:03d}.jpg".format(n))
+    upload_state.init_prepress(uid, 4)
+    upload_state.mutate_prepress(uid, lambda p: p["pages"][1].update(excluded=True))
+
+    published = []
+    _fake_sftp(monkeypatch, published)
+    _fake_thread(monkeypatch)
+
+    store_source.transfer_stored_source(uid)
+
+    names = [p.rsplit("/", 1)[-1] for p in published]
+    assert len(names) == 3                       # 4 lehte − 1 väljajäetu
+    assert names == ["kirik-abc_pg_001.jpg",     # nummerdus jookseb ümber
+                     "kirik-abc_pg_002.jpg",
+                     "kirik-abc_pg_003.jpg"]
+
+
+def test_expected_pages_tuleb_plaanist_mitte_lahtefailist(upload, monkeypatch):
+    """Ilma selleta ei loe is_stalled tööd kunagi valmis ja samm 4 jääb rippuma."""
+    uid, base = upload
+    directory = base / "source"
+    directory.mkdir()
+    for n in range(1, 5):
+        Image.new("RGB", (10, 14), "white").save(directory / "pg_{:03d}.jpg".format(n))
+    upload_state.init_prepress(uid, 4)
+    upload_state.mutate_prepress(uid, lambda p: p["pages"][1].update(excluded=True))
+    upload_state.set_upload_state(uid, expected_pages=4)
+
+    _fake_sftp(monkeypatch, [])
+    _fake_thread(monkeypatch)
+
+    store_source.transfer_stored_source(uid)
+
+    assert upload_state.read_state(uid)["expected_pages"] == 3
