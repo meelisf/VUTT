@@ -20,7 +20,11 @@ Detektor on ABSOLUUTNE korduste arv, MITTE katte-osakaal:
   korduste omaga, 0 ainult kattega) — ei vaja minimaalse pikkuse piirangut.
 
 Periood 2–5 on kohustuslik: 94 juhtu 250-st on „A B A B" tüüpi, mida ühe
-tokeni loendur ei näeks.
+tokeni loendur ei näeks. Periood 5 -> 20 (2026-08-25): mustriks võib olla ka
+MITMEREALINE plokk. Töö 5qdpq4 lk 45 kordas „Bruks Dagh / För år D:r Lax"
+(6 sõna) 315 korda ja lk 21 17-sõnalist plokki 87 korda — kumbki ei mahtunud
+perioodi 5 alla. Ülempiiri tõstmine on range ÜLEMHULK: pikem periood ei saa
+anda rohkem kordusi kui lühem, seega varasemad leiud ei muutu.
 
 Lehekülje PIKKUS on kinnitav signaal, mitte kriteerium: loopinud lehe mediaan
 on 1364 tokenit, puhta oma 281 — aga laeni jookseb ainult pool loopidest
@@ -49,7 +53,7 @@ def _longest_cycle(toks, max_period):
     return best
 
 
-def find_repeat_loop(text, min_reps=10, max_period=5):
+def find_repeat_loop(text, min_reps=10, max_period=20):
     """Otsib lehekülje tekstist korduse-loopi.
 
     Tagastab ``None``, kui loopi ei ole, muidu::

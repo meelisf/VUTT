@@ -189,8 +189,8 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--min-reps", type=int, default=10,
                     help="mitu korda peab muster järjest korduma (vaikimisi 10)")
-    ap.add_argument("--max-period", type=int, default=5,
-                    help="pikim otsitav mustri periood tokenites (vaikimisi 5)")
+    ap.add_argument("--max-period", type=int, default=20,
+                    help="pikim otsitav mustri periood tokenites (vaikimisi 20)")
     ap.add_argument("--base-url", default=DEFAULT_BASE_URL)
     ap.add_argument("--out", default=os.path.join(_PROJECT_ROOT, "output", "ocr_loops.html"))
     args = ap.parse_args()
