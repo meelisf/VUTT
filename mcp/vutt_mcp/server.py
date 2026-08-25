@@ -147,6 +147,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         language: str | None = None,
         genre_id: str | None = None,
         relax_matching: bool = False,
+        compact: bool = False,
         limit: int = 10,
         offset: int = 0,
     ) -> str:
@@ -154,7 +155,11 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         Kasuta, kui tahad teada, MILLISED teosed teemat käsitlevad.
 
         Iga teose juures näidatakse kõige tugevama vastega lehekülg ja katke —
-        see ütleb, miks teos vaste oli.
+        see ütleb, miks teos vaste oli. „Teoseid kokku" on siin TEOSTE arv,
+        mitte lehekülgede oma (search_pages loendab lehekülgi).
+
+        compact=true jätab katked välja — kasuta laia päringu puhul, kus
+        pealkirjad ja katked koos annavad kümnete kilobaitide kaupa teksti.
         """
         body = queries.build_search_body(
             query,
@@ -171,8 +176,11 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         )
         data = client.meili_search(body)
         hits = data.get("hits", [])
+        total = data.get("totalHits", len(hits))
+        edasi = offset + len(hits)
         return fmt.format_search_hits(
-            hits, data.get("totalHits", len(hits)), base_url=base_url
+            hits, total, base_url=base_url, compact=compact, unit="works",
+            next_offset=edasi if len(hits) == limit and total > edasi else None,
         )
 
     @mcp.tool(structured_output=False)

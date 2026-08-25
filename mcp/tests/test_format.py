@@ -382,3 +382,22 @@ def test_next_offset_naitab_kuidas_edasi():
 def test_next_offset_puudub_kui_rohkem_ei_ole():
     out = fmt.format_search_hits([_vaste("aaa", 1)], total=1, base_url=BASE)
     assert "offset=" not in out
+
+
+# ── loenduri sõnastus: teosed vs leheküljed ───────────────────────────────
+
+def test_lehepohine_loendur_ytleb_leheküljed():
+    """„Vasteid kokku" üksi on topelttähendusega — agent luges teoste arvu
+    lehekülgedeks ja vastupidi."""
+    out = fmt.format_search_hits([_vaste("aaa", 1)], total=347, base_url=BASE)
+    assert "347 lehekülge" in out
+    assert "1 teosest" in out
+
+
+def test_teosepohine_loendur_ytleb_teosed():
+    out = fmt.format_search_hits([_vaste("aaa", 1)], total=571, base_url=BASE,
+                                 unit="works")
+    assert "Teoseid kokku: 571" in out
+    assert "lehekülge" not in out
+    # „kuvatud N lk M teosest" on teosepõhises loendis eksitav
+    assert "teosest" not in out

@@ -320,3 +320,31 @@ async def test_get_work_zanr_ilma_koodita_ei_saa_rippuvat_sulgu(server_with):
     server, _ = server_with([{"hits": [_hit(page=1, genre="Oratsioon")], "totalHits": 1}])
     out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
     assert "žanr: Oratsioon" in out and "(" not in out.split("žanr:")[1].split("\n")[0]
+
+
+async def test_search_works_loendab_teoseid_mitte_lehekylgi(server_with):
+    """distinct=work_id puhul ONGI totalHits teoste arv — eksitav oli silt."""
+    server, _ = server_with([{"hits": [_hit(page=1)], "totalHits": 571}])
+    out = await _call(server, "search_works", {"query": "oratio"})
+    assert "Teoseid kokku: 571" in out
+
+
+async def test_search_pages_loendab_lehekylgi(server_with):
+    server, _ = server_with([{"hits": [_hit(page=1)], "totalHits": 347}])
+    out = await _call(server, "search_pages", {"query": "oratio"})
+    assert "347 lehekülge" in out
+
+
+async def test_search_works_compact(server_with):
+    """19 kB tulemus tuli sellest, et compact oli ainult search_pages'il."""
+    server, _ = server_with([{"hits": [_hit(page=1)], "totalHits": 5}])
+    out = await _call(server, "search_works", {"query": "x", "compact": True})
+    assert "respublica" not in out
+    assert "work_id=v7Kq2mXp" in out
+
+
+async def test_search_works_next_offset(server_with):
+    hits = [_hit(page=1, work_id=f"w{n}") for n in range(1, 6)]
+    server, _ = server_with([{"hits": hits, "totalHits": 99}])
+    out = await _call(server, "search_works", {"query": "x", "limit": 5})
+    assert "offset=5" in out

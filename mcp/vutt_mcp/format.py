@@ -189,6 +189,7 @@ def collapse_repeats(text: str) -> str:
 
 def format_search_hits(hits: list[dict], total: int, *, base_url: str,
                        compact: bool = False,
+                       unit: str = "pages",
                        next_offset: int | None = None) -> str:
     if not hits:
         return (
@@ -212,11 +213,15 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str,
     for hit in hits:
         ruhmad.setdefault(hit.get("work_id", ""), []).append(hit)
 
-    blocks = [
-        f"Vasteid kokku: {total} "
-        f"(kuvatud {len(hits)} lk {len(ruhmad)} teosest)",
-        "",
-    ]
+    # Loenduri ühik peab olema välja öeldud: „Vasteid kokku" üksi luges üks
+    # agent teoste arvuks ja teine lehekülgedeks. distinct=work_id puhul ONGI
+    # totalHits teoste arv (kontrollitud: oratio 571 = 571 eri teost).
+    if unit == "works":
+        pais = f"Teoseid kokku: {total} (kuvatud {len(ruhmad)})"
+    else:
+        pais = (f"Vasteid kokku: {total} lehekülge "
+                f"(kuvatud {len(hits)} lk {len(ruhmad)} teosest)")
+    blocks = [pais, ""]
     for i, (work_id, lehed) in enumerate(ruhmad.items(), start=1):
         esimene = lehed[0]
         # Eelista rolliga märgitud loojaid: „autor" on tuletatud väli, mis
