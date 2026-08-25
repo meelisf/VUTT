@@ -65,20 +65,11 @@ WORK_OVERVIEW_RETRIEVE_FIELDS = [
     "teose_lehekylgede_arv",
 ]
 
-# Väljad, mida kasutame FILTRIS (peavad olema filterableAttributes hulgas)
-FILTER_FIELDS = [
-    "work_id",
-    "collections_hierarchy",
-    "year",
-    "languages",
-    "genre_ids",
-    "lehekylje_number",
-]
+# Filtri- ja sordiväljad EI OLE siin loeteluna: käsitsi hoitav loend kirjeldab
+# kavatsust, mitte päringut. `test_meili_contract.py` korjab nimed selle faili
+# lähtekoodist (`clauses.append` ja `"sort"` read) ja võrdleb indeksiseadetega
+# — vt ADR 0027, kus deklareeritud-aga-rakendamata konstant lasi veal elada.
 
-# Väljad, mille järgi SORTEERIME (peavad olema sortableAttributes hulgas)
-SORT_FIELDS = ["lehekylje_number"]
-
-# Väljad, mida OTSIME (peavad olema searchableAttributes hulgas)
 # Väljad, millest otsitakse. Teose metaandmed (title, authors_text) on
 # dubleeritud IGALE lehe-dokumendile, nii et ilma selle piiranguta andis üks
 # pealkirjavaste kõik teose leheküljed „vasteks": „Buchdrucker" 469 vastet,
@@ -86,8 +77,6 @@ SORT_FIELDS = ["lehekylje_number"]
 # Sama jaotus nagu töölaual (searchService.ts, scope='original').
 PAGE_SEARCH_FIELDS = ["lehekylje_tekst", "marginaalia_tekst"]
 WORK_SEARCH_FIELDS = PAGE_SEARCH_FIELDS + ["title", "authors_text"]
-# Lepingutesti jaoks: kõik, mida kuskil otsime, peab olema searchable.
-SEARCH_FIELDS = WORK_SEARCH_FIELDS
 
 # Kasutajale nähtav filtrinimi → Meili atribuut
 FACET_FIELDS = {

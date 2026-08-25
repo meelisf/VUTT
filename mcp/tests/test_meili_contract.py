@@ -18,8 +18,30 @@ from server.meili_settings import (
 from vutt_mcp import queries
 
 
+def _paringu_valjad(muster: str, min_arv: int) -> set:
+    """Korjab `queries.py` LÄHTEKOODIST väljanimed, mida päring tegelikult
+    kasutab.
+
+    Käsitsi hoitav loend kontrollib deklaratsiooni, mitte päringut — ja just
+    see lasi `SEARCH_FIELDS`-i veal elada: konstant oli olemas ja testiga
+    valvatud, aga `attributesToSearchOn` ei jõudnud kunagi päringusse
+    (ADR 0027). Sama mustrit kasutab allpool `meili_doc.py` skann.
+    """
+    import inspect
+    import re
+
+    leitud = set(re.findall(muster, inspect.getsource(queries)))
+    assert len(leitud) >= min_arv, (
+        f"muster {muster!r} leidis ainult {sorted(leitud)} — kui päringu kuju "
+        "muutus, uuenda mustrit; vaikselt tühja tabamust see test läbi ei lase"
+    )
+    return leitud
+
+
 def test_koik_filtrivaljad_on_filterable():
-    missing = set(queries.FILTER_FIELDS) - set(FILTERABLE_ATTRIBUTES)
+    """Väljad tulevad `clauses.append(f"NAME <op> …")` ridadelt, mitte loendist."""
+    kasutatud = _paringu_valjad(r'clauses\.append\(f"(\w+) ', min_arv=6)
+    missing = kasutatud - set(FILTERABLE_ATTRIBUTES)
     assert not missing, f"filterableAttributes hulgast puuduvad: {sorted(missing)}"
 
 
@@ -29,12 +51,20 @@ def test_distinct_valja_peab_olema_filterable():
 
 
 def test_koik_sorteeritavad_valjad_on_sortable():
-    missing = set(queries.SORT_FIELDS) - set(SORTABLE_ATTRIBUTES)
+    """Väljad tulevad `"sort": ["NAME:asc"]` ridadelt."""
+    kasutatud = _paringu_valjad(r'"sort": \["(\w+):', min_arv=1)
+    missing = kasutatud - set(SORTABLE_ATTRIBUTES)
     assert not missing, f"sortableAttributes hulgast puuduvad: {sorted(missing)}"
 
 
 def test_koik_otsitavad_valjad_on_searchable():
-    missing = set(queries.SEARCH_FIELDS) - set(SEARCHABLE_ATTRIBUTES)
+    """Mõlemad ulatused: teoseülene lehetekst ja teoseotsingu laiem hulk.
+
+    Need EI ole enam deklaratsioon — `server.py` annab nad päringusse ja
+    `test_text_tools.py` kontrollib, et nad sinna jõuavad.
+    """
+    kasutatud = set(queries.PAGE_SEARCH_FIELDS) | set(queries.WORK_SEARCH_FIELDS)
+    missing = kasutatud - set(SEARCHABLE_ATTRIBUTES)
     assert not missing, f"searchableAttributes hulgast puuduvad: {sorted(missing)}"
 
 
