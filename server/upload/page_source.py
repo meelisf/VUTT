@@ -16,7 +16,7 @@ from ..config import get_logger
 
 logger = get_logger(__name__)
 
-PREVIEW_DPI = 100          # kontaktlehe pisipilt — odav, ~0,05 s/lk
+PREVIEW_DPI = 100          # ülevaatuse pisipilt — ~0,58 s/lk (mõõdetud 2026-08-24, 143 lk / 82,6 s)
 FULL_DPI = 300             # = OCR-serveri PDF_DPI
 JPEG_QUALITY = 95          # = OCR-serveri img.save(quality=95)
 PREVIEW_MAX_EDGE = 700     # pildikausta eelvaate pikim külg
