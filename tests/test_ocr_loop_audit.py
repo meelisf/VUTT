@@ -96,3 +96,29 @@ class TestLavi:
         text = "a b c d e f g " * 12          # periood 7
         assert find_repeat_loop(text, max_period=5) is None
         assert find_repeat_loop(text, max_period=7) is not None
+
+    def test_vaikimisi_periood_katab_mitmerealise_ploki(self):
+        """Töö 5qdpq4 (2026-08-25): periood 5 jättis kaks päris loopi tabamata.
+
+        Vaikimisi ülempiir tõsteti 20-ni; mõlemad juhtumid on siin päris
+        korpusest, mitte välja mõeldud.
+        """
+        # lk 45: kahe rea plokk, 6 sõna x 315 kordust
+        lk45 = "Bruks Dagh\nFör år D:r Lax\n" * 315
+        loop = find_repeat_loop(lk45)
+        assert loop is not None
+        assert loop["period"] == 6
+        assert loop["reps"] == 315
+
+        # lk 21: viie rea plokk, 17 sõna x 87 kordust
+        plokk = ("dessa siukdom har\nV. S. H. cao. gendz\nerlast bort och\n"
+                 "24 Nov. 1654\nChrst: Berhardts son\n")
+        loop = find_repeat_loop(plokk * 87)
+        assert loop is not None
+        assert loop["period"] == 17
+        assert loop["reps"] == 87
+
+    def test_pikk_periood_ei_varjuta_luhikest(self):
+        """Ülempiiri tõstmine on range ülemhulk — lühike periood võidab ikka."""
+        loop = find_repeat_loop("Propoſit. XII. " * 25)
+        assert loop["period"] == 2
