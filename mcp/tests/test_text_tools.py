@@ -304,3 +304,19 @@ async def test_list_filter_values_ei_kysi_silte_keeltele(server_with):
     client.entity_labels = None   # kui küsitaks, kukuks vastus sildita režiimi
     out = await _call(server, "list_filter_values", {"field": "languages"})
     assert "lat — 15579 lk" in out
+
+
+async def test_get_work_naitab_zanri_q_koodi(server_with):
+    """Sild → kood on ainus tee filtrini; ilma selleta peab mudel loendit
+    skannima ja oletama („Oratsioon — likely Q609697?")."""
+    hit = _hit(page=1, genre="Oratsioon", genre_ids=["Q861911"])
+    server, client = server_with([{"hits": [hit], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "žanr: Oratsioon (Q861911)" in out
+    assert "genre_ids" in client.bodies[0]["attributesToRetrieve"]
+
+
+async def test_get_work_zanr_ilma_koodita_ei_saa_rippuvat_sulgu(server_with):
+    server, _ = server_with([{"hits": [_hit(page=1, genre="Oratsioon")], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "žanr: Oratsioon" in out and "(" not in out.split("žanr:")[1].split("\n")[0]

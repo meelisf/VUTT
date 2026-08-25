@@ -264,6 +264,20 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         return "\n".join(lines)
 
 
+def _zanr_koodiga(hit: dict) -> str:
+    """„Oratsioon (Q861911)" — silt kuvamiseks, kood filtri jaoks.
+
+    Sildistus lahkneb teadlikult (ADR 0014: inline silt võidab, register
+    täidab augud), nii et kood on ainus kindel lüli `list_filter_values`
+    loendini.
+    """
+    silt = hit.get("genre") or ""
+    koodid = [k for k in (hit.get("genre_ids") or []) if k]
+    if not silt:
+        return ", ".join(koodid)
+    return f"{silt} ({', '.join(koodid)})" if koodid else silt
+
+
 def _format_work(hits: list[dict], *, base_url: str) -> str:
     """Teose metaandmed esimesest hitist + lehekülgede loend kanoonilises korras.
 
@@ -277,7 +291,7 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
         ("pealkiri", first.get("title")),
         ("aasta", first.get("aasta") or first.get("year_display")),
         ("koht", first.get("location")),
-        ("žanr", first.get("genre")),
+        ("žanr", _zanr_koodiga(first)),
         ("keeled", first.get("languages")),
         ("kollektsioonid", first.get("collections")),
         ("work_id", work_id),
