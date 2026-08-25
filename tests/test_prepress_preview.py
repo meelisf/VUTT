@@ -38,6 +38,13 @@ def upload(tmp_path, monkeypatch):
         prepress.upload_state, "set_upload_state",
         lambda i, **kw: state.update(kw),
     )
+    # Renderdaja loeb state'i kahel pool: katkestuslipu kontroll iga lehe ees
+    # ja `_reset_status_if_prepping` lõpus. Stub peab peegeldama sama dikte,
+    # mida ülejäänud fixture kirjutab.
+    monkeypatch.setattr(
+        prepress.upload_state, "read_state",
+        lambda i: {"status": state.get("status", "prepping"), "prepress": plan},
+    )
     monkeypatch.setattr(prepress, "source_path", lambda i: str(base / "source.pdf"))
     return uid, plan, state
 

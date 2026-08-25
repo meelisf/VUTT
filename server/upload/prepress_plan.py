@@ -10,6 +10,7 @@ Plaani kuju (state.json → "prepress"):
       "default_split_x": 0.5,
       "preview_status": "idle",     # idle | rendering | ready | error | cancelled
       "preview_done": 0,
+      "preview_cancel": False,      # ühe tsükli lipp; prepress/start nullib
       "pages": [
         {"n": 1, "mode": "nosplit", "split_x": None, "excluded": False}
       ]
@@ -33,6 +34,7 @@ def default_plan(page_count: int) -> dict:
         "default_split_x": 0.5,
         "preview_status": "idle",
         "preview_done": 0,
+        "preview_cancel": False,
         "pages": [
             {"n": n, "mode": "nosplit", "split_x": None, "excluded": False}
             for n in range(1, page_count + 1)

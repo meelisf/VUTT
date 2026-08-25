@@ -74,7 +74,7 @@ export interface UploadImportResponse {
 }
 
 export type PrepressMode = 'default' | 'custom' | 'nosplit';
-export type PreviewStatus = 'idle' | 'rendering' | 'ready' | 'error';
+export type PreviewStatus = 'idle' | 'rendering' | 'ready' | 'error' | 'cancelled';
 
 export interface PrepressPage {
   n: number;
@@ -87,6 +87,8 @@ export interface PrepressPlan {
   default_split_x: number;
   preview_status: PreviewStatus;
   preview_done: number;
+  /** Ühe tsükli lipp: apply seab, prepress/start nullib (ADR 0026). */
+  preview_cancel: boolean;
   pages: PrepressPage[];
   page_count: number;
   output_page_count: number;

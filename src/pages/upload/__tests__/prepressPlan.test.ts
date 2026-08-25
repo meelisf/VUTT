@@ -14,6 +14,7 @@ function plan(overrides: Partial<PrepressPlan> = {}): PrepressPlan {
     default_split_x: 0.5,
     preview_status: 'ready',
     preview_done: 3,
+    preview_cancel: false,
     page_count: 3,
     output_page_count: 6,
     trivial: false,

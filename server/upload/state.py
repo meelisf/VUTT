@@ -198,14 +198,21 @@ def mutate_prepress(upload_id: str, fn) -> Optional[dict]:
 # "error" on kaasas tahtlikult: lähtefail on endiselt VUTT-i poolel (koristus
 # käib alles impordil), seega ebaõnnestunud partiid peab saama uuesti proovida.
 # Ilma selleta jääks upload igaveseks error-olekusse lukku.
-APPLY_START_STATUSES = ("awaiting_split", "error")
+# "prepping" on kaasas, sest ülevaatus on nüüd ALATI nähtav ja eelvaade jookseb
+# iga upload'i puhul — ilma selleta oleks „Edasi" 500-lehelisel tööl ~5 minutit
+# surnud. Apply katkestab eelvaate (preview_cancel), ei oota seda (ADR 0026).
+APPLY_START_STATUSES = ("awaiting_split", "prepping", "error")
 
 
 def try_begin_applying(upload_id: str) -> bool:
-    """CAS: awaiting_split | error → applying. False, kui töö juba käib.
+    """CAS: awaiting_split | prepping | error → applying. False, kui töö juba käib.
 
     Tagab, et topeltklikk, retry või brauseri refresh ei käivita teist
     paralleelset 300 DPI renderdust ega SFTP-d.
+
+    Seab ka preview_cancel lipu — SAMA luku sees ja OTSE dikti, mitte
+    mutate_prepress kaudu: get_upload_lock on tavaline threading.Lock, mitte
+    RLock, seega pesastatud kutse annaks ummikseisu.
     """
     lock = get_upload_lock(upload_id)
     with lock:
@@ -213,5 +220,7 @@ def try_begin_applying(upload_id: str) -> bool:
         if not s or s.get("status") not in APPLY_START_STATUSES:
             return False
         s["status"] = "applying"
+        if isinstance(s.get("prepress"), dict):
+            s["prepress"]["preview_cancel"] = True
         write_state(upload_id, s)
         return True

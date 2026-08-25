@@ -63,6 +63,16 @@ def _render_previews(upload_id: str) -> None:
         )
 
         for n in range(1, count + 1):
+            # Lippu kontrollitakse IGA lehe alguses: apply ja eelvaade jagavad
+            # sama RENDER_SEMAPHORE(1)-i, seega katkestamata renderdus põimuks
+            # apply'ga lehe kaupa ja ligi kahekordistaks selle aja.
+            plan = (upload_state.read_state(upload_id) or {}).get("prepress") or {}
+            if plan.get("preview_cancel"):
+                upload_state.mutate_prepress(
+                    upload_id, lambda p: p.update(preview_status="cancelled")
+                )
+                logger.info("Prepress eelvaade katkestatud: {}".format(upload_id))
+                return
             dst = preview_path(upload_id, n)
             if not os.path.isfile(dst):
                 # Semafor LEHE kaupa, mitte partii ümber (#219). Eesmärk on
@@ -80,7 +90,7 @@ def _render_previews(upload_id: str) -> None:
         upload_state.mutate_prepress(
             upload_id, lambda p: p.update(preview_status="ready")
         )
-        upload_state.set_upload_state(upload_id, status="awaiting_split")
+        _reset_status_if_prepping(upload_id)
         logger.info("Prepress eelvaade valmis: {} ({} lk)".format(upload_id, count))
 
     except Exception as e:
@@ -88,6 +98,17 @@ def _render_previews(upload_id: str) -> None:
         upload_state.mutate_prepress(
             upload_id, lambda p: p.update(preview_status="error")
         )
+        _reset_status_if_prepping(upload_id)
+
+
+def _reset_status_if_prepping(upload_id: str) -> None:
+    """Renderdaja tohib staatust lähtestada AINULT siis, kui ta on selle omanik.
+
+    Pärast preview_cancel-i on staatus "applying" ja selle ülekirjutamine
+    awaiting_split'iks lubaks teise apply CAS-i sisse (topelt-SFTP).
+    """
+    s = upload_state.read_state(upload_id)
+    if s and s.get("status") == "prepping":
         upload_state.set_upload_state(upload_id, status="awaiting_split")
 
 
@@ -103,6 +124,8 @@ def start_preview(upload_id: str) -> None:
             return
         s["status"] = "prepping"
         plan["preview_status"] = "rendering"
+        plan["preview_cancel"] = False   # ühe tsükli lipp, mitte püsiv olek
+        plan["preview_done"] = 0
         s["prepress"] = plan
         upload_state.write_state(upload_id, s)
 
