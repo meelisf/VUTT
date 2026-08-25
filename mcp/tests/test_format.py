@@ -20,7 +20,8 @@ HIT = {
 def test_hit_sisaldab_koiki_votmeandmeid():
     out = fmt.format_search_hits([HIT], total=1, base_url=BASE)
     assert "v7Kq2mXp" in out
-    assert "lk 12/48" in out
+    assert "48 lk" in out       # teose maht teose real
+    assert "lk 12 ·" in out     # vaste lehekülg omal real
     assert "seisund=Valmis" in out
     assert "Disputatio politica" in out
     assert "quod respublica Suecorum" in out
@@ -100,10 +101,22 @@ def test_format_pages_tuhi_vahemik():
     assert "ei ole" in fmt.format_pages([], base_url=BASE, work_id="abc")
 
 
-def test_seisundi_legend_selgitab_koiki_viit():
-    """Lehekülje staatuseid on VIIS — kolmene komplekt on teose koondstaatus."""
-    for status in ("Toores", "Töös", "Parandatud", "Annoteeritud", "Valmis"):
-        assert status in fmt.STATUS_LEGEND
+def test_seisundi_legend_ei_kordu_vastustes():
+    """Legend elab serveri juhendis (üks kord seansis), mitte igas vastuses.
+
+    Kümne päringu jooks kordas seda ~100 tokenit korraga — vt
+    test_instructions.py, mis valvab, et juhend seisundid ikka nimetab.
+    """
+    hits = fmt.format_search_hits([HIT], total=1, base_url=BASE)
+    pages = fmt.format_pages(
+        [{"lehekylje_number": 12, "status": "Toores", "lehekylje_tekst": "x"}],
+        base_url=BASE, work_id="abc",
+    )
+    for out in (hits, pages):
+        assert "usaldusväärsus" not in out
+        assert "puutumata masinlugemine" not in out
+    # seisund ise jääb vastusesse alles
+    assert "seisund=Toores" in pages
 
 
 def test_pikk_pealkiri_kärbitakse_otsingutulemuses():
@@ -113,14 +126,14 @@ def test_pikk_pealkiri_kärbitakse_otsingutulemuses():
     out = fmt.format_search_hits(
         [dict(HIT, title=pikk)], total=1, base_url=BASE
     )
-    title_line = out.splitlines()[3]
+    title_line = next(l for l in out.splitlines() if l.startswith("[1] "))
     assert len(title_line) < 300
     assert "…" in title_line
 
 
 def test_luhike_pealkiri_jaab_puutumata():
     out = fmt.format_search_hits([HIT], total=1, base_url=BASE)
-    title_line = out.splitlines()[3]
+    title_line = next(l for l in out.splitlines() if l.startswith("[1] "))
     assert '"Disputatio politica de republica"' in title_line
     assert "…" not in title_line  # kärpe-ellips ei tohi lühikest pealkirja puudutada
 
@@ -194,6 +207,108 @@ def test_otsingutulemus_ilma_creatorsita_kasutab_autori_valja():
 def test_ilma_loojata_teosel_pole_rippuvat_eraldajat():
     hit = {k: v for k, v in HIT.items() if k != "autor"}
     out = fmt.format_search_hits([hit], total=1, base_url=BASE)
-    title_line = out.splitlines()[3]
+    title_line = next(l for l in out.splitlines() if l.startswith("[1] "))
     assert "]  · " not in title_line
     assert title_line.startswith('[1] "Disputatio')
+
+
+def test_rollilegend_ainult_kui_on_muid_rolle_kui_auctor():
+    """Ainult autoriga teosel ei seleta legend midagi — 92 tokenit tühja."""
+    assert not fmt.needs_role_legend([{"name": "X", "role": "auctor"}])
+    assert not fmt.needs_role_legend([])
+    assert fmt.needs_role_legend([
+        {"name": "X", "role": "auctor"}, {"name": "Y", "role": "aui"},
+    ])
+    # rollita kirje ei tohi legendi välja kutsuda ega ka krahhi teha
+    assert not fmt.needs_role_legend([{"name": "X"}])
+
+
+# ── lehekülgede ülevaade (vahemikena, mitte rida lehe kohta) ──────────────
+
+def _lehed(paarid):
+    return [{"lehekylje_number": n, "status": s} for n, s in paarid]
+
+
+def test_page_index_uhtlane_teos_on_uks_rida():
+    """89 % teostest on kõigil lehtedel sama seisund — 48 rida = 47 kordust."""
+    out = fmt.format_page_index(
+        _lehed([(n, "Toores") for n in range(1, 49)]), base_url=BASE, work_id="v7Kq2mXp"
+    )
+    assert "Leheküljed: 1–48" in out
+    assert "kõik seisund=Toores" in out
+    assert f"{BASE}/work/v7Kq2mXp/{{lk}}" in out
+    assert "lk 7" not in out  # üksikuid lehti ei loetleta
+    assert len(out.splitlines()) == 2
+
+
+def test_page_index_seisundi_muutused_jooksudena():
+    out = fmt.format_page_index(
+        _lehed([(n, "Toores") for n in range(1, 5)]
+               + [(n, "Parandatud") for n in range(5, 7)]
+               + [(7, "Valmis")]),
+        base_url=BASE, work_id="abc",
+    )
+    assert "lk 1–4 Toores" in out
+    assert "lk 5–6 Parandatud" in out
+    assert "lk 7 Valmis" in out          # üksik leht ilma vahemikuta
+    assert "kõik seisund" not in out
+    assert out.index("Toores") < out.index("Parandatud") < out.index("Valmis")
+
+
+def test_page_index_auk_numbrites_jaab_nahtavaks():
+    """Kodeering käib tegelike numbrite peale — auk ei tohi vaikselt kaduda."""
+    out = fmt.format_page_index(
+        _lehed([(1, "Toores"), (2, "Toores"), (9, "Toores")]),
+        base_url=BASE, work_id="abc",
+    )
+    assert "Leheküljed: 1–2 · 9" in out
+
+
+def test_page_index_jarjestab_ise():
+    out = fmt.format_page_index(
+        _lehed([(3, "Toores"), (1, "Toores"), (2, "Toores")]),
+        base_url=BASE, work_id="abc",
+    )
+    assert "Leheküljed: 1–3" in out
+
+
+def test_page_index_puuduv_seisund_ei_kao():
+    out = fmt.format_page_index(
+        [{"lehekylje_number": 1}], base_url=BASE, work_id="abc"
+    )
+    assert "seisund=?" in out
+
+
+# ── otsingutulemuse rühmitamine teose kaupa ───────────────────────────────
+
+def _vaste(work_id, page, title="Disputatio politica", **extra):
+    return dict(HIT, work_id=work_id, lehekylje_number=page, title=title, **extra)
+
+
+def test_search_hits_paise_ei_kordu_sama_teose_lehtedel():
+    """Mõõdetud: 26 % vastuse mahust oli märk-märgilt korduv päis."""
+    out = fmt.format_search_hits(
+        [_vaste("zhdry4", n) for n in (1, 2, 3)], total=3, base_url=BASE
+    )
+    assert out.count("Disputatio politica") == 1
+    assert out.count("work_id=zhdry4") == 1
+    for n in (1, 2, 3):
+        assert f"lk {n} ·" in out
+
+
+def test_search_hits_iga_teos_oma_numbri_all():
+    out = fmt.format_search_hits(
+        [_vaste("aaa", 1), _vaste("bbb", 5, title="Oratio"), _vaste("aaa", 2)],
+        total=3, base_url=BASE,
+    )
+    assert "[1]" in out and "[2]" in out and "[3]" not in out
+    # sama teose lehed koonduvad ühte rühma, ka kui Meili järjestus vaheldub
+    assert out.index("work_id=aaa") < out.index("work_id=bbb")
+    assert out.count("work_id=aaa") == 1
+
+
+def test_search_hits_loendur_nimetab_teoste_arvu():
+    out = fmt.format_search_hits(
+        [_vaste("aaa", 1), _vaste("bbb", 2)], total=99, base_url=BASE
+    )
+    assert "99" in out and "2 teosest" in out

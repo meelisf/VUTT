@@ -152,12 +152,38 @@ need elavad ainult `creators`-is.
 Otsingutulemuse päises näidatakse ainult peamine looja rolliga + respondens;
 täisnimekiri tuleb `get_work`-ist.
 
+### Otsinguulatus ja rühmitamine
+
+`search_pages` otsib **ainult lehetekstist** (`PAGE_SEARCH_FIELDS`), `search_works`
+ka pealkirjast ja autoritest (`WORK_SEARCH_FIELDS`). Teose metaandmed on
+dubleeritud igale lehe-dokumendile, nii et ilma selle piiranguta andis üks
+pealkirjavaste kõik teose leheküljed „vasteks" — „Buchdrucker" 469 vastet,
+millest 380 ei sisaldanud sõna, ja top-10 ühest teosest. Vt ADR 0027.
+
+Vastus on rühmitatud teose kaupa (päis üks kord) ja teoseülene otsing laotatakse
+teoste peale: kuni `PAGES_PER_WORK` (3) lehte teose kohta. `work_id`-ga piiratud
+otsingus kappi ei ole — seal ongi küsimus „kus SELLES teoses".
+
 ### Seisund
 
 Lehekülje seisundeid on **viis**: `Toores`, `Töös`, `Parandatud`,
 `Annoteeritud`, `Valmis`. Kolmene `Toores/Töös/Valmis` on `WorkStatus` — teose
-koondstaatus, eri asi. Sõnavara elab `src/types.ts`-is ja
-`test_meili_contract.py` valvab, et legend sellest maha ei jääks.
+koondstaatus, eri asi. Sõnavara elab `src/types.ts`-is.
+
+`get_work` ei loetle lehti ükshaaval, vaid **vahemikena** (`format_page_index`):
+korpuses on mediaanteoses 9 lehte ja 89 % teostest kannab kõigil lehtedel sama
+seisundit, nii et rida lehe kohta oli peaaegu puhas kordus — 706-leheküljeline
+teos maksis ~18 000 tokenit, vahemikena ~33 (kogu korpuse peale −93 %).
+Kodeering käib tegelike lehenumbrite peale, nii et auk numbrites annab eraldi
+vahemiku. Täis-URL-i iga lehe juures annavad endiselt `search_pages` ja
+`get_pages` — need on kohad, kust lehe sisuni jõutakse.
+
+Skaala seletus on **ainult `instructions.py`-s**, mitte vastustes: klient süstib
+juhendi konteksti üks kord seansi kohta, vastuses kordumine maksis ~100 tokenit
+päringu kohta. `test_meili_contract.py` valvab, et juhend kõiki `types.ts`-i
+seisundeid nimetaks; `test_instructions.py` valvab 2048-märgi lage, millest
+klient juhendi lõikab. Sama loogika rollilegendil: `needs_role_legend()` väljastab
+selle ainult siis, kui teosel on mõni roll peale `auctor`-i.
 
 ## Arendus
 

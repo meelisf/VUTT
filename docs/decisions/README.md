@@ -46,3 +46,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0024](0024-kaugkoristus-failid-kohe-kataloog-hiljem.md) | Katkestamine kustutab kaugfailid kohe, kataloogi eemaldab reaper armuaja järel | kehtib |
 | [0025](0025-ocr-vea-margend-err.md) | OCR-server märgib ebaõnnestunud lehe `.err` failiga; märgend on lõplik | kehtib |
 | [0026](0026-ulevaatus-on-alati-nahtav.md) | Lehtede ülevaatus on alati nähtav; opt-in jääb 300 DPI teele | kehtib |
+| [0027](0027-mcp-otsing-lehetekstist-ja-ruhmitatult.md) | MCP `search_pages` otsib ainult lehetekstist; vastus rühmitatud teose kaupa | kehtib |

@@ -77,7 +77,7 @@ def test_seisundi_legend_katab_koik_pagestatused():
     import os
     import re
 
-    from vutt_mcp import format as fmt
+    from vutt_mcp.instructions import SERVER_INSTRUCTIONS
 
     types_ts = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -90,7 +90,10 @@ def test_seisundi_legend_katab_koik_pagestatused():
     statuses = re.findall(r"=\s*'([^']+)'", block)
     assert len(statuses) >= 5, f"ootasin vähemalt 5 staatust, sain {statuses}"
     for status in statuses:
-        assert status in fmt.STATUS_LEGEND, f"legend ei maini staatust „{status}\""
+        assert status in SERVER_INSTRUCTIONS, (
+            f"serveri juhend ei maini staatust „{status}\" — vastustes seda\n"
+            "enam ei seletata, juhend on ainus koht"
+        )
 
 
 def test_facet_lagi_on_sama_mis_indeksis():
