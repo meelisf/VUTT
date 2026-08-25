@@ -94,6 +94,8 @@ export interface PrepressPlan {
   output_page_count: number;
   trivial: boolean;
   status: string;
+  /** Töötlusotsus omas väljas — meta.type on bibliograafiline väide (§3). */
+  ocr_model: 'print' | 'hand';
 }
 
 export interface PrepressSaveResult {

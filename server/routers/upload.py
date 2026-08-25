@@ -111,6 +111,7 @@ def admin_prepress_get(upload_id: str, user=Depends(require_role("admin"))):
     result["output_page_count"] = prepress_plan.output_page_count(plan, page_count)
     result["trivial"] = prepress_plan.is_trivial_plan(plan)
     result["status"] = state.get("status")
+    result["ocr_model"] = state.get("ocr_model", "print")
     return result
 
 
@@ -205,6 +206,29 @@ def admin_prepress_apply(upload_id: str, user=Depends(require_role("admin"))):
             content={"detail": "Töö juba käib", "status": state.get("status")},
         )
     return {"status": "applying", "path": "split"}
+
+
+@router.post("/admin/upload/{upload_id}/ocr-model")
+async def admin_set_ocr_model(upload_id: str, request: Request,
+                              user=Depends(require_role("admin"))):
+    """Vahetab OCR-mudelit. EI muuda meta.type-i — see on bibliograafiline väli.
+
+    Miks mitte PATCH /meta: update_upload_meta allow-list viskab tundmatu välja
+    vaikselt ära ja tagastab ikka 200 (nii jäid varem salvestumata external_url
+    ja ester_id), ning mudel ei ole ka meta väli.
+    """
+    data = await get_json_data(request)
+    model = data.get("model")
+    if model not in upload_state.OCR_MODELS:
+        raise HTTPException(status_code=400, detail="Vigane mudel")
+    _load_prepress(upload_id)
+    ok = await run_in_threadpool(upload_state.try_set_ocr_model, upload_id, model)
+    if not ok:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "Mudelit saab muuta ainult enne OCR-i saatmist"},
+        )
+    return {"status": "saved", "ocr_model": model}
 
 
 @router.post("/admin/upload/{upload_id}/files")

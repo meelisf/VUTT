@@ -204,6 +204,14 @@ export function savePrepress(
   return apiPost<PrepressSaveResult>(`/admin/upload/${uploadId}/prepress`, plan, { token });
 }
 
+export function setOcrModel(
+  uploadId: string,
+  model: 'print' | 'hand',
+  token: string | null,
+): Promise<{ status: string; ocr_model: string }> {
+  return apiPost(`/admin/upload/${uploadId}/ocr-model`, { model }, { token });
+}
+
 export function applyPrepress(
   uploadId: string,
   token: string | null,

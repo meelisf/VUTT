@@ -41,7 +41,7 @@ def test_koik_prepress_teed_on_admin_all(client_admin):
     from server.routers import upload as upload_router
     prepress_routes = [
         r.path for r in upload_router.router.routes if "prepress" in r.path
-        or "/preview/" in r.path
+        or "/preview/" in r.path or "ocr-model" in r.path
     ]
     assert prepress_routes, "prepress-endpointe ei leitud"
     assert all(p.startswith("/admin/") for p in prepress_routes)
@@ -53,6 +53,33 @@ def test_prepress_noual_admin_rolli(client_admin, login):
     editor = {"Authorization": "Bearer {}".format(login("editor", "editorpass"))}
     resp = client.get("/admin/upload/{}/prepress".format(upload_id), headers=editor)
     assert resp.status_code in (401, 403)
+
+
+def test_ocr_mudeli_vahetus_noual_admin_rolli(client_admin, login):
+    client, _headers, upload_id = client_admin
+    editor = {"Authorization": "Bearer {}".format(login("editor", "editorpass"))}
+    resp = client.post("/admin/upload/{}/ocr-model".format(upload_id),
+                       json={"model": "hand"}, headers=editor)
+    assert resp.status_code in (401, 403)
+
+
+def test_ocr_mudeli_vahetus_muudab_kaugteed_ja_kajastub_plaanis(client_admin):
+    client, headers, upload_id = client_admin
+    resp = client.post("/admin/upload/{}/ocr-model".format(upload_id),
+                       json={"model": "hand"}, headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["ocr_model"] == "hand"
+
+    plan = client.get("/admin/upload/{}/prepress".format(upload_id),
+                      headers=headers).json()
+    assert plan["ocr_model"] == "hand"
+
+
+def test_ocr_mudeli_vahetus_ei_luba_tundmatut_vaartust(client_admin):
+    client, headers, upload_id = client_admin
+    resp = client.post("/admin/upload/{}/ocr-model".format(upload_id),
+                       json={"model": "kuutõbi"}, headers=headers)
+    assert resp.status_code == 400
 
 
 def test_apply_teine_kutse_annab_409(client_admin, monkeypatch):

@@ -224,3 +224,34 @@ def try_begin_applying(upload_id: str) -> bool:
             s["prepress"]["preview_cancel"] = True
         write_state(upload_id, s)
         return True
+
+
+# Mudelit tohib muuta seni, kuni ükski OCR-input fail ei ole kaugserverisse
+# saadetud. Eelvaade elab ainult VUTT-i poolel, seega "prepping" on lubatud.
+MODEL_CHANGE_STATUSES = ("awaiting_split", "prepping", "error")
+OCR_MODELS = ("print", "hand")
+
+
+def try_set_ocr_model(upload_id: str, model: str) -> bool:
+    """CAS: staatusekontroll + ocr_model + MÕLEMAD kaugteed ÜHE luku all.
+
+    Kaks eraldi luku-akent („kontrolli, siis kirjuta") laseks apply vahele:
+    kontroll näeks awaiting_split'i, apply asuks tööle ja kaugteed
+    kirjutataks ümber juba lennus oleva saatmise alt.
+    """
+    from ..upload_ops import remote_paths
+
+    if model not in OCR_MODELS:
+        return False
+    lock = get_upload_lock(upload_id)
+    with lock:
+        s = read_state(upload_id)
+        if not s or s.get("status") not in MODEL_CHANGE_STATUSES:
+            return False
+        slug = (s.get("meta") or {}).get("slug", "")
+        staging, work = remote_paths(model, upload_id, slug)
+        s["ocr_model"] = model
+        s["remote_staging_path"] = staging
+        s["remote_work_path"] = work
+        write_state(upload_id, s)
+        return True

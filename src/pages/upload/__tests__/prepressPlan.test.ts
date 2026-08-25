@@ -19,6 +19,7 @@ function plan(overrides: Partial<PrepressPlan> = {}): PrepressPlan {
     output_page_count: 6,
     trivial: false,
     status: 'awaiting_split',
+    ocr_model: 'print',
     pages: [
       { n: 1, mode: 'default', split_x: null, excluded: false },
       { n: 2, mode: 'custom', split_x: 0.459, excluded: false },
