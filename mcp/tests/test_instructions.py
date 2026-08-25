@@ -44,8 +44,11 @@ def test_juhend_nimetab_tooriistad_toojarjekorras():
 
 
 def test_juhend_selgitab_sonaosa_reeglit():
-    """Mõõdetud: „oratio panegyr" leiab 21 lehest 2 — esimene sõna peab olema
-    terve. Ilma selle reeglita otsivad agendid käändelõpuga täissõnu."""
+    """Esimene sõna peab olema terve; ilma selle reeglita otsivad agendid
+    käändelõpuga täissõnu.
+
+    Absoluutarve siia EGA dokumentatsiooni ei panda — korpus kasvab ja
+    mõõdetud vastete arv vananeb. Reegel on püsiv, number mitte."""
     assert "sõnaosa" in SERVER_INSTRUCTIONS
     assert "VIIMANE" in SERVER_INSTRUCTIONS
     assert "orati" in SERVER_INSTRUCTIONS
