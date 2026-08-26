@@ -352,7 +352,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
             ref={imgRef}
             src={src}
             alt={t('imageViewer.facsimileAlt')}
-            className="max-w-none shadow-2xl sepia-[0.3] pointer-events-none"
+            className="max-w-none shadow-2xl pointer-events-none"
             style={{
               maxHeight: '85vh',
               maxWidth: '85vw',

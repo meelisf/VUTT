@@ -169,7 +169,7 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                       src={page.imageUrl}
                       alt={`Lk ${page.pageNum}`}
                       loading="lazy"
-                      className="absolute inset-0 w-full h-full object-contain sepia-[0.2]"
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   )}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white/70 text-xs text-center py-0.5 leading-tight flex items-center justify-center gap-1">
