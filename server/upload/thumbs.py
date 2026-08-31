@@ -123,6 +123,10 @@ def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -
         "planned_pages": _planned_pages(state, expected_pages),
         "files": state.get("files", []),
         "progress": upload_state.upload_progress.get(upload_id, {}),
+        # Mitu LÄHTE-lehte on apply juba läbi töötanud. Viisard näitab seda
+        # `applying` ajal — see faas on „renderdan ja saadan", mitte „OCR
+        # töötleb" (ADR 0028).
+        "applied_done": (state.get("prepress") or {}).get("applied_done", 0),
     }
     payload.update(lisa)
     return payload

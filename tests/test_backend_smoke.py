@@ -138,6 +138,8 @@ def test_admin_upload_status_returns_staged_state(client, login, make_upload):
         "expected_pages": 3,
         # Kohatäidete arv viisardile: ilma poolitusplaanita = expected_pages.
         "planned_pages": 3,
+        # Apply edenemine — viisard näitab seda `applying` faasis (ADR 0028).
+        "applied_done": 0,
         "files": state["files"],
         "ready": 0,
         "total": 0,

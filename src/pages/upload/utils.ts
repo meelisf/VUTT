@@ -91,7 +91,10 @@ export interface ReviewDerived {
 export function computeReviewDerived(
   pollResult: PollResult | null,
   localDeleted: Set<number>,
-  ocrStartedAt: number | null,
+  /** Millal jõuti `processing`-usse ehk millal KÕIK sisendlehed olid
+   *  avaldatud. EI ole OCR-i algus — OCR jookseb juba `applying` ajal,
+   *  lehthaaval (ADR 0028). Vana nimi `ocrStartedAt` valetas. */
+  processingStartedAt: number | null,
   importLoading: boolean,
   now: number = Date.now(),
   sendProgress: { bytes_sent: number; bytes_total: number } | null = null,
@@ -117,8 +120,13 @@ export function computeReviewDerived(
   const ocrTimeoutMs = pollResult?.expected_pages
     ? Math.max(5 * 60 * 1000, pollResult.expected_pages * OCR_MS_PER_PAGE)
     : OCR_TIMEOUT_MS_FALLBACK;
+  // `applying` on välistatud teise kaitsena: sel ajal alles avaldatakse lehti ja
+  // sisendvoog ei ole suletud. Ajatempel peaks siis niikuinii null olema, aga
+  // ühe kliendi ekraanil võib see olla juba varasemast seatud (reload, resume).
   const ocrTimedOut =
-    ocrStartedAt !== null && now - ocrStartedAt > ocrTimeoutMs && status !== 'done';
+    processingStartedAt !== null
+    && now - processingStartedAt > ocrTimeoutMs
+    && status !== 'done' && status !== 'applying';
   const canImport = (status === 'done' || ocrTimedOut) && readyCount > 0 && !importLoading;
 
   // Kohatäited: lehed 1..planned, mida failide loendis veel ei ole. `planned_pages`

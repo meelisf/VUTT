@@ -23,6 +23,8 @@ export interface PollResult {
   total: number;
   expected_pages: number | null;
   files: FileEntry[];
+  /** Mitu LÄHTE-lehte on apply läbi töötanud. Ainult `applying` faasi teate jaoks. */
+  applied_done?: number;
   progress?: { bytes_sent: number; bytes_total: number; error?: string | null };
   error?: string;
   stalled?: boolean;
