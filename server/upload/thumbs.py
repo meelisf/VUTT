@@ -25,14 +25,51 @@ def _close_quietly(sftp):
             pass
 
 
-def _create_thumbnail(sftp, remote_jpg: str, tmp_thumb: str, thumb_path: str):
-    """Laeb remote JPG-i alla ja salvestab sellest lokaalse pisipildi."""
-    sftp.get(remote_jpg, tmp_thumb)
+THUMB_BOX = (400, 600)
+THUMB_QUALITY = 85
+
+
+def write_thumbnail(src_path: str, dst_path: str) -> None:
+    """Kirjutab pildist pisipildi ATOMAARSELT (`.tmp` + `os.replace`).
+
+    Atomaarsus ei ole ilutsemine: `/admin/upload/{id}/thumb/{n}` serveerib seda
+    faili otse ja poll võib samal ajal sama nime kirjutada. Otse lõppteele
+    salvestamine (endine käitumine) lasi lugejal näha poolikut JPEG-i.
+
+    Kutsuvad NII poll (SFTP-ga alla laaditud pildist) KUI prepress_apply
+    (kohapeal renderdatud 300 DPI pildist) — üks teostus, mitte kaks.
+
+    Sufiks on `.part`, MITTE `.tmp`: poll kasutab `{n:03d}.jpg.tmp` nime
+    allalaadimise ajutise failina JA „teine lõim juba laadib" märgina. Sama nime
+    kasutades kirjutaks see funktsioon oma sisendi keset lugemist üle ja
+    viskaks selle siis `os.replace`-iga minema.
+    """
     from PIL import Image
 
-    with Image.open(tmp_thumb) as img:
-        img.thumbnail((400, 600), Image.LANCZOS)
-        img.save(thumb_path, "JPEG", quality=85)
+    tmp_path = dst_path + ".part"
+    try:
+        with Image.open(src_path) as img:
+            thumb = img.convert("RGB")
+            thumb.thumbnail(THUMB_BOX, Image.LANCZOS)
+            thumb.save(tmp_path, "JPEG", quality=THUMB_QUALITY)
+        os.replace(tmp_path, dst_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _create_thumbnail(sftp, remote_jpg: str, tmp_thumb: str, thumb_path: str):
+    """Laeb remote JPG-i alla ja salvestab sellest lokaalse pisipildi.
+
+    Õhuke SFTP-ümbris `write_thumbnail`-i ümber. `tmp_thumb` on ALLALAADIMISE
+    ajutine fail (mitte pisipildi oma) ja jääb kutsuja omandisse — poll kasutab
+    selle olemasolu märgina „teine lõim juba laadib".
+    """
+    sftp.get(remote_jpg, tmp_thumb)
+    write_thumbnail(tmp_thumb, thumb_path)
     os.unlink(tmp_thumb)
 
 
@@ -86,6 +123,10 @@ def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -
         "planned_pages": _planned_pages(state, expected_pages),
         "files": state.get("files", []),
         "progress": upload_state.upload_progress.get(upload_id, {}),
+        # Mitu LÄHTE-lehte on apply juba läbi töötanud. Viisard näitab seda
+        # `applying` ajal — see faas on „renderdan ja saadan", mitte „OCR
+        # töötleb" (ADR 0028).
+        "applied_done": (state.get("prepress") or {}).get("applied_done", 0),
     }
     payload.update(lisa)
     return payload
@@ -111,6 +152,11 @@ def poll_and_sync_thumbs(
 
     current_status = state.get("status", "pending")
     expected_pages = state.get("expected_pages")
+
+    # Apply ajal on poll LUGEJA (ADR 0028):
+    #   I1 — elutsükli-staatust omab apply-lõim; poll ei tohi seda muuta.
+    #   I2 — VUTT ei tõmba tagasi pilte, mille ta ise just saatis.
+    on_applying = current_status == "applying"
 
     # Uploading/pending/collecting_images/error: SFTP-d pole vaja
     # PREPRESS_IDLE_STATUSES: fail on VUTT-i poolel, OCR-serveris pole veel midagi
@@ -169,28 +215,35 @@ def poll_and_sync_thumbs(
         # valmimine liigub üle nende eraldi (ready_bases jääb ainult has_ocr
         # märgiks). Varem ootas pisipilt lehe .txt-d ja kasutaja nägi minuteid
         # tühja ekraani.
-        for base in sorted(jpg_bases):
-            page_num = file_detection.extract_page_num(base)
-            if page_num <= 0:
-                continue
-            thumb_name = f"{page_num:03d}.jpg"
-            if thumb_name in existing_thumbs:
-                continue
-            tmp_thumb = os.path.join(thumbs_dir, f"{page_num:03d}.jpg.tmp")
-            if os.path.exists(tmp_thumb):
-                continue  # Teise threadi poolt juba allalaadimisel
+        #
+        # I2: `applying` ajal kirjutab pisipildid prepress_apply LOKAALSELT,
+        # sealsamas kus 300 DPI pikslid juba on. publish_atomic ja
+        # write_thumbnail vahel on aken, kus kaug-JPG on olemas ja lokaalne
+        # pisipilt mitte — ilma selle valvurita tõmbaks poll just selles aknas
+        # pildi võrgu kaudu tagasi.
+        if not on_applying:
+            for base in sorted(jpg_bases):
+                page_num = file_detection.extract_page_num(base)
+                if page_num <= 0:
+                    continue
+                thumb_name = f"{page_num:03d}.jpg"
+                if thumb_name in existing_thumbs:
+                    continue
+                tmp_thumb = os.path.join(thumbs_dir, f"{page_num:03d}.jpg.tmp")
+                if os.path.exists(tmp_thumb):
+                    continue  # Teise threadi poolt juba allalaadimisel
 
-            try:
-                thumb_path = os.path.join(thumbs_dir, thumb_name)
-                _create_thumbnail(sftp, f"{remote_work}/{base}.jpg", tmp_thumb, thumb_path)
-                existing_thumbs.add(thumb_name)
-                logger.info(f"Thumbnail loodud: {upload_id}/{thumb_name}")
-            except Exception as e:
-                logger.warning(f"Thumbnail {thumb_name} allalaadimine ebaõnnestus: {e}")
                 try:
-                    os.unlink(tmp_thumb)
-                except Exception:
-                    pass
+                    thumb_path = os.path.join(thumbs_dir, thumb_name)
+                    _create_thumbnail(sftp, f"{remote_work}/{base}.jpg", tmp_thumb, thumb_path)
+                    existing_thumbs.add(thumb_name)
+                    logger.info(f"Thumbnail loodud: {upload_id}/{thumb_name}")
+                except Exception as e:
+                    logger.warning(f"Thumbnail {thumb_name} allalaadimine ebaõnnestus: {e}")
+                    try:
+                        os.unlink(tmp_thumb)
+                    except Exception:
+                        pass
 
         # --- Ehita files massiiv ---
         all_page_nums = sorted(
@@ -232,10 +285,16 @@ def poll_and_sync_thumbs(
         # lugemine jätaks vigase lehega upload'i igavesti pooleli (#250).
         resolved_count = ready_count + len(failed_page_nums)
         new_status = current_status
-        if expected_pages and resolved_count >= expected_pages:
-            new_status = "done"
-        elif all_page_nums:
-            new_status = "reviewing"
+        # I1: `applying` ajal ei ole sisendvoog veel suletud. Ilma selle
+        # valvurita kirjutaks juba esimene JPG-d näinud poll staatuse
+        # `reviewing`-uks keset apply't, ja apply-lõimu lõpetav `processing`
+        # tuleks alles pärast seda. `applying → processing` teeb AINULT
+        # apply-lõim; `processing`-ust alates võtab poll ülemineku üle.
+        if not on_applying:
+            if expected_pages and resolved_count >= expected_pages:
+                new_status = "done"
+            elif all_page_nums:
+                new_status = "reviewing"
 
         # --- Stall-indikaator: jälgi millal viimati uus valmis leht tekkis ---
         now_ts = datetime.now().timestamp()

@@ -98,7 +98,7 @@ export function useUploadWizard() {
   const [localDeleted, setLocalDeleted] = useState<Set<number>>(new Set());
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState('');
-  const [ocrStartedAt, setOcrStartedAt] = useState<number | null>(null);
+  const [processingStartedAt, setProcessingStartedAt] = useState<number | null>(null);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -195,7 +195,7 @@ export function useUploadWizard() {
     setSlug('');
     setSlugManual(false);
     setLocalDeleted(new Set());
-    setOcrStartedAt(null);
+    setProcessingStartedAt(null);
     setPendingMultiFiles([]);
     setMultiCurrentNum(0);
     setMultiTotalNum(0);
@@ -226,7 +226,12 @@ export function useUploadWizard() {
         }
         if (REVIEW_STATUSES.includes(d.status)) {
           setStep(4);
-          if (ocrStartedAt === null) setOcrStartedAt(Date.now());
+          // Ajatempel EI alga `applying` ajal: siis alles avaldatakse lehti ja
+          // OCR jookseb nendega paralleelselt (ADR 0028). Timeout mõõdab
+          // hetkest, mil sisendvoog on suletud ehk `processing`-ust.
+          if (d.status !== 'applying' && processingStartedAt === null) {
+            setProcessingStartedAt(Date.now());
+          }
         }
         if (['done', 'error', 'imported'].includes(d.status)) {
           stopPolling();
@@ -235,7 +240,7 @@ export function useUploadWizard() {
         // Ignoreerime ajutisi võrgu vigu
       }
     },
-    [authToken, stopPolling, ocrStartedAt]
+    [authToken, stopPolling, processingStartedAt]
   );
 
   const startPolling = useCallback(
@@ -262,10 +267,11 @@ export function useUploadWizard() {
     if (!uploadId) return;
     setStep(4);
     setFileUploading(true);   // näita „Sulge ja jälgi" — OCR käib taustal
-    if (ocrStartedAt === null) setOcrStartedAt(Date.now());
+    // Ajatemplit siin EI seata: apply alles ALGAB. `fetchStatus` seab selle,
+    // kui staatus jõuab `processing`-usse (ADR 0028).
     fetchStatus(uploadId);    // vahetu päring, et samm 4 ei ava tühjana
     startPolling(uploadId, POLL_SLOW_MS);
-  }, [uploadId, ocrStartedAt, fetchStatus, startPolling]);
+  }, [uploadId, fetchStatus, startPolling]);
 
   // ---------------------------------------------------------------------------
   // Samm 1 — staging loomine
@@ -512,7 +518,10 @@ export function useUploadWizard() {
     } else if (REVIEW_STATUSES.includes(saved.status)) {
       setStep(4);
       setFileUploading(true);
-      setOcrStartedAt(Date.now() - POLL_SLOW_MS); // Eeldame et on juba alustanud
+      // `applying` ajal jääb null — sisendvoog on veel lahti (ADR 0028).
+      if (saved.status !== 'applying') {
+        setProcessingStartedAt(Date.now() - POLL_SLOW_MS); // Eeldame et on juba alustanud
+      }
       fetchStatus(saved.id); // Vahetu päring — ära kuva vananenud cached andmeid
       startPolling(saved.id, POLL_SLOW_MS);
     } else if (saved.status === 'uploading') {
@@ -546,7 +555,7 @@ export function useUploadWizard() {
   // Arvutused (puhas tuletus utils-ist)
   // ---------------------------------------------------------------------------
   const review = computeReviewDerived(
-    pollResult, localDeleted, ocrStartedAt, importLoading, Date.now(), sendProgress,
+    pollResult, localDeleted, processingStartedAt, importLoading, Date.now(), sendProgress,
   );
   const estimatedTime = ocrEstimate(pollResult?.expected_pages);
 

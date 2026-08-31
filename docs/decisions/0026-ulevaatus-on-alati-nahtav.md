@@ -5,6 +5,10 @@
 **Issue:** #255 · **Asendab osaliselt:** ADR 0017
 **Spekk:** `docs/superpowers/specs/2026-08-24-upload-lehtede-ulevaatus-design.md`
 
+> **Osaliselt asendatud:** [ADR 0028](0028-vutt-materialiseerib-ocr-lehed.md) —
+> 300 DPI läbikäik EI OLE enam opt-in; VUTT materialiseerib lehed alati ja
+> avaldab lehthaaval. Ülejäänud otsused siin kehtivad.
+
 ## Kontekst
 
 ADR 0017 tegi prepressi **tervikuna** opt-in-iks: puutumata lülitiga upload ei

@@ -47,3 +47,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0025](0025-ocr-vea-margend-err.md) | OCR-server märgib ebaõnnestunud lehe `.err` failiga; märgend on lõplik | kehtib |
 | [0026](0026-ulevaatus-on-alati-nahtav.md) | Lehtede ülevaatus on alati nähtav; opt-in jääb 300 DPI teele | kehtib |
 | [0027](0027-mcp-otsing-lehetekstist-ja-ruhmitatult.md) | MCP `search_pages` otsib ainult lehetekstist; vastus rühmitatud teose kaupa | kehtib |
+| [0028](0028-vutt-materialiseerib-ocr-lehed.md) | VUTT materialiseerib OCR-i lehed ja avaldab lehthaaval; LOSS ainult OCR-ib | kehtib |

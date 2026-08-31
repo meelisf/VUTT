@@ -88,7 +88,7 @@ def test_apply_teine_kutse_annab_409(client_admin, monkeypatch):
 
     client, headers, upload_id = client_admin
     # Päris SFTP-lõime testis ei taha — CAS-i käitumine on see, mida mõõdame.
-    monkeypatch.setattr(store_source, "transfer_stored_source", lambda uid: None)
+
 
     first = client.post(
         "/admin/upload/{}/prepress/apply".format(upload_id), headers=headers

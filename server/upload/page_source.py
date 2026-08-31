@@ -58,6 +58,14 @@ class PageSource:
     def render_full(self, n: int, dst: str) -> None:
         raise NotImplementedError
 
+    def source_file(self, n: int) -> Optional[str]:
+        """Lähtefaili tee, kui leht ON juba fail. PDF-il ei ole — tagastab None.
+
+        Võimaldab baithaaval kopeerimist seal, kus teisendust ei ole vaja
+        (vt prepress_apply.can_copy_source_bytes).
+        """
+        return None
+
 
 
 # --- PDF ---
@@ -152,6 +160,12 @@ class ImageDirPageSource(PageSource):
 
     def page_count(self) -> int:
         return len(self._list())
+
+    def source_file(self, n: int) -> Optional[str]:
+        try:
+            return self._path(n)
+        except IndexError:
+            return None
 
     def render_preview(self, n: int, dst: str) -> None:
         from PIL import Image

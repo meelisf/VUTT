@@ -68,6 +68,7 @@
     "expectedPages": "Oodatud: {{n}} lk",
     "done": "OCR lõpetatud",
     "processing": "OCR käib...",
+    "applying": "Renderdan ja saadan lehti… {{done}}/{{total}}",
     "canLeaveNote": "OCR töötlemine käib taustal — see võtab {{time}}. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
     "canLeaveNoteUnknown": "OCR töötlemine käib taustal; kestus sõltub lehekülgede arvust (u 2–3 lk/min). Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
     "editMetaTitle": "Täienda metaandmeid OCR ootamise ajal",

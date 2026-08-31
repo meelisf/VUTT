@@ -151,7 +151,15 @@ def list_upload_states() -> list:
 
 # Staatused, mille korral OCR-serveri SFTP-pollimist ei ole vaja: fail on
 # VUTT-i poolel ja OCR pole veel alanud.
-PREPRESS_IDLE_STATUSES = ("awaiting_split", "prepping", "applying")
+#
+# `applying` EI KUULU siia (ADR 0028): apply avaldab lehti lehthaaval ja LOSS
+# alustab OCR-i kohe, seega apply ajal ON kaugkataloogis vaadata. Poll on siis
+# LUGEJA — vt I1/I2 valvureid thumbs.py-s.
+#
+# Sama konstant vastab ka küsimusele „kas `expected_pages` on veel LÄHTE-lehtede
+# arv" (`thumbs._planned_pages`). Need kaks tähendust langesid kokku alles siis,
+# kui `try_begin_applying` hakkas apply alguses väljundi arvu seadma.
+PREPRESS_IDLE_STATUSES = ("awaiting_split", "prepping")
 
 
 def init_prepress(upload_id: str, page_count: int) -> Optional[dict]:
@@ -220,6 +228,22 @@ def try_begin_applying(upload_id: str) -> bool:
         if not s or s.get("status") not in APPLY_START_STATUSES:
             return False
         s["status"] = "applying"
+        # Mitmes katse see on. Kordus tähendab, et kaugkaustas võib olla eelmise
+        # katse jäänuk — vt apply_and_transfer koristust.
+        s["apply_attempts"] = int(s.get("apply_attempts") or 0) + 1
+        # `expected_pages` saab siin ÜHE tähenduse: alates `applying`-ust on see
+        # VÄLJUND-lehtede arv. Ilma selleta peaks iga lugeja staatuse järgi
+        # arvama, kumba arvu väli parasjagu kannab.
+        from . import prepress_plan
+        plan = s.get("prepress")
+        allikalehti = s.get("expected_pages")
+        if plan and allikalehti:
+            try:
+                s["expected_pages"] = prepress_plan.output_page_count(
+                    plan, int(allikalehti))
+            except Exception as e:
+                logger.warning(
+                    "expected_pages arvutus ebaõnnestus {}: {}".format(upload_id, e))
         if isinstance(s.get("prepress"), dict):
             s["prepress"]["preview_cancel"] = True
         write_state(upload_id, s)

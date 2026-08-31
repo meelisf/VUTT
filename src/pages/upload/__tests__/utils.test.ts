@@ -239,3 +239,27 @@ describe('computeReviewDerived', () => {
     expect(out.canImport).toBe(false);
   });
 });
+
+describe('applying-faas (ADR 0028)', () => {
+  const base = {
+    status: 'applying', ready: 0, total: 0, expected_pages: 192, files: [],
+  };
+
+  it('EI kuuluta timeouti apply ajal, isegi kui ajatempel on vana', () => {
+    // OCR jookseb apply ajal lehthaaval, aga sisendvoog on veel lahti. Apply võib
+    // 200-lehelisel tööl kesta 9 minutit — see ei tohi timeouti ära süüa.
+    // `processingStartedAt` peaks apply ajal olema null; see on teine kaitse.
+    const tulem = computeReviewDerived(
+      base, new Set(), Date.now() - 24 * 60 * 60 * 1000, false, Date.now(), null,
+    );
+    expect(tulem.ocrTimedOut).toBe(false);
+  });
+
+  it('processing ajal kuulutab timeouti endiselt', () => {
+    const tulem = computeReviewDerived(
+      { ...base, status: 'processing' },
+      new Set(), Date.now() - 24 * 60 * 60 * 1000, false, Date.now(), null,
+    );
+    expect(tulem.ocrTimedOut).toBe(true);
+  });
+});

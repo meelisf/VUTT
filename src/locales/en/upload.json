@@ -68,6 +68,7 @@
     "expectedPages": "Expected: {{n}} pages",
     "done": "OCR complete",
     "processing": "OCR running...",
+    "applying": "Rendering and sending pages… {{done}}/{{total}}",
     "canLeaveNote": "OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
     "canLeaveNoteUnknown": "OCR processing runs in the background; the duration depends on the page count (approx. 2–3 pages/min). You can leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
     "editMetaTitle": "Fill in metadata while OCR is running",

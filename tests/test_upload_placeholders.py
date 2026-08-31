@@ -66,8 +66,14 @@ def _plaan(lehti, poolitatavad):
 
 
 def test_planned_pages_poolitamise_ajal_on_valjundi_arv(upload):
-    """Poolitamise ajal on expected_pages LÄHTE-lehtede arv — kohatäiteid on vaja väljundi järgi."""
-    uid = upload(status="applying", expected_pages=33, prepress=_plaan(33, {2, 3, 4}))
+    """Poolitamise ajal on expected_pages LÄHTE-lehtede arv — kohatäiteid on vaja väljundi järgi.
+
+    Staatus on `awaiting_split`, MITTE `applying`: alates ADR 0028-st seab
+    `try_begin_applying` apply alguses väljundi arvu, seega „applying +
+    lähtelehtede arv" ei ole enam võimalik olek. Testi mõte — kohatäiteid tuleb
+    lugeda plaanist, kuni väli kannab veel lähtearvu — jääb samaks.
+    """
+    uid = upload(status="awaiting_split", expected_pages=33, prepress=_plaan(33, {2, 3, 4}))
 
     res = upload_thumbs.poll_and_sync_thumbs(uid, ocr_server_path="/srv",
                                              sftp_open_func=lambda i: _SFTP({}))
@@ -98,14 +104,17 @@ def test_planned_pages_ilma_plaanita_on_expected_pages(upload):
     assert res["planned_pages"] == 12
 
 
-def test_pisipilt_tommatakse_ka_ilma_txt_ita(upload):
+def test_pisipilt_tommatakse_ka_ilma_txt_ita(upload, monkeypatch):
     """Pilt ilmub avaldamise tempos; OCR-i valmimine liigub üle nende eraldi."""
     uid = upload()
     work = "/srv/AUTO-OCR/hand/u1/1651-teos"
     sftp = _SFTP({work: ["1651-teos_pg_001.jpg", "1651-teos_pg_001.txt",
                          "1651-teos_pg_002.jpg"]})          # lk 2: OCR alles käib
     loodud = []
-    upload_thumbs._create_thumbnail = lambda s, r, tmp, lopp: loodud.append(r)
+    # monkeypatch, MITTE otseomistus: globaalne asendus lekkis teistesse
+    # testifailidesse ja lõhkus test_upload_thumbnail_write.py oma.
+    monkeypatch.setattr(upload_thumbs, "_create_thumbnail",
+                        lambda s, r, tmp, lopp: loodud.append(r))
 
     res = upload_thumbs.poll_and_sync_thumbs(uid, ocr_server_path="/srv",
                                              sftp_open_func=lambda i: sftp)

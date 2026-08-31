@@ -168,6 +168,16 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
             <AlertTriangle size={16} />
             {t('pending.stalled')}
           </span>
+        ) : status === 'applying' ? (
+          /* Apply on OMA faas: VUTT renderdab ja saadab lehti, OCR jookseb
+             nendega juba paralleelselt (ADR 0028). „OCR töötleb" oleks siin
+             eksitav — kasutaja ootab pilte, mitte teksti. */
+          <span className="flex items-center gap-1 text-amber-600 font-medium">
+            <Clock size={16} />
+            {t('step3.applying')
+              .replace('{{done}}', String(pollResult?.applied_done ?? 0))
+              .replace('{{total}}', String(pollResult?.planned_pages ?? 0))}
+          </span>
         ) : (
           <span className="flex items-center gap-1 text-amber-600 font-medium">
             <Clock size={16} />

@@ -13,7 +13,7 @@ import threading
 from typing import Optional
 
 from ..config import OCR_SERVER_PATH, get_logger
-from . import ocr_client, page_source, prepress, prepress_plan
+from . import ocr_client, page_source, prepress, prepress_plan, thumbs
 from . import state as upload_state
 
 logger = get_logger(__name__)
@@ -43,6 +43,72 @@ def _write_cut(src_img_path: str, x0: int, x1: int, dst: str) -> None:
         )
 
 
+def can_copy_source_bytes(source, plan: Optional[dict], n: int, width: int) -> bool:
+    """Kas lehe N võib avaldada ORIGINAALBAITIDENA, ilma PIL-i läbimata.
+
+    Tingimused on tahtlikult ranged — see peab olema päris identity-teisendus:
+      1. allikas on failipõhine (pildikaust, mitte PDF)
+      2. `page_cuts` annab TÄPSELT ühe lõike, mis katab kogu laiuse
+         (vertikaalset lõikamist andmemudelis ei eksisteeri, seega y-mõõdet ei
+         ole vaja kontrollida)
+      3. fail on JPEG — LOSS võtab selle muutmata vastu
+      4. EXIF orientation puudub või on 1
+
+    Punkt 4 on see, mis kergesti märkamata jääb: PIL-i `convert("RGB").save()`
+    viskab EXIF-i ära, baithaaval koopia säilitab selle. Pöördega JPEG näeks
+    kahel teel erinev välja.
+    """
+    path = source.source_file(n)
+    if not path:
+        return False
+    if not path.lower().endswith((".jpg", ".jpeg")):
+        return False
+    if prepress_plan.page_cuts(plan, n, width) != [(0, width)]:
+        return False
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            if im.getexif().get(274, 1) != 1:      # 274 = Orientation
+                return False
+    except Exception:
+        return False
+    return True
+
+
+def _write_thumb(upload_id: str, thumbs_dir: str, out_index: int, src: str) -> None:
+    """Kirjutab väljundlehe pisipildi. Viga EI TOHI apply't katkestada.
+
+    Kaugpilt on selleks hetkeks juba `publish_atomic`-uga avaldatud ja OCR võib
+    sellega alustada. Tuletatud UI-artefakti pärast konveieri mahavõtmine oleks
+    vale kompromiss; puuduva pisipildi taastab `processing`-aegne backfill.
+    """
+    try:
+        thumbs.write_thumbnail(
+            src, os.path.join(thumbs_dir, "{:03d}.jpg".format(out_index))
+        )
+    except Exception as e:
+        logger.warning("Pisipilt {} lk {}: {}".format(upload_id, out_index, e))
+
+
+def _byte_copy_path(upload_id: str, source, plan: Optional[dict], n: int) -> Optional[str]:
+    """Lähtefaili tee, kui lehe võib avaldada baithaaval; muidu None.
+
+    Laius loetakse metaandmetest (PIL ei dekodeeri pikslimassiivi `open`-i
+    peale), seega kontroll ise on odav.
+    """
+    path = source.source_file(n)
+    if not path:
+        return None
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            laius = im.size[0]
+    except Exception as e:
+        logger.warning("Baitkoopia kontroll {} lk {}: {}".format(upload_id, n, e))
+        return None
+    return path if can_copy_source_bytes(source, plan, n, laius) else None
+
+
 def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
                     remote_work: str, plan: Optional[dict]) -> int:
     """Renderdab, lõikab ja saadab kõik lehed. Tagastab saadetud lehtede arvu.
@@ -59,6 +125,10 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
     count = source.page_count()
     work_dir = os.path.join(upload_state.upload_dir(upload_id), "apply_tmp")
     os.makedirs(work_dir, exist_ok=True)
+    # Pisipildid sünnivad SIIN, mitte hiljem SFTP-ga tagasi tõmmates: pikslid on
+    # niikuinii kettal. Vastutasuks tohib poll apply ajal olla pelk lugeja (I2).
+    thumbs_dir = os.path.join(upload_state.upload_dir(upload_id), "thumbs")
+    os.makedirs(thumbs_dir, exist_ok=True)
 
     sftp = ocr_client.sftp_open(upload_id)
     out_index = 0
@@ -66,6 +136,19 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
         ocr_client.ensure_remote_dirs(sftp, remote_dirs)
         for n in range(1, count + 1):
             if prepress_plan.is_excluded(plan, n):
+                continue
+
+            # Baithaaval kiirtee: pildikausta leht, millel teisendust ei ole.
+            # Rasteriseerimist ei toimu, seega ka semafori ei ole vaja.
+            kiirtee = _byte_copy_path(upload_id, source, plan, n)
+            if kiirtee:
+                out_index += 1
+                name = remote_page_name(slug, out_index)
+                publish_atomic(sftp, kiirtee, "{}/{}".format(remote_work, name))
+                _write_thumb(upload_id, thumbs_dir, out_index, kiirtee)
+                upload_state.mutate_prepress(
+                    upload_id, lambda p, n=n: p.update(applied_done=n)
+                )
                 continue
 
             full = os.path.join(work_dir, "full.jpg")
@@ -87,6 +170,7 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
                     try:
                         _write_cut(full, x0, x1, cut)
                         publish_atomic(sftp, cut, "{}/{}".format(remote_work, name))
+                        _write_thumb(upload_id, thumbs_dir, out_index, cut)
                     finally:
                         if os.path.exists(cut):
                             os.unlink(cut)
@@ -118,6 +202,22 @@ def apply_and_transfer(upload_id: str) -> None:
     plan = state.get("prepress")
 
     try:
+        # Kordus alustab puhtalt lehelt: eelmise katse .jpg/.txt jäänukid
+        # eksitaksid LOSSi (olemasolev .txt tähendab „juba OCR-itud") ja
+        # muutunud pildile jääks vana tekst. Kustutame FAILID, mitte kataloogi
+        # — kadunud kataloog lennusoleva batchi alt kukutab kogu OCR-teenuse
+        # (ADR 0024 / #225).
+        if int(state.get("apply_attempts") or 0) > 1:
+            sftp = ocr_client.sftp_open(upload_id)
+            try:
+                ocr_client.cleanup_run_files(sftp, remote_work)
+                logger.info("Apply kordus {}: kaugfailid puhastatud".format(upload_id))
+            finally:
+                try:
+                    sftp.close()
+                except Exception:
+                    pass
+
         sent = _transfer_pages(
             upload_id, slug, (remote_staging, remote_work), remote_work, plan
         )
