@@ -4,6 +4,10 @@
 **Staatus:** vastu võetud
 **Osaliselt asendatud:** ADR 0026 — opt-in-põhimõte kehtib ainult 300 DPI läbikäigule.
 
+> **Osaliselt asendatud:** [ADR 0028](0028-vutt-materialiseerib-ocr-lehed.md) —
+> 300 DPI läbikäik EI OLE enam opt-in; VUTT materialiseerib lehed alati ja
+> avaldab lehthaaval. Ülejäänud otsused siin kehtivad.
+
 ## Kontekst
 
 Topeltlehti sai poolitada alles pärast importi, mis tähendas kaht täielikku

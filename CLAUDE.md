@@ -228,9 +228,34 @@ Rea alguses olev `N.` on CommonMarkis nummerdatud loendi marker — „1759. aas
 renderdusel markeri, kui number on ≥ 3-kohaline (aastaarv) VÕI kui plokis on ainult üks
 loendirida (kuupäev). **Allikteksti EI muudeta** — teisendus elab ainult `MarkdownView`-s.
 
-**Poolitamine enne OCR-i (ADR 0017, 0026)** — **opt-in on ainult 300 DPI läbikäik.**
-100 DPI ülevaatus renderdatakse igal upload'il; poolitusteta plaan ei renderda ühtki
-300 DPI pikslit (originaal-PDF, või ainult-väljajätmistel `pdf_subset` alamhulk).
+**Lehtede materialiseerimine (ADR 0028; varem 0017, 0026)** — **üks tee: VUTT
+materialiseerib OCR-i lehed ja avaldab lehthaaval; LOSS ainult OCR-ib.** 300 DPI
+EI OLE enam opt-in ja `admin_prepress_apply` ei hargne `is_trivial_plan` järgi.
+Pildikausta leht, millel teisendust ei ole, kopeeritakse baithaaval
+(`can_copy_source_bytes` — identity-lõige + JPEG + EXIF orientation 1/puudub;
+PIL viskaks EXIF-i ära ja pöördega pilt näeks kahel teel erinev välja).
+
+Kolm invarianti, iga rikkumine on nähtav viga:
+- **I1** — kuni staatus on `applying`, ei muuda `poll_and_sync_thumbs` upload'i
+  põhistaatust. Ilma selleta kirjutab juba esimene JPG-d näinud poll staatuse
+  `reviewing`-uks keset apply't (`elif all_page_nums`).
+- **I2** — `applying` ajal ei laadi poll ühtki kaug-JPG-d alla; pisipildid
+  kirjutab `prepress_apply` kohapeal (mitte-fataalselt: kaugpilt on juba
+  avaldatud). Aken `publish_atomic` ja `write_thumbnail` vahel on reaalne.
+- **I3** — apply ja poll ei jaga sama `SFTPClient`-i; jagatud on ainult
+  `paramiko.Transport`.
+
+`expected_pages` on ÜKS tähendus: `awaiting_split`/`prepping` → lähte-lehtede arv,
+`applying`-ust alates → väljund-lehtede arv (`try_begin_applying` seab).
+`PREPRESS_IDLE_STATUSES` ei sisalda `applying`-ut.
+
+Katkenud apply kordus puhastab kaugtöökausta **failid** (`cleanup_run_files`,
+mitte `rm -rf`) — muidu jääks muutunud pildile eelmise katse `.txt`.
+`RENDER_SEMAPHORE(1)` on protsessi-lokaalne ja nüüd KRIITILINE (kõik upload'id
+läbivad selle) — enne workerite lisamist vaja protsessideülene lukk;
+`config.check_render_concurrency()` hoiatab käivitusel.
+
+100 DPI ülevaatus renderdatakse endiselt igal upload'il.
 `FULL_DPI`/`JPEG_QUALITY` (`server/upload/page_source.py`) PEAVAD kattuma
 OCR-serveri `PDF_DPI = 300` / `quality=95` väärtustega. OCR-serverisse
 avaldatakse **failipõhise `.tmp`+rename-ga** — valvuril pole piltidele
@@ -319,8 +344,7 @@ Workspace'i „Ajalugu" tabist. **Kommentaaride taaste = ÜKS git-commit** (`onC
 **Upload (admin, `/upload`)** — neljaastmeline viisard: metaandmed → fail → **poolitamine**
 → ülevaatus. Failitüüp tuvastatakse magic byte'idest (mitte laiendist). Fail salvestatakse
 esmalt VUTT-i poolele (`uploads/{id}/source.pdf` või `source/`) ja läheb OCR-serverisse alles
-sammu 3 otsuse järel: triviaalne plaan → originaal-PDF staging'usse (OCR-server lõhub ise
-lehekülgedeks), poolitustega plaan → 300 DPI JPG-d otse work-kausta. Import: SFTP alla →
+sammu 3 otsuse järel — ALATI lehthaaval materialiseerituna work-kausta (ADR 0028). Import: SFTP alla →
 `_metadata.json` + lehe-JSON-id →
 git commit → **sünkroonne** Meili sünk → navigeerimine teosele. Staging `uploads/{upload_id}/`
 säilib üle seansi. Kausta nimi = `{slug}-{work_id}`.
