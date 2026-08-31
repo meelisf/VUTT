@@ -651,7 +651,10 @@ const PageImageEditorModal: React.FC<Props> = ({
                   src={imageUrl}
                   alt={current.filename}
                   draggable={false}
-                  className="absolute pointer-events-none select-none"
+                  // max-w-none: Tailwindi preflight seab img-le max-width:100%, mis 90°/270°
+                  // pöördel kärbiks RÕHTSA pildi laiuse konteineri (expand'itud kasti) laiuseks
+                  // — element muutuks ruuduks ja eelvaade paistaks kokkusurutud.
+                  className="absolute pointer-events-none select-none max-w-none"
                   style={{
                     width: imgDispW,
                     height: imgDispH,

@@ -92,7 +92,11 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         <PageThumb
           workId={p.workId}
           src={`${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}${imageTokenQuery}`}
-          className="w-full h-full object-cover"
+          /* `object-contain`, MITTE `cover` (sama kuju nagu upload'i kontaktlehel
+             ja UploadStepReview'l): rõhtne leht ON lapiti ja peab ka ruudustikus
+             lapiti välja nägema. `cover` lõikas küljed 3/4 portreeks ja peitis
+             just selle — lehe tegelikku formaati polnud kaardilt näha. */
+          className="w-full h-full object-contain"
         />
         {/* Nähtav number — all vasakul */}
         <span className={`absolute bottom-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(p.status)}`}>
