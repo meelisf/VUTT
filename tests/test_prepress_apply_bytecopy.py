@@ -1,8 +1,8 @@
 """Pildikausta leht kopeeritakse baithaaval, kui teisendust ei ole.
 
 `ImageDirPageSource.render_full` teeb `convert("RGB").save(quality=95)` — see on
-JPEG ümberkodeerimine. Tänane otsetee (`_transfer_images_thread`) saadab
-originaalbaidid; ühendamine ei tohi kvaliteeti kaotada.
+JPEG ümberkodeerimine. Eemaldatud otsetee (`store_source._transfer_images_thread`)
+saatis originaalbaidid; ühendamine ei tohi seda kvaliteeti kaotada.
 
 Vertikaalset mõõdet EI kontrollita: `page_cuts` annab ainult (x0, x1) ja
 `_write_cut` lõikab alati täiskõrguse — vertikaalset lõikamist andmemudelis ei

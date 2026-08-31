@@ -7,7 +7,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
-from ..upload import prepress, prepress_apply, prepress_plan, store_source
+from ..upload import prepress, prepress_apply, prepress_plan
 from ..upload import state as upload_state
 from ..upload_ops import (
     add_image_page,
@@ -184,21 +184,16 @@ async def admin_prepress_save(upload_id: str, request: Request,
 
 @router.post("/admin/upload/{upload_id}/prepress/apply")
 def admin_prepress_apply(upload_id: str, user=Depends(require_role("admin"))):
-    """Lõpetab sammu 3. Valib teekonna plaani järgi.
+    """Lõpetab sammu 3. ÜKS tee: VUTT materialiseerib lehed (ADR 0028).
+
+    Varem hargnes `is_trivial_plan` järgi ja saatis triviaalse plaani
+    originaal-PDF-ina LOSSi, kus `expand_pdf` rasteriseeris terve faili enne
+    esimese JPG kirjutamist — minuteid, mille jooksul ei olnud midagi näidata
+    ega OCR-ida. `is_trivial_plan` jääb kokkuvõtete ja UI teadete tarbeks.
 
     Sync def — try_begin_applying on blokeeriv faililukk (ADR 0002).
     """
-    state, plan = _load_prepress(upload_id)
-
-    if prepress_plan.is_trivial_plan(plan):
-        # Tänane tee: originaalfail muutmata OCR-serverisse.
-        if not upload_state.try_begin_applying(upload_id):
-            return JSONResponse(
-                status_code=409,
-                content={"detail": "Töö juba käib", "status": state.get("status")},
-            )
-        store_source.transfer_stored_source(upload_id)
-        return {"status": "transferring", "path": "original"}
+    state, _plan = _load_prepress(upload_id)
 
     if not prepress_apply.start_apply(upload_id):
         return JSONResponse(
