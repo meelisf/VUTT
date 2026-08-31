@@ -5,8 +5,8 @@ import {
   applyPrepress, getPrepress, savePrepress, setOcrModel, startPrepress,
 } from '../uploadApi';
 import {
-  applyDefaultSplitTo, clearDefaultSplit, countByMode, setExcluded, setNoSplit,
-  summarizePlan, willSplit,
+  applyDefaultSplitTo, clearDefaultSplit, countByMode, mergePreviewProgress,
+  setExcluded, setNoSplit, summarizePlan, willSplit,
 } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 import SplitActionBar from './SplitActionBar';
@@ -57,10 +57,17 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
   }, [uploadId, token, t]);
 
   // Eelvaate edenemise polling — ainult renderdamise ajal.
+  //
+  // Vastusest võetakse AINULT edenemine (`mergePreviewProgress`). Terve plaani
+  // `setPlan`-i andmine kirjutas üle salvestamata redigeeringud: `GET /prepress`
+  // tagastab ketta seisu, aga `persist` salvestab 400 ms debounce'iga, nii et
+  // vahepeal saabunud poll viskas klõpsu ära (joon sähvatas ja kadus ~1,5 s-ks).
   useEffect(() => {
     if (plan?.preview_status !== 'rendering') return;
     const id = setInterval(() => {
-      getPrepress(uploadId, token).then(setPlan).catch(() => undefined);
+      getPrepress(uploadId, token)
+        .then((p) => setPlan((prev) => mergePreviewProgress(prev, p)))
+        .catch(() => undefined);
     }, POLL_MS);
     return () => clearInterval(id);
   }, [plan?.preview_status, uploadId, token]);

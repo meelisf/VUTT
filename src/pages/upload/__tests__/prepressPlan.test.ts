@@ -7,6 +7,7 @@ import {
   countByMode,
   countOutputPages,
   isPreviewReady,
+  mergePreviewProgress,
   setExcluded,
   setNoSplit,
   summarizePlan,
@@ -270,5 +271,51 @@ describe('setExcluded', () => {
 describe('countByMode', () => {
   it('annab tegevusriba teate arvud', () => {
     expect(countByMode(mixed(), [1, 2, 3, 4])).toEqual({ applied: 3, keptCustom: 1 });
+  });
+});
+
+describe('mergePreviewProgress', () => {
+  it('võtab pollilt AINULT eelvaate edenemise', () => {
+    const kohalik = plan({ preview_status: 'rendering', preview_done: 2 });
+    const serverilt = plan({ preview_status: 'rendering', preview_done: 5 });
+
+    expect(mergePreviewProgress(kohalik, serverilt).preview_done).toBe(5);
+  });
+
+  it('EI kirjuta üle salvestamata poolitusotsust', () => {
+    // Kasutaja klõpsas „poolita" lk 3-l; debounce'itud salvestus pole veel
+    // kohale jõudnud, seega server tagastab endiselt `nosplit`. Terve plaani
+    // asendamine kustutaks klõpsu ära ja joon kaoks sekundiks ekraanilt.
+    const kohalik = plan({
+      preview_status: 'rendering',
+      pages: [
+        { n: 1, mode: 'default', split_x: null, excluded: false },
+        { n: 2, mode: 'custom', split_x: 0.459, excluded: false },
+        { n: 3, mode: 'default', split_x: null, excluded: false },
+      ],
+    });
+    const serverilt = plan({ preview_status: 'rendering', preview_done: 5 });
+
+    const tulem = mergePreviewProgress(kohalik, serverilt);
+
+    expect(tulem.pages[2].mode).toBe('default');
+    expect(tulem.preview_done).toBe(5);
+  });
+
+  it('EI kirjuta üle salvestamata üldjoont ega mudelivalikut', () => {
+    const kohalik = plan({
+      preview_status: 'rendering', default_split_x: 0.42, ocr_model: 'hand',
+    });
+    const serverilt = plan({ preview_status: 'rendering', preview_done: 5 });
+
+    const tulem = mergePreviewProgress(kohalik, serverilt);
+
+    expect(tulem.default_split_x).toBe(0.42);
+    expect(tulem.ocr_model).toBe('hand');
+  });
+
+  it('esimesel laadimisel (kohalikku plaani veel ei ole) võtab serveri oma', () => {
+    const serverilt = plan();
+    expect(mergePreviewProgress(null, serverilt)).toBe(serverilt);
   });
 });
