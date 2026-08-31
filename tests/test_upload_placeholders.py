@@ -158,3 +158,54 @@ def test_pooleliolev_too_on_endiselt_seisnud(tmp_path, monkeypatch):
     }), encoding="utf-8")
 
     assert upload_state.list_upload_states()[0]["stalled"] is True
+
+
+# =========================================================
+# has_thumb — PILDI märk, eraldi OCR-i märgist
+# =========================================================
+#
+# `has_ocr` ütleb, kas lehel on TEKST. Viisard vajab eraldi vastust
+# küsimusele „kas pisipilt on VUTT-i kettal" — muidu peab ta pildi
+# gate'ima `has_ocr` taha ja kasutaja ei näe minuteid juba alla
+# laaditud pilte (mõõdetud 2026-08-31: kõik 35 pisipilti kettal
+# 12:51:40, viimane nähtav alles ~12:55).
+#
+# `has_ocr`-i EI TOHI selleks ära kasutada ka vastupidi: pildita
+# `<img src>` annab 404 ja jääb PÜSIVALT katki — poll uuendab olekut,
+# aga `src` string ei muutu, seega brauser ei proovi uuesti.
+
+
+def test_has_thumb_on_tosi_ka_ilma_txt_ita(upload, monkeypatch):
+    """Pisipilt on kettal → viisard tohib selle kohe näidata, OCR-i ootamata."""
+    uid = upload()
+    work = "/srv/AUTO-OCR/hand/u1/1651-teos"
+    sftp = _SFTP({work: ["1651-teos_pg_001.jpg", "1651-teos_pg_001.txt",
+                         "1651-teos_pg_002.jpg"]})          # lk 2: OCR alles käib
+    monkeypatch.setattr(upload_thumbs, "_create_thumbnail",
+                        lambda s, r, tmp, lopp: None)
+
+    res = upload_thumbs.poll_and_sync_thumbs(uid, ocr_server_path="/srv",
+                                             sftp_open_func=lambda i: sftp)
+
+    lehed = {f["page"]: f for f in res["files"]}
+    assert lehed[2]["has_thumb"] is True, "pilt on olemas, kuigi OCR alles käib"
+    assert lehed[2]["has_ocr"] is False, "has_thumb ei tohi has_ocr-i tähendust muuta"
+
+
+def test_has_thumb_on_vale_kui_allalaadimine_kukkus(upload, monkeypatch):
+    """Ebaõnnestunud allalaadimine ei tohi lubada `<img>`-i, mis 404-b püsivalt."""
+    uid = upload()
+    work = "/srv/AUTO-OCR/hand/u1/1651-teos"
+    sftp = _SFTP({work: ["1651-teos_pg_001.jpg", "1651-teos_pg_001.txt"]})
+
+    def _kukub(s, r, tmp, lopp):
+        raise OSError("SFTP katkes")
+
+    monkeypatch.setattr(upload_thumbs, "_create_thumbnail", _kukub)
+
+    res = upload_thumbs.poll_and_sync_thumbs(uid, ocr_server_path="/srv",
+                                             sftp_open_func=lambda i: sftp)
+
+    lehed = {f["page"]: f for f in res["files"]}
+    assert lehed[1]["has_thumb"] is False, "pilti ei ole — viisard peab näitama ootemärki"
+    assert lehed[1]["has_ocr"] is True, "OCR on ikka valmis"
