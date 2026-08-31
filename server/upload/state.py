@@ -228,6 +228,9 @@ def try_begin_applying(upload_id: str) -> bool:
         if not s or s.get("status") not in APPLY_START_STATUSES:
             return False
         s["status"] = "applying"
+        # Mitmes katse see on. Kordus tähendab, et kaugkaustas võib olla eelmise
+        # katse jäänuk — vt apply_and_transfer koristust.
+        s["apply_attempts"] = int(s.get("apply_attempts") or 0) + 1
         # `expected_pages` saab siin ÜHE tähenduse: alates `applying`-ust on see
         # VÄLJUND-lehtede arv. Ilma selleta peaks iga lugeja staatuse järgi
         # arvama, kumba arvu väli parasjagu kannab.

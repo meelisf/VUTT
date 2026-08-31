@@ -202,6 +202,22 @@ def apply_and_transfer(upload_id: str) -> None:
     plan = state.get("prepress")
 
     try:
+        # Kordus alustab puhtalt lehelt: eelmise katse .jpg/.txt jäänukid
+        # eksitaksid LOSSi (olemasolev .txt tähendab „juba OCR-itud") ja
+        # muutunud pildile jääks vana tekst. Kustutame FAILID, mitte kataloogi
+        # — kadunud kataloog lennusoleva batchi alt kukutab kogu OCR-teenuse
+        # (ADR 0024 / #225).
+        if int(state.get("apply_attempts") or 0) > 1:
+            sftp = ocr_client.sftp_open(upload_id)
+            try:
+                ocr_client.cleanup_run_files(sftp, remote_work)
+                logger.info("Apply kordus {}: kaugfailid puhastatud".format(upload_id))
+            finally:
+                try:
+                    sftp.close()
+                except Exception:
+                    pass
+
         sent = _transfer_pages(
             upload_id, slug, (remote_staging, remote_work), remote_work, plan
         )
