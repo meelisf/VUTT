@@ -89,6 +89,9 @@ export interface PrepressPage {
   mode: PrepressMode;
   split_x: number | null;
   excluded: boolean;
+  /** Pööre päripäeva: 0 | 90 | 180 | 270. Puudub vanas plaanis → 0.
+   *  Apply pöörab renderdatud lehe ENNE lõikamist. */
+  rotate?: number;
 }
 
 export interface PrepressPlan {

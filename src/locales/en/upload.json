@@ -114,7 +114,10 @@
       "include": "Include in OCR",
       "clear": "Clear selection",
       "shiftHint": "Shift+click selects a range",
-      "splitResult": "{{applied}} pages got the global line, {{kept}} manual lines left untouched"
+      "splitResult": "{{applied}} pages got the global line, {{kept}} manual lines left untouched",
+      "rotateLeft": "Rotate left",
+      "rotateRight": "Rotate right",
+      "rotate180": "Rotate 180°"
     },
     "splitAll": "Split all",
     "clearGlobalSplit": "Remove global split",

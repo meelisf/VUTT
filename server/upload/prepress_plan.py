@@ -12,12 +12,15 @@ Plaani kuju (state.json → "prepress"):
       "preview_done": 0,
       "preview_cancel": False,      # ühe tsükli lipp; prepress/start nullib
       "pages": [
-        {"n": 1, "mode": "nosplit", "split_x": None, "excluded": False}
+        {"n": 1, "mode": "nosplit", "split_x": None, "excluded": False,
+         "rotate": 0}
       ]
     }
 
 mode: "default" = kasuta globaalset joont, "custom" = oma joon,
 "nosplit" = ära poolita (VAIKEVÄÄRTUS).
+rotate: 0 | 90 | 180 | 270, päripäeva. Mittedestruktiivne — apply pöörab
+renderdatud lehe ENNE lõikamist, seega `page_cuts` saab juba pööratud laiuse.
 """
 from typing import List, Optional, Tuple
 
@@ -36,7 +39,8 @@ def default_plan(page_count: int) -> dict:
         "preview_done": 0,
         "preview_cancel": False,
         "pages": [
-            {"n": n, "mode": "nosplit", "split_x": None, "excluded": False}
+            {"n": n, "mode": "nosplit", "split_x": None, "excluded": False,
+             "rotate": 0}
             for n in range(1, page_count + 1)
         ],
     }
@@ -159,3 +163,37 @@ def output_page_count(plan: Optional[dict], page_count: int) -> int:
             continue
         total += 2 if effective_split_x(plan, n) is not None else 1
     return total
+
+
+# --- Pööramine ---
+
+VALID_ROTATIONS = (0, 90, 180, 270)
+
+
+def normalize_rotate(angle) -> int:
+    """Toob nurga vahemikku [0, 360) ja nõuab 90° kordset.
+
+    Ainult täisnurgad: 45° pööre nõuaks servade täitmist ja loob OCR-ile
+    uut prahti, mitte ei paranda midagi. `bool` on `int` alamtüüp — see
+    tuleb eraldi välja lükata, muidu läheks `True` 1 kraadina läbi.
+    """
+    if isinstance(angle, bool) or not isinstance(angle, int):
+        raise ValueError("Pööre peab olema täisarv: {!r}".format(angle))
+    normalized = angle % 360
+    if normalized not in VALID_ROTATIONS:
+        raise ValueError("Pööre peab olema 90° kordne: {!r}".format(angle))
+    return normalized
+
+
+def rotate_of(plan: Optional[dict], n: int) -> int:
+    """Lehe N pööre. Puuduv väli = 0 — pooleliolev upload ei tohi katkeda
+    välja lisandumisest."""
+    if not plan:
+        return 0
+    for entry in plan.get("pages", []):
+        if entry.get("n") == n:
+            try:
+                return normalize_rotate(entry.get("rotate", 0) or 0)
+            except ValueError:
+                return 0
+    return 0

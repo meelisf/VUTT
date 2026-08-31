@@ -63,6 +63,9 @@ def can_copy_source_bytes(source, plan: Optional[dict], n: int, width: int) -> b
         return False
     if not path.lower().endswith((".jpg", ".jpeg")):
         return False
+    # Pööratud pilt EI OLE identity-koopia.
+    if prepress_plan.rotate_of(plan, n) != 0:
+        return False
     if prepress_plan.page_cuts(plan, n, width) != [(0, width)]:
         return False
     try:
@@ -73,6 +76,25 @@ def can_copy_source_bytes(source, plan: Optional[dict], n: int, width: int) -> b
     except Exception:
         return False
     return True
+
+
+def _rotate_in_place(path: str, angle: int) -> None:
+    """Pöörab renderdatud lehe KOHAPEAL, päripäeva.
+
+    PIL-i `rotate` on vastupäeva, seega `-angle`. `expand=True` hoiab kogu
+    sisu alles — 90° juures vahetuvad laius ja kõrgus, mis ongi mõte.
+
+    Kutsutakse ENNE `page_cuts`-i: nii saab lõikamine juba pööratud laiuse ja
+    ülejäänud geomeetria ei tea pöördest midagi.
+    """
+    if angle == 0:
+        return
+    from PIL import Image
+
+    with Image.open(path) as im:
+        im.rotate(-angle, expand=True).save(
+            path, "JPEG", quality=page_source.JPEG_QUALITY
+        )
 
 
 def _write_thumb(upload_id: str, thumbs_dir: str, out_index: int, src: str) -> None:
@@ -159,6 +181,8 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
             with prepress.RENDER_SEMAPHORE:
                 source.render_full(n, full)
             try:
+                # Pööre ENNE laiuse mõõtmist ja lõikamist — vt _rotate_in_place.
+                _rotate_in_place(full, prepress_plan.rotate_of(plan, n))
                 from PIL import Image
                 with Image.open(full) as im:
                     width = im.size[0]

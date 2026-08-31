@@ -126,13 +126,23 @@ def admin_prepress_start(upload_id: str, user=Depends(require_role("admin"))):
 
 
 @router.get("/admin/upload/{upload_id}/preview/{page_num}")
-def admin_prepress_preview(upload_id: str, page_num: int,
+def admin_prepress_preview(upload_id: str, page_num: int, rot: int = 0,
                            user=Depends(require_role("admin"))):
-    """100 DPI kontaktlehe pisipilt."""
+    """100 DPI kontaktlehe pisipilt, valikuliselt pööratuna (`?rot=90`).
+
+    Pööre on RENDERDUSPARAMEETER: brauser saab juba pööratud pildi, seega
+    kontaktlehe ja täisvaate joone-geomeetria ei tea pöördest midagi.
+    """
     _load_prepress(upload_id)
     path = prepress.preview_path(upload_id, page_num)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404)
+    if rot:
+        try:
+            path = prepress.rotated_preview_path(
+                upload_id, page_num, prepress_plan.normalize_rotate(rot))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     return FileResponse(path, media_type="image/jpeg")
 
 
@@ -158,10 +168,15 @@ async def admin_prepress_save(upload_id: str, request: Request,
         split_x = entry.get("split_x")
         if mode == "custom":
             split_x = _validate_split_x(split_x)
+        try:
+            rotate = prepress_plan.normalize_rotate(entry.get("rotate", 0) or 0)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         clean[entry.get("n")] = {
             "mode": mode,
             "split_x": split_x if mode == "custom" else None,
             "excluded": bool(entry.get("excluded")),
+            "rotate": rotate,
         }
 
     def _apply(plan):
