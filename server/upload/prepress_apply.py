@@ -43,6 +43,38 @@ def _write_cut(src_img_path: str, x0: int, x1: int, dst: str) -> None:
         )
 
 
+def can_copy_source_bytes(source, plan: Optional[dict], n: int, width: int) -> bool:
+    """Kas lehe N võib avaldada ORIGINAALBAITIDENA, ilma PIL-i läbimata.
+
+    Tingimused on tahtlikult ranged — see peab olema päris identity-teisendus:
+      1. allikas on failipõhine (pildikaust, mitte PDF)
+      2. `page_cuts` annab TÄPSELT ühe lõike, mis katab kogu laiuse
+         (vertikaalset lõikamist andmemudelis ei eksisteeri, seega y-mõõdet ei
+         ole vaja kontrollida)
+      3. fail on JPEG — LOSS võtab selle muutmata vastu
+      4. EXIF orientation puudub või on 1
+
+    Punkt 4 on see, mis kergesti märkamata jääb: PIL-i `convert("RGB").save()`
+    viskab EXIF-i ära, baithaaval koopia säilitab selle. Pöördega JPEG näeks
+    kahel teel erinev välja.
+    """
+    path = source.source_file(n)
+    if not path:
+        return False
+    if not path.lower().endswith((".jpg", ".jpeg")):
+        return False
+    if prepress_plan.page_cuts(plan, n, width) != [(0, width)]:
+        return False
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            if im.getexif().get(274, 1) != 1:      # 274 = Orientation
+                return False
+    except Exception:
+        return False
+    return True
+
+
 def _write_thumb(upload_id: str, thumbs_dir: str, out_index: int, src: str) -> None:
     """Kirjutab väljundlehe pisipildi. Viga EI TOHI apply't katkestada.
 
@@ -56,6 +88,25 @@ def _write_thumb(upload_id: str, thumbs_dir: str, out_index: int, src: str) -> N
         )
     except Exception as e:
         logger.warning("Pisipilt {} lk {}: {}".format(upload_id, out_index, e))
+
+
+def _byte_copy_path(upload_id: str, source, plan: Optional[dict], n: int) -> Optional[str]:
+    """Lähtefaili tee, kui lehe võib avaldada baithaaval; muidu None.
+
+    Laius loetakse metaandmetest (PIL ei dekodeeri pikslimassiivi `open`-i
+    peale), seega kontroll ise on odav.
+    """
+    path = source.source_file(n)
+    if not path:
+        return None
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            laius = im.size[0]
+    except Exception as e:
+        logger.warning("Baitkoopia kontroll {} lk {}: {}".format(upload_id, n, e))
+        return None
+    return path if can_copy_source_bytes(source, plan, n, laius) else None
 
 
 def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
@@ -85,6 +136,19 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
         ocr_client.ensure_remote_dirs(sftp, remote_dirs)
         for n in range(1, count + 1):
             if prepress_plan.is_excluded(plan, n):
+                continue
+
+            # Baithaaval kiirtee: pildikausta leht, millel teisendust ei ole.
+            # Rasteriseerimist ei toimu, seega ka semafori ei ole vaja.
+            kiirtee = _byte_copy_path(upload_id, source, plan, n)
+            if kiirtee:
+                out_index += 1
+                name = remote_page_name(slug, out_index)
+                publish_atomic(sftp, kiirtee, "{}/{}".format(remote_work, name))
+                _write_thumb(upload_id, thumbs_dir, out_index, kiirtee)
+                upload_state.mutate_prepress(
+                    upload_id, lambda p, n=n: p.update(applied_done=n)
+                )
                 continue
 
             full = os.path.join(work_dir, "full.jpg")
