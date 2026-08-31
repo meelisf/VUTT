@@ -3,7 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, get_logger
+from .config import (
+    PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR,
+    check_render_concurrency, get_logger,
+)
 from .utils import build_work_id_cache
 
 logger = get_logger(__name__)
@@ -34,6 +37,12 @@ from .prosopography.indices import rebuild_indices
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"VUTT FastAPI käivitus.")
+    # Ei blokeeri käivitust — RENDER_SEMAPHORE on protsessi-lokaalne ja seda
+    # ei saa siit parandada; hoiatus on selleks, et põhjus oleks logis olemas,
+    # kui keegi workerite arvu tõstab (ADR 0028).
+    _render_hoiatus = check_render_concurrency()
+    if _render_hoiatus:
+        logger.warning(_render_hoiatus)
     from .prosopography.places_ops import validate_places_config
     try:
         validate_places_config()

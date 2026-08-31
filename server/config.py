@@ -316,3 +316,25 @@ def check_production_secrets(exit_on_fail=True):
 
 # Käivita kontroll kohe mooduli importimisel (enne serveri starti)
 check_production_secrets()
+
+
+def check_render_concurrency():
+    """Hoiatab, kui veebiprotsesse on rohkem kui üks.
+
+    `prepress.RENDER_SEMAPHORE(1)` piirab rasterdust ÜHE protsessi sees. Pärast
+    ADR 0028 läbivad KÕIK upload'id rasterduse (varem ainult poolitatavad),
+    seega mitu workerit tähendaks mitut samaaegset 300 DPI renderdust ilma
+    ühegi piiranguta. Tagastab hoiatuse teksti või None.
+    """
+    for nimi in ("WEB_CONCURRENCY", "UVICORN_WORKERS", "GUNICORN_WORKERS"):
+        try:
+            workereid = int(os.getenv(nimi, "1") or "1")
+        except ValueError:
+            continue
+        if workereid > 1:
+            return (
+                "{}={}: RENDER_SEMAPHORE(1) on protsessi-lokaalne. Enne mitme "
+                "workeri kasutamist tuleb see asendada protsessideülese lukuga "
+                "(ADR 0028), muidu renderdab masin korraga {} 300 DPI PDF-i."
+            ).format(nimi, workereid, workereid)
+    return None
