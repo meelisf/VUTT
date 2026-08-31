@@ -207,6 +207,13 @@ def poll_and_sync_thumbs(
                 "page": pn,
                 "filename": f"{pn:03d}.jpg",
                 "has_ocr": pn in ready_page_nums,
+                # PILDI märk, eraldi OCR-i märgist: pisipilt tuleb JPG-ga,
+                # tekst hiljem. Viisard EI TOHI pilti `has_ocr` taha gate'ida
+                # (kasutaja ei näeks minuteid juba alla laaditud pilte), aga ei
+                # tohi ka pimesi `<img>`-i renderdada — puuduva faili 404 jääb
+                # PÜSIVALT katki, sest `src` string ei muutu ja brauser ei
+                # proovi uuesti. Sama muster kui prepressi `isPreviewReady`.
+                "has_thumb": f"{pn:03d}.jpg" in existing_thumbs,
                 "deleted": existing_deleted.get(pn, False),
             }
             if pn in failed_page_nums:

@@ -2,6 +2,12 @@ export interface FileEntry {
   page: number;
   filename: string;
   has_ocr: boolean;
+  /**
+   * Kas pisipilt on VUTT-i kettal. PILDI märk, eraldi `has_ocr`-ist (TEKSTI
+   * märk) — pisipilt tuleb kaugserveri JPG-ga, tekst minuteid hiljem.
+   * Puudub vanas state.json-is; siis langeme tagasi `has_ocr`-ile.
+   */
+  has_thumb?: boolean;
   deleted: boolean;
   /** OCR-serveri .err märgendi sisu — leht kukkus lõplikult läbi (#250). */
   ocr_error?: string;

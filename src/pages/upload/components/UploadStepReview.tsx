@@ -25,6 +25,13 @@ const ThumbCard: React.FC<{
   // Ebaõnnestunud leht EI ole ootel: OCR-server ei võta .err-iga lehte enam ette
   // (#250). Ilma selle haruta keerleks spinner igavesti ja valetaks kasutajale.
   const failed = !entry.has_ocr && !!entry.ocr_error;
+  // Pilti EI gate'ita `has_ocr` taha: pisipilt on kettal kohe, kui kaugserveris
+  // on JPG, tekst tuleb minuteid hiljem. Mõõdetud 2026-08-31: kõik 35 pisipilti
+  // olid kettal 12:51:40, viimane muutus nähtavaks alles ~12:55.
+  // `has_thumb` on serveri vastus küsimusele „kas fail on olemas" — pimesi
+  // renderdatud `<img>` 404-iks ja jääks PÜSIVALT katki, sest `src` string ei
+  // muutu ja brauser ei proovi uuesti (sama lõks kui prepressi eelvaates).
+  const showImage = entry.has_thumb ?? entry.has_ocr;
 
   return (
     <div
@@ -38,8 +45,8 @@ const ThumbCard: React.FC<{
       title={entry.ocr_error || undefined}
     >
       {/* Pisipilt */}
-      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
-        {entry.has_ocr ? (
+      <div className="relative aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
+        {showImage ? (
           <img
             src={thumbUrl}
             alt={`Lk ${entry.page}`}
@@ -50,6 +57,15 @@ const ThumbCard: React.FC<{
           <AlertTriangle size={24} className="text-red-500" />
         ) : (
           <Loader2 size={24} className="text-yellow-500 animate-spin" />
+        )}
+        {/* Pildi peal olev märk — pilt on nüüd olemas ka lehel, mille OCR alles
+            käib või lõplikult kukkus; ilma selleta kaoks seisundi signaal. */}
+        {showImage && !entry.has_ocr && (
+          <span className="absolute top-1 right-1 rounded bg-white/90 p-0.5 shadow-sm">
+            {failed
+              ? <AlertTriangle size={14} className="text-red-500" />
+              : <Loader2 size={14} className="text-yellow-500 animate-spin" />}
+          </span>
         )}
       </div>
 
