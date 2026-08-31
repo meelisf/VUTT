@@ -66,8 +66,14 @@ def _plaan(lehti, poolitatavad):
 
 
 def test_planned_pages_poolitamise_ajal_on_valjundi_arv(upload):
-    """Poolitamise ajal on expected_pages LÄHTE-lehtede arv — kohatäiteid on vaja väljundi järgi."""
-    uid = upload(status="applying", expected_pages=33, prepress=_plaan(33, {2, 3, 4}))
+    """Poolitamise ajal on expected_pages LÄHTE-lehtede arv — kohatäiteid on vaja väljundi järgi.
+
+    Staatus on `awaiting_split`, MITTE `applying`: alates ADR 0028-st seab
+    `try_begin_applying` apply alguses väljundi arvu, seega „applying +
+    lähtelehtede arv" ei ole enam võimalik olek. Testi mõte — kohatäiteid tuleb
+    lugeda plaanist, kuni väli kannab veel lähtearvu — jääb samaks.
+    """
+    uid = upload(status="awaiting_split", expected_pages=33, prepress=_plaan(33, {2, 3, 4}))
 
     res = upload_thumbs.poll_and_sync_thumbs(uid, ocr_server_path="/srv",
                                              sftp_open_func=lambda i: _SFTP({}))

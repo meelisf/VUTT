@@ -112,6 +112,11 @@ def poll_and_sync_thumbs(
     current_status = state.get("status", "pending")
     expected_pages = state.get("expected_pages")
 
+    # Apply ajal on poll LUGEJA (ADR 0028):
+    #   I1 — elutsükli-staatust omab apply-lõim; poll ei tohi seda muuta.
+    #   I2 — VUTT ei tõmba tagasi pilte, mille ta ise just saatis.
+    on_applying = current_status == "applying"
+
     # Uploading/pending/collecting_images/error: SFTP-d pole vaja
     # PREPRESS_IDLE_STATUSES: fail on VUTT-i poolel, OCR-serveris pole veel midagi
     if current_status in (
@@ -169,28 +174,35 @@ def poll_and_sync_thumbs(
         # valmimine liigub üle nende eraldi (ready_bases jääb ainult has_ocr
         # märgiks). Varem ootas pisipilt lehe .txt-d ja kasutaja nägi minuteid
         # tühja ekraani.
-        for base in sorted(jpg_bases):
-            page_num = file_detection.extract_page_num(base)
-            if page_num <= 0:
-                continue
-            thumb_name = f"{page_num:03d}.jpg"
-            if thumb_name in existing_thumbs:
-                continue
-            tmp_thumb = os.path.join(thumbs_dir, f"{page_num:03d}.jpg.tmp")
-            if os.path.exists(tmp_thumb):
-                continue  # Teise threadi poolt juba allalaadimisel
+        #
+        # I2: `applying` ajal kirjutab pisipildid prepress_apply LOKAALSELT,
+        # sealsamas kus 300 DPI pikslid juba on. publish_atomic ja
+        # write_thumbnail vahel on aken, kus kaug-JPG on olemas ja lokaalne
+        # pisipilt mitte — ilma selle valvurita tõmbaks poll just selles aknas
+        # pildi võrgu kaudu tagasi.
+        if not on_applying:
+            for base in sorted(jpg_bases):
+                page_num = file_detection.extract_page_num(base)
+                if page_num <= 0:
+                    continue
+                thumb_name = f"{page_num:03d}.jpg"
+                if thumb_name in existing_thumbs:
+                    continue
+                tmp_thumb = os.path.join(thumbs_dir, f"{page_num:03d}.jpg.tmp")
+                if os.path.exists(tmp_thumb):
+                    continue  # Teise threadi poolt juba allalaadimisel
 
-            try:
-                thumb_path = os.path.join(thumbs_dir, thumb_name)
-                _create_thumbnail(sftp, f"{remote_work}/{base}.jpg", tmp_thumb, thumb_path)
-                existing_thumbs.add(thumb_name)
-                logger.info(f"Thumbnail loodud: {upload_id}/{thumb_name}")
-            except Exception as e:
-                logger.warning(f"Thumbnail {thumb_name} allalaadimine ebaõnnestus: {e}")
                 try:
-                    os.unlink(tmp_thumb)
-                except Exception:
-                    pass
+                    thumb_path = os.path.join(thumbs_dir, thumb_name)
+                    _create_thumbnail(sftp, f"{remote_work}/{base}.jpg", tmp_thumb, thumb_path)
+                    existing_thumbs.add(thumb_name)
+                    logger.info(f"Thumbnail loodud: {upload_id}/{thumb_name}")
+                except Exception as e:
+                    logger.warning(f"Thumbnail {thumb_name} allalaadimine ebaõnnestus: {e}")
+                    try:
+                        os.unlink(tmp_thumb)
+                    except Exception:
+                        pass
 
         # --- Ehita files massiiv ---
         all_page_nums = sorted(
@@ -232,10 +244,16 @@ def poll_and_sync_thumbs(
         # lugemine jätaks vigase lehega upload'i igavesti pooleli (#250).
         resolved_count = ready_count + len(failed_page_nums)
         new_status = current_status
-        if expected_pages and resolved_count >= expected_pages:
-            new_status = "done"
-        elif all_page_nums:
-            new_status = "reviewing"
+        # I1: `applying` ajal ei ole sisendvoog veel suletud. Ilma selle
+        # valvurita kirjutaks juba esimene JPG-d näinud poll staatuse
+        # `reviewing`-uks keset apply't, ja apply-lõimu lõpetav `processing`
+        # tuleks alles pärast seda. `applying → processing` teeb AINULT
+        # apply-lõim; `processing`-ust alates võtab poll ülemineku üle.
+        if not on_applying:
+            if expected_pages and resolved_count >= expected_pages:
+                new_status = "done"
+            elif all_page_nums:
+                new_status = "reviewing"
 
         # --- Stall-indikaator: jälgi millal viimati uus valmis leht tekkis ---
         now_ts = datetime.now().timestamp()
