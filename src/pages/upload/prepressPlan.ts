@@ -129,3 +129,29 @@ export function countByMode(plan: PrepressPlan, ns: number[]): { applied: number
   const keptCustom = picked.filter((p) => p.mode === 'custom').length;
   return { applied: picked.length - keptCustom, keptCustom };
 }
+
+/**
+ * Ühendab eelvaate edenemise pollilt KÄIMASOLEVA plaaniga.
+ *
+ * Poll on olemas kahe serveri välja pärast (`preview_status`, `preview_done`),
+ * aga `GET /prepress` tagastab terve plaani KETTALT. Kogu vastuse `setPlan`-i
+ * andmine kirjutas üle kasutaja salvestamata redigeeringud: klõps „poolita"
+ * sähvatas korraks ja kadus, kuni järgmine poll juba salvestatud plaani tõi.
+ *
+ * Omanikud on lahus: server omab eelvaate edenemist, klient omab redigeeritavaid
+ * välju (`pages`, `default_split_x`, `ocr_model`) seni, kuni ta sammul 3 on.
+ * Debounce'i lühendamine EI OLE lahendus — enne salvestust teele saadetud poll
+ * võib vastata pärast salvestust, seega race jääks ka nulldebounce'iga alles.
+ */
+export function mergePreviewProgress(
+  prev: PrepressPlan | null,
+  fresh: PrepressPlan,
+): PrepressPlan {
+  if (!prev) return fresh;   // esimene laadimine — kohalikku tõde veel ei ole
+  return {
+    ...prev,
+    preview_status: fresh.preview_status,
+    preview_done: fresh.preview_done,
+    preview_cancel: fresh.preview_cancel,
+  };
+}
