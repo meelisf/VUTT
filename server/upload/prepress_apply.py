@@ -13,7 +13,7 @@ import threading
 from typing import Optional
 
 from ..config import OCR_SERVER_PATH, get_logger
-from . import ocr_client, page_source, prepress, prepress_plan
+from . import ocr_client, page_source, prepress, prepress_plan, thumbs
 from . import state as upload_state
 
 logger = get_logger(__name__)
@@ -43,6 +43,21 @@ def _write_cut(src_img_path: str, x0: int, x1: int, dst: str) -> None:
         )
 
 
+def _write_thumb(upload_id: str, thumbs_dir: str, out_index: int, src: str) -> None:
+    """Kirjutab väljundlehe pisipildi. Viga EI TOHI apply't katkestada.
+
+    Kaugpilt on selleks hetkeks juba `publish_atomic`-uga avaldatud ja OCR võib
+    sellega alustada. Tuletatud UI-artefakti pärast konveieri mahavõtmine oleks
+    vale kompromiss; puuduva pisipildi taastab `processing`-aegne backfill.
+    """
+    try:
+        thumbs.write_thumbnail(
+            src, os.path.join(thumbs_dir, "{:03d}.jpg".format(out_index))
+        )
+    except Exception as e:
+        logger.warning("Pisipilt {} lk {}: {}".format(upload_id, out_index, e))
+
+
 def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
                     remote_work: str, plan: Optional[dict]) -> int:
     """Renderdab, lõikab ja saadab kõik lehed. Tagastab saadetud lehtede arvu.
@@ -59,6 +74,10 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
     count = source.page_count()
     work_dir = os.path.join(upload_state.upload_dir(upload_id), "apply_tmp")
     os.makedirs(work_dir, exist_ok=True)
+    # Pisipildid sünnivad SIIN, mitte hiljem SFTP-ga tagasi tõmmates: pikslid on
+    # niikuinii kettal. Vastutasuks tohib poll apply ajal olla pelk lugeja (I2).
+    thumbs_dir = os.path.join(upload_state.upload_dir(upload_id), "thumbs")
+    os.makedirs(thumbs_dir, exist_ok=True)
 
     sftp = ocr_client.sftp_open(upload_id)
     out_index = 0
@@ -87,6 +106,7 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
                     try:
                         _write_cut(full, x0, x1, cut)
                         publish_atomic(sftp, cut, "{}/{}".format(remote_work, name))
+                        _write_thumb(upload_id, thumbs_dir, out_index, cut)
                     finally:
                         if os.path.exists(cut):
                             os.unlink(cut)
