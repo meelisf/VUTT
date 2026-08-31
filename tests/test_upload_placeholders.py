@@ -104,14 +104,17 @@ def test_planned_pages_ilma_plaanita_on_expected_pages(upload):
     assert res["planned_pages"] == 12
 
 
-def test_pisipilt_tommatakse_ka_ilma_txt_ita(upload):
+def test_pisipilt_tommatakse_ka_ilma_txt_ita(upload, monkeypatch):
     """Pilt ilmub avaldamise tempos; OCR-i valmimine liigub üle nende eraldi."""
     uid = upload()
     work = "/srv/AUTO-OCR/hand/u1/1651-teos"
     sftp = _SFTP({work: ["1651-teos_pg_001.jpg", "1651-teos_pg_001.txt",
                          "1651-teos_pg_002.jpg"]})          # lk 2: OCR alles käib
     loodud = []
-    upload_thumbs._create_thumbnail = lambda s, r, tmp, lopp: loodud.append(r)
+    # monkeypatch, MITTE otseomistus: globaalne asendus lekkis teistesse
+    # testifailidesse ja lõhkus test_upload_thumbnail_write.py oma.
+    monkeypatch.setattr(upload_thumbs, "_create_thumbnail",
+                        lambda s, r, tmp, lopp: loodud.append(r))
 
     res = upload_thumbs.poll_and_sync_thumbs(uid, ocr_server_path="/srv",
                                              sftp_open_func=lambda i: sftp)

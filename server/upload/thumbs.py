@@ -25,14 +25,51 @@ def _close_quietly(sftp):
             pass
 
 
-def _create_thumbnail(sftp, remote_jpg: str, tmp_thumb: str, thumb_path: str):
-    """Laeb remote JPG-i alla ja salvestab sellest lokaalse pisipildi."""
-    sftp.get(remote_jpg, tmp_thumb)
+THUMB_BOX = (400, 600)
+THUMB_QUALITY = 85
+
+
+def write_thumbnail(src_path: str, dst_path: str) -> None:
+    """Kirjutab pildist pisipildi ATOMAARSELT (`.tmp` + `os.replace`).
+
+    Atomaarsus ei ole ilutsemine: `/admin/upload/{id}/thumb/{n}` serveerib seda
+    faili otse ja poll võib samal ajal sama nime kirjutada. Otse lõppteele
+    salvestamine (endine käitumine) lasi lugejal näha poolikut JPEG-i.
+
+    Kutsuvad NII poll (SFTP-ga alla laaditud pildist) KUI prepress_apply
+    (kohapeal renderdatud 300 DPI pildist) — üks teostus, mitte kaks.
+
+    Sufiks on `.part`, MITTE `.tmp`: poll kasutab `{n:03d}.jpg.tmp` nime
+    allalaadimise ajutise failina JA „teine lõim juba laadib" märgina. Sama nime
+    kasutades kirjutaks see funktsioon oma sisendi keset lugemist üle ja
+    viskaks selle siis `os.replace`-iga minema.
+    """
     from PIL import Image
 
-    with Image.open(tmp_thumb) as img:
-        img.thumbnail((400, 600), Image.LANCZOS)
-        img.save(thumb_path, "JPEG", quality=85)
+    tmp_path = dst_path + ".part"
+    try:
+        with Image.open(src_path) as img:
+            thumb = img.convert("RGB")
+            thumb.thumbnail(THUMB_BOX, Image.LANCZOS)
+            thumb.save(tmp_path, "JPEG", quality=THUMB_QUALITY)
+        os.replace(tmp_path, dst_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _create_thumbnail(sftp, remote_jpg: str, tmp_thumb: str, thumb_path: str):
+    """Laeb remote JPG-i alla ja salvestab sellest lokaalse pisipildi.
+
+    Õhuke SFTP-ümbris `write_thumbnail`-i ümber. `tmp_thumb` on ALLALAADIMISE
+    ajutine fail (mitte pisipildi oma) ja jääb kutsuja omandisse — poll kasutab
+    selle olemasolu märgina „teine lõim juba laadib".
+    """
+    sftp.get(remote_jpg, tmp_thumb)
+    write_thumbnail(tmp_thumb, thumb_path)
     os.unlink(tmp_thumb)
 
 
