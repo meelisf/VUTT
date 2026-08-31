@@ -8,6 +8,7 @@ import {
   countOutputPages,
   isPreviewReady,
   mergePreviewProgress,
+  rotatePages,
   setExcluded,
   setNoSplit,
   summarizePlan,
@@ -317,5 +318,40 @@ describe('mergePreviewProgress', () => {
   it('esimesel laadimisel (kohalikku plaani veel ei ole) võtab serveri oma', () => {
     const serverilt = plan();
     expect(mergePreviewProgress(null, serverilt)).toBe(serverilt);
+  });
+});
+
+describe('rotatePages', () => {
+  it('lisab pöörde valitud lehtedele', () => {
+    const tulem = rotatePages(plan(), [1, 3], 90);
+    expect(tulem.pages[0].rotate).toBe(90);
+    expect(tulem.pages[1].rotate ?? 0).toBe(0);
+    expect(tulem.pages[2].rotate).toBe(90);
+  });
+
+  it('on KOGUV — sama žest nagu lehekülje halduses', () => {
+    const tulem = rotatePages(rotatePages(plan(), [1], 90), [1], 90);
+    expect(tulem.pages[0].rotate).toBe(180);
+  });
+
+  it('keerab 360 juures nulli tagasi', () => {
+    let p = plan();
+    for (let i = 0; i < 4; i++) p = rotatePages(p, [1], 90);
+    expect(p.pages[0].rotate).toBe(0);
+  });
+
+  it('normaliseerib negatiivse pöörde', () => {
+    expect(rotatePages(plan(), [1], -90).pages[0].rotate).toBe(270);
+  });
+
+  it('talub vana plaani, kus välja veel ei ole', () => {
+    const vana = plan();
+    delete (vana.pages[0] as { rotate?: number }).rotate;
+    expect(rotatePages(vana, [1], 90).pages[0].rotate).toBe(90);
+  });
+
+  it('tühja valikuga ei muuda midagi', () => {
+    const alg = plan();
+    expect(rotatePages(alg, [], 90).pages).toEqual(alg.pages);
   });
 });

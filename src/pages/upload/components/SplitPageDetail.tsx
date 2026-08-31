@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronLeft, ChevronRight, Columns2, Eye, EyeOff, LayoutGrid } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Columns2, Eye, EyeOff, FlipVertical2, LayoutGrid, RotateCcw, RotateCw } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
 import { clampSplitX, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
@@ -195,7 +195,7 @@ const SplitPageDetail: React.FC<Props> = ({
           >
             <img
               ref={imgRef}
-              src={prepressPreviewUrl(uploadId, pageNum, token)}
+              src={prepressPreviewUrl(uploadId, pageNum, token, page?.rotate ?? 0)}
               alt={`${pageNum}`}
               onLoad={measure}
               className="block max-h-full max-w-full object-contain"
@@ -323,6 +323,43 @@ const SplitPageDetail: React.FC<Props> = ({
                   <Columns2 size={15} />
                   {noSplitMode ? t('step3split.card.split') : t('step3split.card.noSplit')}
                 </button>
+                {/* Pööre — samad ikoonid nagu PageImageEditorModal-is (§ tuttav
+                    žest). KOGUV: kaks klõpsu paremale = 180°. Pööre rakendub
+                    enne poolitamist, seega joon liigub pööratud pildiga kaasa. */}
+                <button
+                  type="button"
+                  data-testid="detail-rotate-left"
+                  title={t('step3split.bar.rotateLeft')}
+                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
+                  onClick={() => onPageChange(pageNum, {
+                    rotate: (((page.rotate ?? 0) - 90) % 360 + 360) % 360,
+                  })}
+                >
+                  <RotateCcw size={15} />
+                </button>
+                <button
+                  type="button"
+                  data-testid="detail-rotate-right"
+                  title={t('step3split.bar.rotateRight')}
+                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
+                  onClick={() => onPageChange(pageNum, {
+                    rotate: (((page.rotate ?? 0) + 90) % 360 + 360) % 360,
+                  })}
+                >
+                  <RotateCw size={15} />
+                </button>
+                <button
+                  type="button"
+                  data-testid="detail-rotate-180"
+                  title={t('step3split.bar.rotate180')}
+                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
+                  onClick={() => onPageChange(pageNum, {
+                    rotate: (((page.rotate ?? 0) + 180) % 360 + 360) % 360,
+                  })}
+                >
+                  <FlipVertical2 size={15} />
+                </button>
+
                 <button
                   type="button"
                   data-testid="detail-exclude"

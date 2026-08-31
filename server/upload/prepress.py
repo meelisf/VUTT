@@ -29,6 +29,37 @@ def preview_path(upload_id: str, n: int) -> str:
     return os.path.join(preview_dir(upload_id), "pg_{:04d}.jpg".format(n))
 
 
+def rotated_preview_path(upload_id: str, n: int, angle: int) -> str:
+    """Eelvaate tee antud pöördega. Renderdab ja vahemälustab vajadusel.
+
+    Pööre on RENDERDUSPARAMEETER, mitte CSS: brauser saab juba pööratud pildi,
+    seega kontaktlehe `imageWidthRatio` ja täisvaate `imgBox` matemaatika ei
+    tea pöördest midagi. Just see geomeetria on varem kaks korda katki läinud
+    (object-cover lõikas avause küljed; joon jooksis letterboxi tühja alasse).
+    Boonusena muutub `<img src>` string pöörde muutumisel iseenesest — eraldi
+    cache-bust'i ei ole vaja.
+
+    Vahemälu elab eelvaate kaustas ja koristatakse koos sellega
+    (`cleanup_prepress_artifacts` teeb `preview/` peale rmtree).
+    """
+    base = preview_path(upload_id, n)
+    if angle % 360 == 0:
+        return base
+
+    dst = "{}_r{}.jpg".format(base[:-4], angle % 360)
+    if os.path.isfile(dst):
+        return dst
+
+    from PIL import Image
+
+    tmp = dst + ".part"
+    with Image.open(base) as im:
+        # PIL pöörab vastupäeva, meie nurk on päripäeva → -angle.
+        im.rotate(-(angle % 360), expand=True).save(tmp, "JPEG", quality=80)
+    os.replace(tmp, dst)
+    return dst
+
+
 def source_path(upload_id: str) -> Optional[str]:
     """Salvestatud lähteallikas: source.pdf (fail) või source/ (pildikaust)."""
     base = upload_state.upload_dir(upload_id)

@@ -114,7 +114,10 @@
       "include": "Lisa OCR-i",
       "clear": "Tühista valik",
       "shiftHint": "Shift+klõps valib vahemiku",
-      "splitResult": "{{applied}} lehte sai üldjoone, {{kept}} käsitsi seatut jäi puutumata"
+      "splitResult": "{{applied}} lehte sai üldjoone, {{kept}} käsitsi seatut jäi puutumata",
+      "rotateLeft": "Pööra vasakule",
+      "rotateRight": "Pööra paremale",
+      "rotate180": "Pööra 180°"
     },
     "splitAll": "Poolita kõik",
     "clearGlobalSplit": "Eemalda üldpoolitus",

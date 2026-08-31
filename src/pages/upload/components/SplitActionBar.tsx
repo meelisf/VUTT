@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Columns2, Eye, EyeOff, X } from 'lucide-react';
+import { Columns2, Eye, EyeOff, FlipVertical2, RotateCcw, RotateCw, X } from 'lucide-react';
 
 interface SplitActionBarProps {
   selectedCount: number;
@@ -8,6 +8,7 @@ interface SplitActionBarProps {
   onNoSplit: () => void;
   onExclude: () => void;
   onInclude: () => void;
+  onRotate: (delta: number) => void;
   onClearSelection: () => void;
   resultText: string | null;
 }
@@ -58,6 +59,38 @@ const SplitActionBar: React.FC<SplitActionBarProps> = (props) => {
             </button>
             <button type="button" onClick={props.onInclude} className={btn}>
               <Eye size={14} />{t('step3split.bar.include')}
+            </button>
+          </div>
+
+          {/* Pöörderühm — ikoonid on samad, mis PageImageEditorModal-is, et žest
+              oleks lehekülje haldusest tuttav. Pööre on KOGUV: kaks klõpsu
+              paremale = 180°. Kaardil eraldi ikooni EI OLE (§ nurgad on juba
+              täis) — pööratud leht paistab ruudustikus lihtsalt pööratuna,
+              sest server serveerib pisipildi juba pööratuna. */}
+          <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
+            <button
+              type="button"
+              onClick={() => props.onRotate(-90)}
+              title={t('step3split.bar.rotateLeft')}
+              className={btn}
+            >
+              <RotateCcw size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onRotate(90)}
+              title={t('step3split.bar.rotateRight')}
+              className={btn}
+            >
+              <RotateCw size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onRotate(180)}
+              title={t('step3split.bar.rotate180')}
+              className={btn}
+            >
+              <FlipVertical2 size={14} />
             </button>
           </div>
 

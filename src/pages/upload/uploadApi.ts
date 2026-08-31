@@ -226,6 +226,12 @@ export function applyPrepress(
  * Token käib query-parameetrina — SAMA muster nagu olemasoleval pisipildil
  * (UploadStepReview.tsx: `/admin/upload/${uploadId}/thumb/${page}?token=…`).
  */
-export function prepressPreviewUrl(uploadId: string, n: number, token: string | null): string {
-  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}`;
+/** Eelvaate URL. `rotate` on RENDERDUSPARAMEETER — server annab juba pööratud
+ *  pildi, seega joone- ja kuvasuhte-matemaatika ei tea pöördest midagi. Ühtlasi
+ *  muutub `src` string pöörde muutumisel iseenesest (ei vaja cache-bust'i). */
+export function prepressPreviewUrl(
+  uploadId: string, n: number, token: string | null, rotate = 0,
+): string {
+  const rot = rotate ? `&rot=${rotate}` : '';
+  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}${rot}`;
 }

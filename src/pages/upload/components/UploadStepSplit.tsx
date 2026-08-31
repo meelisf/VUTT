@@ -6,7 +6,7 @@ import {
 } from '../uploadApi';
 import {
   applyDefaultSplitTo, clearDefaultSplit, countByMode, mergePreviewProgress,
-  setExcluded, setNoSplit, summarizePlan, willSplit,
+  rotatePages, setExcluded, setNoSplit, summarizePlan, willSplit,
 } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 import SplitActionBar from './SplitActionBar';
@@ -142,6 +142,9 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
   const handleBarNoSplit = () => { if (plan) persist(setNoSplit(plan, selectedNs)); };
   const handleBarExclude = () => { if (plan) persist(setExcluded(plan, selectedNs, true)); };
   const handleBarInclude = () => { if (plan) persist(setExcluded(plan, selectedNs, false)); };
+  const handleBarRotate = (delta: number) => {
+    if (plan) persist(rotatePages(plan, selectedNs, delta));
+  };
 
   const handleModelChange = async (model: 'print' | 'hand') => {
     if (!plan || plan.ocr_model === model) return;
@@ -352,6 +355,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
         onNoSplit={handleBarNoSplit}
         onExclude={handleBarExclude}
         onInclude={handleBarInclude}
+        onRotate={handleBarRotate}
         onClearSelection={clearSelection}
         resultText={barResult}
       />

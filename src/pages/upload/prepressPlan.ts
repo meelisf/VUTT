@@ -155,3 +155,21 @@ export function mergePreviewProgress(
     preview_cancel: fresh.preview_cancel,
   };
 }
+
+/**
+ * Pöörab valitud lehti `delta` võrra päripäeva. KOGUV, nagu lehekülje halduse
+ * žest: kaks klõpsu paremale = 180°.
+ *
+ * Puuduv `rotate` väli loetakse nulliks — pooleliolev upload ei tohi katkeda
+ * välja lisandumisest.
+ */
+export function rotatePages(
+  plan: PrepressPlan,
+  ns: number[],
+  delta: number,
+): PrepressPlan {
+  return mapPages(plan, ns, (p) => ({
+    ...p,
+    rotate: (((p.rotate ?? 0) + delta) % 360 + 360) % 360,
+  }));
+}
