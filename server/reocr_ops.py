@@ -1534,6 +1534,10 @@ def start_reocr_background() -> Optional[threading.Thread]:
         # ühenduse SÜNKROONSELT lifespan'is (#181) ja poll-singletonid
         # koputaksid kaugserverile iga 10 s, konfiguratsioonis, kus upload on
         # teadlikult välja lülitatud.
+        # Väljafiltreeritud kirjed kaovad ka KETTALT: järgmine `_persist_active_jobs()`
+        # kirjutab need mälu-globaalid (millest LOSS-kirjed on juba puudu) faili
+        # peale ja kustutab need seega jäädavalt (tootmises UPLOAD_ENABLED=true,
+        # seega täna surnud haru, aga käitumine ise ei ole selline vaikimisi).
         single = {k: v for k, v in single.items() if v.get("provider") == "gemini"}
         batch = {k: v for k, v in batch.items() if v.get("provider") == "gemini"}
     revived = _revive_dead_uploads(single) + _revive_dead_uploads(batch)
