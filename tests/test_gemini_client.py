@@ -246,6 +246,65 @@ def test_katkestamine_tagasiloogi_ajal_ei_alusta_uut_katset(monkeypatch):
     assert calls["n"] == 1, "tagasilöögi järel alustati uus katse"
 
 
+@pytest.mark.parametrize("body", [
+    {},
+    {"output": []},
+    {"output": [{"content": []}]},
+    {"output": [{"content": [{"type": "image", "data": "x"}]}]},
+])
+def test_vale_vastuse_kuju_viskab_geminierrori(monkeypatch, body):
+    """200 + kuju ei klapi (pole output'it/tekstiplokki) = protokolliviga, MITTE
+    tühi tulemus — vt I1. `apply` ei tohi seda vaikimisi tühjaks tööks lugeda."""
+    import server.ocr_providers.gemini as gem
+
+    class Resp:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        text = "{}"
+        def json(self):
+            return body
+
+    monkeypatch.setattr(gem.requests, "post", lambda *a, **kw: Resp())
+    monkeypatch.setattr(gem, "_api_key", lambda: "x")
+    with pytest.raises(gem.GeminiError):
+        gem.transcribe(_jpeg(), "JUHIS")
+
+
+def test_tekstiplokk_tuhja_stringiga_ei_viska_ja_annab_tuhja_teksti(monkeypatch):
+    """ADR 0025: mudel tagastas tühja transkriptsiooni on KEHTIV tulemus."""
+    import server.ocr_providers.gemini as gem
+
+    class Resp:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        text = "{}"
+        def json(self):
+            return {"output": [{"content": [{"type": "text", "text": ""}]}],
+                    "usage": {}}
+
+    monkeypatch.setattr(gem.requests, "post", lambda *a, **kw: Resp())
+    monkeypatch.setattr(gem, "_api_key", lambda: "x")
+    text, _ = gem.transcribe(_jpeg(), "JUHIS")
+    assert text == ""
+
+
+def test_200_vigane_json_viskab_geminierrori(monkeypatch):
+    """Edasi lükatud minor #4 (koos I1-ga): toores JSONDecodeError ei tohi kutsujani lekkida."""
+    import server.ocr_providers.gemini as gem
+
+    class Resp:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        text = "ei ole json"
+        def json(self):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setattr(gem.requests, "post", lambda *a, **kw: Resp())
+    monkeypatch.setattr(gem, "_api_key", lambda: "x")
+    with pytest.raises(gem.GeminiError):
+        gem.transcribe(_jpeg(), "JUHIS")
+
+
 def test_katkestamine_enne_esimest_katset_ei_saada_ainsatki_paringut(monkeypatch):
     import server.ocr_providers.gemini as gem
 

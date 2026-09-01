@@ -149,11 +149,26 @@ def _normalize_usage(raw: Optional[dict]) -> Dict[str, int]:
 
 
 def _extract_text(data: dict) -> str:
+    """Ekstraheerib teksti 200-vastusest.
+
+    Piir on TÄHTIS: tekstiplokk OLEMAS, aga sisu tühi string — see on ADR 0025
+    mõttes KEHTIV tulemus (mudel tagastas tühja transkriptsiooni) ja tagastatakse
+    vaikselt `""`-na. Aga kui vastuses ei ole `output`-i ega ÜHTKI `type == "text"`
+    plokki, on tegu protokolliveaga (API kuju muutus vms) — see EI TOHI vaikimisi
+    tühjaks tööks muutuda, sest hulgi-`apply` kirjutaks tühja teksti üle olemasoleva.
+    """
     osad = []
+    leidus_tekstiplokk = False
     for step in data.get("output") or []:
         for block in step.get("content") or []:
-            if block.get("type") == "text" and block.get("text"):
-                osad.append(block["text"])
+            if block.get("type") == "text":
+                leidus_tekstiplokk = True
+                if block.get("text"):
+                    osad.append(block["text"])
+    if not leidus_tekstiplokk:
+        raise GeminiError(
+            "Gemini vastuse kuju ei klapi (tekstiplokke ei leitud); "
+            "ülemise taseme võtmed: {}".format(sorted(data.keys())))
     return "\n".join(osad)
 
 
@@ -196,7 +211,14 @@ def transcribe(image_bytes: bytes, instruction: str,
             logger.warning("Gemini päring ebaõnnestus: %s", viimane)
         else:
             if response.status_code == 200:
-                data = response.json()
+                try:
+                    data = response.json()
+                except ValueError as e:
+                    # 200 + vigane JSON keha — praegu lekiks toores JSONDecodeError
+                    # kutsujani; mähime GeminiError'isse (ei dumbi keha).
+                    raise GeminiError(
+                        "Gemini vastus (200) ei ole loetav JSON: {}".format(
+                            type(e).__name__))
                 return (strip_model_output(_extract_text(data)),
                         _normalize_usage(data.get("usage")))
             viimane = _error_summary(response)
