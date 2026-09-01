@@ -107,9 +107,14 @@ Nõue „teised kasutajad ei saaks ligi" tähendab kolme eraldi asja, mitte üht
 2. **Frontend.** Nupp renderdub ainult `isAtLeast(user?.role, 'superadmin')` korral.
    See on mugavus, mitte turve — turve on punkt 1.
 3. **Võti.** `GEMINI_API_KEY` elab ainult backendi protsessis. Ta ei tohi jõuda ühessegi
-   API-vastusesse, logireale ega veateatesse. Gemini vea korral logitakse HTTP staatus ja
-   vastuse *keha esimesed N märki*, ja päringu headerid **ei lähe logisse** — API-võti on
-   headeris.
+   API-vastusesse, logireale ega veateatesse. Päringu headerid **ei lähe logisse** —
+   API-võti on headeris.
+
+   **Vastuse keha ei dumbita logisse.** Vea korral logitakse HTTP staatus, Gemini
+   veaobjekti `code`/`status`/`message` väljad (JSON-ist parsituna) ja päringu id, kui see
+   olemas on. Kui keha ei ole parsitav JSON, logitakse ainult pikkus ja content-type.
+   Põhjus: 200-vastus ootamatu kujuga võib sisaldada transkribeeritud teksti, ja
+   „välise API veakeha lõikamine logisse" muutub aastatega vaikselt sisulekkeks.
 
 nginx `/api/files/` proksib **kõik** backend-teed avalikult (CLAUDE.md invariant), seega
 peavad uued teed olema `/admin/` prefiksi all **ja** rollikontrolliga. Kumbki eraldi ei
@@ -169,6 +174,32 @@ override) on kutsuja töö, mitte kliendi oma. Klient ei loe `_metadata.json`-it
 - **Mudel:** `GEMINI_OCR_MODEL`, vaikimisi `gemini-3.7-flash`.
 - **Timeout:** `GEMINI_REQUEST_TIMEOUT`, vaikimisi 120 s. Ilma selleta ei lõpe töölõim
   kunagi ja katkestamine jääks rippuma.
+
+**Invariant: iga päring kannab `store=false`.** Interactions API **salvestab vaikimisi**
+(`store=true`) — dokumentatsiooni sõnastuses „the server enables state by default
+(`store=true`), but you can opt into stateless behavior by setting `store=false`".
+
+See ei ole hügieeni-, vaid **privaatsusküsimus**. Otsustatud on, et Gemini-tee tohib
+puutuda ka mitteavalikke teoseid; `store=true` tähendaks, et need skannid ja nende
+transkriptsioonid jäävad Google'i serverisse seisma, ilma et VUTT-i poolel oleks midagi,
+mis seda näitaks või kustutaks. OCR-il ei ole serveripoolset vestlusolekut vaja ühelgi
+juhul — `previous_interaction_id` ahelat siin ei ole.
+
+Ilma selleta oleks väide „klient on olekuta" tõene ainult VUTT-i pool.
+
+**Sampling-parameetreid ei saadeta.** `gemini-3.7-flash` migratsioonijuhis ütleb otse:
+„remove deprecated sampling parameters (`temperature`, `top_p`, `top_k`)". Nende asemel on
+`thinking_level` (`low` | `medium` | `high`, vaikeväärtus `medium`).
+
+**`GEMINI_THINKING_LEVEL`, vaikimisi `low`.** Transkribeerimine on tajuülesanne, mitte
+arutlusülesanne, ja thinking-tokenid lähevad väljundikulu hulka. `low` on lähtekoht, MITTE
+mõõdetud tulemus — keerulise käekirja puhul võib `medium` end ära tasuda ja see on
+võrdlusjooksu eraldi muutuja (vt allpool). Seadistatav just sellepärast, et seda saaks
+mõõta ilma deploy'ta.
+
+`GEMINI_TEMPERATURE` on olemas, aga **vaikimisi määramata = ei saadeta**. Ainus mõte on
+katsetamine juhul, kui `GEMINI_OCR_MODEL`-iga pinnitakse vanem mudel, kus parameeter veel
+kehtib. 3.x mudelil seda ei seata.
 
 ### Juhis (prompt)
 
@@ -276,16 +307,26 @@ vaikimisi 3). Server ehitab mitmekäigulise konteksti: iga näite kohta
 
 Reeglid:
 
-- **Näited tulevad ainult samast teosest.** Teisest teosest lugemine avaks tee, mida
-  `can_read_work` ei valva; ja kasu ongi selles, et näide on sama materjal.
+- **Näited tulevad ainult samast teosest ja peavad olema selle teose kanoonilise
+  leheloendi liikmed.** Ei piisa `os.path.basename` kontrollist ega „fail on olemas"
+  kontrollist: nõue on **kuuluvus teose lehtede loendisse**. Teisest teosest lugemine
+  avaks tee, mida `can_read_work` ei valva.
 - **Värav on mittetühi `.txt`, mitte seisund.** `996o7v` on üleni `Toores` — Valmis-nõue
   teeks funktsiooni kasutuks just seal, kus teda vaja on. Seisund kuvatakse valijas
   (nõuanne), see ei blokeeri.
 - **Sihtleht ei tohi olla iseenda näide** — dedupe enne päringut.
 - **Näitepildid skaleeritakse agressiivsemalt** kui sihtpilt (max mõõde 2000 px): nad on
   kontekst, mitte transkribeeritav objekt. Kogu päringu base64-eelarvet kontrollitakse
-  enne saatmist ühe reeglina (`GEMINI_MAX_INLINE_BYTES` kogu päringule, mitte pildi kohta)
+  enne saatmist ühe reeglina (`GEMINI_MAX_REQUEST_BYTES` kogu päringule, mitte pildi kohta)
   — 3 näidet + sihtleht ilma selleta ületaks API 20 MB lae.
+- **Prefiks on iga päringu jaoks bait-täpselt sama ja kindlas järjekorras:**
+  juhis → näide 1 (pilt) → vastus 1 → näide 2 → vastus 2 → **sihtpilt viimasena**.
+  Implicit caching töötab ka stateless päringutel ja dokumentatsioon soovitab korduvat
+  suurt konteksti hoida päringu alguses. `gemini-3.7-flash` nõuab tabamuseks **vähemalt
+  4096 tokenit prefiksis** — few-shot pakiga see täitub, ilma näideteta üldjuhul mitte.
+  Sedelkataloogi 51 lehe puhul on see reaalne hinnavõit **ilma ühegi uue
+  olekumehhanismita**; näidete järjestuse stabiilsus on selle ainus tingimus, seega
+  näidete loend on **järjestatud, mitte hulk**.
 - **Kulu kasvab lineaarselt näidete arvuga** ja seda iga lehe kohta. `usageMetadata`
   läheb logisse (vt „Kulu nähtavus"), nii et hind on tagantjärele nähtav.
 
@@ -336,10 +377,19 @@ Gemini-tee peab käituma samamoodi, muidu ei ole tulemus sama.
 
 ### Pildi ettevalmistus
 
+**Eelarvet mõõdetakse valmis päringu pealt, mitte pildibaitide summast.** API 20 MB lagi
+katab kogu request'i: piltide base64, juhise, few-shot näidete vastusetekstid ja JSON-i
+enda overhead'i. Seepärast on kontroll `GEMINI_MAX_REQUEST_BYTES` (15 MiB, konservatiivne
+varu) **hinnangulise serialiseeritud payload'i** vastu — üks kontroll kogu päringule, mitte
+per-pilt.
+
 | Tingimus | Tegevus |
 |---|---|
-| base64-suurus < `GEMINI_MAX_INLINE_BYTES` (vaikimisi 15 MB) | saadetakse **bait-baidilt**, ilma ümberkodeerimiseta |
-| üle selle | Pillow skaleerib alla (max mõõde 4000 px, JPEG quality 90) ja **logib** |
+| päring mahub eelarvesse | pildid saadetakse **bait-baidilt**, ilma ümberkodeerimiseta |
+| ei mahu | skaleeritakse: **esmalt näited** (max 2000 px), siis sihtpilt (max 4000 px, quality 90); **logitakse** |
+
+Näiteid skaleeritakse esimesena, sest nad on kontekst, mitte transkribeeritav objekt.
+Sihtpildi kvaliteedi ohverdamine on viimane samm.
 
 Bait-baidilt saatmine on pariteedi küsimus: LOSS saab sama 300 DPI / quality 95 faili
 (`FULL_DPI` / `JPEG_QUALITY`, `server/upload/page_source.py`). Skaleerimine puudutab
@@ -348,10 +398,15 @@ kvaliteedivahet saaks seletada.
 
 ### Samaaegsus ja vead
 
-- Protsessiülene semafor `GEMINI_OCR_CONCURRENCY` (vaikimisi 4). Sama nagu
-  `RENDER_SEMAPHORE`: **protsessi-lokaalne**, ja kui backend kunagi mitme workeriga
-  jookseb, ei ole see enam õige piir — `config.check_render_concurrency()` juba hoiatab
-  selle mustri eest.
+- **Üks töö on järjestikune.** Batch käib lehtede üle ükshaaval, üks lennus olev päring
+  töö kohta. See on teadlik MVP-valik: katkestamine, rate-limit ja olekumuutus on
+  järjestikusel teel kordades lihtsamad. Kui 51 lehte osutub mõõtes liiga aeglaseks, saab
+  töösisese paralleelsuse hiljem eraldi lisada — see on lokaalne muudatus töölõimes.
+- **`GEMINI_MAX_INFLIGHT_REQUESTS` (vaikimisi 4) on ülemine lagi tööde ÜLESES**, mitte
+  ühe töö sisene paralleelsus. Ta hakkab mõjuma alles siis, kui korraga käib mitu tööd.
+  Sama nagu `RENDER_SEMAPHORE`: **protsessi-lokaalne**, ja kui backend kunagi mitme
+  workeriga jookseb, ei ole see enam õige piir — `config.check_render_concurrency()` juba
+  hoiatab selle mustri eest.
 - `429` ja `5xx` → eksponentsiaalne backoff (`GEMINI_MAX_RETRIES`, vaikimisi 3). Pärast
   viimast katset läheb **see leht** `error`-iks ja töö läheb edasi.
 - **Vigane leht on lahendatud, mitte ootel** — sama semantika mis ADR 0025 `.err`
@@ -417,8 +472,16 @@ korda viga.
 - `_try_begin_cancel` seab `cancelling` → töölõime CAS-kontroll ei lase enam midagi
   kirjutada.
 - `_quiesce_upload` join'ib töölõime 30 s. Gemini-lõim võib olla keset API-kutset ja
-  join võib aeguda → 503. **See on aktsepteeritud:** `GEMINI_REQUEST_TIMEOUT` = 120 s
-  tähendab, et lõim lõpeb hiljemalt kahe minutiga ja kordusvajutus õnnestub. Alternatiiv
+  join võib aeguda → 503. **See on aktsepteeritud, aga ainult kahe lisainvariandi
+  toel** — ilma nendeta oleks „lõim lõpeb hiljemalt kahe minutiga" vale:
+
+  1. **Katkestuslippu kontrollitakse ka iga korduskatse vahel**, mitte ainult lehe
+     alguses. Vastasel juhul oleks halvim juhtum `MAX_RETRIES` × `REQUEST_TIMEOUT` +
+     backoff ehk **6–8 minutit**, mitte kaks. Pärast katkestamist uut katset ei alustata.
+  2. **`requests` timeout ei ole kogu operatsiooni wall-clock deadline** — see on
+     connect/read timeout päringu kohta. Ühe lennus oleva päringu tegelik lagi on seega
+     „üks read-timeout", ja just seda kaht minutit siin lubatakse: **ühte päringut, mitte
+     ühte lehte**. Alternatiiv
   (quiesce'i mitte nõuda) oleks ohutu — Gemini-tööl ei ole kaugkoristust, mille alt
   kirjutaja faile tagasi kirjutaks — aga selle erandi tegemine nõuaks `cancel_reocr_job`
   haruks lõhkumist, mis on ADR 0018 kõige tundlikum kood. **Otsus: erandit ei tehta.**
@@ -442,7 +505,7 @@ tulemusi ei säilitata"): katkestamine on kasutaja otsus, et tööd ei olnud; kr
 `start_reocr_background()` tagastab täna `None`, kui `UPLOAD_ENABLED` on väljas — ja siis
 ei laadita `reocr_active.json`-ist **ühtki** tööd. Gemini-tee ei kasuta SFTP-d ega peaks
 sellest lipust sõltuma. Muudatus: **tööde laadimine** toimub, kui
-`UPLOAD_ENABLED or GEMINI_ENABLED`; **SFTP-põhine `scan_and_recover` + reaper** jäävad
+`UPLOAD_ENABLED or GEMINI_ENABLED` (viimane on tuletatud lipp „võti on seatud", mitte eraldi env-nimi); **SFTP-põhine `scan_and_recover` + reaper** jäävad
 `UPLOAD_ENABLED` taha nagu praegu.
 
 Tootmises on `UPLOAD_ENABLED=true`, seega see ei ole täna elav viga — aga sidumata jättes
@@ -450,16 +513,18 @@ oleks Gemini-tee vaikselt katki igas keskkonnas, kus upload on välja lülitatud
 
 ## Konfiguratsioon (ADR 0021)
 
-Kaheksa nime, üks seade kohta:
+Kümme nime, üks seade kohta:
 
 | Nimi | Vaikimisi | Mida |
 |---|---|---|
 | `GEMINI_API_KEY` | (tühi) | API võti; tühi = funktsioon välja lülitatud |
 | `GEMINI_OCR_MODEL` | `gemini-3.7-flash` | mudeli id |
-| `GEMINI_OCR_CONCURRENCY` | `4` | samaaegseid API-kutseid protsessis |
+| `GEMINI_MAX_INFLIGHT_REQUESTS` | `4` | lennus olevate päringute lagi **tööde üleselt** (üks töö on järjestikune) |
+| `GEMINI_THINKING_LEVEL` | `low` | `low` \| `medium` \| `high`; mudeli vaikeväärtus oleks `medium` |
+| `GEMINI_TEMPERATURE` | (määramata) | ei saadeta; 3.x mudelil deprecated, ainult vanema mudeli katsetamiseks |
 | `GEMINI_MAX_RETRIES` | `3` | korduskatseid 429/5xx peale |
 | `GEMINI_REQUEST_TIMEOUT` | `120` | sekundit ühe kutse kohta |
-| `GEMINI_MAX_INLINE_BYTES` | `15728640` | kogu päringu base64-eelarve (API lagi on 20 MB) |
+| `GEMINI_MAX_REQUEST_BYTES` | `15728640` | **hinnanguline serialiseeritud päringu suurus** (API lagi 20 MB) |
 | `GEMINI_MAX_PROMPT_BYTES` | `8192` | juhise pikkuse lagi |
 | `GEMINI_MAX_FEW_SHOT` | `3` | näidislehti ühe päringu kohta |
 
@@ -528,8 +593,15 @@ build. `localeParity.test.ts` on valvur.
 | üle `GEMINI_MAX_PROMPT_BYTES` juhis → 400 | pikkuse lagi |
 | `few_shot_pages` teisest teosest → 400; tühja `.txt`-ga leht → 400 | näidete värav |
 | sihtleht oma näidete seas → eemaldatakse | dedupe |
-| 3 näidet + sihtleht mahub `GEMINI_MAX_INLINE_BYTES` sisse (näiteid skaleeritakse) | päringu eelarve |
+| 3 näidet + sihtleht mahub `GEMINI_MAX_REQUEST_BYTES` sisse (näiteid skaleeritakse esimesena) | päringu eelarve |
 | logikirjes on `prompt_sha256` ja `few_shot`, EI OLE juhise täisteksti | jälgitavus + logi suurus |
+| **iga** Gemini päring kannab `store=false` | privaatsus: vaikeväärtus on `store=true` |
+| päringus ei ole `temperature`/`top_p`/`top_k`, on `thinking_level` | 3.x deprecated parameetrid |
+| `few_shot_pages` liige, mida teose leheloendis ei ole → 400 (ka siis, kui fail kettal on) | näidete värav |
+| katkestamine 429-backoffi ajal → uut katset ei alustata | katkestamise garantii |
+| katkestamine päringu ajal → hilinenud 200 vastus visatakse CAS-i tõttu ära | katkestamise garantii |
+| restart keset Gemini batchi → töö `error`, olemasolevad `.ocr` jäävad ja on `apply`/`discard`-itavad | restart-semantika |
+| vealogis ei ole vastuse keha lõiku | logi ei leki sisu |
 | `strip_model_output()` eemaldab markdown-koodiplokid ja `<think>`, säilitab `[tühi lehekülg]` | pariteet LOSS-iga |
 | 13 MB pilt skaleeritakse, 2 MB pilt saadetakse muutmata | pildi lagi |
 | 429 → backoff → õnnestumine; 429 × N → lehe `error`, töö jätkub | vigade semantika |
@@ -580,6 +652,12 @@ täpsem", vaid „kas parandamine läheb kiiremaks".
 transkribeeritakse mõlema pakkujaga). ~20 lehte, mille kohta on inimese kinnitatud
 „Valmis" tekst; mõõda CER, `<m>` plokkide arv, ⸗ vs `-` osakaal.
 
+**A2. `thinking_level` — kas arutlus tasub ära.** Sama käsikirjamaterjal, `low` vs
+`medium`, sama juhis. Mõõda kvaliteedivahe **ja** `usageMetadata` thinking-tokenid: `low`
+on speki vaikeväärtus lähtekohana, mitte mõõdetud järeldusena. `temperature` ei ole
+`gemini-3.7-flash`-il enam katsetatav muutuja (deprecated) — kui seda tahetakse siiski
+mõõta, tuleb `GEMINI_OCR_MODEL`-iga pinnida vanem mudel ja siis on muutujaid kaks, mitte üks.
+
 **C. Sedelkataloog — kas few-shot töötab.** `996o7v` on valmis testjuhtum: paranda 2
 sedelit käsitsi, lase ülejäänud 51 läbi (a) ilma näideteta, (b) näidetega. Mõõdetav
 suurus on reastruktuuri säilimine — praegune väljund kaotab selle täielikult.
@@ -599,6 +677,12 @@ ohutu — aga **B peab olema tehtud enne, kui trükise Gemini-tulemusi teosekaup
   lähevad logisse, aga eelarvelage ei ole. Teadlik valik, vt „Kulu nähtavus".
 - **Mudelinimed vananevad kiiresti.** `gemini-3.7-flash` on vaikimisi väärtus, mitte
   kõva sõltuvus — `GEMINI_OCR_MODEL` võimaldab vahetada ilma deploy'ta koodimuudatust.
+  **Aga mudeli vahetus muudab ka parameetrite lepingut:** `thinking_level` on 3.x asi ja
+  `temperature` on seal deprecated; vanemal mudelil on vastupidi. `GEMINI_OCR_MODEL`-i
+  muutmine ei ole seega puhtalt konfiguratsiooni-, vaid ülevaatust nõudev muudatus.
+- **`store=false` katab Google'i-poolse säilituse, mitte töötlemise.** Skann läheb ikka
+  välisesse teenusesse. Otsustatud on, et see on lubatud ka mitteavalikel teostel;
+  `store=false` vähendab jälge, ei kaota seda.
 - **Käsikirja juhis lahkneb LOSS-ist teadlikult** (vt „Juhis"). Käsikirja tulemusi ei tohi
   kahe pakkuja vahel võrrelda eeldusel, et sisend oli sama.
 - **Vaba prompt tähendab vaba väljundit.** Juhis, mis palub märgendust, mida VUTT ei tunne,
@@ -610,7 +694,7 @@ ohutu — aga **B peab olema tehtud enne, kui trükise Gemini-tulemusi teosekaup
   (varundus on eraldi, #131). Püsiv jälg on `reocr_log.json`-i hash, mis ütleb *kas* juhis
   oli sama, aga ei taasta selle sisu. Hea juhise õige lõppkoht on commit
   `server/ocr_prompts.py`-sse.
-- **`GEMINI_OCR_CONCURRENCY` on protsessi-lokaalne.** Mitme workeriga (gunicorn) ei ole
+- **`GEMINI_MAX_INFLIGHT_REQUESTS` on protsessi-lokaalne.** Mitme workeriga (gunicorn) ei ole
   see enam õige piir. Sama nõrkus mis `RENDER_SEMAPHORE`-il; kui backend workereid saab,
   vajavad mõlemad protsessideülest lukku.
 
