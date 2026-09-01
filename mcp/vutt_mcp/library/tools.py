@@ -3,6 +3,7 @@ from . import format as fmt
 from .config import LibrarySettings, library_available
 from .query import (
     PageRefError,
+    diagnose,
     fetch_pages,
     list_documents,
     resolve_page_range,
@@ -59,15 +60,24 @@ def register_library_tools(mcp, settings: LibrarySettings) -> bool:
         """Otsib lokaalsest sekundaarkirjanduse kogust ja tagastab katked koos
         TSITEERITAVA viitega (autor, aasta, pealkiri, trükise leheküljenumber).
 
-        Vaikimisi peavad KÕIK päringu sõnad esinema; relax_matching=true
-        lõdvendab. `doc_id` piirab otsingu ühele teosele (vt list_literature).
+        Iga sõna otsitakse SÕNAOSANA: „Morgenstern" leiab ka „Morgensterni".
+        Käänatud vorm ei ole aga oma tüve prefiks — otsi tüve („Morgenstern",
+        mitte „Morgensterns"). Vaikimisi peavad KÕIK sõnad olema samal
+        leheküljel; relax_matching=true nõuab vaid ühte. `doc_id` piirab
+        otsingu ühele teosele (vt list_literature).
 
-        Tekst pärineb skaneeringute OCR-ist ja on kohati lagunenud — täpne
-        fraasiotsing võib vahele jääda."""
+        Tekst pärineb skaneeringute OCR-ist ja on kohati lagunenud, Fraktuuris
+        ka süstemaatiliselt („Abschrift" → „Abfchrift"). TÜHI TULEMUS EI TÕESTA,
+        et teemat pole käsitletud. Tühi vastus ütleb sõnade kaupa, kus sõna
+        esineb ja millisel kujul — järgi seda, ära korda sama päringut."""
         conn = _ava(settings)
         try:
             hits = search(conn, query, doc_id=doc_id, relax=relax_matching,
                           limit=limit)
+            if not hits:
+                return fmt.format_empty(
+                    diagnose(conn, query, doc_id=doc_id),
+                    relax=relax_matching, doc_id=doc_id)
             return fmt.format_hits(hits, _parent_keys(conn, {h.doc_id for h in hits}))
         except ValueError as e:
             return f"Vigane päring: {e}"

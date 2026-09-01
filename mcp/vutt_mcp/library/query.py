@@ -47,14 +47,29 @@ def tokenize(query: str) -> list[str]:
     return [t for t in tokenid if t]
 
 
+# Prefiksotsing viib selle tööriista semantika kokku lubadusega, mille serveri
+# instruktsioon mudelile juba annab („orati" leiab „orationem"). Ilma selleta
+# jäi saksa käänatud vorm („Morgensterns") oma tüvest mööda.
+MIN_PREFIX = 3
+
+
+def _fts_token(token: str) -> str:
+    """Tsiteeritud token, lõpus prefiksitäht. Kaks erandit jäävad täpseks:
+    lühike sõna („de*" sobiks pea kõigega ja upuks bm25 järjestuse ära) ja
+    jutumärkides fraas — see on kasutaja ainus viis täpsust nõuda."""
+    tsiteeritud = '"' + token.replace('"', '""') + '"'
+    if " " in token or len(token) < MIN_PREFIX:
+        return tsiteeritud
+    return tsiteeritud + "*"
+
+
 def build_match(query: str, relax: bool) -> str:
     """Kontrollitud FTS5-avaldis. Iga token tsiteeritakse — nii ei saa kasutaja
     sisend kunagi süntaksiks muutuda."""
     tokenid = tokenize(query)
     if not tokenid:
         raise ValueError("päring on tühi")
-    tsiteeritud = ['"' + t.replace('"', '""') + '"' for t in tokenid]
-    return (" OR " if relax else " AND ").join(tsiteeritud)
+    return (" OR " if relax else " AND ").join(_fts_token(t) for t in tokenid)
 
 
 def _doc_row(rida: sqlite3.Row) -> DocRow:
@@ -217,3 +232,88 @@ def fetch_pages(conn: sqlite3.Connection, doc_id: str, pdf_from: int, pdf_to: in
     if len(read) > len(tulem):
         karbitud = True
     return tulem, karbitud
+
+
+# ─── Tühja tulemuse diagnostika ──────────────────────────────────────────────
+# Staatiline nõuanne („proovi relax_matching=true") ei aita mudelit, kes selle
+# juba rakendas. Mõõdetud fakt aitab: kus sõna esineb ja millisel kujul.
+
+# Fraktuuri pikk ſ loetakse OCR-is f-iks („Abschrift" → „Abfchrift"). Sõna
+# lõpus on ümar s — seda ei puutu.
+_SISEMINE_S = re.compile(r"s(?=[^\W\d_])", re.UNICODE)
+
+MAX_DIAG_TOKENS = 4      # diagnostika ei tohi ise päringut kalliks teha
+MAX_LYHEND = 3           # mitu tähte lõpust maha võib võtta
+# Lühendatud tüvi peab jääma sõnaks: „quux" → „quu" leiaks „quum" ja saadaks
+# mudeli valele jäljele. Variandid (Fraktur, ß) on sama pikad, neile ei kehti.
+MIN_LYHEND_PIKKUS = 5
+
+
+@dataclass(frozen=True)
+class TokenDiag:
+    token: str
+    in_doc: int | None       # None = doc_id filtrit ei olnud
+    in_corpus: int
+    soovitus: str | None = None      # mõõdetud alternatiiv, mitte oletus
+    soovitus_vasteid: int = 0
+    soovitus_pohjus: str = ""        # "fraktur" | "ss" | "lyhend"
+
+
+def _kandidaadid(token: str) -> list:
+    """(sõna, põhjus) paarid, mida tasub MÕÕTA. Järjekord = usaldusväärsus."""
+    read, nahtud = [], {token.lower()}
+
+    def lisa(sona: str, pohjus: str) -> None:
+        if sona and sona.lower() not in nahtud and len(sona) >= MIN_PREFIX:
+            nahtud.add(sona.lower())
+            read.append((sona, pohjus))
+
+    fraktur = _SISEMINE_S.sub("f", token)
+    lisa(fraktur, "fraktur")
+    if "ß" in token:
+        lisa(token.replace("ß", "ss"), "ss")
+    if "ss" in token.lower():
+        lisa(re.sub("ss", "ß", token, flags=re.IGNORECASE), "ss")
+    # Käänatud vorm ei ole oma tüve prefiks („Morgensterns" ↛ „Morgenstern"),
+    # seega prefiksotsing üksi ei päästa — lühenda tüve poole.
+    for alus in (token, fraktur):
+        for pikkus in range(1, MAX_LYHEND + 1):
+            kandidaat = alus[:-pikkus]
+            if len(kandidaat) >= MIN_LYHEND_PIKKUS:
+                lisa(kandidaat, "lyhend")
+    return read
+
+
+def _loenda(conn: sqlite3.Connection, sona: str, doc_id) -> int:
+    sql = "SELECT count(*) FROM pages_fts WHERE pages_fts MATCH ?"
+    parameetrid = [_fts_token(sona)]
+    if doc_id:
+        sql += " AND doc_id = ?"
+        parameetrid.append(doc_id)
+    try:
+        return conn.execute(sql, parameetrid).fetchone()[0]
+    except sqlite3.OperationalError:
+        return 0
+
+
+def diagnose(conn: sqlite3.Connection, query: str, *, doc_id=None) -> list:
+    """Tühja tulemuse põhjus tokenite kaupa. Kutsutakse AINULT siis, kui
+    otsing ei andnud midagi — muidu maksaks iga otsing lisapäringuid."""
+    read = []
+    for token in tokenize(query)[:MAX_DIAG_TOKENS]:
+        korpuses = _loenda(conn, token, None)
+        dokumendis = _loenda(conn, token, doc_id) if doc_id else None
+        ulatuses = dokumendis if doc_id else korpuses
+        soovitus = pohjus = None
+        vasteid = 0
+        if not ulatuses:
+            for kandidaat, kandidaadi_pohjus in _kandidaadid(token):
+                n = _loenda(conn, kandidaat, doc_id)
+                if n:
+                    soovitus, vasteid, pohjus = kandidaat, n, kandidaadi_pohjus
+                    break
+        read.append(TokenDiag(
+            token=token, in_doc=dokumendis, in_corpus=korpuses,
+            soovitus=soovitus, soovitus_vasteid=vasteid,
+            soovitus_pohjus=pohjus or ""))
+    return read
