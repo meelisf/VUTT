@@ -626,7 +626,12 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
             _persist_active_jobs()
         with _reocr_batch_jobs_lock:
             praegune = _reocr_batch_jobs.get(job_id)
-            if praegune:
+            # Valve `processing` peale (I3): kui katkestamine jõudis vahele PÄRAST
+            # viimase lehe commit'i, aga ENNE seda plokki, on staatus juba
+            # `cancelling`. Ilma valveta viiks see plokk töö siiski `done`-ks ja
+            # kutsuks `_drop_backups`-i — `cancel_reocr_job` ei leiaks enam
+            # varukoopiaid, mida taastada, ja kaotaks nii uue kui vana tulemuse.
+            if praegune and praegune.get("status") == "processing":
                 _finalize_batch_if_complete(praegune, job_id)
         _persist_active_jobs()
 

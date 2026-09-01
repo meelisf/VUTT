@@ -331,6 +331,48 @@ def test_commit_kirjutus_ja_omand_on_UHE_luku_all(ops, tmp_path, monkeypatch):
     assert (tmp_path / "w1" / "pg1.ocr").read_text(encoding="utf-8") == "UUS TEKST"
 
 
+def test_gemini_batch_ei_finaliseeru_kui_katkestus_jouab_vahele(ops, tmp_path, monkeypatch):
+    """I3: kui `cancelling` jõuab sisse commiti JA lõpuploki lukustuse vahele,
+    ei tohi lõuguplokk tööd `done`-ks viia ega `_drop_backups`-i kutsuda — muidu
+    kustutaks järgnev `cancel_reocr_job` uued .ocr-id JA leiaks varukoopiate
+    kausta juba kustutatuna (0 taastatud, tulemus jäädavalt kadunud)."""
+    import server.ocr_providers.gemini as gem
+    (tmp_path / "w1" / "pg1.jpg").write_bytes(b"\xff\xd8\xff")
+
+    lase_transkribeerida = threading.Event()
+
+    def transcribe(image_bytes, instruction, **kw):
+        assert lase_transkribeerida.wait(5)
+        return ("UUS TEKST", {})
+
+    monkeypatch.setattr(gem, "transcribe", transcribe)
+
+    drop_kutsed = []
+    monkeypatch.setattr(ops, "_drop_backups", lambda job_id: drop_kutsed.append(job_id))
+
+    def persist_simuleerib_katkestust():
+        # `_persist_active_jobs()` kutse asub REAALSES koodis luku VÄLJAS —
+        # siin simuleerime, et katkestaja jõuab täpselt sellel hetkel lukku
+        # ja seab staatuse `cancelling`-uks, enne kui lõpuplokk selle lukustab.
+        töö = ops._reocr_batch_jobs.get(job_id.get("v"))
+        if töö:
+            töö["status"] = "cancelling"
+
+    monkeypatch.setattr(ops, "_persist_active_jobs", persist_simuleerib_katkestust)
+
+    job_id = {}
+    job_id["v"] = ops.start_reocr_batch("wid", "w1", str(tmp_path / "w1"),
+                                        [("pg1.jpg", 1)], provider="gemini")
+    lase_transkribeerida.set()
+
+    assert _oota(lambda: not ops._upload_threads[job_id["v"]].is_alive())
+
+    töö = ops._reocr_batch_jobs[job_id["v"]]
+    assert töö["status"] == "cancelling", (
+        "lõpuplokk viis töö done-ks, kuigi vahepeal saabus cancelling")
+    assert drop_kutsed == [], "_drop_backups kutsuti, kuigi töö ei olnud enam processing"
+
+
 def test_restart_margib_gemini_batchi_lehed_veaks(ops):
     """Restart lõpetab Gemini-töö — ka LEHE-kirjed, mitte ainult töö staatuse.
 
