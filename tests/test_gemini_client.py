@@ -33,10 +33,25 @@ def test_payload_ei_sisalda_sampling_parameetreid():
 
 
 def test_payload_kannab_thinking_level_ja_mudelit():
+    """`thinking_level` on `generation_config` SEES — ülemisel tasemel annab API 400
+    „Unknown parameter 'thinking_level'" (mõõdetud elava API vastu 2026-09-01)."""
     from server.ocr_providers.gemini import build_payload
     payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.7-flash", "low")
     assert payload["model"] == "gemini-3.7-flash"
-    assert payload["thinking_level"] == "low"
+    assert payload["generation_config"]["thinking_level"] == "low"
+    assert "thinking_level" not in payload
+
+
+def test_mottesamme_ei_ekstraheerita_kunagi():
+    """`thought`-sammud kannavad krüpteeritud `signature`-plokke. Need EI TOHI
+    transkripti sattuda — filter on positiivne (ainult `model_output`)."""
+    from server.ocr_providers.gemini import _extract_text
+    vastus = {"steps": [
+        {"type": "thought", "signature": "SALAJANE",
+         "content": [{"type": "text", "text": "mudeli sisemine arutlus"}]},
+        {"type": "model_output", "content": [{"type": "text", "text": "Mus. 1309"}]},
+    ]}
+    assert _extract_text(vastus) == "Mus. 1309"
 
 
 def test_payload_ei_sisalda_model_rolli_samme():
@@ -88,7 +103,8 @@ def test_transcribe_normaliseerib_usage(monkeypatch):
         headers = {"content-type": "application/json"}
         def json(self):
             return {
-                "output": [{"content": [{"type": "text", "text": "Mus. 1309"}]}],
+                "steps": [{"type": "model_output",
+                           "content": [{"type": "text", "text": "Mus. 1309"}]}],
                 "usage": {"total_input_tokens": 11, "total_output_tokens": 22,
                           "total_thought_tokens": 3, "total_cached_tokens": 4,
                           "total_tokens": 40},
@@ -110,7 +126,7 @@ def test_transcribe_rakendab_strip_model_output(monkeypatch):
         status_code = 200
         headers = {"content-type": "application/json"}
         def json(self):
-            return {"output": [{"content": [{"type": "text",
+            return {"steps": [{"type": "model_output", "content": [{"type": "text",
                                              "text": "```\nMus. 1309\n```"}]}],
                     "usage": {}}
         text = ""
@@ -131,7 +147,8 @@ def test_429_korratakse_ja_onnestub(monkeypatch):
             self.headers = {"content-type": "application/json"}
             self.text = "{}"
         def json(self):
-            return {"output": [{"content": [{"type": "text", "text": "ok"}]}],
+            return {"steps": [{"type": "model_output",
+                               "content": [{"type": "text", "text": "ok"}]}],
                     "usage": {}}
 
     def fake_post(*a, **kw):
@@ -248,9 +265,12 @@ def test_katkestamine_tagasiloogi_ajal_ei_alusta_uut_katset(monkeypatch):
 
 @pytest.mark.parametrize("body", [
     {},
-    {"output": []},
-    {"output": [{"content": []}]},
-    {"output": [{"content": [{"type": "image", "data": "x"}]}]},
+    {"steps": []},
+    {"steps": [{"type": "model_output", "content": []}]},
+    {"steps": [{"type": "model_output",
+                "content": [{"type": "image", "data": "x"}]}]},
+    # ainult mõttesamm, ilma model_output-ita = protokolliviga
+    {"steps": [{"type": "thought", "signature": "ABC"}]},
 ])
 def test_vale_vastuse_kuju_viskab_geminierrori(monkeypatch, body):
     """200 + kuju ei klapi (pole output'it/tekstiplokki) = protokolliviga, MITTE
@@ -279,7 +299,8 @@ def test_tekstiplokk_tuhja_stringiga_ei_viska_ja_annab_tuhja_teksti(monkeypatch)
         headers = {"content-type": "application/json"}
         text = "{}"
         def json(self):
-            return {"output": [{"content": [{"type": "text", "text": ""}]}],
+            return {"steps": [{"type": "model_output",
+                               "content": [{"type": "text", "text": ""}]}],
                     "usage": {}}
 
     monkeypatch.setattr(gem.requests, "post", lambda *a, **kw: Resp())

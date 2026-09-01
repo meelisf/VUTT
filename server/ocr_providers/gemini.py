@@ -79,7 +79,9 @@ def build_payload(image_bytes: bytes, instruction: str,
     return {
         "model": model,
         "store": False,                      # vaikimisi on True — vt ADR/spekk
-        "thinking_level": thinking_level,
+        # `thinking_level` on `generation_config` SEES. Ülemisel tasemel annab API
+        # 400 „Unknown parameter 'thinking_level'" (mõõdetud 2026-09-01).
+        "generation_config": {"thinking_level": thinking_level},
         "input": blocks,
     }
 
@@ -151,15 +153,24 @@ def _normalize_usage(raw: Optional[dict]) -> Dict[str, int]:
 def _extract_text(data: dict) -> str:
     """Ekstraheerib teksti 200-vastusest.
 
+    Vastuse kuju (mõõdetud elava API vastu 2026-09-01): ülemisel tasemel on
+    `steps` (MITTE `output`), milles iga samm kannab `type`-i. Transkriptsioon on
+    `type == "model_output"` sammu `content`-is. `type == "thought"` sammud
+    kannavad `signature` välja — krüpteeritud mõttekäiku, mis EI TOHI kunagi
+    transkripti sattuda (vt `reference_stolen_thoughts_paper`); seepärast on
+    filter positiivne (ainult `model_output`), mitte välistav.
+
     Piir on TÄHTIS: tekstiplokk OLEMAS, aga sisu tühi string — see on ADR 0025
     mõttes KEHTIV tulemus (mudel tagastas tühja transkriptsiooni) ja tagastatakse
-    vaikselt `""`-na. Aga kui vastuses ei ole `output`-i ega ÜHTKI `type == "text"`
-    plokki, on tegu protokolliveaga (API kuju muutus vms) — see EI TOHI vaikimisi
+    vaikselt `""`-na. Aga kui vastuses ei ole ühtki `model_output` tekstiplokki,
+    on tegu protokolliveaga (API kuju muutus vms) — see EI TOHI vaikimisi
     tühjaks tööks muutuda, sest hulgi-`apply` kirjutaks tühja teksti üle olemasoleva.
     """
     osad = []
     leidus_tekstiplokk = False
-    for step in data.get("output") or []:
+    for step in data.get("steps") or []:
+        if step.get("type") != "model_output":
+            continue
         for block in step.get("content") or []:
             if block.get("type") == "text":
                 leidus_tekstiplokk = True
