@@ -206,3 +206,55 @@ def test_liiga_suur_paring_ei_lahe_apisse(monkeypatch):
     with pytest.raises(gem.GeminiError) as exc:
         gem.transcribe(_jpeg(4000, 4000), "JUHIS")
     assert "request_too_large" in str(exc.value)
+
+
+def test_katkestamine_tagasiloogi_ajal_ei_alusta_uut_katset(monkeypatch):
+    """should_cancel PEAB korduste ahela katkestama.
+
+    Ilma selleta kestab 429-de ahel kuni (MAX_RETRIES + 1) × REQUEST_TIMEOUT +
+    tagasilöögid ehk minuteid — katkestaja 30 s join-aken (ADR 0018) aeguks ja
+    töö jääks igavesti `cancelling` olekusse.
+    """
+    import server.ocr_providers.gemini as gem
+    calls = {"n": 0}
+    katkesta = {"v": False}
+
+    class Resp:
+        status_code = 429
+        headers = {"content-type": "application/json"}
+        text = "{}"
+
+        def json(self):
+            return {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+                              "message": "liiga palju"}}
+
+    def fake_post(*a, **kw):
+        calls["n"] += 1
+        return Resp()
+
+    def fake_sleep(_s):
+        katkesta["v"] = True          # katkestamine saabub tagasilöögi une ajal
+
+    monkeypatch.setattr(gem.requests, "post", fake_post)
+    monkeypatch.setattr(gem, "_api_key", lambda: "x")
+    monkeypatch.setattr(gem.time, "sleep", fake_sleep)
+
+    with pytest.raises(gem.GeminiError) as exc:
+        gem.transcribe(_jpeg(), "JUHIS", should_cancel=lambda: katkesta["v"])
+
+    assert gem.CANCELLED_MSG in str(exc.value)
+    assert calls["n"] == 1, "tagasilöögi järel alustati uus katse"
+
+
+def test_katkestamine_enne_esimest_katset_ei_saada_ainsatki_paringut(monkeypatch):
+    import server.ocr_providers.gemini as gem
+
+    def ei_tohi_kutsuda(*a, **kw):
+        raise AssertionError("katkestatud töö ei tohi API-t kutsuda")
+
+    monkeypatch.setattr(gem.requests, "post", ei_tohi_kutsuda)
+    monkeypatch.setattr(gem, "_api_key", lambda: "x")
+
+    with pytest.raises(gem.GeminiError) as exc:
+        gem.transcribe(_jpeg(), "JUHIS", should_cancel=lambda: True)
+    assert gem.CANCELLED_MSG in str(exc.value)

@@ -10,7 +10,7 @@ import base64
 import io
 import json
 import time
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import requests
 from PIL import Image
@@ -157,15 +157,37 @@ def _extract_text(data: dict) -> str:
     return "\n".join(osad)
 
 
+CANCELLED_MSG = "katkestatud"
+
+
+def _cancelled(should_cancel: Optional[Callable[[], bool]]) -> bool:
+    """Kas kutsuja on töö katkestanud? Puuduv tagasikutse = ei ole."""
+    return should_cancel is not None and should_cancel()
+
+
 def transcribe(image_bytes: bytes, instruction: str,
-               few_shot: Sequence[Tuple[bytes, str]] = ()) -> Tuple[str, Dict[str, int]]:
-    """Pilt + juhis (+ (pilt, tekst) näited) → (tekst, normaliseeritud usage)."""
+               few_shot: Sequence[Tuple[bytes, str]] = (),
+               should_cancel: Optional[Callable[[], bool]] = None
+               ) -> Tuple[str, Dict[str, int]]:
+    """Pilt + juhis (+ (pilt, tekst) näited) → (tekst, normaliseeritud usage).
+
+    `should_cancel` on kutsuja katkestuslipp. Üksik HTTP-kutse EI OLE katkestatav
+    (requests ei paku selleks pidet), aga KORDUSED on: lippu kontrollitakse iga
+    katse ees ja iga tagasilöögi-une järel. Ilma selleta võtab kordustega päring
+    kuni `(GEMINI_MAX_RETRIES + 1) * GEMINI_REQUEST_TIMEOUT` + tagasilöögid, mis
+    on kordi rohkem kui katkestamise 30 s join-aken (ADR 0018) — ja just 429-de
+    ajal, mil admin katkestamise nupule vajutabki.
+
+    Vaikimisi `None` = senine käitumine muutumatult.
+    """
     payload = _fit_payload(image_bytes, instruction, few_shot,
                            GEMINI_OCR_MODEL, GEMINI_THINKING_LEVEL)
     headers = {"x-goog-api-key": _api_key(), "Content-Type": "application/json"}
 
     viimane = ""
     for katse in range(GEMINI_MAX_RETRIES + 1):
+        if _cancelled(should_cancel):
+            raise GeminiError(CANCELLED_MSG)
         try:
             response = requests.post(API_URL, json=payload, headers=headers,
                                      timeout=GEMINI_REQUEST_TIMEOUT)
@@ -183,4 +205,6 @@ def transcribe(image_bytes: bytes, instruction: str,
                 break
         if katse < GEMINI_MAX_RETRIES:
             time.sleep(2 ** katse)
+            if _cancelled(should_cancel):
+                raise GeminiError(CANCELLED_MSG)
     raise GeminiError("Gemini päring ebaõnnestus: {}".format(viimane))
