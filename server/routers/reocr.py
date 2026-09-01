@@ -295,5 +295,11 @@ def admin_reocr_cancel(job_id: str, user=Depends(require_role("admin"))):
         raise HTTPException(status_code=409, detail=str(e))
     except RuntimeError as e:
         # Kirjutaja ei peatunud — töö jääb `cancelling` olekusse, stardi-taaste
-        # korjab üles. Klient võib hiljem uuesti proovida.
+        # (`_finish_interrupted_cancellations`) korjab üles alles BACKENDI
+        # TAASKÄIVITUSEL. Kordamine EI AITA: `cancelling` ei ole
+        # `CANCELLABLE_STATUSES`-is, seega järgmine DELETE annab 409
+        # ("Töö ei ole katkestatav"), mitte uut katset. `_try_begin_cancel`
+        # taassisenetavaks tegemine lahendaks selle, aga tooks sisse kahe
+        # samaaegse koristuse ohu (topelt `_restore_backups`) — omaette
+        # disaini ja testikomplekti nõudev otsus, mitte selle parandusvooru osa.
         raise HTTPException(status_code=503, detail=str(e))

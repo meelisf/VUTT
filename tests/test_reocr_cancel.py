@@ -108,11 +108,16 @@ def test_kirjutaja_ei_peatu_jatab_too_cancelling_olekusse(keskkond, monkeypatch)
         "status": "processing", "slug": slug, "produced_pages": [], "pages": [],
     }
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as exc:
         reocr_ops.cancel_reocr_job("b1")
 
     assert koristatud == [], "koristus ei tohi käivituda"
     assert reocr_ops._reocr_batch_jobs["b1"]["status"] == "cancelling"
+    # F3/I2: sõnum jõuab kasutajani MUUTMATA kujul (503 detail) — peab ütlema
+    # tõtt, et kordamine ei aita (teine DELETE annab 409, mitte uut katset).
+    sõnum = str(exc.value)
+    assert "ei aita" in sõnum
+    assert "taaskäivitusel" in sõnum
 
 
 def test_valmis_too_ei_ole_katkestatav(keskkond):

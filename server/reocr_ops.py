@@ -404,10 +404,18 @@ def cancel_reocr_job(job_id: str) -> dict:
     if not _quiesce_upload(job_id):
         # Kirjutaja on veel elus — jäta töö `cancelling` olekusse, stardi-taaste
         # korjab üles. Jääk kaugserveris on parem kui võistlus koristusega.
+        #
+        # Sõnum jõuab kasutajani muutmata kujul (routers/reocr.py 503 `detail`) —
+        # peab ütlema TÕTT: kordamine EI AITA. Teine DELETE ei võta seda tööd
+        # enam vastu (`cancelling` ei ole `CANCELLABLE_STATUSES`-is → 409), nii
+        # et töö laheneb alles backendi taaskäivitusel.
         logger.error(
             f"Re-OCR {job_id}: üleslaadimislõim ei peatunud, koristus edasi lükatud"
         )
-        raise RuntimeError("Üleslaadimislõim ei peatunud")
+        raise RuntimeError(
+            "Katkestamine ei jõudnud lõpule. Töö jääb katkestamise olekusse ja "
+            "laheneb alles serveri taaskäivitusel — kordamine ei aita."
+        )
 
     remote_ok = _cleanup_remote_job(job_id, job)
 
