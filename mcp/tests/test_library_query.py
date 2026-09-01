@@ -53,9 +53,22 @@ def test_katke_umbritseb_leitud_sona():
 
 
 def test_build_match_tsiteerib_tokenid():
-    assert build_match("Ludenius professor", relax=False) == '"Ludenius" AND "professor"'
-    assert build_match("Ludenius professor", relax=True) == '"Ludenius" OR "professor"'
+    assert build_match("Ludenius professor", relax=False) == '"Ludenius"* AND "professor"*'
+    assert build_match("Ludenius professor", relax=True) == '"Ludenius"* OR "professor"*'
+    # Jutumärkides fraas on kasutaja ainus viis täpsust nõuda — prefiksit ei saa.
     assert build_match('"tema oli"', relax=False) == '"tema oli"'
+
+
+def test_luhike_sona_ei_saa_prefiksit():
+    """„de*" sobiks pea kõigega ja upuks bm25 järjestuse ära."""
+    assert build_match("de re", relax=False) == '"de" AND "re"'
+
+
+def test_prefiks_leiab_kaanatud_vormi(conn):
+    """Serveri instruktsioon lubab mudelile sõnaosa otsingut — enne kehtis see
+    ainult Meili teel ja „Ludeni" ei leidnud siit midagi."""
+    assert len(search(conn, "Ludeni")) == 2
+    assert len(search(conn, "Ludenius disputa")) == 1
 
 
 def test_doc_id_piirab(conn):
