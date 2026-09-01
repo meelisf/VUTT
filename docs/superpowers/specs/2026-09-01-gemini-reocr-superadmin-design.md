@@ -398,10 +398,10 @@ kvaliteedivahet saaks seletada.
 
 ### Samaaegsus ja vead
 
-- **Üks töö on järjestikune.** Batch käib lehtede üle ükshaaval, üks lennus olev päring
-  töö kohta. See on teadlik MVP-valik: katkestamine, rate-limit ja olekumuutus on
-  järjestikusel teel kordades lihtsamad. Kui 51 lehte osutub mõõtes liiga aeglaseks, saab
-  töösisese paralleelsuse hiljem eraldi lisada — see on lokaalne muudatus töölõimes.
+- **Üks töö on järjestikune — v1-s, teadlikult ajutiselt.** Batch käib lehtede üle
+  ükshaaval, üks lennus olev päring töö kohta. Katkestamine ja olekumuutus on
+  järjestikusel teel kordades lihtsamad, ja esimene versioon peab olema õige enne, kui
+  ta on kiire. **Vt „Järelsamm: töösisene paralleelsus" — see ei ole lõppseis.**
 - **`GEMINI_MAX_INFLIGHT_REQUESTS` (vaikimisi 4) on ülemine lagi tööde ÜLESES**, mitte
   ühe töö sisene paralleelsus. Ta hakkab mõjuma alles siis, kui korraga käib mitu tööd.
   Sama nagu `RENDER_SEMAPHORE`: **protsessi-lokaalne**, ja kui backend kunagi mitme
@@ -635,6 +635,43 @@ Punktid 1–6 on iseseisvalt kasutuskõlblik tulemus; 7–9 on iteratsioonisilmu
 selgub alles siis, kui punkt 6 on päris materjali peal proovitud. **Kui töö tuleb kuskilt
 katkestada, siis 6. ja 7. vahelt** — mitte keset kontekstiehitust.
 
+## Järelsamm: töösisene paralleelsus
+
+Järjestikune v1 ei ole lõppseis, ja põhjus on mõõdetav: **Gemini-lehe latentsust domineerib
+mudeli mõtlemisaeg, mitte VUTT-i töö.** See on aeg, mille API kulutab — VUTT ootab. N
+paralleelset päringut annab seega ligikaudu N-kordse läbilaskevõime ilma ühegi lisaressursita
+VUTT-i poolel. Just seda, mida `thinking_level` maksab, saab paralleelsusega tagasi.
+
+50-leheline dokument järjestikku, ~20 s/leht, on ~17 minutit. Neljaga paralleelselt ~4.
+Sedelkataloogi mõõtu töö juures on see vahe olulisem kui kogu ülejäänud optimeerimine kokku.
+
+**Rate limit ei ole selle mahu juures piirang.** Google ei avalda enam fikseeritud RPM/TPM
+numbreid — need on konto- ja tier-põhised ja nähtavad AI Studio limiidivaates. Aga
+pilootkoormus (53 lehte, mõni töö päevas) on igast avaldatud tasemest suurusjärkude võrra
+allpool. **Enne paralleelsuse lisamist tuleb see konto pealt üks kord üle vaadata**, mitte
+oletada — number on konto oma, mitte üldine.
+
+Miks see siiski ei ole v1-s:
+
+| Mida paralleelsus katki teeb | Kas on juba lahendatud |
+|---|---|
+| lehe `.ocr` kirjutamine + `produced_pages` | **jah** — CAS ja omand on juba per-leht, luku all |
+| `last_progress_at` mitmest lõimest | **jah** — uuendus käib sama luku all |
+| katkestamine N lennus oleva päringuga | **osalt** — `_cancel_event` on tööpõhine ja jagatud; iga worker peab seda kontrollima nagu praegu, aga `_quiesce_upload` join'ib **ühte** lõime |
+| vigade kuhjumine (429 korraga N-lt lõimelt) | **ei** — backoff peab olema tööülene, mitte per-worker, muidu löövad kõik korraga uuesti |
+
+Ehk kaks tegelikku tööd: `_quiesce_upload` peab join'ima worker-pooli, mitte üht lõime, ja
+backoff peab olema jagatud. Ülejäänu on juba paigas, sest per-lehe invariandid kirjutati
+algusest peale lehe, mitte lõime ümber.
+
+Kuju: `ThreadPoolExecutor(max_workers=GEMINI_JOB_WORKERS)` lehtede üle, `max_workers=1`
+vaikeväärtusena = tänane käitumine. Nii on lülitus tagasi järjestikusele ühe seadistuse
+kaugusel, kui midagi üllatab.
+
+**Eeltingimus:** võrdlusjooks (allpool) peab olema tehtud enne. Kiirem vale vastus ei ole
+edasiminek, ja `thinking_level` valik mõjutab otseselt seda, kui palju paralleelsus üldse
+võita annab.
+
 ## Enne laiemat kasutuselevõttu: võrdlusjooks
 
 Gemini ei ole VUTT-i märgendusel treenitud nagu Qwen; ta järgib juhist, aga `<m>`
@@ -710,3 +747,4 @@ ohutu — aga **B peab olema tehtud enne, kui trükise Gemini-tulemusi teosekaup
 - Ei tee näidete raamatukogu ega jaga näiteid teoste vahel — näited tulevad ainult sama
   teose enda lehtedelt.
 - Ei anna `contributor`/`editor`/`admin` rollile Gemini-teed ega juhise redigeerimist.
+- Ei tee töösisest paralleelsust — see on nimetatud järelsammuna, mitte selle speki osana.
