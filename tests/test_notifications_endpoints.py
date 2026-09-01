@@ -213,14 +213,14 @@ def test_send_notification_multiple_empty_rejected(client, login):
 
 
 def test_send_notification_admins_mode(client, login):
-    """admins režiim: ainult admin rolliga kasutajad saavad."""
+    """admins režiim: admin+ rolliga kasutajad saavad (admin + superadmin = 2)."""
     token = login("editor", "editorpass")
     resp = client.post("/notifications/send", json={
         "recipient_mode": "admins",
         "title": "Adminidele",
     }, headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
-    assert resp.json()["created"] == 1  # ainult admin
+    assert resp.json()["created"] == 2  # admin + superadmin
 
 
 def test_send_notification_all_mode_requires_admin(client, login):
@@ -235,14 +235,14 @@ def test_send_notification_all_mode_requires_admin(client, login):
 
 
 def test_send_notification_all_mode_admin_ok(client, login):
-    """all režiim admin-iga → kõik kasutajad saavad (admin + editor = 2)."""
+    """all režiim admin-iga → kõik kasutajad saavad (admin + editor + superadmin = 3)."""
     token = login("admin", "adminpass")
     resp = client.post("/notifications/send", json={
         "recipient_mode": "all",
         "title": "Kõigile",
     }, headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
-    assert resp.json()["created"] == 2
+    assert resp.json()["created"] == 3
 
 
 def test_send_notification_sender_gets_copy(client, login, backend_env):

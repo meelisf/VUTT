@@ -25,6 +25,16 @@ from ..utils import build_work_id_cache, find_directory_by_id
 router = APIRouter()
 
 
+@router.get("/admin/ocr/providers")
+def admin_ocr_providers(user=Depends(require_role("superadmin"))):
+    """Millised OCR-pakkujad on saadaval. VÕTIT EGA SELLE OSA EI TAGASTATA KUNAGI —
+    ainult `enabled` ja mudeli nimi. Ilma selle endpointita ilmuks nupp ka siis, kui
+    võtit pole, ja kukuks alles vajutusel."""
+    from ..config import GEMINI_OCR_MODEL, gemini_enabled
+    return {"status": "success",
+            "gemini": {"enabled": gemini_enabled(), "model": GEMINI_OCR_MODEL}}
+
+
 # sync def → Starlette jooksutab threadpool'is (faililugemine ei blokeeri event-loopi)
 @router.post("/admin/registrations")
 def admin_registrations(user=Depends(require_role("admin"))):
