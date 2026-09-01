@@ -14,6 +14,16 @@ interface UseReOcrProps {
   isAdmin: boolean;
   viewRef: MutableRefObject<EditorView | null>;
   setIsDirty: (v: boolean) => void;
+  /** OCR-pakkuja. 'gemini' on superadmin-only; backend kontrollib uuesti. */
+  provider?: 'loss' | 'gemini';
+  /**
+   * Kas hook otsib lehe vahetusel ise .ocr faili / localStorage'i pooleliolevat
+   * tööd üles. `.ocr` fail on pakkuja-agnostiline, seega kui sama lehe kohta
+   * kutsutakse `useReOcr`-i mitu korda (nt eraldi instants Gemini-nupu jaoks),
+   * tohib avastamislogika töötada AINULT ühes instantsis — muidu tekiks kaks
+   * kattuvat overlay't sama tulemuse jaoks. Vaikimisi true.
+   */
+  discover?: boolean;
 }
 
 interface UseReOcrReturn {
@@ -36,7 +46,7 @@ const parseJsonResponse = async (response: Response): Promise<any> => {
   }
 };
 
-export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty }: UseReOcrProps): UseReOcrReturn {
+export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provider = 'loss', discover = true }: UseReOcrProps): UseReOcrReturn {
   const [reocrStatus, setReocrStatus] = useState<ReocrStatus>('idle');
   const [reocrText, setReocrText] = useState<string | null>(null);
   const [reocrError, setReocrError] = useState<string | null>(null);
@@ -69,6 +79,10 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty }: UseR
     setReocrStatus('idle');
     setReocrText(null);
     setReocrError(null);
+
+    // Avastamine on ühekordne globaalselt lehe kohta — teine (nt Gemini) instants
+    // ei tohi sama .ocr faili / localStorage-kirjet uuesti üles korjata.
+    if (!discover) return;
 
     if (!authToken || !isAdmin || !pageKey || !page.work_id || !pageFilename) return;
 
@@ -162,7 +176,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty }: UseR
     };
   // pageKey katab work_id + failinime; ülejäänu on sellest tuletatud
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authToken, isAdmin, pageKey]);
+  }, [authToken, isAdmin, pageKey, discover]);
 
   const handleReOcr = useCallback(async () => {
     if (!pageFilename || !authToken || !pageKey) return;
@@ -180,7 +194,11 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty }: UseR
       const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${page.work_id}/reocr-page`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({ page_filename: pageFilename, page_number: page.page_number }),
+        body: JSON.stringify({
+          page_filename: pageFilename,
+          page_number: page.page_number,
+          provider,
+        }),
         timeout: 30000,
       });
       if (!res.ok) {
@@ -224,7 +242,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty }: UseR
       setReocrStatus('error');
       setReocrError(e.message || 'Viga');
     }
-  }, [pageFilename, pageKey, page.work_id, page.page_number, authToken, reocrStorageKey]);
+  }, [pageFilename, pageKey, page.work_id, page.page_number, authToken, reocrStorageKey, provider]);
 
   const applyReOcr = useCallback(() => {
     if (reocrText !== null) {

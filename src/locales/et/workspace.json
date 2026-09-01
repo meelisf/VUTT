@@ -201,6 +201,10 @@
       "cancelling": "Katkestan...",
       "cancelFailed": "Katkestamine ebaõnnestus"
     },
+    "reocrGemini": {
+      "button": "Gemini ({{count}})",
+      "confirmSuffix": "Kasutatakse Google Gemini mudelit (ainult superadmin). Tulemus tuleb tavalisse ootel-loendisse."
+    },
     "tabs": {
       "replace": "Asenda leheküljed"
     },
@@ -429,6 +433,10 @@
       "error": "Re-OCR ebaõnnestus",
       "deleteFile": "Kustuta OCR tulemus",
       "deleteConfirm": "Kas oled kindel? OCR tulemus kustutatakse jäädavalt."
+    },
+    "reocrGemini": {
+      "button": "Re-OCR (Gemini)",
+      "hint": "Transkribeerib Google Gemini mudeliga. Ainult superadminile; tulemus tuleb sama ülevaatuse kaudu."
     }
   },
   "annotations": {

@@ -17,7 +17,8 @@ import {
   Wand2,
   Copy,
   Check,
-  Link
+  Link,
+  Sparkles
 } from 'lucide-react';
 import { Page, Work } from '../../types';
 import type { Collections } from '../../services/collectionService';
@@ -54,6 +55,9 @@ interface HistoryTabProps {
   readOnly: boolean;
   handleReOcr?: () => void;
   reocrStatus?: string;
+  handleGeminiReOcr?: () => void;
+  geminiReocrStatus?: string;
+  geminiEnabled?: boolean;
   onShareableChange?: (shareable: boolean) => void;
   collections?: Collections;
 }
@@ -67,6 +71,9 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   readOnly,
   handleReOcr,
   reocrStatus,
+  handleGeminiReOcr,
+  geminiReocrStatus,
+  geminiEnabled,
   onShareableChange,
   collections
 }) => {
@@ -349,6 +356,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   };
 
   const isAdmin = isAtLeast(user?.role, 'admin');
+
+  // Mõlemad re-OCR nupud jagavad sama lehepõhist .ocr faili ja localStorage
+  // võtit (reocrStorageKey) — seega tohib korraga käia ainult ÜKS töö. Nupp
+  // on lukus, kui KUMB IGANES instants ei ole 'idle' (sh 'done'/'error', mis
+  // ootab kasutaja otsust rakendada/kustutada).
+  const reocrBusy = (reocrStatus !== undefined && reocrStatus !== 'idle')
+    || (geminiReocrStatus !== undefined && geminiReocrStatus !== 'idle');
   const canLoad = Date.now() - lastLoadTime >= RATE_LIMIT_MS;
 
   const [slugCopied, setSlugCopied] = useState(false);
@@ -647,7 +661,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
               </div>
               <button
                 onClick={handleReOcr}
-                disabled={reocrStatus !== 'idle'}
+                disabled={reocrBusy}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded transition-colors disabled:opacity-50"
               >
                 {(reocrStatus === 'uploading' || reocrStatus === 'processing') && (
@@ -658,6 +672,30 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   : reocrStatus === 'processing'
                     ? t('editor.reocr.processing')
                     : t('editor.reocr.button')}
+              </button>
+            </div>
+          )}
+
+          {handleGeminiReOcr && geminiEnabled && (
+            <div className="px-5 py-4 flex items-start justify-between gap-4 border-b border-gray-100 last:border-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800 mb-0.5">
+                  <Sparkles size={13} className="text-violet-600 shrink-0" />
+                  {t('editor.reocrGemini.button')}
+                </div>
+                <p className="text-xs text-gray-400 leading-snug">{t('editor.reocrGemini.hint')}</p>
+              </div>
+              <button
+                onClick={handleGeminiReOcr}
+                disabled={reocrBusy}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 border border-violet-200 bg-violet-50 hover:bg-violet-100 rounded transition-colors disabled:opacity-50"
+              >
+                {(geminiReocrStatus === 'uploading' || geminiReocrStatus === 'processing') && (
+                  <Loader2 className="animate-spin" size={12} />
+                )}
+                {geminiReocrStatus === 'processing'
+                  ? t('editor.reocr.processing')
+                  : t('editor.reocrGemini.button')}
               </button>
             </div>
           )}

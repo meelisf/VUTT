@@ -51,6 +51,13 @@ def backend_env(tmp_path, monkeypatch):
                     "role": "editor",
                     "created_at": "2026-01-01T00:00:00",
                 },
+                "superadmin": {
+                    "password_hash": _sha256("superpass"),
+                    "name": "Super Admin",
+                    "email": "super@example.test",
+                    "role": "superadmin",
+                    "created_at": "2026-01-01T00:00:00",
+                },
             },
             ensure_ascii=False,
             indent=2,

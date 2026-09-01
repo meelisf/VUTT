@@ -5,6 +5,8 @@ import shutil
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
+from ..auth import is_at_least
+from ..config import gemini_enabled
 from ..deps import get_json_data, require_role
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..reocr_apply import apply_ocr_results, discard_ocr_results
@@ -23,6 +25,25 @@ from ..reocr_ops import (
 from ..utils import find_directory_by_id, generate_nanoid
 
 router = APIRouter()
+
+VALID_PROVIDERS = ("loss", "gemini")
+
+
+def _resolve_provider(data: dict, user: dict) -> str:
+    """Pakkuja bodyst + rollivärav.
+
+    Kontroll on FUNKTSIOONI sees, mitte `Depends`-is: FastAPI dependency ei näe
+    request body't ja pakkuja tuleb sealt. LOSS-tee lävi jääb `admin`-iks.
+    """
+    provider = data.get("provider") or "loss"
+    if provider not in VALID_PROVIDERS:
+        raise HTTPException(status_code=400, detail="Tundmatu pakkuja: {}".format(provider))
+    if provider == "gemini":
+        if not is_at_least(user.get("role", "contributor"), "superadmin"):
+            raise HTTPException(status_code=403, detail="Gemini-tee on ainult superadminile")
+        if not gemini_enabled():
+            raise HTTPException(status_code=503, detail="Gemini ei ole seadistatud (GEMINI_API_KEY)")
+    return provider
 
 
 def _prepare_reocr_page(path: str, page_filename: str):
@@ -72,6 +93,7 @@ async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_
     if not isinstance(page_filename, str) or page_filename != os.path.basename(page_filename):
         raise HTTPException(status_code=400, detail="Vigane failinimi")
     page_number = data.get("page_number")
+    provider = _resolve_provider(data, user)
     tmp_path, ocr_model = await run_in_threadpool(
         _prepare_reocr_page, path, page_filename
     )
@@ -84,6 +106,7 @@ async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_
         page_number=page_number,
         username=user["username"],
         material_type=ocr_model,
+        provider=provider,
     )
     return {"status": "accepted", "job_id": job_id}
 
@@ -176,6 +199,7 @@ async def admin_reocr_batch(work_id: str, request: Request, user=Depends(require
     if not isinstance(page_filenames, list) or not page_filenames:
         raise HTTPException(status_code=400, detail="page_filenames puudub või tühi")
     material_type = data.get("material_type") if data.get("material_type") in ("print", "hand") else "print"
+    provider = _resolve_provider(data, user)
     # Failide olemasolu-kontroll (kuni terve teose jagu stat-e) threadpool'is
     pages = await run_in_threadpool(_validate_batch_pages, path, page_filenames)
     job_id = await run_in_threadpool(
@@ -186,6 +210,7 @@ async def admin_reocr_batch(work_id: str, request: Request, user=Depends(require
         pages,
         material_type=material_type,
         username=user["username"],
+        provider=provider,
     )
     return {"status": "accepted", "job_id": job_id}
 
@@ -270,5 +295,11 @@ def admin_reocr_cancel(job_id: str, user=Depends(require_role("admin"))):
         raise HTTPException(status_code=409, detail=str(e))
     except RuntimeError as e:
         # Kirjutaja ei peatunud — töö jääb `cancelling` olekusse, stardi-taaste
-        # korjab üles. Klient võib hiljem uuesti proovida.
+        # (`_finish_interrupted_cancellations`) korjab üles alles BACKENDI
+        # TAASKÄIVITUSEL. Kordamine EI AITA: `cancelling` ei ole
+        # `CANCELLABLE_STATUSES`-is, seega järgmine DELETE annab 409
+        # ("Töö ei ole katkestatav"), mitte uut katset. `_try_begin_cancel`
+        # taassisenetavaks tegemine lahendaks selle, aga tooks sisse kahe
+        # samaaegse koristuse ohu (topelt `_restore_backups`) — omaette
+        # disaini ja testikomplekti nõudev otsus, mitte selle parandusvooru osa.
         raise HTTPException(status_code=503, detail=str(e))

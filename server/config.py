@@ -246,6 +246,32 @@ OCR_SERVER_USER = os.getenv("OCR_SERVER_USER", "mf")
 # Juurkaust OCR serveris — AUTO-OCR/ ja VIGASED/ on selle alamkaustad
 OCR_SERVER_PATH = os.getenv("OCR_SERVER_PATH", "/home/mf/Dokumendid/LLM")
 
+# =========================================================
+# GEMINI (teine OCR-pakkuja, superadmin-only)
+# =========================================================
+# Puuduv võti = funktsioon välja lülitatud. See on KEHTIV seisund, mitte viga —
+# `check_production_secrets()` seda ei nõua.
+# `temperature`/`top_p`/`top_k` jaoks nime EI OLE: Gemini 3.x-il on need deprecated
+# ja asendaja on `thinking_level`.
+GEMINI_API_KEY = env("GEMINI_API_KEY", "")
+GEMINI_OCR_MODEL = env("GEMINI_OCR_MODEL", "gemini-3.7-flash")
+GEMINI_THINKING_LEVEL = env("GEMINI_THINKING_LEVEL", "low")
+# Lagi kehtib TÖÖDE ÜLESELT — üks töö on järjestikune (vt spekk). Piir on VUTT-i
+# poole ettevaatus, MITTE Google'i rate limit (konto on Tier 2, 1000–1500 RPM).
+GEMINI_MAX_INFLIGHT_REQUESTS = int(env("GEMINI_MAX_INFLIGHT_REQUESTS", "4"))
+GEMINI_MAX_RETRIES = int(env("GEMINI_MAX_RETRIES", "3"))
+GEMINI_REQUEST_TIMEOUT = int(env("GEMINI_REQUEST_TIMEOUT", "120"))
+# Hinnanguline SERIALISEERITUD päringu suurus, mitte pildibaitide summa:
+# API 20 MB lagi katab kogu request'i.
+GEMINI_MAX_REQUEST_BYTES = int(env("GEMINI_MAX_REQUEST_BYTES", str(15 * 1024 * 1024)))
+GEMINI_MAX_PROMPT_BYTES = int(env("GEMINI_MAX_PROMPT_BYTES", "8192"))
+GEMINI_MAX_FEW_SHOT = int(env("GEMINI_MAX_FEW_SHOT", "3"))
+
+
+def gemini_enabled() -> bool:
+    """Kas Gemini-tee on kasutatav? Ainus tingimus on seatud võti."""
+    return bool(GEMINI_API_KEY)
+
 # Uploads staging kaust VUTT juurkataloogis (väljaspool data/)
 UPLOADS_DIR = os.path.join(_PROJECT_ROOT, "uploads")
 

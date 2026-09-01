@@ -28,6 +28,18 @@ services:
       - OCR_SERVER_HOST=${OCR_SERVER_HOST:-172.17.120.146}
       - OCR_SERVER_USER=${OCR_SERVER_USER:-mf}
       - OCR_SERVER_PATH=${OCR_SERVER_PATH:-/home/mf/Dokumendid/LLM}
+      # Gemini (teine OCR-pakkuja). Compose loetleb muutujad NIMELISELT —
+      # ainult `.env`-i lisamine ei jõuaks konteinerisse ja funktsioon oleks
+      # vaikselt väljas, ilma ühegi veateateta.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_OCR_MODEL=${GEMINI_OCR_MODEL:-gemini-3.7-flash}
+      - GEMINI_THINKING_LEVEL=${GEMINI_THINKING_LEVEL:-low}
+      - GEMINI_MAX_INFLIGHT_REQUESTS=${GEMINI_MAX_INFLIGHT_REQUESTS:-4}
+      - GEMINI_MAX_RETRIES=${GEMINI_MAX_RETRIES:-3}
+      - GEMINI_REQUEST_TIMEOUT=${GEMINI_REQUEST_TIMEOUT:-120}
+      - GEMINI_MAX_REQUEST_BYTES=${GEMINI_MAX_REQUEST_BYTES:-15728640}
+      - GEMINI_MAX_PROMPT_BYTES=${GEMINI_MAX_PROMPT_BYTES:-8192}
+      - GEMINI_MAX_FEW_SHOT=${GEMINI_MAX_FEW_SHOT:-3}
     volumes:
       # Mountime andmed hostilt konteinerisse
       - ./data:/data

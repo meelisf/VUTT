@@ -22,6 +22,7 @@ import { useEditorFormattingActions } from './editor/useEditorFormattingActions'
 import { useTextAnnotationActions } from './editor/useTextAnnotationActions';
 import { useCodeMirrorLifecycle } from './editor/useCodeMirrorLifecycle';
 import { useTranscriptionGuide } from './editor/useTranscriptionGuide';
+import { useGeminiEnabled } from '../hooks/useGeminiEnabled';
 import type { EditorTab } from './editor/types';
 
 interface TextEditorProps {
@@ -150,6 +151,39 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setIsDirty,
   });
 
+  // Gemini-tee: eraldi hooks-instants, aga avastamislogika (discover) jääb
+  // AINULT eelmisele instantsile — .ocr fail ei tea, kumb pakkuja selle tootis.
+  const isSuperadmin = isAtLeast(user?.role, 'superadmin');
+  const geminiEnabled = useGeminiEnabled(authToken, isSuperadmin);
+  const {
+    reocrStatus: geminiReocrStatus,
+    reocrText: geminiReocrText,
+    reocrError: geminiReocrError,
+    handleReOcr: handleGeminiReOcr,
+    applyReOcr: applyGeminiReOcr,
+    deleteOcrFile: deleteGeminiOcrFile,
+  } = useReOcr({
+    page,
+    authToken,
+    isAdmin: isSuperadmin,
+    viewRef,
+    setIsDirty,
+    provider: 'gemini',
+    discover: false,
+  });
+
+  // Redaktori paneel (banner + tulemuse ülekate) näitab AINULT ühte instantsi
+  // korraga — kumb iganes ei ole 'idle'. LOSS on eelistatud, kui mõlemad on
+  // (ei tohiks juhtuda, kuna nupud on üksteise suhtes lukus, aga paneeli
+  // valik ei tohi selle eelduse peale toetuda). HistoryTab'i nupud saavad
+  // oma tegeliku (jagamata) oleku eraldi allpool.
+  const geminiPanelActive = reocrStatus === 'idle' && geminiReocrStatus !== 'idle';
+  const panelReocrStatus = geminiPanelActive ? geminiReocrStatus : reocrStatus;
+  const panelReocrText = geminiPanelActive ? geminiReocrText : reocrText;
+  const panelReocrError = geminiPanelActive ? geminiReocrError : reocrError;
+  const panelApplyReOcr = geminiPanelActive ? applyGeminiReOcr : applyReOcr;
+  const panelDeleteOcrFile = geminiPanelActive ? deleteGeminiOcrFile : deleteOcrFile;
+
   const {
     handleSave,
     handleSaveWithDrafts,
@@ -241,11 +275,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           cleanMarkup={cleanMarkup}
           onAnnotateSelection={handleAnnotateSelection}
           toggleMarginaliaMode={toggleMarginaliaMode}
-          reocrStatus={reocrStatus}
-          reocrText={reocrText}
-          reocrError={reocrError}
-          applyReOcr={applyReOcr}
-          deleteOcrFile={deleteOcrFile}
+          reocrStatus={panelReocrStatus}
+          reocrText={panelReocrText}
+          reocrError={panelReocrError}
+          applyReOcr={panelApplyReOcr}
+          deleteOcrFile={panelDeleteOcrFile}
           specialCharacters={specialCharacters}
           isCustomChars={isCustomChars}
           showCharPanel={showCharPanel}
@@ -289,6 +323,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           handleDeleteAndSaveTextAnnotation={handleDeleteAndSaveTextAnnotation}
           handleReOcr={handleReOcr}
           reocrStatus={reocrStatus}
+          handleGeminiReOcr={handleGeminiReOcr}
+          geminiReocrStatus={geminiReocrStatus}
+          geminiEnabled={geminiEnabled}
         />
       </div>
     </div>

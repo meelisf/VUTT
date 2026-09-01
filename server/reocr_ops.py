@@ -7,12 +7,13 @@ import os
 import shutil
 import threading
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .config import (
-    BASE_DIR, OCR_SERVER_PATH, REOCR_BACKUPS_DIR, REOCR_LOG_FILE,
-    UPLOAD_ENABLED, get_logger,
+    BASE_DIR, GEMINI_MAX_INFLIGHT_REQUESTS, OCR_SERVER_PATH, REOCR_BACKUPS_DIR,
+    REOCR_LOG_FILE, UPLOAD_ENABLED, gemini_enabled, get_logger,
 )
+from .ocr_prompts import instruction_for
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
 from .upload.ocr_client import cleanup_run_files, publish_atomic
@@ -166,6 +167,78 @@ def _build_batch_pages(slug: str, pages: List[Tuple[str, Optional[int]]]) -> Lis
             "error": None,
         })
     return result
+
+
+# Lagi kehtib TÖÖDE ÜLESELT — üks töö on järjestikune. Protsessi-lokaalne, nagu
+# RENDER_SEMAPHORE: mitme workeriga (gunicorn) ei ole see enam õige piir.
+# `max(1, ...)`: seade tuleb valideerimata env-int'ist. 0 lukustaks iga Gemini-töö
+# vaikselt igaveseks, negatiivne viskaks juba impordil ja võtaks backendi maha.
+_GEMINI_SEMAPHORE = threading.Semaphore(max(1, GEMINI_MAX_INFLIGHT_REQUESTS))
+
+# Kui tihti kontrollida katkestuslippu semafori järjekorras seistes.
+_GEMINI_SLOT_POLL = 1.0
+
+
+def _acquire_gemini_slot(should_cancel: Optional[Callable[[], bool]]) -> bool:
+    """Võtab semafori KATKESTATAVALT. Tagastab False, kui töö katkestati ootel.
+
+    `Semaphore.acquire()` ilma timeout'ita ei ole katkestatav: täis semafori taga
+    ootav 5. töö ei reageeriks katkestuslipule enne, kui mõni eelnev lõpeb —
+    `_quiesce_upload` 30 s join aeguks ja töö jääks igavesti `cancelling`-uks
+    (ADR 0018). Seepärast lühike timeout + lipu kontroll ringi peal.
+    """
+    while True:
+        if should_cancel is not None and should_cancel():
+            return False
+        if _GEMINI_SEMAPHORE.acquire(timeout=_GEMINI_SLOT_POLL):
+            return True
+
+
+def _gemini_transcribe_page(img_path: str, material_type: str,
+                            should_cancel: Optional[Callable[[], bool]] = None
+                            ) -> Optional[str]:
+    """Üks Gemini kutse. Import on FUNKTSIOONI sees, et testid saaksid patchida
+    `server.ocr_providers.gemini.transcribe` ja et moodul ei laeks, kui võtit pole.
+
+    Tagastab None, kui töö katkestati SEMAFORI JÄRJEKORRAS — siis ei ole ühtki
+    tulemust ega viga, on lihtsalt „tööd ei olnud". Katkestus juba lennus oleva
+    päringu korduste vahel tuleb `GeminiError`-ina ja seda käsitleb kutsuja
+    veaharu (mille staatuse-CAS katkestatud töö nagunii kinni püüab).
+    """
+    from .ocr_providers import gemini
+    with open(img_path, "rb") as f:
+        image_bytes = f.read()
+    if not _acquire_gemini_slot(should_cancel):
+        logger.info("Gemini: katkestatud semafori järjekorras")
+        return None
+    try:
+        text, usage = gemini.transcribe(image_bytes, instruction_for(material_type),
+                                        should_cancel=should_cancel)
+    finally:
+        _GEMINI_SEMAPHORE.release()
+    logger.info("Gemini leht valmis: %d märki, usage=%s", len(text), usage)
+    return text
+
+
+def _gemini_commit_page(jobs: dict, lock, job_id: str, slug: str,
+                        page_filename: str, text: str) -> bool:
+    """Kirjutab .ocr JA registreerib omandi ÜHE kriitilise sektsioonina.
+
+    Miks üks sektsioon: `_write_ocr_file` VARUNDAB olemasoleva .ocr faili enne
+    ülekirjutamist, seega „kirjuta, siis vajadusel kustuta" EI OLE tagasipööramine —
+    see jätaks sihtkoha tühjaks ja lehe produced_pages-ist välja. Ühe sektsiooniga
+    on leht kas omatud (ADR 0018 koristus taastab varukoopia) või puutumata.
+
+    OHUTU: `_write_ocr_file` ei võta kumbagi job-lukku (tema ainus lukk on
+    reocr_state._file_lock), seega deadlock'i ei teki. Kirjutus on mõne KB suurune.
+    """
+    with lock:
+        töö = jobs.get(job_id)
+        if not töö or töö.get("status") != "processing":
+            return False
+        _write_ocr_file(slug, page_filename, text, job_id)
+        _record_produced(töö, page_filename)
+        return True
 
 
 _reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_work, remote_img, remote_txt}}
@@ -331,10 +404,18 @@ def cancel_reocr_job(job_id: str) -> dict:
     if not _quiesce_upload(job_id):
         # Kirjutaja on veel elus — jäta töö `cancelling` olekusse, stardi-taaste
         # korjab üles. Jääk kaugserveris on parem kui võistlus koristusega.
+        #
+        # Sõnum jõuab kasutajani muutmata kujul (routers/reocr.py 503 `detail`) —
+        # peab ütlema TÕTT: kordamine EI AITA. Teine DELETE ei võta seda tööd
+        # enam vastu (`cancelling` ei ole `CANCELLABLE_STATUSES`-is → 409), nii
+        # et töö laheneb alles backendi taaskäivitusel.
         logger.error(
             f"Re-OCR {job_id}: üleslaadimislõim ei peatunud, koristus edasi lükatud"
         )
-        raise RuntimeError("Üleslaadimislõim ei peatunud")
+        raise RuntimeError(
+            "Katkestamine ei jõudnud lõpule. Töö jääb katkestamise olekusse ja "
+            "laheneb alles serveri taaskäivitusel — kordamine ei aita."
+        )
 
     remote_ok = _cleanup_remote_job(job_id, job)
 
@@ -435,9 +516,14 @@ def get_active_batch_for_work(work_id: str) -> Optional[str]:
 
 def start_reocr_batch(work_id: str, slug: str, work_path: str,
                       pages: List[Tuple[str, Optional[int]]],
-                      material_type: str = "print", username: str = "") -> str:
+                      material_type: str = "print", username: str = "",
+                      provider: str = "loss") -> str:
     """Alustab mitme lehe batch re-OCR tööd: laeb KÕIK pildid ühte staging-kausta.
-    Loeb pildid otse work_path-ist (EI kustuta originaale). Tagastab job_id."""
+    Loeb pildid otse work_path-ist (EI kustuta originaale). Tagastab job_id.
+
+    `provider="gemini"` marsruudib töö Gemini API-le: kaugartefakte ei teki,
+    `remote_*` välju ega batch-mappingut ei ole (mapping on AINULT SFTP-orbude
+    taastamise tarvis, vt reocr_recovery) ja lehed on kohe `processing`."""
     if material_type not in ("print", "hand"):
         material_type = "print"
     job_id = generate_nanoid()
@@ -445,6 +531,7 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
     remote_work = f"AUTO-OCR/{material_type}/{job_id}/{slug}"
     page_entries = _build_batch_pages(slug, pages)
     now = datetime.now().timestamp()
+    on_gemini = provider == "gemini"
     _batch_map_pages = {
         e["remote_txt_name"]: {"page_filename": e["page_filename"], "page_number": e["page_number"]}
         for e in page_entries
@@ -456,18 +543,105 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
         "slug": slug,
         "username": username,
         "material_type": material_type,
-        "status": "uploading",
+        "provider": provider,
+        "status": "processing" if on_gemini else "uploading",
         "started_at": now,
         "finished_at": None,
         "last_progress_at": now,
-        "remote_staging": remote_staging,
-        "remote_work": remote_work,
         "pages": page_entries,
     }
+    if on_gemini:
+        for entry in page_entries:
+            entry["status"] = "processing"
+    else:
+        job["remote_staging"] = remote_staging
+        job["remote_work"] = remote_work
     with _reocr_batch_jobs_lock:
         _reocr_batch_jobs[job_id] = job
     _persist_active_jobs()
-    reocr_state.persist_batch_mapping(job_id, work_id, slug, _batch_map_pages)
+    if not on_gemini:
+        reocr_state.persist_batch_mapping(job_id, work_id, slug, _batch_map_pages)
+
+    def _gemini_batch():
+        for entry in page_entries:
+            if _cancel_event(job_id).is_set():
+                logger.info("Gemini batch %s: katkestatud", job_id)
+                return
+            with _reocr_batch_jobs_lock:
+                praegune = _reocr_batch_jobs.get(job_id)
+                if not praegune or praegune.get("status") != "processing":
+                    return
+            src = os.path.join(work_path, entry["page_filename"])
+            try:
+                text = _gemini_transcribe_page(
+                    src, material_type, lambda: _cancel_event(job_id).is_set())
+            except Exception as e:
+                # Vigane leht ON edenemine (ADR 0025): ta on LAHENDATUD, mitte ootel.
+                # Ilma last_progress_at uuenduseta lööks seisaku-tuvastus valehäire.
+                logger.warning("Gemini batch %s %s: %s", job_id, entry["page_filename"], e)
+                logitav = False
+                with _reocr_batch_jobs_lock:
+                    praegune = _reocr_batch_jobs.get(job_id)
+                    if not praegune or praegune.get("status") != "processing":
+                        return
+                    for kirje in praegune.get("pages", []):
+                        if (kirje.get("page_filename") == entry["page_filename"]
+                                and kirje.get("status") == "processing"):
+                            kirje["status"] = "error"
+                            kirje["error"] = str(e)
+                            praegune["last_progress_at"] = datetime.now().timestamp()
+                            logitav = True
+                            break
+                if logitav:
+                    _log_batch_page_error(job, job_id, entry, str(e))
+                continue
+            if text is None or _cancel_event(job_id).is_set():
+                return
+            # Kirjutusviga (nt OSError) EI TOHI lõime tappa: muidu jääks batch
+            # `processing`-usse kuni 12 h absoluutlaeni, nagu LOSS-tee enne #227.
+            try:
+                omatud = _gemini_commit_page(_reocr_batch_jobs, _reocr_batch_jobs_lock,
+                                             job_id, slug, entry["page_filename"], text)
+            except Exception as e:
+                logger.warning("Gemini batch %s %s kirjutusviga: %s",
+                               job_id, entry["page_filename"], e)
+                logitav = False
+                with _reocr_batch_jobs_lock:
+                    praegune = _reocr_batch_jobs.get(job_id)
+                    if not praegune or praegune.get("status") != "processing":
+                        return
+                    for kirje in praegune.get("pages", []):
+                        if (kirje.get("page_filename") == entry["page_filename"]
+                                and kirje.get("status") == "processing"):
+                            kirje["status"] = "error"
+                            kirje["error"] = str(e)
+                            praegune["last_progress_at"] = datetime.now().timestamp()
+                            logitav = True
+                            break
+                if logitav:
+                    _log_batch_page_error(job, job_id, entry, str(e))
+                continue
+            if omatud:
+                with _reocr_batch_jobs_lock:
+                    praegune = _reocr_batch_jobs.get(job_id)
+                    if praegune:
+                        for kirje in praegune.get("pages", []):
+                            if (kirje.get("page_filename") == entry["page_filename"]
+                                    and kirje.get("status") == "processing"):
+                                kirje["status"] = "ready"
+                                praegune["last_progress_at"] = datetime.now().timestamp()
+                                break
+            _persist_active_jobs()
+        with _reocr_batch_jobs_lock:
+            praegune = _reocr_batch_jobs.get(job_id)
+            # Valve `processing` peale (I3): kui katkestamine jõudis vahele PÄRAST
+            # viimase lehe commit'i, aga ENNE seda plokki, on staatus juba
+            # `cancelling`. Ilma valveta viiks see plokk töö siiski `done`-ks ja
+            # kutsuks `_drop_backups`-i — `cancel_reocr_job` ei leiaks enam
+            # varukoopiaid, mida taastada, ja kaotaks nii uue kui vana tulemuse.
+            if praegune and praegune.get("status") == "processing":
+                _finalize_batch_if_complete(praegune, job_id)
+        _persist_active_jobs()
 
     def _upload():
         try:
@@ -514,7 +688,8 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                     current["finished_at"] = datetime.now().timestamp()
             _persist_active_jobs()
 
-    _t = threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}")
+    _t = threading.Thread(target=_gemini_batch if on_gemini else _upload,
+                          daemon=True, name=f"reocr-batch-{job_id}")
     _upload_threads[job_id] = _t
     _t.start()
     return job_id
@@ -609,6 +784,11 @@ def _poll_batch_job(job_id: str) -> None:
     with _reocr_batch_jobs_lock:
         job = _reocr_batch_jobs.get(job_id)
         if not job or job["status"] != "processing":
+            return
+        if job.get("provider") == "gemini":
+            # Kaugfaile ei ole — lehed kirjutab töölõim ise. Poll ainult vaatab,
+            # kas kõik on lahendatud (lõim võis surra enne finaliseerimist).
+            _finalize_batch_if_complete(job, job_id)
             return
         pending = [dict(e) for e in job["pages"] if e["status"] == "processing"]
         slug = job["slug"]
@@ -823,6 +1003,7 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
     errors: Dict[str, str] = {}
     progress: Optional[Dict] = None
     active_job_id: Optional[str] = None   # katkestamiseks Manage-vaates (#217)
+    active_provider: Optional[str] = None  # kumb pakkuja parajasti töötab
     with _reocr_batch_jobs_lock:
         for jid, j in _reocr_batch_jobs.items():
             if j["work_id"] != work_id:
@@ -844,6 +1025,8 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
                 progress = summary
             if is_active:
                 active_job_id = jid
+                # Vanemad (enne pakkuja-dimensiooni) kirjed on LOSSi omad.
+                active_provider = j.get("provider", "loss")
     ocr_ready: List[str] = []
     try:
         for fn in os.listdir(work_path):
@@ -883,6 +1066,7 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
         "batch_known": batch_known,
         # Aktiivse batchi id — Manage-vaate katkestamisnupu jaoks (#217)
         "active_job_id": active_job_id,
+        "active_provider": active_provider,
     }
 
 
@@ -993,10 +1177,14 @@ def list_reocr_batch_jobs() -> list:
     return out
 
 
-def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", page_number: int = None, username: str = "", material_type: str = "print") -> str:
+def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", page_number: int = None, username: str = "", material_type: str = "print", provider: str = "loss") -> str:
     """
     Alustab lehekülje re-OCR tööd: laadib pildi OCR serverisse SFTP kaudu.
     Tagastab job_id, mille abil saab staatust küsida poll_reocr_job() kaudu.
+
+    `provider="gemini"` marsruudib töö Gemini API-le: kaugartefakte ei teki,
+    `remote_*` välju ei seata ja staatus on kohe `processing` (üleslaadimise
+    faasi ei ole).
     """
     if material_type not in ('print', 'hand'):
         material_type = 'print'
@@ -1004,24 +1192,71 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
     remote_staging = f"AUTO-OCR/{material_type}/{job_id}"
     remote_work = f"AUTO-OCR/{material_type}/{job_id}/{slug}"
     remote_img_name = f"{slug}_pg_001.jpg"
+    on_gemini = provider == "gemini"
 
-    with _reocr_jobs_lock:
-        _reocr_jobs[job_id] = {
-            "work_id": work_id,
-            "slug": slug,
-            "page_filename": page_filename,
-            "page_number": page_number,
-            "username": username,
-            "status": "uploading",
-            "text": None,
-            "error": None,
-            "started_at": datetime.now().timestamp(),
+    job = {
+        "work_id": work_id,
+        "slug": slug,
+        "page_filename": page_filename,
+        "page_number": page_number,
+        "username": username,
+        "provider": provider,
+        "status": "processing" if on_gemini else "uploading",
+        "text": None,
+        "error": None,
+        "started_at": datetime.now().timestamp(),
+    }
+    if not on_gemini:
+        job.update({
             "remote_staging": remote_staging,
             "remote_work": remote_work,
             "remote_img": f"{remote_work}/{remote_img_name}",
             "remote_txt": f"{remote_work}/{slug}_pg_001.txt",
-        }
+        })
+    with _reocr_jobs_lock:
+        _reocr_jobs[job_id] = job
     _persist_active_jobs()
+
+    def _gemini_single():
+        try:
+            if _cancel_event(job_id).is_set():
+                return
+            text = _gemini_transcribe_page(img_path, material_type,
+                                           lambda: _cancel_event(job_id).is_set())
+            if text is None or _cancel_event(job_id).is_set():
+                return
+            if _gemini_commit_page(_reocr_jobs, _reocr_jobs_lock, job_id, slug,
+                                   page_filename, text):
+                log_job = None
+                with _reocr_jobs_lock:
+                    töö = _reocr_jobs.get(job_id)
+                    if töö and töö.get("status") == "processing":
+                        töö["status"] = "done"
+                        töö["text"] = text
+                        töö["finished_at"] = datetime.now().timestamp()
+                        log_job = dict(töö)
+                        _drop_backups(job_id)
+                if log_job:
+                    _append_to_log(log_job, job_id)
+                _persist_active_jobs()
+        except Exception as e:
+            logger.error("Gemini re-OCR %s viga: %s", job_id, e)
+            log_job = None
+            with _reocr_jobs_lock:
+                töö = _reocr_jobs.get(job_id)
+                if töö and töö.get("status") in ("uploading", "processing"):
+                    töö["status"] = "error"
+                    töö["error"] = str(e)
+                    töö["finished_at"] = datetime.now().timestamp()
+                    log_job = dict(töö)
+            if log_job:
+                _append_to_log(log_job, job_id)
+            _persist_active_jobs()
+        finally:
+            try:
+                os.unlink(img_path)
+            except Exception:
+                pass
 
     def _upload():
         try:
@@ -1066,7 +1301,10 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
             except Exception:
                 pass
 
-    _t = threading.Thread(target=_upload, daemon=True, name=f"reocr-{job_id}")
+    # Ka Gemini-lõim läheb `_upload_threads`-i: katkestamine vaigistab kirjutaja
+    # `_quiesce_upload`-iga ja see otsib teda täpselt sealt (ADR 0018).
+    _t = threading.Thread(target=_gemini_single if on_gemini else _upload,
+                          daemon=True, name=f"reocr-{job_id}")
     _upload_threads[job_id] = _t
     _t.start()
     return job_id
@@ -1083,6 +1321,11 @@ def poll_reocr_job(job_id: str) -> dict:
         if not job:
             return {"status": "not_found"}
         snapshot = dict(job)
+
+    if snapshot.get("provider") == "gemini":
+        # Kaugfaili ei ole — staatuse kirjutab töölõim ise.
+        return {"status": snapshot["status"], "text": snapshot.get("text"),
+                "error": snapshot.get("error")}
 
     current = snapshot["status"]
     if current in ("uploading", "done", "error"):
@@ -1204,6 +1447,9 @@ def _split_loaded(loaded: dict):
     return single, batch
 
 
+_RESTART_ERROR = "Server taaskäivitus töö ajal"
+
+
 def _revive_dead_uploads(jobs: dict) -> int:
     """Restardil laetud 'uploading' tööde upload-thread on surnud → poll ei töötleks neid
     kunagi (poll ainult 'processing') ega reaper (uploading = aktiivne) → igavene zombie.
@@ -1213,6 +1459,31 @@ def _revive_dead_uploads(jobs: dict) -> int:
     Tagastab muudetud tööde arvu."""
     n = 0
     for j in jobs.values():
+        if j.get("provider") == "gemini":
+            # Gemini-töö ei ela restarti üle: kaugartefakti pole, kust tulemust
+            # hiljem korjata. Krahh EI OLE kasutaja otsus — juba kirjutatud .ocr
+            # failid JÄÄVAD alles ja on Manage'is ootel. See on teadlik erinevus
+            # katkestamisest (ADR 0018), kus osalised tulemused kustutatakse.
+            muutus = False
+            if j.get("status") in ("uploading", "processing"):
+                j["status"] = "error"
+                j["error"] = _RESTART_ERROR
+                # Terminaalne staatus vajab lõpuaega, muidu pühib TTL-koristus
+                # (`finished_at` vaikeväärtus 0) kirje kohe esimesel passil ära.
+                j["finished_at"] = datetime.now().timestamp()
+                muutus = True
+            # Ka LEHE-kirjed: `build_reocr_status` per-lehe silmus EI ole
+            # `is_active` taga, seega pooleli jäänud leht näitaks Manage'is
+            # „OCR töötab" kuni TTL-ini — ilma aktiivse tööta ja ilma
+            # katkestamisnuputa, samal ajal kui töö-tasandi viga jääks nähtamatuks.
+            for page in j.get("pages") or []:
+                if page.get("status") in ("uploading", "processing"):
+                    page["status"] = "error"
+                    page["error"] = _RESTART_ERROR
+                    muutus = True
+            if muutus:
+                n += 1
+            continue
         changed = False
         if j.get("status") == "uploading":
             j["status"] = "processing"
@@ -1252,9 +1523,23 @@ def start_reocr_background() -> Optional[threading.Thread]:
     kättesaamatu serveri korral API käivitumist 20–50 s kinni (#181).
 
     Tagastab recovery-lõime (testides join'itav) või None, kui upload on välja lülitatud."""
-    if not UPLOAD_ENABLED:
+    # Tööde LAADIMINE toimib ka ilma upload'ita — Gemini-tee ei kasuta SFTP-d.
+    # SFTP-põhine scan_and_recover + reaper jäävad UPLOAD_ENABLED taha.
+    if not UPLOAD_ENABLED and not gemini_enabled():
         return None
     single, batch = _split_loaded(reocr_state.load_active_jobs())
+    if not UPLOAD_ENABLED:
+        # Siia jõuab ainult Gemini lubatuna. LOSSi töid EI TOHI laadida: nende
+        # ainus edasine tee on SFTP — `_finish_interrupted_cancellations` avaks
+        # ühenduse SÜNKROONSELT lifespan'is (#181) ja poll-singletonid
+        # koputaksid kaugserverile iga 10 s, konfiguratsioonis, kus upload on
+        # teadlikult välja lülitatud.
+        # Väljafiltreeritud kirjed kaovad ka KETTALT: järgmine `_persist_active_jobs()`
+        # kirjutab need mälu-globaalid (millest LOSS-kirjed on juba puudu) faili
+        # peale ja kustutab need seega jäädavalt (tootmises UPLOAD_ENABLED=true,
+        # seega täna surnud haru, aga käitumine ise ei ole selline vaikimisi).
+        single = {k: v for k, v in single.items() if v.get("provider") == "gemini"}
+        batch = {k: v for k, v in batch.items() if v.get("provider") == "gemini"}
     revived = _revive_dead_uploads(single) + _revive_dead_uploads(batch)
     with _reocr_jobs_lock:
         _reocr_jobs.update(single)
@@ -1272,6 +1557,10 @@ def start_reocr_background() -> Optional[threading.Thread]:
 
     if revived or lopetatud:
         _persist_active_jobs()  # kirjuta teisendatud staatus kohe tagasi
+    if not UPLOAD_ENABLED:
+        # Orbude taaste ja reaper on puhtalt SFTP-tööriistad — ilma upload'ita
+        # ei ole neil kaugserverit, kust orbe otsida.
+        return None
     thread = threading.Thread(target=_startup_recovery_and_reaper, daemon=True,
                               name="reocr-startup-recovery")
     thread.start()

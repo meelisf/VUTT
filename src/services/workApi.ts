@@ -52,10 +52,16 @@ export interface ViewerTokenResponse {
 export interface ReocrBatchRequest {
   page_filenames: string[];
   material_type: 'print' | 'hand';
+  /** Puudumisel = "loss" (backendi vaikeväärtus). "gemini" nõuab superadmin-rolli. */
+  provider?: 'loss' | 'gemini';
 }
 
 export interface AddPagesResponse extends ApiStatusResponse {
   meili_warning?: boolean;
+}
+
+export interface OcrProvidersResponse extends ApiStatusResponse {
+  gemini?: { enabled: boolean; model: string };
 }
 
 const auth = (token: string | null, options: ApiRequestOptions = {}): ApiRequestOptions => ({
@@ -127,6 +133,11 @@ export function getViewerToken(workId: string, token: string): Promise<ViewerTok
 
 export function getReocrStatus<T>(workId: string, token: string): Promise<T> {
   return apiGet<T>(`/admin/work/${workId}/reocr-status`, auth(token, { timeout: 8000 }));
+}
+
+/** Millised OCR-pakkujad on seadistatud. Ainult superadmin; võtit vastus ei sisalda. */
+export function getOcrProviders(token: string | null): Promise<OcrProvidersResponse> {
+  return apiGet<OcrProvidersResponse>('/admin/ocr/providers', auth(token, { timeout: 8000 }));
 }
 
 export function startReocrBatch(
