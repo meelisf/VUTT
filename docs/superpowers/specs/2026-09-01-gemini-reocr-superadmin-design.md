@@ -292,18 +292,26 @@ mõõtmisega; kandidaadid, mis on juba teada:
 Kuna Gemini ei ole fine-tuunitud, on **kontekst kvaliteedi peamine hoob**. Vaikimisi
 juhised on kirjutatud raamatulehe jaoks ja kukuvad läbi materjalil, mis ei ole raamatuleht.
 
-Mõõdetud näide — sedelkataloog `996o7v` („Sedelkataloog Emil / ajalugu", 53 lehte, kõik
-`Toores`). Praeguse mudeli väljund lehel 1:
+Näide — sedelkataloog `996o7v` („Sedelkataloog Emil / ajalugu", 53 lehte, kõik `Toores`).
+Kataloogisedel ei ole raamatuleht: seal ei ole jooksvat teksti, poolitusi ega marginaale,
+küll aga on kindel väljajärjestus (signatuur, kirje, formaat, mõõtmed, saabumisaasta,
+valdkond), mida iga järgmine sedel kordab. Üldjuhis ei ütle sellest midagi, ja pooltuhande
+sedeli jaoks ei ole mõtet seda igal käivitusel uuesti sõnastada.
 
-```
-Mus. 1309 Alexander I. Die Adreſse der Juden an Alexander den Erſten. Litographie. 1806. 2 Bl. Jn Deutſch und Jücliſch. 37,6 x 20,0 Jn. 1900 Ajaluzi
-```
-
-Kaardi **reastruktuur on täielikult kadunud** — signatuur, kirje, formaat ja mõõtmed on
-ühel real. Kataloogisedel ei ole raamatuleht: seal ei ole jooksvat teksti, poolitusi ega
-marginaale, küll aga on kindel väljajärjestus, mida iga järgmine sedel kordab. Ükski
-üldjuhis seda ei ütle, ja pooltuhande sedeli jaoks ei ole mõtet seda igal käivitusel uuesti
-sõnastada.
+> **Parandus (2026-09-01).** Selle speki varasem versioon väitis siin, et mudel „kaotab
+> sedeli reastruktuuri täielikult", ja tõi näiteks ühe reana väljundi. **See oli
+> tööriista-artefakt, mitte mõõtmine.** Vaatasin lehte MCP `get_pages` kaudu, mis tagastab
+> Meili välja `lehekylje_tekst` — **otsinguks puhastatud** teksti, kus tühik-tühemik on
+> kollapseeritud (`meili_doc._clean_search_text`, CLAUDE.md „Kaks tekstivälja"). Toores
+> `.txt` oli algusest peale korrektselt reastatud: `data/`-git näitab, et originaal-OCR-i
+> commit sisaldab juba 10-realist kirjet ja faili ei ole pärast seda muudetud.
+>
+> Few-shot'i põhjendus ei sõltu sellest näitest — ta seisab sellel, et Gemini ei ole
+> fine-tuunitud ja väljajärjestust on näitega odavam edasi anda kui sõnadega. Aga
+> **mõõtmisena see väide ei kehtinud** ja ükski hilisem otsus ei tohi sellele toetuda.
+>
+> Üldisem õppetund, mis puudutab iga hilisemat kvaliteedihinnangut: **MCP ei ole
+> transkriptsiooni tõene vaade.** Teksti kuju hindamiseks loe `.txt` failist.
 
 Sellest kaks nõuet, mis moodustavad ühe mehhanismi.
 
@@ -831,8 +839,13 @@ mudel, mis teeb muutujaid kaks (mudel + temperatuur) ja mõõtmise seega mittein
 Kui see katse on ikkagi soovitud, on ta eraldi töö oma seadistusega.
 
 **C. Sedelkataloog — kas few-shot töötab.** `996o7v` on valmis testjuhtum: paranda 2
-sedelit käsitsi, lase ülejäänud 51 läbi (a) ilma näideteta, (b) näidetega. Mõõdetav
-suurus on reastruktuuri säilimine — praegune väljund kaotab selle täielikult.
+sedelit käsitsi, lase ülejäänud 51 läbi (a) ilma näideteta, (b) näidetega. Mõõdetav suurus
+on **väljade eristamise täpsus** (signatuur / kirje / formaat / mõõtmed / aasta) ja
+lühikeste numbriväljade lugemine — mitte reastruktuur, mis on juba täna korras (vt
+parandust „Prompti kohendamine ja few-shot näited" all).
+
+**Võrdlust tehes loe `.txt` failist, mitte MCP kaudu** — MCP tagastab otsinguks
+normaliseeritud teksti ja peidab just selle, mida siin mõõdetakse.
 
 Ükski neist ei blokeeri teostust — funktsioon on superadmini käes ja üksiku lehe tee on
 ohutu — aga **B peab olema tehtud enne, kui trükise Gemini-tulemusi teosekaupa `apply`-takse.**
