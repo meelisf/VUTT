@@ -242,23 +242,30 @@ märgenduses.
 
 **`GEMINI_HAND_INSTRUCTION` — käsikiri, VUTT-i oma versioonitud juhis.** Alguspunkt (v1)
 on LOSSi `KURRENT_INSTRUCTION` sõna-sõnalt, **aga see fail tohib LOSS-ist lahkneda** ja
-seda arendatakse edasi VUTT-i repos. Kolm põhjust:
+seda arendatakse edasi VUTT-i repos.
+
+> **Kopeeri teostushetkel, mitte selle speki pealt.** LOSSi käsikirja-juhist muudeti
+> 2026-09-01. Teostaja võtab teksti sel hetkel kehtivast `qwen3.5/scripts/prompt.py`-st ja
+> kirjutab `ocr_prompts.py` päisesse **kopeerimise kuupäeva ja lähtefaili mtime'i**.
+
+Kolm põhjust:
 
 1. **Käsikiri on Gemini-tee peamine kasutus.** VUTT-i oma kurrendi-mudel ei tule
    keerulise käekirjaga toime; just seepärast see pakkuja lisatakse. Trükis on
    kõrvalvõimalus.
-2. **Pariteedinõue on trükise oma, mitte käsikirja oma.** Range pariteet on vajalik seal,
-   kus sama teost transkribeeritakse mõlema pakkujaga ja tulemused peavad kokku minema —
-   see on trükis. Käsikirja materjali, mille pärast Gemini üldse lisatakse, LOSSi mudel
-   praegu rahuldavalt ei transkribeeri; kahe teel identse juhise hoidmine ei anna seal
-   võrreldavust, vaid ainult piirab paremat teed halvema järgi.
+2. **Fine-tuunitud mudeli juhis ei ole üldmudeli jaoks hea juhis.** `KURRENT_INSTRUCTION`
+   on Qwen-i kurrendi-mudeli **treeningvorm** — fine-tuunitud mudel tahab täpselt seda
+   stringi, millega teda treeniti, ja juhise sõnastuse kvaliteet ei ole seal peaaegu
+   oluline. Gemini on vastupidine juhtum: ta ei ole midagi näinud ja juhis on ainus, mis
+   tal on. Sama teksti hoidmine mõlemal teel optimeeriks Gemini kellegi teise mudeli
+   treeningkonventsiooni järgi — see on vale sihtmärk.
 
-   > **Lahtine kontrollküsimus.** Speki varasem versioon põhjendas seda punkti väitega, et
-   > LOSSi `get_instruction()` saadab mõlemale tüübile `INSTRUCTION`-i. Lugesin koodi ja
-   > see näib nii olevat (`return INSTRUCTION`, `from prompt import INSTRUCTION`, mõlemad
-   > mootoriteed real 571 ja 646), aga **Meelis ütles, et see ei ole nii** — järelikult on
-   > midagi, mida kood ei näita. Kuni see on selgitatud, ei toetu ükski selle speki otsus
-   > sellele väitele. Käsikirja prompti omamise põhjendus seisab iseseisvalt punktidel 1 ja 3.
+   > **Ajalooline märkus.** Kuni 2026-09-01 saatis LOSS *mõlemale* tüübile
+   > `INSTRUCTION`-i (`get_instruction()` → `return INSTRUCTION` tingimusteta); Meelis
+   > parandas selle käsikirja jaoks kohe pärast selle speki kirjutamist. See ei muuda
+   > ülalolevat põhjendust — see põhineb mudeliklasside erinevusel, mitte LOSSi
+   > hetkeseisul. Aga vt „Riskid": prompti kahes kohas hoidmise oht demonstreeris end
+   > **speki esimesel päeval**.
 3. **Gemini ei ole fine-tuunitud.** Qwen-i kurrendi-mudel on treenitud üht kindlat
    väljundivormi tootma; Gemini järgib ainult juhist. Juhise sõnastus **on** seal
    kvaliteedi peamine hoob, ja selle lukustamine kellegi teise mudeli treeningvormi
@@ -832,11 +839,20 @@ ohutu — aga **B peab olema tehtud enne, kui trükise Gemini-tulemusi teosekaup
 
 ## Riskid ja teadaolev võlg
 
-- **Prompt on kahes kohas.** `server/ocr_prompts.py` ja LOSSi
-  `qwen3.5/scripts/prompt.py` kannavad ühte lepingut. LOSSi juhise muutmine lahutaks teed
-  vaikselt. Leevendus: `ocr_prompts.py` päises viide LOSSi failile ja kopeerimise kuupäev.
-  Automaatset valvurit ei ole — LOSS ei ole VUTT-i jaoks runtime'is loetav ja ADR 0023
-  põhimõte on, et MCP/väline pool ei impordi `server`-it. **Teadlikult aktsepteeritud võlg.**
+- **Prompt on kahes kohas — ja see risk realiseerus kohe.** `server/ocr_prompts.py` ja
+  LOSSi `qwen3.5/scripts/prompt.py` kannavad ühte lepingut. **Demonstratsioon: LOSSi
+  käsikirja-juhist muudeti 2026-09-01, selle speki kirjutamise päeval.** Kui `ocr_prompts.py`
+  oleks juba olemas olnud, oleks ta samal päeval vananenud, ilma et miski oleks seda öelnud.
+
+  Leevendus on nõrk ja seda tuleb ausalt nii nimetada: `ocr_prompts.py` päises on viide
+  lähtefailile, kopeerimise kuupäev ja lähtefaili mtime. Automaatset valvurit ei ole —
+  LOSS ei ole VUTT-i jaoks runtime'is loetav ja ADR 0023 põhimõte on, et väline pool ei
+  impordi `server`-it.
+
+  **Kus see päriselt loeb, on ainult trükis** (seal on pariteet range nõue). Käsikirja
+  juhis tohib niikuinii lahkneda, seega tema triiv ei ole viga, vaid ootuspärane. Ehk
+  praktiline nõue kitseneb: **`GEMINI_PRINT_INSTRUCTION` tuleb LOSSi muutmisel üle
+  vaadata**; käsikirja oma mitte. **Teadlikult aktsepteeritud võlg.**
 - **Kvaliteet on mõõtmata** kuni võrdlusjooksuni (vt eelmine peatükk).
 - **Kulu ei ole piiratud ja limiit ei piira seda ka.** Superadmin võib käivitada terve
   teose hulgitöö; Tier 2 (1000–1500 RPM) ei jõua vahele. Token-arvud lähevad logisse, aga
