@@ -429,6 +429,10 @@
       "error": "Re-OCR failed",
       "deleteFile": "Delete OCR result",
       "deleteConfirm": "Are you sure? The OCR result will be permanently deleted."
+    },
+    "reocrGemini": {
+      "button": "Re-OCR (Gemini)",
+      "hint": "Transcribes with the Google Gemini model. Superadmin only; the result goes through the same review step."
     }
   },
   "annotations": {

@@ -39,6 +39,9 @@ interface EditorInfoHistoryTabsProps {
 
   handleReOcr: () => Promise<void>;
   reocrStatus: ReocrStatus;
+  handleGeminiReOcr?: () => Promise<void>;
+  geminiReocrStatus?: ReocrStatus;
+  geminiEnabled?: boolean;
 }
 
 // Info- ja ajaloo-vahekaardid. Edit-tab jääb alati DOM-i eraldi komponendis.
@@ -71,6 +74,9 @@ export default function EditorInfoHistoryTabs({
   handleDeleteAndSaveTextAnnotation,
   handleReOcr,
   reocrStatus,
+  handleGeminiReOcr,
+  geminiReocrStatus,
+  geminiEnabled,
 }: EditorInfoHistoryTabsProps) {
   return (
     <>
@@ -107,6 +113,9 @@ export default function EditorInfoHistoryTabs({
           authToken={authToken}
           handleReOcr={handleReOcr}
           reocrStatus={reocrStatus}
+          handleGeminiReOcr={handleGeminiReOcr}
+          geminiReocrStatus={geminiReocrStatus}
+          geminiEnabled={geminiEnabled}
           onShareableChange={(shareable) => onWorkUpdate?.({ shareable })}
           collections={collections}
           onRestore={(content, restoredTextAnnotations) => {

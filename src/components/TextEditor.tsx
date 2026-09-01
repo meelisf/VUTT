@@ -22,6 +22,7 @@ import { useEditorFormattingActions } from './editor/useEditorFormattingActions'
 import { useTextAnnotationActions } from './editor/useTextAnnotationActions';
 import { useCodeMirrorLifecycle } from './editor/useCodeMirrorLifecycle';
 import { useTranscriptionGuide } from './editor/useTranscriptionGuide';
+import { useGeminiEnabled } from '../hooks/useGeminiEnabled';
 import type { EditorTab } from './editor/types';
 
 interface TextEditorProps {
@@ -148,6 +149,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     isAdmin: isAtLeast(user?.role, 'admin'),
     viewRef,
     setIsDirty,
+  });
+
+  // Gemini-tee: eraldi hooks-instants, aga avastamislogika (discover) jääb
+  // AINULT eelmisele instantsile — .ocr fail ei tea, kumb pakkuja selle tootis.
+  const isSuperadmin = isAtLeast(user?.role, 'superadmin');
+  const geminiEnabled = useGeminiEnabled(authToken, isSuperadmin);
+  const { reocrStatus: geminiReocrStatus, handleReOcr: handleGeminiReOcr } = useReOcr({
+    page,
+    authToken,
+    isAdmin: isSuperadmin,
+    viewRef,
+    setIsDirty,
+    provider: 'gemini',
+    discover: false,
   });
 
   const {
@@ -289,6 +304,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           handleDeleteAndSaveTextAnnotation={handleDeleteAndSaveTextAnnotation}
           handleReOcr={handleReOcr}
           reocrStatus={reocrStatus}
+          handleGeminiReOcr={handleGeminiReOcr}
+          geminiReocrStatus={geminiReocrStatus}
+          geminiEnabled={geminiEnabled}
         />
       </div>
     </div>
