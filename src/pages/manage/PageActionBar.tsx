@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpDown, RefreshCw, Trash2, X, Loader2 } from 'lucide-react';
+import { ArrowUpDown, RefreshCw, Trash2, X, Loader2, Sparkles } from 'lucide-react';
 
 /**
  * Hõljuv alumine kontekstiriba manage-lehe lehekülgede tabis.
@@ -28,6 +28,10 @@ export interface PageActionBarProps {
   actionsDisabled: boolean;           // hasReorderChanges → re-OCR/kustuta blokeeritud
   actionsDisabledTitle: string;
   onReocrClick: () => void;
+  // Gemini-pakkuja (superadmin-only) — nupp puudub, kui käivitaja seda ei anna
+  onGeminiReocrClick?: () => void;
+  geminiEnabled?: boolean;
+  batchProvider: 'loss' | 'gemini';
   batchConfirm: boolean;
   selectedWithTextCount: number;
   onBatchGo: () => void;
@@ -81,7 +85,10 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
         {props.batchConfirm && (
           <div className="px-4 py-3 bg-green-50 border-b border-green-200 flex flex-col gap-2">
             <span className="text-sm text-green-900">
-              {t('manage.reocr.confirm.line1', { count: props.selectedCount })} {t('manage.reocr.confirm.line2')}
+              {t('manage.reocr.confirm.line1', { count: props.selectedCount })}{' '}
+              {props.batchProvider === 'gemini'
+                ? t('manage.reocrGemini.confirmSuffix')
+                : t('manage.reocr.confirm.line2')}
             </span>
             {props.selectedWithTextCount > 0 && (
               <span className="text-xs text-green-700">{t('manage.reocr.confirm.withText', { count: props.selectedWithTextCount })}</span>
@@ -153,13 +160,21 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
 
             {/* Transkribeeri — sekundaarne (outline), vähem prominentne kui Liiguta.
                 Mudel tuletatakse teose tüübist (WorkManage), eraldi valikut pole. */}
-            <div className="border-l border-gray-200 pl-3">
+            <div className="border-l border-gray-200 pl-3 flex items-center">
               <button onClick={props.onReocrClick} disabled={props.actionsDisabled}
                 title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-sm border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-40 rounded">
                 <RefreshCw size={13} />
                 {t('manage.reocr.button', { count: props.selectedCount })}
               </button>
+              {props.onGeminiReocrClick && props.geminiEnabled && (
+                <button onClick={props.onGeminiReocrClick} disabled={props.actionsDisabled}
+                  title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
+                  className="ml-2 flex items-center gap-1.5 px-2.5 py-1 text-sm border border-violet-300 text-violet-700 hover:bg-violet-50 disabled:opacity-40 rounded">
+                  <Sparkles size={13} />
+                  {t('manage.reocrGemini.button', { count: props.selectedCount })}
+                </button>
+              )}
             </div>
 
             {/* Kustuta — destruktiivne, ainult ikoon (kinnitusmodaal tuleb niikuinii) */}

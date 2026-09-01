@@ -40,6 +40,7 @@ import {
   startReocrBatch,
   WorkPageInfo,
 } from '../services/workApi';
+import { useGeminiEnabled } from '../hooks/useGeminiEnabled';
 import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
@@ -117,6 +118,8 @@ const WorkManage: React.FC = () => {
   const [ocrModel, setOcrModel] = useState<'print' | 'hand'>('print');
   const [batchConfirm, setBatchConfirm] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
+  // Kumb pakkuja käivitatakse — valitakse nupu klõpsul, enne kinnitusdialoogi avamist
+  const [batchProvider, setBatchProvider] = useState<'loss' | 'gemini'>('loss');
   // Batchi katkestamine (#217)
   const [batchCancelConfirm, setBatchCancelConfirm] = useState(false);
   const [batchCancelling, setBatchCancelling] = useState(false);
@@ -143,6 +146,10 @@ const WorkManage: React.FC = () => {
   const [gridCols, setGridCols] = useState(5);
 
   const isAdmin = isAtLeast(user?.role, 'admin');
+  // Gemini pakkuja: nupp nähtav ainult siis, kui roll JA serveripoolne seadistus lubavad
+  // (frontend-kontroll on mugavus, backend jõustab superadmin-nõude uuesti).
+  const isSuperadmin = isAtLeast(user?.role, 'superadmin');
+  const geminiEnabled = useGeminiEnabled(authToken, isSuperadmin);
 
   useEffect(() => {
     if (user && !isAdmin) {
@@ -361,6 +368,7 @@ const WorkManage: React.FC = () => {
       await startReocrBatch(workId, authToken, {
         page_filenames: Array.from(selectedFiles),
         material_type: ocrModel,
+        provider: batchProvider,
       });
       setBatchConfirm(false);
       handleClearSelection();
@@ -1274,7 +1282,10 @@ const WorkManage: React.FC = () => {
           onMove={handleMove}
           actionsDisabled={hasReorderChanges}
           actionsDisabledTitle={t('manage.bulkDelete.draftBlocked')}
-          onReocrClick={() => setBatchConfirm(true)}
+          onReocrClick={() => { setBatchProvider('loss'); setBatchConfirm(true); }}
+          onGeminiReocrClick={() => { setBatchProvider('gemini'); setBatchConfirm(true); }}
+          geminiEnabled={geminiEnabled}
+          batchProvider={batchProvider}
           batchConfirm={batchConfirm}
           selectedWithTextCount={selectedWithTextCount}
           onBatchGo={handleBatchReocr}

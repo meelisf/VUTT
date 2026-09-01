@@ -201,6 +201,10 @@
       "cancelling": "Cancelling...",
       "cancelFailed": "Cancelling failed"
     },
+    "reocrGemini": {
+      "button": "Gemini ({{count}})",
+      "confirmSuffix": "Uses the Google Gemini model (superadmin only). The result appears in the usual pending list."
+    },
     "tabs": {
       "replace": "Replace pages"
     },

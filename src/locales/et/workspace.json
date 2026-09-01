@@ -201,6 +201,10 @@
       "cancelling": "Katkestan...",
       "cancelFailed": "Katkestamine ebaõnnestus"
     },
+    "reocrGemini": {
+      "button": "Gemini ({{count}})",
+      "confirmSuffix": "Kasutatakse Google Gemini mudelit (ainult superadmin). Tulemus tuleb tavalisse ootel-loendisse."
+    },
     "tabs": {
       "replace": "Asenda leheküljed"
     },

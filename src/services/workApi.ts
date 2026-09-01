@@ -52,6 +52,8 @@ export interface ViewerTokenResponse {
 export interface ReocrBatchRequest {
   page_filenames: string[];
   material_type: 'print' | 'hand';
+  /** Puudumisel = "loss" (backendi vaikeväärtus). "gemini" nõuab superadmin-rolli. */
+  provider?: 'loss' | 'gemini';
 }
 
 export interface AddPagesResponse extends ApiStatusResponse {
