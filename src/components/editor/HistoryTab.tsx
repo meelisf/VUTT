@@ -356,6 +356,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   };
 
   const isAdmin = isAtLeast(user?.role, 'admin');
+
+  // Mõlemad re-OCR nupud jagavad sama lehepõhist .ocr faili ja localStorage
+  // võtit (reocrStorageKey) — seega tohib korraga käia ainult ÜKS töö. Nupp
+  // on lukus, kui KUMB IGANES instants ei ole 'idle' (sh 'done'/'error', mis
+  // ootab kasutaja otsust rakendada/kustutada).
+  const reocrBusy = (reocrStatus !== undefined && reocrStatus !== 'idle')
+    || (geminiReocrStatus !== undefined && geminiReocrStatus !== 'idle');
   const canLoad = Date.now() - lastLoadTime >= RATE_LIMIT_MS;
 
   const [slugCopied, setSlugCopied] = useState(false);
@@ -654,7 +661,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
               </div>
               <button
                 onClick={handleReOcr}
-                disabled={reocrStatus !== 'idle'}
+                disabled={reocrBusy}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded transition-colors disabled:opacity-50"
               >
                 {(reocrStatus === 'uploading' || reocrStatus === 'processing') && (
@@ -680,7 +687,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
               </div>
               <button
                 onClick={handleGeminiReOcr}
-                disabled={geminiReocrStatus !== 'idle'}
+                disabled={reocrBusy}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 border border-violet-200 bg-violet-50 hover:bg-violet-100 rounded transition-colors disabled:opacity-50"
               >
                 {(geminiReocrStatus === 'uploading' || geminiReocrStatus === 'processing') && (
