@@ -11,10 +11,6 @@ export interface ReocrStatusResponse {
   progress: { total: number; ready: number; errors: number; active: boolean } | null;
   /** Aktiivse batchi id — katkestamiseks. null, kui aktiivset tööd pole (#217). */
   active_job_id?: string | null;
-  /** Viimase batch-töö lehed, mille .ocr on kettal (stem'id). Puudub vanas backendis. */
-  batch_ready?: string[];
-  /** Kas batch-kirje leiti. False = server taaskäivitati → varuvariant. */
-  batch_known?: boolean;
 }
 
 const stripExt = (fn: string): string => fn.replace(/\.[^.]+$/, '');
@@ -49,16 +45,15 @@ export interface ApplicableReocr {
   filenames: string[];
   /** Mitmel rakendataval lehel on juba tekst → ülekirjutuse hoiatus dialoogis. */
   withTextCount: number;
-  /** Batch-infot ei ole (serveri restart) → ulatus on KÕIK ootel tulemused. */
-  isFallback: boolean;
 }
 
 /**
- * Millised lehed lähevad hulgi-rakendusse.
+ * Millised lehed lähevad hulgi-rakendusse: KÕIK selle teose ootel .ocr-tulemused
+ * (ADR 0029). Varem oli ulatus viimane batch-töö, aga siis rääkis loendur ainult
+ * ühest partiist — kaks järjestikust batchi (või üksik re-OCR) jättis osa ootel
+ * tulemusi loendurist ja hulgi-rakendusest välja, ilma et UI-s midagi seda ütleks.
+ * Kinnitusdialoog nimetab ulatuse eraldi välja.
  *
- * Vaikimisi AINULT selle teose viimase batch-töö lehed, et kellegi teise üksik
- * ootel tulemus samas teoses jääks puutumata. Kui batch-kirjet ei ole (server
- * taaskäivitati), langeme tagasi kõigile ootel tulemustele ja UI ütleb selle välja.
  * Leht, millel käib parasjagu uus OCR, jäetakse välja — vana tulemuse rakendamine
  * poolelioleva töö ajal oleks segadust tekitav.
  */
@@ -66,15 +61,13 @@ export function applicableReocrPages(
   pages: { filename: string; has_text: boolean }[],
   status: ReocrStatusResponse | null,
 ): ApplicableReocr {
-  if (!status) return { filenames: [], withTextCount: 0, isFallback: false };
-  const isFallback = status.batch_known !== true;
-  const stems = new Set(isFallback ? status.ocr_ready : (status.batch_ready ?? []));
+  if (!status) return { filenames: [], withTextCount: 0 };
+  const stems = new Set(status.ocr_ready);
   const applicable = pages.filter(
     (p) => stems.has(stripExt(p.filename)) && !status.active[p.filename],
   );
   return {
     filenames: applicable.map((p) => p.filename),
     withTextCount: applicable.filter((p) => p.has_text).length,
-    isFallback,
   };
 }

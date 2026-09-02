@@ -370,8 +370,9 @@ def test_list_reocr_batch_jobs_summary():
         r._reocr_batch_jobs.clear()
 
 
-def test_build_reocr_status_batch_ready_ainult_viimasest_batchist(tmp_path, monkeypatch):
-    """batch_ready = viimase batch-töö lehed, mille .ocr on kettal. Võõras .ocr jääb välja."""
+def test_build_reocr_status_progress_on_koik_partiid(tmp_path, monkeypatch):
+    """progress = teose KÕIGI partiide koond, kui ükski ei ole aktiivne (ADR 0029).
+    Varem võitis vanim partii ja riba näitas 1/1, kuigi ootel oli 3 tulemust."""
     from server import reocr_ops
     work_dir = tmp_path / "teos"
     work_dir.mkdir()
@@ -396,16 +397,53 @@ def test_build_reocr_status_batch_ready_ainult_viimasest_batchist(tmp_path, monk
     }
     try:
         st = reocr_ops.build_reocr_status("w", str(work_dir))
-        assert st["batch_known"] is True
-        assert st["batch_ready"] == ["a", "b"]   # c-l pole .ocr, "voeras" pole batchist
-        assert "voeras" in st["ocr_ready"]        # ocr_ready näitab endiselt kõike
+        # Ilma aktiivse batchita on progress KÕIGI partiide koond, mitte vanima
+        # partii oma: 1 + 3 lehte, 1 + 2 valmis, 0 + 1 viga.
+        assert st["progress"] == {"total": 4, "ready": 3, "errors": 1, "active": False}
+        # Ootel-loendur katab kõik kettal olevad tulemused, ka võõra üksik-re-OCR-i
+        assert st["ocr_ready"] == ["a", "b", "voeras"]
+        # Partiipõhine lõige on kadunud (ADR 0029)
+        assert "batch_ready" not in st and "batch_known" not in st
     finally:
         del reocr_ops._reocr_batch_jobs["VANA"]
         del reocr_ops._reocr_batch_jobs["UUS"]
 
 
+def test_build_reocr_status_aktiivne_batch_varjutab_koondi(tmp_path):
+    """Elava partii ajal näitab progress SEDA partiid — muidu kaoks edenemine
+    (ja katkestamisnupp) vanade partiide numbrite sisse."""
+    from server import reocr_ops
+    work_dir = tmp_path / "teos-akt"
+    work_dir.mkdir()
+
+    reocr_ops._reocr_batch_jobs["VANA2"] = {
+        "kind": "batch", "work_id": "wa", "slug": "teos-akt", "status": "done",
+        "started_at": 100, "finished_at": 200, "last_progress_at": 200,
+        "remote_work": "r", "pages": [
+            {"page_filename": "z.jpg", "stem": "z", "status": "ready", "error": None},
+        ],
+    }
+    reocr_ops._reocr_batch_jobs["ELAV"] = {
+        "kind": "batch", "work_id": "wa", "slug": "teos-akt", "status": "processing",
+        "started_at": 300, "finished_at": None, "last_progress_at": 300,
+        "remote_work": "r", "pages": [
+            {"page_filename": "a.jpg", "stem": "a", "status": "ready", "error": None},
+            {"page_filename": "b.jpg", "stem": "b", "status": "processing", "error": None},
+        ],
+    }
+    try:
+        st = reocr_ops.build_reocr_status("wa", str(work_dir))
+        assert st["progress"] == {"total": 2, "ready": 1, "errors": 0, "active": True}
+        assert st["active_job_id"] == "ELAV"
+    finally:
+        del reocr_ops._reocr_batch_jobs["VANA2"]
+        del reocr_ops._reocr_batch_jobs["ELAV"]
+
+
 def test_build_reocr_status_ilma_batch_kirjeta(tmp_path):
-    """Serveri restart kaotab batch-kirje → batch_known False, batch_ready tühi."""
+    """Serveri restart kaotab batch-kirje, aga ootel tulemused elavad kettal.
+    Progress puudub (pole millegi kohta öelda), ocr_ready näitab neid ikka —
+    hulgi-rakendus tugineb ainult sellele (ADR 0029)."""
     from server import reocr_ops
     work_dir = tmp_path / "teos2"
     work_dir.mkdir()
@@ -413,8 +451,7 @@ def test_build_reocr_status_ilma_batch_kirjeta(tmp_path):
 
     st = reocr_ops.build_reocr_status("tundmatu-teos", str(work_dir))
 
-    assert st["batch_known"] is False
-    assert st["batch_ready"] == []
+    assert st["progress"] is None
     assert st["ocr_ready"] == ["a"]
 
 
@@ -434,6 +471,7 @@ def test_build_reocr_status_talub_stem_ita_kirjet(tmp_path):
     }
     try:
         st = reocr_ops.build_reocr_status("w3", str(work_dir))
-        assert st["batch_ready"] == ["a"]
+        assert st["ocr_ready"] == ["a"]
+        assert st["progress"] == {"total": 1, "ready": 1, "errors": 0, "active": True}
     finally:
         del reocr_ops._reocr_batch_jobs["ELUSTATUD"]

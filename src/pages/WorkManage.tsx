@@ -396,7 +396,7 @@ const WorkManage: React.FC = () => {
     }
   };
 
-  // Rakendatavad lehed: viimase batchi ootel tulemused (vt applicableReocrPages)
+  // Rakendatavad lehed: KÕIK selle teose ootel tulemused (vt applicableReocrPages)
   const applicable = applicableReocrPages(pages, reocrStatus);
 
   const handleApplyAll = async () => {
@@ -846,9 +846,10 @@ const WorkManage: React.FC = () => {
                             {t('manage.reocr.pending.confirmApplyWithText', { count: applicable.withTextCount })}
                           </p>
                         )}
-                        {applicable.isFallback && (
-                          <p className="mt-1 font-medium">{t('manage.reocr.pending.confirmFallback')}</p>
-                        )}
+                        {/* Ulatus on teose-, mitte partiipõhine (ADR 0029) — ütle
+                            see välja, sest kaasa võivad tulla ka teise kasutaja
+                            ootel tulemused. */}
+                        <p className="mt-1 font-medium">{t('manage.reocr.pending.confirmScope')}</p>
                         <div className="mt-2 flex items-center gap-2">
                           <button onClick={handleApplyAll} disabled={pendingBusy}
                             className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded">
