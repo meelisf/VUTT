@@ -42,54 +42,34 @@ describe('applicableReocrPages', () => {
     { filename: 'd.jpg', has_text: false },
   ];
 
-  it('võtab ainult viimase batchi lehed, võõras ootel tulemus jääb välja', () => {
+  it('võtab KÕIK selle teose ootel tulemused, ka teisest partiist', () => {
     const st: ReocrStatusResponse = {
       active: {}, errors: {}, progress: null,
       ocr_ready: ['a', 'b', 'voeras'],
-      batch_ready: ['a', 'b'],
-      batch_known: true,
-    };
-    const r = applicableReocrPages(pages, st);
-    expect(r.filenames).toEqual(['a.jpg', 'b.jpg']);
-    expect(r.withTextCount).toBe(1);
-    expect(r.isFallback).toBe(false);
-  });
-
-  it('ilma batch-infota (server taaskäivitatud) võtab kõik ootel tulemused', () => {
-    const st: ReocrStatusResponse = {
-      active: {}, errors: {}, progress: null,
-      ocr_ready: ['a', 'b', 'voeras'],
-      batch_ready: [],
-      batch_known: false,
     };
     const r = applicableReocrPages(pages, st);
     expect(r.filenames).toEqual(['a.jpg', 'b.jpg', 'voeras.jpg']);
     expect(r.withTextCount).toBe(1);
-    expect(r.isFallback).toBe(true);
   });
 
   it('jätab välja lehe, millel käib parasjagu uus OCR', () => {
     const st: ReocrStatusResponse = {
       active: { 'a.jpg': 'processing' }, errors: {}, progress: null,
       ocr_ready: ['a', 'b'],
-      batch_ready: ['a', 'b'],
-      batch_known: true,
     };
     expect(applicableReocrPages(pages, st).filenames).toEqual(['b.jpg']);
   });
 
-  it('vanad backendid ilma uute väljadeta ei kuku kokku', () => {
-    const st = {
-      active: {}, errors: {}, progress: null, ocr_ready: ['a'],
-    } as ReocrStatusResponse;
-    const r = applicableReocrPages(pages, st);
-    expect(r.filenames).toEqual(['a.jpg']);
-    expect(r.isFallback).toBe(true);
+  it('ei paku lehte, mille .ocr-i kettal ei ole', () => {
+    const st: ReocrStatusResponse = {
+      active: {}, errors: {}, progress: null, ocr_ready: [],
+    };
+    expect(applicableReocrPages(pages, st).filenames).toEqual([]);
   });
 
   it('ilma staatuseta ei paku midagi', () => {
     expect(applicableReocrPages(pages, null)).toEqual({
-      filenames: [], withTextCount: 0, isFallback: false,
+      filenames: [], withTextCount: 0,
     });
   });
 });

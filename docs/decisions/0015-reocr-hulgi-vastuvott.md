@@ -1,6 +1,7 @@
 # 0015 — Batch re-OCR tulemused võetakse vastu hulgi, ühe commitina
 
-**Staatus:** kehtib
+**Staatus:** kehtib · **§1 asendatud:** ADR 0029 (ulatus on teose, mitte partii
+tasemel)
 
 ## Kontekst
 
@@ -17,10 +18,11 @@ Manage-lehele tuleb teosetasemel tegevus „Rakenda kõik" / „Lükka kõik tag
 Rakendus toimub backendis (`server/reocr_apply.py`), mitte kliendipoolse
 `/save` tsüklina.
 
-1. **Ulatus = selle teose viimase batch-töö lehed.** `build_reocr_status`
-   tagastab `batch_ready` (viimase batchi lehtede stem'id, mille `.ocr` on
-   kettal) ja `batch_known`. Nii jääb kellegi teise üksik ootel tulemus samas
-   teoses puutumata.
+1. ~~**Ulatus = selle teose viimase batch-töö lehed.**~~ **Asendatud ADR 0029-ga
+   (2026-09-02): ulatus on KÕIK selle teose ootel `.ocr`-tulemused.** Partii
+   lõige (`batch_ready`/`batch_known`) jättis vanema partii ja üksik-re-OCR-i
+   tulemused loendurist vaikselt välja; kaitseks on nüüd see, et
+   kinnitusdialoog nimetab ulatuse alati välja.
 
 2. **Rakendatavate lehtede loend tuleb kliendilt.** Server valideerib bare
    failinime (path traversal) ja rakendab täpselt selle loendi. Server ei
@@ -52,11 +54,10 @@ Rakendus toimub backendis (`server/reocr_apply.py`), mitte kliendipoolse
 
 - **Batch-kirje EI ela üle backendi restardi.** Mapping-fail
   (`state/reocr_batch_maps/{job_id}.json`) kustutatakse batch'i lõppedes ja
-  mälukirje kaob `server_update.sh --no-cache` deploy'ga. Seetõttu on
-  `batch_known: false` varuvariant **tahtlik, mitte viga**: UI pakub siis
-  „Rakenda kõik ootel" ja kinnitusdialoog ütleb selgelt, et rakendatakse kõik
-  selle teose ootel tulemused. Ilma selleta jääksid pärast deploy'd valmis
-  tulemused hulgi-rakenduseta.
+  mälukirje kaob `server_update.sh --no-cache` deploy'ga. Ootel tulemused
+  elavad seevastu `.ocr` failidena kettal. ADR 0029 järel ei ole see enam
+  varuvariant, vaid ainus tee: hulgi-rakendus tugineb ALATI kettale
+  (`ocr_ready`), mitte mälus olevale partii-kirjele.
 
 - **Batch-kirje lehtedel ei pruugi olla `stem` välja.** `reocr_active.json`-ist
   elustatud ja vanemad kirjed sisaldavad ainult `page_filename`-i —

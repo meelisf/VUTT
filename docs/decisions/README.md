@@ -48,3 +48,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0026](0026-ulevaatus-on-alati-nahtav.md) | Lehtede ülevaatus on alati nähtav; opt-in jääb 300 DPI teele | kehtib |
 | [0027](0027-mcp-otsing-lehetekstist-ja-ruhmitatult.md) | MCP `search_pages` otsib ainult lehetekstist; vastus rühmitatud teose kaupa | kehtib |
 | [0028](0028-vutt-materialiseerib-ocr-lehed.md) | VUTT materialiseerib OCR-i lehed ja avaldab lehthaaval; LOSS ainult OCR-ib | kehtib |
+| [0029](0029-ootel-reocr-loendur-on-teose-tasemel.md) | Ootel re-OCR loendur ja hulgi-rakendus on teose, mitte partii tasemel | kehtib |

@@ -997,13 +997,19 @@ threading.Thread(target=_reocr_cleanup_loop, daemon=True, name="reocr-cleanup").
 
 def build_reocr_status(work_id: str, work_path: str) -> Dict:
     """Koondab teose re-OCR staatuse manage-lehe jaoks. Hoiab kolm mõistet lahus:
-    active (OCR töötab), ocr_ready (.ocr ootel, stem'id), errors. progress = aktiivse
-    batchi kokkuvõte."""
+    active (OCR töötab), ocr_ready (.ocr ootel, stem'id), errors.
+
+    `progress` on TEOSE, mitte ühe batchi tasemel (ADR 0029): aktiivse batchi ajal
+    näitab seda batchi (elav edenemine + katkestamisnupp), muidu KÕIGI selle teose
+    batch-tööde koondit. Varem võttis silmus esimese nähtud kirje ehk lisamis-
+    järjestuses VANIMA batchi — uue partii lõppedes hüppas riba tagasi vana partii
+    numbritele, samal ajal kui ootel-loendur rääkis juba uuest."""
     active: Dict[str, str] = {}
     errors: Dict[str, str] = {}
     progress: Optional[Dict] = None
     active_job_id: Optional[str] = None   # katkestamiseks Manage-vaates (#217)
     active_provider: Optional[str] = None  # kumb pakkuja parajasti töötab
+    koond_total = koond_ready = koond_errors = 0
     with _reocr_batch_jobs_lock:
         for jid, j in _reocr_batch_jobs.items():
             if j["work_id"] != work_id:
@@ -1020,13 +1026,17 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
                 "errors": sum(1 for e in j["pages"] if e["status"] == "error"),
                 "active": is_active,
             }
-            # Eelista aktiivset batchi; muidu viimast nähtut
-            if is_active or progress is None:
-                progress = summary
+            koond_total += summary["total"]
+            koond_ready += summary["ready"]
+            koond_errors += summary["errors"]
             if is_active:
+                progress = summary   # elav batch varjutab koondi
                 active_job_id = jid
                 # Vanemad (enne pakkuja-dimensiooni) kirjed on LOSSi omad.
                 active_provider = j.get("provider", "loss")
+    if progress is None and koond_total:
+        progress = {"total": koond_total, "ready": koond_ready,
+                    "errors": koond_errors, "active": False}
     ocr_ready: List[str] = []
     try:
         for fn in os.listdir(work_path):
@@ -1036,34 +1046,14 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
         pass
     ocr_ready.sort()  # Deterministlik järjekord
 
-    # Hulgi-rakenduse ulatus: AINULT selle teose viimase batch-töö lehed, et
-    # kellegi teise üksik ootel tulemus samas teoses jääks puutumata.
-    # NB: elustatud kirjel võib 'stem' puududa → tuletame page_filename-ist.
-    batch_stems: List[str] = []
-    batch_known = False
-    latest_started = float("-inf")
-    with _reocr_batch_jobs_lock:
-        for j in _reocr_batch_jobs.values():
-            if j["work_id"] != work_id:
-                continue
-            started = j.get("started_at") or 0
-            if started >= latest_started:
-                latest_started = started
-                batch_stems = [
-                    e.get("stem") or os.path.splitext(e["page_filename"])[0]
-                    for e in j.get("pages", [])
-                ]
-                batch_known = True
-    ready_set = set(ocr_ready)
-    batch_ready = sorted(s for s in batch_stems if s in ready_set)
-
+    # Hulgi-rakenduse ulatus = KÕIK selle teose ootel .ocr-tulemused (ADR 0029).
+    # Varasem `batch_ready`/`batch_known` (viimase batchi lõige) on kadunud: see
+    # peitis vanema partii ja üksik-re-OCR-i tulemused loendurist ära.
     return {
         "active": active,
         "ocr_ready": ocr_ready,
         "errors": errors,
         "progress": progress,
-        "batch_ready": batch_ready,
-        "batch_known": batch_known,
         # Aktiivse batchi id — Manage-vaate katkestamisnupu jaoks (#217)
         "active_job_id": active_job_id,
         "active_provider": active_provider,
