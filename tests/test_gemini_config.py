@@ -24,7 +24,7 @@ def _reload(monkeypatch, tmp_path, env):
 def test_vaikevaartused(monkeypatch, tmp_path):
     cfg = _reload(monkeypatch, tmp_path, {})
     assert cfg.GEMINI_API_KEY == ""
-    assert cfg.GEMINI_OCR_MODEL == "gemini-3.7-flash"
+    assert cfg.GEMINI_OCR_MODEL == "gemini-3.8-flash"
     assert cfg.GEMINI_THINKING_LEVEL == "low"
     assert cfg.GEMINI_MAX_INFLIGHT_REQUESTS == 4
     assert cfg.GEMINI_MAX_RETRIES == 3

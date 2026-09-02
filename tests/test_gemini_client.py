@@ -18,7 +18,7 @@ def _jpeg(width=100, height=100) -> bytes:
 def test_payload_kannab_store_false():
     """Interactions API salvestab VAIKIMISI. Skanne ei tohi Google'isse seisma jääda."""
     from server.ocr_providers.gemini import build_payload
-    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.7-flash", "low")
+    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.8-flash", "low")
     assert payload["store"] is False
 
 
@@ -26,7 +26,7 @@ def test_payload_ei_sisalda_sampling_parameetreid():
     """temperature/top_p/top_k on Gemini 3.x-il deprecated."""
     from server.ocr_providers.gemini import build_payload
     import json
-    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.7-flash", "low")
+    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.8-flash", "low")
     serialiseeritud = json.dumps(payload).lower()
     for key in ("temperature", "top_p", "top_k", "topp", "topk"):
         assert key not in serialiseeritud
@@ -36,8 +36,8 @@ def test_payload_kannab_thinking_level_ja_mudelit():
     """`thinking_level` on `generation_config` SEES — ülemisel tasemel annab API 400
     „Unknown parameter 'thinking_level'" (mõõdetud elava API vastu 2026-09-01)."""
     from server.ocr_providers.gemini import build_payload
-    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.7-flash", "low")
-    assert payload["model"] == "gemini-3.7-flash"
+    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.8-flash", "low")
+    assert payload["model"] == "gemini-3.8-flash"
     assert payload["generation_config"]["thinking_level"] == "low"
     assert "thinking_level" not in payload
 
@@ -58,7 +58,7 @@ def test_payload_ei_sisalda_model_rolli_samme():
     """Näited on ÜKS user-input, mitte sünteetiline vestlusajalugu (dokumenteerimata)."""
     from server.ocr_providers.gemini import build_payload
     payload = build_payload(_jpeg(), "JUHIS", ((_jpeg(), "näite tekst"),),
-                            "gemini-3.7-flash", "low")
+                            "gemini-3.8-flash", "low")
     def roles(node):
         if isinstance(node, dict):
             for k, v in node.items():
@@ -76,7 +76,7 @@ def test_payload_ei_sisalda_model_rolli_samme():
 def test_payload_lopeb_tekstiga_mitte_pildiga():
     """Sihtpilt ei tohi olla viimane element — API-versioonide kindlus."""
     from server.ocr_providers.gemini import build_payload
-    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.7-flash", "low")
+    payload = build_payload(_jpeg(), "JUHIS", (), "gemini-3.8-flash", "low")
     last = payload["input"][-1]
     assert last.get("type") == "text"
     assert last.get("text", "").strip()
@@ -86,7 +86,7 @@ def test_naited_tulevad_enne_sihtpilti():
     """Stabiilne prefiks: juhis → näited → sihtpilt. Implicit caching sõltub sellest."""
     from server.ocr_providers.gemini import build_payload
     payload = build_payload(_jpeg(), "JUHIS", ((_jpeg(), "NÄITETEKST"),),
-                            "gemini-3.7-flash", "low")
+                            "gemini-3.8-flash", "low")
     blob = payload["input"]
     naite_idx = next(i for i, b in enumerate(blob)
                      if b.get("type") == "text" and "NÄITETEKST" in b.get("text", ""))
@@ -205,7 +205,7 @@ def test_vaike_pilt_saadetakse_muutmata():
     import base64
     from server.ocr_providers.gemini import build_payload
     raw = _jpeg(100, 100)
-    payload = build_payload(raw, "JUHIS", (), "gemini-3.7-flash", "low")
+    payload = build_payload(raw, "JUHIS", (), "gemini-3.8-flash", "low")
     pildid = [b for b in payload["input"] if b.get("type") == "image"]
     assert base64.b64decode(pildid[0]["data"]) == raw
 

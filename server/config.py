@@ -254,7 +254,7 @@ OCR_SERVER_PATH = os.getenv("OCR_SERVER_PATH", "/home/mf/Dokumendid/LLM")
 # `temperature`/`top_p`/`top_k` jaoks nime EI OLE: Gemini 3.x-il on need deprecated
 # ja asendaja on `thinking_level`.
 GEMINI_API_KEY = env("GEMINI_API_KEY", "")
-GEMINI_OCR_MODEL = env("GEMINI_OCR_MODEL", "gemini-3.7-flash")
+GEMINI_OCR_MODEL = env("GEMINI_OCR_MODEL", "gemini-3.8-flash")
 GEMINI_THINKING_LEVEL = env("GEMINI_THINKING_LEVEL", "low")
 # Lagi kehtib TÖÖDE ÜLESELT — üks töö on järjestikune (vt spekk). Piir on VUTT-i
 # poole ettevaatus, MITTE Google'i rate limit (konto on Tier 2, 1000–1500 RPM).
