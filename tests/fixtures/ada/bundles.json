@@ -1,0 +1,128 @@
+{
+  "_embedded" : {
+    "bundles" : [ {
+      "uuid" : "acd9a484-d0a6-43a2-b19f-d8cd2dbde692",
+      "name" : "ORIGINAL",
+      "handle" : null,
+      "metadata" : {
+        "dc.title" : [ {
+          "value" : "ORIGINAL",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "type" : "bundle",
+      "_links" : {
+        "item" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/acd9a484-d0a6-43a2-b19f-d8cd2dbde692/item"
+        },
+        "bitstreams" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/acd9a484-d0a6-43a2-b19f-d8cd2dbde692/bitstreams"
+        },
+        "primaryBitstream" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/acd9a484-d0a6-43a2-b19f-d8cd2dbde692/primaryBitstream"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/acd9a484-d0a6-43a2-b19f-d8cd2dbde692"
+        }
+      }
+    }, {
+      "uuid" : "b22e28b2-4318-4e40-b1a1-5b45c4074de9",
+      "name" : "LICENSE",
+      "handle" : null,
+      "metadata" : {
+        "dc.title" : [ {
+          "value" : "LICENSE",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "type" : "bundle",
+      "_links" : {
+        "item" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/b22e28b2-4318-4e40-b1a1-5b45c4074de9/item"
+        },
+        "bitstreams" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/b22e28b2-4318-4e40-b1a1-5b45c4074de9/bitstreams"
+        },
+        "primaryBitstream" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/b22e28b2-4318-4e40-b1a1-5b45c4074de9/primaryBitstream"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/b22e28b2-4318-4e40-b1a1-5b45c4074de9"
+        }
+      }
+    }, {
+      "uuid" : "15ce61d7-7b52-4cb9-af12-27969e100889",
+      "name" : "TEXT",
+      "handle" : null,
+      "metadata" : {
+        "dc.title" : [ {
+          "value" : "TEXT",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "type" : "bundle",
+      "_links" : {
+        "item" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/15ce61d7-7b52-4cb9-af12-27969e100889/item"
+        },
+        "bitstreams" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/15ce61d7-7b52-4cb9-af12-27969e100889/bitstreams"
+        },
+        "primaryBitstream" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/15ce61d7-7b52-4cb9-af12-27969e100889/primaryBitstream"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/15ce61d7-7b52-4cb9-af12-27969e100889"
+        }
+      }
+    }, {
+      "uuid" : "25fda0ba-158c-46a8-8416-9de244c235e2",
+      "name" : "THUMBNAIL",
+      "handle" : null,
+      "metadata" : {
+        "dc.title" : [ {
+          "value" : "THUMBNAIL",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "type" : "bundle",
+      "_links" : {
+        "item" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/25fda0ba-158c-46a8-8416-9de244c235e2/item"
+        },
+        "bitstreams" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/25fda0ba-158c-46a8-8416-9de244c235e2/bitstreams"
+        },
+        "primaryBitstream" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/25fda0ba-158c-46a8-8416-9de244c235e2/primaryBitstream"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bundles/25fda0ba-158c-46a8-8416-9de244c235e2"
+        }
+      }
+    } ]
+  },
+  "page" : {
+    "number" : 0,
+    "size" : 20,
+    "totalPages" : 1,
+    "totalElements" : 4
+  },
+  "_links" : {
+    "self" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/bundles"
+    }
+  }
+}
