@@ -35,6 +35,29 @@ from ..save_diff import page_content_unchanged
 from ..utils import find_directory_by_id
 router = APIRouter()
 
+# Võtmed, mille SERVER kirjutab ja mida klient ei saada tagasi. Ilma nendeta
+# pühiks iga redaktori salvestus need vaikselt ära — miski ei kuku, andmed
+# lihtsalt kaovad. Uus serveripoolne lehe-väli LISATAKSE SIIA.
+SERVERIPOOLSED_LEHE_VALJAD = ("sequence", "source")
+
+
+def merge_serveripoolsed_valjad(olemasolev: dict, kliendilt: dict) -> dict:
+    """Täidab kliendi meta_content'i augud kettal olevate serveriväljadega.
+
+    Täidab AINULT augud: kui klient saatis välja, jääb kliendi oma peale.
+    """
+    tulemus = dict(kliendilt)
+    wrapper = olemasolev.get("meta_content") if isinstance(olemasolev, dict) else None
+    if not isinstance(wrapper, dict):
+        wrapper = {}
+    for vali in SERVERIPOOLSED_LEHE_VALJAD:
+        vana = olemasolev.get(vali) if isinstance(olemasolev, dict) else None
+        if vana is None:
+            vana = wrapper.get(vali)
+        if vana is not None and tulemus.get(vali) is None:
+            tulemus[vali] = vana
+    return tulemus
+
 
 def _read_catalog_metadata(catalog: str) -> dict:
     """Laeb teose meta ligipääsukontrolliks; vigane/puuduv meta on fail-closed."""
@@ -99,13 +122,11 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     if data.get('meta_content'):
         json_path = os.path.join(BASE_DIR, catalog, os.path.splitext(filename)[0] + ".json")
         meta_content = data['meta_content']
-        # Säilita sequence väli kui on olemas (ära lase salvestamisel üle kirjutada)
+        # Säilita serveripoolsed väljad (nt sequence, source), mida klient ei saada.
         if os.path.exists(json_path):
             try:
                 existing = await run_in_threadpool(_read_json_file, json_path)
-                existing_seq = existing.get('sequence') or existing.get('meta_content', {}).get('sequence')
-                if existing_seq is not None and meta_content.get('sequence') is None:
-                    meta_content['sequence'] = existing_seq
+                meta_content = merge_serveripoolsed_valjad(existing, meta_content)
             except Exception:
                 pass
         additional.append((json_path, json.dumps(meta_content, indent=2, ensure_ascii=False)))
