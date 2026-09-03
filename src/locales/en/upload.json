@@ -167,6 +167,21 @@
     "replaceBtn": "Replace: {{title}}",
     "remove": "Remove replacement"
   },
+  "ada": {
+    "title": "Import from ADA",
+    "placeholder": "10062/7822",
+    "hint": "Handle, hdl: reference, or dspace.ut.ee URL",
+    "fetch": "Fetch",
+    "fileCount": "{{count}} files, {{size}}",
+    "skipped": "Skipped (not a PDF): {{files}}",
+    "precision": { "1": "month only", "2": "year only", "3": "undated" },
+    "machineTranslation": "machine translation, please check",
+    "takeAda": "use ADA's value",
+    "downloading": "Downloading from ADA",
+    "downloadProgress": "{{done}}/{{total}} files · {{mbDone}}/{{mbTotal}} MB",
+    "retry": "Retry download",
+    "lookupFailed": "ADA lookup failed"
+  },
   "status": {
     "pending": "Pending",
     "uploading": "Uploading",

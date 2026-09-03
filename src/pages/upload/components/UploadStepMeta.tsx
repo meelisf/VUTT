@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
 import type { Collection } from '../../../services/collectionService';
-import type { UploadType } from '../types';
+import type { AdaLookupResult, AdaVormiVali, UploadType } from '../types';
+import { ApiError } from '../../../services/apiClient';
+import { adaLookup, mergeAdaIntoForm } from '../adaApi';
+import AdaImportBar from './AdaImportBar';
 
 interface UploadStepMetaProps {
   title: string;
@@ -51,9 +54,82 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
   onReplaceDismiss,
   onSubmit,
   t,
-}) => (
+}) => {
+  // -------------------------------------------------------------------------
+  // ADA import — handle → metaandmete eeltäitmine (ei loo uploadi).
+  // -------------------------------------------------------------------------
+  const [adaHandle, setAdaHandle] = useState('');
+  const [adaLoading, setAdaLoading] = useState(false);
+  const [adaError, setAdaError] = useState('');
+  const [adaResult, setAdaResult] = useState<AdaLookupResult | null>(null);
+  const [adaUlekirjutatavad, setAdaUlekirjutatavad] = useState<
+    Array<{ vali: AdaVormiVali; adaVaartus: string }>
+  >([]);
+  // Pealkiri on masintõlgitud (ADA `title_suggestion`) — kaob esimesel puudutusel.
+  const [titleOnMachineTranslated, setTitleOnMachineTranslated] = useState(false);
+
+  const handleAdaFetch = async () => {
+    setAdaError('');
+    setAdaLoading(true);
+    try {
+      const tulemus = await adaLookup(adaHandle.trim());
+      setAdaResult(tulemus);
+      // title_suggestion (kui olemas) on Gemini masintõlge ja eelistatakse
+      // originaalpealkirjale — aga see PEAB jääma nähtavalt märgituks.
+      const adaOnMasinTolge = Boolean(tulemus.title_suggestion);
+      const adaValjad: Partial<Record<AdaVormiVali, string>> = {
+        title: tulemus.title_suggestion || tulemus.meta.title,
+        year: tulemus.meta.year,
+      };
+      const praegune: Partial<Record<AdaVormiVali, string>> = { title, year };
+      const { vaartused, ulekirjutatavad } = mergeAdaIntoForm(praegune, adaValjad);
+      if (vaartused.title !== title) {
+        setTitle(vaartused.title);
+        setTitleOnMachineTranslated(adaOnMasinTolge);
+      }
+      if (vaartused.year !== year) {
+        setYear(vaartused.year);
+      }
+      setAdaUlekirjutatavad(ulekirjutatavad);
+    } catch (e) {
+      setAdaError(e instanceof ApiError ? e.message : t('ada.lookupFailed'));
+    } finally {
+      setAdaLoading(false);
+    }
+  };
+
+  // Ülekirjutus-kaardilt „võta ADA oma" — ühekordne, admin peab teadlikult klõpsama.
+  const handleTakeAda = (vali: AdaVormiVali) => {
+    const kirje = adaUlekirjutatavad.find((u) => u.vali === vali);
+    if (!kirje) return;
+    if (vali === 'title') {
+      setTitle(kirje.adaVaartus);
+      setTitleOnMachineTranslated(
+        Boolean(adaResult?.title_suggestion) && kirje.adaVaartus === adaResult?.title_suggestion,
+      );
+    } else if (vali === 'year') {
+      setYear(kirje.adaVaartus);
+    }
+    setAdaUlekirjutatavad((prev) => prev.filter((u) => u.vali !== vali));
+  };
+
+  return (
   <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
     <h2 className="text-lg font-semibold text-gray-900 mb-5">{t('step1.title')}</h2>
+
+    {!autoCreateLoading && (
+      <AdaImportBar
+        handle={adaHandle}
+        setHandle={setAdaHandle}
+        laeb={adaLoading}
+        viga={adaError}
+        tulemus={adaResult}
+        onTomba={handleAdaFetch}
+        ulekirjutatavad={adaUlekirjutatavad}
+        onTakeAda={handleTakeAda}
+        t={t}
+      />
+    )}
 
     {/* Automaatne laadimine — replace mode, loome uploadi ilma kasutaja sekkumiseta */}
     {autoCreateLoading && (
@@ -109,10 +185,20 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
           <input
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              // Esimene puudutus kustutab masintõlke-märke — see on nüüd
+              // admini enda kinnitatud tekst.
+              if (titleOnMachineTranslated) setTitleOnMachineTranslated(false);
+            }}
             placeholder={t('step1.titlePlaceholder')}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+              titleOnMachineTranslated ? 'bg-amber-50 border-amber-300' : 'border-gray-300'
+            }`}
           />
+          {titleOnMachineTranslated && (
+            <p className="text-xs text-amber-700 mt-1">{t('ada.machineTranslation')}</p>
+          )}
         </div>
 
         {/* Tüüp (trükis / käsikiri) */}
@@ -212,6 +298,7 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
       </>
     )}
   </div>
-);
+  );
+};
 
 export default UploadStepMeta;
