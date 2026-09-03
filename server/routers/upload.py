@@ -9,6 +9,7 @@ from ..ada import client as ada_client
 from ..ada import fetch as ada_fetch
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
+from ..ocr_providers import gemini
 from ..upload import prepress, prepress_apply, prepress_plan
 from ..upload import state as upload_state
 from ..upload_ops import (
@@ -66,6 +67,17 @@ async def admin_ada_lookup(request: Request, user=Depends(require_role("admin"))
         tulemus = await run_in_threadpool(ada_client.lookup, data.get("handle", ""))
     except ada_client.AdaViga as e:
         raise HTTPException(status_code=400, detail=e.kasutaja_sonum)
+
+    # Kakskeelne pealkiri ühes lahtris. Pakkumine, mitte otsus — UI märgistab
+    # selle masintõlkena kuni admin lahtrit puudutab.
+    ingliskeelne = await run_in_threadpool(
+        gemini.translate_title, tulemus["meta"].get("title", "")
+    )
+    if ingliskeelne:
+        tulemus["title_suggestion"] = "{} / {}".format(
+            tulemus["meta"]["title"], ingliskeelne
+        )
+
     return {"status": "success", "ada": tulemus}
 
 

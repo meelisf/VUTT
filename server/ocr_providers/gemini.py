@@ -241,3 +241,51 @@ def transcribe(image_bytes: bytes, instruction: str,
             if _cancelled(should_cancel):
                 raise GeminiError(CANCELLED_MSG)
     raise GeminiError("Gemini päring ebaõnnestus: {}".format(viimane))
+
+
+TOLKE_JUHIS = (
+    "Tõlgi järgnev raamatukogukirje pealkiri eesti keelest inglise keelde. "
+    "Pärisnimesid (isikunimed, kohanimed) EI tõlgita — need jäävad muutmata. "
+    "Tagasta AINULT tõlge, ilma selgituste ja jutumärkideta."
+)
+
+
+def translate_title(eestikeelne: str) -> Optional[str]:
+    """Eestikeelne pealkiri → ingliskeelne. None = ei õnnestunud.
+
+    EI VISKA erandit: tõlge on mugavus, mitte impordi eeltingimus. Ebaõnnestunud
+    tõlke korral jääb pealkiri eestikeelseks ja admin kirjutab ise.
+
+    Taaskasutab sama API_URL-i, võtit ja `_extract_text`-i mis `transcribe()` —
+    erinevus on ainult selles, et sisendiks on tekst, mitte pilt.
+    """
+    tekst = (eestikeelne or "").strip()
+    if not tekst or not GEMINI_API_KEY:
+        return None  # `GEMINI_API_KEY` on moodulitasandi konstant — test patchib selle
+    # `input` on LAME plokkide list, mitte role/content-struktuur — sama kuju
+    # nagu `build_payload` (gemini.py:69). `store: False` väldib skannide ja
+    # pealkirjade Google'isse seisma jäämist; `thinking_level` PEAB olema
+    # `generation_config` sees, ülemisel tasemel annab API 400.
+    payload = {
+        "model": GEMINI_OCR_MODEL,
+        "store": False,
+        "generation_config": {"thinking_level": GEMINI_THINKING_LEVEL},
+        "input": [
+            {"type": "text", "text": TOLKE_JUHIS},
+            {"type": "text", "text": tekst},
+        ],
+    }
+    try:
+        vastus = requests.post(
+            API_URL, json=payload,
+            headers={"x-goog-api-key": _api_key(), "Content-Type": "application/json"},
+            timeout=GEMINI_REQUEST_TIMEOUT,
+        )
+        if vastus.status_code != 200:
+            logger.warning("Pealkirja tõlge: %s", _error_summary(vastus))
+            return None
+        tolge = (_extract_text(vastus.json()) or "").strip()
+        return tolge or None
+    except Exception as e:
+        logger.warning("Pealkirja tõlge kukkus: %s", e)
+        return None
