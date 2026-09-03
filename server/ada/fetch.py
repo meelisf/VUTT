@@ -6,7 +6,6 @@ Poolik allalaadimine elab `.part`-failina ja ei näe kunagi välja nagu valmis f
 import os
 import subprocess
 import threading
-from typing import Optional
 
 import requests
 
@@ -81,20 +80,37 @@ def laadi_tykk(url: str, sihtfail: str, oodatud_baite: int) -> None:
         # `.part` jääb alles; järgmine katse kirjutab selle üle. Valmis nime
         # ta EI saa, seega poolik sisu ei jõua kunagi pdfunite'i.
         raise
-    if oodatud_baite and saadud != oodatud_baite:
+    # Tundmatu suurus EI ole luba kontroll vahele jätta — see oleks täpselt
+    # see auk, mille vastu F2 kaitseb, ainult tagauksest. Fail on OLEMASOLU
+    # tõe allikas, seega ilma suuruseta ei saa öelda, et tükk on terve.
+    if oodatud_baite <= 0:
+        raise AdaFetchViga(
+            "ADA ei andnud faili suurust — terviklikkust ei saa kontrollida"
+        )
+    if saadud != oodatud_baite:
         raise AdaFetchViga(
             "Fail jäi pooleli: saadud {} baiti, oodatud {}".format(saadud, oodatud_baite)
         )
     os.replace(ajutine, sihtfail)
 
 
-def liida_pdfid(kaust: str, sihtfail: str) -> None:
-    """`pdfunite` — AINUS lubatud tööriist. qpdf/pdftk/pypdf ei ole konteineris."""
-    failid = sorted(
-        os.path.join(kaust, n) for n in os.listdir(kaust) if n.endswith(".pdf")
-    )
-    if not failid:
+def liida_pdfid(kaust: str, sihtfail: str, arv_tykke: int) -> None:
+    """`pdfunite` — AINUS lubatud tööriist. qpdf/pdftk/pypdf ei ole konteineris.
+
+    Failinimekiri EI tule kausta sisu loendist (`os.listdir`) — vana katse
+    kõrgema numbriga jäänuk-tükk liidetaks muidu dokumenti kaasa. Nimed
+    tuletatakse praeguse fetch'i tegelikust allikate arvust: 001.pdf .. NNN.pdf.
+    """
+    if arv_tykke <= 0:
         raise AdaFetchViga("Liidetavaid PDF-e ei ole")
+    failid = [
+        os.path.join(kaust, "{:03d}.pdf".format(i)) for i in range(1, arv_tykke + 1)
+    ]
+    puuduvad = [f for f in failid if not os.path.exists(f)]
+    if puuduvad:
+        raise AdaFetchViga("Liidetavaid PDF-e puudu: {}".format(
+            ", ".join(os.path.basename(f) for f in puuduvad)
+        ))
     cmd = ["pdfunite"] + failid + [sihtfail]
     tulemus = subprocess.run(cmd, capture_output=True, timeout=LIITMISE_TIMEOUT)
     if tulemus.returncode != 0:
@@ -138,6 +154,14 @@ def _toota(upload_id: str) -> None:
     """Taustalõim: tükid alla, liida, olek edasi."""
     kaust = ada_kaust(upload_id)
     try:
+        # Kontroll ENNE makedirs'i: `Katkesta` võib olla jõudnud kustutada
+        # staging-kausta juba CAS-i kirjutuse ja siinse esimese lause vahel.
+        # `os.makedirs(..., exist_ok=True)` tekitaks kaustad (koos vanematega)
+        # uuesti ja alustaks ~320 MB allalaadimist kausta, mis on nähtamatu
+        # uploadide loendile (state.json puudub).
+        if not tohib_jatkata(upload_id):
+            logger.info("ADA fetch katkestatud enne algust (staging kadus): %s", upload_id)
+            return
         os.makedirs(kaust, exist_ok=True)
         s = upload_state.read_state(upload_id)
         allikad = ((s or {}).get("ada") or {}).get("sources") or []
@@ -164,7 +188,7 @@ def _toota(upload_id: str) -> None:
         if not tohib_jatkata(upload_id):
             return
         source_pdf = os.path.join(upload_state.upload_dir(upload_id), "source.pdf")
-        liida_pdfid(kaust, source_pdf)
+        liida_pdfid(kaust, source_pdf, len(allikad))
         lehti = lehtede_arv(source_pdf)
 
         # Täida lähtekaardi lehepiirid: mitmes leht liidetud PDF-is iga tükk algab.
@@ -188,9 +212,16 @@ def _toota(upload_id: str) -> None:
         )
         upload_state.init_prepress(upload_id, lehti)
 
-        for n in os.listdir(kaust):
-            os.unlink(os.path.join(kaust, n))
-        os.rmdir(kaust)
+        # Koristus on OMAETTE try: fetch on siin juba ÕNNESTUNUD (awaiting_split
+        # kirjutatud, source.pdf kettal) — koristuse ebaõnnestumine ei tohi seda
+        # üle kirjutada ada_error'iks (sama kuju mis ADR 0028 I2: pisipildi
+        # kirjutus pärast avaldamist on mittefataalne).
+        try:
+            for n in os.listdir(kaust):
+                os.unlink(os.path.join(kaust, n))
+            os.rmdir(kaust)
+        except Exception:
+            logger.warning("ADA fetch koristus ebaõnnestus: %s", upload_id, exc_info=True)
         logger.info("ADA fetch valmis: %s (%s lk)", upload_id, lehti)
     except Exception as e:
         logger.error("ADA fetch kukkus: %s (%s)", upload_id, e, exc_info=True)
