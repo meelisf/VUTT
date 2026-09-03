@@ -14,10 +14,9 @@ import {
   TYPE_PRINT,
   POLL_FAST_MS,
   POLL_SLOW_MS,
-  PREPRESS_STATUSES,
-  ADA_TRANSFER_STATUSES,
+  adaSammuOlek,
 } from './constants';
-import { adaFetch } from './adaApi';
+import { adaFetch, buildAdaCreateExtras } from './adaApi';
 import {
   ocrEstimate,
   sanitizeSlug,
@@ -215,19 +214,21 @@ export function useUploadWizard() {
       try {
         const d: PollResult = await getUploadStatus(id, authToken);
         setPollResult(d);
-        // ADA allalaadimine käib VUTT-i poolel → viisardi 2. samm
-        // (progressiriba failivalija asemel). `ada_fetching` EI TOHI kuuluda
-        // PREPRESS_STATUSES-esse — muidu viskaks polling admini poolitamise
-        // vaatesse keset ~320 MB allalaadimist (sama viga nagu `applying`,
-        // ADR 0028).
-        if (ADA_TRANSFER_STATUSES.includes(d.status)) {
+        // `adaSammuOlek` on ÜKS tõde selle kohta, kas staatus kuulub ADA
+        // allalaadimise (2) või poolitamise (3) sammu — vt constants.ts.
+        // `ada_fetching` EI TOHI kuuluda PREPRESS_STATUSES-esse — muidu
+        // viskaks polling admini poolitamise vaatesse keset ~320 MB
+        // allalaadimist (sama viga nagu `applying`, ADR 0028).
+        const sammuOlek = adaSammuOlek(d.status);
+        if (sammuOlek === 2) {
+          // ADA allalaadimine käib VUTT-i poolel → progressiriba failivalija asemel.
           setStep(2);
           setFileUploading(true);
           if (d.status === 'ada_error') stopPolling();
           return;
         }
-        // Poolitamise samm (3) — fail on VUTT-i poolel, OCR pole veel alanud.
-        if (PREPRESS_STATUSES.includes(d.status)) {
+        if (sammuOlek === 3) {
+          // Poolitamise samm — fail on VUTT-i poolel, OCR pole veel alanud.
           setStep(3);
           setFileUploading(false);
         }
@@ -310,23 +311,7 @@ export function useUploadWizard() {
             collections: selectedCollection ? [selectedCollection] : [],
             replace_work_id: replaceWorkId || null,
             type: workType,
-            ...(adaResult ? {
-              ada: {
-                handle: adaResult.handle,
-                item_uuid: adaResult.item_uuid,
-                sources: adaResult.failid.map((f) => ({
-                  name: f.name,
-                  bitstream_uuid: f.bitstream_uuid,
-                  size_bytes: f.size_bytes,
-                })),
-              },
-              languages: adaResult.meta.languages,
-              creators: adaResult.meta.creators,
-              year_display: adaResult.meta.year_display,
-              ester_id: adaResult.meta.ester_id,
-              archive_refs: adaResult.meta.archive_refs,
-              external_url: adaResult.meta.external_url,
-            } : {}),
+            ...buildAdaCreateExtras(adaResult ?? null),
           }, authToken);
           // Backend küpsetab work_id slug'i → kuva reaalne kaustanimi (data/{slug}-{work_id}/)
           if (d.upload?.meta?.slug) setSlug(d.upload.meta.slug);
@@ -418,7 +403,7 @@ export function useUploadWizard() {
    * uuesti alla — `alusta_fetchi` jätkab sealt, kus pooleli jäi.
    */
   const handleAdaRetry = useCallback(async () => {
-    if (!uploadId) return;
+    if (!uploadId || !authToken) return;
     setFileUploading(true);
     setPollResult((prev) => ({
       ready: 0, total: 0, expected_pages: null, files: [],
@@ -579,13 +564,16 @@ export function useUploadWizard() {
     setPollResult(poll);
     setLocalDeleted(new Set(saved.files.filter((f) => f.deleted).map((f) => f.page)));
 
-    if (ADA_TRANSFER_STATUSES.includes(saved.status)) {
+    // `adaSammuOlek` on ÜKS tõde ADA (2) vs poolitamise (3) sammu kohta —
+    // sama helper mis `fetchStatus`-is, vt constants.ts.
+    const resumeSammuOlek = adaSammuOlek(saved.status);
+    if (resumeSammuOlek === 2) {
       // ADA allalaadimine käib (või seisab veaga) — samm 2, progressiriba.
       setStep(2);
       setFileUploading(true);
       fetchStatus(saved.id); // Vahetu päring — ära kuva vananenud cached andmeid
       startPolling(saved.id, POLL_FAST_MS);
-    } else if (PREPRESS_STATUSES.includes(saved.status)) {
+    } else if (resumeSammuOlek === 3) {
       setStep(3); // poolitamise ootel — eelvaate olek loetakse UploadStepSplit'is
     } else if (REVIEW_STATUSES.includes(saved.status)) {
       setStep(4);

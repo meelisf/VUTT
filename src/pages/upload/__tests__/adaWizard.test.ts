@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { adaSammuOlek, ADA_TRANSFER_STATUSES } from '../constants';
+import { adaSammuOlek, PREPRESS_STATUSES } from '../constants';
 
 describe('ADA staatuste marsruutimine', () => {
   it('ada_fetching kuulub 2. sammu, mitte 3. sammu', () => {
@@ -15,7 +15,9 @@ describe('ADA staatuste marsruutimine', () => {
   });
 
   it('ada_fetching EI OLE prepress-staatus', () => {
-    // Muidu viskaks polling admini poolitamise vaatesse keset allalaadimist.
-    expect(ADA_TRANSFER_STATUSES).toContain('ada_fetching');
+    // Muidu viskaks polling admini poolitamise vaatesse keset allalaadimist —
+    // see on täpselt see väide, mis peaks tabama listide kokkusulatamist.
+    expect(PREPRESS_STATUSES).not.toContain('ada_fetching');
+    expect(PREPRESS_STATUSES).not.toContain('ada_error');
   });
 });
