@@ -1,18 +1,21 @@
 import { apiPost } from '../../services/apiClient';
 import type { AdaLookupResult, AdaMergeTulemus, AdaVormiVali } from './types';
 
-/** Handle → ADA metaandmed + failiplaan. Ei loo uploadi. */
-export async function adaLookup(handle: string): Promise<AdaLookupResult> {
+/** Handle → ADA metaandmed + failiplaan. Ei loo uploadi.
+ *  Endpoint nõuab admin-rolli (`require_role("admin")`) — token PEAB kaasa minema,
+ *  muidu vastab server 401-ga ja vorm ei täitu kunagi (vt uploadApi.ts mustrit). */
+export async function adaLookup(handle: string, token: string | null): Promise<AdaLookupResult> {
   const vastus = await apiPost<{ status: string; ada: AdaLookupResult }>(
     '/admin/ada/lookup',
     { handle },
+    { token },
   );
   return vastus.ada;
 }
 
 /** Käivitab ADA failide allalaadimise. 409 = juba käib. */
-export async function adaFetch(uploadId: string): Promise<void> {
-  await apiPost(`/admin/upload/${uploadId}/ada-fetch`, {});
+export async function adaFetch(uploadId: string, token: string | null): Promise<void> {
+  await apiPost(`/admin/upload/${uploadId}/ada-fetch`, {}, { token });
 }
 
 /** Väljad, mida ADA täidab. Puhas nimekiri — UI ja test kasutavad sama. */

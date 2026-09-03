@@ -198,6 +198,7 @@ const UploadPage: React.FC = () => {
             replaceWorkTitle={wizard.replaceWorkTitle}
             onReplaceDismiss={wizard.handleReplaceDismiss}
             onSubmit={wizard.handleStep1Submit}
+            authToken={authToken}
             t={t}
           />
         )}

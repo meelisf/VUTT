@@ -28,6 +28,8 @@ interface UploadStepMetaProps {
   replaceWorkTitle: string | null;
   onReplaceDismiss: () => void;
   onSubmit: () => void;
+  /** ADA lookup nõuab admin-rolli — samast allikast, mis teistele viisardi sammudele. */
+  authToken: string | null;
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -53,6 +55,7 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
   replaceWorkTitle,
   onReplaceDismiss,
   onSubmit,
+  authToken,
   t,
 }) => {
   // -------------------------------------------------------------------------
@@ -72,7 +75,7 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
     setAdaError('');
     setAdaLoading(true);
     try {
-      const tulemus = await adaLookup(adaHandle.trim());
+      const tulemus = await adaLookup(adaHandle.trim(), authToken);
       setAdaResult(tulemus);
       // title_suggestion (kui olemas) on Gemini masintõlge ja eelistatakse
       // originaalpealkirjale — aga see PEAB jääma nähtavalt märgituks.
