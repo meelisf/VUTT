@@ -63,16 +63,51 @@ laiali löödud kaob kontekst, mis nad omavahel seob.
 Tehniliselt: 65 PDF-i liidetakse `pdfunite`-ga üheks `source.pdf`-iks ja edasi töötab
 viisard täpselt nagu ühe PDF-i puhul.
 
-**Seos lähtefailiga säilitatakse lehekommentaariga.** Iga ADA-tüki esimesele
-leheküljele kirjutatakse lehe JSON-i `comments` massiivi kanne kujul:
+**Seos lähtefailiga säilitatakse kahel kujul, ühes ja samas lehe JSON-is.**
+
+*Masinloetav* — struktureeritud väli lehe JSON-i juurtasandil:
+
+```json
+"source": {
+  "provider": "ada",
+  "handle": "10062/7822",
+  "bitstream_uuid": "d950abcc-105f-47ef-97a7-bcc535c7ea38",
+  "name": "07.03.1813.pdf"
+}
+```
+
+*Inimloetav* — sama info kommentaarina `comments` massiivis, autoriga `ada-import`:
 
 ```
 ADA: 07.03.1813.pdf
 https://dspace.ut.ee/server/api/core/bitstreams/{uuid}/content
 ```
 
-autoriga `ada-import`. Kommentaar läheb samasse git-commit'i, mille import niikuinii
-teeb. Nii on üksikkirja piir ja tema päritolu jäljendatav, kuigi teos on üks.
+Mõlemad kirjutatakse **ainult ADA-tüki esimesele säilinud leheküljele** ja lähevad samasse
+git-commit'i, mille import niikuinii teeb. Kuna mõlemad elavad lehe enda JSON-is, liiguvad
+nad `reorder-pages` kasutamisel koos lehega kaasa.
+
+Import teab provenance'i täpselt ja struktureeritult — sellest ainult stringi alles jätta
+oleks info vaikne äraviskamine.
+
+### `source` väli PEAB olema salvestustee säilitusloendis
+
+Ilma selleta on struktureeritud väli **vähem vastupidav kui kommentaar**. Lehe salvestustee
+(`editing.py:98-111`) kirjutab `meta_content`-i kliendilt **tervikuna üle** ja säilitab
+eraldi ainult ühe võtme:
+
+```python
+existing_seq = existing.get('sequence') or existing.get('meta_content', {}).get('sequence')
+if existing_seq is not None and meta_content.get('sequence') is None:
+    meta_content['sequence'] = existing_seq
+```
+
+Frontend ei tea `source` väljast midagi ega saada seda tagasi, seega **esimene Ctrl+S
+redaktoris pühiks provenance'i vaikselt ära**. `comments` jääb alles ainult sellepärast, et
+klient laeb ja saadab selle.
+
+Seega: `source` lisatakse samasse säilitusloogikasse nagu `sequence`. Test peab seda katma —
+see on täpselt selline viga, mida keegi kunagi ei märka.
 
 ### Järjekord
 
@@ -92,9 +127,19 @@ Seega sordib import ise, **failinimest parsitud kuupäeva järgi**:
 | `yyyy.pdf` | aasta 1. jaanuar | `1813.pdf` → 1813-01-01 |
 | parsimatu | lõppu, nime järgi | `9997.pdf`, `9998.pdf`, `9999.pdf` |
 
-Osaliselt dateeritud failid lähevad oma perioodi **algusesse** (sama kuupäeva korral
-enne täiskuupäevalisi). Import ei paku lohistamist — admin saab lehed hiljem halduses
-ümber tõsta (`POST /admin/work/{work_id}/reorder-pages`, `pages.py:374`).
+**Sortimisvõti hoiab täpsust eraldi, mitte ei võltsi puuduvat päeva:**
+
+```python
+(aasta, kuu_või_0, päev_või_0, täpsus, algne_järjekord)
+```
+
+`11.1815.pdf` ei ole `1815-11-01` — ta on „1815, november, päev teadmata". Praktiline
+tulemus on sama (osaliselt dateeritud fail satub oma perioodi algusesse, sest 0 < 1), aga
+kood **ei väida** teadmist, mida tal ei ole. Parsimatud (`9997.pdf`) saavad `aasta = ∞` ja
+lähevad lõppu, omavahel algses järjekorras.
+
+Import ei paku lohistamist — admin saab lehed hiljem halduses ümber tõsta
+(`POST /admin/work/{work_id}/reorder-pages`, `pages.py:374`).
 
 ## Otsus 2: metaandmete leping
 
@@ -124,6 +169,34 @@ Kolm teadlikku valikut:
 
 `type` vaikevalik on **käsikiri** (peamine kasutus), aga lüliti on nähtav ja admini
 muuta — `meta.type` on bibliograafiline väide ja seda ei seata vaikselt (ADR 0028 §3).
+
+### Mitmeväärtuselisus
+
+Dublin Core väljad on **põhimõtteliselt kordused**. Näitekirje annab neist ainult
+`dc.subject`-i mitmena, aga leping ei tohi sõltuda sellest, mida üks kirje juhtub sisaldama:
+
+| Väli | Reegel mitme väärtuse korral |
+|---|---|
+| `dc.contributor.author` | **kõik** → `creators[]`, ADA järjekorras |
+| `dc.language` | **kõik tuntud** → `languages[]`; tundmatud jäetakse vahele vaikselt logides |
+| `dc.identifier.other` | **kõik** → eraldi `archive_refs[]` kanded, sama `archive_id` |
+| `dc.description.uri` | ainult **ESTER-URL** → `ester_id`; ülejäänud eiratakse |
+| `dc.identifier.uri` | ainult **handle-URL** → `external_url`; muu eiratakse |
+| `dc.title` | eelistus `[et]` → keeleta → esimene; ülejäänud eiratakse |
+| `dc.date.issued` | **esimene**; ülejäänu eiratakse |
+
+`languages` semantika on ADR 0019 järgi „teoses sisuliselt esinevad keeled" — see ühtib
+`dc.language` korduste tähendusega, seega kõigi võtmine on õige, mitte laisk.
+
+### `year` on ADA `dc.date.issued`, mitte ajavahemiku algus
+
+Näitekirje: `dc.date.issued = 1812`, aga materjal ulatub 1823-ni. Ühe teosena satub see
+VUTT-i aastafiltris **1812. aasta alla**, kuigi sisaldab kirju 11 aasta ulatuses.
+
+See on **teadlik otsus, mitte kogemata**: `year` peegeldab ADA väidet, seda ei tuletata
+koosseisu kronoloogilisest ulatusest. Ulatus on nähtav `year_display`-s
+(`31. dets.1812 – 9. jaan.1823`). Kui aastafiltri käitumine hakkab praktikas segama, on see
+eraldi otsus `year_start`/`year_end` kohta, mitte selle impordi vaikne kõrvalmõju.
 
 ### Kakskeelne pealkiri
 
@@ -184,6 +257,23 @@ Vajutus → `POST /admin/ada/lookup` → vorm täitub. Alla ilmub kokkuvõte:
 
 Loend on **ainult vaatamiseks**. Hoiatusmärgid näitavad faile, mille kuupäeva ei
 õnnestunud täielikult parsida — need on ka ainsad, mille asukoht võib olla vale.
+
+**Juba täidetud vorm.** Lookup ei tohi admini käsitsi tehtud parandust vaikselt maha
+kirjutada:
+
+- **tühjad väljad** täidetakse ADA väärtusega;
+- **mittetühjad väljad**, mille ADA väärtus erineb, jäävad puutumata ja märgitakse
+  („ADA pakub: …" + ühekordne „võta ADA oma" nupp välja kõrval).
+
+**Duplikaadi hoiatus.** Kuna handle läheb `external_url`-i, saab `lookup` kontrollida, kas
+see ADA kirje on juba imporditud: *„See ADA kirje on VUTT-is olemas: <pealkiri>"* koos
+lingiga. **Hoiatus, mitte blokeering** — kordusimport võib olla tahtlik (parem skaneering).
+
+Maksumus ei ole päris null: `external_url` **ei ole** täna `FILTERABLE_ATTRIBUTES`-is
+(`meili_settings.py:31`) ega otsitav. Vaja on lisada see filtrisse ja uuendada
+`mcp/tests/test_meili_contract.py`-d. **Reindeksit ei nõua** — väli on `meili_doc.py:471`
+järgi dokumentides juba olemas, muutub ainult indeksi seadistus. Kui see osutub plaani
+kirjutamisel kalliks, on hoiatus ainus asi, mis siit välja langeb.
 
 ### Samm 2 — fail
 
@@ -248,6 +338,49 @@ Blokeeriv I/O ei tohi olla `async def` sees (ADR 0002): `lookup` on sünkroonne 
 `pdfinfo` ja `pdftoppm`). `qpdf`, `pdftk` ja `pypdf` ei ole — neid ei tohi kasutada.
 Ainus uus väline sõltuvus on ADA HTTP.
 
+### Taustatöö leping
+
+Kolm invarianti. Iga rikkumine annab vea, mida on hiljem raske seletada.
+
+**F1 — `ada-fetch` on idempotentne, CAS-iga nagu apply.** Topeltklõps, brauseri retry või
+kaks avatud tabi ei tohi käivitada kahte lõime, mis mõlemad kirjutavad samasse
+`uploads/{id}/`-i. Sama muster nagu `try_begin_applying` (`state.py:215`):
+
+```
+pending | ada_error  →  ada_fetching  →  awaiting_split
+```
+
+Kui seis on juba `ada_fetching`, tagastab endpoint 409 ega käivita teist worker'it.
+
+**F2 — iga tükk laaditakse `.part`-i ja nimetatakse ümber alles pärast suuruse kontrolli.**
+
+```
+017.pdf.part  →  (saadud baidid == bitstream'i sizeBytes)  →  017.pdf
+```
+
+Ilma selleta jätab ühenduse katkemine 80 MB peal kettale poolik `017.pdf`, mis näeb retry
+jaoks välja nagu valmis fail — ja `pdfunite` saaks katkise sisendi. **Fail kettal on tõde:**
+`017.pdf` olemasolu tähendab „see tükk on terve", ja jätkamine laadib ainult puuduvad.
+
+**F3 — worker kontrollib tükkide vahel, kas upload on veel olemas.** `Katkesta` kustutab
+staging-kausta; parasjagu faili kirjutav lõim tekitaks kustutatud kataloogi uuesti või
+kirjutaks state'i tagasi. Kontroll käib **iga tüki alguses**, sama muster nagu
+`preview_cancel` (ADR 0028).
+
+### Restart
+
+`upload_progress` on mälupõhine — backendi restart 200 MB peal kaotab progressi. Töö ei tohi
+jääda igaveseks `ada_fetching`-usse.
+
+Durable job queue'd ei ehitata. Piisab kahest asjast:
+
+1. käivitusel märgitakse iga `ada_fetching` upload ümber `ada_error`-iks („katkes, jätka") —
+   sama koht, kus `reocr_recovery` juba täna rippuvaid töid koristab;
+2. „Laen uuesti" jätkab sealt, kus `.part`-loogika pooleli jäi — juba tervikuna
+   allalaaditud tükke ei tõmmata uuesti.
+
+Worker on restartitav, sest tõde on failides, mitte mälus.
+
 ### Lähtekaart `state.json`-is
 
 Uus **ülemise taseme** võti (`set_upload_state` kaudu, mitte `prepress` sisse):
@@ -283,8 +416,26 @@ sammus 3 ühe lehe välja, nihkub kogu ülejäänu ja ADA-kommentaarid maanduksi
 valedele lehtedele. Vaikselt — see on halvim liik viga.
 
 Lahendus: `_transfer_pages` kirjutab iga avaldatud lähtelehe kohta kaardi
-`prepress.page_map[str(n)] = out_index` (**esimene** väljund selle lähtelehe kohta;
-poolitatud leht annab kaks väljundit, ankruks kõlbab esimene).
+**kõigist** temast tekkinud väljundlehtedest, järjekorras:
+
+```json
+"page_map": {"1": [1], "2": [2, 3], "3": [4]}
+```
+
+**Miks list, mitte üks number.** Sammu 4 `deleted` käib **väljundlehe** kohta —
+`mark_page_deleted` sobitab `filename` järgi (`upload_ops.py:282`). Poolitatud lähtelehest
+tekib kaks väljundit ja admin võib kustutada neist ainult ühe:
+
+```
+src 10 poolitatakse → out 17 (ülemine), out 18 (alumine)
+admin kustutab sammus 4 out 17, jätab out 18
+```
+
+Üheainsa `int`-iga oleks ankur `17` — kustutatud leht — kuigi ADA tükk ise on VUTT-is
+täiesti olemas. Listiga leiab algoritm `18` ja kommentaar maandub õigesti.
+
+Semantiliselt on list ka õigem üldine mudel: üks lähteleht annab **0, 1 või N**
+väljundlehte.
 
 **`out_index` kasvab kahes kohas** — baithaaval kiirteel (rida 167) ja poolituse
 lõikesilmuses (rida 191) — ja `mutate_prepress(applied_done=n)` kutsutakse samuti kahest
@@ -296,20 +447,33 @@ Kirjutus läheb sinna, kus juba niikuinii `applied_done` uuendatakse — täiend
 täiendav kirjutus. `mutate_prepress` on ADR 0028 järgi **ainus** lubatud tee `prepress`
 alamväljade muutmiseks.
 
+**Kaart tuleb apply alguses nullida.** `try_begin_applying` lubab CAS-i ka olekust `error`
+(`state.py:215`, `APPLY_START_STATUSES`) ja loeb kordusi `apply_attempts`-i — kordus-apply
+on päris ja võib joosta **teise plaaniga**. Vana kaardi võtmed ei tohi ellu jääda, muidu
+osutab ankur eelmise katse nummerdusele.
+
 `prepress` ei tea ADA-st midagi. Kaart on üldine ja kasutatav ka mujal.
 
 ### Ankru resolutsioon impordil
 
 Import loeb `ada.sources` ja `prepress.page_map` ning iga tüki kohta:
 
-1. leiab esimese lähtelehe vahemikus `[first_src_page, first_src_page + page_count - 1]`,
-   mis `page_map`-is **eksisteerib** (st ei jäetud sammus 3 välja);
-2. võtab tema `out_index`-i;
-3. tõlgib selle sammu 4 `deleted`-filtri järgseks lõplikuks leheküljenumbriks — samas
-   kohas, kus `import_work.py` niikuinii `importable` lehti ümber nummerdab;
-4. kirjutab kommentaari sellele leheküljele.
+```
+tüki jaoks:
+  iga lähteleht vahemikus [first_src_page, first_src_page + page_count - 1]:
+      iga out_index listis page_map[lähteleht]:
+          kui see väljundleht elas sammu 4 `deleted` üle:
+              ankur = tema lõplik ümbernummerdatud leheküljenumber
+              lõpeta
+```
 
-**Kui terve tükk jäeti välja, ei teki kommentaari üldse** — mitte vale kohta.
+Lõplik number tuleb samast kohast, kus `import_work.py` niikuinii `importable` lehti ümber
+nummerdab (`import_work.py:148`).
+
+See üks silmus katab korraga viis juhtu: sammu 3 `excluded`, poolituse, poolituse esimese
+poole kustutamise, mõlema poole kustutamise ja terve tüki kadumise.
+
+**Kui ükski tüki leht ei elanud üle, ei teki kommentaari üldse** — mitte vale kohta.
 
 ## Väljajätmise semantika (olemasolev, kinnitatud)
 
@@ -355,12 +519,28 @@ mis kontrollib, et fixture'id vastavad endiselt tegelikkusele.
 | `page_map` | `_transfer_pages` väljajätmistega → kaart õige, `out_index` ei nihku |
 | ankru-resolutsioon | tükk + `page_map` + `deleted` → kommentaar õigel lehel; **terve tükk välja → kommentaari ei teki** |
 | `deu`-kaardistus | sõnalised `dc.language` väärtused → ISO; tundmatu → tühi |
+| **split + esimene pool kustutatud** | `src 10 → [17, 18]`, `out 17` kustutatud → ankur on `18`, mitte `17` |
+| **mõlemad pooled kustutatud** | ankur libiseb tüki järgmisele lähtelehele |
+| **`page_map` nullimine** | apply A → plaani muutus → apply B → kaardis ainult B kaardistus |
+| **`source` üle Ctrl+S** | lehe salvestus redaktorist EI pühi `source` välja |
+| **retry pärast poolikut allalaadimist** | `.part` ei loeta valmis tükiks; terved tükke ei tõmmata uuesti |
+| **`ada-fetch` topeltkutse** | teine POST annab 409, teist worker'it ei teki |
+| **mitu DC väärtust** | mitu autorit, mitu keelt, mitu `identifier.other`; `dc.title` `[et]` eelistus |
+| **restart `ada_fetching` ajal** | käivitusel → `ada_error`, mitte igavene `ada_fetching` |
 
 **Väravad enne PR-i:** `npm run typecheck`, `npm test`, `npm run lint:ci`,
 `.venv/bin/pytest tests/`. Uued i18n-võtmed **mõlemasse keelde korraga** (`fallbackLng`
-on väljas). Uus **ADR 0030**: `page_map` on invariant — `_transfer_pages` peab selle
-kirjutama iga avaldatud lehe kohta, muidu maanduvad ADA-kommentaarid vaikselt valel
-leheküljel.
+on väljas). 
+
+**Uus ADR 0030 — `page_map` kaardistab lähtelehe kõigile temast tekkinud väljundlehtedele.**
+
+> `_transfer_pages` kirjutab iga avaldatud lähtelehe kohta **järjestatud listi** temast
+> materialiseeritud väljundlehtedest. Kirjutus toimub mõlemas kohas, kus `out_index`
+> kasvab (baithaaval kiirtee ja poolituse lõikesilmus), ja kaart nullitakse iga apply
+> alguses. Lähteleht, mis ei andnud ühtki väljundit, kaardis ei esine.
+
+Ilma selleta maanduvad ADA-kommentaarid vaikselt valel leheküljel — ja vaikne on siin
+kõige olulisem sõna: midagi ei kuku, tulemus on lihtsalt vale.
 
 ## Skoobist väljas
 
