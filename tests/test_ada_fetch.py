@@ -29,23 +29,47 @@ def _status(tmp_path, uid):
     return json.loads((tmp_path / uid / "state.json").read_text(encoding="utf-8"))["status"]
 
 
-# --- F1: idempotentsus ---
+@pytest.fixture
+def loimed(monkeypatch):
+    """Püüab kinni käivitatud lõimed — päris töölõim kirjutaks tmp_path'ist VÄLJA."""
+    kaivitatud = []
 
-def test_teine_fetch_ei_kaivita_teist_toolim(upload, tmp_path):
+    class FakeThread:
+        def __init__(self, *a, **k):
+            kaivitatud.append(k.get("name") or "?")
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(fetch.threading, "Thread", FakeThread)
+    return kaivitatud
+
+
+# --- F1: idempotentsus ---
+# `loimed` asendab töölõime — need testid kontrollivad CAS-i, mitte workerit
+# (`_toota` behaviour on eraldi testitud otsekutsega). Ilma selleta jookseks
+# päris taustalõim, väljuks monkeypatch'itud tmp_path'ist ja kirjutaks
+# päris uploads-kausta pärast testi lõppu (vt task-6-report.md Fix 1).
+
+def test_teine_fetch_ei_kaivita_teist_toolim(upload, tmp_path, loimed):
     assert fetch.alusta_fetchi(upload) is True
     assert _status(tmp_path, upload) == "ada_fetching"
+    assert len(loimed) == 1
     assert fetch.alusta_fetchi(upload) is False
+    assert len(loimed) == 1
 
 
-def test_fetch_saab_alata_ada_error_seisust(upload, tmp_path):
+def test_fetch_saab_alata_ada_error_seisust(upload, tmp_path, loimed):
     upload_state.set_upload_state(upload, status="ada_error")
     assert fetch.alusta_fetchi(upload) is True
+    assert len(loimed) == 1
 
 
-def test_fetch_ei_saa_alata_awaiting_split_seisust(upload):
+def test_fetch_ei_saa_alata_awaiting_split_seisust(upload, loimed):
     """Fail on juba kohal — kordus kirjutaks source.pdf-i üle."""
     upload_state.set_upload_state(upload, status="awaiting_split")
     assert fetch.alusta_fetchi(upload) is False
+    assert len(loimed) == 0
 
 
 # --- F2: .part ---

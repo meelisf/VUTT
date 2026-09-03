@@ -6,7 +6,7 @@ Poolik allalaadimine elab `.part`-failina ja ei näe kunagi välja nagu valmis f
 import os
 import subprocess
 import threading
-from typing import List, Optional
+from typing import Optional
 
 import requests
 
