@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from ..ada import client as ada_client
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
 from ..upload import prepress, prepress_apply, prepress_plan
@@ -46,6 +47,25 @@ async def admin_upload_create(request: Request, user=Depends(require_role("admin
     data["slug"] = slug
     upload = await run_in_threadpool(create_upload, data, username=user["username"])
     return {"status": "success", "upload": upload}
+
+
+@router.post("/admin/ada/lookup")
+async def admin_ada_lookup(request: Request, user=Depends(require_role("admin"))):
+    """Handle või item-UUID → ADA metaandmed + failiplaan. EI KIRJUTA midagi.
+
+    `lookup` normaliseerib ise ja viskab prügi peal `AdaViga` ENNE ühtki
+    võrgukutset — seepärast siin eelfiltrit EI OLE. Eelfilter lükkaks tagasi
+    ka UUID- ja items-URL-kuju, mida `lookup` tahtlikult toetab.
+
+    `run_in_threadpool`: `requests.get` on blokeeriv ja `async def` sees
+    külmutaks event-loopi, kui ADA on kättesaamatu (ADR 0002).
+    """
+    data = await get_json_data(request)
+    try:
+        tulemus = await run_in_threadpool(ada_client.lookup, data.get("handle", ""))
+    except ada_client.AdaViga as e:
+        raise HTTPException(status_code=400, detail=e.kasutaja_sonum)
+    return {"status": "success", "ada": tulemus}
 
 
 @router.get("/admin/upload/{upload_id}/status")
