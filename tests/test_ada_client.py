@@ -34,6 +34,18 @@ def test_items_url_ei_ole_handle():
     assert client.on_item_uuid("https://dspace.ut.ee/items/5a495195-44c1-463b-a425-643dc4dcf13f")
 
 
+def test_lookup_parsimatu_sisend_ei_tee_vorku_ainult_annab_vea(monkeypatch):
+    """lookup() normaliseerib handle'it ise — tundmatu sisend PEAB kukkuma
+    enne ühtki võrgupäringut, mitte alles ADA vastuse peale."""
+    def kukkuv_get(url, **kwargs):
+        raise AssertionError("requests.get ei tohiks parsimatu sisendi puhul üldse kutsutud saada: {}".format(url))
+
+    monkeypatch.setattr(client.requests, "get", kukkuv_get)
+    with pytest.raises(client.AdaViga) as exc:
+        client.lookup("mingi jama")
+    assert "handle" in exc.value.kasutaja_sonum.lower()
+
+
 # --- lookup ---
 
 class FakeVastus:

@@ -4,7 +4,7 @@ API kuju on TEOSTUSDETAIL. Leping on `lookup()` tagastuskuju — DSpace on
 versioonide vahel teid muutnud ja teeb seda uuesti.
 """
 import re
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import requests
 
@@ -112,6 +112,8 @@ def lookup(sisend: str) -> Dict[str, object]:
         })
 
     return {
+        # "handle" tähendus sõltub kutsuteest: paljas handle, kui sisend oli
+        # handle-kujuline; muul juhul kutsujalt saadud toores UUID/items-URL.
         "handle": sisend,
         "item_uuid": item_uuid,
         "meta": mapping.dc_vuttiks(item),
