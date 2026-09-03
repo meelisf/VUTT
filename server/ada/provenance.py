@@ -7,6 +7,8 @@ teise.
 from datetime import datetime
 from typing import Dict, List
 
+from ..utils import generate_nanoid
+
 KOMMENTAARI_AUTOR = "ada-import"
 HANDLE_URL = "http://hdl.handle.net/{}"
 BITSTREAM_URL = "https://dspace.ut.ee/server/api/core/bitstreams/{}/content"
@@ -55,8 +57,15 @@ def ehita_kommentaar(handle: str, allikas: dict) -> dict:
     PÜSIV identifikaator on handle — ülikool tagab, et see resolvib digiteeringule.
     Bitstream-UUID on DSpace'i sisemine detail ja VÕIB muutuda, seepärast on ta
     viimane rida, mitte ainus viide.
+
+    `id` on kohustuslik (`src/types.ts` `Annotation.id`) — ilma selleta jätab
+    `comment_history_ops` kommentaari versioonidest ja kustutuste ajaloost vaikimisi
+    välja (`cid is None: continue`) ja „Kommentaaride taaste" ei näe seda enam kunagi.
+    Ajatempel kollisiooniks liiga ebausaldusväärne (tihe silmus üle lehtede) —
+    kasutame sama `generate_nanoid`-i, mida `work_id`/`upload_id` jaoks kasutatakse.
     """
     return {
+        "id": generate_nanoid(),
         "author": KOMMENTAARI_AUTOR,
         "text": "ADA: {}\n{}\n{}".format(
             allikas.get("name"),

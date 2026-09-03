@@ -68,3 +68,19 @@ def test_kommentaar_sisaldab_nime_ja_urli():
     assert "ua" in k["text"]
     assert "hdl.handle.net/10062/7822" in k["text"]
     assert k["author"] == "ada-import"
+
+
+def test_kommentaaril_on_id():
+    """Ilma `id`-ta jätab comment_history_ops kommentaari ajaloost välja ja
+    „Kommentaaride taaste" ei suuda seda enam kunagi taastada."""
+    k = provenance.ehita_kommentaar("10062/7822", SOURCES[0])
+    assert k.get("id")
+    assert isinstance(k["id"], str)
+
+
+def test_kommentaaride_id_on_erinev():
+    """Ajatempel kollisiooniks liiga ebausaldusväärne (tihe silmus üle lehtede) —
+    kaks järjestikust kommentaari PEAVAD saama erineva id."""
+    k1 = provenance.ehita_kommentaar("10062/7822", SOURCES[0])
+    k2 = provenance.ehita_kommentaar("10062/7822", SOURCES[0])
+    assert k1["id"] != k2["id"]

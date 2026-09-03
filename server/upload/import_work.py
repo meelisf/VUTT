@@ -224,12 +224,19 @@ def import_as_work(
                          "comments": [], "history": []}
             allikas = ada_ankrud.get(jrk)
             if allikas:
-                page_json["source"] = ada_provenance.ehita_source_vali(
-                    ada_plokk.get('handle', ''), allikas
-                )
-                page_json["comments"].append(
-                    ada_provenance.ehita_kommentaar(ada_plokk.get('handle', ''), allikas)
-                )
+                ada_handle = ada_plokk.get('handle')
+                if ada_handle:
+                    page_json["source"] = ada_provenance.ehita_source_vali(ada_handle, allikas)
+                    page_json["comments"].append(
+                        ada_provenance.ehita_kommentaar(ada_handle, allikas)
+                    )
+                else:
+                    # Puuduv handle EI TOHI toota katkist hdl.handle.net/-URL-i —
+                    # parem jätta provenance sootuks kirjutamata (vt task-8 review).
+                    logger.warning(
+                        f"import {upload_id}: ADA handle puudub, lk {pn} jääb "
+                        "provenance'ita"
+                    )
             with open(local_json, 'w', encoding='utf-8') as f:
                 json.dump(page_json, f, ensure_ascii=False, indent=2)
             os.chmod(local_json, 0o644)
