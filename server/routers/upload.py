@@ -1,5 +1,6 @@
 import asyncio
 import os
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -30,6 +31,32 @@ from ..utils import build_work_id_cache
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+def otsi_teos_external_url_jargi(url: str) -> Optional[dict]:
+    """Kas see ADA kirje on juba imporditud. None = ei ole (või kontroll ebaõnnestus).
+
+    Duplikaadikontroll on mugavus, mitte eeldus: kui Meilisearch on maas,
+    aeglane või päring ebaõnnestub muul põhjusel, EI TOHI see importi
+    blokeerida — seepärast laiaulatuslik `except` ja `None`-tagastus.
+    """
+    if not url:
+        return None
+    from ..meilisearch_ops import _meili_search
+    try:
+        tulemus = _meili_search({
+            "q": "",
+            "filter": 'external_url = "{}"'.format(url.replace('"', "")),
+            "limit": 1,
+            "attributesToRetrieve": ["work_id", "title"],
+        })
+        hits = tulemus.get("hits") or []
+        if not hits:
+            return None
+        return {"work_id": hits[0].get("work_id"), "title": hits[0].get("title")}
+    except Exception:
+        logger.warning("Duplikaadikontroll ebaõnnestus", exc_info=True)
+        return None
 
 
 @router.get("/admin/uploads")
@@ -77,6 +104,15 @@ async def admin_ada_lookup(request: Request, user=Depends(require_role("admin"))
         tulemus["title_suggestion"] = "{} / {}".format(
             tulemus["meta"]["title"], ingliskeelne
         )
+
+    # Duplikaadi HOIATUS, mitte blokeering — sama kirje kordusimport võib olla
+    # tahtlik (nt parem skaneering). run_in_threadpool: Meili-päring on
+    # blokeeriv HTTP (ADR 0002).
+    olemasolev = await run_in_threadpool(
+        otsi_teos_external_url_jargi, tulemus["meta"].get("external_url") or ""
+    )
+    if olemasolev:
+        tulemus["olemasolev"] = olemasolev
 
     return {"status": "success", "ada": tulemus}
 

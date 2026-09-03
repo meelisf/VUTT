@@ -72,6 +72,7 @@ FILTERABLE_ATTRIBUTES = [
     "tags_en",
     "is_public",
     "shareable",
+    "external_url",
 ]
 
 SORTABLE_ATTRIBUTES = [
@@ -94,4 +95,5 @@ RUNTIME_REQUIRED_FILTERABLE = {
     "collections",
     "year_start",
     "year_end",
+    "external_url",
 }

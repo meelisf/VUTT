@@ -107,6 +107,14 @@ const AdaImportBar: React.FC<Props> = ({
               </p>
             )}
 
+            {tulemus.olemasolev && (
+              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                <span className="text-amber-800">
+                  {t('ada.duplicate', { title: tulemus.olemasolev.title })}
+                </span>
+              </div>
+            )}
+
             {/* Väljad, kus ADA väärtus erineb admini käsitsi sisestatust — ei kirjutata
                 automaatselt üle, aga pakutakse ühekordset nuppu. */}
             {ulekirjutatavad.length > 0 && (
