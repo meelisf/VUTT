@@ -246,6 +246,11 @@ def try_begin_applying(upload_id: str) -> bool:
                     "expected_pages arvutus ebaõnnestus {}: {}".format(upload_id, e))
         if isinstance(s.get("prepress"), dict):
             s["prepress"]["preview_cancel"] = True
+        # ADR 0030: kordus-apply võib joosta TEISE plaaniga. Vana kaardi võtmed
+        # osutaksid eelmise katse nummerdusele — ankrud maanduksid valel lehel.
+        prepress = s.get("prepress")
+        if isinstance(prepress, dict):
+            prepress["page_map"] = {}
         write_state(upload_id, s)
         return True
 

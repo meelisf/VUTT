@@ -168,11 +168,18 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
                 name = remote_page_name(slug, out_index)
                 publish_atomic(sftp, kiirtee, "{}/{}".format(remote_work, name))
                 _write_thumb(upload_id, thumbs_dir, out_index, kiirtee)
+                # ADR 0030: kaart PEAB katma ka baithaaval kiirtee — muutmata pilt
+                # on kõige tavalisem juht, mitte erand.
                 upload_state.mutate_prepress(
-                    upload_id, lambda p, n=n: p.update(applied_done=n)
+                    upload_id,
+                    lambda p, n=n, outs=[out_index]: (
+                        p.update(applied_done=n),
+                        p.setdefault("page_map", {}).update({str(n): outs}),
+                    ),
                 )
                 continue
 
+            lehe_valjundid = []
             full = os.path.join(work_dir, "full.jpg")
             # Semafor LEHE kaupa, mitte partii ümber (#219): kaitse eesmärk on
             # üks rasteriseerimine korraga. Partii ümber hoituna seisaks teise
@@ -189,6 +196,7 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
 
                 for (x0, x1) in prepress_plan.page_cuts(plan, n, width):
                     out_index += 1
+                    lehe_valjundid.append(out_index)
                     name = remote_page_name(slug, out_index)
                     cut = os.path.join(work_dir, name)
                     try:
@@ -203,7 +211,11 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
                     os.unlink(full)
 
             upload_state.mutate_prepress(
-                upload_id, lambda p, n=n: p.update(applied_done=n)
+                upload_id,
+                lambda p, n=n, outs=lehe_valjundid: (
+                    p.update(applied_done=n),
+                    p.setdefault("page_map", {}).update({str(n): outs}),
+                ),
             )
     finally:
         try:
