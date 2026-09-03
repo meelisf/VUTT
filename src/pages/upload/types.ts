@@ -25,7 +25,14 @@ export interface PollResult {
   files: FileEntry[];
   /** Mitu LÄHTE-lehte on apply läbi töötanud. Ainult `applying` faasi teate jaoks. */
   applied_done?: number;
-  progress?: { bytes_sent: number; bytes_total: number; error?: string | null };
+  progress?: {
+    bytes_sent: number;
+    bytes_total: number;
+    error?: string | null;
+    /** ADA allalaadimine: mitu allikfaili on tükeldatult valmis (vt server/ada/fetch.py). */
+    files_done?: number;
+    files_total?: number;
+  };
   error?: string;
   stalled?: boolean;
 }

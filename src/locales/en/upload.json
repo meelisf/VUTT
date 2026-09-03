@@ -180,7 +180,8 @@
     "downloading": "Downloading from ADA",
     "downloadProgress": "{{done}}/{{total}} files · {{mbDone}}/{{mbTotal}} MB",
     "retry": "Retry download",
-    "lookupFailed": "ADA lookup failed"
+    "lookupFailed": "ADA lookup failed",
+    "errorFallback": "ADA download failed"
   },
   "status": {
     "pending": "Pending",
@@ -193,6 +194,8 @@
     "imported": "Imported",
     "awaiting_split": "Awaiting split",
     "prepping": "Preparing preview",
-    "applying": "Processing and sending"
+    "applying": "Processing and sending",
+    "ada_fetching": "Downloading from ADA",
+    "ada_error": "ADA download error"
   }
 }

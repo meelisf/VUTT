@@ -27,7 +27,9 @@ interface UploadStepMetaProps {
   replaceWorkId: string | null;
   replaceWorkTitle: string | null;
   onReplaceDismiss: () => void;
-  onSubmit: () => void;
+  /** ADA-tulemus (kui käsitsi ei sisestatud) kandub create-payload'i ja
+   *  käivitab kohe failide allalaadimise — vt useUploadWizard.handleStep1Submit. */
+  onSubmit: (adaResult: AdaLookupResult | null) => void;
   /** ADA lookup nõuab admin-rolli — samast allikast, mis teistele viisardi sammudele. */
   authToken: string | null;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -286,7 +288,7 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
         )}
 
         <button
-          onClick={onSubmit}
+          onClick={() => onSubmit(adaResult)}
           disabled={!title.trim() || (workType.id !== 'Q87167' && !year.trim()) || !slug.trim() || step1Loading}
           className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
         >

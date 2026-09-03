@@ -180,7 +180,8 @@
     "downloading": "Laen ADA-st",
     "downloadProgress": "{{done}}/{{total}} faili · {{mbDone}}/{{mbTotal}} MB",
     "retry": "Laen uuesti",
-    "lookupFailed": "ADA päring ebaõnnestus"
+    "lookupFailed": "ADA päring ebaõnnestus",
+    "errorFallback": "ADA allalaadimine ebaõnnestus"
   },
   "status": {
     "pending": "Ootel",
@@ -193,6 +194,8 @@
     "imported": "Imporditud",
     "awaiting_split": "Poolitamise ootel",
     "prepping": "Eelvaadet valmistamas",
-    "applying": "Töötleb ja saadab"
+    "applying": "Töötleb ja saadab",
+    "ada_fetching": "Laen ADA-st",
+    "ada_error": "ADA allalaadimise viga"
   }
 }
