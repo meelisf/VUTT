@@ -165,6 +165,16 @@ def import_as_work(
 
     remote_work = f"{ocr_server_path}/{state['remote_work_path']}"
 
+    # ADA provenance: milline lõplik lehekülg kannab millise lähtefaili viidet.
+    ada_plokk = state.get('ada') or {}
+    ada_ankrud = {}
+    if ada_plokk.get('sources'):
+        from ..ada import provenance as ada_provenance
+        page_map = ((state.get('prepress') or {}).get('page_map')) or {}
+        ada_ankrud = ada_provenance.leia_ankrud(
+            ada_plokk['sources'], page_map, [f['page'] for f in importable]
+        )
+
     sftp = None
     try:
         sftp = sftp_open_func(upload_id)
@@ -182,7 +192,7 @@ def import_as_work(
 
         # Lae alla iga soovitud leht
         downloaded = 0
-        for entry in importable:
+        for jrk, entry in enumerate(importable, start=1):
             pn = entry['page']
             jpg_name = jpg_map[pn]
             txt_name = jpg_name.replace('.jpg', '.txt')
@@ -210,7 +220,16 @@ def import_as_work(
                     raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); import katkestati")
             os.chmod(local_txt, 0o644)
 
-            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
+            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [],
+                         "comments": [], "history": []}
+            allikas = ada_ankrud.get(jrk)
+            if allikas:
+                page_json["source"] = ada_provenance.ehita_source_vali(
+                    ada_plokk.get('handle', ''), allikas
+                )
+                page_json["comments"].append(
+                    ada_provenance.ehita_kommentaar(ada_plokk.get('handle', ''), allikas)
+                )
             with open(local_json, 'w', encoding='utf-8') as f:
                 json.dump(page_json, f, ensure_ascii=False, indent=2)
             os.chmod(local_json, 0o644)
