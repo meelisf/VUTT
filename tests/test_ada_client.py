@@ -98,6 +98,18 @@ def test_lookup_kannab_metaandmed_kaasa(fake_ada):
     assert meta["ester_id"] == "b1812728"
 
 
+@pytest.mark.parametrize("sisend", [
+    "5a495195-44c1-463b-a425-643dc4dcf13f",
+    "https://dspace.ut.ee/items/5a495195-44c1-463b-a425-643dc4dcf13f",
+    "hdl:10062/7822",
+])
+def test_lookup_handle_on_alati_kanooniline_paljas_kuju(fake_ada, sisend):
+    """"handle" väljundis tuleb ADA item'i enda kanoonilisest väljast, mitte
+    kutsuja toorest sisendist — muidu saaks sama kirje neli erinevat
+    talletatud kuju (ADR 0022)."""
+    assert client.lookup(sisend)["handle"] == "10062/7822"
+
+
 def test_lookup_margib_ebatapse_kuupaevaga_failid(fake_ada):
     failid = client.lookup("10062/7822")["failid"]
     ebatapsed = {f["name"] for f in failid if f["tapsus"] > 0}

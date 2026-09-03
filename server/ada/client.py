@@ -112,9 +112,9 @@ def lookup(sisend: str) -> Dict[str, object]:
         })
 
     return {
-        # "handle" tähendus sõltub kutsuteest: paljas handle, kui sisend oli
-        # handle-kujuline; muul juhul kutsujalt saadud toores UUID/items-URL.
-        "handle": sisend,
+        # ADA item kannab ISE kanoonilist PALJAST handle'it, olenemata sellest,
+        # kas kirje leiti handle'i või UUID-ga. Toores sisend jääb ainult varuteeks.
+        "handle": item.get("handle") or sisend,
         "item_uuid": item_uuid,
         "meta": mapping.dc_vuttiks(item),
         "failid": failid,
