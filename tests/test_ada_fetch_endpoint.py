@@ -69,3 +69,20 @@ def test_poll_ei_puuduta_sftp_d_ada_fetchingu_ajal(client, login, monkeypatch):
     r = client.get("/admin/upload/{}/status".format(uid), headers=_peis(login))
     assert r.status_code == 200
     assert r.json()["status"] == "ada_fetching"
+
+
+def test_ada_error_sonum_joudab_status_vastusesse(client, login):
+    """`server/ada/fetch.py` kirjutab veateate `ada_error` võtmesse (mitte
+    `error_message`-isse) — `_payload` (`server/upload/thumbs.py`) peab selle
+    `error`-väljana edastama, muidu näeb admin "Laen uuesti" ekraanil ainult
+    üldist teadet, mitte päris põhjust (nt "pdfunite kukkus: ...")."""
+    from server.upload import state as upload_state
+    uid = _loo(client, login, ada=ADA_PLOKK)["id"]
+    sonum = "Fail jäi pooleli: saadud 10 baiti, oodatud 20"
+    upload_state.set_upload_state(uid, status="ada_error", ada_error=sonum)
+
+    r = client.get("/admin/upload/{}/status".format(uid), headers=_peis(login))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ada_error"
+    assert body["error"] == sonum

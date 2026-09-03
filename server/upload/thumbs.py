@@ -166,7 +166,7 @@ def poll_and_sync_thumbs(
         "ada_fetching", "ada_error",
     ) + upload_state.PREPRESS_IDLE_STATUSES:
         return _payload(state, upload_id, current_status, expected_pages,
-                        error=state.get("error_message"))
+                        error=state.get("error_message") or state.get("ada_error"))
 
     slug = state["meta"]["slug"]
     remote_work = f"{ocr_server_path}/{state['remote_work_path']}"
