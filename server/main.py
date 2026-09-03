@@ -65,6 +65,11 @@ async def lifespan(app: FastAPI):
     start_reocr_background()  # re-OCR restardi-jätkamine (AINULT API-protsessis); orbude
                               # taaste + reaper käivad taustalõimes, et maas OCR-server ei
                               # blokeeriks API käivitumist (#181)
+    # Rippuv ada_fetching → ada_error. Ilma selleta blokeeriks CAS „Laen uuesti"
+    # nupu igaveseks, sest upload_progress kadus restardiga.
+    from .ada.fetch import taasta_rippuvad_fetchid
+    threading.Thread(target=taasta_rippuvad_fetchid, daemon=True,
+                     name="ada-fetch-recovery").start()
     yield
     print("VUTT FastAPI sulgemine.")
 

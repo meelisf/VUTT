@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from ..ada import client as ada_client
+from ..ada import fetch as ada_fetch
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
 from ..upload import prepress, prepress_apply, prepress_plan
@@ -76,6 +77,24 @@ def admin_upload_status(upload_id: str, user=Depends(require_role("admin"))):
     # poll_and_sync_thumbs tagastab oma "status" välja (upload olek: pending/processing/done jne)
     # mis kirjutab üle siinsest "success" — seega tagastatav "status" on upload olek, mitte HTTP wrapper
     return poll_and_sync_thumbs(upload_id)
+
+
+@router.post("/admin/upload/{upload_id}/ada-fetch")
+def admin_upload_ada_fetch(upload_id: str, user=Depends(require_role("admin"))):
+    """Käivitab ADA failide allalaadimise taustalõimes.
+
+    SÜNKROONNE def: `alusta_fetchi` loeb ja kirjutab state.json-i (blokeeriv I/O).
+    """
+    if not _valid_upload_id(upload_id):
+        raise HTTPException(status_code=400, detail="Vigane upload_id")
+    state = upload_state.read_state(upload_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Uploadi ei leitud")
+    if not (state.get("ada") or {}).get("sources"):
+        raise HTTPException(status_code=400, detail="Sellel uploadil ei ole ADA lähtekaarti")
+    if not ada_fetch.alusta_fetchi(upload_id):
+        raise HTTPException(status_code=409, detail="Allalaadimine juba käib")
+    return {"status": "ada_fetching"}
 
 
 @router.get("/admin/upload/{upload_id}/thumb/{page_num}")

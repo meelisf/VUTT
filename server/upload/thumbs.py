@@ -162,6 +162,8 @@ def poll_and_sync_thumbs(
     # PREPRESS_IDLE_STATUSES: fail on VUTT-i poolel, OCR-serveris pole veel midagi
     if current_status in (
         "pending", "uploading", "error", "imported", "collecting_images",
+        # ADA allalaadimine käib VUTT-i poolel; OCR-serveris ei ole veel midagi.
+        "ada_fetching", "ada_error",
     ) + upload_state.PREPRESS_IDLE_STATUSES:
         return _payload(state, upload_id, current_status, expected_pages,
                         error=state.get("error_message"))

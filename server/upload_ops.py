@@ -228,6 +228,9 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
         "files": [],
         "created_at": datetime.now().isoformat(),
         "replace_work_id": meta.get('replace_work_id') or None,
+        # ADA lähtekaart. `sources` lehepiirid (`first_src_page`, `page_count`)
+        # täidab fetch alles pärast liitmist — siin on ainult nimed ja uuid-d.
+        "ada": meta.get('ada') or None,
     }
 
     lock = _get_upload_lock(upload_id)
