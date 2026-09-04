@@ -73,6 +73,8 @@ export function formatEta(seconds: number): string {
 export interface ReviewDerived {
   filesWithLocalDeleted: FileEntry[];
   readyCount: number;
+  /** Mitu lehte SAAB importida — tekstiga VÕI imporditava veaga (#294). */
+  importableCount: number;
   /** Lehed, mida server pole veel avaldanud — ruudustik näitab neid kohatäitena. */
   placeholderPages: number[];
   progress: PollResult['progress'];
@@ -105,6 +107,15 @@ export function computeReviewDerived(
     deleted: f.deleted || localDeleted.has(f.page),
   }));
   const readyCount = filesWithLocalDeleted.filter((f) => f.has_ocr && !f.deleted).length;
+  // Impordi värav EI OLE sama mis „valmis" loendur. `readyCount` tähendab „mitu
+  // lehte on TEKSTIGA" ja UI ütleb seda. Aga leht, mille mudel jättis tühjaks
+  // (kordusloop), on ADR 0025 järgi LAHENDATUD ja imporditav — skaneering on
+  // olemas ja inimene kirjutab teksti Workspace'is. Ühelehelisel teosel jäi
+  // `readyCount > 0` värav igavesti kinni ja teost ei saanud üldse importida (#294).
+  // `importable` puudub vanades state.json-ides → varutee `has_ocr`.
+  const importableCount = filesWithLocalDeleted.filter(
+    (f) => (f.importable ?? f.has_ocr) && !f.deleted,
+  ).length;
   // Kaks järjestikust faasi: brauser → VUTT (sendProgress, kliendi mõõdetud) ja
   // VUTT → OCR-server (pollResult.progress, backendi raporteeritud). Kui esimene
   // veel käib, näitame seda — polling ei tea sel hetkel failist veel midagi.
@@ -127,7 +138,7 @@ export function computeReviewDerived(
     processingStartedAt !== null
     && now - processingStartedAt > ocrTimeoutMs
     && status !== 'done' && status !== 'applying';
-  const canImport = (status === 'done' || ocrTimedOut) && readyCount > 0 && !importLoading;
+  const canImport = (status === 'done' || ocrTimedOut) && importableCount > 0 && !importLoading;
 
   // Kohatäited: lehed 1..planned, mida failide loendis veel ei ole. `planned_pages`
   // tuleb poolitusplaanist (33 lähtelehte + 27 poolitust = 60), sest `expected_pages`
@@ -142,5 +153,5 @@ export function computeReviewDerived(
     }
   }
 
-  return { filesWithLocalDeleted, readyCount, placeholderPages, progress, progressPct, status, ocrTimeoutMs, ocrTimedOut, canImport };
+  return { filesWithLocalDeleted, readyCount, importableCount, placeholderPages, progress, progressPct, status, ocrTimeoutMs, ocrTimedOut, canImport };
 }

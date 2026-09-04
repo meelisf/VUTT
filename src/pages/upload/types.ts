@@ -11,6 +11,14 @@ export interface FileEntry {
   deleted: boolean;
   /** OCR-serveri .err märgendi sisu — leht kukkus lõplikult läbi (#250). */
   ocr_error?: string;
+  /**
+   * Kas seda lehte SAAB teosesse importida (#294). Backend arvutab, frontend EI
+   * tõlgenda `.err` kategooriaid ise — sõnavara elab ainult `server/ocr_err.py`-s.
+   * Tekstiga leht on alati imporditav; veaga leht ainult `mudel`-kategoorias
+   * (skaneering korras, inimene kirjutab teksti — ADR 0025).
+   * Puudub vanas state.json-is; siis langeme tagasi `has_ocr`-ile.
+   */
+  importable?: boolean;
 }
 
 export interface PollResult {

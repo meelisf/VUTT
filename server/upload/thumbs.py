@@ -108,6 +108,21 @@ def _planned_pages(state: dict, expected_pages) -> Optional[int]:
     return expected_pages
 
 
+def on_importable(entry: dict) -> bool:
+    """Kas seda lehte saab teosesse importida.
+
+    Backend arvutab, frontend EI tõlgenda. `.err` kategooriate sõnavara elab
+    AINULT `ocr_err.py`-s — kahes kohas hoituna nad triivivad lahku (sama viga
+    tehti Meili atribuudinimekirjadega).
+
+    Leht on imporditav, kui tal ON tekst, VÕI kui viga on `mudel`-kategooriast:
+    skaneering on korras ja inimene kirjutab teksti Workspace'is (ADR 0025).
+    """
+    if entry.get("has_ocr"):
+        return True
+    return ocr_err.on_imporditav_tuhjana(entry.get("ocr_error"))
+
+
 def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -> dict:
     """Staatuse-vastuse ÜKS kuju.
 
@@ -279,6 +294,8 @@ def poll_and_sync_thumbs(
                 entry["ocr_error"] = sisu
                 # Kategooria otsustab, kas lehte saab tühjana importida (#250).
                 entry["ocr_error_kind"] = ocr_err.parse_err(sisu)[0]
+            # Värav frontendile. PEAB olema pärast `ocr_error` määramist.
+            entry["importable"] = on_importable(entry)
             new_files.append(entry)
 
         # --- Uus staatus ---
