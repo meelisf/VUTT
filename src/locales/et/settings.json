@@ -21,8 +21,6 @@
     "roleLabel": "Roll",
     "scopeLabel": "Toimetamine",
     "scopeAll": "kogu korpus",
-    "scopeCount_one": "{{count}} kollektsioon",
-    "scopeCount_other": "{{count}} kollektsiooni",
     "scopeNone": "ulatust pole määratud",
     "noneHint": "Sulle ei ole veel ühtki kollektsiooni määratud, seega ei saa sa tekste muuta. Pöördu administraatori poole.",
     "contributorHint": "Nendes kollektsioonides saad tekste toimetada. Mujal on tekst nähtav, aga redaktor on lukus.",

@@ -4,13 +4,14 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
+import { getCollectionColorClasses } from '../services/collectionService';
 import { describeWriteScope } from '../utils/roleUtils';
 import { Navigate } from 'react-router-dom';
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation(['settings', 'common']);
   const { user, userSettings, updateSettings } = useUser();
-  const { getCollectionName } = useCollection();
+  const { collections, getCollectionName } = useCollection();
 
   // Kirjutamisulatus (ADR 0031) — sama fail-closed loogika mis canEditWork'il.
   // Hook'id peavad olema enne varajast Navigate'i, seega arvutus talub user=null.
@@ -28,13 +29,22 @@ const Settings: React.FC = () => {
   const currentLang = (userSettings.language || (i18n.language.startsWith('et') ? 'et' : 'en')) as 'et' | 'en';
   const defaultTab = userSettings.default_tab || 'edit';
 
-  // Kokkuklapitud päise kokkuvõte: roll · ulatus
-  const scopeSummary =
-    scope.kind === 'all'
-      ? t('settings:permissions.scopeAll')
-      : scope.kind === 'collections'
-        ? t('settings:permissions.scopeCount', { count: scope.ids.length })
-        : t('settings:permissions.scopeNone');
+  // Kollektsiooni silt tema oma värvides (vt getCollectionColorClasses)
+  const collectionChip = (id: string) => {
+    const c = getCollectionColorClasses(collections[id] ?? null);
+    return (
+      <span
+        key={id}
+        className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-medium ${c.bg} ${c.text} ${c.border}`}
+      >
+        {getCollectionName(id, currentLang)}
+      </span>
+    );
+  };
+
+  // Kokkuklapitud päises näita kuni kaks silti, ülejäänud loendurina —
+  // pikk ulatus ei tohi päist lõhkuda.
+  const HEADER_CHIPS = 2;
 
   const handleLangChange = (lang: 'et' | 'en') => {
     updateSettings({ language: lang });
@@ -48,6 +58,75 @@ const Settings: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header showSearchButton={false} pageTitle={t('settings:pageTitle')} />
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Õigused — klapitav, vt ADR 0031 */}
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            {t('settings:permissions.heading')}
+          </h2>
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <button
+              onClick={() => setScopeToggled(!scopeOpen)}
+              aria-expanded={scopeOpen}
+              className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-gray-50 transition-colors rounded-lg"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                {scopeOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                {t('settings:permissions.title')}
+              </span>
+              <span className="flex flex-wrap items-center justify-end gap-1.5 text-xs text-gray-500">
+                <span className="font-semibold text-gray-900">{t(`common:roles.${user.role}`)}</span>
+                <span aria-hidden="true">·</span>
+                {scope.kind === 'collections' ? (
+                  <>
+                    {scope.ids.slice(0, HEADER_CHIPS).map(collectionChip)}
+                    {scope.ids.length > HEADER_CHIPS && <span>+{scope.ids.length - HEADER_CHIPS}</span>}
+                  </>
+                ) : (
+                  <span>
+                    {scope.kind === 'all'
+                      ? t('settings:permissions.scopeAll')
+                      : t('settings:permissions.scopeNone')}
+                  </span>
+                )}
+              </span>
+            </button>
+
+            {scopeOpen && (
+              <div className="px-4 pb-4 pt-1 border-t border-gray-100 space-y-3">
+                <div className="flex gap-3 text-sm">
+                  <span className="w-28 flex-shrink-0 text-xs font-medium text-gray-500 mt-0.5">
+                    {t('settings:permissions.roleLabel')}
+                  </span>
+                  <span className="font-semibold text-gray-900">{t(`common:roles.${user.role}`)}</span>
+                </div>
+
+                <div className="flex gap-3 text-sm">
+                  <span className="w-28 flex-shrink-0 text-xs font-medium text-gray-500 mt-0.5">
+                    {t('settings:permissions.scopeLabel')}
+                  </span>
+                  {scope.kind === 'collections' ? (
+                    <div className="flex flex-wrap gap-1.5">{scope.ids.map(collectionChip)}</div>
+                  ) : (
+                    <span className="text-gray-900">
+                      {scope.kind === 'all'
+                        ? t('settings:permissions.scopeAll')
+                        : t('settings:permissions.scopeNone')}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  {scope.kind === 'all'
+                    ? t('settings:permissions.allHint')
+                    : scope.kind === 'collections'
+                      ? t('settings:permissions.contributorHint')
+                      : t('settings:permissions.noneHint')}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Kasutajaliides */}
         <div>
@@ -111,66 +190,6 @@ const Settings: React.FC = () => {
                 {t('settings:workspace.info')}
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Õigused — klapitav, vt ADR 0031 */}
-        <div>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            {t('settings:permissions.heading')}
-          </h2>
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <button
-              onClick={() => setScopeToggled(!scopeOpen)}
-              aria-expanded={scopeOpen}
-              className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-gray-50 transition-colors rounded-lg"
-            >
-              <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                {scopeOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                {t('settings:permissions.title')}
-              </span>
-              <span className="text-xs text-gray-500 text-right">
-                {t(`common:roles.${user.role}`)} · {scopeSummary}
-              </span>
-            </button>
-
-            {scopeOpen && (
-              <div className="px-4 pb-4 pt-1 border-t border-gray-100 space-y-3">
-                <div className="flex gap-3 text-sm">
-                  <span className="w-28 flex-shrink-0 text-xs font-medium text-gray-500 mt-0.5">
-                    {t('settings:permissions.roleLabel')}
-                  </span>
-                  <span className="text-gray-900">{t(`common:roles.${user.role}`)}</span>
-                </div>
-
-                <div className="flex gap-3 text-sm">
-                  <span className="w-28 flex-shrink-0 text-xs font-medium text-gray-500 mt-0.5">
-                    {t('settings:permissions.scopeLabel')}
-                  </span>
-                  {scope.kind === 'collections' ? (
-                    <ul className="text-gray-900 space-y-1">
-                      {scope.ids.map((id) => (
-                        <li key={id}>{getCollectionName(id, currentLang)}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="text-gray-900">
-                      {scope.kind === 'all'
-                        ? t('settings:permissions.scopeAll')
-                        : t('settings:permissions.scopeNone')}
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-xs text-gray-500">
-                  {scope.kind === 'all'
-                    ? t('settings:permissions.allHint')
-                    : scope.kind === 'collections'
-                      ? t('settings:permissions.contributorHint')
-                      : t('settings:permissions.noneHint')}
-                </p>
-              </div>
-            )}
           </div>
         </div>
 
