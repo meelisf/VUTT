@@ -65,7 +65,13 @@ def _get(url: str) -> dict:
         raise AdaViga("Sellist kirjet ADA-s ei ole.")
     if not getattr(vastus, "ok", vastus.status_code == 200):
         raise AdaViga("ADA vastas veaga (HTTP {}).".format(vastus.status_code))
-    return vastus.json()
+    try:
+        return vastus.json()
+    except ValueError as e:
+        # HTTP 200 + mitte-JSON keha (nt hoolduslehekülg HTML-ina) — endpoint
+        # püüab kinni AINULT AdaViga, seega toores ValueError lekiks 500-ks.
+        logger.warning("ADA vastus ei ole loetav JSON: %s (%s)", url, type(e).__name__)
+        raise AdaViga("ADA vastas ootamatus vormingus. Proovi hiljem või täida vorm käsitsi.")
 
 
 def lookup(sisend: str) -> Dict[str, object]:
@@ -123,10 +129,19 @@ def lookup(sisend: str) -> Dict[str, object]:
             "tapsus": mapping.parse_failinime_kuupaev(nimi)[3],
         })
 
+    handle = item.get("handle")
+    if not handle:
+        # DSpace tagastab ALATI `handle`-välja — kui see puudub, on midagi
+        # anomaalset. Varem oli siin `or sisend`-fallback, aga see taastas
+        # täpselt selle vea, mille pärast handle tehti kanooniliseks: sisend
+        # võib olla toores URL või UUID, ja `hdl.handle.net/{see}` annab
+        # väärkuju igas tulevases provenance-kommentaaris (ADR 0022).
+        raise AdaViga("ADA kirjel puudub handle — ei saa importi jätkata.")
+
     return {
         # ADA item kannab ISE kanoonilist PALJAST handle'it, olenemata sellest,
-        # kas kirje leiti handle'i või UUID-ga. Toores sisend jääb ainult varuteeks.
-        "handle": item.get("handle") or sisend,
+        # kas kirje leiti handle'i või UUID-ga.
+        "handle": handle,
         "item_uuid": item_uuid,
         "meta": mapping.dc_vuttiks(item),
         "failid": failid,

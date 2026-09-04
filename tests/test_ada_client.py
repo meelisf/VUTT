@@ -133,6 +133,35 @@ def test_lookup_votab_ainult_original_kimbu(fake_ada, monkeypatch):
     assert "acd9a484-d0a6-43a2-b19f-d8cd2dbde692" in bitstream_paringud[0]
 
 
+def test_lookup_ilma_item_handleta_viskab_vea(monkeypatch):
+    """DSpace tagastab ALATI `handle`. Kui see siiski puudub, EI tohi
+    lookup() taastada vana `item.get("handle") or sisend`-fallback'i —
+    see andis pooltoorest sisendist (nt käsitsi kleebitud URL) väärkuju
+    `http://hdl.handle.net/https://dspace.ut.ee/handle/...` igas
+    tulevases provenance'is. Puuduv handle on serveri-poolne anomaalia,
+    mille peaks kõva veaga tagasi lükkama, mitte vaikselt fallbackima."""
+    item = json.loads((FIXTURES / "item.json").read_text(encoding="utf-8"))
+    item = dict(item)
+    item.pop("handle", None)
+    bundles = json.loads((FIXTURES / "bundles.json").read_text(encoding="utf-8"))
+    bitstreams = json.loads((FIXTURES / "bitstreams.json").read_text(encoding="utf-8"))
+
+    def fake_get(url, **kwargs):
+        if "/pid/find" in url:
+            return FakeVastus(item)
+        if "/core/items/" in url and "/bundles" not in url:
+            return FakeVastus(item)
+        if "/bundles" in url and "/bundles/" not in url:
+            return FakeVastus(bundles)
+        if "/bitstreams" in url:
+            return FakeVastus(bitstreams)
+        raise AssertionError("ootamatu URL: {}".format(url))
+
+    monkeypatch.setattr(client.requests, "get", fake_get)
+    with pytest.raises(client.AdaViga):
+        client.lookup("10062/7822")
+
+
 def test_lookup_ilma_pdf_ideta_viskab_vea(monkeypatch):
     item = json.loads((FIXTURES / "item.json").read_text(encoding="utf-8"))
     bundles = json.loads((FIXTURES / "bundles.json").read_text(encoding="utf-8"))
@@ -181,6 +210,22 @@ def test_lookup_kaerdatud_leheline_loend_viskab_vea(monkeypatch):
     sonum = exc.value.kasutaja_sonum
     assert "120" in sonum
     assert "2" in sonum
+
+
+def test_lookup_mitte_json_vastus_annab_adaviga_mitte_500(monkeypatch):
+    """HTTP 200 + HTML (nt hoolduslehekülg) — vastus.json() viskab
+    JSONDecodeError'i, mis endpoint ei püüa kinni (ainult AdaViga on
+    püütud) → praegu lekiks 500 disainis lubatud kõneka vea asemel."""
+    class HtmlVastus:
+        status_code = 200
+        ok = True
+
+        def json(self):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setattr(client.requests, "get", lambda url, **k: HtmlVastus())
+    with pytest.raises(client.AdaViga):
+        client.lookup("10062/7822")
 
 
 def test_lookup_404_annab_koneka_vea(monkeypatch):
