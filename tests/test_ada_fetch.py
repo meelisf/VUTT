@@ -336,3 +336,39 @@ def test_toota_katkestus_looke_ja_liitmise_vahel_ei_liida_ega_kirjuta(upload, tm
 
     assert liida_kutsutud == []
     assert not (tmp_path / upload).exists()
+
+
+def test_toota_koristuse_ebaonnestumine_ei_riku_edu(upload, tmp_path, monkeypatch):
+    """ADR 0028 I2 sama kuju: kettajäänuk pärast avaldamist on mittefataalne.
+    Siin on 'avaldamine' fetch'i awaiting_split-kirjutus — kui `os.rmdir`
+    ajutise ada/-kausta koristusel viskab (nt NFS-i viivitus, õigused), EI
+    tohi see kirjutada üle juba õnnestunud fetch'i tulemust ada_error'iks.
+    Koristus on omaette try-plokk täpselt selleks."""
+    allikad = [{"bitstream_uuid": "a", "size_bytes": 10, "name": "001.pdf"}]
+    upload_state.set_upload_state(
+        upload, ada={"handle": "10062/7822", "item_uuid": "u", "sources": allikad}
+    )
+
+    def fake_laadi_tykk(url, siht, oodatud):
+        pass  # allalaadimine on eraldi testitud (F2)
+
+    def fake_liida_pdfid(kaust, sihtfail, arv_tykke):
+        pass  # liitmine on eraldi testitud
+
+    def fake_lehtede_arv(pdf_path):
+        return 4
+
+    monkeypatch.setattr(fetch, "laadi_tykk", fake_laadi_tykk)
+    monkeypatch.setattr(fetch, "liida_pdfid", fake_liida_pdfid)
+    monkeypatch.setattr(fetch, "lehtede_arv", fake_lehtede_arv)
+
+    def kukkuv_rmdir(path):
+        raise OSError("simuleeritud NFS-viivitus")
+
+    monkeypatch.setattr(fetch.os, "rmdir", kukkuv_rmdir)
+
+    fetch._toota(upload)
+
+    s = upload_state.read_state(upload)
+    assert s["status"] == "awaiting_split"
+    assert s.get("ada_error") is None

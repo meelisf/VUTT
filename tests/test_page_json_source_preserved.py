@@ -3,8 +3,6 @@
 `editing.py` kirjutab meta_content'i kliendilt TERVIKUNA üle. `sequence` on
 eraldi säilitatud; `source` (ADA provenance) peab käituma samamoodi.
 """
-import json
-
 from server.routers.editing import merge_serveripoolsed_valjad
 
 
@@ -29,6 +27,16 @@ def test_klient_tohib_source_i_muuta_kui_saadab():
         {"source": {"provider": "ada"}}, {"source": {"provider": "kasitsi"}}
     )
     assert tulemus["source"] == {"provider": "kasitsi"}
+
+
+def test_sequence_null_ei_kaota_nulli():
+    """Falsy serv: sequence=0 on ÕIGE väärtus (esimene lehekülg), mitte
+    'väärtus puudub'. Kood kontrollib `is None`, mitte truthiness'i — see
+    test fikseerib selle, et tulevane 'lihtsustus' (`if not vana`) ei
+    murraks vaikselt 0-indeksiga lehti.
+    """
+    tulemus = merge_serveripoolsed_valjad({"sequence": 0}, {"sequence": None})
+    assert tulemus["sequence"] == 0
 
 
 def test_meta_content_wrapper_kuju():
