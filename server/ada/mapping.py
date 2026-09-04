@@ -124,7 +124,13 @@ def dc_vuttiks(item: dict) -> Dict[str, object]:
         "title": _pealkiri(item),
         "year": _esimene(item, "dc.date.issued") or "",
         "year_display": _esimene(item, "dc.coverage.temporal") or "",
-        "creators": [{"label": k["value"]} for k in _vaartused(item, "dc.contributor.author")],
+        # `name` on VUTT-i võti (mitte `label`) ja `auctor` on põhjendatud väide:
+        # `dc.contributor.author` ON definitsiooni järgi autor. Q-koodi/prosopograafia
+        # ID-d siin EI panda — automaatne nimesobitus tekitas duplikaat-ID-d (#240).
+        "creators": [
+            {"name": k["value"], "role": "auctor"}
+            for k in _vaartused(item, "dc.contributor.author")
+        ],
         "languages": keeled,
         "ester_id": ester,
         "archive_refs": [
