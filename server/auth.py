@@ -209,6 +209,7 @@ def verify_user(username, password):
         "name": users[username]["name"],
         "role": users[username].get("role", "contributor"),
         "allowed_collections": users[username].get("allowed_collections", []),
+        "edit_collections": users[username].get("edit_collections", []),
     }
 
 
@@ -312,6 +313,7 @@ def get_all_users():
             "role": user_data.get("role", "contributor"),
             "created_at": user_data.get("created_at"),
             "allowed_collections": user_data.get("allowed_collections", []),
+            "edit_collections": user_data.get("edit_collections", []),
         })
     # Sorteeri loomisaja järgi (uuemad ees), kui loomisaeg puudub, siis lõppu
     result.sort(key=lambda x: x.get("created_at") or "0000", reverse=True)
@@ -417,6 +419,61 @@ def update_user_allowed_collections(username, collection_ids, admin_user):
     delete_user_sessions(username)
     print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' kollektsioone: {old} -> {sanitized}")
     return True, "Kollektsioonid uuendatud", sanitized
+
+
+def update_user_edit_collections(username, collection_ids, admin_user):
+    """Muudab kasutaja kirjutamisulatust (edit_collections).
+
+    Erinevalt allowed_collections'ist (lugemisõigus piiratud kogudele) on see
+    KIRJUTAMISULATUS ja kehtib kõigile kollektsioonidele — contributor tohib
+    toimetada ka avalikku kollektsiooni, kui see on tema ulatuses (ADR 0031).
+    Sanitiseeritakse seega KÕIGI olemasolevate kollektsioonide, mitte ainult
+    restricted-nähtavusega kollektsioonide vastu.
+
+    Args:
+        username: Muudetava kasutaja kasutajanimi
+        collection_ids: Soovitud kollektsiooni-id-de list (kliendilt, valideerimata)
+        admin_user: Admin kasutaja, kes muudatuse teeb
+
+    Returns:
+        (success: bool, message: str, edit_collections: list[str])
+        edit_collections on serveris salvestatud (sanitiseeritud, deterministlikus
+        järjekorras) nimekiri — see on tõe allikas, mille frontend state'i kirjutab.
+        Vea korral on see [].
+    """
+    if not isinstance(username, str) or not username.strip():
+        return False, "Kasutajanimi puudub", []
+    if not isinstance(collection_ids, list):
+        return False, "Vigane kollektsioonide nimekiri", []
+
+    users = load_users()
+    if username not in users:
+        return False, "Kasutajat ei leitud", []
+
+    # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
+    target_role = users[username].get("role", "contributor")
+    if not can_manage_user(admin_user["role"], target_role):
+        return False, "Pole õigust selle kasutaja ulatust muuta", []
+
+    # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad id-d
+    # (KÕIK kollektsioonid, mitte ainult restricted), järjesta konfiguratsiooni
+    # järjekorra järgi (stabiilne diff).
+    collections_config = get_cached_collections()
+    submitted = {c for c in collection_ids if isinstance(c, str)}
+    sanitized = [cid for cid in collections_config if cid in submitted]
+
+    # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
+    old = users[username].get("edit_collections", [])
+    if old == sanitized:
+        return True, "Ulatus uuendatud", sanitized
+
+    users[username]["edit_collections"] = sanitized
+    save_users(users)
+    # Sessioon kannab kasutajaobjekti hetktõmmist (require_token tagastab
+    # session["user"]) — ilma invalideerimiseta jääks vana ulatus 24h kehtima.
+    delete_user_sessions(username)
+    print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' kirjutamisulatust: {old} -> {sanitized}")
+    return True, "Ulatus uuendatud", sanitized
 
 
 def delete_user(username, admin_user):
