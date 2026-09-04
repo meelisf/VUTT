@@ -50,3 +50,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0028](0028-vutt-materialiseerib-ocr-lehed.md) | VUTT materialiseerib OCR-i lehed ja avaldab lehthaaval; LOSS ainult OCR-ib | kehtib |
 | [0029](0029-ootel-reocr-loendur-on-teose-tasemel.md) | Ootel re-OCR loendur ja hulgi-rakendus on teose, mitte partii tasemel | kehtib |
 | [0030](0030-page-map-lahteleht-valjundlehtedeks.md) | `page_map` kaardistab lähtelehe kõigile temast tekkinud väljundlehtedele | kehtib |
+| [0031](0031-kirjutamisoigus-on-lugemisoigus-ja-ulatus.md) | Kirjutamisõigus = lugemisõigus JA ulatus; contributor toimetab ainult oma kollektsioonides | kehtib |
