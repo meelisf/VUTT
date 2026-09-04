@@ -150,6 +150,39 @@ def test_lookup_ilma_pdf_ideta_viskab_vea(monkeypatch):
     assert "PDF" in exc.value.kasutaja_sonum
 
 
+def test_lookup_kaerdatud_leheline_loend_viskab_vea(monkeypatch):
+    """DSpace 7 rakendab server-poolset `rest.max-page-size`-i — ?size=1000
+    ei ole tõend, et kõik bitstreamid tagastati. Kui `page.totalElements`
+    ületab tagastatud loendi pikkust, on nimekiri vaikimisi katkine ja
+    peab viskama sõnastatud vea, mitte vaikimisi importima poolik loend.
+    """
+    item = json.loads((FIXTURES / "item.json").read_text(encoding="utf-8"))
+    bundles = json.loads((FIXTURES / "bundles.json").read_text(encoding="utf-8"))
+    # Server ütleb, et kokku on 120 elementi, aga tagastab ainult 2 (nagu
+    # rest.max-page-size lõikaks lehe).
+    kaerdatud = {
+        "_embedded": {"bitstreams": [
+            {"name": "01.01.1800.pdf", "uuid": "u1", "sizeBytes": 10},
+            {"name": "02.01.1800.pdf", "uuid": "u2", "sizeBytes": 10},
+        ]},
+        "page": {"size": 100, "totalElements": 120},
+    }
+
+    def fake_get(url, **kwargs):
+        if "/pid/find" in url:
+            return FakeVastus(item)
+        if "/bundles" in url and "/bundles/" not in url:
+            return FakeVastus(bundles)
+        return FakeVastus(kaerdatud)
+
+    monkeypatch.setattr(client.requests, "get", fake_get)
+    with pytest.raises(client.AdaViga) as exc:
+        client.lookup("10062/7822")
+    sonum = exc.value.kasutaja_sonum
+    assert "120" in sonum
+    assert "2" in sonum
+
+
 def test_lookup_404_annab_koneka_vea(monkeypatch):
     monkeypatch.setattr(client.requests, "get", lambda url, **k: FakeVastus({}, status=404))
     with pytest.raises(client.AdaViga) as exc:

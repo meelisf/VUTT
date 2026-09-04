@@ -96,6 +96,18 @@ def lookup(sisend: str) -> Dict[str, object]:
     kimbu_sisu = _get("{}/core/bundles/{}/bitstreams?size=1000".format(BASE, original))
     koik = (kimbu_sisu.get("_embedded") or {}).get("bitstreams") or []
 
+    # DSpace 7 rakendab server-poolset `rest.max-page-size`-i — ?size=1000 ei
+    # ole tõend, et tagastati KÕIK bitstreamid, ainult et 65 (praeguse
+    # suurima kirje) jäi piirist alla. Kontrolli `page.totalElements` vastu:
+    # vaikimisi katkine loend importiks vaikselt poole teosest.
+    kogus_kokku = (kimbu_sisu.get("page") or {}).get("totalElements")
+    if kogus_kokku is not None and kogus_kokku > len(koik):
+        raise AdaViga(
+            "ADA teatas kokku {} failist kimbus, aga vastas ainult {}-ga "
+            "(serveri leheküljestuse piir). Impordi ei saa usaldada — "
+            "proovi hiljem või täida vorm käsitsi.".format(kogus_kokku, len(koik))
+        )
+
     pdfid = [b for b in koik if (b.get("name") or "").lower().endswith(".pdf")]
     vahele_jaetud = [b.get("name") or "?" for b in koik if b not in pdfid]
     if not pdfid:
