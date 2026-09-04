@@ -27,33 +27,45 @@ _ESTER = re.compile(r"record=(b\d+)")
 _HANDLE_URL = re.compile(r"hdl\.handle\.net/|/handle/")
 
 
-def parse_failinime_kuupaev(nimi: str) -> Tuple[int, int, int, int, str]:
-    """Failinimest sortimisvõti `(aasta, kuu, päev, täpsus, nimi)`.
+def parse_failinime_kuupaev(nimi: str) -> Tuple[int, int, int, int]:
+    """Failinimest sortimisvõti `(aasta, kuu, päev, täpsus)`.
 
     Täpsus hoitakse ERALDI, mitte ei võltsita puuduvat päeva 1-ks: `11.1815.pdf`
     on „1815, november, päev teadmata", mitte 1815-11-01. Praktiline järjestus on
     sama (0 < 1), aga kood ei väida teadmist, mida tal ei ole.
 
-    Parsimatu (`9997.pdf`) saab aasta 99999 → läheb lõppu, omavahel nime järgi.
+    Võtmes EI OLE failinime. Sama põhjus: nimi ei ole järjestusteave. Parsimatud
+    failid (`9997.pdf`, `klinger.fr.pdf`) saavad aasta 99999 → lähevad lõppu ja
+    jäävad seal `sorted`-i stabiilsuse tõttu ADA enda järjekorda.
     """
     tyvi = nimi[:-4] if nimi.lower().endswith(".pdf") else nimi
     m = _TAIS.match(tyvi)
     if m:
-        return (int(m.group(3)), int(m.group(2)), int(m.group(1)), 0, nimi)
+        return (int(m.group(3)), int(m.group(2)), int(m.group(1)), 0)
     m = _KUU.match(tyvi)
     if m:
-        return (int(m.group(2)), int(m.group(1)), 0, 1, nimi)
+        return (int(m.group(2)), int(m.group(1)), 0, 1)
     m = _AASTA.match(tyvi)
     if m and int(m.group(1)) <= 2100:
-        return (int(m.group(1)), 0, 0, 2, nimi)
-    return (99999, 0, 0, 3, nimi)
+        return (int(m.group(1)), 0, 0, 2)
+    return (99999, 0, 0, 3)
 
 
 def sordi_bitstreamid(bitstreams: List[dict]) -> List[dict]:
-    """Kronoloogiline järjestus failinimest.
+    """Kronoloogiline järjestus failinimest, MUUDE failide puhul ADA oma järjekord.
 
-    ADA enda bitstream-järjekord EI OLE usaldusväärne: näitekirjes on neli 1816.
-    aasta kirja loendi lõpus, ilmselt hiljem juurde lisatud.
+    ADA enda järjekord ei ole alati usaldusväärne — kirjes 10062/7822 on neli 1816.
+    aasta kirja loendi lõpus — seega dateeritud failid sorditakse.
+
+    Aga ADA failinimed EI OLE süsteemsed. Mõõdetud 2026-09-04, 10 kirjet
+    Morgensterni kogust: 127 PDF-ist parsis `dd.mm.yyyy` kujuga **null**. Nende
+    tähestikuline sortimine oli aktiivne kahju — kirjes 10062/1778 tõstis see
+    kirjaveaga `kinger.pdf` ette ja dateeritud kirjad lõppu, kuigi ADA oli need
+    mõistlikult järjestanud.
+
+    Seepärast: kus kuupäeva ei ole, ei mõtle import järjekorda välja. `sorted` on
+    stabiilne, seega võrdse võtmega failid jäävad ADA järjekorda. Admin tõstab
+    vajadusel halduses ümber (`POST /admin/work/{work_id}/reorder-pages`).
     """
     return sorted(bitstreams, key=lambda b: parse_failinime_kuupaev(b.get("name", "")))
 
