@@ -118,6 +118,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
       <CommentHistoryPanel
         page={_page}
+        work={work}
         comments={comments}
         setComments={setComments}
         onCommentsRestored={onCommentsRestored}

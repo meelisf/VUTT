@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, History as HistoryIcon } from 'lucide-react';
-import type { Annotation, Page } from '../../types';
-import { isAtLeast } from '../../utils/roleUtils';
+import type { Annotation, Page, Work } from '../../types';
+import { canEditWork } from '../../utils/roleUtils';
 import { fetchCommentHistory, restoreComment, type CommentHistory } from '../../services/commentHistoryService';
 import { lineDiff } from '../../utils/lineDiff';
 import MarkdownView from '../MarkdownView';
 
 interface CommentHistoryPanelProps {
   page: Page;
+  work?: Work;
   comments: Annotation[];
   setComments: (comments: Annotation[]) => void;
   onCommentsRestored?: (comments: Annotation[]) => void;
@@ -20,6 +21,7 @@ interface CommentHistoryPanelProps {
 // parenti sünkroniseeritakse ainult uue comments-massiiviga.
 const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
   page,
+  work,
   comments,
   setComments,
   onCommentsRestored,
@@ -32,7 +34,10 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
-  const canRestore = isAtLeast(user?.role, 'editor');
+  // Server lubab /page-comments/history ja /page-comments/restore contributor'ile
+  // TEMA ENDA kollektsiooni ulatuses (ADR 0031, can_write_work) — mitte ainult
+  // editor+'ile. Väravaks peab olema sama ulatuse-kontroll, mitte fikseeritud roll.
+  const canRestore = canEditWork(user, work);
   if (!canRestore) return null;
 
   const loadHistory = async (force = false) => {
