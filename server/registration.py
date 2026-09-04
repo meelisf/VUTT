@@ -9,7 +9,8 @@ import uuid
 import threading
 from datetime import datetime, timedelta
 from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE, get_logger
-from .auth import load_users, users_lock
+from .auth import load_users, users_lock, sanitize_edit_collections
+from .cache import get_cached_collections
 from .utils import atomic_write_json
 
 logger = get_logger(__name__)
@@ -191,6 +192,16 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
     admin- ega superadmin-kontot, ka mitte siis, kui päringu koostab
     superadmin ise. Rollitõstmine käib ALATI eraldi admin-tegevusena
     (update_user_role), mitte kutse kaudu.
+
+    Roll on kahe erineva "vale" väärtuse suhtes erineval moel fail-safe:
+    - PUUDUV roll (None — päringus polnud `role` võtit üldse) → "editor",
+      tagasiühilduvus vanade tokenite/kutsete käitumisega.
+    - OLEMAS, aga TUNDMATU roll (trükiviga, nt "contributer", või muu
+      lubamatu väärtus nagu "admin") → "contributor" (RANGEM, mitte laiem) —
+      fail-closed, sest see viitab kas veale kliendis või ründekatsele, mitte
+      tagasiühilduvusele. Vaikeväärtus `role="editor"` katab kutsujad, kes
+      argumenti üldse ei anna (nt vanad testid) — funktsioonisisene loogika
+      käsitleb seda samamoodi kui "puudub".
     """
     data = load_invite_tokens()
 
@@ -198,6 +209,14 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
     expires_at = datetime.now() + timedelta(hours=48)
     username = _next_available_username(email, data, preferred_username=username)
 
+    if role is None:
+        resolved_role = "editor"
+    elif role in ("contributor", "editor"):
+        resolved_role = role
+    else:
+        resolved_role = "contributor"
+
+    collections_config = get_cached_collections()
     token_data = {
         "token": token,
         "email": email.lower(),
@@ -207,8 +226,8 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
         "expires_at": expires_at.isoformat(),
         "created_by": created_by,
         "used": False,
-        "role": role if role in ("contributor", "editor") else "editor",
-        "edit_collections": [c for c in (edit_collections or []) if isinstance(c, str)],
+        "role": resolved_role,
+        "edit_collections": sanitize_edit_collections(edit_collections or [], collections_config),
     }
 
     data["tokens"].append(token_data)
@@ -329,11 +348,22 @@ def create_user_from_invite(token, password):
     from .auth import hash_password
     password_hash = hash_password(password)
 
+    # Teine klamber tarbimisteel (leid 6): token peaks juba sisaldama ainult
+    # lubatud rolli (create_invite_token kirjutab), aga ei usaldata pimesi —
+    # käsitsi muudetud/defektne tokenifail ei tohi anda laiemat rolli kui
+    # kinnine loend lubab. Puuduv võti (vanad tokenid) → "editor" (tagasiühilduvus,
+    # katab test_create_user_from_invite_handles_legacy_token_without_role_fields);
+    # olemas-aga-tundmatu väärtus → "contributor" (fail-closed, sama loend mis
+    # create_invite_token'is).
+    role = token_data.get("role", "editor")
+    if role not in ("contributor", "editor"):
+        role = "contributor"
+
     users[username] = {
         "password_hash": password_hash,
         "name": name,
         "email": email,
-        "role": token_data.get("role", "editor"),
+        "role": role,
         "edit_collections": token_data.get("edit_collections", []),
         "created_at": datetime.now().isoformat()
     }

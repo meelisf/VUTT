@@ -421,6 +421,29 @@ def update_user_allowed_collections(username, collection_ids, admin_user):
     return True, "Kollektsioonid uuendatud", sanitized
 
 
+def sanitize_edit_collections(collection_ids, collections_config):
+    """Ühine sanitiseerimine kirjutamisulatuse (edit_collections) jaoks.
+
+    Jätab alles ainult string-tüüpi id-d, mis eksisteerivad `collections_config`-is
+    JA EI OLE `virtual_group` — teosele ei saagi virtuaalset gruppi kunagi määrata
+    (vt frontend `MetadataModal.tsx`), seega ei saa see olla ka mõistlik
+    kirjutamisulatuse liige (ADR 0031). Server on tõe allikas, mitte UI: sama
+    filter kehtib nii kasutaja hilisemal muutmisel (`update_user_edit_collections`)
+    kui konto loomishetkel (`registration.create_invite_token`) — kaks kirjutajat,
+    kes ei tohi lahkneda.
+
+    Vigane sisend (mitte list) → tühi ulatus (fail-closed), mitte erind.
+    Tulemus on konfiguratsiooni järjekorras (deterministlik, stabiilne diff).
+    """
+    if not isinstance(collection_ids, list):
+        return []
+    submitted = {c for c in collection_ids if isinstance(c, str)}
+    return [
+        cid for cid, c in collections_config.items()
+        if cid in submitted and c.get("type") != "virtual_group"
+    ]
+
+
 def update_user_edit_collections(username, collection_ids, admin_user):
     """Muudab kasutaja kirjutamisulatust (edit_collections).
 
@@ -455,12 +478,11 @@ def update_user_edit_collections(username, collection_ids, admin_user):
     if not can_manage_user(admin_user["role"], target_role):
         return False, "Pole õigust selle kasutaja ulatust muuta", []
 
-    # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad id-d
-    # (KÕIK kollektsioonid, mitte ainult restricted), järjesta konfiguratsiooni
-    # järjekorra järgi (stabiilne diff).
+    # Sanitiseerimine (KÕIGI kollektsioonide vastu, mitte ainult restricted;
+    # virtual_group välja jäetud) — ühine tee registreerimise omaga, vt
+    # sanitize_edit_collections.
     collections_config = get_cached_collections()
-    submitted = {c for c in collection_ids if isinstance(c, str)}
-    sanitized = [cid for cid in collections_config if cid in submitted]
+    sanitized = sanitize_edit_collections(collection_ids, collections_config)
 
     # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
     old = users[username].get("edit_collections", [])

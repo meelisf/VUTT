@@ -61,7 +61,11 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     token_data = await run_in_threadpool(
         create_invite_token, reg["email"], reg["name"], user["username"],
         username=reg.get("username"),
-        role=data.get("role", "editor"),
+        # `role` võtme PUUDUMINE (None) ja OLEMAS-AGA-TUNDMATU väärtus on
+        # create_invite_token'ile erinev signaal (leid 5, ADR 0031) — ÄRA
+        # anna siin vaikeväärtust "editor", muidu kaob see vahe juba enne
+        # sinnajõudmist.
+        role=data.get("role"),
         edit_collections=data.get("edit_collections", []),
     )
     return {
