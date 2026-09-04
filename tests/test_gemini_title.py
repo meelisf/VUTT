@@ -40,6 +40,25 @@ def test_juhis_keelab_parisnimede_tolkimise(monkeypatch):
     assert "pärisnime" in juhis.lower() or "proper name" in juhis.lower()
 
 
+def test_erand_ei_logi_erandi_sisu_ainult_tuupi(monkeypatch, caplog):
+    """`_api_key()` kutsutakse try-ploki SEES (x-goog-api-key päise jaoks) —
+    vigane võti .env-is annab `requests.InvalidHeader`'i, mille sõnum
+    kannab päise väärtust ehk VÕTIT ennast. Logi tohib kanda ainult
+    erandi TÜÜPI (nagu transcribe() teeb), mitte erandi enda sõnumit —
+    vt 2026-07-14 API-võtme leke (feedback_saladused_tool_outputis)."""
+    monkeypatch.setattr(gemini, "GEMINI_API_KEY", "SALAJANE-VOTI-EI-TOHI-LOGISSE")
+
+    def kukub(*a, **k):
+        raise ValueError("header value: SALAJANE-VOTI-EI-TOHI-LOGISSE")
+
+    monkeypatch.setattr(gemini.requests, "post", kukub)
+    with caplog.at_level("WARNING"):
+        assert gemini.translate_title("Pealkiri") is None
+    logitud = "\n".join(r.getMessage() for r in caplog.records)
+    assert "SALAJANE-VOTI-EI-TOHI-LOGISSE" not in logitud
+    assert "ValueError" in logitud
+
+
 def test_tyhi_sisend_ei_kutsu_apit(monkeypatch):
     monkeypatch.setattr(gemini, "GEMINI_API_KEY", "võti")
     monkeypatch.setattr(gemini.requests, "post",

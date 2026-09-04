@@ -287,5 +287,9 @@ def translate_title(eestikeelne: str) -> Optional[str]:
         tolge = (_extract_text(vastus.json()) or "").strip()
         return tolge or None
     except Exception as e:
-        logger.warning("Pealkirja tõlge kukkus: %s", e)
+        # Ainult erandi TÜÜP, mitte erandi sõnum — `_api_key()` kutsutakse
+        # ülal päise ehitamiseks ja vigane võti annab `requests.InvalidHeader`'i,
+        # mille sõnum kannab päise väärtust (võtit ennast). Sama reegel mis
+        # transcribe()-s (vt rida 221, 232) pärast 2026-07-14 võtme leket.
+        logger.warning("Pealkirja tõlge kukkus: %s", type(e).__name__)
         return None
