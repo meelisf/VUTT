@@ -263,3 +263,59 @@ describe('applying-faas (ADR 0028)', () => {
     expect(tulem.ocrTimedOut).toBe(true);
   });
 });
+
+describe('computeReviewDerived — impordi värav .err lehtedel (#294)', () => {
+  it('lubab impordi, kui AINUS lehekülg on imporditava veaga', () => {
+    // Ühelehelise teose ainus leht sattus kordusloopi. Backend võtaks ta vastu
+    // (ADR 0025: mudeli viga = leht on lahendatud, inimene kirjutab teksti),
+    // aga `readyCount` luges ainult `has_ocr` → nupp jäi keelatuks ja teost EI
+    // SAANUD üldse importida.
+    const poll: PollResult = {
+      status: 'done', ready: 0, total: 1, expected_pages: 1,
+      files: [{
+        page: 1, filename: '1.jpg', has_ocr: false, deleted: false,
+        ocr_error: 'mudel: KordusLoop: periood 1 sõna, 780 kordust',
+        importable: true,
+      }],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false);
+    expect(out.canImport).toBe(true);
+    expect(out.readyCount).toBe(0); // „valmis" tähendab endiselt „tekstiga"
+  });
+
+  it('EI luba impordi, kui ainus viga on pildi-kategooriast', () => {
+    // `pilt` = skaneeringut ei saa avada → lehte ei saa ka käsitsi täita.
+    const poll: PollResult = {
+      status: 'done', ready: 0, total: 1, expected_pages: 1,
+      files: [{
+        page: 1, filename: '1.jpg', has_ocr: false, deleted: false,
+        ocr_error: 'pilt: UnidentifiedImageError: cannot identify image file',
+        importable: false,
+      }],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false);
+    expect(out.canImport).toBe(false);
+  });
+
+  it('kustutatud imporditav leht ei ava väravat', () => {
+    const poll: PollResult = {
+      status: 'done', ready: 0, total: 1, expected_pages: 1,
+      files: [{
+        page: 1, filename: '1.jpg', has_ocr: false, deleted: false,
+        ocr_error: 'mudel: KordusLoop', importable: true,
+      }],
+    };
+    const out = computeReviewDerived(poll, new Set([1]), null, false);
+    expect(out.canImport).toBe(false);
+  });
+
+  it('vana state.json ilma liputa langeb tagasi has_ocr peale', () => {
+    // Enne seda muudatust salvestatud upload'idel `importable` puudub.
+    const poll: PollResult = {
+      status: 'done', ready: 1, total: 1, expected_pages: 1,
+      files: [{ page: 1, filename: '1.jpg', has_ocr: true, deleted: false }],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false);
+    expect(out.canImport).toBe(true);
+  });
+});
