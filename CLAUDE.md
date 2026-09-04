@@ -187,7 +187,8 @@ Uus filtreeritav väli läheb **mõlemasse** nimekirja `meili_settings.py`-s:
 `FILTERABLE_ATTRIBUTES` (seed/täisreindeks) JA `RUNTIME_REQUIRED_FILTERABLE` — ainult
 teist rakendab `_ensure_filterable_attributes()` juba jooksvale instantsile. Ainult
 esimesse lisamine jätab välja tootmises filtreerimatuks: filter-päring ebaõnnestub,
-lai `except` neelab vea, funktsioon ei tööta kunagi ja miski ei anna sellest märku.
+ja kas keegi seda märkab, sõltub kutsujast — lai `except` ümber teeb sellest
+vaikse no-op'i.
 
 Kaks tekstivälja: `lehekylje_tekst` (**otsinguks puhastatud** — reavahetuse sidekriipsud liidetud,
 markup eemaldatud) vs `text_content` (**toores, redaktorile** — kõik märgendid alles, otsitav ei ole).
