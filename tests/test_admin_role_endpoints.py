@@ -106,3 +106,19 @@ def test_edit_collections_change_invalidates_sessions(client, login, backend_env
     )
     verify = client.post("/verify-token", json={"token": editor_token})
     assert verify.json()["valid"] is False
+
+
+def test_admin_cannot_edit_equal_level_edit_collections(client, login, backend_env, monkeypatch):
+    """Õiguste eskaleerumise regressioonivalvur (analoogne test_user_collections.py::
+    test_permission_denied_equal_level'ile, aga update_user_edit_collections'i jaoks).
+
+    admin ei tohi muuta teise admini (siin: iseenda) kirjutamisulatust —
+    can_manage_user peab nõudma RANGELT madalamat sihttaset."""
+    _patch_editable_collections(monkeypatch)
+    token = login("admin", "adminpass")
+    r = client.post(
+        "/admin/users/update-edit-collections",
+        json={"username": "admin", "edit_collections": ["sample"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 400
