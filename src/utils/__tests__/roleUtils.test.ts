@@ -57,4 +57,8 @@ describe('canEditWork', () => {
   it('keelab välja logitud kasutajal', () => {
     expect(canEditWork(null, work)).toBe(false);
   });
+
+  it('keelab undefined roll (fail-closed: = contributor) ilma kollektsioonita', () => {
+    expect(canEditWork({ edit_collections: ['oma'] }, { collections: [] })).toBe(false);
+  });
 });
