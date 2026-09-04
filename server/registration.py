@@ -178,8 +178,20 @@ def suggest_username_for_email(email):
     return username
 
 
-def create_invite_token(email, name, created_by, username=None):
-    """Loob uue invite tokeni (kehtiv 48h)."""
+def create_invite_token(email, name, created_by, username=None, role="editor",
+                        edit_collections=None):
+    """Loob uue invite tokeni (kehtiv 48h).
+
+    role ja edit_collections salvestatakse tokenisse, et konto tekiks
+    lõpliku õigusseisundiga — mitte kaheastmeliselt (ADR 0031 mõte:
+    kasutajaseisund on kontseptuaalselt atomaarne).
+
+    TURVAPIIR: role tuleb kliendilt (admini brauserist) ja on siin RANGELT
+    piiratud (contributor, editor) — kutselingi kaudu ei tohi kunagi tekkida
+    admin- ega superadmin-kontot, ka mitte siis, kui päringu koostab
+    superadmin ise. Rollitõstmine käib ALATI eraldi admin-tegevusena
+    (update_user_role), mitte kutse kaudu.
+    """
     data = load_invite_tokens()
 
     token = str(uuid.uuid4())
@@ -194,7 +206,9 @@ def create_invite_token(email, name, created_by, username=None):
         "created_at": datetime.now().isoformat(),
         "expires_at": expires_at.isoformat(),
         "created_by": created_by,
-        "used": False
+        "used": False,
+        "role": role if role in ("contributor", "editor") else "editor",
+        "edit_collections": [c for c in (edit_collections or []) if isinstance(c, str)],
     }
 
     data["tokens"].append(token_data)
@@ -309,9 +323,9 @@ def create_user_from_invite(token, password):
         username = f"{base_username}{counter}"
         counter += 1
 
-    # Loo uus kasutaja (vaikimisi editor-roll)
-    # Vaikimisi roll on 'editor' (mitte 'contributor'), kuna pending-edits voog
-    # pole veel implementeeritud. Muuta ainult koos /save endpointi uuendamisega.
+    # Roll ja kirjutamisulatus tulevad tokenist (valitud kinnitamisel) — kasutaja
+    # tekib kohe lõpliku õigusseisundiga. Vanadel tokenitel (enne seda muudatust
+    # loodud) need võtmed puuduvad täielikult, seega `.get()` vaikeväärtusega.
     from .auth import hash_password
     password_hash = hash_password(password)
 
@@ -319,7 +333,8 @@ def create_user_from_invite(token, password):
         "password_hash": password_hash,
         "name": name,
         "email": email,
-        "role": "editor",  # Oli: "contributor" - vt kommentaari ülal
+        "role": token_data.get("role", "editor"),
+        "edit_collections": token_data.get("edit_collections", []),
         "created_at": datetime.now().isoformat()
     }
 
@@ -334,4 +349,4 @@ def create_user_from_invite(token, password):
         return None, "Kasutaja loomine ebaõnnestus, palun proovi uuesti"
 
     logger.info(f"Loodud uus kasutaja: {username} ({name})")
-    return {"username": username, "name": name, "role": "editor"}, None
+    return {"username": username, "name": name, "role": users[username]["role"]}, None

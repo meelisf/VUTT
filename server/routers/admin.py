@@ -55,8 +55,14 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     if not reg or reg["status"] != "pending":
         raise HTTPException(status_code=400, detail="Vigane taotlus")
     await run_in_threadpool(update_registration_status, reg["id"], "approved", user["username"])
+    # Roll ja kirjutamisulatus valitakse SIIN, mitte hiljem kaheastmeliselt —
+    # create_invite_token piirab rolli sisemiselt (contributor, editor); admin
+    # ei saa kutselingi kaudu tekitada admin- ega superadmin-kontot.
     token_data = await run_in_threadpool(
-        create_invite_token, reg["email"], reg["name"], user["username"], username=reg.get("username")
+        create_invite_token, reg["email"], reg["name"], user["username"],
+        username=reg.get("username"),
+        role=data.get("role", "editor"),
+        edit_collections=data.get("edit_collections", []),
     )
     return {
         "status": "success",
@@ -66,6 +72,8 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         "email": token_data["email"],
         "username": token_data["username"],
         "name": token_data["name"],
+        "role": token_data["role"],
+        "edit_collections": token_data["edit_collections"],
     }
 
 

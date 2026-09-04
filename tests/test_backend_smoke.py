@@ -51,7 +51,7 @@ def test_user_chars_roundtrip_with_bearer_token(client, login, backend_env):
 
 def test_invite_set_password_consumes_token_once(client, backend_env):
     # Kolmas argument on created_by (kutsuva admini nimi), mitte uue kasutaja roll.
-    # Kõik invite-kasutajad saavad alati "editor" rolli (hardcoded create_user_from_invite).
+    # Rolli argumenti ei anta — create_invite_token vaikeväärtus on "editor".
     invite = backend_env["registration"].create_invite_token(
         "new.user@example.test",
         "New User",
