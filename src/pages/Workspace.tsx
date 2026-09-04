@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { isAtLeast } from '../utils/roleUtils';
+import { isAtLeast, canEditWork } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MeiliSearch } from 'meilisearch';
@@ -681,7 +681,7 @@ const Workspace: React.FC = () => {
             onSave={handleSave}
             onUnsavedChanges={setEditorChanges}
             onOpenMetaModal={isAtLeast(user?.role, 'admin') ? openMetaModal : undefined}
-            readOnly={!user}
+            readOnly={!canEditWork(user, work)}
             statusDirty={statusDirty}
             currentStatus={currentStatus}
             onStatusChange={user ? setCurrentStatus : undefined}
