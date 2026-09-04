@@ -27,7 +27,13 @@
     "sendEmail": "Saada e-kiri",
     "loadError": "Viga taotluste laadimisel",
     "approveError": "Kinnitamine ebaõnnestus",
-    "rejectError": "Tagasilükkamine ebaõnnestus"
+    "rejectError": "Tagasilükkamine ebaõnnestus",
+    "roleLabel": "Roll",
+    "roleEditor": "Toimetaja (kogu korpus)",
+    "roleContributor": "Kaastööline (valitud kollektsioonid)",
+    "editCollections": "Kirjutamisulatus",
+    "editCollectionsHint": "Kaastööline saab toimetada ainult neid kollektsioone.",
+    "editCollectionsNone": "Ulatust pole valitud — kaastööline ei saa midagi muuta"
   },
   "users": {
     "title": "Kasutajad",
@@ -60,7 +66,13 @@
     "addCollection": "lisa kogu",
     "removeCollection": "Eemalda {{name}}",
     "noRestrictedCollections": "Piiratud kogusid pole",
-    "collectionsUpdateFailed": "Kollektsioonide uuendamine ebaõnnestus"
+    "collectionsUpdateFailed": "Kollektsioonide uuendamine ebaõnnestus",
+    "roleLabel": "Roll",
+    "roleEditor": "Toimetaja (kogu korpus)",
+    "roleContributor": "Kaastööline (valitud kollektsioonid)",
+    "editCollections": "Kirjutamisulatus",
+    "editCollectionsHint": "Kaastööline saab toimetada ainult neid kollektsioone. Ulatuse muutmine katkestab kasutaja sessiooni — ta peab uuesti sisse logima.",
+    "editCollectionsNone": "Ulatust pole valitud — kaastööline ei saa midagi muuta"
   },
   "pending": {
     "title": "Ootel muudatused",

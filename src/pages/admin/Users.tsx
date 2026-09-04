@@ -26,6 +26,7 @@ interface User {
   role: 'contributor' | 'editor' | 'admin' | 'superadmin';
   created_at: string | null;
   allowed_collections?: string[];
+  edit_collections?: string[];
 }
 
 interface UsersResponse {
@@ -46,6 +47,16 @@ const UsersPage: React.FC = () => {
     () =>
       Object.entries(collections)
         .filter(([, c]) => c.visibility === 'restricted')
+        .map(([id, c]) => ({ id, name: c.name?.et || id }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'et')),
+    [collections]
+  );
+
+  // KÕIK kollektsioonid, mitte ainult restricted: kirjutamisulatus (edit_collections)
+  // kehtib ka avalikele kogudele — erinevalt allowed_collections'ist.
+  const allCollections = React.useMemo(
+    () =>
+      Object.entries(collections)
         .map(([id, c]) => ({ id, name: c.name?.et || id }))
         .sort((a, b) => a.name.localeCompare(b.name, 'et')),
     [collections]
@@ -169,6 +180,33 @@ const UsersPage: React.FC = () => {
       }
     } catch (e) {
       console.error('Collections change error:', e);
+      setUsersError(t('users.collectionsUpdateFailed'));
+    } finally {
+      setCollectionsUpdating(null);
+    }
+  };
+
+  // Kirjutamisulatuse (edit_collections) muutmine — sama muster mis allowed_collections'il:
+  // serveri vastus on tõe allikas. NB: server kustutab muudatusel kasutaja sessioonid
+  // (vana ulatus ei tohi jääda 24h kehtima), kasutaja peab uuesti sisse logima.
+  const handleEditCollectionsChange = async (username: string, nextScope: string[]) => {
+    setCollectionsUpdating(username);
+    setUsersError(null);
+    try {
+      const data = await apiPost<{ status: string; edit_collections?: string[]; message?: string }>(
+        '/admin/users/update-edit-collections',
+        { username, edit_collections: nextScope },
+        { token: authToken }
+      );
+      if (data.status === 'success') {
+        setUsers(users.map(u =>
+          u.username === username ? { ...u, edit_collections: data.edit_collections || [] } : u
+        ));
+      } else {
+        setUsersError(data.message || t('users.collectionsUpdateFailed'));
+      }
+    } catch (e) {
+      console.error('Edit collections update error:', e);
       setUsersError(t('users.collectionsUpdateFailed'));
     } finally {
       setCollectionsUpdating(null);
@@ -522,6 +560,38 @@ const UsersPage: React.FC = () => {
                           })()}
                         </div>
                       </div>
+
+                      {/* Kirjutamisulatus — ainult contributor'itel; kehtib KÕIGI kollektsioonide,
+                          mitte ainult piiratud kogude kohta */}
+                      {u.role === 'contributor' && (
+                        <div className="flex items-start gap-2">
+                          <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">
+                            {t('users.editCollections')}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap gap-2">
+                              {allCollections.map((c) => (
+                                <label key={c.id} className="flex items-center gap-1 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    disabled={!canManage || collectionsUpdating === u.username}
+                                    checked={(u.edit_collections || []).includes(c.id)}
+                                    onChange={(e) => {
+                                      const cur = u.edit_collections || [];
+                                      handleEditCollectionsChange(
+                                        u.username,
+                                        e.target.checked ? [...cur, c.id] : cur.filter((x) => x !== c.id)
+                                      );
+                                    }}
+                                  />
+                                  {c.name}
+                                </label>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{t('users.editCollectionsHint')}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Vähemoluline: loodud-kuupäev */}
