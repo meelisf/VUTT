@@ -175,6 +175,7 @@
     "fileCount": "{{count}} faili, {{size}}",
     "skipped": "Vahele jäetud (ei ole PDF): {{files}}",
     "duplicate": "See kirje näib olevat juba imporditud: „{{title}}\". Kordusimport võib olla tahtlik (nt parem skaneering).",
+    "duplicateLink": "Vaata olemasolevat teost",
     "precision": { "1": "ainult kuu", "2": "ainult aasta", "3": "dateerimata" },
     "machineTranslation": "masintõlge, kontrolli",
     "takeAda": "võta ADA oma",

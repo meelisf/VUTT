@@ -175,6 +175,7 @@
     "fileCount": "{{count}} files, {{size}}",
     "skipped": "Skipped (not a PDF): {{files}}",
     "duplicate": "This record appears to have been imported already: \"{{title}}\". A repeat import may be intentional (e.g. a better scan).",
+    "duplicateLink": "View existing work",
     "precision": { "1": "month only", "2": "year only", "3": "undated" },
     "machineTranslation": "machine translation, please check",
     "takeAda": "use ADA's value",

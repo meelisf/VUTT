@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, Loader2, AlertTriangle, Check } from 'lucide-react';
+import { ChevronDown, Loader2, AlertTriangle, Check, ExternalLink } from 'lucide-react';
 import type { AdaLookupResult, AdaVormiVali } from '../types';
 
 interface Props {
@@ -112,6 +112,17 @@ const AdaImportBar: React.FC<Props> = ({
                 <span className="text-amber-800">
                   {t('ada.duplicate', { title: tulemus.olemasolev.title })}
                 </span>
+                {/* Uus vaheleht — admin on pooleli viisardiga, navigeerimine samas
+                    aknas kaotaks vormi oleku. */}
+                <a
+                  href={`/work/${tulemus.olemasolev.work_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 flex items-center gap-1 text-primary-600 hover:underline w-fit"
+                >
+                  <ExternalLink size={11} />
+                  {t('ada.duplicateLink')}
+                </a>
               </div>
             )}
 
