@@ -100,9 +100,25 @@ def test_year_display_tuleb_coverage_temporalist(item):
 
 
 def test_creators_on_paljas_tekst_ilma_q_koodita(item):
-    """Automaatne prosopograafia-sidumine tekitas duplikaat-ID-d (#240)."""
+    """Automaatne prosopograafia-sidumine tekitas duplikaat-ID-d (#240).
+
+    Q-koodi EI panda. Aga võti peab olema `name` (VUTT-i kuju, mitte `label`) ja
+    roll `auctor` — `dc.contributor.author` ON definitsiooni järgi autor, seega
+    see on põhjendatud väide, mitte oletus.
+    """
     loojad = mapping.dc_vuttiks(item)["creators"]
-    assert loojad == [{"label": "Klinger, Friedrich Maximilian von"}]
+    assert loojad == [{"name": "Klinger, Friedrich Maximilian von", "role": "auctor"}]
+    assert "id" not in loojad[0], "Q-koodi/prosopograafia-ID EI tohi automaatselt tekkida"
+
+
+def test_creators_ei_kasuta_label_votit(item):
+    """`label` oli vale kuju: VUTT-i teosed kasutavad `name` (#293).
+
+    Vale võtmega kirje ei jõua UI-sse ja admin peab isiku käsitsi uuesti siduma.
+    """
+    for looja in mapping.dc_vuttiks(item)["creators"]:
+        assert "label" not in looja
+        assert looja["name"]
 
 
 def test_keel_kaardistub_iso_koodiks(item):
@@ -137,7 +153,8 @@ def test_subject_ei_lahe_tagidesse(item):
 def test_mitu_autorit_koik_sailivad():
     v = mapping.dc_vuttiks({"metadata": {"dc.contributor.author": [
         {"value": "Klinger, F. M. von"}, {"value": "Morgenstern, Karl"}]}})
-    assert [c["label"] for c in v["creators"]] == ["Klinger, F. M. von", "Morgenstern, Karl"]
+    assert [c["name"] for c in v["creators"]] == ["Klinger, F. M. von", "Morgenstern, Karl"]
+    assert all(c["role"] == "auctor" for c in v["creators"])
 
 
 def test_mitu_keelt_koik_tuntud_sailivad():
