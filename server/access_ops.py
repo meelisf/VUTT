@@ -48,7 +48,7 @@ def can_write_work(work_metadata: dict, user: Optional[dict]) -> bool:
         return False
     if not can_read_work(work_metadata, user):
         return False
-    if user.get("role") != "contributor":
+    if user.get("role", "contributor") != "contributor":
         return True
     scope = set(user.get("edit_collections", []))
     if not scope:

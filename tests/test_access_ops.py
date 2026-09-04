@@ -220,9 +220,25 @@ def test_contributor_without_field_writes_nothing():
     assert can_write_work(meta, {"username": "c", "role": "contributor"}) is False
 
 
+def test_user_without_role_field_cannot_write():
+    """Leid 2: `can_read_work` kasutab `user.get("role", "contributor")`, aga
+    `can_write_work` kasutas varem `user.get("role")` ilma vaikeväärtuseta —
+    puuduva `role`-iga (osaline) kasutajaobjekt tõlgendati kui `None != "contributor"`
+    ehk editor+-na ja ulatusest mööda pääseti (fail-open). Vaikeväärtus peab olema
+    "contributor" (fail-closed): puuduv role + puuduv edit_collections = tühi ulatus."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, {"username": "c"}) is False
+
+
 def test_decision_does_not_consult_derived_index(monkeypatch):
     """ADR 0031 invariant 2: õigusotsus ei tohi puudutada work_collections_index'it.
-    Kui mõni tulevane muudatus paneb ta sellest sõltuma, kukub see test."""
+    Kui mõni tulevane muudatus paneb ta sellest sõltuma, kukub see test.
+
+    See katab KÄITUSAEGSE kutsekuju (`indices._load_work_collections()`, mooduli
+    kaudu). Importaegset sidumist (`from ... import _load_work_collections`) see
+    ei taba — selle katab paariline test allpool,
+    `test_access_ops_source_does_not_reference_derived_index`."""
     from server.access_ops import can_write_work
     import server.prosopography.indices as indices
 
@@ -232,3 +248,26 @@ def test_decision_does_not_consult_derived_index(monkeypatch):
     monkeypatch.setattr(indices, "_load_work_collections", _explode)
     meta = {"collections": ["col-public"]}
     assert can_write_work(meta, _contributor(["col-public"])) is True
+
+
+def test_access_ops_source_does_not_reference_derived_index():
+    """ADR 0031 invariant 2, teine katsevorm: staatiline kontroll importaegse
+    sideme vastu.
+
+    Eelmine test (test_decision_does_not_consult_derived_index) püüab kinni
+    KÄITUSAEGSE kutse kujul `indices._load_work_collections()` — monkeypatch
+    asendab mooduli atribuudi. Aga kui `access_ops.py` impordiks funktsiooni
+    otse nime kaudu (`from .prosopography.indices import _load_work_collections`,
+    nagu juba tehakse `server/routers/public.py:16`-s), oleks nimi juba
+    importimise ajal originaaliga seotud ja mooduli-atribuudi monkeypatch ei
+    mõjuks — käitusaegne test jääks roheliseks, kuigi rikkumine on olemas.
+    Seepärast kontrollib see teine, sõltumatu test otse lähtekoodi stringi
+    tasandil: kummagi vormi jälge (importi ega otsest viidet) ei tohi
+    `access_ops.py`-s olla.
+    """
+    import inspect
+    import server.access_ops as access_ops
+
+    source = inspect.getsource(access_ops)
+    assert "_load_work_collections" not in source
+    assert "work_collections_index" not in source
