@@ -231,6 +231,17 @@ def test_user_without_role_field_cannot_write():
     assert can_write_work(meta, {"username": "c"}) is False
 
 
+def test_contributor_role_none_fails_closed():
+    """Leid 7: `{"role": None}` (võti EKSISTEERIB, väärtus None) ei tohi
+    `.get("role", "contributor")` vaikeväärtusest mööda pääseda — see rakendub
+    ainult puuduva võtme korral, mitte None väärtuse korral. Enne parandust
+    tõlgendati None kui "mitte contributor" ehk piiramatu kirjutus (fail-open)."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    user = {"username": "c", "role": None, "edit_collections": []}
+    assert can_write_work(meta, user) is False
+
+
 def test_decision_does_not_consult_derived_index(monkeypatch):
     """ADR 0031 invariant 2: õigusotsus ei tohi puudutada work_collections_index'it.
     Kui mõni tulevane muudatus paneb ta sellest sõltuma, kukub see test.
@@ -271,3 +282,7 @@ def test_access_ops_source_does_not_reference_derived_index():
     source = inspect.getsource(access_ops)
     assert "_load_work_collections" not in source
     assert "work_collections_index" not in source
+    # Sama invariant kehtib ka konstandi-teele: `server/config.py`-s elab
+    # `WORK_COLLECTIONS_INDEX_FILE`, mille kaudu saaks indeksit lugeda ilma
+    # eelmiste stringideta kokku puutumata.
+    assert "WORK_COLLECTIONS_INDEX_FILE" not in source

@@ -53,7 +53,11 @@ def can_write_work(work_metadata: dict, user: Optional[dict]) -> bool:
         return False
     if not can_read_work(work_metadata, user):
         return False
-    if user.get("role", "contributor") != "contributor":
+    # `.get(key, default)` ei asenda `None`-i, kui võti EKSISTEERIB väärtusega None
+    # (nt {"role": None}) — vaikeväärtus rakendub ainult puuduva võtme korral. Seepärast
+    # `or`, mitte `.get(..., "contributor")` üksi: fail-closed ka role=None puhul.
+    role = user.get("role") or "contributor"
+    if role != "contributor":
         return True
     scope = set(user.get("edit_collections", []))
     if not scope:
