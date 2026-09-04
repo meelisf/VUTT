@@ -197,6 +197,13 @@ markup eemaldatud) vs `text_content` (**toores, redaktorile** — kõik märgend
 `save_work_metadata` tagastab `(meta, changed)`. Salvestamine EI paranda enam Meili lahknevust —
 selleks on reindeks. Meili sünk koondatakse teose kaupa, dirty-lipp elab vea üle (ADR 0013).
 
+**Õigused (ADR 0031)** — kirjutamisõigus on **lugemisõigus JA ulatus**, mõlemad
+`can_write_work`-is (`server/access_ops.py`). Kirjutamisulatus (`edit_collections`,
+ainult `contributor`) ei anna KUNAGI lugemisõigust; lugemisõigus on
+`allowed_collections`. Uus kirjutustee kutsub `can_write_work`-i, ei kirjuta oma
+kontrolli. Õigusotsust EI tehta `work_collections_index.json` põhjal — see on
+read-model (ADR 0007); autoriteet on `_metadata.json`.
+
 **Marginaalia (ADR 0003, 0009)** — iga sisuline füüsiline marginaaliarida on eraldi `<m>…</m>`
 plokk; `<m>` on VÄLIMINE täg ega sisalda reavahetust. Järjestikused plokid koondatakse üheks
 kaardiks ainult renderduses (`groupMarginaliaBlocks`). Normaliseerimine toimub **ainult

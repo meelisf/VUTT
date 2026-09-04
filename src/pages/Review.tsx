@@ -4,11 +4,10 @@
  * Näitab Git-põhiseid viimaseid muudatusi. Kasutajad näevad oma muudatusi,
  * admin näeb kõiki.
  * 
- * MÄRKUS: Algselt oli see leht mõeldud pending-edits ülevaatuseks
- * (contributor-rolli kasutajate muudatuste kinnitamiseks). See süsteem
- * on implementeeritud (vt server/pending_edits.py), kuid ei ole kasutusel,
- * kuna tekitab liiga suure halduskoormuse. Praegu on see leht lihtsalt
- * Git ajaloo vaatamiseks.
+ * MÄRKUS: Algselt oli see leht mõeldud pending-edits ülevaatuseks (contributor-rolli
+ * muudatuste kinnitamiseks). See süsteem ehitati ja EEMALDATI (099d0ad), sest
+ * eelkinnitamine tekitas liiga suure halduskoormuse. Järelevalve käib nüüd nähtavuse
+ * kaudu: vt ADR 0031 ja spekk 2026-09-04-contributor-kollektsiooni-ulatus-design.md.
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

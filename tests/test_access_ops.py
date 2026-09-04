@@ -155,3 +155,80 @@ def test_generate_meili_token_with_collection(monkeypatch):
     payload = jwt.decode(token, "test-key-32-chars-long-padding-x", algorithms=["HS256"])
     assert 'collections_hierarchy IN ["herrnhuter"]' in payload["searchRules"]["teosed"]["filter"]
     assert "is_public = true" in payload["searchRules"]["teosed"]["filter"]
+
+
+# ---- can_write_work: contributor'i kollektsiooni-ulatus (ADR 0031) ----
+
+def _contributor(edit_collections, allowed_collections=None):
+    return {
+        "username": "contrib",
+        "role": "contributor",
+        "edit_collections": edit_collections,
+        "allowed_collections": allowed_collections or [],
+    }
+
+
+def test_contributor_can_write_own_collection():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, _contributor(["col-public"])) is True
+
+
+def test_contributor_cannot_write_other_collection():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, _contributor(["col-muu"])) is False
+
+
+def test_contributor_cannot_write_work_without_collections():
+    from server.access_ops import can_write_work
+    assert can_write_work({"collections": []}, _contributor(["col-public"])) is False
+
+
+def test_contributor_with_empty_scope_writes_nothing():
+    from server.access_ops import can_write_work
+    assert can_write_work({"collections": ["col-public"]}, _contributor([])) is False
+
+
+def test_contributor_scope_does_not_grant_read_access():
+    """Invariant 1: kirjutamisulatus EI muutu kaudseks lugemisõiguseks.
+    edit_collections=["col-restricted"], aga allowed_collections=[] → keeld."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-restricted"]}
+    user = _contributor(["col-restricted"], allowed_collections=[])
+    assert can_write_work(meta, user) is False
+
+
+def test_contributor_writes_restricted_with_both_fields():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-restricted"]}
+    user = _contributor(["col-restricted"], allowed_collections=["col-restricted"])
+    assert can_write_work(meta, user) is True
+
+
+def test_editor_ignores_edit_collections():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    user = {"username": "ed", "role": "editor", "edit_collections": [], "allowed_collections": []}
+    assert can_write_work(meta, user) is True
+
+
+def test_contributor_without_field_writes_nothing():
+    """Puuduv edit_collections = tühi ulatus (fail-closed)."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, {"username": "c", "role": "contributor"}) is False
+
+
+def test_decision_does_not_consult_derived_index(monkeypatch):
+    """ADR 0031 invariant 2: õigusotsus ei tohi puudutada work_collections_index'it.
+    Kui mõni tulevane muudatus paneb ta sellest sõltuma, kukub see test."""
+    from server.access_ops import can_write_work
+    import server.prosopography.indices as indices
+
+    def _explode(*args, **kwargs):
+        raise AssertionError("õigusotsus ei tohi tuletatud indeksit lugeda")
+
+    monkeypatch.setattr(indices, "_load_work_collections", _explode)
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, _contributor(["col-public"])) is True
