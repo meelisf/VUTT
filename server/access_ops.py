@@ -1,6 +1,11 @@
+import json
+import os
+from typing import Optional
+
+from fastapi import HTTPException
+
 from .cache import get_cached_collections
 from .auth import is_at_least
-from typing import Optional
 
 
 def is_work_public(work_metadata: dict) -> bool:
@@ -54,3 +59,30 @@ def can_write_work(work_metadata: dict, user: Optional[dict]) -> bool:
     if not scope:
         return False
     return bool(scope & set(work_metadata.get("collections", [])))
+
+
+def require_catalog_access(catalog: str, user: dict, base_dir: str,
+                           *, write: bool = False) -> dict:
+    """Loeb teose meta ja kontrollib ligipääsu. Fail-closed: vigane või puuduv
+    meta ei tähenda avalikku teost.
+
+    base_dir on parameeter, mitte mooduli konstant, sest kutsuja moodul (editing,
+    notifications) omab oma BASE_DIR-i ja testid patchivad just seda.
+    """
+    if not catalog or catalog != os.path.basename(catalog):
+        raise HTTPException(status_code=400, detail="Vigane teose tee")
+    work_dir = os.path.join(base_dir, catalog)
+    meta_path = os.path.join(work_dir, "_metadata.json")
+    if not os.path.isdir(work_dir) or not os.path.exists(meta_path):
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Teose metaandmeid ei saa praegu lugeda")
+    if not isinstance(meta, dict):
+        raise HTTPException(status_code=503, detail="Teose metaandmed on vigased")
+    allowed = can_write_work(meta, user) if write else can_read_work(meta, user)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Puudub õigus sellele teosele")
+    return meta

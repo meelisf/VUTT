@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
-from ..access_ops import can_read_work, can_write_work
+from ..access_ops import require_catalog_access
 from ..auth import is_at_least
 from ..cache import get_cached_suggestions
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
@@ -59,30 +59,10 @@ def merge_serveripoolsed_valjad(olemasolev: dict, kliendilt: dict) -> dict:
     return tulemus
 
 
-def _read_catalog_metadata(catalog: str) -> dict:
-    """Laeb teose meta ligipääsukontrolliks; vigane/puuduv meta on fail-closed."""
-    if not catalog or catalog != os.path.basename(catalog):
-        raise HTTPException(status_code=400, detail="Vigane teose tee")
-    work_dir = os.path.join(BASE_DIR, catalog)
-    meta_path = os.path.join(work_dir, "_metadata.json")
-    if not os.path.isdir(work_dir) or not os.path.exists(meta_path):
-        raise HTTPException(status_code=404, detail="Teost ei leitud")
-    try:
-        with open(meta_path, "r", encoding="utf-8") as f:
-            meta = json.load(f)
-    except Exception:
-        raise HTTPException(status_code=503, detail="Teose metaandmeid ei saa praegu lugeda")
-    if not isinstance(meta, dict):
-        raise HTTPException(status_code=503, detail="Teose metaandmed on vigased")
-    return meta
-
-
 def _require_catalog_access(catalog: str, user: dict, *, write: bool = False) -> dict:
-    meta = _read_catalog_metadata(catalog)
-    allowed = can_write_work(meta, user) if write else can_read_work(meta, user)
-    if not allowed:
-        raise HTTPException(status_code=403, detail="Puudub õigus sellele teosele")
-    return meta
+    """Õhuke wrapper jagatud helperi ümber — annab kaasa selle mooduli enda
+    BASE_DIR-i (testid patchivad `editing.BASE_DIR`, mitte `access_ops`-i)."""
+    return require_catalog_access(catalog, user, BASE_DIR, write=write)
 
 
 def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
@@ -99,11 +79,9 @@ def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
 
 
 @router.post("/save")
-# NB: contributor roll on reserveeritud tulevaste pending-edits funktsioonide jaoks.
-# Praegu loob registreerimine kõik kasutajad 'editor' rolliga (registration.py).
-# Kui contributor-roll kunagi aktiveeritakse, tuleb /save endpoint uuendada
-# (hetkel nõuab 'editor' miinimumi, mis blokeerib contributor kasutajate salvestused).
-async def save(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
+# NB: contributor tohib salvestada, aga ainult oma edit_collections'i teostesse —
+# ulatuse kontrollib _require_catalog_access(write=True) allpool (ADR 0031).
+async def save(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
     text = unicodedata.normalize('NFC', data.get('text_content', '')) if data.get('text_content') else ""
     # Marginaalia-tägid kanoonilisele kujule (<m> välimiseks) — hoiab failid puhtana
@@ -192,7 +170,7 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
     return {"status": "success", "changed": changed}
 
 @router.post("/get-work-metadata")
-async def get_work_meta_direct(request: Request, user=Depends(require_role("editor"))):
+async def get_work_meta_direct(request: Request, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
     path = find_directory_by_id(data.get("work_id"))
     if path is None:
@@ -204,7 +182,7 @@ async def get_work_meta_direct(request: Request, user=Depends(require_role("edit
     return {"status": "success", "metadata": metadata}
 
 @router.post("/get-metadata-suggestions")
-async def metadata_suggestions(request: Request, user=Depends(require_role("editor"))):
+async def metadata_suggestions(request: Request, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
     return {"status": "success", **get_cached_suggestions(data.get('lang', 'et'))}
 
@@ -258,7 +236,7 @@ async def recent_edits(request: Request, user=Depends(get_user)):
     return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": is_at_least(user['role'], 'admin')}
 
 @router.post("/git-history")
-async def git_history(request: Request, user=Depends(require_role("editor"))):
+async def git_history(request: Request, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
     catalog = os.path.basename(data.get('original_path', ''))
     filename = os.path.basename(data.get('file_name', ''))
@@ -270,7 +248,7 @@ async def git_history(request: Request, user=Depends(require_role("editor"))):
     return {"status": "success", "history": history}
 
 @router.post("/commit-diff")
-async def commit_diff(request: Request, user=Depends(require_role("editor"))):
+async def commit_diff(request: Request, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
     commit_hash = data.get('commit_hash')
     catalog, clean_path = _catalog_from_filepath(data.get('filepath', ''))
@@ -328,7 +306,7 @@ def _read_current_comments(json_path):
 
 
 @router.post("/page-comments/history")
-async def page_comments_history(request: Request, user=Depends(require_role("editor"))):
+async def page_comments_history(request: Request, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
     _catalog, _filename, json_relpath, json_path, _txt = _validate_page_paths(data)
     await run_in_threadpool(_require_catalog_access, _catalog, user)
@@ -339,7 +317,7 @@ async def page_comments_history(request: Request, user=Depends(require_role("edi
 
 @router.post("/page-comments/restore")
 async def page_comments_restore(
-    request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))
+    request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("contributor"))
 ):
     data = await get_json_data(request)
     mode = data.get('mode')
@@ -393,7 +371,7 @@ async def page_comments_restore(
 
 
 @router.post("/git-restore")
-async def git_restore(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
+async def git_restore(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename:
