@@ -233,6 +233,22 @@ export function buildCollectionTree(collections: Collections): CollectionTreeNod
 }
 
 /**
+ * Tagastab kollektsioonid, millele saab teose määrata (id + kuvanimi, sorditud nime järgi).
+ * Kasutatakse kirjutamisulatuse valijates (contributor'i edit_collections) — virtual_group
+ * on välja jäetud, sest teosele ei saagi seda kunagi määrata (vt MetadataModal), mistõttu
+ * see ei saa olla ka mõistlik kirjutamisulatuse liige.
+ */
+export function getWritableCollectionOptions(
+  collections: Collections,
+  lang: 'et' | 'en' = 'et'
+): Array<{ id: string; name: string }> {
+  return Object.entries(collections)
+    .filter(([, c]) => c.type !== 'virtual_group')
+    .map(([id, c]) => ({ id, name: c.name?.[lang] || c.name?.et || id }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'et'));
+}
+
+/**
  * Tühjenda vahemälu (nt pärast admin muudatusi).
  */
 export function clearCache(): void {

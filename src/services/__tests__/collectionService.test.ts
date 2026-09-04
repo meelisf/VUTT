@@ -12,6 +12,7 @@ import {
   buildCollectionTree,
   getCollections,
   getVocabularies,
+  getWritableCollectionOptions,
   clearCache,
   Collection,
   Collections,
@@ -113,6 +114,37 @@ describe('buildCollectionTree', () => {
     expect(tree[0].id).toBe('root');
     expect(tree[0].children.length).toBe(1);
     expect(tree[0].children[0].id).toBe('child');
+  });
+});
+
+describe('getWritableCollectionOptions', () => {
+  it('jätab virtual_group tüüpi kollektsioonid välja', () => {
+    const cols = {
+      grupp: { name: { et: 'Grupp', en: 'Group' }, type: 'virtual_group' },
+      a: { name: { et: 'Aakadeemia', en: 'Academy' } },
+      b: { name: { et: 'Bibliotheca', en: 'Library' } },
+    } as unknown as Collections;
+    const options = getWritableCollectionOptions(cols);
+    expect(options.map(o => o.id)).toEqual(['a', 'b']);
+    expect(options.find(o => o.id === 'grupp')).toBeUndefined();
+  });
+
+  it('sorditakse kuvanime järgi', () => {
+    const cols = {
+      z: { name: { et: 'Ülikool', en: 'University' } },
+      a: { name: { et: 'Akadeemia', en: 'Academy' } },
+    } as unknown as Collections;
+    expect(getWritableCollectionOptions(cols).map(o => o.id)).toEqual(['a', 'z']);
+  });
+
+  it('kasutab en nime, kui lang=en, fallback et-le', () => {
+    const cols = {
+      a: { name: { et: 'Eesti', en: 'English' } },
+      b: { name: { et: 'Ainult eesti', en: '' } },
+    } as unknown as Collections;
+    const options = getWritableCollectionOptions(cols, 'en');
+    expect(options.find(o => o.id === 'a')?.name).toBe('English');
+    expect(options.find(o => o.id === 'b')?.name).toBe('Ainult eesti');
   });
 });
 

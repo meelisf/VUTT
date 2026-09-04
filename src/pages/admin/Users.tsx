@@ -16,6 +16,7 @@ import {
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
+import { getWritableCollectionOptions } from '../../services/collectionService';
 import { apiPost } from '../../services/apiClient';
 import { ROLE_LEVELS, canManageUser, assignableRoles, roleLevel } from '../../utils/roleUtils';
 
@@ -53,12 +54,10 @@ const UsersPage: React.FC = () => {
   );
 
   // KÕIK kollektsioonid, mitte ainult restricted: kirjutamisulatus (edit_collections)
-  // kehtib ka avalikele kogudele — erinevalt allowed_collections'ist.
+  // kehtib ka avalikele kogudele — erinevalt allowed_collections'ist. virtual_group on
+  // välja jäetud (vt getWritableCollectionOptions).
   const allCollections = React.useMemo(
-    () =>
-      Object.entries(collections)
-        .map(([id, c]) => ({ id, name: c.name?.et || id }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'et')),
+    () => getWritableCollectionOptions(collections),
     [collections]
   );
 

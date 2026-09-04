@@ -3,6 +3,7 @@ import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCollection } from '../../contexts/CollectionContext';
+import { getWritableCollectionOptions } from '../../services/collectionService';
 import {
   UserPlus,
   Check,
@@ -76,12 +77,9 @@ const Registrations: React.FC = () => {
 
   // KÕIK kollektsioonid, mitte ainult restricted: kirjutamisulatus kehtib ka
   // avalikele kogudele (erinevalt allowed_collections'ist, mis mõjutab ainult
-  // piiratud kogusid).
+  // piiratud kogusid). virtual_group on välja jäetud (vt getWritableCollectionOptions).
   const allCollections = React.useMemo(
-    () =>
-      Object.entries(collections)
-        .map(([id, c]) => ({ id, name: c.name?.et || id }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'et')),
+    () => getWritableCollectionOptions(collections),
     [collections]
   );
 
