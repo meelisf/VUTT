@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useCollection } from '../../contexts/CollectionContext';
+import { getWritableCollectionOptions } from '../../services/collectionService';
 import {
   UserPlus,
   Check,
@@ -55,6 +57,7 @@ interface RegistrationActionResponse extends InviteResult {
 const Registrations: React.FC = () => {
   const { t } = useTranslation(['admin', 'common']);
   const { user, authToken, isLoading: userLoading } = useUser();
+  const { collections } = useCollection();
   const navigate = useNavigate();
 
   const [registrations, setRegistrations] = useState<Registration[]>([]);
@@ -63,6 +66,22 @@ const Registrations: React.FC = () => {
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  // Rolli ja ulatuse valik on taotluse ID järgi eraldi seisund (mitte üks jagatud
+  // muutuja) — taotlusi kuvatakse mitu korraga ning jagatud seisund laseks adminil
+  // kinnitada VALE rolli/ulatuse, kui ta valib ühel real ja vajutab kinnita teisel.
+  const [approveRole, setApproveRole] = useState<Record<string, 'editor' | 'contributor'>>({});
+  const [approveScope, setApproveScope] = useState<Record<string, string[]>>({});
+  const roleFor = (regId: string): 'editor' | 'contributor' => approveRole[regId] || 'editor';
+  const scopeFor = (regId: string): string[] => approveScope[regId] || [];
+
+  // KÕIK kollektsioonid, mitte ainult restricted: kirjutamisulatus kehtib ka
+  // avalikele kogudele (erinevalt allowed_collections'ist, mis mõjutab ainult
+  // piiratud kogusid). virtual_group on välja jäetud (vt getWritableCollectionOptions).
+  const allCollections = React.useMemo(
+    () => getWritableCollectionOptions(collections),
+    [collections]
+  );
 
   useEffect(() => {
     if (!userLoading && (!user || !isAtLeast(user.role, 'admin'))) {
@@ -100,9 +119,14 @@ const Registrations: React.FC = () => {
     setProcessingId(regId);
     setInviteResult(null);
 
+    const role = roleFor(regId);
+    const scope = role === 'contributor' ? scopeFor(regId) : [];
+
     try {
       const data = await apiPost<RegistrationActionResponse>('/admin/registrations/approve', {
-        registration_id: regId
+        registration_id: regId,
+        role,
+        edit_collections: scope
       }, { token: authToken });
 
       if (data.status === 'success') {
@@ -114,6 +138,9 @@ const Registrations: React.FC = () => {
           username: data.username,
           name: data.name
         });
+        // Käsitletud taotluse valik ei ole enam vajalik — koorista, et Record ei kasvaks lõputult.
+        setApproveRole((prev) => { const next = { ...prev }; delete next[regId]; return next; });
+        setApproveScope((prev) => { const next = { ...prev }; delete next[regId]; return next; });
         await loadRegistrations();
       } else {
         setError(data.message || t('registrations.approveError'));
@@ -300,11 +327,54 @@ const Registrations: React.FC = () => {
                             <p className="text-sm text-gray-700">{reg.motivation}</p>
                           </div>
                         </div>
+
+                        <div className="flex flex-col gap-2 mt-3">
+                          <label className="text-xs font-medium text-gray-500">{t('registrations.roleLabel')}</label>
+                          <select
+                            value={roleFor(reg.id)}
+                            onChange={(e) =>
+                              setApproveRole((prev) => ({ ...prev, [reg.id]: e.target.value as 'editor' | 'contributor' }))
+                            }
+                            className="text-sm border border-gray-300 rounded px-2 py-1 w-fit"
+                          >
+                            <option value="editor">{t('registrations.roleEditor')}</option>
+                            <option value="contributor">{t('registrations.roleContributor')}</option>
+                          </select>
+
+                          {roleFor(reg.id) === 'contributor' && (
+                            <div>
+                              <span className="text-xs font-medium text-gray-500">{t('registrations.editCollections')}</span>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {allCollections.map((c) => (
+                                  <label key={c.id} className="flex items-center gap-1 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={scopeFor(reg.id).includes(c.id)}
+                                      onChange={(e) =>
+                                        setApproveScope((prev) => {
+                                          const cur = prev[reg.id] || [];
+                                          const next = e.target.checked
+                                            ? [...cur, c.id]
+                                            : cur.filter((x) => x !== c.id);
+                                          return { ...prev, [reg.id]: next };
+                                        })
+                                      }
+                                    />
+                                    {c.name}
+                                  </label>
+                                ))}
+                              </div>
+                              {scopeFor(reg.id).length === 0 && (
+                                <p className="text-xs text-amber-700 mt-1">{t('registrations.editCollectionsNone')}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2 ml-4">
                         <button
                           onClick={() => handleApprove(reg.id)}
-                          disabled={processingId === reg.id}
+                          disabled={processingId === reg.id || (roleFor(reg.id) === 'contributor' && scopeFor(reg.id).length === 0)}
                           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 transition-colors flex items-center gap-1"
                         >
                           {processingId === reg.id ? (

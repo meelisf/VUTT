@@ -155,3 +155,134 @@ def test_generate_meili_token_with_collection(monkeypatch):
     payload = jwt.decode(token, "test-key-32-chars-long-padding-x", algorithms=["HS256"])
     assert 'collections_hierarchy IN ["herrnhuter"]' in payload["searchRules"]["teosed"]["filter"]
     assert "is_public = true" in payload["searchRules"]["teosed"]["filter"]
+
+
+# ---- can_write_work: contributor'i kollektsiooni-ulatus (ADR 0031) ----
+
+def _contributor(edit_collections, allowed_collections=None):
+    return {
+        "username": "contrib",
+        "role": "contributor",
+        "edit_collections": edit_collections,
+        "allowed_collections": allowed_collections or [],
+    }
+
+
+def test_contributor_can_write_own_collection():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, _contributor(["col-public"])) is True
+
+
+def test_contributor_cannot_write_other_collection():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, _contributor(["col-muu"])) is False
+
+
+def test_contributor_cannot_write_work_without_collections():
+    from server.access_ops import can_write_work
+    assert can_write_work({"collections": []}, _contributor(["col-public"])) is False
+
+
+def test_contributor_with_empty_scope_writes_nothing():
+    from server.access_ops import can_write_work
+    assert can_write_work({"collections": ["col-public"]}, _contributor([])) is False
+
+
+def test_contributor_scope_does_not_grant_read_access():
+    """Invariant 1: kirjutamisulatus EI muutu kaudseks lugemisõiguseks.
+    edit_collections=["col-restricted"], aga allowed_collections=[] → keeld."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-restricted"]}
+    user = _contributor(["col-restricted"], allowed_collections=[])
+    assert can_write_work(meta, user) is False
+
+
+def test_contributor_writes_restricted_with_both_fields():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-restricted"]}
+    user = _contributor(["col-restricted"], allowed_collections=["col-restricted"])
+    assert can_write_work(meta, user) is True
+
+
+def test_editor_ignores_edit_collections():
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    user = {"username": "ed", "role": "editor", "edit_collections": [], "allowed_collections": []}
+    assert can_write_work(meta, user) is True
+
+
+def test_contributor_without_field_writes_nothing():
+    """Puuduv edit_collections = tühi ulatus (fail-closed)."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, {"username": "c", "role": "contributor"}) is False
+
+
+def test_user_without_role_field_cannot_write():
+    """Leid 2: `can_read_work` kasutab `user.get("role", "contributor")`, aga
+    `can_write_work` kasutas varem `user.get("role")` ilma vaikeväärtuseta —
+    puuduva `role`-iga (osaline) kasutajaobjekt tõlgendati kui `None != "contributor"`
+    ehk editor+-na ja ulatusest mööda pääseti (fail-open). Vaikeväärtus peab olema
+    "contributor" (fail-closed): puuduv role + puuduv edit_collections = tühi ulatus."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, {"username": "c"}) is False
+
+
+def test_contributor_role_none_fails_closed():
+    """Leid 7: `{"role": None}` (võti EKSISTEERIB, väärtus None) ei tohi
+    `.get("role", "contributor")` vaikeväärtusest mööda pääseda — see rakendub
+    ainult puuduva võtme korral, mitte None väärtuse korral. Enne parandust
+    tõlgendati None kui "mitte contributor" ehk piiramatu kirjutus (fail-open)."""
+    from server.access_ops import can_write_work
+    meta = {"collections": ["col-public"]}
+    user = {"username": "c", "role": None, "edit_collections": []}
+    assert can_write_work(meta, user) is False
+
+
+def test_decision_does_not_consult_derived_index(monkeypatch):
+    """ADR 0031 invariant 2: õigusotsus ei tohi puudutada work_collections_index'it.
+    Kui mõni tulevane muudatus paneb ta sellest sõltuma, kukub see test.
+
+    See katab KÄITUSAEGSE kutsekuju (`indices._load_work_collections()`, mooduli
+    kaudu). Importaegset sidumist (`from ... import _load_work_collections`) see
+    ei taba — selle katab paariline test allpool,
+    `test_access_ops_source_does_not_reference_derived_index`."""
+    from server.access_ops import can_write_work
+    import server.prosopography.indices as indices
+
+    def _explode(*args, **kwargs):
+        raise AssertionError("õigusotsus ei tohi tuletatud indeksit lugeda")
+
+    monkeypatch.setattr(indices, "_load_work_collections", _explode)
+    meta = {"collections": ["col-public"]}
+    assert can_write_work(meta, _contributor(["col-public"])) is True
+
+
+def test_access_ops_source_does_not_reference_derived_index():
+    """ADR 0031 invariant 2, teine katsevorm: staatiline kontroll importaegse
+    sideme vastu.
+
+    Eelmine test (test_decision_does_not_consult_derived_index) püüab kinni
+    KÄITUSAEGSE kutse kujul `indices._load_work_collections()` — monkeypatch
+    asendab mooduli atribuudi. Aga kui `access_ops.py` impordiks funktsiooni
+    otse nime kaudu (`from .prosopography.indices import _load_work_collections`,
+    nagu juba tehakse `server/routers/public.py:16`-s), oleks nimi juba
+    importimise ajal originaaliga seotud ja mooduli-atribuudi monkeypatch ei
+    mõjuks — käitusaegne test jääks roheliseks, kuigi rikkumine on olemas.
+    Seepärast kontrollib see teine, sõltumatu test otse lähtekoodi stringi
+    tasandil: kummagi vormi jälge (importi ega otsest viidet) ei tohi
+    `access_ops.py`-s olla.
+    """
+    import inspect
+    import server.access_ops as access_ops
+
+    source = inspect.getsource(access_ops)
+    assert "_load_work_collections" not in source
+    assert "work_collections_index" not in source
+    # Sama invariant kehtib ka konstandi-teele: `server/config.py`-s elab
+    # `WORK_COLLECTIONS_INDEX_FILE`, mille kaudu saaks indeksit lugeda ilma
+    # eelmiste stringideta kokku puutumata.
+    assert "WORK_COLLECTIONS_INDEX_FILE" not in source

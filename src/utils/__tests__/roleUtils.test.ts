@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roleLevel, canManageUser, canAssignRole, assignableRoles, isAtLeast, ROLE_LEVELS } from '../roleUtils';
+import { roleLevel, canManageUser, canAssignRole, assignableRoles, isAtLeast, canEditWork, ROLE_LEVELS } from '../roleUtils';
 
 describe('roleUtils', () => {
   it('hierarhia neli taset', () => {
@@ -32,5 +32,33 @@ describe('roleUtils', () => {
     expect(isAtLeast('superadmin', 'editor')).toBe(true);
     expect(isAtLeast(undefined, 'admin')).toBe(false);
     expect(isAtLeast(null, 'admin')).toBe(false);
+  });
+});
+
+describe('canEditWork', () => {
+  const work = { collections: ['oma'] };
+
+  it('lubab editoril kõike', () => {
+    expect(canEditWork({ role: 'editor' }, work)).toBe(true);
+  });
+
+  it('lubab contributoril oma kollektsiooni', () => {
+    expect(canEditWork({ role: 'contributor', edit_collections: ['oma'] }, work)).toBe(true);
+  });
+
+  it('keelab contributoril võõra kollektsiooni', () => {
+    expect(canEditWork({ role: 'contributor', edit_collections: ['muu'] }, work)).toBe(false);
+  });
+
+  it('keelab contributoril kollektsioonita teose', () => {
+    expect(canEditWork({ role: 'contributor', edit_collections: ['oma'] }, { collections: [] })).toBe(false);
+  });
+
+  it('keelab välja logitud kasutajal', () => {
+    expect(canEditWork(null, work)).toBe(false);
+  });
+
+  it('keelab undefined roll (fail-closed: = contributor) ilma kollektsioonita', () => {
+    expect(canEditWork({ edit_collections: ['oma'] }, { collections: [] })).toBe(false);
   });
 });

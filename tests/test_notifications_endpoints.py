@@ -16,6 +16,8 @@ meilisearch) ja vajaks lehe failide setup-i. Selle tuumloogika (notificationi
 loomine kommentaari autorile) on kaetud test_notifications_ops.py kaudu
 (create_notification + find_username_by_display_name).
 """
+import json
+
 import pytest
 
 
@@ -234,15 +236,17 @@ def test_send_notification_all_mode_requires_admin(client, login):
     assert "administraatorile" in resp.json()["detail"]
 
 
-def test_send_notification_all_mode_admin_ok(client, login):
-    """all režiim admin-iga → kõik kasutajad saavad (admin + editor + superadmin = 3)."""
+def test_send_notification_all_mode_admin_ok(client, login, backend_env):
+    """all režiim admin-iga → kõik kasutajad saavad (loendurit ei fikseeri arvuna,
+    sest conftest'i kasutajate arv muutub — vt #297 contrib-kasutajate lisandumine)."""
+    total_users = len(json.loads(backend_env["users_file"].read_text(encoding="utf-8")))
     token = login("admin", "adminpass")
     resp = client.post("/notifications/send", json={
         "recipient_mode": "all",
         "title": "Kõigile",
     }, headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
-    assert resp.json()["created"] == 3
+    assert resp.json()["created"] == total_users
 
 
 def test_send_notification_sender_gets_copy(client, login, backend_env):

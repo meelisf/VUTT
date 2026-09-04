@@ -39,3 +39,30 @@ export function canAssignRole(actorRole: string, newRole: string): boolean {
 export function assignableRoles(actorRole: string): Role[] {
   return ORDER.filter((r) => canAssignRole(actorRole, r));
 }
+
+interface WorkScope {
+  collections?: string[];
+}
+
+interface UserScope {
+  role?: string;
+  edit_collections?: string[];
+}
+
+/**
+ * Kas kasutaja tohib teost muuta. Peegeldab serveri can_write_work'i
+ * ulatuse-osa (ADR 0031). Lugemisõiguse osa jääb serverile — frontend on
+ * ergonoomika, mitte turve.
+ *
+ * Fail-closed: puuduv roll = contributor (piiratud).
+ */
+export function canEditWork(user: UserScope | null | undefined, work: WorkScope | null | undefined): boolean {
+  if (!user) return false;
+  // Fail-closed: puuduv roll tähendab contributor'it (piiratud), mitte admin'it
+  const role = user.role ?? 'contributor';
+  if (role !== 'contributor') return true;
+  const scope = user.edit_collections ?? [];
+  if (scope.length === 0) return false;
+  const workCollections = work?.collections ?? [];
+  return workCollections.some((c) => scope.includes(c));
+}

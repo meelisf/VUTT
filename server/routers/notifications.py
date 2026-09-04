@@ -25,6 +25,7 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 from starlette.concurrency import run_in_threadpool
 
+from ..access_ops import require_catalog_access
 from ..config import BASE_DIR
 from ..deps import get_user, require_role, get_json_data
 from ..auth import get_all_users, role_level
@@ -159,7 +160,7 @@ def _deliver_notifications_sync(recipients, notification_type, title, body, link
 async def reply_to_page_comment(
     request: Request,
     background_tasks: BackgroundTasks,
-    user=Depends(require_role("editor")),
+    user=Depends(require_role("contributor")),
 ):
     """Lisab lehekülje kommentaarile vastuse ja loob kommentaari autorile teavituse."""
     data = await get_json_data(request)
@@ -172,6 +173,10 @@ async def reply_to_page_comment(
 
     if not catalog or not filename or not comment_id or not reply_text:
         raise HTTPException(status_code=400, detail="Puudulikud vastuse andmed")
+
+    # Ligipääsukontroll oli siin varem puudu (elav auk, #297/ADR 0031) — vastamine
+    # on kirjutustegevus, seega nõuab write=True (contributor ulatuse kontroll).
+    await run_in_threadpool(require_catalog_access, catalog, user, BASE_DIR, write=True)
 
     result = await run_in_threadpool(
         _apply_reply_sync, catalog, filename, comment_id, reply_text, work_id, page_number, user

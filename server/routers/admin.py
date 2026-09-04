@@ -6,7 +6,14 @@ import threading
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
-from ..auth import can_manage_user, delete_user, get_all_users, update_user_allowed_collections, update_user_role
+from ..auth import (
+    can_manage_user,
+    delete_user,
+    get_all_users,
+    update_user_allowed_collections,
+    update_user_edit_collections,
+    update_user_role,
+)
 from ..config import BASE_DIR
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
@@ -48,8 +55,18 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     if not reg or reg["status"] != "pending":
         raise HTTPException(status_code=400, detail="Vigane taotlus")
     await run_in_threadpool(update_registration_status, reg["id"], "approved", user["username"])
+    # Roll ja kirjutamisulatus valitakse SIIN, mitte hiljem kaheastmeliselt —
+    # create_invite_token piirab rolli sisemiselt (contributor, editor); admin
+    # ei saa kutselingi kaudu tekitada admin- ega superadmin-kontot.
     token_data = await run_in_threadpool(
-        create_invite_token, reg["email"], reg["name"], user["username"], username=reg.get("username")
+        create_invite_token, reg["email"], reg["name"], user["username"],
+        username=reg.get("username"),
+        # `role` võtme PUUDUMINE (None) ja OLEMAS-AGA-TUNDMATU väärtus on
+        # create_invite_token'ile erinev signaal (leid 5, ADR 0031) — ÄRA
+        # anna siin vaikeväärtust "editor", muidu kaob see vahe juba enne
+        # sinnajõudmist.
+        role=data.get("role"),
+        edit_collections=data.get("edit_collections", []),
     )
     return {
         "status": "success",
@@ -59,6 +76,8 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         "email": token_data["email"],
         "username": token_data["username"],
         "name": token_data["name"],
+        "role": token_data["role"],
+        "edit_collections": token_data["edit_collections"],
     }
 
 
@@ -100,6 +119,19 @@ async def admin_update_collections(request: Request, user=Depends(require_role("
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success", "allowed_collections": allowed}
+
+
+@router.post("/admin/users/update-edit-collections")
+async def admin_update_edit_collections(request: Request, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    # NB: kirjutamisulatus (edit_collections) kehtib KÕIGILE kollektsioonidele,
+    # mitte ainult restricted omadele nagu allowed_collections — vt update_user_edit_collections.
+    success, message, scope = await run_in_threadpool(
+        update_user_edit_collections,
+        data.get("username"), data.get("edit_collections", []), user)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success", "edit_collections": scope}
 
 
 @router.post("/admin/users/delete")

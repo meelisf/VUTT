@@ -27,7 +27,13 @@
     "sendEmail": "Send email",
     "loadError": "Error loading registration requests",
     "approveError": "Approval failed",
-    "rejectError": "Rejection failed"
+    "rejectError": "Rejection failed",
+    "roleLabel": "Role",
+    "roleEditor": "Editor (whole corpus)",
+    "roleContributor": "Contributor (selected collections)",
+    "editCollections": "Write scope",
+    "editCollectionsHint": "A contributor can only edit these collections.",
+    "editCollectionsNone": "No scope selected — this contributor cannot edit anything"
   },
   "users": {
     "title": "Users",
@@ -60,7 +66,13 @@
     "addCollection": "add collection",
     "removeCollection": "Remove {{name}}",
     "noRestrictedCollections": "No restricted collections",
-    "collectionsUpdateFailed": "Failed to update collections"
+    "collectionsUpdateFailed": "Failed to update collections",
+    "roleLabel": "Role",
+    "roleEditor": "Editor (whole corpus)",
+    "roleContributor": "Contributor (selected collections)",
+    "editCollections": "Write scope",
+    "editCollectionsHint": "A contributor can only edit these collections. Changing the scope ends the user's session — they will need to log in again.",
+    "editCollectionsNone": "No scope selected — this contributor cannot edit anything"
   },
   "pending": {
     "title": "Pending Edits",

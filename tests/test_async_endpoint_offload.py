@@ -262,6 +262,9 @@ def test_notifications_reply_jookseb_threadpoolis(monkeypatch):
         return {"status": "success", "comments": [], "reply": {}, "commit_hash": "abc"}
 
     monkeypatch.setattr(notifications, "_apply_reply_sync", fake_apply)
+    # Ligipääsukontroll (#297/ADR 0031) loeb tegelikku _metadata.json-i — see test
+    # kontrollib ainult threadpool-offloadi, mitte ligipääsuloogikat, seega mock.
+    monkeypatch.setattr(notifications, "require_catalog_access", lambda *a, **k: {})
 
     result = asyncio.run(notifications.reply_to_page_comment(
         _json_request(b'{"original_path":"w","file_name":"p.txt","comment_id":"c1","text":"hi"}'),
