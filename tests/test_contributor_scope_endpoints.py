@@ -39,25 +39,37 @@ def _auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _save_body():
+def _save_body(text):
+    # NB: /save loeb tegelikult 'text_content' (server/routers/editing.py) —
+    # 'content' polnud kunagi õige väljanimi ja jättis salvestatava teksti tühjaks.
     return {
         "original_path": "oma-teos",
         "file_name": "page1.txt",
-        "content": "uus tekst",
+        "text_content": text,
         "meta_content": {},
     }
 
 
 def test_contributor_saves_own_collection(client, login, scoped_work_env):
+    """Tõestab PÄRIS kirjutust, mitte ainult 200: changed=True JA kettal olev
+    sisu vastab saadetule (no-op salvestus tagastaks samuti 200, aga changed=False
+    ega kirjutaks kettale midagi uut)."""
     token = login("contrib", "contribpass")
-    response = client.post("/save", json=_save_body(), headers=_auth(token))
+    text = "uus tekst sisu"
+    response = client.post("/save", json=_save_body(text), headers=_auth(token))
     assert response.status_code == 200, response.text
+    assert response.json().get("changed") is True, response.text
+    saved = (scoped_work_env["data_dir"] / "oma-teos" / "page1.txt").read_text(encoding="utf-8")
+    assert saved == text
 
 
 def test_contributor_cannot_save_other_collection(client, login, scoped_work_env):
+    """Aed peab lööma ENNE kirjutust: 403 JA leht jääb muutumatuks."""
     token = login("contrib_muu", "contribpass")
-    response = client.post("/save", json=_save_body(), headers=_auth(token))
+    response = client.post("/save", json=_save_body("teine tekst"), headers=_auth(token))
     assert response.status_code == 403
+    saved = (scoped_work_env["data_dir"] / "oma-teos" / "page1.txt").read_text(encoding="utf-8")
+    assert saved == "tekst"
 
 
 def test_contributor_reads_metadata_of_public_work(client, login, scoped_work_env):
