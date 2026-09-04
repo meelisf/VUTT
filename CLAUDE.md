@@ -29,7 +29,7 @@ Väravad (samad jooksevad CI-s, `.github/workflows/ci.yml`):
 |------|--------|
 | `npm run typecheck` | Vite EI typecheck'i — `build` üksi ei püüa tüübivigu |
 | `npm test` | vitest |
-| `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 55` — parandades LANGETA arvu |
+| `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 49` — parandades LANGETA arvu |
 | `.venv/bin/pytest tests/` | Kasuta ALATI projekti venv-i (`.venv/bin/python`), süsteemi `python3`-l puuduvad sõltuvused |
 
 CI käivitub ainult main'i-PR-idel: virnastatud PR checke ei saa (baasi ümbersuunamine EI käivita, close+reopen käivitab). Merge-stiil = merge-commit.
@@ -125,6 +125,7 @@ Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json
 | `meilisearch_ops.py` | Meili sünk, ThreadPoolExecutor, keep-warm |
 | `git_ops.py`, `auth.py`, `cache.py`, `rate_limit.py` | Versioonihaldus, autentimine, cache (TTL 5 min), rate-limit |
 | `upload/`, `upload_ops.py` | Upload-viisard + OCR-serveri integratsioon; poolitamine enne OCR-i elab `upload/prepress*.py` + `page_source.py` + `store_source.py` moodulites |
+| `ada/` | ADA (dspace.ut.ee) import: `mapping` (puhas DC-kaardistus), `client` (REST), `fetch` (allalaadimine), `provenance` (ankrud) |
 | `marginalia_normalize.py` | `normalize_marginalia_tags()` — kutsutakse KÕIGIS kirjutusteedes |
 
 **Python 3.9 ühilduvus:** `Optional[dict]`, mitte `dict | None`.
@@ -181,6 +182,13 @@ kõigi filtrite muutmist → eraldi projekt, mitte möödaminnes. **Uus indeksee
 AINULT `meili_doc.py`-sse** — mõlemad teed (live `meilisearch_ops.py` + seed
 `scripts/1-1_consolidate_data.py`) impordivad sealt. `attributesToSearchOn` väli PEAB
 dokumendis eksisteerima. `*_object` väljad on ainult Meili dokumentides; `work_id` peab olema KÕIGIS.
+
+Uus filtreeritav väli läheb **mõlemasse** nimekirja `meili_settings.py`-s:
+`FILTERABLE_ATTRIBUTES` (seed/täisreindeks) JA `RUNTIME_REQUIRED_FILTERABLE` — ainult
+teist rakendab `_ensure_filterable_attributes()` juba jooksvale instantsile. Ainult
+esimesse lisamine jätab välja tootmises filtreerimatuks: filter-päring ebaõnnestub,
+ja kas keegi seda märkab, sõltub kutsujast — lai `except` ümber teeb sellest
+vaikse no-op'i.
 
 Kaks tekstivälja: `lehekylje_tekst` (**otsinguks puhastatud** — reavahetuse sidekriipsud liidetud,
 markup eemaldatud) vs `text_content` (**toores, redaktorile** — kõik märgendid alles, otsitav ei ole).
@@ -280,6 +288,15 @@ KOGU teenuse (#225). Tühja kataloogi eemaldab `server/ocr_reaper.py` armuaja
 (`RUN_DIR_REAP_GRACE` = 600 s) järel; `reocr_recovery` jätab ajastatud kataloogi vahele.
 Eduka impordi järgne koristus tohib jääda `rm -rf`-iks — seal ei ole ühtki pilti, millest
 batch tekiks.
+
+**`page_map` (ADR 0030)** — `_transfer_pages` kirjutab iga avaldatud lähtelehe kohta
+listi temast tekkinud väljundlehtedest, MÕLEMAS kohas kus `out_index` kasvab, ja kaart
+nullitakse apply alguses. `int` ei kõlba: sammu 4 `deleted` käib väljundlehe kohta ja
+poolitatud lehe ühe poole kustutamine jätaks ankru kustutatud lehele.
+
+**Lehe JSON serveripoolsed väljad** — `editing.py` kirjutab `meta_content`-i kliendilt
+TERVIKUNA üle. Uus serveripoolne lehe-väli PEAB minema `SERVERIPOOLSED_LEHE_VALJAD`-i,
+muidu kaob ta esimese Ctrl+S peale, ilma vea ja logita.
 
 **OCR vea-märgend (ADR 0025)** — OCR-server kirjutab ebaõnnestunud lehe kõrvale
 `{tüvi}.err` (üks rida: `ErandiTüüp: sõnum`). Märgend on **lõplik**: `main_loop` ei võta

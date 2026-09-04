@@ -76,3 +76,29 @@ def test_update_upload_meta_ei_lase_labi_tundmatut_valja(staging):
     meta = upload_ops.get_upload(uid)['meta']
     assert meta['slug'].startswith('t-')
     assert 'suvaline' not in meta
+
+
+# --- 3. create_upload peab kandma kõik ADA väljad -----------------------
+
+def test_create_upload_sailitab_ada_valjad(staging):
+    """ADA lookup saadab `year_display`, `ester_id`, `archive_refs` ja
+    `external_url` juba loomispäringus (vt adaApi.ts buildAdaCreateExtras) —
+    need ei tohi create_upload'i fikseeritud meta-literaalis kaduma minna.
+    `external_url` on ka duplikaadihoiatuse ainus filter, seega selle
+    kadumine tähendab, et hoiatus ei saa ADA-impordil KUNAGI käivituda.
+    """
+    state = upload_ops.create_upload({
+        'title': 'Test ADA teos',
+        'year': '1650',
+        'slug': 'test-ada',
+        'year_display': 'ca. 1650',
+        'ester_id': '1234567',
+        'archive_refs': [{'archive_id': 'EAA', 'reference': '1234-5-6'}],
+        'external_url': 'https://dspace.ut.ee/handle/10062/7822',
+    }, 'mf')
+
+    meta = state['meta']
+    assert meta['year_display'] == 'ca. 1650'
+    assert meta['ester_id'] == '1234567'
+    assert meta['archive_refs'] == [{'archive_id': 'EAA', 'reference': '1234-5-6'}]
+    assert meta['external_url'] == 'https://dspace.ut.ee/handle/10062/7822'

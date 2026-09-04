@@ -5,6 +5,9 @@ interface UploadProgress {
   bytes_sent: number;
   bytes_total: number;
   error?: string | null;
+  /** ADA-voog: mitu allikfaili on tükeldatult valmis (vt server/ada/fetch.py). */
+  files_done?: number;
+  files_total?: number;
 }
 
 interface UploadStepTransferProps {
@@ -32,6 +35,11 @@ interface UploadStepTransferProps {
   onFilesSelected: (files: File[]) => void;
   onMultipleImageUpload: (files: File[]) => void;
   onClearPendingMultiFiles: () => void;
+  /** ADA-voog: serveri veateade (`ada_error`), kui backend selle andis. */
+  adaError?: string;
+  /** ADA-voog: „Laen uuesti" — CAS lubab `ada_error → ada_fetching`,
+   *  juba kettal olevaid tükke ei tõmmata uuesti. */
+  onAdaRetry: () => void;
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -57,6 +65,8 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
   onFilesSelected,
   onMultipleImageUpload,
   onClearPendingMultiFiles,
+  adaError,
+  onAdaRetry,
   t,
 }) => (
   <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
@@ -72,7 +82,55 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
     </div>
 
     {/* Upload progress (kui SFTP käib) */}
-    {fileUploading ? (
+    {fileUploading && (status === 'ada_fetching' || status === 'ada_error') ? (
+      /* ADA-voog: server tõmbab failid ise (kuni 65 tükki, ~320 MB) — siin
+         näidatakse allalaadimise progressi, mitte failivalijat (Task 11). */
+      <div className="space-y-3">
+        {status === 'ada_fetching' ? (
+          <>
+            <div className="flex items-center gap-3">
+              <Loader2 size={20} className="animate-spin text-primary-600 shrink-0" />
+              <p className="text-sm font-medium text-gray-800">{t('ada.downloading')}</p>
+            </div>
+            {progress && progress.bytes_total > 0 && (
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>{t('step2.progressLabel').replace('{{pct}}', String(progressPct))}</span>
+                  <span>
+                    {t('ada.downloadProgress', {
+                      done: progress.files_done ?? 0,
+                      total: progress.files_total ?? 0,
+                      mbDone: Math.round(progress.bytes_sent / 1024 / 1024),
+                      mbTotal: Math.round(progress.bytes_total / 1024 / 1024),
+                    })}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <span>{adaError || t('ada.errorFallback')}</span>
+            </div>
+            <button
+              type="button"
+              onClick={onAdaRetry}
+              className="text-sm font-medium text-primary-700 hover:text-primary-900 underline"
+            >
+              {t('ada.retry')}
+            </button>
+          </div>
+        )}
+      </div>
+    ) : fileUploading ? (
       <div className="space-y-3">
         <div className="flex items-center gap-3">
           <Loader2 size={20} className="animate-spin text-primary-600 shrink-0" />

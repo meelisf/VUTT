@@ -25,7 +25,14 @@ export interface PollResult {
   files: FileEntry[];
   /** Mitu LÄHTE-lehte on apply läbi töötanud. Ainult `applying` faasi teate jaoks. */
   applied_done?: number;
-  progress?: { bytes_sent: number; bytes_total: number; error?: string | null };
+  progress?: {
+    bytes_sent: number;
+    bytes_total: number;
+    error?: string | null;
+    /** ADA allalaadimine: mitu allikfaili on tükeldatult valmis (vt server/ada/fetch.py). */
+    files_done?: number;
+    files_total?: number;
+  };
   error?: string;
   stalled?: boolean;
 }
@@ -113,4 +120,45 @@ export interface PrepressSaveResult {
   status: string;
   output_page_count: number;
   trivial: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// ADA import (handle → metaandmed)
+// ---------------------------------------------------------------------------
+
+export type AdaVormiVali = 'title' | 'year' | 'year_display';
+
+export interface AdaFile {
+  name: string;
+  bitstream_uuid: string;
+  size_bytes: number;
+  /** 0 = täiskuupäev, 1 = kuu+aasta, 2 = aasta, 3 = parsimatu. >0 → UI hoiatusmärk. */
+  tapsus: number;
+}
+
+export interface AdaLookupResult {
+  handle: string;
+  item_uuid: string;
+  meta: {
+    title: string;
+    year: string;
+    year_display: string;
+    creators: Array<{ label: string }>;
+    languages: string[];
+    ester_id: string | null;
+    archive_refs: Array<{ archive_id: string; reference: string }>;
+    external_url: string | null;
+  };
+  failid: AdaFile[];
+  kogu_baite: number;
+  vahele_jaetud: string[];
+  /** Gemini pakutud „eesti / english" kuju. Puudub, kui tõlge ei õnnestunud. */
+  title_suggestion?: string;
+  /** Sama handle on juba imporditud (Task 12). HOIATUS, mitte blokeering. */
+  olemasolev?: { work_id: string; title: string };
+}
+
+export interface AdaMergeTulemus {
+  vaartused: Record<string, string>;
+  ulekirjutatavad: Array<{ vali: AdaVormiVali; adaVaartus: string }>;
 }

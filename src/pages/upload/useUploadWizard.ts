@@ -14,7 +14,9 @@ import {
   TYPE_PRINT,
   POLL_FAST_MS,
   POLL_SLOW_MS,
+  adaSammuOlek,
 } from './constants';
+import { adaFetch, buildAdaCreateExtras } from './adaApi';
 import {
   ocrEstimate,
   sanitizeSlug,
@@ -36,14 +38,7 @@ import {
   uploadImagePage,
   uploadSingleFile,
 } from './uploadApi';
-import type { PollResult, SavedUpload } from './types';
-
-/** Staatused, mille korral fail on VUTT-i poolel ja poolitamise samm on avatud.
- *
- * `applying` EI KUULU siia: apply on ühekordne (kordus annab 409), plaani ei
- * saa enam muuta ja kasutaja kuulub juba ülevaatuse sammu, kus ta näeb
- * edenemist. Siia jäetuna viskaks polling ta poolitamise vaatesse tagasi. */
-const PREPRESS_STATUSES = ['awaiting_split', 'prepping'];
+import type { AdaLookupResult, PollResult, SavedUpload } from './types';
 
 /** Staatused, mille korral OCR-i pool on käigus → viisardi 4. samm. */
 const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done'];
@@ -219,8 +214,21 @@ export function useUploadWizard() {
       try {
         const d: PollResult = await getUploadStatus(id, authToken);
         setPollResult(d);
-        // Poolitamise samm (3) — fail on VUTT-i poolel, OCR pole veel alanud.
-        if (PREPRESS_STATUSES.includes(d.status)) {
+        // `adaSammuOlek` on ÜKS tõde selle kohta, kas staatus kuulub ADA
+        // allalaadimise (2) või poolitamise (3) sammu — vt constants.ts.
+        // `ada_fetching` EI TOHI kuuluda PREPRESS_STATUSES-esse — muidu
+        // viskaks polling admini poolitamise vaatesse keset ~320 MB
+        // allalaadimist (sama viga nagu `applying`, ADR 0028).
+        const sammuOlek = adaSammuOlek(d.status);
+        if (sammuOlek === 2) {
+          // ADA allalaadimine käib VUTT-i poolel → progressiriba failivalija asemel.
+          setStep(2);
+          setFileUploading(true);
+          if (d.status === 'ada_error') stopPolling();
+          return;
+        }
+        if (sammuOlek === 3) {
+          // Poolitamise samm — fail on VUTT-i poolel, OCR pole veel alanud.
           setStep(3);
           setFileUploading(false);
         }
@@ -276,7 +284,13 @@ export function useUploadWizard() {
   // ---------------------------------------------------------------------------
   // Samm 1 — staging loomine
   // ---------------------------------------------------------------------------
-  async function handleStep1Submit() {
+  /**
+   * `adaResult` on Task 10 ADA-lookup'i tulemus (UploadStepMeta hoiab seda
+   * lokaalse olekuna) — kui olemas, kannab create-payload ADA-ploki kaasa ja
+   * käivitab kohe failide allalaadimise (`ada-fetch`), et samm 2 avaneks
+   * juba progressiribaga, mitte failivalijaga.
+   */
+  async function handleStep1Submit(adaResult?: AdaLookupResult | null) {
     if (!title.trim() || !authToken) return;
     if (workType.id !== 'Q87167' && !year.trim()) return;
     setStep1Loading(true);
@@ -297,10 +311,24 @@ export function useUploadWizard() {
             collections: selectedCollection ? [selectedCollection] : [],
             replace_work_id: replaceWorkId || null,
             type: workType,
+            ...buildAdaCreateExtras(adaResult ?? null),
           }, authToken);
           // Backend küpsetab work_id slug'i → kuva reaalne kaustanimi (data/{slug}-{work_id}/)
           if (d.upload?.meta?.slug) setSlug(d.upload.meta.slug);
           setUploadId(d.upload.id);
+          if (adaResult) {
+            // Käivita kohe — ebaõnnestumise korral kukub see sama catch-i, mis
+            // allpool (jääb sammu 1 peale nähtava veaga, staging jääb 'pending'-usse
+            // ja järgmine „Laen uuesti" samm 2-s saab sellest CAS-iga jätkata).
+            await adaFetch(d.upload.id, authToken);
+            setFileUploading(true);
+            setPollResult((prev) => ({
+              ready: 0, total: 0, expected_pages: null, files: [],
+              ...(prev ?? {}),
+              status: 'ada_fetching',
+            }));
+            startPolling(d.upload.id, POLL_FAST_MS);
+          }
           setStep(2);
           return;
         } catch (e) {
@@ -368,6 +396,29 @@ export function useUploadWizard() {
       sendStartedAtRef.current = null;
     }
   }
+
+  /**
+   * „Laen uuesti" nupp `ada_error` olekus. Backendi CAS lubab
+   * `ada_error → ada_fetching` ja juba kettal olevad tükid (`NNN.pdf`) ei lähe
+   * uuesti alla — `alusta_fetchi` jätkab sealt, kus pooleli jäi.
+   */
+  const handleAdaRetry = useCallback(async () => {
+    if (!uploadId || !authToken) return;
+    setFileUploading(true);
+    setPollResult((prev) => ({
+      ready: 0, total: 0, expected_pages: null, files: [],
+      ...(prev ?? {}),
+      status: 'ada_fetching',
+      error: undefined,
+    }));
+    try {
+      await adaFetch(uploadId, authToken);
+    } catch {
+      // Serveri tõde loeb kohe järgmine poll — kui käivitus tegelikult ei
+      // õnnestunud (nt CAS 409), näitab see uuesti `ada_error`-it.
+    }
+    startPolling(uploadId, POLL_FAST_MS);
+  }, [uploadId, authToken, startPolling]);
 
   // Mitme JPG/PNG faili järjestikuline üleslaadimine
   async function handleMultipleImageUpload(files: File[]) {
@@ -513,7 +564,16 @@ export function useUploadWizard() {
     setPollResult(poll);
     setLocalDeleted(new Set(saved.files.filter((f) => f.deleted).map((f) => f.page)));
 
-    if (PREPRESS_STATUSES.includes(saved.status)) {
+    // `adaSammuOlek` on ÜKS tõde ADA (2) vs poolitamise (3) sammu kohta —
+    // sama helper mis `fetchStatus`-is, vt constants.ts.
+    const resumeSammuOlek = adaSammuOlek(saved.status);
+    if (resumeSammuOlek === 2) {
+      // ADA allalaadimine käib (või seisab veaga) — samm 2, progressiriba.
+      setStep(2);
+      setFileUploading(true);
+      fetchStatus(saved.id); // Vahetu päring — ära kuva vananenud cached andmeid
+      startPolling(saved.id, POLL_FAST_MS);
+    } else if (resumeSammuOlek === 3) {
       setStep(3); // poolitamise ootel — eelvaate olek loetakse UploadStepSplit'is
     } else if (REVIEW_STATUSES.includes(saved.status)) {
       setStep(4);
@@ -623,5 +683,6 @@ export function useUploadWizard() {
     handleDeletePending,
     handleResume,
     handlePrepressApplied,
+    handleAdaRetry,
   };
 }

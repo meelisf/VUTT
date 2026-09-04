@@ -21,12 +21,19 @@ def _parse_ts(value) -> float:
 def _upload_status_key(status: str) -> str:
     if status in ("pending", "uploading", "collecting_images"):
         return "uploading"
+    # ada_fetching = ADA-serverist failide server-server allalaadimine — see
+    # on käimasolev töö, mitte viga; kuvatakse nagu tavaline 'uploading'
+    # (vt ka queue_ahead allpool: 'uploading' loetakse aktiivseks).
+    if status == "ada_fetching":
+        return "uploading"
     if status == "processing":
         return "processing"
     if status in ("reviewing", "done"):
         return "review"
     if status == "imported":
         return "imported"
+    # ada_error langeb siia (nagu iga muu tõrge) — vt _normalize_upload
+    # error_message-fallback ada_error-le.
     return "error"
 
 
@@ -57,7 +64,9 @@ def _normalize_upload(state: dict, title_of) -> dict:
         "started_at": _parse_ts(state.get("created_at")),
         "progress": {"ready": ready, "total": total} if total else None,
         "link": _upload_link(state, status_key),
-        "error": state.get("error_message"),
+        # ADA-tõmbaja kirjutab vea ada_error-isse, mitte error_message-isse
+        # (vt sama fallback server/upload/thumbs.py-s).
+        "error": state.get("error_message") or state.get("ada_error"),
         "username": state.get("username") or "",  # None (vanad uploadid) → ""
     }
 

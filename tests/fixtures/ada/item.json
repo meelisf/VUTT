@@ -1,0 +1,135 @@
+{
+  "id" : "5a495195-44c1-463b-a425-643dc4dcf13f",
+  "uuid" : "5a495195-44c1-463b-a425-643dc4dcf13f",
+  "name" : "65 kirja Karl Morgensternile, \tSt. Petersburg",
+  "handle" : "10062/7822",
+  "metadata" : {
+    "dc.contributor.author" : [ {
+      "value" : "Klinger, Friedrich Maximilian von",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.coverage.temporal" : [ {
+      "value" : "31. dets.1812 - 9. jaan.1823; 7 k. s.d.",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.date.accessioned" : [ {
+      "value" : "2008-11-19T11:56:36Z",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.date.available" : [ {
+      "value" : "2008-11-19T11:56:36Z",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.date.issued" : [ {
+      "value" : "1812",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.description.uri" : [ {
+      "value" : "http://tartu.ester.ee/record=b1812728~S1*est",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.identifier.other" : [ {
+      "value" : "F 3,Mrg CCCXLII,kd.8,l.246-362",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.identifier.uri" : [ {
+      "value" : "http://hdl.handle.net/10062/7822",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.language" : [ {
+      "value" : "German",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ],
+    "dc.subject" : [ {
+      "value" : "Kiri",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    }, {
+      "value" : "Letter",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 1
+    }, {
+      "value" : "Brief",
+      "language" : "",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 2
+    } ],
+    "dc.title" : [ {
+      "value" : "65 kirja Karl Morgensternile, \tSt. Petersburg",
+      "language" : "et",
+      "authority" : null,
+      "confidence" : -1,
+      "place" : 0
+    } ]
+  },
+  "inArchive" : true,
+  "discoverable" : true,
+  "withdrawn" : false,
+  "lastModified" : "2026-04-08T08:39:13.544+00:00",
+  "entityType" : null,
+  "type" : "item",
+  "_links" : {
+    "accessStatus" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/accessStatus"
+    },
+    "bundles" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/bundles"
+    },
+    "identifiers" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/identifiers"
+    },
+    "mappedCollections" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/mappedCollections"
+    },
+    "owningCollection" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/owningCollection"
+    },
+    "relationships" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/relationships"
+    },
+    "version" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/version"
+    },
+    "templateItemOf" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/templateItemOf"
+    },
+    "thumbnail" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f/thumbnail"
+    },
+    "self" : {
+      "href" : "https://dspace.ut.ee/server/api/core/items/5a495195-44c1-463b-a425-643dc4dcf13f"
+    }
+  }
+}

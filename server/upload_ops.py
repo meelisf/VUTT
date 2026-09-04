@@ -218,6 +218,14 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
             "collections": meta.get('collections', []),
             "languages": meta.get('languages', []),
             "tags": meta.get('tags', []),
+            # Sama väljad, mida update_upload_meta allow-list lubab — need tulevad
+            # ADA lookup'ist juba loomispäringus (adaApi.ts buildAdaCreateExtras),
+            # mitte ainult hilisemast PATCH-ist. external_url kadumine oleks eriti
+            # halb: see on duplikaadihoiatuse ainus filtriväli.
+            "year_display": meta.get('year_display'),
+            "ester_id": meta.get('ester_id'),
+            "archive_refs": meta.get('archive_refs', []),
+            "external_url": meta.get('external_url'),
         },
         "expected_pages": None,
         # Töötlusotsus, mitte bibliograafiline väide — vaikeväärtus tuletatakse
@@ -228,6 +236,9 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
         "files": [],
         "created_at": datetime.now().isoformat(),
         "replace_work_id": meta.get('replace_work_id') or None,
+        # ADA lähtekaart. `sources` lehepiirid (`first_src_page`, `page_count`)
+        # täidab fetch alles pärast liitmist — siin on ainult nimed ja uuid-d.
+        "ada": meta.get('ada') or None,
     }
 
     lock = _get_upload_lock(upload_id)

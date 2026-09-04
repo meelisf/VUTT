@@ -167,6 +167,24 @@
     "replaceBtn": "Asenda: {{title}}",
     "remove": "Eemalda asendus"
   },
+  "ada": {
+    "title": "Impordi ADA-st",
+    "placeholder": "10062/7822",
+    "hint": "Handle, hdl:-viide või dspace.ut.ee URL",
+    "fetch": "Tõmba",
+    "fileCount": "{{count}} faili, {{size}}",
+    "skipped": "Vahele jäetud (ei ole PDF): {{files}}",
+    "duplicate": "See kirje näib olevat juba imporditud: „{{title}}\". Kordusimport võib olla tahtlik (nt parem skaneering).",
+    "duplicateLink": "Vaata olemasolevat teost",
+    "precision": { "1": "ainult kuu", "2": "ainult aasta", "3": "dateerimata" },
+    "machineTranslation": "masintõlge, kontrolli",
+    "takeAda": "võta ADA oma",
+    "downloading": "Laen ADA-st",
+    "downloadProgress": "{{done}}/{{total}} faili · {{mbDone}}/{{mbTotal}} MB",
+    "retry": "Laen uuesti",
+    "lookupFailed": "ADA päring ebaõnnestus",
+    "errorFallback": "ADA allalaadimine ebaõnnestus"
+  },
   "status": {
     "pending": "Ootel",
     "uploading": "Üles laadimisel",
@@ -178,6 +196,8 @@
     "imported": "Imporditud",
     "awaiting_split": "Poolitamise ootel",
     "prepping": "Eelvaadet valmistamas",
-    "applying": "Töötleb ja saadab"
+    "applying": "Töötleb ja saadab",
+    "ada_fetching": "Laen ADA-st",
+    "ada_error": "ADA allalaadimise viga"
   }
 }

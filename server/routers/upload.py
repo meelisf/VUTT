@@ -1,12 +1,16 @@
 import asyncio
 import os
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from ..ada import client as ada_client
+from ..ada import fetch as ada_fetch
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
+from ..ocr_providers import gemini
 from ..upload import prepress, prepress_apply, prepress_plan
 from ..upload import state as upload_state
 from ..upload_ops import (
@@ -29,6 +33,32 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def otsi_teos_external_url_jargi(url: str) -> Optional[dict]:
+    """Kas see ADA kirje on juba imporditud. None = ei ole (või kontroll ebaõnnestus).
+
+    Duplikaadikontroll on mugavus, mitte eeldus: kui Meilisearch on maas,
+    aeglane või päring ebaõnnestub muul põhjusel, EI TOHI see importi
+    blokeerida — seepärast laiaulatuslik `except` ja `None`-tagastus.
+    """
+    if not url:
+        return None
+    from ..meilisearch_ops import _meili_search
+    try:
+        tulemus = _meili_search({
+            "q": "",
+            "filter": 'external_url = "{}"'.format(url.replace('"', "")),
+            "limit": 1,
+            "attributesToRetrieve": ["work_id", "title"],
+        })
+        hits = tulemus.get("hits") or []
+        if not hits:
+            return None
+        return {"work_id": hits[0].get("work_id"), "title": hits[0].get("title")}
+    except Exception:
+        logger.warning("Duplikaadikontroll ebaõnnestus", exc_info=True)
+        return None
+
+
 @router.get("/admin/uploads")
 async def admin_uploads(user=Depends(require_role("admin"))):
     if not UPLOAD_ENABLED:
@@ -48,6 +78,45 @@ async def admin_upload_create(request: Request, user=Depends(require_role("admin
     return {"status": "success", "upload": upload}
 
 
+@router.post("/admin/ada/lookup")
+async def admin_ada_lookup(request: Request, user=Depends(require_role("admin"))):
+    """Handle või item-UUID → ADA metaandmed + failiplaan. EI KIRJUTA midagi.
+
+    `lookup` normaliseerib ise ja viskab prügi peal `AdaViga` ENNE ühtki
+    võrgukutset — seepärast siin eelfiltrit EI OLE. Eelfilter lükkaks tagasi
+    ka UUID- ja items-URL-kuju, mida `lookup` tahtlikult toetab.
+
+    `run_in_threadpool`: `requests.get` on blokeeriv ja `async def` sees
+    külmutaks event-loopi, kui ADA on kättesaamatu (ADR 0002).
+    """
+    data = await get_json_data(request)
+    try:
+        tulemus = await run_in_threadpool(ada_client.lookup, data.get("handle", ""))
+    except ada_client.AdaViga as e:
+        raise HTTPException(status_code=400, detail=e.kasutaja_sonum)
+
+    # Kakskeelne pealkiri ühes lahtris. Pakkumine, mitte otsus — UI märgistab
+    # selle masintõlkena kuni admin lahtrit puudutab.
+    ingliskeelne = await run_in_threadpool(
+        gemini.translate_title, tulemus["meta"].get("title", "")
+    )
+    if ingliskeelne:
+        tulemus["title_suggestion"] = "{} / {}".format(
+            tulemus["meta"]["title"], ingliskeelne
+        )
+
+    # Duplikaadi HOIATUS, mitte blokeering — sama kirje kordusimport võib olla
+    # tahtlik (nt parem skaneering). run_in_threadpool: Meili-päring on
+    # blokeeriv HTTP (ADR 0002).
+    olemasolev = await run_in_threadpool(
+        otsi_teos_external_url_jargi, tulemus["meta"].get("external_url") or ""
+    )
+    if olemasolev:
+        tulemus["olemasolev"] = olemasolev
+
+    return {"status": "success", "ada": tulemus}
+
+
 @router.get("/admin/upload/{upload_id}/status")
 def admin_upload_status(upload_id: str, user=Depends(require_role("admin"))):
     # SÜNKROONNE def (mitte async) — FastAPI jooksutab selle threadpoolis, et
@@ -56,6 +125,24 @@ def admin_upload_status(upload_id: str, user=Depends(require_role("admin"))):
     # poll_and_sync_thumbs tagastab oma "status" välja (upload olek: pending/processing/done jne)
     # mis kirjutab üle siinsest "success" — seega tagastatav "status" on upload olek, mitte HTTP wrapper
     return poll_and_sync_thumbs(upload_id)
+
+
+@router.post("/admin/upload/{upload_id}/ada-fetch")
+def admin_upload_ada_fetch(upload_id: str, user=Depends(require_role("admin"))):
+    """Käivitab ADA failide allalaadimise taustalõimes.
+
+    SÜNKROONNE def: `alusta_fetchi` loeb ja kirjutab state.json-i (blokeeriv I/O).
+    """
+    if not _valid_upload_id(upload_id):
+        raise HTTPException(status_code=400, detail="Vigane upload_id")
+    state = upload_state.read_state(upload_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Uploadi ei leitud")
+    if not (state.get("ada") or {}).get("sources"):
+        raise HTTPException(status_code=400, detail="Sellel uploadil ei ole ADA lähtekaarti")
+    if not ada_fetch.alusta_fetchi(upload_id):
+        raise HTTPException(status_code=409, detail="Allalaadimine juba käib")
+    return {"status": "ada_fetching"}
 
 
 @router.get("/admin/upload/{upload_id}/thumb/{page_num}")

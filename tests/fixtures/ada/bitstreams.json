@@ -1,0 +1,3447 @@
+{
+  "_embedded" : {
+    "bitstreams" : [ {
+      "id" : "a18e4167-694a-4b91-8731-812aa917be88",
+      "uuid" : "a18e4167-694a-4b91-8731-812aa917be88",
+      "name" : "31.12.1812.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "31.12.1812.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "31.12.1812.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 10651165,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "47aabd995b645a6608da9efce945fba8"
+      },
+      "sequenceId" : 5,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/a18e4167-694a-4b91-8731-812aa917be88/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/a18e4167-694a-4b91-8731-812aa917be88/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/a18e4167-694a-4b91-8731-812aa917be88/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/a18e4167-694a-4b91-8731-812aa917be88/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/a18e4167-694a-4b91-8731-812aa917be88"
+        }
+      }
+    }, {
+      "id" : "69232e62-5e1d-4ef1-a059-a8cac1e6083b",
+      "uuid" : "69232e62-5e1d-4ef1-a059-a8cac1e6083b",
+      "name" : "9999.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "9999.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "9999.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2304873,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "500232f80314405256e8bf4edb3825ef"
+      },
+      "sequenceId" : 6,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/69232e62-5e1d-4ef1-a059-a8cac1e6083b/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/69232e62-5e1d-4ef1-a059-a8cac1e6083b/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/69232e62-5e1d-4ef1-a059-a8cac1e6083b/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/69232e62-5e1d-4ef1-a059-a8cac1e6083b/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/69232e62-5e1d-4ef1-a059-a8cac1e6083b"
+        }
+      }
+    }, {
+      "id" : "d950abcc-105f-47ef-97a7-bcc535c7ea38",
+      "uuid" : "d950abcc-105f-47ef-97a7-bcc535c7ea38",
+      "name" : "07.03.1813.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "07.03.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "07.03.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4464285,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "a8bd06b741634abca27d352cee47f9b0"
+      },
+      "sequenceId" : 8,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d950abcc-105f-47ef-97a7-bcc535c7ea38/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d950abcc-105f-47ef-97a7-bcc535c7ea38/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d950abcc-105f-47ef-97a7-bcc535c7ea38/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d950abcc-105f-47ef-97a7-bcc535c7ea38/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d950abcc-105f-47ef-97a7-bcc535c7ea38"
+        }
+      }
+    }, {
+      "id" : "7a23e0c2-a515-4445-96bf-836b8d32af77",
+      "uuid" : "7a23e0c2-a515-4445-96bf-836b8d32af77",
+      "name" : "18.02.1813.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "18.02.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "18.02.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2109161,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "abc698ea86234aba8af1a8bc5edda0f9"
+      },
+      "sequenceId" : 9,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/7a23e0c2-a515-4445-96bf-836b8d32af77/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/7a23e0c2-a515-4445-96bf-836b8d32af77/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/7a23e0c2-a515-4445-96bf-836b8d32af77/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/7a23e0c2-a515-4445-96bf-836b8d32af77/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/7a23e0c2-a515-4445-96bf-836b8d32af77"
+        }
+      }
+    }, {
+      "id" : "20968f78-da56-422a-8bfd-62e525d41d5c",
+      "uuid" : "20968f78-da56-422a-8bfd-62e525d41d5c",
+      "name" : "21.08.1813.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "21.08.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "21.08.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2778011,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "17d24bc08bc971d75c0e7d44ef28b42b"
+      },
+      "sequenceId" : 10,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20968f78-da56-422a-8bfd-62e525d41d5c/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20968f78-da56-422a-8bfd-62e525d41d5c/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20968f78-da56-422a-8bfd-62e525d41d5c/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20968f78-da56-422a-8bfd-62e525d41d5c/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20968f78-da56-422a-8bfd-62e525d41d5c"
+        }
+      }
+    }, {
+      "id" : "38f0e9ea-115d-46d9-9baf-54895ced53e6",
+      "uuid" : "38f0e9ea-115d-46d9-9baf-54895ced53e6",
+      "name" : "27.08.1813.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "27.08.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "27.08.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2073997,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "b1c1441dfa2fa6190c05dfdb4ad615d5"
+      },
+      "sequenceId" : 11,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/38f0e9ea-115d-46d9-9baf-54895ced53e6/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/38f0e9ea-115d-46d9-9baf-54895ced53e6/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/38f0e9ea-115d-46d9-9baf-54895ced53e6/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/38f0e9ea-115d-46d9-9baf-54895ced53e6/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/38f0e9ea-115d-46d9-9baf-54895ced53e6"
+        }
+      }
+    }, {
+      "id" : "b65bb492-d4b0-40d1-a654-7dfc7773138a",
+      "uuid" : "b65bb492-d4b0-40d1-a654-7dfc7773138a",
+      "name" : "24.10.1813.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "24.10.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "24.10.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 6115120,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "14a95250fe69a3fba12f9c9ebfcb84fb"
+      },
+      "sequenceId" : 12,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b65bb492-d4b0-40d1-a654-7dfc7773138a/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b65bb492-d4b0-40d1-a654-7dfc7773138a/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b65bb492-d4b0-40d1-a654-7dfc7773138a/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b65bb492-d4b0-40d1-a654-7dfc7773138a/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b65bb492-d4b0-40d1-a654-7dfc7773138a"
+        }
+      }
+    }, {
+      "id" : "0c45cb68-012e-436a-9e13-0c547d421699",
+      "uuid" : "0c45cb68-012e-436a-9e13-0c547d421699",
+      "name" : "18.11.1813.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "18.11.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "18.11.1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 3273327,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "314714f21720cb0268eebc15040f1b37"
+      },
+      "sequenceId" : 13,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/0c45cb68-012e-436a-9e13-0c547d421699/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/0c45cb68-012e-436a-9e13-0c547d421699/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/0c45cb68-012e-436a-9e13-0c547d421699/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/0c45cb68-012e-436a-9e13-0c547d421699/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/0c45cb68-012e-436a-9e13-0c547d421699"
+        }
+      }
+    }, {
+      "id" : "4be387c5-7b33-4435-af14-9ed886fbe9ee",
+      "uuid" : "4be387c5-7b33-4435-af14-9ed886fbe9ee",
+      "name" : "1813.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.source" : [ {
+          "value" : "1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "1813.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4176158,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "4e2bdee14409d5f7f0415923c6ffc0bb"
+      },
+      "sequenceId" : 7,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4be387c5-7b33-4435-af14-9ed886fbe9ee/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4be387c5-7b33-4435-af14-9ed886fbe9ee/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4be387c5-7b33-4435-af14-9ed886fbe9ee/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4be387c5-7b33-4435-af14-9ed886fbe9ee/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4be387c5-7b33-4435-af14-9ed886fbe9ee"
+        }
+      }
+    }, {
+      "id" : "ec20a688-d601-447e-a4fc-bb420f55d762",
+      "uuid" : "ec20a688-d601-447e-a4fc-bb420f55d762",
+      "name" : "07.04.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "07.04.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "07.04.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4046342,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "03bb085ec7c2bfb6e093c27c75cb59ca"
+      },
+      "sequenceId" : 14,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ec20a688-d601-447e-a4fc-bb420f55d762/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ec20a688-d601-447e-a4fc-bb420f55d762/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ec20a688-d601-447e-a4fc-bb420f55d762/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ec20a688-d601-447e-a4fc-bb420f55d762/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ec20a688-d601-447e-a4fc-bb420f55d762"
+        }
+      }
+    }, {
+      "id" : "27407da0-d227-4a41-9367-3abed7c10a1a",
+      "uuid" : "27407da0-d227-4a41-9367-3abed7c10a1a",
+      "name" : "15.05.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "15.05.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "15.05.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 9229978,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "85f555f947ca71998aea2101a349b456"
+      },
+      "sequenceId" : 15,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/27407da0-d227-4a41-9367-3abed7c10a1a/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/27407da0-d227-4a41-9367-3abed7c10a1a/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/27407da0-d227-4a41-9367-3abed7c10a1a/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/27407da0-d227-4a41-9367-3abed7c10a1a/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/27407da0-d227-4a41-9367-3abed7c10a1a"
+        }
+      }
+    }, {
+      "id" : "acb2434b-da7b-4f03-b6c8-a6788ef91932",
+      "uuid" : "acb2434b-da7b-4f03-b6c8-a6788ef91932",
+      "name" : "17.05.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "17.05.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "17.05.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 6313307,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "598f791c817933fc441305a2eeff1d24"
+      },
+      "sequenceId" : 16,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/acb2434b-da7b-4f03-b6c8-a6788ef91932/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/acb2434b-da7b-4f03-b6c8-a6788ef91932/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/acb2434b-da7b-4f03-b6c8-a6788ef91932/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/acb2434b-da7b-4f03-b6c8-a6788ef91932/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/acb2434b-da7b-4f03-b6c8-a6788ef91932"
+        }
+      }
+    }, {
+      "id" : "6a088888-14b7-47f4-810b-7550a0c4119e",
+      "uuid" : "6a088888-14b7-47f4-810b-7550a0c4119e",
+      "name" : "14.07.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "14.07.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "14.07.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 6611018,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "02942fac24550bc05a3baf10254ca7b1"
+      },
+      "sequenceId" : 17,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a088888-14b7-47f4-810b-7550a0c4119e/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a088888-14b7-47f4-810b-7550a0c4119e/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a088888-14b7-47f4-810b-7550a0c4119e/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a088888-14b7-47f4-810b-7550a0c4119e/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a088888-14b7-47f4-810b-7550a0c4119e"
+        }
+      }
+    }, {
+      "id" : "ac610f6f-e730-4075-9eee-c278b454ae24",
+      "uuid" : "ac610f6f-e730-4075-9eee-c278b454ae24",
+      "name" : "20.07.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.source" : [ {
+          "value" : "/dspace/upload/C:\\Documents and Settings\\cipac\\My Documents\\jaagupioma\\kirjad2\\49.Klinger,Friedrich_Maximilian_von\\20.07.1814\\20.07.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "20.07.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2977844,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "d05e760d4ef06a292becb3bf6c439836"
+      },
+      "sequenceId" : 1,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ac610f6f-e730-4075-9eee-c278b454ae24/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ac610f6f-e730-4075-9eee-c278b454ae24/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ac610f6f-e730-4075-9eee-c278b454ae24/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ac610f6f-e730-4075-9eee-c278b454ae24/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ac610f6f-e730-4075-9eee-c278b454ae24"
+        }
+      }
+    }, {
+      "id" : "05b6d465-77a9-4346-8e99-cedd2c661287",
+      "uuid" : "05b6d465-77a9-4346-8e99-cedd2c661287",
+      "name" : "30.07.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "30.07.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "30.07.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4369676,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "2d7218511106ec6797a3dedbce83f2f7"
+      },
+      "sequenceId" : 18,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/05b6d465-77a9-4346-8e99-cedd2c661287/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/05b6d465-77a9-4346-8e99-cedd2c661287/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/05b6d465-77a9-4346-8e99-cedd2c661287/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/05b6d465-77a9-4346-8e99-cedd2c661287/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/05b6d465-77a9-4346-8e99-cedd2c661287"
+        }
+      }
+    }, {
+      "id" : "e8d8d6b9-b8c2-49a2-aea6-bd58de3999f9",
+      "uuid" : "e8d8d6b9-b8c2-49a2-aea6-bd58de3999f9",
+      "name" : "28.10.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "28.10.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "28.10.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 6277039,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "78de9b328a768ff50cd5e21cb9da139a"
+      },
+      "sequenceId" : 19,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e8d8d6b9-b8c2-49a2-aea6-bd58de3999f9/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e8d8d6b9-b8c2-49a2-aea6-bd58de3999f9/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e8d8d6b9-b8c2-49a2-aea6-bd58de3999f9/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e8d8d6b9-b8c2-49a2-aea6-bd58de3999f9/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e8d8d6b9-b8c2-49a2-aea6-bd58de3999f9"
+        }
+      }
+    }, {
+      "id" : "9f02a7e9-1ee4-451d-82b9-2da5544a431c",
+      "uuid" : "9f02a7e9-1ee4-451d-82b9-2da5544a431c",
+      "name" : "13.11.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "13.11.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "13.11.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 1999106,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "9e2f2403b8429b7a377231537109d63e"
+      },
+      "sequenceId" : 20,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/9f02a7e9-1ee4-451d-82b9-2da5544a431c/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/9f02a7e9-1ee4-451d-82b9-2da5544a431c/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/9f02a7e9-1ee4-451d-82b9-2da5544a431c/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/9f02a7e9-1ee4-451d-82b9-2da5544a431c/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/9f02a7e9-1ee4-451d-82b9-2da5544a431c"
+        }
+      }
+    }, {
+      "id" : "ae35a529-a205-4a5f-8cae-f0cb6e0d272d",
+      "uuid" : "ae35a529-a205-4a5f-8cae-f0cb6e0d272d",
+      "name" : "20.11.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "20.11.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "20.11.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2014051,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "23ef16a4741ad95052e02d149cb76c94"
+      },
+      "sequenceId" : 21,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ae35a529-a205-4a5f-8cae-f0cb6e0d272d/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ae35a529-a205-4a5f-8cae-f0cb6e0d272d/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ae35a529-a205-4a5f-8cae-f0cb6e0d272d/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ae35a529-a205-4a5f-8cae-f0cb6e0d272d/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ae35a529-a205-4a5f-8cae-f0cb6e0d272d"
+        }
+      }
+    }, {
+      "id" : "4bb05bbb-94de-4d7c-8cca-c2545d74f90e",
+      "uuid" : "4bb05bbb-94de-4d7c-8cca-c2545d74f90e",
+      "name" : "27.11.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "27.11.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "27.11.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2017234,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "221f545ea4e85a48ed93a6244dd561c6"
+      },
+      "sequenceId" : 22,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4bb05bbb-94de-4d7c-8cca-c2545d74f90e/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4bb05bbb-94de-4d7c-8cca-c2545d74f90e/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4bb05bbb-94de-4d7c-8cca-c2545d74f90e/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4bb05bbb-94de-4d7c-8cca-c2545d74f90e/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4bb05bbb-94de-4d7c-8cca-c2545d74f90e"
+        }
+      }
+    }, {
+      "id" : "fe65db21-9a8a-48fa-a7da-8121866783d2",
+      "uuid" : "fe65db21-9a8a-48fa-a7da-8121866783d2",
+      "name" : "04.12.1814.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "04.12.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "04.12.1814.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 1967773,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "3cbbdfebc00cf70ebad4ea13c9792bb5"
+      },
+      "sequenceId" : 23,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/fe65db21-9a8a-48fa-a7da-8121866783d2/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/fe65db21-9a8a-48fa-a7da-8121866783d2/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/fe65db21-9a8a-48fa-a7da-8121866783d2/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/fe65db21-9a8a-48fa-a7da-8121866783d2/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/fe65db21-9a8a-48fa-a7da-8121866783d2"
+        }
+      }
+    }, {
+      "id" : "c4be4685-80f6-4ba3-8373-097adacc56e8",
+      "uuid" : "c4be4685-80f6-4ba3-8373-097adacc56e8",
+      "name" : "9998.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "9998.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "9998.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 770230,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "6a73f967d4955b3111a2d59df2fc6c7c"
+      },
+      "sequenceId" : 24,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c4be4685-80f6-4ba3-8373-097adacc56e8/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c4be4685-80f6-4ba3-8373-097adacc56e8/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c4be4685-80f6-4ba3-8373-097adacc56e8/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c4be4685-80f6-4ba3-8373-097adacc56e8/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c4be4685-80f6-4ba3-8373-097adacc56e8"
+        }
+      }
+    }, {
+      "id" : "97b674a3-8382-4c5a-95a8-1fd022642be1",
+      "uuid" : "97b674a3-8382-4c5a-95a8-1fd022642be1",
+      "name" : "04.01.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "04.01.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "04.01.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 8994366,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "95a38c0a9d7f6f8ccc319bcf873f1511"
+      },
+      "sequenceId" : 25,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/97b674a3-8382-4c5a-95a8-1fd022642be1/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/97b674a3-8382-4c5a-95a8-1fd022642be1/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/97b674a3-8382-4c5a-95a8-1fd022642be1/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/97b674a3-8382-4c5a-95a8-1fd022642be1/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/97b674a3-8382-4c5a-95a8-1fd022642be1"
+        }
+      }
+    }, {
+      "id" : "66db135f-9701-482b-abc1-984d2946667c",
+      "uuid" : "66db135f-9701-482b-abc1-984d2946667c",
+      "name" : "05.01.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "05.01.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "05.01.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 7727691,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "90df538db46d86dd4b09b264731a61b4"
+      },
+      "sequenceId" : 26,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/66db135f-9701-482b-abc1-984d2946667c/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/66db135f-9701-482b-abc1-984d2946667c/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/66db135f-9701-482b-abc1-984d2946667c/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/66db135f-9701-482b-abc1-984d2946667c/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/66db135f-9701-482b-abc1-984d2946667c"
+        }
+      }
+    }, {
+      "id" : "82babfbe-e761-4d01-a834-f68ba4f94222",
+      "uuid" : "82babfbe-e761-4d01-a834-f68ba4f94222",
+      "name" : "05.03.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "05.03.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "05.03.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 8123489,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "56c969db067b3ecadd0d0497cdceaa8e"
+      },
+      "sequenceId" : 27,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/82babfbe-e761-4d01-a834-f68ba4f94222/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/82babfbe-e761-4d01-a834-f68ba4f94222/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/82babfbe-e761-4d01-a834-f68ba4f94222/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/82babfbe-e761-4d01-a834-f68ba4f94222/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/82babfbe-e761-4d01-a834-f68ba4f94222"
+        }
+      }
+    }, {
+      "id" : "894c4c82-3edd-47fb-9eee-aeb3fb627155",
+      "uuid" : "894c4c82-3edd-47fb-9eee-aeb3fb627155",
+      "name" : "18.05.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "18.05.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "18.05.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4261316,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "e5878538f766293c536f7f8cc2292f4f"
+      },
+      "sequenceId" : 28,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/894c4c82-3edd-47fb-9eee-aeb3fb627155/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/894c4c82-3edd-47fb-9eee-aeb3fb627155/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/894c4c82-3edd-47fb-9eee-aeb3fb627155/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/894c4c82-3edd-47fb-9eee-aeb3fb627155/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/894c4c82-3edd-47fb-9eee-aeb3fb627155"
+        }
+      }
+    }, {
+      "id" : "5493161a-3033-48e5-85d1-f5f3779bb728",
+      "uuid" : "5493161a-3033-48e5-85d1-f5f3779bb728",
+      "name" : "11.06.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "11.06.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "11.06.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5841324,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "bec38234b6960d5c96513d29413284ac"
+      },
+      "sequenceId" : 29,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/5493161a-3033-48e5-85d1-f5f3779bb728/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/5493161a-3033-48e5-85d1-f5f3779bb728/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/5493161a-3033-48e5-85d1-f5f3779bb728/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/5493161a-3033-48e5-85d1-f5f3779bb728/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/5493161a-3033-48e5-85d1-f5f3779bb728"
+        }
+      }
+    }, {
+      "id" : "bc213680-1dc3-4ae9-b9df-2bd8f4c543bc",
+      "uuid" : "bc213680-1dc3-4ae9-b9df-2bd8f4c543bc",
+      "name" : "24.06.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "24.06.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "24.06.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2868380,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "7fa8560592928f4dd8412c8b7911c71a"
+      },
+      "sequenceId" : 30,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/bc213680-1dc3-4ae9-b9df-2bd8f4c543bc/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/bc213680-1dc3-4ae9-b9df-2bd8f4c543bc/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/bc213680-1dc3-4ae9-b9df-2bd8f4c543bc/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/bc213680-1dc3-4ae9-b9df-2bd8f4c543bc/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/bc213680-1dc3-4ae9-b9df-2bd8f4c543bc"
+        }
+      }
+    }, {
+      "id" : "371becbd-6e32-464f-bd71-6150335933e7",
+      "uuid" : "371becbd-6e32-464f-bd71-6150335933e7",
+      "name" : "25.06.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "25.06.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "25.06.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 7249977,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "b09c091187e89ccd1379ef55a5ee3721"
+      },
+      "sequenceId" : 31,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/371becbd-6e32-464f-bd71-6150335933e7/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/371becbd-6e32-464f-bd71-6150335933e7/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/371becbd-6e32-464f-bd71-6150335933e7/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/371becbd-6e32-464f-bd71-6150335933e7/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/371becbd-6e32-464f-bd71-6150335933e7"
+        }
+      }
+    }, {
+      "id" : "61bca0cc-adc4-4c6e-a246-5f4e826b0ff1",
+      "uuid" : "61bca0cc-adc4-4c6e-a246-5f4e826b0ff1",
+      "name" : "06.08.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "06.08.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "06.08.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5108482,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "3a2004307672ef82e8cd4c3c6078d8ba"
+      },
+      "sequenceId" : 32,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/61bca0cc-adc4-4c6e-a246-5f4e826b0ff1/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/61bca0cc-adc4-4c6e-a246-5f4e826b0ff1/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/61bca0cc-adc4-4c6e-a246-5f4e826b0ff1/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/61bca0cc-adc4-4c6e-a246-5f4e826b0ff1/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/61bca0cc-adc4-4c6e-a246-5f4e826b0ff1"
+        }
+      }
+    }, {
+      "id" : "4560d7e5-77ee-410f-8d0a-43f37a99af3e",
+      "uuid" : "4560d7e5-77ee-410f-8d0a-43f37a99af3e",
+      "name" : "15.08.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "15.08.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "15.08.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 6743227,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "4c8dd2f7ee4b426f6b7aeba6a55eb9a8"
+      },
+      "sequenceId" : 33,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4560d7e5-77ee-410f-8d0a-43f37a99af3e/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4560d7e5-77ee-410f-8d0a-43f37a99af3e/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4560d7e5-77ee-410f-8d0a-43f37a99af3e/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4560d7e5-77ee-410f-8d0a-43f37a99af3e/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4560d7e5-77ee-410f-8d0a-43f37a99af3e"
+        }
+      }
+    }, {
+      "id" : "4c4ce78a-10f3-4708-bd60-ed9a1c33cdb7",
+      "uuid" : "4c4ce78a-10f3-4708-bd60-ed9a1c33cdb7",
+      "name" : "18.10.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "18.10.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "18.10.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2071865,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "e55ec2b399bf15e1f6e6a67bec24cd8c"
+      },
+      "sequenceId" : 34,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4c4ce78a-10f3-4708-bd60-ed9a1c33cdb7/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4c4ce78a-10f3-4708-bd60-ed9a1c33cdb7/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4c4ce78a-10f3-4708-bd60-ed9a1c33cdb7/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4c4ce78a-10f3-4708-bd60-ed9a1c33cdb7/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4c4ce78a-10f3-4708-bd60-ed9a1c33cdb7"
+        }
+      }
+    }, {
+      "id" : "4b42d631-35a4-4a80-b224-9cc56751fdd9",
+      "uuid" : "4b42d631-35a4-4a80-b224-9cc56751fdd9",
+      "name" : "25.10.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "25.10.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "25.10.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 1738990,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "c6d47cbfb1c7678f25ff9b7bd35aa12b"
+      },
+      "sequenceId" : 35,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4b42d631-35a4-4a80-b224-9cc56751fdd9/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4b42d631-35a4-4a80-b224-9cc56751fdd9/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4b42d631-35a4-4a80-b224-9cc56751fdd9/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4b42d631-35a4-4a80-b224-9cc56751fdd9/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4b42d631-35a4-4a80-b224-9cc56751fdd9"
+        }
+      }
+    }, {
+      "id" : "f780b61a-1b35-4bf2-9c45-cea16771e4cd",
+      "uuid" : "f780b61a-1b35-4bf2-9c45-cea16771e4cd",
+      "name" : "03.11.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "03.11.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "03.11.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2142094,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "76419c5aeacf9e3d55641ff25423b192"
+      },
+      "sequenceId" : 36,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f780b61a-1b35-4bf2-9c45-cea16771e4cd/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f780b61a-1b35-4bf2-9c45-cea16771e4cd/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f780b61a-1b35-4bf2-9c45-cea16771e4cd/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f780b61a-1b35-4bf2-9c45-cea16771e4cd/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f780b61a-1b35-4bf2-9c45-cea16771e4cd"
+        }
+      }
+    }, {
+      "id" : "f059a610-5d53-47dd-8d0d-6ab792300c0c",
+      "uuid" : "f059a610-5d53-47dd-8d0d-6ab792300c0c",
+      "name" : "11.1815.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "11.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "11.1815.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 1089799,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "6020dd28478ce1f3ec2f14633a864530"
+      },
+      "sequenceId" : 37,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f059a610-5d53-47dd-8d0d-6ab792300c0c/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f059a610-5d53-47dd-8d0d-6ab792300c0c/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f059a610-5d53-47dd-8d0d-6ab792300c0c/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f059a610-5d53-47dd-8d0d-6ab792300c0c/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/f059a610-5d53-47dd-8d0d-6ab792300c0c"
+        }
+      }
+    }, {
+      "id" : "46b48e27-8350-4b99-9215-bb89003660e2",
+      "uuid" : "46b48e27-8350-4b99-9215-bb89003660e2",
+      "name" : "03.03.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "03.03.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "03.03.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5602503,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "62d185156a970f3e64ee4c3bdabee835"
+      },
+      "sequenceId" : 38,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/46b48e27-8350-4b99-9215-bb89003660e2/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/46b48e27-8350-4b99-9215-bb89003660e2/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/46b48e27-8350-4b99-9215-bb89003660e2/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/46b48e27-8350-4b99-9215-bb89003660e2/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/46b48e27-8350-4b99-9215-bb89003660e2"
+        }
+      }
+    }, {
+      "id" : "63eca289-12e6-4e1e-9a8b-e4b3a342d88d",
+      "uuid" : "63eca289-12e6-4e1e-9a8b-e4b3a342d88d",
+      "name" : "28.03.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "28.03.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "28.03.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2156629,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "5f408e0545b13f95c443cd7febeff356"
+      },
+      "sequenceId" : 39,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/63eca289-12e6-4e1e-9a8b-e4b3a342d88d/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/63eca289-12e6-4e1e-9a8b-e4b3a342d88d/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/63eca289-12e6-4e1e-9a8b-e4b3a342d88d/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/63eca289-12e6-4e1e-9a8b-e4b3a342d88d/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/63eca289-12e6-4e1e-9a8b-e4b3a342d88d"
+        }
+      }
+    }, {
+      "id" : "96c689fe-8dfe-44f6-8b33-0d377d7e6219",
+      "uuid" : "96c689fe-8dfe-44f6-8b33-0d377d7e6219",
+      "name" : "24.04.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "24.04.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "24.04.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4181171,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "c8561771a61e18328d04109094306bfc"
+      },
+      "sequenceId" : 40,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/96c689fe-8dfe-44f6-8b33-0d377d7e6219/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/96c689fe-8dfe-44f6-8b33-0d377d7e6219/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/96c689fe-8dfe-44f6-8b33-0d377d7e6219/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/96c689fe-8dfe-44f6-8b33-0d377d7e6219/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/96c689fe-8dfe-44f6-8b33-0d377d7e6219"
+        }
+      }
+    }, {
+      "id" : "254eacb3-27cd-4f6d-b5fb-e8a353cefea0",
+      "uuid" : "254eacb3-27cd-4f6d-b5fb-e8a353cefea0",
+      "name" : "23.05.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "23.05.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "23.05.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4325511,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "5ff4e11ff12e17462e6c3c62155351e0"
+      },
+      "sequenceId" : 41,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/254eacb3-27cd-4f6d-b5fb-e8a353cefea0/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/254eacb3-27cd-4f6d-b5fb-e8a353cefea0/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/254eacb3-27cd-4f6d-b5fb-e8a353cefea0/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/254eacb3-27cd-4f6d-b5fb-e8a353cefea0/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/254eacb3-27cd-4f6d-b5fb-e8a353cefea0"
+        }
+      }
+    }, {
+      "id" : "ca0d51c5-e392-4a93-9418-fc6cf550fc76",
+      "uuid" : "ca0d51c5-e392-4a93-9418-fc6cf550fc76",
+      "name" : "30.05.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "30.05.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "30.05.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 9463350,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "3fff58b67a73d95d9506b6b074a9bf24"
+      },
+      "sequenceId" : 42,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ca0d51c5-e392-4a93-9418-fc6cf550fc76/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ca0d51c5-e392-4a93-9418-fc6cf550fc76/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ca0d51c5-e392-4a93-9418-fc6cf550fc76/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ca0d51c5-e392-4a93-9418-fc6cf550fc76/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/ca0d51c5-e392-4a93-9418-fc6cf550fc76"
+        }
+      }
+    }, {
+      "id" : "3e2e92a3-9ad6-4a18-b83c-5b9dc025d1fa",
+      "uuid" : "3e2e92a3-9ad6-4a18-b83c-5b9dc025d1fa",
+      "name" : "08.09.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "08.09.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "08.09.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 1943385,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "1e5724ae572ba1f9af3ca480de5718a4"
+      },
+      "sequenceId" : 43,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/3e2e92a3-9ad6-4a18-b83c-5b9dc025d1fa/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/3e2e92a3-9ad6-4a18-b83c-5b9dc025d1fa/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/3e2e92a3-9ad6-4a18-b83c-5b9dc025d1fa/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/3e2e92a3-9ad6-4a18-b83c-5b9dc025d1fa/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/3e2e92a3-9ad6-4a18-b83c-5b9dc025d1fa"
+        }
+      }
+    }, {
+      "id" : "4ae4efbf-6737-463f-a8d6-deac22430463",
+      "uuid" : "4ae4efbf-6737-463f-a8d6-deac22430463",
+      "name" : "09.06.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "09.06.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "09.06.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 6579411,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "1c58d7bff758ed9372d12d8fa74343ea"
+      },
+      "sequenceId" : 44,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4ae4efbf-6737-463f-a8d6-deac22430463/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4ae4efbf-6737-463f-a8d6-deac22430463/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4ae4efbf-6737-463f-a8d6-deac22430463/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4ae4efbf-6737-463f-a8d6-deac22430463/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/4ae4efbf-6737-463f-a8d6-deac22430463"
+        }
+      }
+    }, {
+      "id" : "c2be88ee-dc30-4251-96a8-b6fd87dfec45",
+      "uuid" : "c2be88ee-dc30-4251-96a8-b6fd87dfec45",
+      "name" : "12.08.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "12.08.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "12.08.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2290963,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "097f50b9c377ff5f483a626622dc1c6e"
+      },
+      "sequenceId" : 45,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c2be88ee-dc30-4251-96a8-b6fd87dfec45/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c2be88ee-dc30-4251-96a8-b6fd87dfec45/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c2be88ee-dc30-4251-96a8-b6fd87dfec45/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c2be88ee-dc30-4251-96a8-b6fd87dfec45/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/c2be88ee-dc30-4251-96a8-b6fd87dfec45"
+        }
+      }
+    }, {
+      "id" : "e1c45830-1cc7-4db6-9fd4-a1df8c7cf6cc",
+      "uuid" : "e1c45830-1cc7-4db6-9fd4-a1df8c7cf6cc",
+      "name" : "22.08.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "22.08.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "22.08.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 8680248,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "c4231ea5196bb3e4a961a50750aeba48"
+      },
+      "sequenceId" : 46,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e1c45830-1cc7-4db6-9fd4-a1df8c7cf6cc/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e1c45830-1cc7-4db6-9fd4-a1df8c7cf6cc/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e1c45830-1cc7-4db6-9fd4-a1df8c7cf6cc/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e1c45830-1cc7-4db6-9fd4-a1df8c7cf6cc/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/e1c45830-1cc7-4db6-9fd4-a1df8c7cf6cc"
+        }
+      }
+    }, {
+      "id" : "20414260-26e8-4ad7-92ed-aabf093815e2",
+      "uuid" : "20414260-26e8-4ad7-92ed-aabf093815e2",
+      "name" : "15.09.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "15.09.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "15.09.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 12439374,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "7026dc51105ffdb49e5babd86f2fc124"
+      },
+      "sequenceId" : 47,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20414260-26e8-4ad7-92ed-aabf093815e2/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20414260-26e8-4ad7-92ed-aabf093815e2/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20414260-26e8-4ad7-92ed-aabf093815e2/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20414260-26e8-4ad7-92ed-aabf093815e2/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/20414260-26e8-4ad7-92ed-aabf093815e2"
+        }
+      }
+    }, {
+      "id" : "d86eb7f7-279a-42ea-9d77-e2c10fe688e7",
+      "uuid" : "d86eb7f7-279a-42ea-9d77-e2c10fe688e7",
+      "name" : "03.10.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "03.10.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "03.10.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 11972509,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "38d2d148e2b0a6195e2ce499c757196d"
+      },
+      "sequenceId" : 48,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d86eb7f7-279a-42ea-9d77-e2c10fe688e7/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d86eb7f7-279a-42ea-9d77-e2c10fe688e7/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d86eb7f7-279a-42ea-9d77-e2c10fe688e7/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d86eb7f7-279a-42ea-9d77-e2c10fe688e7/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d86eb7f7-279a-42ea-9d77-e2c10fe688e7"
+        }
+      }
+    }, {
+      "id" : "700ea469-aa34-43f7-b7fc-874f8d8f7cef",
+      "uuid" : "700ea469-aa34-43f7-b7fc-874f8d8f7cef",
+      "name" : "18.10.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "18.10.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "18.10.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 12491680,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "7d9562b52f7ad8cf8ca652a402ad9f6c"
+      },
+      "sequenceId" : 49,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/700ea469-aa34-43f7-b7fc-874f8d8f7cef/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/700ea469-aa34-43f7-b7fc-874f8d8f7cef/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/700ea469-aa34-43f7-b7fc-874f8d8f7cef/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/700ea469-aa34-43f7-b7fc-874f8d8f7cef/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/700ea469-aa34-43f7-b7fc-874f8d8f7cef"
+        }
+      }
+    }, {
+      "id" : "d76ea046-765b-479d-adf3-98f49cd26b05",
+      "uuid" : "d76ea046-765b-479d-adf3-98f49cd26b05",
+      "name" : "31.10.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "31.10.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "31.10.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5840607,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "8abd5df8ca4557d8677c8aa5f4d24a97"
+      },
+      "sequenceId" : 50,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d76ea046-765b-479d-adf3-98f49cd26b05/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d76ea046-765b-479d-adf3-98f49cd26b05/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d76ea046-765b-479d-adf3-98f49cd26b05/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d76ea046-765b-479d-adf3-98f49cd26b05/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d76ea046-765b-479d-adf3-98f49cd26b05"
+        }
+      }
+    }, {
+      "id" : "2ab0fe77-bfcf-41dd-9c00-3894e51b7651",
+      "uuid" : "2ab0fe77-bfcf-41dd-9c00-3894e51b7651",
+      "name" : "9997.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "9997.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "9997.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 7962362,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "9b2fc915fe8c68c3fbd79c85ef4992ba"
+      },
+      "sequenceId" : 51,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/2ab0fe77-bfcf-41dd-9c00-3894e51b7651/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/2ab0fe77-bfcf-41dd-9c00-3894e51b7651/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/2ab0fe77-bfcf-41dd-9c00-3894e51b7651/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/2ab0fe77-bfcf-41dd-9c00-3894e51b7651/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/2ab0fe77-bfcf-41dd-9c00-3894e51b7651"
+        }
+      }
+    }, {
+      "id" : "119eb5f1-6a93-4a67-b6ea-71ecb8d95e81",
+      "uuid" : "119eb5f1-6a93-4a67-b6ea-71ecb8d95e81",
+      "name" : "11.01.1817.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "11.01.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "11.01.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 2406784,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "3b0ce63072ab1147286df7f35769051a"
+      },
+      "sequenceId" : 52,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/119eb5f1-6a93-4a67-b6ea-71ecb8d95e81/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/119eb5f1-6a93-4a67-b6ea-71ecb8d95e81/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/119eb5f1-6a93-4a67-b6ea-71ecb8d95e81/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/119eb5f1-6a93-4a67-b6ea-71ecb8d95e81/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/119eb5f1-6a93-4a67-b6ea-71ecb8d95e81"
+        }
+      }
+    }, {
+      "id" : "6a084aec-86c9-4e41-8fa4-9b310ff65bff",
+      "uuid" : "6a084aec-86c9-4e41-8fa4-9b310ff65bff",
+      "name" : "25.01.1817.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "25.01.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "25.01.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4650990,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "41e1eaa9f56e25235aa6fc903f6e8bb7"
+      },
+      "sequenceId" : 53,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a084aec-86c9-4e41-8fa4-9b310ff65bff/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a084aec-86c9-4e41-8fa4-9b310ff65bff/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a084aec-86c9-4e41-8fa4-9b310ff65bff/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a084aec-86c9-4e41-8fa4-9b310ff65bff/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6a084aec-86c9-4e41-8fa4-9b310ff65bff"
+        }
+      }
+    }, {
+      "id" : "b7a4e394-0bda-4c0d-bc82-40248e5ec573",
+      "uuid" : "b7a4e394-0bda-4c0d-bc82-40248e5ec573",
+      "name" : "24.04.1817.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "24.04.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "24.04.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4587155,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "bf4ac47466622a662b3b24e70ccf5aa0"
+      },
+      "sequenceId" : 54,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b7a4e394-0bda-4c0d-bc82-40248e5ec573/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b7a4e394-0bda-4c0d-bc82-40248e5ec573/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b7a4e394-0bda-4c0d-bc82-40248e5ec573/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b7a4e394-0bda-4c0d-bc82-40248e5ec573/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b7a4e394-0bda-4c0d-bc82-40248e5ec573"
+        }
+      }
+    }, {
+      "id" : "354b1e2a-efe5-4b51-ae35-5cc85929eb88",
+      "uuid" : "354b1e2a-efe5-4b51-ae35-5cc85929eb88",
+      "name" : "22.08.1817.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "22.08.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "22.08.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 6025745,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "c0a528ef81c1ceaaa702b3b958a9ae3d"
+      },
+      "sequenceId" : 55,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/354b1e2a-efe5-4b51-ae35-5cc85929eb88/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/354b1e2a-efe5-4b51-ae35-5cc85929eb88/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/354b1e2a-efe5-4b51-ae35-5cc85929eb88/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/354b1e2a-efe5-4b51-ae35-5cc85929eb88/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/354b1e2a-efe5-4b51-ae35-5cc85929eb88"
+        }
+      }
+    }, {
+      "id" : "36968a46-bf84-431e-bbf6-22fe90b4401d",
+      "uuid" : "36968a46-bf84-431e-bbf6-22fe90b4401d",
+      "name" : "14.12.1817.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "14.12.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "14.12.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4952036,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "c797f69c06b2fa7242771a0d6e0bf8f1"
+      },
+      "sequenceId" : 56,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/36968a46-bf84-431e-bbf6-22fe90b4401d/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/36968a46-bf84-431e-bbf6-22fe90b4401d/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/36968a46-bf84-431e-bbf6-22fe90b4401d/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/36968a46-bf84-431e-bbf6-22fe90b4401d/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/36968a46-bf84-431e-bbf6-22fe90b4401d"
+        }
+      }
+    }, {
+      "id" : "841b056f-638a-4199-b5a2-06fe1df2c63a",
+      "uuid" : "841b056f-638a-4199-b5a2-06fe1df2c63a",
+      "name" : "28.12.1817.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "28.12.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "28.12.1817.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5138647,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "632d80a1dc40632dba3a2ea03094cc96"
+      },
+      "sequenceId" : 57,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/841b056f-638a-4199-b5a2-06fe1df2c63a/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/841b056f-638a-4199-b5a2-06fe1df2c63a/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/841b056f-638a-4199-b5a2-06fe1df2c63a/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/841b056f-638a-4199-b5a2-06fe1df2c63a/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/841b056f-638a-4199-b5a2-06fe1df2c63a"
+        }
+      }
+    }, {
+      "id" : "44cc3c07-5e0f-4722-9967-ef804a28815f",
+      "uuid" : "44cc3c07-5e0f-4722-9967-ef804a28815f",
+      "name" : "22.02.1818.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "22.02.1818.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "22.02.1818.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5978706,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "0a5e729afc28b6ae1b789d2726267bfd"
+      },
+      "sequenceId" : 58,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/44cc3c07-5e0f-4722-9967-ef804a28815f/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/44cc3c07-5e0f-4722-9967-ef804a28815f/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/44cc3c07-5e0f-4722-9967-ef804a28815f/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/44cc3c07-5e0f-4722-9967-ef804a28815f/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/44cc3c07-5e0f-4722-9967-ef804a28815f"
+        }
+      }
+    }, {
+      "id" : "1f737e92-0a5d-46cc-9e7d-632a075cf939",
+      "uuid" : "1f737e92-0a5d-46cc-9e7d-632a075cf939",
+      "name" : "30.08.1818.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "30.08.1818.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "30.08.1818.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 7274893,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "dc107778abd11084dbb565432a9f4316"
+      },
+      "sequenceId" : 59,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1f737e92-0a5d-46cc-9e7d-632a075cf939/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1f737e92-0a5d-46cc-9e7d-632a075cf939/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1f737e92-0a5d-46cc-9e7d-632a075cf939/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1f737e92-0a5d-46cc-9e7d-632a075cf939/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1f737e92-0a5d-46cc-9e7d-632a075cf939"
+        }
+      }
+    }, {
+      "id" : "dd49666a-bcc5-40e7-aee3-5e08bb750cd5",
+      "uuid" : "dd49666a-bcc5-40e7-aee3-5e08bb750cd5",
+      "name" : "03.03.1819.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "03.03.1819.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "03.03.1819.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 8277635,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "a9fd95518072db0331ff6f9da737599e"
+      },
+      "sequenceId" : 60,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/dd49666a-bcc5-40e7-aee3-5e08bb750cd5/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/dd49666a-bcc5-40e7-aee3-5e08bb750cd5/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/dd49666a-bcc5-40e7-aee3-5e08bb750cd5/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/dd49666a-bcc5-40e7-aee3-5e08bb750cd5/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/dd49666a-bcc5-40e7-aee3-5e08bb750cd5"
+        }
+      }
+    }, {
+      "id" : "d5f003a2-0449-4f6d-a8ec-6430ffcc6e95",
+      "uuid" : "d5f003a2-0449-4f6d-a8ec-6430ffcc6e95",
+      "name" : "09.01.1820.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "09.01.1820.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "09.01.1820.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4936157,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "4d2f36cddd3e16d3bff7c83841deb226"
+      },
+      "sequenceId" : 61,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d5f003a2-0449-4f6d-a8ec-6430ffcc6e95/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d5f003a2-0449-4f6d-a8ec-6430ffcc6e95/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d5f003a2-0449-4f6d-a8ec-6430ffcc6e95/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d5f003a2-0449-4f6d-a8ec-6430ffcc6e95/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/d5f003a2-0449-4f6d-a8ec-6430ffcc6e95"
+        }
+      }
+    }, {
+      "id" : "87895703-34fe-48f9-83a8-3ee9b64f256f",
+      "uuid" : "87895703-34fe-48f9-83a8-3ee9b64f256f",
+      "name" : "08.04.1821.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "08.04.1821.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "08.04.1821.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5611048,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "8a13329c29b5a4e6c4e9de3326815188"
+      },
+      "sequenceId" : 62,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/87895703-34fe-48f9-83a8-3ee9b64f256f/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/87895703-34fe-48f9-83a8-3ee9b64f256f/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/87895703-34fe-48f9-83a8-3ee9b64f256f/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/87895703-34fe-48f9-83a8-3ee9b64f256f/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/87895703-34fe-48f9-83a8-3ee9b64f256f"
+        }
+      }
+    }, {
+      "id" : "1577db15-6fbc-4276-bd26-9cd271f01cca",
+      "uuid" : "1577db15-6fbc-4276-bd26-9cd271f01cca",
+      "name" : "12.01.1822.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "12.01.1822.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "12.01.1822.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 3769010,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "12e87566b2938a87c9316b0cf9a48b57"
+      },
+      "sequenceId" : 63,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1577db15-6fbc-4276-bd26-9cd271f01cca/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1577db15-6fbc-4276-bd26-9cd271f01cca/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1577db15-6fbc-4276-bd26-9cd271f01cca/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1577db15-6fbc-4276-bd26-9cd271f01cca/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/1577db15-6fbc-4276-bd26-9cd271f01cca"
+        }
+      }
+    }, {
+      "id" : "70d7b4a6-d424-4f2c-ae34-9b6b06ca5f58",
+      "uuid" : "70d7b4a6-d424-4f2c-ae34-9b6b06ca5f58",
+      "name" : "09.01.1823.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "09.01.1823.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "09.01.1823.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4857829,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "06a7455bde154b6c249249154e49b800"
+      },
+      "sequenceId" : 64,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/70d7b4a6-d424-4f2c-ae34-9b6b06ca5f58/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/70d7b4a6-d424-4f2c-ae34-9b6b06ca5f58/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/70d7b4a6-d424-4f2c-ae34-9b6b06ca5f58/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/70d7b4a6-d424-4f2c-ae34-9b6b06ca5f58/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/70d7b4a6-d424-4f2c-ae34-9b6b06ca5f58"
+        }
+      }
+    }, {
+      "id" : "77dac9a3-3131-44ed-b380-6423af04edf3",
+      "uuid" : "77dac9a3-3131-44ed-b380-6423af04edf3",
+      "name" : "10.11.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "10.11.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "10.11.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 8444530,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "e1942155073c7e014ac43bcf2de13d83"
+      },
+      "sequenceId" : 65,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/77dac9a3-3131-44ed-b380-6423af04edf3/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/77dac9a3-3131-44ed-b380-6423af04edf3/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/77dac9a3-3131-44ed-b380-6423af04edf3/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/77dac9a3-3131-44ed-b380-6423af04edf3/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/77dac9a3-3131-44ed-b380-6423af04edf3"
+        }
+      }
+    }, {
+      "id" : "324b5647-b8cb-42b3-865b-3393bfdfdf84",
+      "uuid" : "324b5647-b8cb-42b3-865b-3393bfdfdf84",
+      "name" : "12.11.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "12.11.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "12.11.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4823748,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "3990e209aaa8daea64630838869025e1"
+      },
+      "sequenceId" : 66,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/324b5647-b8cb-42b3-865b-3393bfdfdf84/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/324b5647-b8cb-42b3-865b-3393bfdfdf84/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/324b5647-b8cb-42b3-865b-3393bfdfdf84/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/324b5647-b8cb-42b3-865b-3393bfdfdf84/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/324b5647-b8cb-42b3-865b-3393bfdfdf84"
+        }
+      }
+    }, {
+      "id" : "b1e6a404-6b99-4c6e-8c47-306b7923d701",
+      "uuid" : "b1e6a404-6b99-4c6e-8c47-306b7923d701",
+      "name" : "30.11.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "30.11.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "30.11.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 4368521,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "54329e1996f09ffbe28ed400a5806036"
+      },
+      "sequenceId" : 67,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b1e6a404-6b99-4c6e-8c47-306b7923d701/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b1e6a404-6b99-4c6e-8c47-306b7923d701/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b1e6a404-6b99-4c6e-8c47-306b7923d701/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b1e6a404-6b99-4c6e-8c47-306b7923d701/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/b1e6a404-6b99-4c6e-8c47-306b7923d701"
+        }
+      }
+    }, {
+      "id" : "6abd1e83-7e0d-4f41-bf45-2ff075ff8393",
+      "uuid" : "6abd1e83-7e0d-4f41-bf45-2ff075ff8393",
+      "name" : "28.12.1816.pdf",
+      "handle" : null,
+      "metadata" : {
+        "dc.description" : [ {
+          "value" : "",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.source" : [ {
+          "value" : "28.12.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ],
+        "dc.title" : [ {
+          "value" : "28.12.1816.pdf",
+          "language" : null,
+          "authority" : null,
+          "confidence" : -1,
+          "place" : 0
+        } ]
+      },
+      "bundleName" : "ORIGINAL",
+      "sizeBytes" : 5001264,
+      "checkSum" : {
+        "checkSumAlgorithm" : "MD5",
+        "value" : "654bb3607370890d5b03f7441b5deed6"
+      },
+      "sequenceId" : 68,
+      "type" : "bitstream",
+      "_links" : {
+        "content" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6abd1e83-7e0d-4f41-bf45-2ff075ff8393/content"
+        },
+        "bundle" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6abd1e83-7e0d-4f41-bf45-2ff075ff8393/bundle"
+        },
+        "format" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6abd1e83-7e0d-4f41-bf45-2ff075ff8393/format"
+        },
+        "thumbnail" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6abd1e83-7e0d-4f41-bf45-2ff075ff8393/thumbnail"
+        },
+        "self" : {
+          "href" : "https://dspace.ut.ee/server/api/core/bitstreams/6abd1e83-7e0d-4f41-bf45-2ff075ff8393"
+        }
+      }
+    } ]
+  },
+  "page" : {
+    "number" : 0,
+    "size" : 100,
+    "totalPages" : 1,
+    "totalElements" : 65
+  },
+  "_links" : {
+    "self" : {
+      "href" : "https://dspace.ut.ee/server/api/core/bundles/acd9a484-d0a6-43a2-b19f-d8cd2dbde692/bitstreams?size=100"
+    }
+  }
+}
