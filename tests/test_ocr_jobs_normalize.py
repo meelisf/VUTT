@@ -120,6 +120,38 @@ def test_normalize_includes_username():
     assert by_id["u1"]["username"] == ""   # upload ei salvesta kasutajanime
 
 
+def test_normalize_upload_ada_fetching_is_uploading_not_error():
+    """ada_fetching (server-poolne allalaadimine) EI ole viga — see peab
+    kuvama nagu tavaline 'uploading', mitte punase veana Review-lehel."""
+    uploads = [{"id": "u4", "status": "ada_fetching",
+                "meta": {"title": "ADA teos", "slug": "ada-teos-x", "work_id": "wx"},
+                "expected_pages": None, "created_at": "2026-07-01T10:00:00", "files": []}]
+    e = normalize_ocr_jobs(uploads, [], [], _title_of)[0]
+    assert e["status_key"] == "uploading"
+    assert e["error"] is None
+
+
+def test_normalize_upload_ada_error_reads_ada_error_message():
+    """ADA-tõmbaja kirjutab vea `ada_error`-isse, mitte `error_message`-isse
+    (vt server/upload/thumbs.py sama fallback)."""
+    uploads = [{"id": "u5", "status": "ada_error", "ada_error": "ADA server ei vasta",
+                "meta": {"title": "ADA teos", "slug": "ada-teos-x", "work_id": "wx"},
+                "expected_pages": None, "created_at": "2026-07-01T10:00:00", "files": []}]
+    e = normalize_ocr_jobs(uploads, [], [], _title_of)[0]
+    assert e["status_key"] == "error"
+    assert e["error"] == "ADA server ei vasta"
+
+
+def test_normalize_upload_error_message_eelistab_error_message_valja():
+    """Kui mõlemad on olemas, eelistatakse error_message (nagu thumbs.py-s)."""
+    uploads = [{"id": "u6", "status": "error", "error_message": "tavaline viga",
+                "ada_error": "seda ei tohiks näha",
+                "meta": {"title": "X", "slug": "x", "work_id": "wx"},
+                "expected_pages": None, "created_at": "2026-07-01T10:00:00", "files": []}]
+    e = normalize_ocr_jobs(uploads, [], [], _title_of)[0]
+    assert e["error"] == "tavaline viga"
+
+
 def test_normalize_queue_ahead_across_all_active():
     # Aktiivsed single+batch erineva started_at-iga → ühtne järjekord üle tüüpide.
     # (float started_at, et vältida ISO/TZ-sõltuvust; done pole aktiivne → 0)
