@@ -1,18 +1,40 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
+import { useCollection } from '../contexts/CollectionContext';
+import { describeWriteScope } from '../utils/roleUtils';
 import { Navigate } from 'react-router-dom';
 
 const Settings: React.FC = () => {
-  const { t, i18n } = useTranslation('settings');
+  const { t, i18n } = useTranslation(['settings', 'common']);
   const { user, userSettings, updateSettings } = useUser();
+  const { getCollectionName } = useCollection();
+
+  // Kirjutamisulatus (ADR 0031) — sama fail-closed loogika mis canEditWork'il.
+  // Hook'id peavad olema enne varajast Navigate'i, seega arvutus talub user=null.
+  const scope = describeWriteScope(user?.role, user?.edit_collections);
+  // null = kasutaja ei ole nuppu puutunud → vaikimisi kinni, v.a ulatuseta
+  // contributor (ainus seisund, kus salvestada ei saa kuskil ja tegevusjuhist on
+  // vaja). EI tohi olla useState'i algväärtus: esimesel renderdusel on user veel
+  // null (UserContext hüdreerib effectis) ja algväärtus jääks igaveseks „lahti".
+  const [scopeToggled, setScopeToggled] = useState<boolean | null>(null);
+  const scopeOpen = scopeToggled ?? scope.kind === 'none';
 
   // Ainult autentitud kasutajatele
   if (!user) return <Navigate to="/" replace />;
 
   const currentLang = (userSettings.language || (i18n.language.startsWith('et') ? 'et' : 'en')) as 'et' | 'en';
   const defaultTab = userSettings.default_tab || 'edit';
+
+  // Kokkuklapitud päise kokkuvõte: roll · ulatus
+  const scopeSummary =
+    scope.kind === 'all'
+      ? t('settings:permissions.scopeAll')
+      : scope.kind === 'collections'
+        ? t('settings:permissions.scopeCount', { count: scope.ids.length })
+        : t('settings:permissions.scopeNone');
 
   const handleLangChange = (lang: 'et' | 'en') => {
     updateSettings({ language: lang });
@@ -89,6 +111,66 @@ const Settings: React.FC = () => {
                 {t('settings:workspace.info')}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Õigused — klapitav, vt ADR 0031 */}
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            {t('settings:permissions.heading')}
+          </h2>
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <button
+              onClick={() => setScopeToggled(!scopeOpen)}
+              aria-expanded={scopeOpen}
+              className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-gray-50 transition-colors rounded-lg"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                {scopeOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                {t('settings:permissions.title')}
+              </span>
+              <span className="text-xs text-gray-500 text-right">
+                {t(`common:roles.${user.role}`)} · {scopeSummary}
+              </span>
+            </button>
+
+            {scopeOpen && (
+              <div className="px-4 pb-4 pt-1 border-t border-gray-100 space-y-3">
+                <div className="flex gap-3 text-sm">
+                  <span className="w-28 flex-shrink-0 text-xs font-medium text-gray-500 mt-0.5">
+                    {t('settings:permissions.roleLabel')}
+                  </span>
+                  <span className="text-gray-900">{t(`common:roles.${user.role}`)}</span>
+                </div>
+
+                <div className="flex gap-3 text-sm">
+                  <span className="w-28 flex-shrink-0 text-xs font-medium text-gray-500 mt-0.5">
+                    {t('settings:permissions.scopeLabel')}
+                  </span>
+                  {scope.kind === 'collections' ? (
+                    <ul className="text-gray-900 space-y-1">
+                      {scope.ids.map((id) => (
+                        <li key={id}>{getCollectionName(id, currentLang)}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-gray-900">
+                      {scope.kind === 'all'
+                        ? t('settings:permissions.scopeAll')
+                        : t('settings:permissions.scopeNone')}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  {scope.kind === 'all'
+                    ? t('settings:permissions.allHint')
+                    : scope.kind === 'collections'
+                      ? t('settings:permissions.contributorHint')
+                      : t('settings:permissions.noneHint')}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

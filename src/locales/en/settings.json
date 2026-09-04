@@ -14,5 +14,18 @@
     },
     "edit": "Edit",
     "info": "Info & annotations"
+  },
+  "permissions": {
+    "heading": "Permissions",
+    "title": "My permissions",
+    "roleLabel": "Role",
+    "scopeLabel": "Editing",
+    "scopeAll": "entire corpus",
+    "scopeCount_one": "{{count}} collection",
+    "scopeCount_other": "{{count}} collections",
+    "scopeNone": "no scope assigned",
+    "noneHint": "No collection has been assigned to you yet, so you cannot edit any text. Please contact an administrator.",
+    "contributorHint": "You can edit texts in these collections. Elsewhere the text is visible but the editor is locked.",
+    "allHint": "Your role is not limited to particular collections."
   }
 }
