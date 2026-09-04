@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roleLevel, canManageUser, canAssignRole, assignableRoles, isAtLeast, canEditWork, ROLE_LEVELS } from '../roleUtils';
+import { roleLevel, canManageUser, canAssignRole, assignableRoles, isAtLeast, canEditWork, describeWriteScope, ROLE_LEVELS } from '../roleUtils';
 
 describe('roleUtils', () => {
   it('hierarhia neli taset', () => {
@@ -60,5 +60,35 @@ describe('canEditWork', () => {
 
   it('keelab undefined roll (fail-closed: = contributor) ilma kollektsioonita', () => {
     expect(canEditWork({ edit_collections: ['oma'] }, { collections: [] })).toBe(false);
+  });
+});
+
+describe('describeWriteScope', () => {
+  it('editor ja üle selle: piiranguta ulatus', () => {
+    expect(describeWriteScope('editor', [])).toEqual({ kind: 'all' });
+    expect(describeWriteScope('admin', ['oma'])).toEqual({ kind: 'all' });
+    expect(describeWriteScope('superadmin', undefined)).toEqual({ kind: 'all' });
+  });
+
+  it('contributor ulatusega: kollektsioonide loend', () => {
+    expect(describeWriteScope('contributor', ['oma', 'teine'])).toEqual({
+      kind: 'collections',
+      ids: ['oma', 'teine'],
+    });
+  });
+
+  it('contributor ilma ulatuseta: none, mitte all', () => {
+    expect(describeWriteScope('contributor', [])).toEqual({ kind: 'none' });
+    expect(describeWriteScope('contributor', undefined)).toEqual({ kind: 'none' });
+  });
+
+  it('fail-closed: undefined roll käitub contributorina', () => {
+    expect(describeWriteScope(undefined, [])).toEqual({ kind: 'none' });
+    expect(describeWriteScope(undefined, ['oma'])).toEqual({ kind: 'collections', ids: ['oma'] });
+  });
+
+  it('fail-closed: tundmatu roll ei anna piiranguta ulatust', () => {
+    expect(describeWriteScope('root', ['oma'])).toEqual({ kind: 'collections', ids: ['oma'] });
+    expect(describeWriteScope('root', [])).toEqual({ kind: 'none' });
   });
 });

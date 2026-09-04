@@ -66,3 +66,24 @@ export function canEditWork(user: UserScope | null | undefined, work: WorkScope 
   const workCollections = work?.collections ?? [];
   return workCollections.some((c) => scope.includes(c));
 }
+
+/**
+ * Kirjutamisulatus kuvamiseks (Seaded → „Minu õigused").
+ * `all` = piiranguta (editor ja üle), `collections` = contributor'i ulatus,
+ * `none` = contributor ilma ulatuseta (ei saa mitte kuskil salvestada).
+ */
+export type WriteScope =
+  | { kind: 'all' }
+  | { kind: 'collections'; ids: string[] }
+  | { kind: 'none' };
+
+/**
+ * Sama fail-closed loogika mis `canEditWork`-il: ainult TUNTUD editor+ roll
+ * annab piiranguta ulatuse, kõik muu (sh `undefined` ja tundmatu roll)
+ * käitub contributor'ina.
+ */
+export function describeWriteScope(role: string | undefined | null, editCollections?: string[]): WriteScope {
+  if (isAtLeast(role, 'editor')) return { kind: 'all' };
+  const ids = editCollections ?? [];
+  return ids.length > 0 ? { kind: 'collections', ids } : { kind: 'none' };
+}
