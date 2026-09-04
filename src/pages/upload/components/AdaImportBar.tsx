@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, Loader2, AlertTriangle, Check, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, AlertTriangle, Check, ExternalLink } from 'lucide-react';
 import type { AdaLookupResult, AdaVormiVali } from '../types';
 
 interface Props {
@@ -30,12 +30,26 @@ const AdaImportBar: React.FC<Props> = ({
   handle, setHandle, laeb, viga, tulemus, onTomba, ulekirjutatavad, onTakeAda, t,
 }) => {
   const [avatud, setAvatud] = useState(false);
+  // Sektsiooni avatus. ADA-import on HARV tee — kokku klapitult ei konkureeri ta
+  // käsitsi täitmisega. Tulemus ei saa saabuda suletud sektsiooni: „Tõmba" nupp on
+  // sektsiooni SEES, seega avatus on tulemuse eeltingimus. Seepärast piisab pelgast
+  // olekust ja admin saab kokkuvõtte soovi korral ka ise kinni klappida.
+  const [sisuNahtav, setSisuNahtav] = useState(false);
   return (
     <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden">
-      <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+      <button
+        type="button"
+        onClick={() => setSisuNahtav(!sisuNahtav)}
+        aria-expanded={sisuNahtav}
+        className="w-full px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center gap-1.5
+                   text-left hover:bg-gray-100 transition-colors"
+      >
+        {sisuNahtav
+          ? <ChevronDown size={13} className="text-gray-500 shrink-0" />
+          : <ChevronRight size={13} className="text-gray-500 shrink-0" />}
         <span className="text-xs font-semibold text-gray-700">{t('ada.title')}</span>
-      </div>
-      <div className="p-3">
+      </button>
+      <div className={sisuNahtav ? 'p-3' : 'hidden'}>
         <div className="flex gap-2">
           <input
             type="text"

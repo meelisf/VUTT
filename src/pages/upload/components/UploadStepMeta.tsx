@@ -122,20 +122,6 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
   <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
     <h2 className="text-lg font-semibold text-gray-900 mb-5">{t('step1.title')}</h2>
 
-    {!autoCreateLoading && (
-      <AdaImportBar
-        handle={adaHandle}
-        setHandle={setAdaHandle}
-        laeb={adaLoading}
-        viga={adaError}
-        tulemus={adaResult}
-        onTomba={handleAdaFetch}
-        ulekirjutatavad={adaUlekirjutatavad}
-        onTakeAda={handleTakeAda}
-        t={t}
-      />
-    )}
-
     {/* Automaatne laadimine — replace mode, loome uploadi ilma kasutaja sekkumiseta */}
     {autoCreateLoading && (
       <div className="flex items-center gap-3 py-8 justify-center text-gray-500">
@@ -278,6 +264,22 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* ADA-import on HARV tee: vorm on esimene ja kohe kasutatav, import tuleb
+            selle ALLA kokku klapitult. Vt eraldusjoon ülal. */}
+        <div className="border-t border-gray-200 pt-5 mt-1">
+          <AdaImportBar
+            handle={adaHandle}
+            setHandle={setAdaHandle}
+            laeb={adaLoading}
+            viga={adaError}
+            tulemus={adaResult}
+            onTomba={handleAdaFetch}
+            ulekirjutatavad={adaUlekirjutatavad}
+            onTakeAda={handleTakeAda}
+            t={t}
+          />
         </div>
 
         {/* Vea teade */}
