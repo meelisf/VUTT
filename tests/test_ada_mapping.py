@@ -49,8 +49,32 @@ def test_sortimine_parandab_ada_jarjekorra(bitstreams):
 
 
 def test_dateerimata_on_loppu(bitstreams):
+    """Dateerimata failid lähevad lõppu ja säilitavad seal ADA ENDA järjekorra.
+
+    ADA annab need järjekorras 9999 → 9998 → 9997; tähestik annaks vastupidise.
+    Import ei tohi järjestust välja mõelda seal, kus tal alust ei ole.
+    """
     sorditud = [b["name"] for b in mapping.sordi_bitstreamid(bitstreams)]
-    assert sorditud[-3:] == ["9997.pdf", "9998.pdf", "9999.pdf"]
+    assert sorditud[-3:] == ["9999.pdf", "9998.pdf", "9997.pdf"]
+
+
+def test_dateerimata_ei_sorteerita_tahestikuliselt():
+    """Mõõdetud ADA-s: enamik failinimesid EI OLE `dd.mm.yyyy` (0/127 valimis).
+
+    Nende puhul oli varasem tähestikuline sortimine aktiivne kahju — kirjes
+    10062/1778 tõstis see kirjaveaga `kinger.pdf` ette ja dateeritud kirjad lõppu,
+    kuigi ADA oli need mõistlikult järjestanud.
+    """
+    ada_jarjekord = [
+        {"name": "klinger17.05.1803.pdf"},
+        {"name": "zzz.pdf"},
+        {"name": "klinger.fr.pdf"},
+        {"name": "kinger.pdf"},
+    ]
+    sorditud = [b["name"] for b in mapping.sordi_bitstreamid(ada_jarjekord)]
+    # Dateeritud fail tuleb ette; ülejäänud kolm SÄILITAVAD ADA järjekorra
+    # (tähestik annaks kinger → klinger.fr → zzz).
+    assert sorditud == ["klinger17.05.1803.pdf", "zzz.pdf", "klinger.fr.pdf", "kinger.pdf"]
 
 
 def test_osaline_kuupaev_perioodi_alguses(bitstreams):
