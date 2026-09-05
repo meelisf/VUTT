@@ -107,9 +107,10 @@ pealkirja lõppu nähtamatu `\r`-i, mis läheb otse kirja `Subject:` päisesse.
 Mall ilma tühja reata on viga, mitte pealkirjata kiri: selge erind, mille
 püüavad kinni mallide renderdustestid.
 
-**Kuupäeva mallis ei ole.** Tokeni eluiga on konstant (`timedelta(hours=48)`,
-`registration.py:209`), seega mall ütleb „$expires_hours tundi" /
-„$expires_hours hours" ja arv tuleb sellestsamast konstandist. Nii ei teki
+**Kuupäeva mallis ei ole.** Tokeni eluiga on konstant (`INVITE_EXPIRY_HOURS
+= 48`, `registration.py:24`, kasutusel `registration.py:216`), seega mall
+ütleb „$expires_hours tundi" / „$expires_hours hours" ja arv tuleb
+sellestsamast konstandist. Nii ei teki
 küsimust, kas kuupäev vormindada `05.09.2026 kell 18:00` või `Sep 5, 2026` —
 lokaaditundlikku kuupäeva ei sünni üldse. Reegel tulevastele mallidele: **kui
 mall siiski vajab kuupäeva, vormindab selle kutsuja saaja keeles ja annab
@@ -119,8 +120,12 @@ mallile valmis stringi** — `render_mail` ei võta vastu `datetime`-i.
 `render_mail(template_name, lang, **ctx) -> (subject, body)`. Kasutab
 `Template.substitute`, MITTE `safe_substitute` — puuduv võti peab andma
 `KeyError` testis, mitte saatma kasutajale kirja, milles seisab `$username`.
-Tundmatu keel → `et`. Puuduv mallifail on programmeerimisviga, mitte
-käitusaja-olukord: viga logisse ja `et` fail.
+Tundmatu keel → `et`. Puuduv mallifail on programmeerimisviga (vale malli
+nimi koodis, unustatud keelevariant), mitte käitusaja-olukord: `render_mail`
+viskab `FileNotFoundError` otse, ilma varulahenduseta. Graatsiline
+degradeerumine (logi + vaikimisi `et` fail) peidaks just selle vea —
+programmeerimisvea tuleb näha kohe, testis, mitte tootmise logis pärast
+seda, kui kiri juba (vale malliga) väljus.
 
 **Tarbija täna.** `POST /admin/registrations/approve` tagastab lisaks
 `invite_url`-ile ka `mail_subject` ja `mail_body`, renderdatuna saaja keeles.
@@ -180,10 +185,15 @@ Server jätab masina teate `title` välja endiselt kirja: vana klient ja iga
 tundmatu tüüp langevad selle peale tagasi. Ta ei ole enam kuvamise autoriteet,
 vaid varuvõimalus.
 
-`UserMenu.tsx` kuvab sama teavituste loendit ja peab kasutama sama
-renderdusfunktsiooni — kaks kuvamiskohta ei tohi lahkneda. Renderdus tõstetakse
-jagatud abifunktsiooni (`src/utils/notificationText.ts` või sarnane), mida
-mõlemad kutsuvad.
+`UserMenu.tsx` kuvab sama teavituste loendit, aga ainult lugemata teadete
+ARVU — pealkirja ta ei renderda, seega `notificationTitle` ei ole talle
+tarbija. Küll aga peab `UserMenu.tsx` eristama saadetud koopiat (`type ===
+"sent_notification"`) saabunud teatest samamoodi nagu `Notifications.tsx`
+(lugemata arvu ei tohi paisutada enda saadetud sõnumitega) — see kontroll
+(`isSentNotification`) oli enne dubleeritud mõlemas failis. Jagatud
+moodulisse (`src/utils/notificationText.ts`) läheb seega kaks asja:
+`isSentNotification` (mõlema faili tarbitav) ja `notificationTitle`, mille
+ainus tarbija on `Notifications.tsx`.
 
 ## Andmemudel
 
