@@ -1,0 +1,13 @@
+VUTT – account activation link
+
+Dear $name,
+
+Your request for access to the VUTT platform has been approved.
+
+Your username is: $username
+
+Please set your password using the link below (the link is valid for $expires_hours hours):
+$url
+
+Kind regards,
+On behalf of the VUTT team

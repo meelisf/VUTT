@@ -20,6 +20,9 @@ logger = get_logger(__name__)
 registrations_lock = threading.RLock()
 tokens_lock = threading.RLock()
 
+# Kutselingi eluiga. Mall viitab samale konstandile — kaks kohta lahkneksid.
+INVITE_EXPIRY_HOURS = 48
+
 # =========================================================
 # REGISTREERIMISE FUNKTSIOONID
 # =========================================================
@@ -210,7 +213,7 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
     data = load_invite_tokens()
 
     token = str(uuid.uuid4())
-    expires_at = datetime.now() + timedelta(hours=48)
+    expires_at = datetime.now() + timedelta(hours=INVITE_EXPIRY_HOURS)
     username = _next_available_username(email, data, preferred_username=username)
 
     if role is None:
