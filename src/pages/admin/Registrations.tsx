@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
-import { deriveUsernameFromEmail } from '../../utils/username';
 import { apiPost } from '../../services/apiClient';
 
 interface Registration {
@@ -32,6 +31,7 @@ interface Registration {
   status: 'pending' | 'approved' | 'rejected';
   reviewed_by: string | null;
   reviewed_at: string | null;
+  language?: 'et' | 'en';
 }
 
 interface InviteResult {
@@ -41,6 +41,8 @@ interface InviteResult {
   email: string;
   username?: string;
   name: string;
+  mail_subject: string;
+  mail_body: string;
 }
 
 interface RegistrationsResponse {
@@ -72,8 +74,11 @@ const Registrations: React.FC = () => {
   // kinnitada VALE rolli/ulatuse, kui ta valib ühel real ja vajutab kinnita teisel.
   const [approveRole, setApproveRole] = useState<Record<string, 'editor' | 'contributor'>>({});
   const [approveScope, setApproveScope] = useState<Record<string, string[]>>({});
+  const [approveLanguage, setApproveLanguage] = useState<Record<string, 'et' | 'en'>>({});
   const roleFor = (regId: string): 'editor' | 'contributor' => approveRole[regId] || 'editor';
   const scopeFor = (regId: string): string[] => approveScope[regId] || [];
+  const languageFor = (reg: Registration): 'et' | 'en' =>
+    approveLanguage[reg.id] || reg.language || 'et';
 
   // KÕIK kollektsioonid, mitte ainult restricted: kirjutamisulatus kehtib ka
   // avalikele kogudele (erinevalt allowed_collections'ist, mis mõjutab ainult
@@ -126,7 +131,8 @@ const Registrations: React.FC = () => {
       const data = await apiPost<RegistrationActionResponse>('/admin/registrations/approve', {
         registration_id: regId,
         role,
-        edit_collections: scope
+        edit_collections: scope,
+        language: languageFor(registrations.find((r) => r.id === regId) as Registration)
       }, { token: authToken });
 
       if (data.status === 'success') {
@@ -136,11 +142,14 @@ const Registrations: React.FC = () => {
           expires_at: data.expires_at,
           email: data.email,
           username: data.username,
-          name: data.name
+          name: data.name,
+          mail_subject: data.mail_subject,
+          mail_body: data.mail_body
         });
         // Käsitletud taotluse valik ei ole enam vajalik — koorista, et Record ei kasvaks lõputult.
         setApproveRole((prev) => { const next = { ...prev }; delete next[regId]; return next; });
         setApproveScope((prev) => { const next = { ...prev }; delete next[regId]; return next; });
+        setApproveLanguage((prev) => { const next = { ...prev }; delete next[regId]; return next; });
         await loadRegistrations();
       } else {
         setError(data.message || t('registrations.approveError'));
@@ -248,20 +257,7 @@ const Registrations: React.FC = () => {
                     {linkCopied ? t('registrations.linkCopied') : t('registrations.copyLink')}
                   </button>
                   <a
-                    href={(() => {
-                      const fullUrl = `${window.location.origin}${inviteResult.invite_url}`;
-                      const username = inviteResult.username || deriveUsernameFromEmail(inviteResult.email);
-                      const subject = encodeURIComponent('VUTT – konto aktiveerimise link');
-                      const body = encodeURIComponent(
-                        `Tere ${inviteResult.name},\n\n` +
-                        `Teie juurdepääsutaotlus VUTT platvormile on kinnitatud.\n\n` +
-                        `Teie kasutajanimi on: ${username}\n\n` +
-                        `Palun seadistage oma parool alloleva lingi kaudu (link kehtib 48 tundi):\n` +
-                        `${fullUrl}\n\n` +
-                        `Lugupidamisega,\nVUTT meeskonna nimel`
-                      );
-                      return `mailto:${inviteResult.email}?subject=${subject}&body=${body}`;
-                    })()}
+                    href={`mailto:${inviteResult.email}?subject=${encodeURIComponent(inviteResult.mail_subject)}&body=${encodeURIComponent(inviteResult.mail_body)}`}
                     className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
                   >
                     <Mail size={16} />
@@ -339,6 +335,18 @@ const Registrations: React.FC = () => {
                           >
                             <option value="editor">{t('registrations.roleEditor')}</option>
                             <option value="contributor">{t('registrations.roleContributor')}</option>
+                          </select>
+
+                          <label className="text-xs font-medium text-gray-500">{t('registrations.languageLabel')}</label>
+                          <select
+                            value={languageFor(reg)}
+                            onChange={(e) =>
+                              setApproveLanguage((prev) => ({ ...prev, [reg.id]: e.target.value as 'et' | 'en' }))
+                            }
+                            className="text-sm border border-gray-300 rounded px-2 py-1 w-fit"
+                          >
+                            <option value="et">{t('registrations.languageEt')}</option>
+                            <option value="en">{t('registrations.languageEn')}</option>
                           </select>
 
                           {roleFor(reg.id) === 'contributor' && (

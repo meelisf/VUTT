@@ -33,7 +33,10 @@
     "roleContributor": "Kaastööline (valitud kollektsioonid)",
     "editCollections": "Kirjutamisulatus",
     "editCollectionsHint": "Kaastööline saab toimetada ainult neid kollektsioone.",
-    "editCollectionsNone": "Ulatust pole valitud — kaastööline ei saa midagi muuta"
+    "editCollectionsNone": "Ulatust pole valitud — kaastööline ei saa midagi muuta",
+    "languageLabel": "Suhtluskeel",
+    "languageEt": "Eesti keel",
+    "languageEn": "Inglise keel"
   },
   "users": {
     "title": "Kasutajad",
