@@ -217,6 +217,16 @@ ALLOWED_ORIGINS = [
 ]
 
 # =========================================================
+# AVALIK AADRESS (kirjades olevad lingid)
+# =========================================================
+
+# Kirjas peab olema klõpsatav täisaadress — kasutaja postkastis ei ole
+# `/set-password?token=...` millegi suhtes suhteline. Trailing slash
+# eemaldatakse, et `f"{PUBLIC_BASE_URL}{invite_url}"` ei annaks kahekordset
+# kaldkriipsu.
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://vutt.utlib.ut.ee").rstrip("/")
+
+# =========================================================
 # RATE LIMITING
 # =========================================================
 

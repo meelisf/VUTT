@@ -14,12 +14,14 @@ from ..auth import (
     update_user_edit_collections,
     update_user_role,
 )
-from ..config import BASE_DIR
+from ..config import BASE_DIR, PUBLIC_BASE_URL
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
+from ..mail_templates import render_mail
 from ..meilisearch_ops import delete_work_from_meilisearch
 from ..people_ops import get_refresh_status, refresh_all_people_safe
 from ..registration import (
+    INVITE_EXPIRY_HOURS,
     create_invite_token,
     get_registration_by_id,
     load_pending_registrations,
@@ -27,6 +29,7 @@ from ..registration import (
 )
 from ..password_reset import create_reset_token
 from ..trash_ops import list_deleted_pages, list_deleted_works, restore_deleted_page, restore_deleted_work
+from ..user_language import normalize_language
 from ..utils import build_work_id_cache, find_directory_by_id
 
 router = APIRouter()
@@ -58,6 +61,9 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     # Roll ja kirjutamisulatus valitakse SIIN, mitte hiljem kaheastmeliselt —
     # create_invite_token piirab rolli sisemiselt (contributor, editor); admin
     # ei saa kutselingi kaudu tekitada admin- ega superadmin-kontot.
+    # Keele valib taotleja; admin saab selle enne kutse loomist üle kirjutada
+    # (nt väliskülaline, kes täitis vormi eestikeelsel lehel).
+    language = normalize_language(data.get("language") or reg.get("language"))
     token_data = await run_in_threadpool(
         create_invite_token, reg["email"], reg["name"], user["username"],
         username=reg.get("username"),
@@ -67,20 +73,35 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         # sinnajõudmist.
         role=data.get("role"),
         edit_collections=data.get("edit_collections", []),
-        # Täielik keele-käsitlus (admini ülekirjutus) tuleb hilisemas taskis —
-        # praegu antakse taotluse keel lihtsalt tokenile edasi.
-        language=reg.get("language"),
+        language=language,
+    )
+    invite_url = f"/set-password?token={token_data['token']}"
+    # Kiri renderdatakse serveris: üks tekstiallikas nii tänasele mailto-nupule
+    # kui #298 saatjale. render_mail loeb malli kettalt/mälust — sama kaalu
+    # klass mis teised siin threadpool'i pandud sync-kutsed, seega ühtsuse
+    # mõttes samamoodi käideldud (ADR 0002).
+    mail_subject, mail_body = await run_in_threadpool(
+        render_mail,
+        "invite",
+        language,
+        name=token_data["name"],
+        username=token_data["username"],
+        url=f"{PUBLIC_BASE_URL}{invite_url}",
+        expires_hours=INVITE_EXPIRY_HOURS,
     )
     return {
         "status": "success",
         "invite_token": token_data["token"],
-        "invite_url": f"/set-password?token={token_data['token']}",
+        "invite_url": invite_url,
         "expires_at": token_data["expires_at"],
         "email": token_data["email"],
         "username": token_data["username"],
         "name": token_data["name"],
         "role": token_data["role"],
         "edit_collections": token_data["edit_collections"],
+        "language": language,
+        "mail_subject": mail_subject,
+        "mail_body": mail_body,
     }
 
 
