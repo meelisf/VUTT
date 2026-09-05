@@ -277,7 +277,9 @@ def test_language_travels_from_form_to_account(client, login, backend_env, monke
     })
     assert reg["language"] == "en"
 
-    set_pw = client.post("/set-password", json={
+    # NB: endpoint on `/invite/set-password` (auth.py:170) — `/reset/set-password`
+    # on parooli TAASTAMISE tee, mitte kutse oma.
+    set_pw = client.post("/invite/set-password", json={
         "token": approve["invite_token"], "password": "TugevParool123",
     })
     assert set_pw.status_code == 200, set_pw.text
