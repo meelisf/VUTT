@@ -99,6 +99,32 @@ hours" ja arvväärtuse annab kutsuja sellestsamast konstandist. Kui mall
 tulevikus siiski vajab kuupäeva, vormindab selle KUTSUJA saaja keeles ja
 annab mallile valmis stringi — `render_mail` ei võta vastu `datetime`-i.
 
+### 4. Kutsuja, kes on juba olekut muutnud, püüab erindi
+
+`render_mail` viskab endiselt tingimusteta — puuduv mall on
+programmeerimisviga ja peab jääma nähtavaks otsekutses (nt
+`test_mail_templates.py`-s). Aga `POST /admin/registrations/approve` ei ole
+otsekutse: selleks ajaks, kui ta `render_mail`-i kutsub, on taotlus juba
+`update_registration_status`-iga „approved" ja kutsetoken kettal
+(`create_invite_token`). Kui viskaks siin läbi kliendini, jääks admin
+katmata 500 ette, taotlus aga jääks tootmises jäädavalt orvuks: see ei ole
+enam `pending` nimekirjas, seega pole seda kuskil näha, ja kordus annab 400.
+
+Seepärast püüab `approve_registration` (`server/routers/admin.py`) erindi
+**enda sees**, mitte `render_mail`-i sees: logib selle (`logger.error`,
+malli nimi ja keel kaasas) ning tagastab 200 vastuse, millest
+`mail_subject`/`mail_body` puuduvad — täpselt sama kuju, mida frontend juba
+oskab käsitleda vana (kirjamallita) backendi jaoks (Task 7). Kutse ise
+(`invite_token`/`invite_url`) jääb vastusesse alles, admin näeb ja saab
+kopeerida kopeeritavat linki käsitsi. See ei ole vastuolu otsusega 3 —
+`render_mail` ise EI degradeeru graatsiliselt ega saada kirja vaikeväärtusega
+sisuga; vastutus lasub kutsujal, kes on juba olekut muutnud ja kellele
+kadunud kutse on halvem tulemus kui kirjata vastus.
+
+Valvab: `tests/test_approve_mail_language.py` (`render_mail` mockitud
+viskama) — kinnitab, et vastus on ikkagi 200, `invite_token`/`invite_url`
+on olemas, ja `mail_subject`/`mail_body` puuduvad.
+
 ## Tagajärjed
 
 Iga uus teavitustüüp, mille lause server oskaks tüübist + parameetritest

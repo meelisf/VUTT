@@ -45,6 +45,11 @@ interface InviteResult {
   // need väljad puuduvad — vt kaitset mailto-nupu renderdamisel.
   mail_subject?: string;
   mail_body?: string;
+  // Serveri ehitatud täisaadress (PUBLIC_BASE_URL + invite_url) — sama allikas,
+  // mida kasutab ka kirja tekst. Puudub vana backendi vastuses (frontend
+  // deployitud enne backendit); sel juhul langeb kuvamine/kopeerimine tagasi
+  // window.location.origin põhisele arvutusele (vt fullInviteUrl).
+  invite_absolute_url?: string;
 }
 
 interface RegistrationsResponse {
@@ -152,7 +157,8 @@ const Registrations: React.FC = () => {
           username: data.username,
           name: data.name,
           mail_subject: data.mail_subject,
-          mail_body: data.mail_body
+          mail_body: data.mail_body,
+          invite_absolute_url: data.invite_absolute_url
         });
         // Käsitletud taotluse valik ei ole enam vajalik — koorista, et Record ei kasvaks lõputult.
         setApproveRole((prev) => { const next = { ...prev }; delete next[regId]; return next; });
@@ -191,10 +197,16 @@ const Registrations: React.FC = () => {
     }
   };
 
+  // Kuvatava ja kopeeritava lingi allikas: ÜKS koht, sama väärtus, mida
+  // server kirja sisse kirjutas (PUBLIC_BASE_URL + invite_url). Vana backend
+  // ei tagasta invite_absolute_url't — sel juhul on window.location.origin
+  // sobiv varulahendus, sest see on kuvamis-, mitte kirjatekstiallikas.
+  const fullInviteUrl = (result: InviteResult) =>
+    result.invite_absolute_url || `${window.location.origin}${result.invite_url}`;
+
   const copyInviteLink = () => {
     if (inviteResult) {
-      const fullUrl = `${window.location.origin}${inviteResult.invite_url}`;
-      navigator.clipboard.writeText(fullUrl);
+      navigator.clipboard.writeText(fullInviteUrl(inviteResult));
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     }
@@ -255,7 +267,7 @@ const Registrations: React.FC = () => {
                 )}
                 <div className="mt-3 flex items-center gap-2">
                   <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
-                    {window.location.origin}{inviteResult.invite_url}
+                    {fullInviteUrl(inviteResult)}
                   </code>
                   <button
                     onClick={copyInviteLink}

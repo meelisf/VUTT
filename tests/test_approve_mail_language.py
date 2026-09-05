@@ -3,6 +3,7 @@
 Enne seda oli tekst kõvakodeeritud eesti keeles frontendis mailto: URL-i sees
 — ingliskeelne kasutaja sai esimese kirja alati eesti keeles.
 """
+import importlib
 
 
 def _approve(client, login, backend_env, monkeypatch, language=None, approve_language=None):
@@ -63,3 +64,25 @@ def test_mail_body_contains_absolute_url(client, login, backend_env, monkeypatch
     # täpselt see topeltkaldkriips — sõltumata sellest, mis väärtusega
     # PUBLIC_BASE_URL parasjagu on.
     assert "//set-password" not in data["mail_body"]
+
+
+def test_render_mail_failure_leaves_invite_intact(client, login, backend_env, monkeypatch):
+    """ADR 0033 täiendus: kui render_mail viskab, ei tohi taotlus jääda orvuks.
+
+    Selleks ajaks on update_registration_status ja create_invite_token juba
+    käivitatud (taotlus "approved", token kettal) — endpoint peab erindi ise
+    püüdma ja tagastama kutse ILMA kirjatekstita, mitte 500 viskama.
+    """
+    admin_router = importlib.import_module("server.routers.admin")
+
+    def _boom(*_args, **_kwargs):
+        raise FileNotFoundError("Kirjamalli ei leitud (testi simulatsioon)")
+
+    monkeypatch.setattr(admin_router, "render_mail", _boom)
+
+    data = _approve(client, login, backend_env, monkeypatch)
+
+    assert data["invite_token"]
+    assert data["invite_url"]
+    assert "mail_subject" not in data
+    assert "mail_body" not in data
