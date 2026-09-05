@@ -227,11 +227,14 @@ async def _run_bulk(work_ids, transform, username, label, background_tasks, *, c
 @router.get("/recent-edits")
 async def recent_edits(request: Request, user=Depends(get_user)):
     f_user = request.query_params.get('user') if is_at_least(user['role'], 'admin') else user['username']
+    # Kollektsioonifilter ainult kitsendab; isikukaardid jäävad filtriga välja.
+    f_collection = request.query_params.get('collection') or None
     res = await run_in_threadpool(
         get_recent_commits,
         username=f_user,
         limit=int(request.query_params.get('limit', 30)),
         skip=int(request.query_params.get('offset', 0)),
+        collection=f_collection,
     )
     return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": is_at_least(user['role'], 'admin')}
 
