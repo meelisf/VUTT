@@ -41,8 +41,10 @@ interface InviteResult {
   email: string;
   username?: string;
   name: string;
-  mail_subject: string;
-  mail_body: string;
+  // Optional: vana kujuga serveri vastuses (frontend deployitud enne backendit)
+  // need väljad puuduvad — vt kaitset mailto-nupu renderdamisel.
+  mail_subject?: string;
+  mail_body?: string;
 }
 
 interface RegistrationsResponse {
@@ -77,8 +79,14 @@ const Registrations: React.FC = () => {
   const [approveLanguage, setApproveLanguage] = useState<Record<string, 'et' | 'en'>>({});
   const roleFor = (regId: string): 'editor' | 'contributor' => approveRole[regId] || 'editor';
   const scopeFor = (regId: string): string[] => approveScope[regId] || [];
-  const languageFor = (reg: Registration): 'et' | 'en' =>
-    approveLanguage[reg.id] || reg.language || 'et';
+  // Võtab regId (mitte Registration objekti) — kutsekohas ei pea taotlust uuesti
+  // otsima ega `as`-iga eeldama, et otsing õnnestus (taotlus võib olla vahepeal
+  // nimekirjast kadunud, kui teine admin jõudis ette).
+  const languageFor = (regId: string): 'et' | 'en' => {
+    if (approveLanguage[regId]) return approveLanguage[regId];
+    const reg = registrations.find((r) => r.id === regId);
+    return reg?.language || 'et';
+  };
 
   // KÕIK kollektsioonid, mitte ainult restricted: kirjutamisulatus kehtib ka
   // avalikele kogudele (erinevalt allowed_collections'ist, mis mõjutab ainult
@@ -132,7 +140,7 @@ const Registrations: React.FC = () => {
         registration_id: regId,
         role,
         edit_collections: scope,
-        language: languageFor(registrations.find((r) => r.id === regId) as Registration)
+        language: languageFor(regId)
       }, { token: authToken });
 
       if (data.status === 'success') {
@@ -256,14 +264,21 @@ const Registrations: React.FC = () => {
                     {linkCopied ? <CheckCircle size={16} /> : <Copy size={16} />}
                     {linkCopied ? t('registrations.linkCopied') : t('registrations.copyLink')}
                   </button>
-                  <a
-                    href={`mailto:${inviteResult.email}?subject=${encodeURIComponent(inviteResult.mail_subject)}&body=${encodeURIComponent(inviteResult.mail_body)}`}
-                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
-                  >
-                    <Mail size={16} />
-                    {t('registrations.sendEmail')}
-                  </a>
+                  {inviteResult.mail_subject && inviteResult.mail_body ? (
+                    <a
+                      href={`mailto:${inviteResult.email}?subject=${encodeURIComponent(inviteResult.mail_subject)}&body=${encodeURIComponent(inviteResult.mail_body)}`}
+                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                    >
+                      <Mail size={16} />
+                      {t('registrations.sendEmail')}
+                    </a>
+                  ) : null}
                 </div>
+                {/* Kirjamall puudub vana kujuga serveri vastuses (frontend deployitud enne backendit) —
+                    näita seda selgesõnaliselt, mitte vaikimisi tühja/undefined-tekstiga kirja. */}
+                {!(inviteResult.mail_subject && inviteResult.mail_body) && (
+                  <p className="text-xs text-amber-700 mt-2">{t('registrations.mailTemplateMissing')}</p>
+                )}
                 <p className="text-xs text-green-600 mt-2">
                   {t('registrations.expires')}: {formatDate(inviteResult.expires_at)}
                 </p>
@@ -339,7 +354,7 @@ const Registrations: React.FC = () => {
 
                           <label className="text-xs font-medium text-gray-500">{t('registrations.languageLabel')}</label>
                           <select
-                            value={languageFor(reg)}
+                            value={languageFor(reg.id)}
                             onChange={(e) =>
                               setApproveLanguage((prev) => ({ ...prev, [reg.id]: e.target.value as 'et' | 'en' }))
                             }

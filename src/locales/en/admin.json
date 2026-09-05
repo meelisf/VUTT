@@ -36,7 +36,8 @@
     "editCollectionsNone": "No scope selected — this contributor cannot edit anything",
     "languageLabel": "Language",
     "languageEt": "Estonian",
-    "languageEn": "English"
+    "languageEn": "English",
+    "mailTemplateMissing": "Could not get the mail template from the server — use the copied link instead."
   },
   "users": {
     "title": "Users",

@@ -36,7 +36,8 @@
     "editCollectionsNone": "Ulatust pole valitud — kaastööline ei saa midagi muuta",
     "languageLabel": "Suhtluskeel",
     "languageEt": "Eesti keel",
-    "languageEn": "Inglise keel"
+    "languageEn": "Inglise keel",
+    "mailTemplateMissing": "Kirjamalli ei saadud serverist — kasuta kopeeritud linki."
   },
   "users": {
     "title": "Kasutajad",
