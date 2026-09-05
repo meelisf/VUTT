@@ -70,6 +70,21 @@ autoriteet kasutaja praeguse valiku üle.
 Olemasolevaid kasutajaid ei migreerita: puuduv väli = `et`, ja kellel
 `user_settings.language` juba on, sellel see niikuinii võidab.
 
+**Kes küsib kasutaja keelt, küsib seda ühest funktsioonist.** `users.json`
+kannab keelt, mille inimene registreerudes valis; kui ta hiljem Seadetes keelt
+muudab, kirjutatakse `user_settings`, MITTE `users.json` — kaks kirjutuskohta
+lahkneksid ajas. Seetõttu ei tohi ükski saatja lugeda `users.json`-i otse:
+`server/user_language.py` funktsioon `get_user_language(username)` annab
+`user_settings.language` → `users.json.language` → `et` ja on ainuõige allikas.
+
+Ilma selleta saaks kasutaja, kes Seadetes keele vahetas, järgmise kirja ikka
+vanas keeles — viga, mis ei ilmneks enne #298 saatmiskanali valmimist ja mille
+põhjus oleks siis juba ammu kirjutatud. Kahekordset kirjutamist (uuenda ka
+`users.json`) EI tehta: üks kirjutuskoht, üks lugemisfunktsioon.
+
+`users.json` keel on niisiis algväärtus ja varuallikas, mitte autoriteet
+kasutaja praeguse valiku üle.
+
 ### B. Kirjamallid on repos, tekstifailidena
 
 `server/email_templates/invite.et.txt` ja `invite.en.txt`. Kuju:
@@ -83,8 +98,22 @@ $url
 ```
 
 Esimene rida = pealkiri, tühi rida, ülejäänu = keha. Platseholderid
-`string.Template` kujul (`$name`, `$username`, `$url`, `$expires`) — stdlib,
-uut sõltuvust ei tule.
+`string.Template` kujul (`$name`, `$username`, `$url`, `$expires_hours`) —
+stdlib, uut sõltuvust ei tule.
+
+**Laadimine normaliseerib reavahetused** (CRLF → LF) enne pealkirja ja keha
+eraldamist ning strip'ib pealkirja. Windowsis toimetatud mall jätaks muidu
+pealkirja lõppu nähtamatu `\r`-i, mis läheb otse kirja `Subject:` päisesse.
+Mall ilma tühja reata on viga, mitte pealkirjata kiri: selge erind, mille
+püüavad kinni mallide renderdustestid.
+
+**Kuupäeva mallis ei ole.** Tokeni eluiga on konstant (`timedelta(hours=48)`,
+`registration.py:209`), seega mall ütleb „$expires_hours tundi" /
+„$expires_hours hours" ja arv tuleb sellestsamast konstandist. Nii ei teki
+küsimust, kas kuupäev vormindada `05.09.2026 kell 18:00` või `Sep 5, 2026` —
+lokaaditundlikku kuupäeva ei sünni üldse. Reegel tulevastele mallidele: **kui
+mall siiski vajab kuupäeva, vormindab selle kutsuja saaja keeles ja annab
+mallile valmis stringi** — `render_mail` ei võta vastu `datetime`-i.
 
 **Renderdaja:** `server/mail_templates.py`, funktsioon
 `render_mail(template_name, lang, **ctx) -> (subject, body)`. Kasutab
@@ -104,6 +133,16 @@ nimel; tekstimuudatus väärib ülevaatust. Repos olev tekstifail rahuldab issue
 nõude „toimetatav ilma koodi puutumata" (muudatus on tekstifaili PR, mitte
 koodimuudatus) ja annab lisaks selle, mida `data/config/` ei annaks: puuduv või
 katkine mall kukub CI-s, mitte kasutaja postkastis.
+
+**Admin saab keelt parandada enne kutse loomist.** Heakskiitmise ekraan on
+juba koht, kus valitakse roll ja kirjutamisulatus (`Registrations.tsx`), seega
+keel läheb samasse valikute ritta: taotluse kaardil on näha, mille inimene
+valis, ja admin saab selle enne kutse loomist ümber lülitada.
+`POST /admin/registrations/approve` võtab valikulise `language` parameetri —
+puudumisel kasutatakse taotluses salvestatut. See on ainus korrektsioonipunkt
+enne kirja väljaminekut: otsekutse-teed (kutse ilma taotluseta)
+koodis ei ole — `create_invite_token`-i ainus kutsuja on
+`admin.py:62` — ja kui see kunagi lisandub, peab ka tema keele küsima.
 
 **Ulatusest väljas:** `password_reset` mall. Parooli-taastamise vool
 (`/admin/users/reset-password`) annab admini ekraanile ainult kopeeritava
@@ -125,8 +164,11 @@ Kaks selgelt eristuvat liiki:
 Masina teate pealkirja renderdab frontend `type` + `actor_name` põhjal
 locales'ist. Rada on juba olemas (`Notifications.tsx:31`,
 `notifications.commentReplyFallback`), aga rida 30 ei jõua sinna kunagi —
-parandus on eelistada tüübipõhist renderdust salvestatud pealkirjale **teadaolevate
-süsteemitüüpide korral**. Mõju on tagasiulatuv: juba salvestatud teavitused
+parandus on eelistada tüübipõhist renderdust salvestatud pealkirjale
+**teadaolevate süsteemitüüpide korral, tingimusel et kõik tõlkevõtme nõutavad
+parameetrid on päriselt olemas**. Puuduv `actor_name` (vana kirje, katkine
+metadata) tähendab tagasilangust salvestatud `title`-le — eestikeelne lause on
+halb, „undefined vastas sinu kommentaarile" on hullem. Mõju on tagasiulatuv: juba salvestatud teavitused
 kannavad `type` ja `actor_name` välju, seega nad hakkavad samuti lugeja keeles
 kuvama.
 
@@ -169,11 +211,21 @@ Kõik kolm on valikulised: puuduv väli = `et`.
 - vana kirje ilma `language` väljata käitub nagu `et` (tagasiühilduvus);
 - `GET /user-settings` tagastab `users.json` keele, kui `user_settings`-is
   keelt ei ole; ei kirjuta faili;
-- `user_settings.language` võidab `users.json` keelt, kui mõlemad on olemas;
+- `get_user_language`: `user_settings.language` võidab `users.json` keelt, kui
+  mõlemad on olemas; kummagita → `et`; keele muutmine Seadetes EI kirjuta
+  `users.json`-i, aga `get_user_language` tagastab uue keele;
 - iga mall igas keeles renderdub täieliku kontekstiga ja tulemuses ei ole ühtki
   `$` alles;
 - puuduv platseholder annab `KeyError` (mitte vaikset `$name`-i kirjas);
-- `approve` vastus sisaldab `mail_subject`/`mail_body` saaja keeles.
+- `approve` vastus sisaldab `mail_subject`/`mail_body` saaja keeles;
+- `approve` `language` parameeter kirjutab taotluses salvestatu üle, puudumisel
+  mitte;
+- CRLF-iga mallifail annab sama tulemuse mis LF-iga ja pealkirja lõpus ei ole
+  tühimärke;
+- mall ilma tühja reata annab selge erindi;
+- renderdatud kiri mahub `mailto:` eelarvesse: `encodeURIComponent(subject) +
+  encodeURIComponent(body)` alla 1800 märgi. Outlook lõikab pika `mailto:` URL-i
+  vaikselt katki, seega on see mõõdetav lävi, mitte soovitus „hoia lühike".
 
 **Frontend**
 
@@ -181,6 +233,10 @@ Kõik kolm on valikulised: puuduv väli = `et`.
   ka siis kui salvestatud `title` on eestikeelne;
 - admini saadetud sõnumi pealkiri jääb muutumatuks;
 - tundmatu tüüp langeb salvestatud pealkirja peale tagasi;
+- teadaolev tüüp PUUDUVA `actor_name`-iga langeb samuti salvestatud pealkirjale,
+  mitte ei renderda `undefined`-i;
+- `Notifications.tsx` ja `UserMenu.tsx` kuvavad sama teavitust identselt (sama
+  jagatud funktsioon);
 - `localeParity` (ADR 0011): uued võtmed mõlemas keeles.
 
 ## Väravad
@@ -200,4 +256,6 @@ sisse kirjutatud stringist.
 
 Rollid, kutselingi turvapiir (`create_invite_token` rollifiltrid, ADR 0031),
 tokeni eluiga, `users.json` ülejäänud kuju, teavituste failipõhine salvestus ja
-200-kirje piir, `mailto:` kui kohaletoimetamise viis (kanal on #298).
+200-kirje piir, `mailto:` kui kohaletoimetamise viis (kanal on #298),
+`encodeURIComponent` mailto parameetritel (juba olemas,
+`Registrations.tsx:254-262`).
