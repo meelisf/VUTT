@@ -6,9 +6,10 @@ import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { deriveUsernameFromEmail } from '../utils/username';
+import { defaultRegistrationLanguage, UiLanguage } from './registerLanguage';
 
 const Register: React.FC = () => {
-  const { t } = useTranslation(['register', 'common']);
+  const { t, i18n } = useTranslation(['register', 'common']);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -18,6 +19,7 @@ const Register: React.FC = () => {
     website: ''  // Honeypot väli - botid täidavad, inimesed ei näe
   });
   const [gdprConsent, setGdprConsent] = useState(false);
+  const [language, setLanguage] = useState<UiLanguage>(defaultRegistrationLanguage(i18n.language));
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -100,6 +102,7 @@ const Register: React.FC = () => {
           affiliation: formData.affiliation.trim() || null,
           motivation: formData.motivation.trim(),
           gdpr_consent: true,
+          language,
           website: formData.website  // Honeypot
         })
       });
@@ -223,6 +226,24 @@ const Register: React.FC = () => {
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* Suhtluskeel — vaikimisi UI keel, aga inimene saab muuta:
+                eestikeelset lehte sirviv väliskülaline soovib ingliskeelset kirja. */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('form.language')}
+              </label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as UiLanguage)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors"
+                disabled={isSubmitting}
+              >
+                <option value="et">{t('form.languageEt')}</option>
+                <option value="en">{t('form.languageEn')}</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">{t('form.languageHint')}</p>
             </div>
 
             {/* Asutus */}
