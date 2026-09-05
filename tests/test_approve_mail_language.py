@@ -49,6 +49,17 @@ def test_admin_can_override_language_at_approval(client, login, backend_env, mon
 
 
 def test_mail_body_contains_absolute_url(client, login, backend_env, monkeypatch):
-    """Kirjas peab olema klõpsatav täisaadress, mitte /set-password?token=..."""
+    """Kirjas peab olema klõpsatav täisaadress, mitte /set-password?token=...,
+    ja täpselt üks kaldkriips PUBLIC_BASE_URL-i ja invite_url-i liitekohas —
+    mitte `https://.../ /set-password...` (topeltkaldkriips, kui
+    PUBLIC_BASE_URL säilitaks lõpu-kaldkriipsu)."""
+    from server.config import PUBLIC_BASE_URL
+
     data = _approve(client, login, backend_env, monkeypatch)
-    assert data["mail_body"].count("http") >= 1
+    expected_url = f"{PUBLIC_BASE_URL}{data['invite_url']}"
+    assert expected_url in data["mail_body"]
+    # See on tegelik regressioonikaitse: kui PUBLIC_BASE_URL säilitaks
+    # lõpu-kaldkriipsu (nt `.rstrip("/")` kaob config.py-st), tekiks siia
+    # täpselt see topeltkaldkriips — sõltumata sellest, mis väärtusega
+    # PUBLIC_BASE_URL parasjagu on.
+    assert "//set-password" not in data["mail_body"]
