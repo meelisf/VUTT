@@ -8,6 +8,7 @@ import { UserNotification } from '../types';
 import { getNotifications } from '../services/notificationService';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { isSentNotification } from '../utils/notificationText';
 
 const UserMenu: React.FC = () => {
   const { t } = useTranslation(['common', 'auth', 'admin']);
@@ -78,7 +79,6 @@ const UserMenu: React.FC = () => {
 
   if (!user) return null;
 
-  const isSentNotification = (notification: UserNotification) => notification.type === 'sent_notification';
   const receivedNotifications = notifications.filter(n => !isSentNotification(n));
   const unreadCount = receivedNotifications.filter(n => !n.read_at).length;
   const badgeCount = unreadCount + pendingRegistrationCount;
