@@ -13,6 +13,7 @@ import {
   NotificationRecipient,
   sendNotification,
 } from '../services/notificationService';
+import { isSentNotification, notificationTitle } from '../utils/notificationText';
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -24,14 +25,6 @@ const formatDate = (value: string) => {
     hour: '2-digit',
     minute: '2-digit',
   });
-};
-
-const notificationTitle = (notification: UserNotification, fallback: string) => {
-  if (notification.title) return notification.title;
-  if (notification.type === 'comment_reply' && notification.actor_name) {
-    return `${notification.actor_name} ${fallback}`;
-  }
-  return fallback;
 };
 
 const notificationBody = (notification: UserNotification) => {
@@ -46,8 +39,6 @@ const notificationLink = (notification: UserNotification) => {
   }
   return '';
 };
-
-const isSentNotification = (notification: UserNotification) => notification.type === 'sent_notification';
 
 const sentRecipientsLabel = (notification: UserNotification, allLabel: string) => {
   const metadata = notification.metadata || {};
@@ -319,7 +310,7 @@ const Notifications: React.FC = () => {
                               {isSentNotification(notification) ? t('notifications.sentBadge') : t('notifications.receivedBadge')}
                             </span>
                             <h2 className="text-sm font-semibold text-gray-900">
-                              {notificationTitle(notification, t('notifications.commentReplyFallback'))}
+                              {notificationTitle(notification, t)}
                             </h2>
                           </div>
                           {notificationBody(notification) && (
@@ -383,7 +374,7 @@ const Notifications: React.FC = () => {
                 <div className="flex items-start justify-between gap-3 p-3 bg-primary-50 border border-primary-200 rounded-md">
                   <div>
                     <p className="text-sm font-medium text-primary-900">{t('notifications.replyingTo')}</p>
-                    <p className="text-xs text-primary-700 mt-1">{notificationTitle(replyingTo, t('notifications.commentReplyFallback'))}</p>
+                    <p className="text-xs text-primary-700 mt-1">{notificationTitle(replyingTo, t)}</p>
                   </div>
                   <button
                     type="button"

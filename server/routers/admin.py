@@ -14,12 +14,14 @@ from ..auth import (
     update_user_edit_collections,
     update_user_role,
 )
-from ..config import BASE_DIR
+from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
+from ..mail_templates import render_mail
 from ..meilisearch_ops import delete_work_from_meilisearch
 from ..people_ops import get_refresh_status, refresh_all_people_safe
 from ..registration import (
+    INVITE_EXPIRY_HOURS,
     create_invite_token,
     get_registration_by_id,
     load_pending_registrations,
@@ -27,7 +29,10 @@ from ..registration import (
 )
 from ..password_reset import create_reset_token
 from ..trash_ops import list_deleted_pages, list_deleted_works, restore_deleted_page, restore_deleted_work
+from ..user_language import normalize_language
 from ..utils import build_work_id_cache, find_directory_by_id
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -58,6 +63,9 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     # Roll ja kirjutamisulatus valitakse SIIN, mitte hiljem kaheastmeliselt —
     # create_invite_token piirab rolli sisemiselt (contributor, editor); admin
     # ei saa kutselingi kaudu tekitada admin- ega superadmin-kontot.
+    # Keele valib taotleja; admin saab selle enne kutse loomist üle kirjutada
+    # (nt väliskülaline, kes täitis vormi eestikeelsel lehel).
+    language = normalize_language(data.get("language") or reg.get("language"))
     token_data = await run_in_threadpool(
         create_invite_token, reg["email"], reg["name"], user["username"],
         username=reg.get("username"),
@@ -67,18 +75,53 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         # sinnajõudmist.
         role=data.get("role"),
         edit_collections=data.get("edit_collections", []),
+        language=language,
     )
-    return {
+    invite_url = f"/set-password?token={token_data['token']}"
+    invite_absolute_url = f"{PUBLIC_BASE_URL}{invite_url}"
+    response = {
         "status": "success",
         "invite_token": token_data["token"],
-        "invite_url": f"/set-password?token={token_data['token']}",
+        "invite_url": invite_url,
+        "invite_absolute_url": invite_absolute_url,
         "expires_at": token_data["expires_at"],
         "email": token_data["email"],
         "username": token_data["username"],
         "name": token_data["name"],
         "role": token_data["role"],
         "edit_collections": token_data["edit_collections"],
+        "language": language,
     }
+    # Kiri renderdatakse serveris: üks tekstiallikas nii tänasele mailto-nupule
+    # kui #298 saatjale. render_mail loeb malli kettalt/mälust — sama kaalu
+    # klass mis teised siin threadpool'i pandud sync-kutsed, seega ühtsuse
+    # mõttes samamoodi käideldud (ADR 0002).
+    #
+    # Selleks ajaks on taotlus juba "approved" ja token kettal (ADR 0033
+    # täiendus) — puuduv mall on programmeerimisviga ja render_mail PEAB
+    # selle kohal viskama (nii käitub ka test_mail_templates.py), aga siin,
+    # kutsuja poolel, oleks katmata 500 halvem kui kirjata vastus: klient
+    # saaks vea, kuigi kutse on juba tekkinud, ja taotlus kaoks pending-
+    # nimekirjast jäädavalt nähtamatuks (kordus annab 400). Seega püüame
+    # erindi siin ja degradeerume nähtavalt — kopeeritav link jääb tööle.
+    try:
+        mail_subject, mail_body = await run_in_threadpool(
+            render_mail,
+            "invite",
+            language,
+            name=token_data["name"],
+            username=token_data["username"],
+            url=invite_absolute_url,
+            expires_hours=INVITE_EXPIRY_HOURS,
+        )
+        response["mail_subject"] = mail_subject
+        response["mail_body"] = mail_body
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        logger.error(
+            "Kutsekirja renderdus ebaõnnestus (mall=invite, keel=%s): %s",
+            language, e,
+        )
+    return response
 
 
 @router.post("/admin/registrations/reject")

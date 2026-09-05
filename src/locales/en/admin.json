@@ -33,7 +33,11 @@
     "roleContributor": "Contributor (selected collections)",
     "editCollections": "Write scope",
     "editCollectionsHint": "A contributor can only edit these collections.",
-    "editCollectionsNone": "No scope selected — this contributor cannot edit anything"
+    "editCollectionsNone": "No scope selected — this contributor cannot edit anything",
+    "languageLabel": "Language",
+    "languageEt": "Estonian",
+    "languageEn": "English",
+    "mailTemplateMissing": "Could not get the mail template from the server — use the copied link instead."
   },
   "users": {
     "title": "Users",

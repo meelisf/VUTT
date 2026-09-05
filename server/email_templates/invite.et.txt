@@ -1,0 +1,13 @@
+VUTT – konto aktiveerimise link
+
+Tere $name,
+
+Teie juurdepääsutaotlus VUTT platvormile on kinnitatud.
+
+Teie kasutajanimi on: $username
+
+Palun seadistage oma parool alloleva lingi kaudu (link kehtib $expires_hours tundi):
+$url
+
+Lugupidamisega,
+VUTT meeskonna nimel

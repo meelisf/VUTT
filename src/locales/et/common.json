@@ -119,7 +119,7 @@
     "loadError": "Teavituste laadimine ebaõnnestus.",
     "sendError": "Teavituse saatmine ebaõnnestus.",
     "recipientsLoadError": "Saajate laadimine ebaõnnestus.",
-    "commentReply": "{{name}} vastas sinu kommentaarile",
+    "commentReply": "{{actor}} vastas sinu kommentaarile",
     "commentReplyFallback": "vastas sinu kommentaarile"
   },
   "form": {

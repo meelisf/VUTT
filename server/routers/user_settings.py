@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..deps import get_json_data, get_user
+from ..user_language import get_user_language
 from ..user_settings_ops import load_user_settings, save_user_settings
 
 router = APIRouter()
@@ -10,8 +11,15 @@ router = APIRouter()
 # sync def → threadpool: kasutaja seadete faililugemine ei blokeeri event-loopi
 @router.get("/user-settings")
 def get_user_settings(request: Request, user=Depends(get_user)):
-    """Tagastab kasutaja kõik seaded."""
+    """Tagastab kasutaja kõik seaded.
+
+    Puuduv `language` täidetakse kontolt (registreerimisel valitud keel) —
+    seeme, MITTE migratsioon: faili siin ei kirjutata. Fail tekib alles siis,
+    kui kasutaja midagi päriselt salvestab.
+    """
     settings = load_user_settings(user["username"])
+    if not settings.get("language"):
+        settings["language"] = get_user_language(user["username"])
     return {"status": "success", "settings": settings}
 
 

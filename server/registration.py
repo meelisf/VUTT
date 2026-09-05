@@ -12,12 +12,16 @@ from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE, 
 from .auth import load_users, users_lock, sanitize_edit_collections
 from .cache import get_cached_collections
 from .utils import atomic_write_json
+from .user_language import normalize_language
 
 logger = get_logger(__name__)
 
 # Lukud failioperatsioonide jaoks
 registrations_lock = threading.RLock()
 tokens_lock = threading.RLock()
+
+# Kutselingi eluiga. Mall viitab samale konstandile — kaks kohta lahkneksid.
+INVITE_EXPIRY_HOURS = 48
 
 # =========================================================
 # REGISTREERIMISE FUNKTSIOONID
@@ -38,7 +42,7 @@ def save_pending_registrations(data):
         atomic_write_json(PENDING_REGISTRATIONS_FILE, data)
 
 
-def add_registration(name, email, affiliation, motivation, gdpr_consent=False):
+def add_registration(name, email, affiliation, motivation, gdpr_consent=False, language=None):
     """Lisab uue registreerimistaotluse."""
     data = load_pending_registrations()
 
@@ -60,6 +64,9 @@ def add_registration(name, email, affiliation, motivation, gdpr_consent=False):
         "username": suggest_username_for_email(email),
         "affiliation": affiliation,
         "motivation": motivation,
+        # Keel püütakse vormilt: enne esimest sisselogimist ei ole kasutajal
+        # ühtki teist kohta, kus oma keelt öelda.
+        "language": normalize_language(language),
         "gdpr_consent_at": datetime.now().isoformat() if gdpr_consent else None,
         "submitted_at": datetime.now().isoformat(),
         "status": "pending",
@@ -180,7 +187,7 @@ def suggest_username_for_email(email):
 
 
 def create_invite_token(email, name, created_by, username=None, role="editor",
-                        edit_collections=None):
+                        edit_collections=None, language=None):
     """Loob uue invite tokeni (kehtiv 48h).
 
     role ja edit_collections salvestatakse tokenisse, et konto tekiks
@@ -206,7 +213,7 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
     data = load_invite_tokens()
 
     token = str(uuid.uuid4())
-    expires_at = datetime.now() + timedelta(hours=48)
+    expires_at = datetime.now() + timedelta(hours=INVITE_EXPIRY_HOURS)
     username = _next_available_username(email, data, preferred_username=username)
 
     if role is None:
@@ -228,6 +235,7 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
         "used": False,
         "role": resolved_role,
         "edit_collections": sanitize_edit_collections(edit_collections or [], collections_config),
+        "language": normalize_language(language),
     }
 
     data["tokens"].append(token_data)
@@ -365,6 +373,8 @@ def create_user_from_invite(token, password):
         "email": email,
         "role": role,
         "edit_collections": token_data.get("edit_collections", []),
+        # Vanadel tokenitel võtit ei ole → normalize_language(None) = "et"
+        "language": normalize_language(token_data.get("language")),
         "created_at": datetime.now().isoformat()
     }
 

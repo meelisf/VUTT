@@ -119,7 +119,7 @@
     "loadError": "Failed to load notifications.",
     "sendError": "Failed to send notification.",
     "recipientsLoadError": "Failed to load recipients.",
-    "commentReply": "{{name}} replied to your comment",
+    "commentReply": "{{actor}} replied to your comment",
     "commentReplyFallback": "replied to your comment"
   },
   "form": {

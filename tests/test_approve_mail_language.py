@@ -1,0 +1,88 @@
+"""Kutsekirja tekst tuleb serverist, saaja keeles.
+
+Enne seda oli tekst kõvakodeeritud eesti keeles frontendis mailto: URL-i sees
+— ingliskeelne kasutaja sai esimese kirja alati eesti keeles.
+"""
+import importlib
+
+
+def _approve(client, login, backend_env, monkeypatch, language=None, approve_language=None):
+    monkeypatch.setattr(backend_env["registration"], "get_cached_collections", lambda: {})
+    body = {
+        "name": "New User", "email": "new@example.test",
+        "motivation": "I would like to help", "gdpr_consent": True,
+    }
+    if language:
+        body["language"] = language
+    client.post("/register", json=body)
+
+    admin_token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    reg_id = client.post("/admin/registrations", headers=headers).json()["registrations"][0]["id"]
+    payload = {"registration_id": reg_id, "role": "editor", "edit_collections": []}
+    if approve_language:
+        payload["language"] = approve_language
+    res = client.post("/admin/registrations/approve", json=payload, headers=headers)
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+def test_mail_rendered_in_requested_language(client, login, backend_env, monkeypatch):
+    data = _approve(client, login, backend_env, monkeypatch, language="en")
+    assert data["language"] == "en"
+    assert "activation" in data["mail_subject"].lower()
+    assert data["username"] in data["mail_body"]
+    assert data["invite_url"] in data["mail_body"]
+    assert "$" not in data["mail_body"]
+
+
+def test_mail_defaults_to_estonian(client, login, backend_env, monkeypatch):
+    data = _approve(client, login, backend_env, monkeypatch)
+    assert data["language"] == "et"
+    assert "aktiveerimise" in data["mail_subject"].lower()
+
+
+def test_admin_can_override_language_at_approval(client, login, backend_env, monkeypatch):
+    """Admin teab, et tegemist on väliskülalisega, kes täitis vormi ET lehel."""
+    data = _approve(client, login, backend_env, monkeypatch, language="et", approve_language="en")
+    assert data["language"] == "en"
+    assert "activation" in data["mail_subject"].lower()
+
+
+def test_mail_body_contains_absolute_url(client, login, backend_env, monkeypatch):
+    """Kirjas peab olema klõpsatav täisaadress, mitte /set-password?token=...,
+    ja täpselt üks kaldkriips PUBLIC_BASE_URL-i ja invite_url-i liitekohas —
+    mitte `https://.../ /set-password...` (topeltkaldkriips, kui
+    PUBLIC_BASE_URL säilitaks lõpu-kaldkriipsu)."""
+    from server.config import PUBLIC_BASE_URL
+
+    data = _approve(client, login, backend_env, monkeypatch)
+    expected_url = f"{PUBLIC_BASE_URL}{data['invite_url']}"
+    assert expected_url in data["mail_body"]
+    # See on tegelik regressioonikaitse: kui PUBLIC_BASE_URL säilitaks
+    # lõpu-kaldkriipsu (nt `.rstrip("/")` kaob config.py-st), tekiks siia
+    # täpselt see topeltkaldkriips — sõltumata sellest, mis väärtusega
+    # PUBLIC_BASE_URL parasjagu on.
+    assert "//set-password" not in data["mail_body"]
+
+
+def test_render_mail_failure_leaves_invite_intact(client, login, backend_env, monkeypatch):
+    """ADR 0033 täiendus: kui render_mail viskab, ei tohi taotlus jääda orvuks.
+
+    Selleks ajaks on update_registration_status ja create_invite_token juba
+    käivitatud (taotlus "approved", token kettal) — endpoint peab erindi ise
+    püüdma ja tagastama kutse ILMA kirjatekstita, mitte 500 viskama.
+    """
+    admin_router = importlib.import_module("server.routers.admin")
+
+    def _boom(*_args, **_kwargs):
+        raise FileNotFoundError("Kirjamalli ei leitud (testi simulatsioon)")
+
+    monkeypatch.setattr(admin_router, "render_mail", _boom)
+
+    data = _approve(client, login, backend_env, monkeypatch)
+
+    assert data["invite_token"]
+    assert data["invite_url"]
+    assert "mail_subject" not in data
+    assert "mail_body" not in data
