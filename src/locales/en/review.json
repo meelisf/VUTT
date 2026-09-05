@@ -46,6 +46,10 @@
   "subtitleAdmin": "All users' changes",
   "empty": "No changes made yet",
   "emptyUser": "You haven't made any changes yet",
+  "emptyCollection": "No changes in this collection",
+  "emptyUserCollection": "You have not made any changes in this collection",
+  "emptyForUser": "{{user}} has no changes",
+  "emptyForUserCollection": "{{user}} has no changes in this collection",
   "loading": "Loading changes...",
   "error": "Failed to load changes",
   "table": {
@@ -82,5 +86,8 @@
     "deletions": "removed",
     "empty": "No changes found",
     "error": "Failed to load changes"
+  },
+  "collectionFilter": {
+    "personsHidden": "person record changes are hidden"
   }
 }

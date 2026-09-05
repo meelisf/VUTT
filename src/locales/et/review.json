@@ -46,6 +46,10 @@
   "subtitleAdmin": "Kõigi kasutajate muudatused",
   "empty": "Muudatusi pole veel tehtud",
   "emptyUser": "Sa pole veel ühtegi muudatust teinud",
+  "emptyCollection": "Selles kollektsioonis pole muudatusi",
+  "emptyUserCollection": "Sa pole selles kollektsioonis muudatusi teinud",
+  "emptyForUser": "Kasutajal {{user}} pole muudatusi",
+  "emptyForUserCollection": "Kasutajal {{user}} pole selles kollektsioonis muudatusi",
   "loading": "Laadin muudatusi...",
   "error": "Muudatuste laadimine ebaõnnestus",
   "table": {
@@ -82,5 +86,8 @@
     "deletions": "eemaldatud",
     "empty": "Muudatused puuduvad",
     "error": "Muudatuste laadimine ebaõnnestus"
+  },
+  "collectionFilter": {
+    "personsHidden": "isikukaartide muudatused on peidus"
   }
 }

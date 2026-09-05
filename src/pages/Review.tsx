@@ -27,6 +27,7 @@ import {
   Plus,
   Minus,
   Wand2,
+  Library,
   CheckCircle,
   XCircle,
   UserCircle,
@@ -35,6 +36,8 @@ import {
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
+import { useCollection } from '../contexts/CollectionContext';
+import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 interface RecentCommit {
@@ -99,8 +102,11 @@ interface DiffData {
 }
 
 const Review: React.FC = () => {
-  const { t } = useTranslation(['review', 'common', 'workspace']);
+  const { t, i18n } = useTranslation(['review', 'common', 'workspace']);
   const { user, authToken: token, isLoading: userLoading } = useUser();
+  // Kollektsioonivalik tuleb päisest (sama valik nagu Dashboardil) — Review
+  // ei kasva oma teist rippmenüüd, aga näitab filtrit nähtavalt (vt allpool).
+  const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
   const navigate = useNavigate();
 
   const [commits, setCommits] = useState<RecentCommit[]>([]);
@@ -141,7 +147,7 @@ const Review: React.FC = () => {
       setHasMore(false);
       loadRecentEdits(0, false);
     }
-  }, [user, token, selectedUser]);
+  }, [user, token, selectedUser, selectedCollection]);
 
   // Lae kõigi kasutajate nimekiri admin jaoks
   useEffect(() => {
@@ -259,6 +265,11 @@ const Review: React.FC = () => {
       // Kui admin on valinud konkreetse kasutaja
       if (selectedUser) {
         url += `&user=${encodeURIComponent(selectedUser)}`;
+      }
+
+      // Päises valitud kollektsioon (alamkollektsioonid tulevad kaasa)
+      if (selectedCollection) {
+        url += `&collection=${encodeURIComponent(selectedCollection)}`;
       }
 
       // Git-ajaloo koostamine võib külma failisüsteemi või hõivatud threadpool'i korral
@@ -579,6 +590,26 @@ const Review: React.FC = () => {
 
           {/* Content */}
           <div className="p-6">
+            {/* Nähtav kollektsioonifilter: päises tehtud valik ei tohi siin
+                vaikselt mõjuda — üks klõps viib tagasi kõigi tööde peale. */}
+            {activeTab === 'history' && selectedCollection && collections[selectedCollection] && (() => {
+              const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
+              return (
+                <div className={`mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-4 py-2.5 text-sm ${colorClasses.bg} ${colorClasses.border}`}>
+                  <Library size={16} className={colorClasses.text} />
+                  <span className={`font-medium ${colorClasses.text}`}>
+                    {getCollectionName(selectedCollection, i18n.language === 'en' ? 'en' : 'et')}
+                  </span>
+                  <span className="text-gray-500">{t('collectionFilter.personsHidden')}</span>
+                  <button
+                    onClick={() => setSelectedCollection(null)}
+                    className="ml-auto text-primary-700 hover:text-primary-800 underline underline-offset-2"
+                  >
+                    {t('common:collections.all')}
+                  </button>
+                </div>
+              );
+            })()}
             {activeTab === 'reocr' ? (
               /* OCR tööde tab */
               <>
@@ -808,7 +839,11 @@ const Review: React.FC = () => {
               <div className="text-center py-12">
                 <History className="mx-auto text-gray-300" size={48} />
                 <p className="mt-4 text-gray-500">
-                  {isAdmin ? t('empty') : t('emptyUser')}
+                  {selectedUser
+                    ? (selectedCollection ? t('emptyForUserCollection', { user: selectedUser }) : t('emptyForUser', { user: selectedUser }))
+                    : selectedCollection
+                      ? (isAdmin ? t('emptyCollection') : t('emptyUserCollection'))
+                      : (isAdmin ? t('empty') : t('emptyUser'))}
                 </p>
               </div>
             ) : (

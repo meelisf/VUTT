@@ -105,6 +105,7 @@ def get_work_info_from_folder(folder_name):
     - title: pealkiri
     - year: aasta
     - author: autor (praeses või auctor)
+    - collections: teose kollektsioonide ID-d
 
     Kasutab cache'i.
     """
@@ -117,7 +118,8 @@ def get_work_info_from_folder(folder_name):
         'slug': sanitize_id(folder_name),
         'title': None,
         'year': None,
-        'author': None
+        'author': None,
+        'collections': []
     }
 
     if os.path.exists(metadata_path):
@@ -128,6 +130,7 @@ def get_work_info_from_folder(folder_name):
                 info['slug'] = meta.get('slug') or info['slug']
                 info['title'] = meta.get('title')
                 info['year'] = meta.get('year')
+                info['collections'] = meta.get('collections') or []
 
                 # Autor creators massiivist
                 creators = meta.get('creators', [])
@@ -145,6 +148,19 @@ def get_work_info_from_folder(folder_name):
 
     _work_info_cache[folder_name] = info
     return info
+
+
+def _invalidate_work_info(relative_paths):
+    """Unustab teose info cache'i, kui `_metadata.json` muutus.
+
+    Cache kannab nüüd ka `collections`-i (Review kollektsioonifilter), seega
+    aegunud kirje ei näitaks enam ainult vana pealkirja, vaid paigutaks teose
+    muudatuste vaates valesse kollektsiooni.
+    """
+    for rel in relative_paths:
+        parts = rel.replace(os.sep, '/').split('/')
+        if len(parts) >= 2 and parts[-1] == '_metadata.json':
+            _work_info_cache.pop(parts[0], None)
 
 
 # Cache piltide nimekirja jaoks (kausta nimi -> sorteeritud piltide nimekiri)
@@ -352,6 +368,7 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
     relative_path = os.path.relpath(filepath, BASE_DIR)
     extra = additional_files or []
     files_to_add = [relative_path] + [os.path.relpath(path, BASE_DIR) for path, _ in extra]
+    _invalidate_work_info(files_to_add)
     git_env = os.environ.copy()
     git_env.update({
         "GIT_AUTHOR_NAME": username,
@@ -822,20 +839,22 @@ def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "V
         return False
 
 
-def _get_changed_paths_by_commit(repo, max_commits):
+def _get_changed_paths_by_commit(repo, max_commits, username=None):
     """Loeb commitite failiteed ühe git-protsessiga.
 
     ``Commit.stats`` käivitab iga commiti kohta eraldi ``git diff`` protsessi;
     Review-vaates tähendas see tavaliselt üle saja protsessi. NUL-eraldajaga
     log säilitab ka tühikute ja mitte-ASCII märkidega failinimed.
+
+    ``username`` antakse gitile edasi (``--author``), et skanniaken loeks
+    kasutaja ENDA commite, mitte kõiki. Vt ``get_recent_commits``.
     """
     marker = "VUTT_COMMIT:"
-    output = repo.git.log(
-        f"--max-count={max_commits}",
-        f"--format={marker}%H",
-        "--name-only",
-        "-z",
-    )
+    args = [f"--format={marker}%H", "--name-only", "-z"]
+    if max_commits is not None:
+        args.insert(0, f"--max-count={max_commits}")
+    args.extend(_author_log_args(username))
+    output = repo.git.log(*args)
     paths_by_hash = {}
     current_hash = None
     for raw_part in output.split("\0"):
@@ -850,29 +869,66 @@ def _get_changed_paths_by_commit(repo, max_commits):
     return paths_by_hash
 
 
-def get_recent_commits(username=None, limit=50, skip=0):
+def _author_log_args(username):
+    """git log argumendid autori järgi filtreerimiseks.
+
+    ``--fixed-strings`` on tahtlik: ``--author`` on muidu regex ja nimest
+    tehtud muster võiks vaikselt MITTE sobituda (kasutaja näeks tühja ajalugu).
+    Fikseeritud string sobitub alati üle, mitte alla — täpse nime kontrolli
+    teeb niikuinii Python (``commit.author.name == username``).
     """
-    Tagastab viimased commitid, valikuliselt filtreerituna kasutaja järgi.
+    if not username:
+        return []
+    return ["--fixed-strings", f"--author={username}"]
 
-    Args:
-        username: Kui määratud, tagastab ainult selle kasutaja commitid
-        limit: Maksimaalne tulemuste arv
-        skip: Mitu tulemust algusest vahele jätta (pagineerimine)
 
-    Returns:
-        dict: {"commits": list, "has_more": bool}
+def _collection_scope_ids(collection_id):
+    """Valitud kollektsioon + kõik selle alamkollektsioonid.
+
+    Sama semantika mis Meili ``collections_hierarchy`` filtril: teos kuulub
+    valikusse, kui mõni ta kollektsioonidest on valitu ise või selle järglane.
+    Autoriteet teose kuuluvuse üle jääb ``_metadata.json``-ile (ADR 0007) —
+    siin loetakse ainult kollektsioonipuu kuju.
     """
-    repo = get_or_init_repo()
+    # Laisk import: server.cache → meilisearch_ops → git_ops oleks tsükkel.
+    from .cache import get_cached_collections
 
+    scope = {collection_id}
     try:
-        # Võtame piisavalt commiteid, arvestades skip + limit + puhver filtreerimiseks
-        max_commits = (skip + limit) * 3 + 50
-        all_commits = list(repo.iter_commits(max_count=max_commits))
+        collections = get_cached_collections() or {}
+    except Exception as e:
+        logger.warning(f"Kollektsioonipuu lugemine ebaõnnestus: {e}")
+        return scope
+
+    changed = True
+    while changed:  # puu on madal, praktikas paar iteratsiooni
+        changed = False
+        for cid, col in collections.items():
+            if cid not in scope and (col or {}).get("parent") in scope:
+                scope.add(cid)
+                changed = True
+    return scope
+
+
+def _scan_commits(repo, window, username, collection_ids, limit, skip):
+    """Skannib `window` commiti (None = kogu ajalugu) ja koostab tulemused.
+
+    Tagastab (results, has_more, scanned), kus `scanned` on läbi vaadatud
+    commitite arv — kutsuja järeldab sellest, kas ajalugu sai otsa.
+    """
+    try:
+        iter_kwargs = {}
+        if window is not None:
+            iter_kwargs["max_count"] = window
+        if username:
+            iter_kwargs["fixed_strings"] = True
+            iter_kwargs["author"] = username
+        all_commits = list(repo.iter_commits(**iter_kwargs))
     except Exception:
-        return {"commits": [], "has_more": False}
+        return [], False, 0
 
     try:
-        changed_paths = _get_changed_paths_by_commit(repo, max_commits)
+        changed_paths = _get_changed_paths_by_commit(repo, window, username)
     except Exception as e:
         # Ühilduvusfallback ebatavalise/vana git-versiooni jaoks.
         logger.warning(f"Git failiteede koondlugemine ebaõnnestus: {e}")
@@ -884,7 +940,8 @@ def get_recent_commits(username=None, limit=50, skip=0):
     has_more = False
 
     for commit in all_commits:
-        # Filtreeri kasutaja järgi (kui määratud)
+        # Filtreeri kasutaja järgi (kui määratud). Git on juba kitsendanud,
+        # aga --fixed-strings sobitub üle: siin käib täpne kontroll.
         if username and commit.author.name != username:
             continue
 
@@ -933,6 +990,10 @@ def get_recent_commits(username=None, limit=50, skip=0):
                 )
 
                 if is_prosopo:
+                    # Isikukaart ei kuulu ühtegi kollektsiooni — kollektsiooni
+                    # valides jääb ta välja, „Kõik tööd" toob tagasi.
+                    if collection_ids:
+                        continue
                     nanoid = filename.removesuffix(".json")
                     person_id = f"vutt:P{nanoid}"
                     file_key = f"prosopo/{commit.hexsha[:8]}"  # üks kirje per commit (merge puhuks)
@@ -969,6 +1030,10 @@ def get_recent_commits(username=None, limit=50, skip=0):
 
                 # Leia teose info _metadata.json failist
                 work_info = get_work_info_from_folder(folder_name)
+
+                # Kollektsioonifilter: teose praegune kuuluvus _metadata.json-is
+                if collection_ids and not (set(work_info.get('collections') or ()) & collection_ids):
+                    continue
 
                 if is_import_commit:
                     # Impordi commit: emit ainult _metadata.json kirje, txt-failid vahele
@@ -1025,5 +1090,44 @@ def get_recent_commits(username=None, limit=50, skip=0):
         except Exception as e:
             logger.warning(f"Viga commiti {commit.hexsha[:8]} töötlemisel: {e}")
             continue
+
+    return results, has_more, len(all_commits)
+
+
+def get_recent_commits(username=None, limit=50, skip=0, collection=None):
+    """
+    Tagastab viimased commitid, valikuliselt filtreerituna kasutaja ja
+    kollektsiooni järgi.
+
+    Args:
+        username: Kui määratud, tagastab ainult selle kasutaja commitid
+        limit: Maksimaalne tulemuste arv
+        skip: Mitu tulemust algusest vahele jätta (pagineerimine)
+        collection: Kui määratud, ainult selle kollektsiooni (ja ta
+            alamkollektsioonide) teoste muudatused; isikukaardid jäävad välja
+
+    Returns:
+        dict: {"commits": list, "has_more": bool}
+
+    Skanniaken: alustame kitsalt (kiire tavajuht) ja laieneme, kuni tulemusi
+    on `limit` jagu või ajalugu saab otsa. Ilma laienemiseta näeks filtriga
+    kasutaja tühja nimekirja lihtsalt sellepärast, et ta muudatused jäid
+    akna taha — täpselt see viga, mida see funktsioon parandab.
+    """
+    repo = get_or_init_repo()
+    collection_ids = _collection_scope_ids(collection) if collection else None
+
+    base_window = (skip + limit) * 3 + 50
+    windows = [base_window, base_window * 4, base_window * 16, None]  # None = kogu ajalugu
+
+    results, has_more = [], False
+    for window in windows:
+        results, has_more, scanned = _scan_commits(
+            repo, window, username, collection_ids, limit, skip
+        )
+        if len(results) >= limit or has_more:
+            break
+        if window is None or scanned < window:
+            break  # ajalugu otsas — laiem aken ei annaks midagi juurde
 
     return {"commits": results, "has_more": has_more}
