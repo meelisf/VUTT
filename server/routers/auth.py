@@ -137,6 +137,7 @@ async def register(request: Request):
         data.get("affiliation"),
         data.get("motivation", ""),
         gdpr_consent=bool(data.get("gdpr_consent")),
+        language=data.get("language"),
     )
     if not registration:
         raise HTTPException(status_code=400, detail=error)

@@ -67,6 +67,9 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         # sinnajõudmist.
         role=data.get("role"),
         edit_collections=data.get("edit_collections", []),
+        # Täielik keele-käsitlus (admini ülekirjutus) tuleb hilisemas taskis —
+        # praegu antakse taotluse keel lihtsalt tokenile edasi.
+        language=reg.get("language"),
     )
     return {
         "status": "success",
