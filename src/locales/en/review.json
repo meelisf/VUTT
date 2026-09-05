@@ -88,6 +88,6 @@
     "error": "Failed to load changes"
   },
   "collectionFilter": {
-    "personsHidden": "person record changes are hidden"
+    "personsHidden": "prosopography changes are hidden"
   }
 }
