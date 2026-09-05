@@ -51,3 +51,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0029](0029-ootel-reocr-loendur-on-teose-tasemel.md) | Ootel re-OCR loendur ja hulgi-rakendus on teose, mitte partii tasemel | kehtib |
 | [0030](0030-page-map-lahteleht-valjundlehtedeks.md) | `page_map` kaardistab lähtelehe kõigile temast tekkinud väljundlehtedele | kehtib |
 | [0031](0031-kirjutamisoigus-on-lugemisoigus-ja-ulatus.md) | Kirjutamisõigus = lugemisõigus JA ulatus; contributor toimetab ainult oma kollektsioonides | kehtib |
+| [0032](0032-filter-enne-skanniakent.md) | Filter läheb andmeallikasse või aken kasvab; piiratud akna järel filtreerimine annab vaikselt tühja vastuse | kehtib |
