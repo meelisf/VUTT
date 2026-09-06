@@ -255,26 +255,26 @@ def test_poll_kirje_kannab_importable_lippu():
     Sõnavara („mudel on imporditav") tohib elada AINULT `ocr_err.py`-s; poll
     annab frontendile valmis otsuse, mitte tooraine.
     """
-    from server.upload import thumbs
+    from server.upload import page_status
 
-    assert thumbs.on_importable({"has_ocr": True}) is True
-    assert thumbs.on_importable(
+    assert page_status.is_importable({"has_ocr": True}) is True
+    assert page_status.is_importable(
         {"has_ocr": False, "ocr_error": "mudel: KordusLoop: periood 1, 780 kordust"}
     ) is True
 
 
 def test_pildi_viga_ei_ole_importable():
     """`pilt` = skaneeringut ei saa avada → lehte EI SAA käsitsi transkribeerida."""
-    from server.upload import thumbs
+    from server.upload import page_status
 
-    assert thumbs.on_importable(
+    assert page_status.is_importable(
         {"has_ocr": False, "ocr_error": "pilt: UnidentifiedImageError: cannot identify"}
     ) is False
 
 
 def test_ilma_ocrita_ja_ilma_veata_ei_ole_importable():
     """Leht, mis on veel töös — ei valmis ega lõplikult ebaõnnestunud."""
-    from server.upload import thumbs
+    from server.upload import page_status
 
-    assert thumbs.on_importable({"has_ocr": False}) is False
-    assert thumbs.on_importable({"has_ocr": False, "ocr_error": ""}) is False
+    assert page_status.is_importable({"has_ocr": False}) is False
+    assert page_status.is_importable({"has_ocr": False, "ocr_error": ""}) is False

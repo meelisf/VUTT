@@ -193,3 +193,51 @@ def test_replace_work_content_git_rm_viga_katkestab_ja_taastab_jpg(tmp_path, mon
     assert (work_dir / "vana-teos_pg_001.jpg").exists()
     trash_root = data_dir / "._trash" / work_id / "replaced_content"
     assert not list(trash_root.glob("*/*.jpg"))
+
+
+def _setup_kahe_lehega(tmp_path, monkeypatch):
+    """Nagu `_setup_replace_files`, aga teine leht on mudeli veaga (ADR 0025).
+
+    Mudeli veaga leht KUULUB teosesse: skaneering on korras ja inimene kirjutab
+    teksti Workspace'is. Kui ta impordist välja jääb, nihkuvad järgnevad lehed.
+    """
+    upload_id, work_id, slug, work_dir, data_dir = _setup_replace_files(tmp_path, monkeypatch)
+    state_path = Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["files"] = [
+        {"page": 1, "has_ocr": True, "deleted": False},
+        {"page": 2, "has_ocr": False, "deleted": False,
+         "ocr_error": "mudel: KordusLoop: periood 1 sõna, 780 kordust",
+         "ocr_error_kind": "mudel"},
+    ]
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    return upload_id, work_id, slug, work_dir, data_dir
+
+
+def test_replace_ei_jata_mudeli_veaga_lehte_impordist_valja(tmp_path, monkeypatch):
+    """Asendustee kasutas `has_ocr`-i, import_work.py aga `on_importable`-it.
+
+    Kaks teed, kaks vastust samale küsimusele „kas see leht kuulub teosesse"
+    (#261). Tagajärg oli vaikne: mudeli veaga leht kadus asendusel ära ja
+    järgnevad lehed nihkusid, ilma vea ja logita.
+
+    Test vaatab, KAS leht jõuab preflighti: kaugkaustast on 2. lehe JPG puudu,
+    nii et päris `validate_remote_ocr_files` peab teda taga otsima ja kurtma.
+    Vea korral (leht jäi välja) läheb kood destruktiivsete sammudeni.
+    """
+    import server.git_ops as git_ops
+
+    upload_id, work_id, _slug, _work_dir, _data_dir = _setup_kahe_lehega(tmp_path, monkeypatch)
+    # 2. lehe JPG-d kaugkaustas EI OLE.
+    sftp = _ListSftp(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"])
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _upload_id: sftp)
+    monkeypatch.setattr(
+        git_ops, "get_or_init_repo",
+        lambda: (_ for _ in ()).throw(RuntimeError("preflight lasi vigase seisu läbi")),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+
+    assert exc.value.status_code == 400
+    assert "2" in exc.value.detail, exc.value.detail
