@@ -6,11 +6,37 @@
 set -e  # Peata skript vea korral
 
 NO_CACHE=""
+FORCE=""
 for arg in "$@"; do
   if [ "$arg" = "--no-cache" ]; then
     NO_CACHE="--no-cache"
   fi
+  if [ "$arg" = "--force" ] || [ "$arg" = "--anyway" ]; then
+    FORCE="1"
+  fi
 done
+
+# Deploy-valve (#257): restart tapab apply-lõime ja kaotab kasutaja töö.
+# Kontroll loeb FAILE, mitte API-t — peab töötama ka siis, kui backend on maas.
+# `set -e` ei tohi seda vaikselt läbi lasta, seega väljumiskood käsitsi.
+echo "🛡️  [0/5] Kontrollin, kas mõni töö on lennus..."
+if [ ! -f scripts/check_inflight.py ]; then
+  # Puuduv valve EI TOHI tähendada rohelist tuld.
+  echo "❌ scripts/check_inflight.py puudub — kas git pull jäi tegemata?"
+  echo "   Kontrolli käsitsi või kasuta --force."
+  [ -z "$FORCE" ] && exit 1
+fi
+INFLIGHT_RC=0
+python3 scripts/check_inflight.py "$(pwd)" || INFLIGHT_RC=$?
+if [ "$INFLIGHT_RC" -ne 0 ]; then
+  if [ -n "$FORCE" ]; then
+    echo "⚠️  --force: jätkan HOOLIMATA sellest, et töö on lennus."
+    echo "   Pooleliolev upload jääb 'applying' olekusse; taaste viib ta"
+    echo "   käivitusel tagasi (#256), aga kasutaja peab 'Rakenda' uuesti vajutama."
+  else
+    exit 1
+  fi
+fi
 
 echo "🔄 [1/4] Uuendan koodi Gitist..."
 git pull
