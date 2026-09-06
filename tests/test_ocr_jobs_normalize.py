@@ -163,6 +163,46 @@ def test_normalize_queue_ahead_across_all_active():
                 "slow": False, "started_at": 25.0, "ready": 0, "total": 1}]
     by_id = {e["id"]: e for e in normalize_ocr_jobs([], singles, batches, _title_of)}
     # Aktiivsed started_at järgi: b1(25) < s1(30); done s2 pole aktiivne
-    assert by_id["b1"]["queue_ahead"] == 0
-    assert by_id["s1"]["queue_ahead"] == 1
-    assert by_id["s2"]["queue_ahead"] == 0   # mitte-aktiivne → 0
+    assert by_id["b1"]["queue_ahead_pages"] == 0
+    assert by_id["s1"]["queue_ahead_pages"] == 1   # b1 total=1 → üks leht ees
+    assert by_id["s2"]["queue_ahead_pages"] == 0   # mitte-aktiivne → 0
+
+
+def test_queue_ahead_loeb_lehti_mitte_toid():
+    """„~2 varasemat tööd" võib tähendada 3 lehte või 800 (#251).
+
+    See on eristav test: töö-põhine loendus annaks 0/1/2, lehe-põhine 0/100/101.
+    Andmestik on kohapeal olemas — batch ja upload kannavad `total`, üksik
+    re-OCR on definitsiooni järgi üks leht.
+    """
+    singles = [{"job_id": "s1", "work_id": "wid", "slug": "w", "page_number": 1,
+                "status": "processing", "slow": False, "started_at": 20.0, "error": None}]
+    batches = [{"job_id": "b1", "work_id": "wid", "slug": "w", "status": "processing",
+                "slow": False, "started_at": 10.0, "ready": 0, "total": 100}]
+    uploads = [{"id": "u1", "status": "processing",
+                "meta": {"title": "Hiline", "slug": "h", "work_id": "wid"},
+                "expected_pages": 5, "created_at": "2026-09-01T10:00:00", "files": []}]
+
+    by_id = {e["id"]: e for e in normalize_ocr_jobs(uploads, singles, batches, _title_of)}
+
+    assert by_id["b1"]["queue_ahead_pages"] == 0
+    assert by_id["s1"]["queue_ahead_pages"] == 100   # 100-leheline batch ees
+    assert by_id["u1"]["queue_ahead_pages"] == 101   # batch + üksik leht
+
+
+def test_queue_ahead_ilma_lehtede_arvuta_loeb_uheks():
+    """Teadmata suurusega töö EI TOHI kaduda: null lehte tähendaks „ees ei ole midagi".
+
+    Upload, mille `expected_pages` on veel teadmata (fail alles saabub), peab
+    andma vähemalt ühe lehe — muidu näeks tema taga ootaja tühja järjekorda.
+    """
+    uploads = [{"id": "u1", "status": "processing",
+                "meta": {"title": "Teadmata", "slug": "t", "work_id": "wid"},
+                "expected_pages": None, "created_at": "2026-09-01T10:00:00", "files": []}]
+    singles = [{"job_id": "s1", "work_id": "wid", "slug": "w", "page_number": 1,
+                "status": "processing", "slow": False, "started_at": 4e9, "error": None}]
+
+    by_id = {e["id"]: e for e in normalize_ocr_jobs(uploads, singles, [], _title_of)}
+
+    assert by_id["u1"]["queue_ahead_pages"] == 0
+    assert by_id["s1"]["queue_ahead_pages"] == 1

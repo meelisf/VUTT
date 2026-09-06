@@ -19,7 +19,7 @@
     "slow": "aeglane, töötab edasi",
     "elapsedMin": "töötab {{mins}} min",
     "elapsedLtMin": "töötab <1 min",
-    "queueAhead": "~{{count}} varasemat tööd",
+    "queueAhead": "~{{count}} lehte ees",
     "cancelJob": "Katkesta töö",
     "cancelConfirm": "Katkestada? Seni valmis saanud lehtede tulemused visatakse ära.",
     "cancelConfirmYes": "Jah, katkesta",

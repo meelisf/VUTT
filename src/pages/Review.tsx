@@ -74,7 +74,7 @@ interface ReocrJob {
   finished_at: number | null;
   slow?: boolean;
   slow_since?: number | null;
-  queue_ahead?: number;
+  queue_ahead_pages?: number;
   title?: string;
 }
 
@@ -92,7 +92,7 @@ interface OcrJob {
   link: string;
   error: string | null;
   username?: string;
-  queue_ahead?: number;
+  queue_ahead_pages?: number;
 }
 
 interface DiffData {
@@ -659,9 +659,9 @@ const Review: React.FC = () => {
                                 <ExternalLink size={11} />
                               </Link>
                             )}
-                            {isActive && !!job.queue_ahead && job.queue_ahead > 0 && (
+                            {isActive && !!job.queue_ahead_pages && job.queue_ahead_pages > 0 && (
                               <span className="text-xs text-gray-400">
-                                {t('reocr.queueAhead', { count: job.queue_ahead })}
+                                {t('reocr.queueAhead', { count: job.queue_ahead_pages })}
                               </span>
                             )}
                           </div>
