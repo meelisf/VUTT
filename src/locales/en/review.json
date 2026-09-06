@@ -24,8 +24,7 @@
     "cancelConfirm": "Cancel? Results for pages finished so far will be discarded.",
     "cancelConfirmYes": "Yes, cancel",
     "cancelling": "Cancelling...",
-    "cancelFailed": "Cancelling failed",
-    "statusCancelled": "Cancelled"
+    "cancelFailed": "Cancelling failed"
   },
   "ocr": {
     "type": {
@@ -39,7 +38,9 @@
       "review": "in review",
       "ready": "ready",
       "imported": "imported",
-      "error": "error"
+      "error": "error",
+      "cancelled": "cancelled",
+      "cancelling": "cancelling..."
     }
   },
   "subtitle": "Your recent work",

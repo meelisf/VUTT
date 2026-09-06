@@ -24,8 +24,7 @@
     "cancelConfirm": "Katkestada? Seni valmis saanud lehtede tulemused visatakse ära.",
     "cancelConfirmYes": "Jah, katkesta",
     "cancelling": "Katkestan...",
-    "cancelFailed": "Katkestamine ebaõnnestus",
-    "statusCancelled": "Katkestatud"
+    "cancelFailed": "Katkestamine ebaõnnestus"
   },
   "ocr": {
     "type": {
@@ -39,7 +38,9 @@
       "review": "ülevaatusel",
       "ready": "valmis",
       "imported": "imporditud",
-      "error": "viga"
+      "error": "viga",
+      "cancelled": "katkestatud",
+      "cancelling": "katkestan..."
     }
   },
   "subtitle": "Sinu viimased töökohad",

@@ -206,3 +206,37 @@ def test_queue_ahead_ilma_lehtede_arvuta_loeb_uheks():
 
     assert by_id["u1"]["queue_ahead_pages"] == 0
     assert by_id["s1"]["queue_ahead_pages"] == 1
+
+
+def test_katkestatud_too_ei_ole_viga():
+    """Katkestamine on KASUTAJA OTSUS, mitte tõrge (#217).
+
+    `_reocr_status_key` langetas kõik tundmatu `error`-i alla, nii et teadlikult
+    katkestatud töö paistis loendis ebaõnnestununa. See on eristav test: kood,
+    mis jätaks `cancelled` vaikimisi haru alla, läbiks kõik ülejäänud testid.
+    """
+    singles = [{"job_id": "s1", "work_id": "wid", "slug": "w", "page_number": 1,
+                "status": "cancelled", "slow": False, "started_at": 10.0, "error": None}]
+    e = normalize_ocr_jobs([], singles, [], _title_of)[0]
+    assert e["status_key"] == "cancelled"
+
+
+def test_katkestamisel_on_oma_olek_mitte_viga():
+    """`cancelling` võib venida kuni restardini (ADR 0018).
+
+    Just siis tahab kasutaja näha, et süsteem tegeleb tema käsuga — „viga" on
+    selles olekus kõige eksitavam võimalik vastus.
+    """
+    batches = [{"job_id": "b1", "work_id": "wid", "slug": "w", "status": "cancelling",
+                "slow": False, "started_at": 10.0, "ready": 2, "total": 5}]
+    e = normalize_ocr_jobs([], [], batches, _title_of)[0]
+    assert e["status_key"] == "cancelling"
+
+
+def test_paris_viga_jaab_veaks():
+    """Valvur teise suuna vastu: `error` ei tohi katkestamise varju kaduda."""
+    singles = [{"job_id": "s1", "work_id": "wid", "slug": "w", "page_number": 1,
+                "status": "error", "slow": False, "started_at": 10.0,
+                "error": "Gemini päring ebaõnnestus"}]
+    e = normalize_ocr_jobs([], singles, [], _title_of)[0]
+    assert e["status_key"] == "error"

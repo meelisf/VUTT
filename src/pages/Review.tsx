@@ -85,7 +85,7 @@ interface OcrJob {
   slug: string;
   work_id: string | null;
   page_number: number | null;
-  status_key: 'uploading' | 'processing' | 'review' | 'ready' | 'imported' | 'error';
+  status_key: 'uploading' | 'processing' | 'review' | 'ready' | 'imported' | 'error' | 'cancelled' | 'cancelling';
   slow: boolean;
   started_at: number | null;
   progress: { ready: number; total: number } | null;
@@ -214,7 +214,10 @@ const Review: React.FC = () => {
   useEffect(() => {
     if (!isAdmin) return;
 
-    const hasActive = reocrJobs.some(j => j.status_key === 'uploading' || j.status_key === 'processing');
+    // `cancelling` on KÄIMASOLEV olek (võib venida kuni restardini, ADR 0018).
+    // Ilma selleta jääks „Katkestan…" ekraanile kinni kuni käsitsi värskenduseni.
+    const hasActive = reocrJobs.some(j => j.status_key === 'uploading'
+      || j.status_key === 'processing' || j.status_key === 'cancelling');
     if (activeTab !== 'reocr' && !hasActive) return;
 
     reocrPollRef.current = setTimeout(() => loadReocrJobs(), 4000);
@@ -630,11 +633,15 @@ const Review: React.FC = () => {
                     const isActive = job.status_key === 'uploading' || job.status_key === 'processing';
                     const isSlow = isActive && job.slow;
                     const isError = job.status_key === 'error';
+                    // Katkestatud töö ei ole viga ega õnnestumine — ilma
+                    // oma kuvandita läheks ta rohelisse ehk paistaks valminuna.
+                    const isCancelled = job.status_key === 'cancelled' || job.status_key === 'cancelling';
                     return (
                       <div key={job.id}
                         className={`flex items-center gap-4 px-4 py-3 rounded-lg border ${
                           isActive ? 'border-amber-200 bg-amber-50' :
-                          isError ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'
+                          isError ? 'border-red-200 bg-red-50' :
+                          isCancelled ? 'border-gray-200 bg-gray-50' : 'border-green-200 bg-green-50'
                         }`}>
                         {/* Staatus ikoon */}
                         <div className="shrink-0">
@@ -698,7 +705,8 @@ const Review: React.FC = () => {
                             className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
                               isSlow ? 'bg-amber-100 text-amber-800' :
                               isActive ? 'bg-amber-100 text-amber-700' :
-                              isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                              isError ? 'bg-red-100 text-red-700' :
+                              isCancelled ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700'
                             }`}>
                             {isSlow ? t('reocr.slow') : t(`ocr.statusKey.${job.status_key}`)}
                           </Link>
@@ -706,7 +714,8 @@ const Review: React.FC = () => {
                           <span className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
                             isSlow ? 'bg-amber-100 text-amber-800' :
                             isActive ? 'bg-amber-100 text-amber-700' :
-                            isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            isError ? 'bg-red-100 text-red-700' :
+                            isCancelled ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700'
                           }`}>
                             {isSlow ? t('reocr.slow') : t(`ocr.statusKey.${job.status_key}`)}
                           </span>
