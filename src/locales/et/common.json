@@ -71,7 +71,10 @@
     "boundaryReload": "Lae uuesti",
     "boundaryHome": "Avalehele",
     "boundaryDetails": "Veateade",
-    "notLoggedIn": "Logi sisse"
+    "notLoggedIn": "Logi sisse",
+    "ocr": {
+      "content_blocked": "Gemini sisufilter keeldus sellest leheküljest. Proovi LOSS-mudelit."
+    }
   },
   "language": {
     "switchTo": "Vaheta keeleks {{lang}}",
