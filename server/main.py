@@ -70,6 +70,13 @@ async def lifespan(app: FastAPI):
     from .ada.fetch import taasta_rippuvad_fetchid
     threading.Thread(target=taasta_rippuvad_fetchid, daemon=True,
                      name="ada-fetch-recovery").start()
+    # Rippuv `applying` → awaiting_split või error (#256). Restart tapab
+    # apply-lõime enne, kui ta staatust muuta jõuab; ilma taasteta jääb upload
+    # igaveseks „OCR server töötleb…" alla. Otsus tuleb lokaalsest state'ist,
+    # SSH-d siin EI OLE (ADR 0002).
+    from .upload.apply_recovery import taasta_rippuvad_applyd
+    threading.Thread(target=taasta_rippuvad_applyd, daemon=True,
+                     name="apply-recovery").start()
     yield
     print("VUTT FastAPI sulgemine.")
 
