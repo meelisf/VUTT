@@ -81,6 +81,12 @@ def _reocr_status_key(status: str) -> str:
         return "processing"
     if status == "done":
         return "ready"
+    # Katkestamine on KASUTAJA OTSUS, mitte tõrge. Vaikimisi `error`-i alla
+    # langedes paistis teadlikult katkestatud töö ebaõnnestununa — ja `cancelling`,
+    # mis võib venida kuni restardini (ADR 0018), samuti, just siis kui kasutaja
+    # tahaks näha, et süsteem tegeleb tema käsuga (#217).
+    if status in ("cancelled", "cancelling"):
+        return status
     return "error"
 
 
