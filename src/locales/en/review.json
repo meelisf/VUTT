@@ -19,7 +19,7 @@
     "slow": "slow, still running",
     "elapsedMin": "running {{mins}} min",
     "elapsedLtMin": "running <1 min",
-    "queueAhead": "~{{count}} earlier jobs",
+    "queueAhead": "~{{count}} pages ahead",
     "cancelJob": "Cancel job",
     "cancelConfirm": "Cancel? Results for pages finished so far will be discarded.",
     "cancelConfirmYes": "Yes, cancel",
