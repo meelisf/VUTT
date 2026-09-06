@@ -21,6 +21,7 @@ from .upload import import_work as _import_work
 from .utils import generate_nanoid, derive_year_fields
 from .heartbeat import mark_error, mark_success, register_job
 from . import ocr_reaper
+from .upload import page_status
 
 
 def _normalize_txt_file(path: str):
@@ -569,7 +570,11 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
     # Täielikkuse preflight ENNE vana sisu puutumist. Hiljem kontrollime remote
     # loendit uuesti, et katta ka preflight'i ja downloadi vaheline muutus.
-    importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]
+    # `is_importable`, MITTE `has_ocr`: mudeli veaga leht kuulub teosesse
+    # (ADR 0025). `has_ocr` jättis ta vaikselt välja ja järgnevad lehed
+    # nihkusid — import_work.py-s oli reegel õige, siin mitte (#261).
+    importable = [f for f in state.get('files', [])
+                  if not f.get('deleted') and page_status.is_importable(f)]
     if not importable:
         raise HTTPException(status_code=400, detail="Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
     importable.sort(key=lambda f: f['page'])

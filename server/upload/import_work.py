@@ -9,11 +9,11 @@ import os
 import shutil
 
 from ..config import BASE_DIR, OCR_SERVER_PATH, get_logger
-from .. import ocr_err
 from ..marginalia_normalize import normalize_marginalia_tags
 from ..utils import generate_nanoid, derive_year_fields
 from .file_detection import extract_page_num, page_base_name
 from .state import get_upload_lock, read_state, write_state
+from . import page_status
 
 logger = get_logger(__name__)
 
@@ -39,7 +39,7 @@ def blank_import_pages(importable):
     täidetav — kumbagi ei tohi impordist välja jätta, muidu lehed nihkuvad.
     """
     return {e['page'] for e in importable
-            if not e.get('has_ocr') and ocr_err.on_imporditav_tuhjana(e.get('ocr_error'))}
+            if page_status.is_importable(e) and not page_status.is_ready(e)}
 
 
 def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
@@ -147,8 +147,7 @@ def import_as_work(
     # skaneering on olemas, nii et inimene täidab teksti Workspace'is (#250).
     # Ilma selleta kukkus leht vaikselt välja ja järgnevad lehed nihkusid.
     importable = [f for f in state.get('files', [])
-                  if not f.get('deleted')
-                  and (f.get('has_ocr') or ocr_err.on_imporditav_tuhjana(f.get('ocr_error')))]
+                  if not f.get('deleted') and page_status.is_importable(f)]
     if not importable:
         raise ValueError("Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
     importable.sort(key=lambda f: f['page'])

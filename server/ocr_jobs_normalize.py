@@ -4,6 +4,7 @@ DOM-/IO-vaba. title_of süstitakse (endpoint annab cache'itud lugeja, test lambd
 """
 from datetime import datetime
 from typing import Callable, List, Optional
+from .upload import page_status
 
 
 def _parse_ts(value) -> float:
@@ -49,7 +50,9 @@ def _normalize_upload(state: dict, title_of) -> dict:
     status = state.get("status", "pending")
     status_key = _upload_status_key(status)
     files = state.get("files", []) or []
-    ready = sum(1 for f in files if f.get("has_ocr") and not f.get("deleted"))
+    # Dashboard näitab „tekstiga lehti", seega `is_ready`, mitte `is_resolved`;
+    # kustutatud leht ei ole kasutaja jaoks tehtud töö (#261).
+    ready = page_status.count(files, page_status.is_ready, skip_deleted=True)
     total = state.get("expected_pages") or len(files)
     title = meta.get("title") or meta.get("slug", "")
     return {

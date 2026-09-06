@@ -11,6 +11,7 @@ from typing import Optional
 
 from ..config import UPLOADS_DIR, get_logger
 from ..utils import atomic_write_json
+from . import page_status
 
 logger = get_logger(__name__)
 
@@ -135,8 +136,9 @@ def list_upload_states() -> list:
                 # Lahendatud = valmis VÕI lõplikult ebaõnnestunud (#250). Ainult
                 # `has_ocr` lugemine jättis vigadega töö igaveseks „OCR seisab"
                 # märgi alla — kõrvuti teatega „Valmis", mis on vastuoluline.
-                resolved = sum(1 for fl in state.get("files", [])
-                               if fl.get("has_ocr") or fl.get("ocr_error"))
+                # Reegel elab `page_status`-es, mitte siin (#261).
+                resolved = page_status.count(
+                    state.get("files"), page_status.is_resolved, skip_deleted=False)
                 state["stalled"] = is_stalled(
                     resolved, state.get("expected_pages"),
                     state.get("last_progress_at"), datetime.now().timestamp(),

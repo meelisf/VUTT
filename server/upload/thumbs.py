@@ -10,6 +10,7 @@ from typing import Any, Callable, Optional
 
 from ..config import OCR_SERVER_PATH, get_logger
 from .. import ocr_err
+from . import page_status
 from . import file_detection, prepress_plan, state as upload_state
 from .ocr_client import sftp_open
 
@@ -106,21 +107,6 @@ def _planned_pages(state: dict, expected_pages) -> Optional[int]:
         except Exception as e:
             logger.warning(f"planned_pages arvutus ebaõnnestus: {e}")
     return expected_pages
-
-
-def on_importable(entry: dict) -> bool:
-    """Kas seda lehte saab teosesse importida.
-
-    Backend arvutab, frontend EI tõlgenda. `.err` kategooriate sõnavara elab
-    AINULT `ocr_err.py`-s — kahes kohas hoituna nad triivivad lahku (sama viga
-    tehti Meili atribuudinimekirjadega).
-
-    Leht on imporditav, kui tal ON tekst, VÕI kui viga on `mudel`-kategooriast:
-    skaneering on korras ja inimene kirjutab teksti Workspace'is (ADR 0025).
-    """
-    if entry.get("has_ocr"):
-        return True
-    return ocr_err.on_imporditav_tuhjana(entry.get("ocr_error"))
 
 
 def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -> dict:
@@ -295,14 +281,17 @@ def poll_and_sync_thumbs(
                 # Kategooria otsustab, kas lehte saab tühjana importida (#250).
                 entry["ocr_error_kind"] = ocr_err.parse_err(sisu)[0]
             # Värav frontendile. PEAB olema pärast `ocr_error` määramist.
-            entry["importable"] = on_importable(entry)
+            entry["importable"] = page_status.is_importable(entry)
             new_files.append(entry)
 
         # --- Uus staatus ---
-        ready_count = len(ready_page_nums)
-        # Lahendatud = valmis VÕI lõplikult ebaõnnestunud. Ainult ready_count'i
-        # lugemine jätaks vigase lehega upload'i igavesti pooleli (#250).
-        resolved_count = ready_count + len(failed_page_nums)
+        # Loendamine käib ehitatud kirjete pealt, mitte kaugfailide nimede
+        # pealt: nii vastavad `ready` ja `resolved` täpselt sellele, mida
+        # klient `files` massiivis näeb, ja reegel elab ühes kohas (#261).
+        # `skip_deleted=False`: kustutatud leht ON lahendatud, muidu ei jõuaks
+        # `resolved >= expected_pages` kunagi täis ja upload jääks „reviewing".
+        ready_count = page_status.count(new_files, page_status.is_ready, skip_deleted=False)
+        resolved_count = page_status.count(new_files, page_status.is_resolved, skip_deleted=False)
         new_status = current_status
         # I1: `applying` ajal ei ole sisendvoog veel suletud. Ilma selle
         # valvurita kirjutaks juba esimene JPG-d näinud poll staatuse
@@ -317,8 +306,8 @@ def poll_and_sync_thumbs(
 
         # --- Stall-indikaator: jälgi millal viimati uus valmis leht tekkis ---
         now_ts = datetime.now().timestamp()
-        prev_resolved = sum(1 for f in state.get("files", [])
-                            if f.get("has_ocr") or f.get("ocr_error"))
+        prev_resolved = page_status.count(
+            state.get("files"), page_status.is_resolved, skip_deleted=False)
         last_progress_at = state.get("last_progress_at")
         # Edenes (uusi lahendatud lehti) VÕI puudub baseline (esimene poll) → uuenda ajatempel
         if resolved_count > prev_resolved or last_progress_at is None:
