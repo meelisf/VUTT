@@ -33,6 +33,17 @@ export const PREPRESS_STATUSES = ['awaiting_split', 'prepping'];
  * `applying`, ADR 0028). */
 export const ADA_TRANSFER_STATUSES = ['ada_fetching', 'ada_error'];
 
+/** Staatused, mille korral pooleliolevat upload'i saab jätkata.
+ *
+ * Peab katma KÕIK `server/upload/state.py` `ALL_STATUSES` väärtused, mis ei ole
+ * `error` ega `imported` — klassifitseerimata staatus teeb upload'i vaikselt
+ * mittejätkatavaks (nupp kaob, viga ei tule). Valvur:
+ * `tests/test_lepingud_kahes_otsas.py`. */
+export const RESUMABLE_STATUSES = [
+  'pending', 'collecting_images', 'awaiting_split', 'prepping', 'applying',
+  'processing', 'reviewing', 'done', ...ADA_TRANSFER_STATUSES,
+];
+
 /** Staatus → viisardi samm ADA-voos. */
 export function adaSammuOlek(status: string): number {
   if (ADA_TRANSFER_STATUSES.includes(status)) return 2;

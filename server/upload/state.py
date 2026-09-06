@@ -161,6 +161,34 @@ def list_upload_states() -> list:
 # Sama konstant vastab ka küsimusele „kas `expected_pages` on veel LÄHTE-lehtede
 # arv" (`thumbs._planned_pages`). Need kaks tähendust langesid kokku alles siis,
 # kui `try_begin_applying` hakkas apply alguses väljundi arvu seadma.
+# Kanooniline upload'i staatuse sõnavara: KÕIK väärtused, mida backend võib
+# `state.json`-i `status` välja kirjutada. Tarbija on frontend, kes peab iga
+# staatuse klassifitseerima (jätkatav / viga / imporditud) — klassifitseerimata
+# staatus teeb upload'i VAIKSELT mittejätkatavaks, ilma vea ja logita.
+# Valvur: `tests/test_lepingud_kahes_otsas.py`.
+#
+# `uploading` EI KUULU siia: see on frontendi-sisene olek brauseripoolse
+# üleslaadimise ajaks (`useUploadWizard.ts`), mitte serveri kirjutatud väärtus.
+# `rendering`/`ready`/`cancelled` on `prepress.preview_status` — ERI VÄLI.
+#
+# PIIR: see loend on käsitsi hooldatav. Ainuke tee ta usaldusväärselt ausana
+# hoida oleks üks kirjutustee (praegu kirjutavad staatust ka `s["status"] = ...`
+# otseomistused kolmes moodulis), mis on omaette töö.
+ALL_STATUSES = (
+    "pending",             # loodud, faili veel ei ole
+    "collecting_images",   # pildikausta kogumine käib
+    "ada_fetching",        # ADA server-server allalaadimine käib
+    "ada_error",           # ADA allalaadimine kukkus
+    "awaiting_split",      # fail VUTT-i poolel, poolitamise samm avatud
+    "prepping",            # eelvaate renderdus käib
+    "applying",            # materialiseerimine + avaldamine käib
+    "processing",          # OCR-server töötab
+    "reviewing",           # osa lehti valmis, ülevaatus võimalik
+    "done",                # kõik lehed lahendatud
+    "imported",            # teoseks imporditud (lõppseisund)
+    "error",               # tõrge
+)
+
 PREPRESS_IDLE_STATUSES = ("awaiting_split", "prepping")
 
 

@@ -24,7 +24,7 @@ import UploadStepMeta from './components/UploadStepMeta';
 import UploadStepTransfer from './components/UploadStepTransfer';
 import UploadStepReview from './components/UploadStepReview';
 import UploadStepSplit from './components/UploadStepSplit';
-import { TYPE_HAND, TYPE_PRINT, ADA_TRANSFER_STATUSES } from './constants';
+import { TYPE_HAND, TYPE_PRINT, RESUMABLE_STATUSES } from './constants';
 import { useUploadWizard } from './useUploadWizard';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -91,10 +91,10 @@ const UploadPage: React.FC = () => {
                 <h2 className="font-semibold text-gray-800 mb-3 text-sm">{t('pending.title')}</h2>
                 <div className="space-y-2">
                   {wizard.pendingUploads.map((u) => {
-                    const canResume = [
-                      'pending', 'uploading', 'awaiting_split', 'prepping', 'applying',
-                      'processing', 'reviewing', 'done', ...ADA_TRANSFER_STATUSES,
-                    ].includes(u.status);
+                    // Loend elab `constants.ts`-is: backend võib lisada staatuse,
+                    // mille klassifitseerimata jätmine peidaks „Jätka" nupu vaikselt.
+                    const canResume = RESUMABLE_STATUSES.includes(u.status)
+                      || u.status === 'uploading';   // frontendi-sisene olek
                     const isError = u.status === 'error';
                     const isImported = u.status === 'imported';
                     return (
