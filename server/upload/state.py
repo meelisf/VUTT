@@ -60,8 +60,42 @@ def read_state(upload_id: str):
         return json.load(f)
 
 
+def _valideeri_staatus(upload_id: str, state: dict) -> None:
+    """Tundmatu staatus: testides erand, tootmises vali logi (#314).
+
+    KIRJUTUST EI BLOKEERITA. Kahju tundmatust staatusest on „upload muutub
+    vaikselt mittejätkatavaks"; kirjutamisest keeldumine lõhuks upload'i
+    KÕVEMINI kui probleem, mida see lahendab — ja just siis, kui `ALL_STATUSES`
+    osutub puudulikuks, ehk halvimal hetkel. Kirjutus ise on õigustatud;
+    vananenud on LOEND.
+
+    Testijooks on koht, kus vale staatus peab kukutama kohe: testid kirjutavad
+    neid staatusi läbi samade teede sadu kordi, seega viga tuleb välja ilma, et
+    keegi peaks logi lugema. `PYTEST_CURRENT_TEST` on pytesti enda muutuja —
+    valik ei sõltu sellest, kas testi autor mäletas lippu seada.
+
+    `preview_status` (prepressi eelvaade: rendering/ready/cancelled) on ERI VÄLI
+    oma sõnavaraga ja siia EI puutu.
+    """
+    staatus = state.get("status")
+    if staatus is None or staatus in ALL_STATUSES:
+        return
+    sonum = ("Tundmatu upload'i staatus {!r} (upload {}): lisa ta "
+             "ALL_STATUSES-esse ja klassifitseeri frontendis, muidu kaob "
+             "„Jätka\" nupp vaikselt ära.".format(staatus, upload_id))
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        raise ValueError(sonum)
+    logger.error(sonum)
+
+
 def write_state(upload_id: str, state: dict):
-    """Kirjutab state.json atomaarse asendusega (ei lukusta ise — kasuta get_upload_lock)."""
+    """Kirjutab state.json atomaarse asendusega (ei lukusta ise — kasuta get_upload_lock).
+
+    KÕIK staatuse kirjutusteed lähevad siit läbi, ka `s["status"] = ...`
+    otseomistused kuues moodulis — seepärast elab valideerimine siin, mitte
+    `set_upload_state`-is (#314).
+    """
+    _valideeri_staatus(upload_id, state)
     path = state_path(upload_id)
     atomic_write_json(path, state)
 
