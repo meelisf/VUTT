@@ -71,7 +71,10 @@
     "boundaryReload": "Reload",
     "boundaryHome": "Go to Home",
     "boundaryDetails": "Error details",
-    "notLoggedIn": "Sign in"
+    "notLoggedIn": "Sign in",
+    "ocr": {
+      "content_blocked": "Gemini's content filter refused this page. Try the LOSS model."
+    }
   },
   "language": {
     "switchTo": "Switch language to {{lang}}",

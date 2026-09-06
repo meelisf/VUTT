@@ -11,6 +11,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ocrErrorText } from '../utils/ocrErrorText';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -664,7 +665,11 @@ const Review: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          {job.error && <p className="text-xs text-red-600 mt-0.5">{job.error}</p>}
+                          {job.error && (
+                            <p className="text-xs text-red-600 mt-0.5">
+                              {ocrErrorText(job.error, t)}
+                            </p>
+                          )}
                         </div>
 
                         {/* Kasutaja + aeg */}
@@ -796,7 +801,11 @@ const Review: React.FC = () => {
                                 </Link>
                               )}
                             </div>
-                            {entry.error && <p className="text-xs text-red-500 mt-0.5">{entry.error}</p>}
+                            {entry.error && (
+                              <p className="text-xs text-red-500 mt-0.5">
+                                {ocrErrorText(entry.error, t)}
+                              </p>
+                            )}
                           </div>
                           <div className="text-xs text-gray-400 text-right shrink-0">
                             <div className="flex items-center gap-1 justify-end">

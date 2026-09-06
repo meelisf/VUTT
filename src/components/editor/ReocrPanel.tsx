@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ReocrStatus } from './useReOcr';
+import { ocrErrorText } from '../../utils/ocrErrorText';
 
 interface ReocrPanelProps {
   status: ReocrStatus;
@@ -13,7 +14,7 @@ interface ReocrPanelProps {
 
 // Re-OCR oleku banner ja tulemuse/vea ülekate tekstiredaktoris.
 export default function ReocrPanel({ status, text, error, onApply, onDelete, variant }: ReocrPanelProps) {
-  const { t } = useTranslation(['workspace']);
+  const { t } = useTranslation(['workspace', 'common']);
 
   if (variant === 'banner') {
     if (status !== 'uploading' && status !== 'processing') return null;
@@ -36,7 +37,9 @@ export default function ReocrPanel({ status, text, error, onApply, onDelete, var
           </div>
           {status === 'error' ? (
             <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4">
-              <div className="text-sm text-red-600">{error}</div>
+              {/* Pakkuja veakood → lause lugeja keeles (ADR 0033); tundmatu koodi
+                  puhul jääb serveri sõnum alles. */}
+              <div className="text-sm text-red-600">{ocrErrorText(error, t)}</div>
               <button
                 onClick={onDelete}
                 className="px-4 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"

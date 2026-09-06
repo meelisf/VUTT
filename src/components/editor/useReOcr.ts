@@ -107,7 +107,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
             setReocrText(pd.text ?? '');
           } else if (pd.status === 'error') {
             setReocrStatus('error');
-            setReocrError(pd.error || 'Tundmatu viga');
+            setReocrError(pd.error || null);
             localStorage.removeItem(reocrStorageKey!);
           } else if (pd.status === 'not_found') {
             setReocrStatus('idle');
@@ -227,7 +227,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
             setReocrText(pd.text ?? '');
           } else if (pd.status === 'error') {
             setReocrStatus('error');
-            setReocrError(pd.error || 'Tundmatu viga');
+            setReocrError(pd.error || null);
             if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
           } else {
             reocrPollRef.current = setTimeout(poll, 3000);

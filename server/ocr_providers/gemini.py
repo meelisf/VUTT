@@ -121,6 +121,25 @@ def _fit_payload(image_bytes: bytes, instruction: str,
             MAX_REQUEST_BYTES))
 
 
+# Google'i sisufilter keeldub osast varauusaegsest materjalist (meditsiin, anatoomia,
+# alkeemia, usupoleemika, kohtuprotsessid). Eristav info tuleb `error.status` väljas,
+# `code` välja ei ole — mõõdetud tootmises (#292).
+CONTENT_BLOCKED = "content_blocked"
+
+
+def _error_status(response) -> str:
+    """API veakood (`error.status`) või tühi string. Ei viska.
+
+    Eraldi `_error_summary`-st: too koostab inimloetava kokkuvõtte LOGISSE,
+    see annab masinloetava koodi OTSUSTAMISEKS. Kokkuvõttest koodi otsimine
+    (`"content_blocked" in summary`) sobitaks ka API vabateksti sõnumi.
+    """
+    try:
+        return str(((response.json() or {}).get("error") or {}).get("status") or "")
+    except (ValueError, AttributeError):
+        return ""
+
+
 def _error_summary(response) -> str:
     """Vea kokkuvõte LOGIMISEKS ja kasutajale. Vastuse keha EI dumbita.
 
@@ -234,6 +253,14 @@ def transcribe(image_bytes: bytes, instruction: str,
                         _normalize_usage(data.get("usage")))
             viimane = _error_summary(response)
             logger.warning("Gemini päring ebaõnnestus: %s", viimane)
+            if _error_status(response) == CONTENT_BLOCKED:
+                # Masinloetav prefiks (nagu `request_too_large`) — UI renderdab
+                # selle põhjal lugeja keeles suunava lause (ADR 0033). Google'i
+                # oma selgitus („safe coding, security, or biology") saadab meie
+                # kasutaja valele jäljele ja jääb ainult logisse.
+                raise GeminiError(
+                    "{}: Gemini sisufilter keeldus sellest lehest".format(
+                        CONTENT_BLOCKED))
             if response.status_code not in (429, 500, 502, 503, 504):
                 break
         if katse < GEMINI_MAX_RETRIES:
