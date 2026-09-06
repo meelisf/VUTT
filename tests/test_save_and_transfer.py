@@ -320,9 +320,11 @@ class TestPrepareUpload:
 class TestHelpers:
     def test_set_upload_state_uuendab_staatus(self, make_state):
         upload_id, _ = make_state()
-        upload_ops._set_upload_state(upload_id, status='uploading', expected_pages=3)
+        # `processing`, mitte `uploading`: viimast backend ei kirjuta kunagi
+        # (frontendi-sisene olek brauseripoolse üleslaadimise ajaks, #314).
+        upload_ops._set_upload_state(upload_id, status='processing', expected_pages=3)
         s = upload_ops._read_state(upload_id)
-        assert s['status'] == 'uploading'
+        assert s['status'] == 'processing'
         assert s['expected_pages'] == 3
 
     def test_set_upload_state_idempotentne_kui_state_puudub(self, uploads_dir):

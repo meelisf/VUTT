@@ -41,7 +41,10 @@ def test_vahetus_on_lubatud_ka_eelvaate_ajal(upload):
     assert upload_state.try_set_ocr_model(upload, "hand") is True
 
 
-@pytest.mark.parametrize("status", ["applying", "uploading", "processing",
+# `uploading` on siit VÄLJAS: backend ei kirjuta seda kunagi `state.json`-i
+# (frontendi-sisene olek, #314). Ülejäänud neli on päris staatused ja kaitstav
+# omadus on nagunii sama — `MODEL_CHANGE_STATUSES` lubab ainult kolme.
+@pytest.mark.parametrize("status", ["applying", "processing",
                                     "reviewing", "imported"])
 def test_vahetus_pole_lubatud_parast_apply_algust(upload, status):
     """Mudelit tohib muuta, kuni ükski OCR-input fail ei ole kaugserveris."""
