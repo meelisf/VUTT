@@ -99,3 +99,49 @@ def test_csp_kaks_rida_on_identsed():
     assert a.group(1).strip() == b.group(1).strip(), (
         "CSP read lahknevad:\n  add_header     : {}\n  more_set_headers: {}".format(
             a.group(1).strip(), b.group(1).strip()))
+
+
+# ---------------------------------------------------------------------------
+# 4. Rollihierarhia: backend ↔ frontend
+# ---------------------------------------------------------------------------
+
+def test_rollihierarhia_kattub_frontendiga():
+    """Sama järjestus kahes keeles. Frontend on MUGAVUS, backend on turve —
+    aga lahknedes valetab UI: peidab nupu, mille backend lubaks, või näitab
+    nuppu, mille backend keelab (kasutaja saab veateate, mitte selgituse).
+    """
+    from server.auth import ROLE_HIERARCHY
+
+    ts = _loe("src/utils/roleUtils.ts")
+    plokk = re.search(r"ROLE_LEVELS[^=]*=\s*\{(.*?)\}", ts, re.S)
+    assert plokk, "roleUtils.ts-st ei leitud ROLE_LEVELS-i"
+    fe = {m.group(1): int(m.group(2))
+          for m in re.finditer(r"(\w+)\s*:\s*(\d+)", plokk.group(1))}
+    assert fe == ROLE_HIERARCHY, (
+        "rollihierarhiad lahknevad:\n  backend : {}\n  frontend: {}".format(
+            ROLE_HIERARCHY, fe))
+
+
+# ---------------------------------------------------------------------------
+# 5. Upload'i staatuse sõnavara: kes kirjutab ↔ kes klassifitseerib
+# ---------------------------------------------------------------------------
+
+def test_frontend_klassifitseerib_iga_upload_staatuse():
+    """Klassifitseerimata staatus = upload muutub VAIKSELT mittejätkatavaks.
+
+    Ei viga, ei logi — „Jätka" nupp lihtsalt kaob ja töö jääb rippu. Just see
+    vaikne kuju teeb sellest #261 juhtumi, mitte lärmaka failinime-konventsiooni.
+    """
+    from server.upload import state as upload_state
+
+    ts = _loe("src/pages/upload/constants.ts")
+    def loend(nimi):
+        m = re.search(nimi + r"\s*(?::[^=]*)?=\s*\[(.*?)\]", ts, re.S)
+        assert m, "constants.ts-st ei leitud loendit {}".format(nimi)
+        return set(re.findall(r"['\"]([a-z_]+)['\"]", m.group(1)))
+
+    kaetud = loend("RESUMABLE_STATUSES") | loend("ADA_TRANSFER_STATUSES") | {"error", "imported"}
+    katmata = set(upload_state.ALL_STATUSES) - kaetud
+    assert not katmata, (
+        "backend võib kirjutada staatuse, mida frontend ei klassifitseeri: {}".format(
+            sorted(katmata)))
