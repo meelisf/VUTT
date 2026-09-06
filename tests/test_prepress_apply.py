@@ -221,3 +221,32 @@ def test_semafor_vabaneb_lehtede_vahel(upload, monkeypatch):
     assert renderdamise_ajal == [False, False, False], "renderduse ajal peab kinni olema"
     assert saatmise_ajal and all(saatmise_ajal), "SFTP ootel ei tohi semafori hoida"
     assert _vaba(), "semafor peab pärast partiid vaba olema"
+
+
+def test_valjajatmine_ilma_poolitamiseta_jatab_lehe_saatmata(upload, monkeypatch):
+    """#255 algne juhtum: tühi leht jäetakse välja ja MIDAGI ei poolitata.
+
+    See on funktsiooni kõige tavalisem päris kasutus ja ainus, mis oli kunagi
+    KATKI: `is_trivial_plan` luges „ainult väljajätmised" triviaalseks, saatis
+    originaalfaili muutmata edasi ja väljajäetud leht OCR-iti ikka (#264).
+    ADR 0028 kaotas selle haru ära, aga just seda kuju ei katnud ükski test —
+    kõigis `excluded` testides oli poolitus sees.
+
+    Väljundlehed nummerdatakse ümber: väljajäetud leht EI JÄTA auku.
+    """
+    from server.upload import prepress_plan
+
+    uid, _base = upload
+    plan = prepress_plan.default_plan(3)      # vaikimisi: kõik `nosplit` (ADR 0026)
+    plan["pages"][1]["excluded"] = True
+    assert all(p["mode"] == "nosplit" for p in plan["pages"]), "eeldus: ei poolitata"
+
+    sftp = FakeSftp(existing=["/remote"])
+    monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
+    prepress_apply._transfer_pages(
+        uid, "kirik-abc", ("/remote", "/remote/w"), "/remote/w", plan)
+
+    assert sftp.renames == [
+        ("/remote/w/kirik-abc_pg_001.jpg.tmp", "/remote/w/kirik-abc_pg_001.jpg"),
+        ("/remote/w/kirik-abc_pg_002.jpg.tmp", "/remote/w/kirik-abc_pg_002.jpg"),
+    ], "väljajäetud leht ei tohi OCR-serverisse jõuda ega auku jätta"
