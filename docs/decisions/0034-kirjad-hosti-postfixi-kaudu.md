@@ -42,6 +42,11 @@ päringu ajal, mitte postfixi järjekorda.
 poolist võetud aadress võib võrgu taasloomisel vahetuda ja siis lakkaks
 saatmine töötamast ilma ühegi muudatuseta kummalgi pool.
 
+Mõõdetud vahe, mida on kerge segi ajada: `host-gateway` lahendub **docker0**
+aadressiks (`192.168.200.1`), mitte selle compose-võrgu gateway'ks. See on
+ainult siht-aadress. Relay-loa otsustab postfix **kliendi** aadressi järgi
+(`192.168.201.4`), seega on `mynetworks`-is oluline just alamvõrk.
+
 **3. Autentimist ei ole ja saladusi ei ole.** Relee usaldab IP-d. `SMTP_HOST`,
 `SMTP_PORT`, `SMTP_TIMEOUT`, `MAIL_FROM`, `MAIL_FROM_NAME` on tavalised
 seaded ADR 0021 nimelepingu järgi; vaikeväärtus elab ainult `config.py`-s.

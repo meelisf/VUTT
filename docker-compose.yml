@@ -54,9 +54,13 @@ services:
       - MAIL_FROM=${MAIL_FROM:-}
       - MAIL_FROM_NAME=${MAIL_FROM_NAME:-}
     # Hosti postfix (relayhost = mailhost.ut.ee). Konteineri „localhost" on
-    # konteiner ise, seega tuleb hosti aadress Dockerilt. Nimi, mitte IP:
-    # bridge-võrgu gateway on `192.168.201.1` ainult seni, kuni alamvõrk on
-    # allpool fikseeritud.
+    # konteiner ise, seega tuleb hosti aadress Dockerilt.
+    #
+    # `host-gateway` osutab docker0-le (mõõdetud: 192.168.200.1), MITTE selle
+    # compose-võrgu gateway'le — see on ainult siht-aadress. Relay-luba otsustab
+    # postfix hoopis KLIENDI aadressi järgi (mõõdetud: 192.168.201.4), mis peab
+    # olema hosti `mynetworks`-is. Seepärast on allpool fikseeritud just
+    # alamvõrk, mitte gateway.
     extra_hosts:
       - "smtp-relay:host-gateway"
     volumes:
