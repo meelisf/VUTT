@@ -539,7 +539,8 @@ def _compute_crop_box(crop, w: int, h: int):
 def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, username="admin"):
     """Pöörab, kärbib ja/või sirgestab lehepilti kohapeal (failinimi/tekst/JSON/sequence säilivad).
 
-    Varundab ENNE ülekirjutust (trash + esmane ._originals), kasutab atomaarset os.replace'i.
+    Varundab ENNE ülekirjutust esmase pristine originaali (._originals), kasutab
+    atomaarset os.replace'i. Vahesamme ei varundata — vt #325.
     Tagastab no-op / changed / found:False sõnastiku; raise ValueError vigaste parameetrite korral.
     """
     angle = float(angle)
@@ -566,23 +567,19 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, use
             return {"found": False}
 
         img_path = os.path.join(path, filename)
-        base, ext = os.path.splitext(filename)
-        ext_l = ext.lower()
+        ext_l = os.path.splitext(filename)[1].lower()
 
-        # 1) Varunda ENNE muutmist — trash
-        trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_images')
-        os.makedirs(trash_dir, exist_ok=True)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        shutil.copy2(img_path, os.path.join(trash_dir, f"{base}_{timestamp}{ext}"))
-
-        # 2) Pristine originaal — ainult esimesel korral
+        # 1) Pristine originaal — ainult esimesel korral.
+        # Vahesamme EI varundata (#325): iga kärbe/pööre kirjutas varem uue faili
+        # ._trash/{work_id}/replaced_images/ alla, mis kasvas piiramatult, kuigi
+        # taastamiseks kasutatakse ainult siinset pristine originaali.
         orig_dir = os.path.join(BASE_DIR, '._originals', work_id)
         os.makedirs(orig_dir, exist_ok=True)
         orig_backup = os.path.join(orig_dir, filename)
         if not os.path.exists(orig_backup):
             shutil.copy2(img_path, orig_backup)  # enne exif_transpose'i → 100% muutumatu
 
-        # 3) Teisendus Pillow'ga
+        # 2) Teisendus Pillow'ga
         from PIL import Image as PILImage, ImageOps
         with PILImage.open(img_path) as raw:
             img = ImageOps.exif_transpose(raw)
@@ -612,7 +609,7 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, use
                     img = img.crop(box)
             out_w, out_h = img.size
 
-            # 4) Salvesta tmp-faili SAMAS kaustas (EXDEV kaitse), siis atomaarne replace
+            # 3) Salvesta tmp-faili SAMAS kaustas (EXDEV kaitse), siis atomaarne replace
             tmp_path = img_path + '.tmp'
             if is_jpeg:
                 img.save(tmp_path, "JPEG", quality=95)
@@ -621,7 +618,7 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, use
         os.replace(tmp_path, img_path)
         os.chmod(img_path, 0o644)
 
-        # 5) Regenereeri thumbnail — vea korral ei rollback'i
+        # 4) Regenereeri thumbnail — vea korral ei rollback'i
         thumbnail_warning = False
         try:
             from .image_server import generate_thumbnail, invalidate_cover
@@ -636,7 +633,7 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, use
             logger.error(f"TRANSFORM: thumbnaili regen ebaõnnestus {filename}: {e}")
             thumbnail_warning = True
 
-        # 6) Logi (struktureeritud). NB: Meilit EI sünki — failinimi/tekst/sequence ei muutu.
+        # 5) Logi (struktureeritud). NB: Meilit EI sünki — failinimi/tekst/sequence ei muutu.
         log_path = os.path.join(BASE_DIR, 'transform_image.log')
         with open(log_path, 'a', encoding='utf-8') as lf:
             lf.write(
@@ -685,22 +682,15 @@ def restore_original_page_image(work_id, filename, username="admin"):
         if filename not in get_sorted_images(path):
             return {"found": False}
 
-        base, ext = os.path.splitext(filename)
-
-        # 1) Varunda praegune → trash
-        trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_images')
-        os.makedirs(trash_dir, exist_ok=True)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        if os.path.exists(img_path):
-            shutil.copy2(img_path, os.path.join(trash_dir, f"{base}_{timestamp}{ext}"))
-
-        # 2) Kopeeri originaal tmp → atomaarne replace (._originals JÄÄB)
+        # 1) Kopeeri originaal tmp → atomaarne replace (._originals JÄÄB).
+        # Praegust (tuletatud) pilti ei varundata (#325): ._originals on tema
+        # allikas ja jääb alles, seega taastus on korduvalt korratav.
         tmp_path = img_path + '.tmp'
         shutil.copy2(orig_backup, tmp_path)
         os.replace(tmp_path, img_path)
         os.chmod(img_path, 0o644)
 
-        # 3) Regenereeri thumbnail
+        # 2) Regenereeri thumbnail
         thumbnail_warning = False
         try:
             from .image_server import generate_thumbnail, invalidate_cover
@@ -715,7 +705,7 @@ def restore_original_page_image(work_id, filename, username="admin"):
             logger.error(f"RESTORE: thumbnaili regen ebaõnnestus {filename}: {e}")
             thumbnail_warning = True
 
-        # 4) Logi
+        # 3) Logi
         log_path = os.path.join(BASE_DIR, 'transform_image.log')
         with open(log_path, 'a', encoding='utf-8') as lf:
             lf.write(

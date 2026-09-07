@@ -67,7 +67,7 @@
   "management": {
     "title": "Work management",
     "deleteWork": "Delete work",
-    "deleteWorkConfirmMessage": "Are you sure you want to delete \"{{title}}\"? Image files are kept for 90 days, text is recoverable from git.",
+    "deleteWorkConfirmMessage": "Are you sure you want to delete \"{{title}}\"? Image files are moved to the trash and text is recoverable from git.",
     "deleteWorkConfirm": "Yes, delete",
     "deleteWorkCancel": "Cancel",
     "deleteWorkError": "Deletion failed",
@@ -239,7 +239,7 @@
       "page": "Page {{cur}} / {{total}}",
       "prev": "Previous page",
       "next": "Next page",
-      "confirmBody": "The old image is kept in trash for 90 days. Text and metadata are unchanged.",
+      "confirmBody": "The old image is kept in the trash. Text and metadata are unchanged.",
       "dontAskAgain": "Don't ask again in this window",
       "allDone": "All pages processed",
       "splitDone": "Page split",

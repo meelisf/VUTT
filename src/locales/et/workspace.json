@@ -67,7 +67,7 @@
   "management": {
     "title": "Teose haldus",
     "deleteWork": "Kustuta teos",
-    "deleteWorkConfirmMessage": "Kas oled kindel, et soovid kustutada teose \"{{title}}\"? Pildifailid säilitatakse 90 päeva, tekst on gitist taastatav.",
+    "deleteWorkConfirmMessage": "Kas oled kindel, et soovid kustutada teose \"{{title}}\"? Pildifailid liiguvad prügikasti ja tekst on gitist taastatav.",
     "deleteWorkConfirm": "Jah, kustuta",
     "deleteWorkCancel": "Tühista",
     "deleteWorkError": "Kustutamine ebaõnnestus",
@@ -239,7 +239,7 @@
       "page": "Leht {{cur}} / {{total}}",
       "prev": "Eelmine leht",
       "next": "Järgmine leht",
-      "confirmBody": "Vana pilt säilib prügikastis 90 päeva. Tekst ja metaandmed jäävad muutmata.",
+      "confirmBody": "Vana pilt säilib prügikastis. Tekst ja metaandmed jäävad muutmata.",
       "dontAskAgain": "Ära küsi selles aknas uuesti",
       "allDone": "Kõik lehed läbi töödeldud",
       "splitDone": "Leht poolitatud",
