@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from server.mail_templates import MAILTO_BUDGET, render_mail
 from server.registration import INVITE_EXPIRY_HOURS
+from server.password_reset import RESET_TOKEN_TTL_HOURS
 
 INVITE_CONTEXT = {
     "name": "Mari Maasikas",
@@ -90,5 +91,48 @@ def test_template_without_blank_line_raises(tmp_path, monkeypatch):
 def test_invite_fits_mailto_budget(lang):
     """Outlook lõikab pika mailto: URL-i vaikselt — lävi on mõõdetav, mitte soovitus."""
     subject, body = render_mail("invite", lang, **INVITE_CONTEXT)
+    encoded = len(quote(subject)) + len(quote(body))
+    assert encoded < MAILTO_BUDGET, f"{lang}: {encoded} märki, eelarve {MAILTO_BUDGET}"
+
+
+# --- Parooli taastamine (#298) --------------------------------------------
+
+RESET_CONTEXT = {
+    "name": "Mari Maasikas",
+    "username": "mmaasikas",
+    "url": "https://vutt.utlib.ut.ee/set-password?token=abc123&reset=1",
+    "expires_hours": RESET_TOKEN_TTL_HOURS,
+}
+
+
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_password_reset_renders_in_both_languages(lang):
+    subject, body = render_mail("password_reset", lang, **RESET_CONTEXT)
+    assert subject and body
+    assert "$" not in subject
+    assert "$" not in body
+    assert RESET_CONTEXT["url"] in body
+    assert RESET_CONTEXT["username"] in body
+    assert str(RESET_TOKEN_TTL_HOURS) in body
+
+
+def test_password_reset_languages_differ():
+    et = render_mail("password_reset", "et", **RESET_CONTEXT)
+    en = render_mail("password_reset", "en", **RESET_CONTEXT)
+    assert et[0] != en[0]
+    assert et[1] != en[1]
+
+
+def test_password_reset_is_not_invite():
+    """Kaks eri kirja: „algatati taastamine" ei tohi lugeda „konto kinnitati"."""
+    reset_subject, reset_body = render_mail("password_reset", "et", **RESET_CONTEXT)
+    invite_subject, invite_body = render_mail("invite", "et", **INVITE_CONTEXT)
+    assert reset_subject != invite_subject
+    assert reset_body != invite_body
+
+
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_password_reset_fits_mailto_budget(lang):
+    subject, body = render_mail("password_reset", lang, **RESET_CONTEXT)
     encoded = len(quote(subject)) + len(quote(body))
     assert encoded < MAILTO_BUDGET, f"{lang}: {encoded} märki, eelarve {MAILTO_BUDGET}"

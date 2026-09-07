@@ -11,6 +11,7 @@ import {
   KeyRound,
   Copy,
   CheckCircle,
+  Mail,
   X
 } from 'lucide-react';
 import Header from '../../components/Header';
@@ -75,8 +76,14 @@ const UsersPage: React.FC = () => {
   // Ankru-ristkülik portaliga renderdatud menüü/kinnituse positsioneerimiseks.
   // Vajalik, sest tabeli ümbris on overflow-x-auto, mis lõikaks absolute-menüü "nurga taha".
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-  const [resetResult, setResetResult] = useState<{ username: string; name: string; reset_url: string } | null>(null);
+  const [resetResult, setResetResult] = useState<{
+    username: string; name: string; reset_url: string;
+    // Saatmise tulemus (#298). `undefined` = vana backend, mis ei saatnud üldse.
+    mail_sent?: boolean; mail_error?: string | null;
+  } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Saadetud kirja korral on taastelink peidus — see avab ta tagasi.
+  const [showResetLink, setShowResetLink] = useState(false);
 
   useEffect(() => {
     if (!userLoading && (!user || roleLevel(user.role) < ROLE_LEVELS.admin)) {
@@ -218,11 +225,20 @@ const UsersPage: React.FC = () => {
     setUsersError(null);
     setResetResult(null);
     setLinkCopied(false);
+    setShowResetLink(false);
     try {
-      const data = await apiPost<{ status: string; reset_url?: string; username?: string; name?: string; message?: string }>(
-        '/admin/users/reset-password', { username }, { token: authToken });
+      const data = await apiPost<{
+        status: string; reset_url?: string; username?: string; name?: string; message?: string;
+        mail_sent?: boolean; mail_error?: string | null;
+      }>('/admin/users/reset-password', { username }, { token: authToken });
       if (data.status === 'success' && data.reset_url) {
-        setResetResult({ username: data.username || username, name: data.name || '', reset_url: data.reset_url });
+        setResetResult({
+          username: data.username || username,
+          name: data.name || '',
+          reset_url: data.reset_url,
+          mail_sent: data.mail_sent,
+          mail_error: data.mail_error,
+        });
       } else {
         setUsersError(data.message || t('users.resetError'));
       }
@@ -321,6 +337,30 @@ const UsersPage: React.FC = () => {
                     {resetResult.name} (<span className="font-mono">{resetResult.username}</span>)
                   </p>
                   <p className="text-xs text-green-700 mt-1">{t('users.resetLinkHint')}</p>
+                  {/* Saatmise tulemus. Link ülal kehtib kõigil kolmel juhul —
+                      teade puudutab ainult edasitoimetamist. */}
+                  {resetResult.mail_sent === true && (
+                    <p className="text-xs text-green-700 mt-1 flex items-center gap-1">
+                      <Mail size={13} />
+                      {t('mail.sentToUser')}
+                    </p>
+                  )}
+                  {resetResult.mail_sent === false && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      {t('mail.failed', { reason: resetResult.mail_error || '—' })}
+                    </p>
+                  )}
+                  {/* Saadetud kirja korral on link peidus, mitte ära võetud:
+                      kiri võib maanduda rämpsposti (#298). */}
+                  {resetResult.mail_sent === true && !showResetLink && (
+                    <button
+                      onClick={() => setShowResetLink(true)}
+                      className="mt-2 text-xs text-green-800 underline hover:text-green-900"
+                    >
+                      {t('mail.showLink')}
+                    </button>
+                  )}
+                  {(resetResult.mail_sent !== true || showResetLink) && (
                   <div className="mt-3 flex items-center gap-2">
                     <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
                       {window.location.origin}{resetResult.reset_url}
@@ -333,6 +373,7 @@ const UsersPage: React.FC = () => {
                       {linkCopied ? t('users.linkCopied') : t('users.copyLink')}
                     </button>
                   </div>
+                  )}
                 </div>
                 <button
                   onClick={() => setResetResult(null)}

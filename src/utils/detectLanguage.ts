@@ -10,6 +10,13 @@ function isSupported(value: unknown): value is SupportedLanguage {
   return typeof value === 'string' && (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
 }
 
+/** `EN-us` → `en`; toetamata või puuduv → null. */
+function normalize(value: string | null | undefined): SupportedLanguage | null {
+  if (typeof value !== 'string') return null;
+  const base = value.toLowerCase().split('-')[0];
+  return isSupported(base) ? base : null;
+}
+
 /**
  * Valib algkeele. Kordab senist `i18next-browser-languagedetector` käitumist
  * (`order: ['localStorage', 'navigator']`), aga teeb seda **enne** i18n
@@ -20,14 +27,21 @@ function isSupported(value: unknown): value is SupportedLanguage {
  * mõlemad ja kogu #187 võit kaoks.
  *
  * Järjekord:
- * 1. Käsitsi valik localStorage'is (`vutt_language`) — kaalukaim.
- * 2. Brauseri keeled: esimene toetatud vaste (`et-EE` → `et`).
- * 3. Inglise keel.
+ * 1. URL-i `?lang=` — kaalukaim (#298). Kutse- ja parooli-taastekirja link
+ *    kannab saaja keelt: kiri oli tema keeles, seega peab ka leht olema,
+ *    ka siis kui brauser või varem salvestatud valik ütleb muud. Saaja ei ole
+ *    veel sisse loginud, seega `user_settings` keelt siin veel ei ole.
+ * 2. Käsitsi valik localStorage'is (`vutt_language`).
+ * 3. Brauseri keeled: esimene toetatud vaste (`et-EE` → `et`).
+ * 4. Inglise keel.
  */
 export function detectInitialLanguage(
   stored: string | null | undefined,
   navigatorLanguages: readonly string[] | undefined,
+  urlLanguage?: string | null,
 ): SupportedLanguage {
+  const fromUrl = normalize(urlLanguage);
+  if (fromUrl) return fromUrl;
   if (isSupported(stored)) return stored;
 
   for (const raw of navigatorLanguages ?? []) {
@@ -51,5 +65,13 @@ export function detectInitialLanguageFromBrowser(): SupportedLanguage {
   const langs = typeof navigator !== 'undefined'
     ? navigator.languages ?? (navigator.language ? [navigator.language] : [])
     : [];
-  return detectInitialLanguage(stored, langs);
+
+  let urlLanguage: string | null = null;
+  try {
+    urlLanguage = new URLSearchParams(window.location.search).get('lang');
+  } catch {
+    /* SSR või katkine URL — tuvastus jätkab ilma selleta */
+  }
+
+  return detectInitialLanguage(stored, langs, urlLanguage);
 }

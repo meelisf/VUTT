@@ -293,5 +293,11 @@
     "requestBody": "Soovin lisada arhiivi registrisse: {{id}}, {{name}}",
     "requestSent": "Teavitus adminidele saadetud.",
     "send": "Saada"
+  },
+  "mail": {
+    "sent": "Kiri saadetud aadressile {{email}}",
+    "sentToUser": "Kiri saadetud kasutaja e-posti aadressile",
+    "failed": "Kirja ei õnnestunud saata ({{reason}}) — anna link käsitsi edasi",
+    "showLink": "Näita linki"
   }
 }

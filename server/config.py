@@ -227,6 +227,35 @@ ALLOWED_ORIGINS = [
 PUBLIC_BASE_URL = env("PUBLIC_BASE_URL", "https://vutt.utlib.ut.ee").rstrip("/")
 
 # =========================================================
+# KIRJADE SAATMINE (SMTP)
+# =========================================================
+
+# Saatmine käib hosti postfixi kaudu, mis releeb `mailhost.ut.ee`-le (ADR 0034).
+# Autentimist EI OLE — relee usaldab IP-d, seega siin ei ole ühtki saladust.
+#
+# Tühi `SMTP_HOST` või `MAIL_FROM` = saatmine välja lülitatud. See on KEHTIV
+# seisund (arendus, testid), mitte viga: admini ekraanile jääb kopeeritav link.
+# Vaikeväärtust „localhost" siin ei ole — see prooviks arenduses igal kutsel
+# ühendust ja peidaks tootmises seadistamata jäänud hosti vea müra sisse.
+SMTP_HOST = env("SMTP_HOST", "")
+SMTP_PORT = int(env("SMTP_PORT", "25"))
+# Postfix võtab kirja järjekorda kohe (relee poole liigub see ise, hiljem),
+# seega on see lühike ega tohi olla pikk: HTTP-päring ootab selle taga.
+SMTP_TIMEOUT = int(env("SMTP_TIMEOUT", "10"))
+
+# Peab olema @ut.ee — ülikooli relee lubab ainult seda domeeni ja ainult siis
+# joondub SPF/DMARC. `vutt-abi@ut.ee` suunab elavasse postkasti, et bounce'id
+# oleksid nähtavad; suunamiseta no-reply neelaks need vaikselt.
+MAIL_FROM = env("MAIL_FROM", "")
+MAIL_FROM_NAME = env("MAIL_FROM_NAME", "VUTT")
+
+
+def mail_enabled() -> bool:
+    """Kas kirju saab saata. Loeb globaale KUTSE HETKEL (testid patch'ivad neid)."""
+    return bool(SMTP_HOST and MAIL_FROM)
+
+
+# =========================================================
 # RATE LIMITING
 # =========================================================
 
