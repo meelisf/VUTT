@@ -53,3 +53,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0031](0031-kirjutamisoigus-on-lugemisoigus-ja-ulatus.md) | Kirjutamisõigus = lugemisõigus JA ulatus; contributor toimetab ainult oma kollektsioonides | kehtib |
 | [0032](0032-filter-enne-skanniakent.md) | Filter läheb andmeallikasse või aken kasvab; piiratud akna järel filtreerimine annab vaikselt tühja vastuse | kehtib |
 | [0033](0033-serveripoolne-kasutajale-nahtav-tekst.md) | Rakenduses loetav tekst renderdatakse lugeja keeles, lahkuv tekst saaja salvestatud keeles; keelt küsitakse ühest funktsioonist | kehtib |
+| [0034](0034-kirjad-hosti-postfixi-kaudu.md) | Kirjad lähevad hosti postfixi kaudu (`mailhost.ut.ee`); saatmisviga ei kaota juba loodud linki | kehtib |

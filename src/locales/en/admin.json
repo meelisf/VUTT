@@ -293,5 +293,10 @@
     "requestBody": "I'd like to add an archive to the registry: {{id}}, {{name}}",
     "requestSent": "Notification sent to admins.",
     "send": "Send"
+  },
+  "mail": {
+    "sent": "Email sent to {{email}}",
+    "sentToUser": "Email sent to the user's address",
+    "failed": "Could not send the email ({{reason}}) — pass the link on manually"
   }
 }

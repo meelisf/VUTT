@@ -18,6 +18,7 @@ from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
 from ..mail_templates import render_mail
+from ..mailer import send_mail
 from ..meilisearch_ops import delete_work_from_meilisearch
 from ..people_ops import get_refresh_status, refresh_all_people_safe
 from ..registration import (
@@ -27,14 +28,39 @@ from ..registration import (
     load_pending_registrations,
     update_registration_status,
 )
-from ..password_reset import create_reset_token
+from ..password_reset import RESET_TOKEN_TTL_HOURS, create_reset_token
 from ..trash_ops import list_deleted_pages, list_deleted_works, restore_deleted_page, restore_deleted_work
-from ..user_language import normalize_language
+from ..user_language import get_user_language, normalize_language
 from ..utils import build_work_id_cache, find_directory_by_id
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def _render_and_send(template: str, language: str, to: str, **context) -> dict:
+    """Renderdab kirja ja üritab selle ära saata. EI VISKA.
+
+    Tagastab vastuse-fragmendi (`mail_subject`, `mail_body`, `mail_sent`,
+    `mail_error`). Mõlemad pooled on tahtlikult vigatolerantsed: kutse- või
+    taastelink on selleks hetkeks juba loodud ja kettal, seega oleks katmata
+    500 halvem kui kirjata vastus — admin kaotaks lingi, mis päriselt eksisteerib
+    (ADR 0033 täiendus, ADR 0034).
+
+    Mall renderdatakse ALATI, ka õnnestunud saatmise korral: `mail_body` on
+    admini käsitsi-varutee (mailto/kopeeri), kui kiri jääb kuhugi kinni.
+
+    Blokeeriv (faililugemine + SMTP) — kutsu `run_in_threadpool` kaudu.
+    """
+    try:
+        subject, body = render_mail(template, language, **context)
+    except (FileNotFoundError, ValueError, KeyError) as e:
+        logger.error("Kirja renderdus ebaõnnestus (mall=%s, keel=%s): %s", template, language, e)
+        return {"mail_sent": False, "mail_error": f"Kirjamalli renderdus ebaõnnestus: {e}"}
+
+    ok, error = send_mail(to, subject, body)
+    return {"mail_subject": subject, "mail_body": body, "mail_sent": ok, "mail_error": error}
+
 
 
 @router.get("/admin/ocr/providers")
@@ -92,35 +118,28 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         "edit_collections": token_data["edit_collections"],
         "language": language,
     }
-    # Kiri renderdatakse serveris: üks tekstiallikas nii tänasele mailto-nupule
-    # kui #298 saatjale. render_mail loeb malli kettalt/mälust — sama kaalu
-    # klass mis teised siin threadpool'i pandud sync-kutsed, seega ühtsuse
-    # mõttes samamoodi käideldud (ADR 0002).
+    # Kiri renderdatakse serveris ja saadetakse ära: üks tekstiallikas nii
+    # saatjale kui admini mailto-varuteele. Mõlemad on blokeeriv I/O
+    # (faililugemine + SMTP), seega threadpool'i (ADR 0002).
     #
     # Selleks ajaks on taotlus juba "approved" ja token kettal (ADR 0033
     # täiendus) — puuduv mall on programmeerimisviga ja render_mail PEAB
     # selle kohal viskama (nii käitub ka test_mail_templates.py), aga siin,
     # kutsuja poolel, oleks katmata 500 halvem kui kirjata vastus: klient
     # saaks vea, kuigi kutse on juba tekkinud, ja taotlus kaoks pending-
-    # nimekirjast jäädavalt nähtamatuks (kordus annab 400). Seega püüame
-    # erindi siin ja degradeerume nähtavalt — kopeeritav link jääb tööle.
-    try:
-        mail_subject, mail_body = await run_in_threadpool(
-            render_mail,
-            "invite",
-            language,
-            name=token_data["name"],
-            username=token_data["username"],
-            url=invite_absolute_url,
-            expires_hours=INVITE_EXPIRY_HOURS,
-        )
-        response["mail_subject"] = mail_subject
-        response["mail_body"] = mail_body
-    except (FileNotFoundError, ValueError, KeyError) as e:
-        logger.error(
-            "Kutsekirja renderdus ebaõnnestus (mall=invite, keel=%s): %s",
-            language, e,
-        )
+    # nimekirjast jäädavalt nähtamatuks (kordus annab 400). Sama loogika
+    # kehtib saatmisvea kohta (ADR 0034) — degradeerume nähtavalt, kopeeritav
+    # link jääb tööle.
+    response.update(await run_in_threadpool(
+        _render_and_send,
+        "invite",
+        language,
+        token_data["email"],
+        name=token_data["name"],
+        username=token_data["username"],
+        url=invite_absolute_url,
+        expires_hours=INVITE_EXPIRY_HOURS,
+    ))
     return response
 
 
@@ -209,13 +228,41 @@ async def admin_reset_password(request: Request, user=Depends(require_role("admi
     token_data, error = await run_in_threadpool(create_reset_token, target, user["username"])
     if not token_data:
         raise HTTPException(status_code=400, detail=error)
-    return {
+
+    reset_url = f"/set-password?token={token_data['token']}&reset=1"
+    reset_absolute_url = f"{PUBLIC_BASE_URL}{reset_url}"
+    response = {
         "status": "success",
-        "reset_url": f"/set-password?token={token_data['token']}&reset=1",
+        "reset_url": reset_url,
+        "reset_absolute_url": reset_absolute_url,
         "expires_at": token_data["expires_at"],
         "username": token_data["username"],
         "name": token_data["name"],
     }
+
+    # Keel tuleb `get_user_language`-ist, MITTE `users.json`-i väljalt otse:
+    # kasutaja, kes on Seadetes keelt vahetanud, saab kirja selles keeles
+    # (ADR 0033).
+    language = await run_in_threadpool(get_user_language, target)
+    email = (users[target].get("email") or "").strip()
+    if not email:
+        # Vana kirje ilma e-postita: link on olemas, kanalit ei ole. Vaikselt
+        # "saatmata" jätmine näeks admini ekraanil välja nagu saatmisviga.
+        response.update({"mail_sent": False,
+                         "mail_error": "Kasutajal ei ole e-posti aadressi"})
+        return response
+
+    response.update(await run_in_threadpool(
+        _render_and_send,
+        "password_reset",
+        language,
+        email,
+        name=token_data["name"] or target,
+        username=token_data["username"],
+        url=reset_absolute_url,
+        expires_hours=RESET_TOKEN_TTL_HOURS,
+    ))
+    return response
 
 
 @router.post("/admin/trash")

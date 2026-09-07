@@ -43,6 +43,22 @@ services:
       - GEMINI_MAX_REQUEST_BYTES=${GEMINI_MAX_REQUEST_BYTES:-15728640}
       - GEMINI_MAX_PROMPT_BYTES=${GEMINI_MAX_PROMPT_BYTES:-8192}
       - GEMINI_MAX_FEW_SHOT=${GEMINI_MAX_FEW_SHOT:-3}
+      # Kirjade saatmine (#298, ADR 0034). Kanal: konteiner → hosti postfix →
+      # mailhost.ut.ee. Autentimist ei ole, seega siin ei ole saladusi.
+      # Väärtused tulevad `.env`-ist; TÜHI = saatmine välja lülitatud ja
+      # vaikeväärtus elab AINULT `server/config.py`-s (duplikaat siin võidaks
+      # vaikselt koodi oma — mõõdetud GEMINI_OCR_MODEL-i puhul 2026-09-02).
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_TIMEOUT=${SMTP_TIMEOUT:-}
+      - MAIL_FROM=${MAIL_FROM:-}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-}
+    # Hosti postfix (relayhost = mailhost.ut.ee). Konteineri „localhost" on
+    # konteiner ise, seega tuleb hosti aadress Dockerilt. Nimi, mitte IP:
+    # bridge-võrgu gateway on `192.168.201.1` ainult seni, kuni alamvõrk on
+    # allpool fikseeritud.
+    extra_hosts:
+      - "smtp-relay:host-gateway"
     volumes:
       # Mountime andmed hostilt konteinerisse
       - ./data:/data
@@ -126,4 +142,8 @@ networks:
     driver: bridge
     ipam:
       config:
+        # FIKSEERITUD, mitte Dockeri poolist võetud: sama vahemik on hosti
+        # postfixi `mynetworks`-is (ADR 0034). Kui see siin muutuks, keelduks
+        # relee konteineri kirjadest — 554 Relay access denied, ilma et
+        # kummalgi pool midagi oleks „katki".
         - subnet: 192.168.201.0/24
