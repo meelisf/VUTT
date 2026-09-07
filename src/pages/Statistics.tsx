@@ -10,6 +10,7 @@ import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
 import { getGenreFacets, getGenreLabelMap } from '../services/searchService';
+import { ALL_COLLECTIONS } from '../contexts/collectionUrl';
 
 interface StatusCount {
   name: string;
@@ -27,13 +28,16 @@ const Statistics: React.FC = () => {
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
   const index = useMeiliIndex();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   // Sünkroonib kollektsiooni URL ?collection= parameetriga (mõlemas suunas)
-  useCollectionUrlSync(selectedCollection, setSearchParams);
+  useCollectionUrlSync();
   useEffect(() => {
     const collectionParam = searchParams.get('collection');
-    if (collectionParam && collections[collectionParam] && collectionParam !== selectedCollection) {
+    if (collectionParam === ALL_COLLECTIONS) {
+      // Sõnaselge „kõik kogud" lingist — muidu jääks saaja oma kogusse.
+      if (selectedCollection !== null) setSelectedCollection(null);
+    } else if (collectionParam && collections[collectionParam] && collectionParam !== selectedCollection) {
       setSelectedCollection(collectionParam);
     }
   }, [searchParams.get('collection'), collections]);

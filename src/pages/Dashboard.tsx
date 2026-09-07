@@ -30,6 +30,7 @@ import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLink
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import DashboardBulkActionBar from '../components/dashboard/DashboardBulkActionBar';
 import DashboardResultsHeader from '../components/dashboard/DashboardResultsHeader';
+import { ALL_COLLECTIONS } from '../contexts/collectionUrl';
 
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
@@ -117,7 +118,7 @@ const Dashboard: React.FC = () => {
   );
 
   // Sünkroonib selectedCollection → URL ?collection= param (Context → URL suund)
-  useCollectionUrlSync(selectedCollection, setSearchParams);
+  useCollectionUrlSync();
 
   // Salvesta dashboardi URL sessionStorage'isse, et logo saaks siia tagasi tuua
   useEffect(() => {
@@ -152,7 +153,10 @@ const Dashboard: React.FC = () => {
   // Sünkroniseeri kollektsiooni URL parameeter kontekstiga
   useEffect(() => {
     // Kui URL-is on kollektsioon ja see on kehtiv, sea see kontekstis
-    if (collectionParam && collections[collectionParam] && collectionParam !== selectedCollection) {
+    if (collectionParam === ALL_COLLECTIONS) {
+      // Sõnaselge „kõik kogud" lingist — muidu jääks saaja oma kogusse.
+      if (selectedCollection !== null) setSelectedCollection(null);
+    } else if (collectionParam && collections[collectionParam] && collectionParam !== selectedCollection) {
       setSelectedCollection(collectionParam);
     }
     // Kui URL-is pole kollektsiooni, aga kontekstis on, tühjenda URL param (ära eemalda valikut)

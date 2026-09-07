@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { getCollections, Collections } from '../services/collectionService';
+import { COLLECTION_PARAM, resolveInitialCollection } from './collectionUrl';
 
 interface CollectionContextType {
   // Valitud kollektsiooni ID (null = kõik tööd)
@@ -35,12 +36,18 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
         const data = await getCollections();
         setCollections(data);
 
-        // Taasta valik localStorage'ist; uuel kasutajal kasuta vaikimisi kollektsiooni
+        // URL > localStorage > vaikekogu (#323). URL loetakse `window.location`-ist,
+        // mitte `useSearchParams`-ist: provider istub Routerist väljaspool ja see
+        // on ühekordne algväärtus, mitte jooksev sünkroniseerimine.
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored && data[stored]) {
-          setSelectedCollectionState(stored);
-        } else if (!stored && data[DEFAULT_COLLECTION]) {
-          setSelectedCollectionState(DEFAULT_COLLECTION);
+        const fromUrl = new URLSearchParams(window.location.search).get(COLLECTION_PARAM);
+        const initial = resolveInitialCollection(fromUrl, stored, data, DEFAULT_COLLECTION);
+        setSelectedCollectionState(initial);
+        // Lingiga tulnud valik jääb kehtima ka edasi — sama, mis oleks
+        // kogu käsitsi valimine. Ilma selleta hüppaks järgmine leht tagasi.
+        if (fromUrl && initial !== stored) {
+          if (initial) localStorage.setItem(STORAGE_KEY, initial);
+          else localStorage.removeItem(STORAGE_KEY);
         }
       } catch (e) {
         console.error('Failed to load collections:', e);

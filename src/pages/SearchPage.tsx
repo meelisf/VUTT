@@ -16,6 +16,7 @@ import { useSearchResults } from './search/hooks/useSearchResults';
 import { useSearchFacets } from './search/hooks/useSearchFacets';
 import { useQCodeMaps } from './search/hooks/useQCodeMaps';
 import { useFilterDraft } from './search/hooks/useFilterDraft';
+import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 
 const RETURN_URL_KEY = 'vutt_return_url';
 
@@ -24,6 +25,9 @@ const SearchPage: React.FC = () => {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+    // Aktiivne kogu käib URL-iga kaasa (#323) — muidu avaneb jagatud link
+    // saaja kogus ja annab null vastet.
+    useCollectionUrlSync();
     const index = useMeiliIndex();
 
     const urlParams = useSearchUrlParams();
