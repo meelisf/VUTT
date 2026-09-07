@@ -138,6 +138,7 @@ async def register(request: Request):
         data.get("motivation", ""),
         gdpr_consent=bool(data.get("gdpr_consent")),
         language=data.get("language"),
+        interest_collections=data.get("interest_collections"),
     )
     if not registration:
         raise HTTPException(status_code=400, detail=error)

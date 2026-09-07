@@ -37,7 +37,8 @@
     "languageLabel": "Suhtluskeel",
     "languageEt": "Eesti keel",
     "languageEn": "Inglise keel",
-    "mailTemplateMissing": "Kirjamalli ei saadud serverist — kasuta kopeeritud linki."
+    "mailTemplateMissing": "Kirjamalli ei saadud serverist — kasuta kopeeritud linki.",
+    "interestLabel": "Huvipakkuvad kogud"
   },
   "users": {
     "title": "Kasutajad",

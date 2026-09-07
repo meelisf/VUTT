@@ -6,6 +6,11 @@ import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { deriveUsernameFromEmail } from '../utils/username';
+import {
+  Collections,
+  getCollections,
+  getWritableCollectionOptions,
+} from '../services/collectionService';
 import { defaultRegistrationLanguage, UiLanguage } from './registerLanguage';
 
 const Register: React.FC = () => {
@@ -19,6 +24,10 @@ const Register: React.FC = () => {
     website: ''  // Honeypot väli - botid täidavad, inimesed ei näe
   });
   const [gdprConsent, setGdprConsent] = useState(false);
+  // Taotleja huvi (#321): SOOV, mitte volitus. Eeltäidab admini
+  // kinnitusekraanil kirjutamisulatuse; õigusi see ei anna (ADR 0031).
+  const [collections, setCollections] = useState<Collections>({});
+  const [interestCollections, setInterestCollections] = useState<string[]>([]);
   const [language, setLanguage] = useState<UiLanguage>(defaultRegistrationLanguage(i18n.language));
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,6 +36,32 @@ const Register: React.FC = () => {
   const fallbackUsernamePreview = useMemo(() => deriveUsernameFromEmail(formData.email), [formData.email]);
   const [serverUsernamePreview, setServerUsernamePreview] = useState('');
   const usernamePreview = serverUsernamePreview || fallbackUsernamePreview;
+
+  // Sama filter mis admini ulatuse-valikul (virtuaalgrupid välja) — server
+  // sanitiseerib samamoodi, seega vormil ei tohi paista muud kui see, mis
+  // päriselt kõlbab. Peidetud (restricted) kogud on nimekirjas TEADLIKULT:
+  // uus kasutaja peab nägema, mida üldse paluda saab.
+  const interestOptions = useMemo(
+    () => getWritableCollectionOptions(collections, i18n.language === 'en' ? 'en' : 'et'),
+    [collections, i18n.language]
+  );
+
+  const toggleInterest = (id: string) => {
+    setInterestCollections((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
+  };
+
+  // Vorm on autentimata, `/collections` samuti — huvivalik ei nõua sisselogimist.
+  // Laadimise ebaõnnestumine EI TOHI registreerimist blokeerida: väli on
+  // vabatahtlik ja `getCollections` degradeerub tühjaks objektiks.
+  useEffect(() => {
+    let cancelled = false;
+    getCollections().then((loaded) => {
+      if (!cancelled) setCollections(loaded);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const email = formData.email.trim().toLowerCase();
@@ -103,6 +138,7 @@ const Register: React.FC = () => {
           motivation: formData.motivation.trim(),
           gdpr_consent: true,
           language,
+          interest_collections: interestCollections,
           website: formData.website  // Honeypot
         })
       });
@@ -275,6 +311,47 @@ const Register: React.FC = () => {
                 disabled={isSubmitting}
               />
             </div>
+
+            {/* Huvipakkuvad kogud (#321). Vabatahtlik: uus inimene ei pruugi
+                korpust veel tunda, ja sundvalik annaks admini eeltäiteks
+                juhusliku vastuse — halvem kui tühi. */}
+            {interestOptions.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('form.interest')}
+                </label>
+                <p className="text-xs text-gray-500 mb-2">{t('form.interestHint')}</p>
+                <div className="max-h-56 overflow-y-auto border border-gray-300 rounded-lg divide-y divide-gray-100">
+                  {interestOptions.map(({ id, name }) => {
+                    const collection = collections[id];
+                    const description = collection?.description?.[i18n.language === 'en' ? 'en' : 'et'];
+                    return (
+                      <label
+                        key={id}
+                        className="flex items-start gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={interestCollections.includes(id)}
+                          onChange={() => toggleInterest(id)}
+                          disabled={isSubmitting}
+                          className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 flex-shrink-0"
+                        />
+                        <span className="min-w-0">
+                          <span className="text-sm text-gray-800">{name}</span>
+                          {collection?.visibility === 'restricted' && (
+                            <span className="ml-2 text-xs text-amber-700">{t('form.interestRestricted')}</span>
+                          )}
+                          {description && (
+                            <span className="block text-xs text-gray-500">{description}</span>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* GDPR nõusolek */}
             <div className="flex items-start gap-3">

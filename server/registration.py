@@ -42,8 +42,16 @@ def save_pending_registrations(data):
         atomic_write_json(PENDING_REGISTRATIONS_FILE, data)
 
 
-def add_registration(name, email, affiliation, motivation, gdpr_consent=False, language=None):
-    """Lisab uue registreerimistaotluse."""
+def add_registration(name, email, affiliation, motivation, gdpr_consent=False,
+                    language=None, interest_collections=None):
+    """Lisab uue registreerimistaotluse.
+
+    `interest_collections` on taotleja SOOV (#321): millistes kogudes ta
+    tahaks tööd teha. Väli eeltäidab admini kinnitusekraanil kirjutamisulatuse
+    valiku ja EI ANNA ise ühtki õigust — ulatuse otsustab admin (ADR 0031).
+    Sanitiseerimine käib sama funktsiooniga mis päris ulatus, et kaks
+    nimekirja ei saaks lahkneda: tundmatu id ja virtuaalgrupp kukuvad välja.
+    """
     data = load_pending_registrations()
 
     # Kontrolli, kas sama email on juba ootel
@@ -64,6 +72,10 @@ def add_registration(name, email, affiliation, motivation, gdpr_consent=False, l
         "username": suggest_username_for_email(email),
         "affiliation": affiliation,
         "motivation": motivation,
+        # Soov, mitte volitus — vt funktsiooni dokumentatsiooni.
+        "interest_collections": sanitize_edit_collections(
+            interest_collections or [], get_cached_collections()
+        ),
         # Keel püütakse vormilt: enne esimest sisselogimist ei ole kasutajal
         # ühtki teist kohta, kus oma keelt öelda.
         "language": normalize_language(language),

@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getWritableCollectionOptions } from '../../services/collectionService';
+import { resolveApproveScope } from './approveScope';
 import {
   UserPlus,
   Check,
@@ -15,6 +16,7 @@ import {
   Building,
   Mail,
   MessageSquare,
+  FolderTree,
   ChevronLeft
 } from 'lucide-react';
 import Header from '../../components/Header';
@@ -32,6 +34,9 @@ interface Registration {
   reviewed_by: string | null;
   reviewed_at: string | null;
   language?: 'et' | 'en';
+  // Taotleja SOOV (#321), mitte volitus: eeltäidab ulatuse valiku allpool.
+  // Puudub vanades taotlustes ja vana backendi vastuses.
+  interest_collections?: string[];
 }
 
 interface InviteResult {
@@ -90,7 +95,11 @@ const Registrations: React.FC = () => {
   const [approveScope, setApproveScope] = useState<Record<string, string[]>>({});
   const [approveLanguage, setApproveLanguage] = useState<Record<string, 'et' | 'en'>>({});
   const roleFor = (regId: string): 'editor' | 'contributor' => approveRole[regId] || 'editor';
-  const scopeFor = (regId: string): string[] => approveScope[regId] || [];
+  const scopeFor = (regId: string): string[] =>
+    resolveApproveScope(
+      approveScope[regId],
+      registrations.find((r) => r.id === regId)?.interest_collections
+    );
   // Võtab regId (mitte Registration objekti) — kutsekohas ei pea taotlust uuesti
   // otsima ega `as`-iga eeldama, et otsing õnnestus (taotlus võib olla vahepeal
   // nimekirjast kadunud, kui teine admin jõudis ette).
@@ -387,6 +396,21 @@ const Registrations: React.FC = () => {
                             <p className="text-sm text-gray-700">{reg.motivation}</p>
                           </div>
                         </div>
+
+                        {/* Taotleja märgitud huvi (#321). Kuvatakse ka siis, kui
+                            roll on editor: see on info taotleja kohta, mitte
+                            ainult ulatuse eeltäide. */}
+                        {reg.interest_collections && reg.interest_collections.length > 0 && (
+                          <div className="mt-2 flex items-start gap-2 text-sm text-gray-600">
+                            <FolderTree size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                            <span>
+                              <span className="text-xs text-gray-500">{t('registrations.interestLabel')}: </span>
+                              {reg.interest_collections
+                                .map((id) => allCollections.find((c) => c.id === id)?.name || id)
+                                .join(', ')}
+                            </span>
+                          </div>
+                        )}
 
                         <div className="flex flex-col gap-2 mt-3">
                           <label className="text-xs font-medium text-gray-500">{t('registrations.roleLabel')}</label>

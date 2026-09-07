@@ -17,6 +17,9 @@
     "affiliationPlaceholder": "Ülikool, raamatukogu vms",
     "motivation": "Kuidas plaanid töölauda kasutada?",
     "motivationPlaceholder": "nt uurin 17. saj. trükiseid, õpin ajalugu, tõlgin vms",
+    "interest": "Huvipakkuvad kogud",
+    "interestHint": "Vabatahtlik. Aitab meil su konto õigesti seadistada ja näidata, kust alustada. Ligipääsu otsustab administraator.",
+    "interestRestricted": "piiratud ligipääs",
     "submit": "Esita taotlus"
   },
   "success": {
