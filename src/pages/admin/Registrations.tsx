@@ -94,7 +94,9 @@ const Registrations: React.FC = () => {
   const [approveRole, setApproveRole] = useState<Record<string, 'editor' | 'contributor'>>({});
   const [approveScope, setApproveScope] = useState<Record<string, string[]>>({});
   const [approveLanguage, setApproveLanguage] = useState<Record<string, 'et' | 'en'>>({});
-  const roleFor = (regId: string): 'editor' | 'contributor' => approveRole[regId] || 'editor';
+  // Vaikeroll on KITSAM (ADR 0035): uus konto saab kirjutamisõiguse ainult
+  // valitud kogudesse. `editor` (kogu korpus) on admini teadlik valik.
+  const roleFor = (regId: string): 'editor' | 'contributor' => approveRole[regId] || 'contributor';
   const scopeFor = (regId: string): string[] =>
     resolveApproveScope(
       approveScope[regId],
