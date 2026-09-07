@@ -12,6 +12,7 @@ import {
   getWritableCollectionOptions,
 } from '../services/collectionService';
 import { defaultRegistrationLanguage, UiLanguage } from './registerLanguage';
+import { MAX_INTEREST_COLLECTIONS, toggleInterest } from './registerInterest';
 
 const Register: React.FC = () => {
   const { t, i18n } = useTranslation(['register', 'common']);
@@ -46,11 +47,10 @@ const Register: React.FC = () => {
     [collections, i18n.language]
   );
 
-  const toggleInterest = (id: string) => {
-    setInterestCollections((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
-    );
+  const handleInterestToggle = (id: string) => {
+    setInterestCollections((prev) => toggleInterest(prev, id));
   };
+  const interestFull = interestCollections.length >= MAX_INTEREST_COLLECTIONS;
 
   // Vorm on autentimata, `/collections` samuti — huvivalik ei nõua sisselogimist.
   // Laadimise ebaõnnestumine EI TOHI registreerimist blokeerida: väli on
@@ -320,21 +320,29 @@ const Register: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {t('form.interest')}
                 </label>
-                <p className="text-xs text-gray-500 mb-2">{t('form.interestHint')}</p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {t('form.interestHint', { count: MAX_INTEREST_COLLECTIONS })}
+                </p>
                 <div className="max-h-56 overflow-y-auto border border-gray-300 rounded-lg divide-y divide-gray-100">
                   {interestOptions.map(({ id, name }) => {
                     const collection = collections[id];
                     const description = collection?.description?.[i18n.language === 'en' ? 'en' : 'et'];
+                    const checked = interestCollections.includes(id);
+                    // Täis loendis on valimata kastid välja lülitatud, aga
+                    // valitud kastid MITTE — muidu ei saaks meelt muuta.
+                    const disabled = isSubmitting || (interestFull && !checked);
                     return (
                       <label
                         key={id}
-                        className="flex items-start gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50"
+                        className={`flex items-start gap-3 px-3 py-2 ${
+                          disabled ? 'cursor-default opacity-60' : 'cursor-pointer hover:bg-gray-50'
+                        }`}
                       >
                         <input
                           type="checkbox"
-                          checked={interestCollections.includes(id)}
-                          onChange={() => toggleInterest(id)}
-                          disabled={isSubmitting}
+                          checked={checked}
+                          onChange={() => handleInterestToggle(id)}
+                          disabled={disabled}
                           className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 flex-shrink-0"
                         />
                         <span className="min-w-0">

@@ -18,7 +18,7 @@
     "motivation": "Kuidas plaanid töölauda kasutada?",
     "motivationPlaceholder": "nt uurin 17. saj. trükiseid, õpin ajalugu, tõlgin vms",
     "interest": "Huvipakkuvad kogud",
-    "interestHint": "Vabatahtlik. Aitab meil su konto õigesti seadistada ja näidata, kust alustada. Ligipääsu otsustab administraator.",
+    "interestHint": "Vabatahtlik, kuni {{count}} kogu. Aitab meil su konto õigesti seadistada ja näidata, kust alustada. Ligipääsu otsustab administraator, kes võib anda ka rohkem.",
     "interestRestricted": "piiratud ligipääs",
     "submit": "Esita taotlus"
   },

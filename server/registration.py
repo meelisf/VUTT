@@ -23,6 +23,12 @@ tokens_lock = threading.RLock()
 # Kutselingi eluiga. Mall viitab samale konstandile — kaks kohta lahkneksid.
 INVITE_EXPIRY_HOURS = 48
 
+# Mitu kogu tohib taotleja registreerimisvormil huvipakkuvaks märkida (#321).
+# Piir on SOOVIL, mitte õigusel: admini ulatuse-valik ei ole piiratud ja ta
+# tohib alati juurde panna. Vorm ei ole turvapiir, seega sama arv on ka siin
+# (`src/pages/registerInterest.ts` — kaks keelt, üks reegel).
+MAX_INTEREST_COLLECTIONS = 3
+
 # =========================================================
 # REGISTREERIMISE FUNKTSIOONID
 # =========================================================
@@ -75,7 +81,7 @@ def add_registration(name, email, affiliation, motivation, gdpr_consent=False,
         # Soov, mitte volitus — vt funktsiooni dokumentatsiooni.
         "interest_collections": sanitize_edit_collections(
             interest_collections or [], get_cached_collections()
-        ),
+        )[:MAX_INTEREST_COLLECTIONS],
         # Keel püütakse vormilt: enne esimest sisselogimist ei ole kasutajal
         # ühtki teist kohta, kus oma keelt öelda.
         "language": normalize_language(language),

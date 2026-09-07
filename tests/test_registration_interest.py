@@ -9,6 +9,7 @@ import pytest
 COLLECTIONS = {
     "ag": {"name": {"et": "Academia Gustaviana", "en": "Academia Gustaviana"}},
     "agc": {"name": {"et": "Academia Gustavo-Carolina", "en": "Academia Gustavo-Carolina"}},
+    "matused": {"name": {"et": "Matusetrükised", "en": "Funeral prints"}},
     "rootsi": {"name": {"et": "Rootsi aja ülikool", "en": "Swedish era"}, "type": "virtual_group"},
 }
 
@@ -77,3 +78,37 @@ def test_huvi_ei_anna_kirjutamisulatust(client, login, collections):
                       headers=headers)
     assert res.status_code == 200, res.text
     assert res.json()["edit_collections"] == []
+
+
+def test_soovi_arv_on_piiratud(client, login, collections, monkeypatch):
+    """Piir on SOOVIL, mitte õigusel (#321). Vorm hoiab seda ka ise, aga vorm
+    ei ole turvapiir — server lõikab liigse maha."""
+    from server import registration
+
+    monkeypatch.setattr(registration, "MAX_INTEREST_COLLECTIONS", 2)
+    # Kolm KEHTIVAT kogu (+ virtuaalgrupp ja tundmatu id, mis kukuvad juba enne
+    # piiri) — muidu ei eristaks test piiri sanitiseerimisest.
+    _register(client, interest_collections=["ag", "agc", "matused", "rootsi", "pole-olemas"])
+    assert _pending(client, login)["interest_collections"] == ["ag", "agc"]
+
+
+def test_vaikepiir_on_kolm(client, login, collections):
+    _register(client, interest_collections=["ag", "agc", "matused"])
+    from server.registration import MAX_INTEREST_COLLECTIONS
+
+    assert MAX_INTEREST_COLLECTIONS == 3
+    assert _pending(client, login)["interest_collections"] == ["ag", "agc", "matused"]
+
+
+def test_admini_ulatust_piir_ei_puuduta(client, login, collections):
+    """Admin tohib anda rohkem kui MAX_INTEREST_COLLECTIONS kogu."""
+    _register(client, interest_collections=["ag"])
+    headers = {"Authorization": f"Bearer {login('admin', 'adminpass')}"}
+    reg_id = _pending(client, login)["id"]
+
+    res = client.post("/admin/registrations/approve",
+                      json={"registration_id": reg_id, "role": "contributor",
+                            "edit_collections": ["ag", "agc"]},
+                      headers=headers)
+    assert res.status_code == 200, res.text
+    assert res.json()["edit_collections"] == ["ag", "agc"]
