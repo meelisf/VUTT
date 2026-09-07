@@ -37,7 +37,8 @@
     "languageLabel": "Language",
     "languageEt": "Estonian",
     "languageEn": "English",
-    "mailTemplateMissing": "Could not get the mail template from the server — use the copied link instead."
+    "mailTemplateMissing": "Could not get the mail template from the server — use the copied link instead.",
+    "interestLabel": "Collections of interest"
   },
   "users": {
     "title": "Users",

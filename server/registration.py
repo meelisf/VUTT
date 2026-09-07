@@ -23,6 +23,12 @@ tokens_lock = threading.RLock()
 # Kutselingi eluiga. Mall viitab samale konstandile — kaks kohta lahkneksid.
 INVITE_EXPIRY_HOURS = 48
 
+# Mitu kogu tohib taotleja registreerimisvormil huvipakkuvaks märkida (#321).
+# Piir on SOOVIL, mitte õigusel: admini ulatuse-valik ei ole piiratud ja ta
+# tohib alati juurde panna. Vorm ei ole turvapiir, seega sama arv on ka siin
+# (`src/pages/registerInterest.ts` — kaks keelt, üks reegel).
+MAX_INTEREST_COLLECTIONS = 3
+
 # =========================================================
 # REGISTREERIMISE FUNKTSIOONID
 # =========================================================
@@ -42,8 +48,16 @@ def save_pending_registrations(data):
         atomic_write_json(PENDING_REGISTRATIONS_FILE, data)
 
 
-def add_registration(name, email, affiliation, motivation, gdpr_consent=False, language=None):
-    """Lisab uue registreerimistaotluse."""
+def add_registration(name, email, affiliation, motivation, gdpr_consent=False,
+                    language=None, interest_collections=None):
+    """Lisab uue registreerimistaotluse.
+
+    `interest_collections` on taotleja SOOV (#321): millistes kogudes ta
+    tahaks tööd teha. Väli eeltäidab admini kinnitusekraanil kirjutamisulatuse
+    valiku ja EI ANNA ise ühtki õigust — ulatuse otsustab admin (ADR 0031).
+    Sanitiseerimine käib sama funktsiooniga mis päris ulatus, et kaks
+    nimekirja ei saaks lahkneda: tundmatu id ja virtuaalgrupp kukuvad välja.
+    """
     data = load_pending_registrations()
 
     # Kontrolli, kas sama email on juba ootel
@@ -64,6 +78,10 @@ def add_registration(name, email, affiliation, motivation, gdpr_consent=False, l
         "username": suggest_username_for_email(email),
         "affiliation": affiliation,
         "motivation": motivation,
+        # Soov, mitte volitus — vt funktsiooni dokumentatsiooni.
+        "interest_collections": sanitize_edit_collections(
+            interest_collections or [], get_cached_collections()
+        )[:MAX_INTEREST_COLLECTIONS],
         # Keel püütakse vormilt: enne esimest sisselogimist ei ole kasutajal
         # ühtki teist kohta, kus oma keelt öelda.
         "language": normalize_language(language),
@@ -186,7 +204,7 @@ def suggest_username_for_email(email):
     return username
 
 
-def create_invite_token(email, name, created_by, username=None, role="editor",
+def create_invite_token(email, name, created_by, username=None, role="contributor",
                         edit_collections=None, language=None):
     """Loob uue invite tokeni (kehtiv 48h).
 
@@ -200,15 +218,15 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
     superadmin ise. Rollitõstmine käib ALATI eraldi admin-tegevusena
     (update_user_role), mitte kutse kaudu.
 
-    Roll on kahe erineva "vale" väärtuse suhtes erineval moel fail-safe:
-    - PUUDUV roll (None — päringus polnud `role` võtit üldse) → "editor",
-      tagasiühilduvus vanade tokenite/kutsete käitumisega.
-    - OLEMAS, aga TUNDMATU roll (trükiviga, nt "contributer", või muu
-      lubamatu väärtus nagu "admin") → "contributor" (RANGEM, mitte laiem) —
-      fail-closed, sest see viitab kas veale kliendis või ründekatsele, mitte
-      tagasiühilduvusele. Vaikeväärtus `role="editor"` katab kutsujad, kes
-      argumenti üldse ei anna (nt vanad testid) — funktsioonisisene loogika
-      käsitleb seda samamoodi kui "puudub".
+    Iga väärtus peale `contributor`/`editor` annab `contributor`-i (ADR 0035):
+    puuduv (None), tundmatu (trükiviga „contributer") ja lubamatu („admin")
+    on kõik sama vastus — KITSAM, mitte laiem.
+
+    Varem oli PUUDUV roll eraldi juhtum ja andis `editor`-i
+    (tagasiühilduvus vanade kutsetega). See vahe on tahtlikult kaotatud:
+    vaikimisi kogu korpuse kirjutamisõigus on tagurpidi vähima õiguse
+    põhimõttest, ja vana klient, mis `role` võtit ei saada, peab saama
+    kitsama, mitte laiema konto. Ulatuse annab admin kinnitamisel.
     """
     data = load_invite_tokens()
 
@@ -216,9 +234,7 @@ def create_invite_token(email, name, created_by, username=None, role="editor",
     expires_at = datetime.now() + timedelta(hours=INVITE_EXPIRY_HOURS)
     username = _next_available_username(email, data, preferred_username=username)
 
-    if role is None:
-        resolved_role = "editor"
-    elif role in ("contributor", "editor"):
+    if role in ("contributor", "editor"):
         resolved_role = role
     else:
         resolved_role = "contributor"
@@ -359,11 +375,10 @@ def create_user_from_invite(token, password):
     # Teine klamber tarbimisteel (leid 6): token peaks juba sisaldama ainult
     # lubatud rolli (create_invite_token kirjutab), aga ei usaldata pimesi —
     # käsitsi muudetud/defektne tokenifail ei tohi anda laiemat rolli kui
-    # kinnine loend lubab. Puuduv võti (vanad tokenid) → "editor" (tagasiühilduvus,
-    # katab test_create_user_from_invite_handles_legacy_token_without_role_fields);
-    # olemas-aga-tundmatu väärtus → "contributor" (fail-closed, sama loend mis
-    # create_invite_token'is).
-    role = token_data.get("role", "editor")
+    # kinnine loend lubab. Puuduv võti (vanad tokenid) ja tundmatu väärtus
+    # annavad mõlemad "contributor"-i — sama reegel mis create_invite_token'is
+    # (ADR 0035): kitsam, mitte laiem.
+    role = token_data.get("role", "contributor")
     if role not in ("contributor", "editor"):
         role = "contributor"
 

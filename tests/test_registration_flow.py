@@ -53,8 +53,14 @@ def test_approve_with_contributor_role_and_scope(client, login, backend_env, mon
     assert new_user["edit_collections"] == ["sample"]
 
 
-def test_approve_defaults_to_editor_without_role(client, login, backend_env):
-    """Tagasiühilduvus: rollita kinnitamine annab senise vaikeväärtuse."""
+def test_approve_defaults_to_contributor_without_role(client, login, backend_env):
+    """Rollita kinnitamine annab KITSAMA rolli (ADR 0035).
+
+    Varem andis see `editor`-i (tagasiühilduvus). Vana klient, mis `role`
+    võtit ei saada, peab saama kitsama konto: ulatuseta contributor ei saa
+    midagi muuta, kuni admin ulatuse annab — see on parandatav seisund,
+    vaikimisi antud kogu korpuse kirjutamisõigus ei ole.
+    """
     client.post("/register", json={
         "name": "Teine", "email": "teine@example.test",
         "motivation": "test", "gdpr_consent": True,
@@ -65,7 +71,7 @@ def test_approve_defaults_to_editor_without_role(client, login, backend_env):
     reg_id = listing.json()["registrations"][0]["id"]
     approve = client.post("/admin/registrations/approve", json={"registration_id": reg_id},
                           headers={"Authorization": f"Bearer {admin_token}"})
-    assert approve.json()["role"] == "editor"
+    assert approve.json()["role"] == "contributor"
     assert approve.json()["edit_collections"] == []
     token = approve.json()["invite_token"]
     created = client.post("/invite/set-password",
@@ -74,7 +80,7 @@ def test_approve_defaults_to_editor_without_role(client, login, backend_env):
                                  headers={"Authorization": f"Bearer {admin_token}"})
     new_user = [u for u in users_response.json()["users"]
                 if u["username"] == created.json()["username"]][0]
-    assert new_user["role"] == "editor"
+    assert new_user["role"] == "contributor"
     assert new_user["edit_collections"] == []
 
 
@@ -83,8 +89,9 @@ def test_approve_rejects_admin_role_via_invite(client, login, backend_env):
     superadmin-kontot, isegi kui päringu koostab admin ise. `create_invite_token`
     lubab AINULT (contributor, editor) — kõik muu OLEMAS-AGA-TUNDMATU väärtus
     langeb RANGEMALE, mitte laiemale rollile: contributor'ile (leid 5, ADR 0031).
-    See erineb PUUDUVA `role`-välja juhtumist (test_approve_defaults_to_editor_without_role),
-    kus tagasiühilduvuse pärast on vaikeväärtus endiselt editor."""
+    Alates ADR 0035-st on PUUDUV `role` sama vastusega
+    (test_approve_defaults_to_contributor_without_role) — mõlemad annavad
+    kitsama rolli."""
     client.post("/register", json={
         "name": "Kolmas", "email": "kolmas@example.test",
         "motivation": "test", "gdpr_consent": True,
@@ -137,7 +144,10 @@ def test_approve_typo_role_falls_back_to_contributor(client, login, backend_env)
 def test_create_user_from_invite_handles_legacy_token_without_role_fields(client, backend_env):
     """Tagasiühilduvus: enne seda muudatust loodud invite-tokenitel pole
     `role`/`edit_collections` võtmeid üldse (mitte ainult None). `create_user_from_invite`
-    ei tohi selle peale KeyError'iga kukkuda — vaikeväärtused rakenduvad."""
+    ei tohi selle peale KeyError'iga kukkuda — vaikeväärtused rakenduvad.
+
+    Vaikeväärtus on `contributor` (ADR 0035), mitte `editor`: aegunud
+    tokenifail ei tohi anda laiemat kontot kui tänane kutsevoog."""
     registration = backend_env["registration"]
 
     legacy_token = {
@@ -158,10 +168,10 @@ def test_create_user_from_invite_handles_legacy_token_without_role_fields(client
 
     result, error = registration.create_user_from_invite("legacy-token-123", "pikkparool123")
     assert error is None, error
-    assert result["role"] == "editor"
+    assert result["role"] == "contributor"
 
     users = json.loads(backend_env["users_file"].read_text(encoding="utf-8"))
-    assert users["vanakasutaja"]["role"] == "editor"
+    assert users["vanakasutaja"]["role"] == "contributor"
     assert users["vanakasutaja"]["edit_collections"] == []
 
 

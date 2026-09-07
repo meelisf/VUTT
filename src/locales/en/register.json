@@ -17,6 +17,9 @@
     "affiliationPlaceholder": "University, library, etc.",
     "motivation": "How do you plan to use the workbench?",
     "motivationPlaceholder": "e.g. researching 17th-century prints, studying history, translating, etc.",
+    "interest": "Collections you are interested in",
+    "interestHint": "Optional, up to {{count}} collections. Helps us set up your account and show you where to start. Access is decided by an administrator, who can also grant more.",
+    "interestRestricted": "restricted access",
     "submit": "Submit request"
   },
   "success": {
