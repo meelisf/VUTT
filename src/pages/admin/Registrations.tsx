@@ -79,6 +79,8 @@ const Registrations: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Saadetud kirja korral on link peidus (vt allpool) — see avab ta tagasi.
+  const [showInviteLink, setShowInviteLink] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Rolli ja ulatuse valik on taotluse ID järgi eraldi seisund (mitte üks jagatud
@@ -154,6 +156,7 @@ const Registrations: React.FC = () => {
       }, { token: authToken });
 
       if (data.status === 'success') {
+        setShowInviteLink(false);
         setInviteResult({
           invite_url: data.invite_url,
           invite_token: data.invite_token,
@@ -272,6 +275,18 @@ const Registrations: React.FC = () => {
                     {t('users.username')}: <span className="font-semibold">{inviteResult.username}</span>
                   </p>
                 )}
+                {/* Kui kiri läks välja, on link ja käsitsi-saatmise nupud müra —
+                    aga mitte kasutu müra: kiri võib maanduda rämpsposti. Seepärast
+                    ainult peidus, mitte ära võetud (#298). */}
+                {inviteResult.mail_sent === true && !showInviteLink && (
+                  <button
+                    onClick={() => setShowInviteLink(true)}
+                    className="mt-2 text-xs text-green-800 underline hover:text-green-900"
+                  >
+                    {t('mail.showLink')}
+                  </button>
+                )}
+                {(inviteResult.mail_sent !== true || showInviteLink) && (
                 <div className="mt-3 flex items-center gap-2">
                   <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
                     {fullInviteUrl(inviteResult)}
@@ -293,6 +308,7 @@ const Registrations: React.FC = () => {
                     </a>
                   ) : null}
                 </div>
+                )}
                 {/* Kirjamall puudub vana kujuga serveri vastuses (frontend deployitud enne backendit) —
                     näita seda selgesõnaliselt, mitte vaikimisi tühja/undefined-tekstiga kirja. */}
                 {!(inviteResult.mail_subject && inviteResult.mail_body) && (

@@ -82,6 +82,8 @@ const UsersPage: React.FC = () => {
     mail_sent?: boolean; mail_error?: string | null;
   } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Saadetud kirja korral on taastelink peidus — see avab ta tagasi.
+  const [showResetLink, setShowResetLink] = useState(false);
 
   useEffect(() => {
     if (!userLoading && (!user || roleLevel(user.role) < ROLE_LEVELS.admin)) {
@@ -223,6 +225,7 @@ const UsersPage: React.FC = () => {
     setUsersError(null);
     setResetResult(null);
     setLinkCopied(false);
+    setShowResetLink(false);
     try {
       const data = await apiPost<{
         status: string; reset_url?: string; username?: string; name?: string; message?: string;
@@ -347,6 +350,17 @@ const UsersPage: React.FC = () => {
                       {t('mail.failed', { reason: resetResult.mail_error || '—' })}
                     </p>
                   )}
+                  {/* Saadetud kirja korral on link peidus, mitte ära võetud:
+                      kiri võib maanduda rämpsposti (#298). */}
+                  {resetResult.mail_sent === true && !showResetLink && (
+                    <button
+                      onClick={() => setShowResetLink(true)}
+                      className="mt-2 text-xs text-green-800 underline hover:text-green-900"
+                    >
+                      {t('mail.showLink')}
+                    </button>
+                  )}
+                  {(resetResult.mail_sent !== true || showResetLink) && (
                   <div className="mt-3 flex items-center gap-2">
                     <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
                       {window.location.origin}{resetResult.reset_url}
@@ -359,6 +373,7 @@ const UsersPage: React.FC = () => {
                       {linkCopied ? t('users.linkCopied') : t('users.copyLink')}
                     </button>
                   </div>
+                  )}
                 </div>
                 <button
                   onClick={() => setResetResult(null)}

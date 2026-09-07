@@ -297,6 +297,7 @@
   "mail": {
     "sent": "Kiri saadetud aadressile {{email}}",
     "sentToUser": "Kiri saadetud kasutaja e-posti aadressile",
-    "failed": "Kirja ei õnnestunud saata ({{reason}}) — anna link käsitsi edasi"
+    "failed": "Kirja ei õnnestunud saata ({{reason}}) — anna link käsitsi edasi",
+    "showLink": "Näita linki"
   }
 }

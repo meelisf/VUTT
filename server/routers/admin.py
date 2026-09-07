@@ -103,7 +103,10 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         edit_collections=data.get("edit_collections", []),
         language=language,
     )
-    invite_url = f"/set-password?token={token_data['token']}"
+    # `lang` kannab saaja keele lehele: kiri on tema keeles, aga brauser, kus ta
+    # lingi avab, võib olla kolmandas keeles ja sisse ta veel loginud ei ole
+    # (`user_settings` keelt seega ei ole). Vt `utils/detectLanguage.ts`.
+    invite_url = f"/set-password?token={token_data['token']}&lang={language}"
     invite_absolute_url = f"{PUBLIC_BASE_URL}{invite_url}"
     response = {
         "status": "success",
@@ -229,7 +232,11 @@ async def admin_reset_password(request: Request, user=Depends(require_role("admi
     if not token_data:
         raise HTTPException(status_code=400, detail=error)
 
-    reset_url = f"/set-password?token={token_data['token']}&reset=1"
+    # Keel tuleb `get_user_language`-ist, MITTE `users.json`-i väljalt otse:
+    # kasutaja, kes on Seadetes keelt vahetanud, saab kirja selles keeles
+    # (ADR 0033). Sama keel läheb `lang`-iga lehele kaasa.
+    language = await run_in_threadpool(get_user_language, target)
+    reset_url = f"/set-password?token={token_data['token']}&reset=1&lang={language}"
     reset_absolute_url = f"{PUBLIC_BASE_URL}{reset_url}"
     response = {
         "status": "success",
@@ -240,10 +247,6 @@ async def admin_reset_password(request: Request, user=Depends(require_role("admi
         "name": token_data["name"],
     }
 
-    # Keel tuleb `get_user_language`-ist, MITTE `users.json`-i väljalt otse:
-    # kasutaja, kes on Seadetes keelt vahetanud, saab kirja selles keeles
-    # (ADR 0033).
-    language = await run_in_threadpool(get_user_language, target)
     email = (users[target].get("email") or "").strip()
     if not email:
         # Vana kirje ilma e-postita: link on olemas, kanalit ei ole. Vaikselt

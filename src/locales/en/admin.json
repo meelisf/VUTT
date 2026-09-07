@@ -297,6 +297,7 @@
   "mail": {
     "sent": "Email sent to {{email}}",
     "sentToUser": "Email sent to the user's address",
-    "failed": "Could not send the email ({{reason}}) — pass the link on manually"
+    "failed": "Could not send the email ({{reason}}) — pass the link on manually",
+    "showLink": "Show the link"
   }
 }
