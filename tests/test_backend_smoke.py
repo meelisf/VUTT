@@ -143,6 +143,7 @@ def test_admin_upload_status_returns_staged_state(client, login, make_upload):
         "applied_done": 0,
         # Impordi taaste loeb tulemuse siit, kui /import päring katkes (#327).
         "work_id": None,
+        "import_progress": None,
         "files": state["files"],
         "ready": 0,
         "total": 0,

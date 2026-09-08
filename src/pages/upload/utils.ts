@@ -155,3 +155,35 @@ export function computeReviewDerived(
 
   return { filesWithLocalDeleted, readyCount, importableCount, placeholderPages, progress, progressPct, status, ocrTimeoutMs, ocrTimedOut, canImport };
 }
+
+/** Faas → tõlkevõti. Tundmatu faas (vanem/uuem backend) ei tohi ekraani
+ *  tühjaks jätta — üldine „import käib" on alati parem kui mitte midagi. */
+const IMPORDI_FAASI_VOTI: Record<string, string> = {
+  downloading: 'step3.importDownloading',
+  git: 'step3.importGit',
+  meili: 'step3.importMeili',
+};
+
+export interface ImpordiEdenemine {
+  label: string;
+  /** Riba täituvus protsentides, või null kui seda ei saa ausalt öelda.
+   *  Git ja indekseerimine on ühe sammu tööd — nende „87%" oleks väljamõeldis. */
+  pct: number | null;
+}
+
+/** Impordi edenemine kuvatavaks tekstiks. Puhas funktsioon: `t` annab tooriku,
+ *  asendused teeb see (sama muster nagu `step3.applying` juures). */
+export function impordiEdenemine(
+  progress: PollResult['import_progress'] | undefined,
+  t: (key: string) => string,
+): ImpordiEdenemine | null {
+  if (!progress) return null;
+  const { phase, done, total } = progress;
+  const label = t(IMPORDI_FAASI_VOTI[phase] ?? 'step3.importRunning')
+    .replace('{{done}}', String(done ?? 0))
+    .replace('{{total}}', String(total ?? 0));
+  const pct = phase === 'downloading' && total > 0
+    ? Math.round((done / total) * 100)
+    : null;
+  return { label, pct };
+}

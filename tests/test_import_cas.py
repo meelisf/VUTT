@@ -163,3 +163,45 @@ def test_rippuv_importing_taastatakse_kaivitusel(tmp_path, monkeypatch):
 
     assert _staatus() == "done"
     assert "import_prev_status" not in upload_state.read_state("imp1")
+
+
+def test_import_kirjutab_edenemise_faasid(tmp_path, monkeypatch):
+    """Kasutaja peab nägema, MIS toimub — impordi ajal ekraan muidu ei liigu.
+
+    Faasid tulevad järjekorras ja allalaadimise loendur jõuab lõpuni; lõpus
+    märki enam ei ole (`imported` on lõppseisund, mitte edenemine).
+    """
+    nahtud = []
+    paris_write = upload_state.write_state
+
+    def _jalgi(uid, s):
+        p = s.get("import_progress")
+        if p:
+            nahtud.append((p["phase"], p["done"], p["total"]))
+        paris_write(uid, s)
+
+    sftp = _Sftp(["test-teos_pg_001.jpg", "test-teos_pg_001.txt",
+                  "test-teos_pg_002.jpg", "test-teos_pg_002.txt"])
+    _seadista(tmp_path, monkeypatch, sftp)
+    monkeypatch.setattr(upload_ops, "_write_state", _jalgi)
+
+    upload_ops.import_as_work("imp1", username="admin")
+
+    faasid = [f for f, _, _ in nahtud]
+    assert faasid[0] == "downloading"
+    assert faasid.index("git") < faasid.index("meili"), "faasid vales järjekorras"
+    assert ("downloading", 2, 2) in nahtud, "loendur ei jõudnud viimase leheni"
+    assert "import_progress" not in upload_state.read_state("imp1")
+
+
+def test_poll_annab_edenemise_kliendile(tmp_path, monkeypatch):
+    """Edenemine peab jõudma staatusevastusesse — poll on ainus tee kasutajani."""
+    sftp = _Sftp([])
+    _seadista(tmp_path, monkeypatch, sftp, staatus="importing")
+    s = upload_state.read_state("imp1")
+    s["import_progress"] = {"phase": "downloading", "done": 7, "total": 12}
+    upload_state.write_state("imp1", s)
+
+    vastus = thumbs.poll_and_sync_thumbs("imp1", sftp_open_func=lambda _u: _Sftp([]))
+
+    assert vastus["import_progress"] == {"phase": "downloading", "done": 7, "total": 12}

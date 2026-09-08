@@ -131,6 +131,9 @@ def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -
         # Klient vajab seda impordi TAASTEKS: kui 504 katkestas /import päringu,
         # loeb viisard tulemuse siit, mitte katkenud vastusest.
         "work_id": state.get("work_id"),
+        # Impordi faas ja loendur (`importing` ajal). Poll on siis LUGEJA ega
+        # tee SFTP-d, seega on see edenemise ainus tee kasutajani.
+        "import_progress": state.get("import_progress"),
     }
     payload.update(lisa)
     return payload

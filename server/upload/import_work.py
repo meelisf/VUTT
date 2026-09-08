@@ -7,6 +7,7 @@ senised monkeypatchid (_sftp_open, BASE_DIR jne) edasi töötaksid.
 import json
 import os
 import shutil
+import time
 
 from ..config import BASE_DIR, OCR_SERVER_PATH, get_logger
 from ..marginalia_normalize import normalize_marginalia_tags
@@ -124,7 +125,7 @@ def _alusta_importi(upload_id, get_upload_lock_func, read_state_func, write_stat
 
 def _lopeta_import(upload_id, uus_staatus, get_upload_lock_func, read_state_func,
                    write_state_func, **lisa):
-    """Seab lõppstaatuse ja koristab `import_prev_status` märgi."""
+    """Seab lõppstaatuse ja koristab impordi ajutised märgid."""
     state_lock = get_upload_lock_func(upload_id)
     with state_lock:
         s = read_state_func(upload_id)
@@ -132,9 +133,48 @@ def _lopeta_import(upload_id, uus_staatus, get_upload_lock_func, read_state_func
             return
         s['status'] = uus_staatus
         s.pop('import_prev_status', None)
+        s.pop('import_progress', None)
         for k, v in lisa.items():
             s[k] = v
         write_state_func(upload_id, s)
+
+
+# Kui tihti tohib edenemine kettale minna. 524-lehelise teose puhul oleks
+# lehekaupa kirjutamine 524 täis-state'i ülekirjutust; sekund on kasutajale
+# piisavalt sujuv ja kettale odav.
+EDENEMISE_SAMM_S = 1.0
+
+
+class _Edenemine:
+    """Impordi edenemine `state.json`-i, ajaliselt hõrendatult.
+
+    Poll on `importing` ajal LUGEJA (ADR 0036), seega on see ainus kirjutaja
+    ja lugeja näeb alati tervet kirjet.
+    """
+
+    def __init__(self, upload_id, get_upload_lock_func, read_state_func, write_state_func):
+        self.upload_id = upload_id
+        self.get_lock = get_upload_lock_func
+        self.read = read_state_func
+        self.write = write_state_func
+        self.faas = None
+        self.viimati = 0.0
+
+    def __call__(self, faas: str, tehtud: int = 0, kokku: int = 0):
+        nyyd = time.monotonic()
+        # Faasivahetus ja viimane leht lähevad ALATI kirja: nende vahelejätmine
+        # jätaks kasutaja ekraanile lõpetatud faasi poolelioleva loenduri.
+        oluline = faas != self.faas or (kokku and tehtud >= kokku)
+        if not oluline and nyyd - self.viimati < EDENEMISE_SAMM_S:
+            return
+        self.faas = faas
+        self.viimati = nyyd
+        with self.get_lock(self.upload_id):
+            s = self.read(self.upload_id)
+            if not s:
+                return
+            s['import_progress'] = {"phase": faas, "done": tehtud, "total": kokku}
+            self.write(self.upload_id, s)
 
 
 def taasta_rippuvad_impordid(read_state_func=read_state,
@@ -235,6 +275,8 @@ def _teosta_import(
 
     # Staatuse värav on `_alusta_importi`-s (CAS) — siia jõuab ainult
     # 'importing', mille selle kutse enda CAS just seadis.
+    edenemine = _Edenemine(upload_id, get_upload_lock_func, read_state_func,
+                           write_state_func)
 
     meta = state['meta']
     title = meta['title']
@@ -345,6 +387,7 @@ def _teosta_import(
                 json.dump(page_json, f, ensure_ascii=False, indent=2)
             os.chmod(local_json, 0o644)
             downloaded += 1
+            edenemine("downloading", downloaded, len(importable))
 
         sftp.close()
         sftp = None
@@ -406,6 +449,8 @@ def _teosta_import(
         json.dump(metadata, f, ensure_ascii=False, indent=2)
     os.chmod(meta_path, 0o644)
 
+    edenemine("git", len(importable), len(importable))
+
     # Git commit
     git_committed = False
     git_warning = None
@@ -440,6 +485,8 @@ def _teosta_import(
         update_work_collections(work_id, metadata.get("collections") or [])
     except Exception as e:
         logger.warning(f"import {upload_id}: person_to_works viga: {e}")
+
+    edenemine("meili", len(importable), len(importable))
 
     # Meilisearch sünk (sünkroonne — ootame lõpuni, et teos oleks kohe kättesaadav)
     try:

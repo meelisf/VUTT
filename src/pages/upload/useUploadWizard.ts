@@ -211,6 +211,9 @@ export function useUploadWizard() {
     }
   }, []);
 
+  // Import käib SELLES kliendis. Poll ei tohi siis `done` peale seisma jääda.
+  const importInFlightRef = useRef(false);
+
   const fetchStatus = useCallback(
     async (id: string) => {
       if (!authToken) return;
@@ -244,7 +247,11 @@ export function useUploadWizard() {
             setProcessingStartedAt(Date.now());
           }
         }
-        if (['done', 'error', 'imported'].includes(d.status)) {
+        // `done` peatab pollimise ainult siis, kui import EI käi: impordi ajal
+        // on poll ainus tee, mida mööda edenemine kasutajani jõuab, ja ta on
+        // siis odav (server ei ava SFTP-d, ADR 0036).
+        if (['error', 'imported'].includes(d.status)
+            || (d.status === 'done' && !importInFlightRef.current)) {
           stopPolling();
         }
       } catch {
@@ -482,6 +489,10 @@ export function useUploadWizard() {
     if (!uploadId || !authToken) return;
     setImportLoading(true);
     setImportError('');
+    // Kiire poll impordi ajaks: server kirjutab faasi ja loenduri state'i,
+    // kasutaja näeb neid nupu juures.
+    importInFlightRef.current = true;
+    startPolling(uploadId, POLL_FAST_MS);
     try {
       const d = await importUploadWithRecovery(uploadId, authToken);
       stopPolling();
@@ -491,7 +502,9 @@ export function useUploadWizard() {
       navigate(`/work/${d.work_id}`, uploadWarning ? { state: { uploadWarning } } : undefined);
     } catch (e) {
       setImportError(e instanceof Error ? e.message : t('step3.importError'));
+      stopPolling();
     } finally {
+      importInFlightRef.current = false;
       setImportLoading(false);
     }
   }

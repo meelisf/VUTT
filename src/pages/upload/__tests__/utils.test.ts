@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeReviewDerived,
+  impordiEdenemine,
   estimateRemainingSeconds,
   formatEta,
   isImageFile,
@@ -317,5 +318,39 @@ describe('computeReviewDerived — impordi värav .err lehtedel (#294)', () => {
     };
     const out = computeReviewDerived(poll, new Set(), null, false);
     expect(out.canImport).toBe(true);
+  });
+});
+
+describe('impordiEdenemine', () => {
+  // Võti tagasi, et test ei sõltuks tõlkefailist — kontrollime kaardistust,
+  // mitte sõnastust. Asendused peavad ikka toimuma.
+  const t = (key: string) => `${key}|{{done}}/{{total}}`;
+
+  it('ilma edenemiseta ei kuvata midagi', () => {
+    expect(impordiEdenemine(undefined, t)).toBeNull();
+    expect(impordiEdenemine(null, t)).toBeNull();
+  });
+
+  it('allalaadimine annab loenduri ja protsendi', () => {
+    const out = impordiEdenemine({ phase: 'downloading', done: 143, total: 524 }, t);
+    expect(out?.label).toBe('step3.importDownloading|143/524');
+    expect(out?.pct).toBe(27);
+  });
+
+  it('git ja indekseerimine on ilma ribata — protsent oleks väljamõeldud', () => {
+    expect(impordiEdenemine({ phase: 'git', done: 5, total: 5 }, t)?.pct).toBeNull();
+    expect(impordiEdenemine({ phase: 'meili', done: 5, total: 5 }, t)?.pct).toBeNull();
+    expect(impordiEdenemine({ phase: 'meili', done: 5, total: 5 }, t)?.label)
+      .toBe('step3.importMeili|5/5');
+  });
+
+  it('tundmatu faas ei kuku, vaid annab üldise teate', () => {
+    const out = impordiEdenemine({ phase: 'miski_uus', done: 0, total: 0 }, t);
+    expect(out?.label).toBe('step3.importRunning|0/0');
+    expect(out?.pct).toBeNull();
+  });
+
+  it('nullist koguarv ei anna jagamist nulliga', () => {
+    expect(impordiEdenemine({ phase: 'downloading', done: 0, total: 0 }, t)?.pct).toBeNull();
   });
 });
