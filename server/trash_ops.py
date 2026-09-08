@@ -288,6 +288,17 @@ def restore_deleted_page(work_id, folder_name, filename, username="VUTT Server")
         return {'ok': False, 'reason': 'unknown',
                 'error': 'Kustutamise committi ei leitud — lehte ei saa taastada'}
 
+    liik = liigita(sonum)
+    if not on_taastatav(liik):
+        selgitus = (
+            "Poolituse jääk ei ole taastatav: see on kahe praeguse lehe lähtepilt. "
+            "Terve topeltlehe saab tagasi kummagi poole pildiredaktorist "
+            "(„Taasta originaal\")."
+            if liik == "split" else
+            "Kirje päritolu ei ole teada — taastamine võib teha duplikaadi."
+        )
+        return {'ok': False, 'reason': liik, 'error': selgitus}
+
     # 2. Taasta .txt ja .json parent commitist
     restored = []
     for ext in ['.txt', '.json']:

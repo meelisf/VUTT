@@ -327,3 +327,70 @@ def test_list_deleted_pages_jatab_kataloogid_vahele(monkeypatch, tmp_path):
     (trash / "alamkaust").mkdir()
     monkeypatch.setattr(trash_ops, "TRASH_DIR", str(tmp_path / "._trash"))
     assert trash_ops.list_deleted_pages("w9", "1693-w9") == []
+
+
+def test_restore_keeldub_poolituse_jaagist_ja_ei_puutu_faile(trash_repo):
+    """Punkt 3: duplikaat ei tohi tekkida ka otse API kaudu.
+
+    Ainult liideses peitmine jätaks vea endpointi alles — „ainult adminid
+    saavad andmeid rikkuda" ei ole kaitse.
+    """
+    repo = trash_repo["repo"]
+    base_dir = trash_repo["base_dir"]
+    trash_root = trash_repo["trash_root"]
+    work_id, folder = "page_w4", "1694-w4"
+    folder_path = base_dir / folder
+    folder_path.mkdir()
+    (folder_path / "orig.txt").write_text("terve", encoding="utf-8")
+    (folder_path / "orig.json").write_text('{"sequence": 300}', encoding="utf-8")
+    (folder_path / "orig.jpg").write_bytes(b"\xff\xd8jpg")
+    # Poolituse väljundlehed jäävad kausta alles (nagu päriselt) — muidu
+    # kustutab `git rm orig.*` kausta täielikult (tühjaks jäänud kataloog),
+    # nii et test komistaks vale kontrolli otsa ("Teose kataloog ei leitud").
+    (folder_path / "kept.txt").write_text("poolituse väljund", encoding="utf-8")
+    (folder_path / "kept.json").write_text("{}", encoding="utf-8")
+    repo.index.add([
+        f"{folder}/orig.txt", f"{folder}/orig.json",
+        f"{folder}/kept.txt", f"{folder}/kept.json",
+    ])
+    repo.index.commit("init")
+
+    trash_pages = trash_root / work_id / "pages"
+    trash_pages.mkdir(parents=True)
+    import shutil
+    shutil.move(str(folder_path / "orig.jpg"), str(trash_pages / "orig.jpg"))
+    repo.git.rm(f"{folder}/orig.txt", f"{folder}/orig.json")
+    actor = Actor("poolitaja", "p@vutt.local")
+    repo.index.commit(f"Lõika leht 3 ({folder}): eemalda originaal [{work_id}]",
+                      author=actor, committer=actor)
+
+    res = trash_ops.restore_deleted_page(work_id, folder, "orig.jpg", username="taastaja")
+
+    assert res["ok"] is False
+    assert res["reason"] == "split"
+    # Ükski fail ei tohi liikuda ega tekkida
+    assert (trash_pages / "orig.jpg").exists(), "jääk liigutati prügikastist ära"
+    assert not (folder_path / "orig.txt").exists(), "tekst toodi gitist tagasi"
+    assert not (folder_path / "orig.jpg").exists()
+
+
+def test_restore_keeldub_tundmatust_kirjest(trash_repo):
+    """Git-jälge ei ole → ei tea, kas kustutatud leht või poolituse jääk.
+
+    Tundmatu päritoluga faili tagasitoomine võib teha duplikaadi; alles
+    jätmine ei tee midagi.
+    """
+    base_dir = trash_repo["base_dir"]
+    trash_root = trash_repo["trash_root"]
+    work_id, folder = "page_w5", "1695-w5"
+    (base_dir / folder).mkdir()
+    trash_pages = trash_root / work_id / "pages"
+    trash_pages.mkdir(parents=True)
+    # Fail on prügikastis, aga gitis pole teda kunagi olnud
+    (trash_pages / "orb.jpg").write_bytes(b"\xff\xd8jpg")
+
+    res = trash_ops.restore_deleted_page(work_id, folder, "orb.jpg", username="taastaja")
+
+    assert res["ok"] is False
+    assert res["reason"] == "unknown"
+    assert (trash_pages / "orb.jpg").exists()

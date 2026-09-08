@@ -311,7 +311,10 @@ def admin_restore_page(work_id: str, filename: str, user=Depends(require_role("a
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     res = restore_deleted_page(work_id, os.path.basename(path), filename, username=user["username"])
     if not res["ok"]:
-        raise HTTPException(status_code=400, detail=res["error"])
+        # 409 = päring on korrektne, aga selle kirje LIIGIGA see operatsioon ei käi.
+        # Muud vead (fail puudub, git ei anna) jäävad 400-ks nagu enne.
+        kood = 409 if res.get("reason") in ("split", "unknown") else 400
+        raise HTTPException(status_code=kood, detail=res["error"])
     return {"status": "success"}
 
 
