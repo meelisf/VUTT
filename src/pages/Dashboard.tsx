@@ -85,6 +85,11 @@ const Dashboard: React.FC = () => {
 
   // Täpsemad filtrid (AdvancedFilters komponent)
   const [selectedTags, setSelectedTags] = useState<string[]>(teoseTagsParam);
+
+  // Kas kuupäevarühmast paremal on üldse midagi (filtrisildid või „Tühista")?
+  // Otsustab, kas eraldajakriips on eraldaja või lihtsalt kriips tühjas ruumis.
+  const aktiivseidSilte = !!(authorParam || respondensParam || printerParam || statusParam
+    || inputValue || yearStart || yearEnd || selectedTags.length > 0);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(genreParam);
   const [selectedType, setSelectedType] = useState<string | null>(typeParam);
   const [selectedStatus, setSelectedStatus] = useState<WorkStatus | null>(statusParam);
@@ -684,14 +689,17 @@ const Dashboard: React.FC = () => {
               })()}
 
               {/* Controls Row */}
-              <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-4 sm:justify-between bg-white p-2 sm:p-3 rounded-lg border border-gray-200 shadow-sm">
-                {/* Year Filter */}
-                <div className="flex items-center gap-3">
-                  <span className="hidden sm:inline text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{t('search.timeRange')}</span>
-                  <DateRangeInput start={yearStart} end={yearEnd} onStartChange={setYearStart} onEndChange={setYearEnd} />
-                </div>
+              {/* `justify-between` on ära: nelja elemendiga venitas ta eraldajad
+                  tühja ruumi keskele — paremat serva hoiab nüüd `ml-auto`. */}
+              <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-4 bg-white p-2 sm:p-3 rounded-lg border border-gray-200 shadow-sm">
+                {/* Ajavahemik. Eraldi silti („AJAVAHEMIK") ei ole: „Alates"/„Kuni"
+                    ütlevad sama ja silt sõi riba laiust, mille tõttu sortimine
+                    murdus üksi eraldi reale. */}
+                <DateRangeInput start={yearStart} end={yearEnd} onStartChange={setYearStart} onEndChange={setYearEnd} compact />
 
-                <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
+                {/* Eraldaja ainult siis, kui temast paremal ON midagi eraldada —
+                    ilma filtrisiltideta seisis ta tühjas ruumis. */}
+                {aktiivseidSilte && <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>}
 
                 {/* Author Filter Badge */}
                 {authorParam && (
@@ -791,10 +799,10 @@ const Dashboard: React.FC = () => {
                   </button>
                 )}
 
-                <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
+                <div className="h-6 w-px bg-gray-200 hidden sm:block ml-auto"></div>
 
                 {/* Sort Control */}
-                <div className="flex items-center gap-2 ml-auto sm:ml-0">
+                <div className="flex items-center gap-2">
                   <ArrowUpDown size={16} className="text-gray-400" />
                   <select
                     value={sort}
