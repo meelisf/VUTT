@@ -10,7 +10,6 @@ import {
   Wrench,
   AlertTriangle,
   RotateCcw,
-  FileImage,
   Upload,
   RefreshCw,
 } from 'lucide-react';
@@ -29,10 +28,12 @@ import {
   DeletedWorkPage,
   discardReocrResults,
   getDeletedWorkPages,
+  getModifiedImages,
   getReocrStatus,
   getViewerToken,
   getWorkMetadata,
   getWorkPages,
+  ModifiedImage,
   reorderWorkPages,
   replaceWorkPageImage,
   restoreDeletedWorkPage,
@@ -40,6 +41,7 @@ import {
   startReocrBatch,
   WorkPageInfo,
 } from '../services/workApi';
+import { restoreOriginalPageImage, RestoreResult } from '../services/pageService';
 import { useGeminiEnabled } from '../hooks/useGeminiEnabled';
 import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
@@ -47,6 +49,10 @@ import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
 import PageActionBar from './manage/PageActionBar';
 import { mapReocrState, selectableNoTextFiles, applicableReocrPages, ReocrStatusResponse } from '../utils/reocrStatus';
+import { ruhmita } from './manage/trashGrouping';
+import TrashDeletedPages from './manage/TrashDeletedPages';
+import TrashModifiedImages from './manage/TrashModifiedImages';
+import TrashSplitRemnants from './manage/TrashSplitRemnants';
 
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
@@ -96,6 +102,8 @@ const WorkManage: React.FC = () => {
   const [trashError, setTrashError] = useState<string | null>(null);
   const [restoringPage, setRestoringPage] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [modifiedImages, setModifiedImages] = useState<ModifiedImage[]>([]);
+  const [restoringOriginal, setRestoringOriginal] = useState<string | null>(null);
 
   // Lehekülgede järjekorra muutmine
   const [draftPositions, setDraftPositions] = useState<Record<string, number>>({});
@@ -190,6 +198,9 @@ const WorkManage: React.FC = () => {
       } else {
         setTrashError(t('manage.trash.loadError'));
       }
+      // Üks nupuvajutus laeb mõlemad plokid: kustutatud lehed JA muudetud pildid.
+      const mi = await getModifiedImages(workId, authToken);
+      setModifiedImages(mi.images ?? []);
     } catch {
       setTrashError(t('manage.trash.loadError'));
     } finally {
@@ -615,10 +626,45 @@ const WorkManage: React.FC = () => {
       } else {
         setRestoreMessage({ text: `${t('manage.trash.restoreError')}: ${data.detail || data.message || ''}`, ok: false });
       }
-    } catch {
-      setRestoreMessage({ text: t('manage.trash.restoreError'), ok: false });
+    } catch (e) {
+      // 409 (nt poolituse jääk) kannab serveri `detail`-teksti — just see ütleb
+      // kasutajale, MIKS kirjet ei taastata. Üldine sõnum peidaks selle ära.
+      const detail = e instanceof ApiError ? e.message : null;
+      setRestoreMessage({ text: detail || t('manage.trash.restoreError'), ok: false });
     } finally {
       setRestoringPage(null);
+    }
+  };
+
+  // Taastab lehe pildi ._originals pristine versiooni (Halda-vaate "Muudetud
+  // pildid" plokk). Käsitleb kõiki vastuse kujusid nagu pildiredaktor
+  // (PageImageEditorModal.doRestoreOriginal): {"found": false} JA
+  // {"success": true, "restored": false, "reason": "no_original"} EI OLE õnnestumine.
+  const handleRestoreOriginal = async (filename: string) => {
+    if (!workId || !authToken) return;
+    setRestoringOriginal(filename);
+    setRestoreMessage(null);
+    try {
+      const r = await restoreOriginalPageImage(workId, filename, authToken) as RestoreResult & { found?: boolean };
+      if (r.found === false) {
+        setRestoreMessage({ text: t('manage.trash.restoreError'), ok: false });
+        return;
+      }
+      if (!r.restored && r.reason === 'no_original') {
+        setRestoreMessage({ text: t('manage.editor.noOriginal'), ok: false });
+        return;
+      }
+      // Taastamine EI muuda ._originals faili, seega `v` jääb samaks — muutub
+      // `v_current`. Laadi loend uuesti (kustutatud lehed + muudetud pildid koos)
+      // ja tõsta thumbCacheBust, sest lehekülgede loend ja pildiredaktor saavad
+      // pildid pildiserverist ega tea sellest muudatusest midagi.
+      await loadTrashPages();
+      setThumbCacheBust(Date.now());
+    } catch (e) {
+      const detail = e instanceof ApiError ? e.message : null;
+      setRestoreMessage({ text: detail || t('manage.trash.restoreError'), ok: false });
+    } finally {
+      setRestoringOriginal(null);
     }
   };
 
@@ -1117,45 +1163,6 @@ const WorkManage: React.FC = () => {
               </div>
             )}
 
-            {!trashLoading && trashLoaded && trashPages.length === 0 && (
-              <p className="p-5 text-sm text-gray-400">{t('manage.trash.empty')}</p>
-            )}
-
-            {!trashLoading && trashPages.length > 0 && (
-              <div className="divide-y divide-gray-100">
-                {trashPages.map((page) => (
-                  <div key={page.filename} className="flex items-center gap-3 px-5 py-3">
-                    <div className="flex-shrink-0 text-gray-300">
-                      <FileImage size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-700 font-mono">{page.filename}</p>
-                      {page.deleted_at && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {t('manage.trash.deletedAt')}: {new Date(page.deleted_at).toLocaleString('et-EE', {
-                            day: '2-digit', month: '2-digit', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
-                          })}
-                          {page.deleted_by && ` · ${page.deleted_by}`}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleRestorePage(page.filename)}
-                      disabled={restoringPage === page.filename}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded transition-colors disabled:opacity-50"
-                    >
-                      {restoringPage === page.filename ? (
-                        <><Loader2 size={13} className="animate-spin" />{t('manage.trash.restoring')}</>
-                      ) : (
-                        <><RotateCcw size={13} />{t('manage.trash.restore')}</>
-                      )}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
             {!trashLoaded && !trashLoading && !trashError && (
               <div className="p-5 text-center">
                 <button
@@ -1167,6 +1174,19 @@ const WorkManage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {!trashLoading && trashLoaded && (() => {
+            const { deleted, split } = ruhmita(trashPages);
+            return (
+              <>
+                <TrashDeletedPages pages={deleted} workId={workId!} token={authToken}
+                  restoringPage={restoringPage} onRestore={handleRestorePage} t={t} />
+                <TrashModifiedImages images={modifiedImages} workId={workId!} token={authToken}
+                  restoringOriginal={restoringOriginal} onRestoreOriginal={handleRestoreOriginal} t={t} />
+                <TrashSplitRemnants pages={split} workId={workId!} token={authToken} t={t} />
+              </>
+            );
+          })()}
 
           {/* Ohutsoon — prügikasti tabi all */}
           <div className="bg-white rounded-xl border border-red-200 shadow-sm">
