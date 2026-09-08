@@ -43,6 +43,9 @@ export interface PollResult {
   };
   error?: string;
   stalled?: boolean;
+  /** Imporditud teose ID. Katkenud /import päringu järel on see tulemuse
+   *  tõene allikas — vt `importUploadWithRecovery`. */
+  work_id?: string | null;
 }
 
 export interface UploadType {

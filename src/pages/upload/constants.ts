@@ -41,7 +41,7 @@ export const ADA_TRANSFER_STATUSES = ['ada_fetching', 'ada_error'];
  * `tests/test_lepingud_kahes_otsas.py`. */
 export const RESUMABLE_STATUSES = [
   'pending', 'collecting_images', 'awaiting_split', 'prepping', 'applying',
-  'processing', 'reviewing', 'done', ...ADA_TRANSFER_STATUSES,
+  'processing', 'reviewing', 'done', 'importing', ...ADA_TRANSFER_STATUSES,
 ];
 
 /** Staatus → viisardi samm ADA-voos. */

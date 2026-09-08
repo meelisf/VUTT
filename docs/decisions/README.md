@@ -55,3 +55,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0033](0033-serveripoolne-kasutajale-nahtav-tekst.md) | Rakenduses loetav tekst renderdatakse lugeja keeles, lahkuv tekst saaja salvestatud keeles; keelt küsitakse ühest funktsioonist | kehtib |
 | [0034](0034-kirjad-hosti-postfixi-kaudu.md) | Kirjad lähevad hosti postfixi kaudu (`mailhost.ut.ee`); saatmisviga ei kaota juba loodud linki | kehtib |
 | [0035](0035-uue-konto-vaikeroll-on-kitsam.md) | Uue konto vaikeroll on `contributor`; iga muu väärtus peale contributor/editor annab kitsama rolli | kehtib |
+| [0036](0036-katkenud-vastus-ei-ole-ebaonnestunud-too.md) | Katkenud vastus ei ole ebaõnnestunud töö; pikk töö deklareerib, et ta käib, ja ooteaeg on leping kahe otsa vahel | kehtib |

@@ -301,7 +301,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
         title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
         className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
       >
-        {importLoading ? (
+        {importLoading || status === 'importing' ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <AlertTriangle size={16} />
@@ -315,7 +315,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
         title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
         className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
       >
-        {importLoading ? (
+        {importLoading || status === 'importing' ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <CheckCircle size={16} />

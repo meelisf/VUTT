@@ -88,7 +88,115 @@ def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
     return jpg_map
 
 
+# Staatused, millest import tohib alata. `imported` ei kuulu siia (teos on juba
+# olemas), `importing` samuti mitte — see ongi CAS-i mõte.
+IMPORT_LUBATUD_STAATUSED = ("done", "reviewing")
+
+
+def _alusta_importi(upload_id, get_upload_lock_func, read_state_func, write_state_func):
+    """CAS `done|reviewing → importing`. Tagastab eelmise staatuse.
+
+    Import kestab 500-lehelisel teosel üle minuti ja klient annab enne alla
+    (nginx `proxy_read_timeout`). Ilma selle märgita ei tea keegi — ei kasutaja,
+    ei server —, et töö KÄIB: kordusklikk jõudis „Kaust ... on juba olemas"-ni,
+    mis kõlab nagu andmeviga, mitte nagu „oota".
+    """
+    state_lock = get_upload_lock_func(upload_id)
+    with state_lock:
+        state = read_state_func(upload_id)
+        if not state:
+            raise ValueError("Upload ei leitud")
+        praegune = state.get('status')
+        if praegune == 'importing':
+            raise ValueError("Import juba käib — oota, kuni see lõpeb")
+        if praegune not in IMPORT_LUBATUD_STAATUSED:
+            raise ValueError(
+                f"Upload peab olema 'done' või 'reviewing' olekus, praegu: '{praegune}'"
+            )
+        state['status'] = 'importing'
+        # Eelmine staatus PEAB elama state'is, mitte ainult mälus: konteineri
+        # restart tapab lõime enne except-haru ja käivitustaaste peab teadma,
+        # kuhu tagasi minna (sama muster nagu apply_recovery, #256).
+        state['import_prev_status'] = praegune
+        write_state_func(upload_id, state)
+    return praegune
+
+
+def _lopeta_import(upload_id, uus_staatus, get_upload_lock_func, read_state_func,
+                   write_state_func, **lisa):
+    """Seab lõppstaatuse ja koristab `import_prev_status` märgi."""
+    state_lock = get_upload_lock_func(upload_id)
+    with state_lock:
+        s = read_state_func(upload_id)
+        if not s:
+            return
+        s['status'] = uus_staatus
+        s.pop('import_prev_status', None)
+        for k, v in lisa.items():
+            s[k] = v
+        write_state_func(upload_id, s)
+
+
+def taasta_rippuvad_impordid(read_state_func=read_state,
+                             write_state_func=write_state,
+                             get_upload_lock_func=get_upload_lock) -> None:
+    """Käivitusel: rippuv `importing` saab eelmise staatuse tagasi (#256 muster).
+
+    Ilma selleta jääks upload IGAVESEKS `importing`-usse ja CAS keelaks iga
+    uue katse — viga oleks püsivam kui see, mille vastu CAS kaitseb.
+    Poolik teosekaust on juba `import_as_work` except-harus kustutatud; kui
+    restart tabas täpselt kirjutamise ajal, jääb kaust alles ja järgmine katse
+    ütleb seda selgelt („Kaust ... on juba olemas").
+    """
+    from .state import UPLOADS_DIR
+    if not os.path.isdir(UPLOADS_DIR):
+        return
+    for uid in sorted(os.listdir(UPLOADS_DIR)):
+        try:
+            s = read_state_func(uid)
+            if not s or s.get('status') != 'importing':
+                continue
+            eelmine = s.get('import_prev_status') or 'reviewing'
+            _lopeta_import(uid, eelmine, get_upload_lock_func, read_state_func,
+                           write_state_func)
+            logger.warning("Import taastatud staatusesse %s: %s", eelmine, uid)
+        except Exception:
+            # Erand ÜHE upload'i pealt ei tohi ülejäänuid taastamata jätta.
+            logger.warning("Impordi taaste ebaõnnestus: %s", uid, exc_info=True)
+
+
 def import_as_work(
+    upload_id: str,
+    username: str = None,
+    *,
+    get_upload_lock_func=get_upload_lock,
+    read_state_func=read_state,
+    write_state_func=write_state,
+    **muud,
+) -> dict:
+    """CAS-i ja taastega ümbris tegeliku impordi ümber.
+
+    Staatus antakse TAGASI iga vea korral (ka `KeyboardInterrupt`/`SystemExit`
+    korral — `BaseException`), muidu jääks upload importimatuks.
+    """
+    eelmine = _alusta_importi(upload_id, get_upload_lock_func, read_state_func,
+                              write_state_func)
+    try:
+        return _teosta_import(
+            upload_id,
+            username=username,
+            get_upload_lock_func=get_upload_lock_func,
+            read_state_func=read_state_func,
+            write_state_func=write_state_func,
+            **muud,
+        )
+    except BaseException:
+        _lopeta_import(upload_id, eelmine, get_upload_lock_func, read_state_func,
+                       write_state_func)
+        raise
+
+
+def _teosta_import(
     upload_id: str,
     username: str = None,
     *,
@@ -125,11 +233,8 @@ def import_as_work(
     if not state:
         raise ValueError("Upload ei leitud")
 
-    current_status = state.get('status')
-    if current_status not in ('done', 'reviewing'):
-        raise ValueError(
-            f"Upload peab olema 'done' või 'reviewing' olekus, praegu: '{current_status}'"
-        )
+    # Staatuse värav on `_alusta_importi`-s (CAS) — siia jõuab ainult
+    # 'importing', mille selle kutse enda CAS just seadis.
 
     meta = state['meta']
     title = meta['title']
@@ -348,12 +453,8 @@ def import_as_work(
         logger.warning(f"import {upload_id}: meilisearch sync viga: {e}")
 
     # Uuenda upload state → 'imported'
-    with state_lock:
-        s = read_state_func(upload_id)
-        if s:
-            s['status'] = 'imported'
-            s['work_id'] = work_id
-            write_state_func(upload_id, s)
+    _lopeta_import(upload_id, 'imported', get_upload_lock_func, read_state_func,
+                   write_state_func, work_id=work_id)
 
     # Prepress-artefaktid ei ole enam vajalikud — preview/ ja eriti strips/
     # koguneksid muidu uploads/ alla märkamatult.

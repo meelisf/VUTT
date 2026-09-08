@@ -32,7 +32,7 @@ import {
   deleteUpload,
   getReplaceWorkMetadata,
   getUploadStatus,
-  importUpload,
+  importUploadWithRecovery,
   listUploads,
   replaceWorkUpload,
   uploadImagePage,
@@ -41,7 +41,10 @@ import {
 import type { AdaLookupResult, PollResult, SavedUpload } from './types';
 
 /** Staatused, mille korral OCR-i pool on käigus → viisardi 4. samm. */
-const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done'];
+// `importing` kuulub siia: import kestab suurel teosel minuteid ja
+// vahepealne lehe värskendus peab tooma kasutaja tagasi ülevaatusele,
+// mitte viisardi algusse.
+const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done', 'importing'];
 
 export function useUploadWizard() {
   const { t } = useTranslation(['upload', 'common']);
@@ -480,7 +483,7 @@ export function useUploadWizard() {
     setImportLoading(true);
     setImportError('');
     try {
-      const d = await importUpload(uploadId, authToken);
+      const d = await importUploadWithRecovery(uploadId, authToken);
       stopPolling();
       setFileUploading(false);
       const uploadWarning = d.warning || (d.git_committed === false ? t('step3.gitCommitWarning') : undefined);

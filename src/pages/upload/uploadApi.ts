@@ -168,15 +168,80 @@ export async function uploadImagePage(
   await parseUploadResponse(response);
 }
 
+/** Impordi lagi. Import kestab O(lehtede arv): 524 lk ≈ 75 s (SFTP alla, git
+ *  commit, Meili sünk). Vana 60 s lagi langes kokku nginx-i vaikimisi
+ *  `proxy_read_timeout`-iga ja iga suurem teos andis 504 valmis teose kohta.
+ *  Lagi on nüüd sama, mis nginx-is (`nginx.host.conf`, `/api/files/admin/`). */
+const IMPORT_TIMEOUT_MS = 600_000;
+
+/** Kui vastus siiski kaob, küsitakse tulemus staatusest — nii tihti ja nii
+ *  kaua. Eelarve katab ka väga suure teose, mille import juba käib. */
+const IMPORT_RECOVERY_POLL_MS = 3_000;
+const IMPORT_RECOVERY_BUDGET_MS = 15 * 60 * 1000;
+
 export function importUpload(uploadId: string, token: string | null): Promise<UploadImportResponse> {
-  return apiPost<UploadImportResponse>(`/admin/upload/${uploadId}/import`, {}, { token, timeout: 60_000 });
+  return apiPost<UploadImportResponse>(
+    `/admin/upload/${uploadId}/import`, {}, { token, timeout: IMPORT_TIMEOUT_MS },
+  );
+}
+
+export interface ImportRecoveryDeps {
+  doImport?: typeof importUpload;
+  checkStatus?: typeof getUploadStatus;
+  pollMs?: number;
+  budgetMs?: number;
+}
+
+const maga = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Impordib ja EI usu katkenud päringut tõendina.
+ *
+ *  Import jookseb serveris threadpoolis: kliendi lahtiühendamine (504, timeout,
+ *  suletud sülearvuti) EI katkesta seda. Katkenud vastus tähendab „ma ei tea",
+ *  mitte „ebaõnnestus" — tõene allikas on upload'i staatus:
+ *    `imported` → import LÄKS läbi, tulemus on `work_id`,
+ *    `importing` → käib veel, ootame,
+ *    muu → server andis staatuse tagasi ehk import päriselt kukkus.
+ */
+export async function importUploadWithRecovery(
+  uploadId: string,
+  token: string | null,
+  deps: ImportRecoveryDeps = {},
+): Promise<UploadImportResponse & { recovered?: boolean }> {
+  const {
+    doImport = importUpload,
+    checkStatus = getUploadStatus,
+    pollMs = IMPORT_RECOVERY_POLL_MS,
+    budgetMs = IMPORT_RECOVERY_BUDGET_MS,
+  } = deps;
+
+  try {
+    return await doImport(uploadId, token);
+  } catch (algne) {
+    const tahtaeg = Date.now() + budgetMs;
+    do {
+      let olek;
+      try {
+        olek = await checkStatus(uploadId, token);
+      } catch {
+        // Ka staatus ei vasta — algne viga on parem teade kui „staatus ei vasta".
+        throw algne;
+      }
+      if (olek.status === 'imported' && olek.work_id) {
+        return { work_id: olek.work_id, recovered: true };
+      }
+      if (olek.status !== 'importing') throw algne;
+      await maga(pollMs);
+    } while (Date.now() < tahtaeg);
+    throw algne;
+  }
 }
 
 export function replaceWorkUpload(uploadId: string, workId: string, token: string | null): Promise<UploadImportResponse> {
   return apiPost<UploadImportResponse>(
     `/admin/upload/${uploadId}/replace-work/${workId}`,
     { metadata_updates: {} },
-    { token, timeout: 30_000 },
+    { token, timeout: IMPORT_TIMEOUT_MS },
   );
 }
 
