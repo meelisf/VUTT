@@ -14,6 +14,7 @@ from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo
 from .utils import WORK_ID_CACHE
 from .meilisearch_ops import sync_work_to_meilisearch
+from .trash_reason import liigita, on_taastatav
 
 logger = get_logger(__name__)
 
@@ -185,6 +186,33 @@ def restore_deleted_work(work_id, username="VUTT Server"):
     return {'ok': True, 'folder_name': folder_name, 'title': title}
 
 
+def leia_kustutamise_commit(repo, folder_name, base):
+    """Viimane commit, mis selle lehe `.txt`-i kustutas. TEE, mitte sõnum.
+
+    Vana `--grep {kaust}/{base}` eeldas, et failinimi on commiti sõnumis. Ei
+    ole: hulgikustutus kirjutab „Kustuta 2 lehte: {kaust}" ja poolitus
+    „Lõika leht N (…)". Tootmises jäi nii 303 kirjet 462-st ilma kuupäeva,
+    autori ja TAASTATAVUSETA (#325).
+
+    `.txt` on ankur: ta on igal lehel olemas ja git-tracked (`.jpg` ei ole).
+    """
+    try:
+        rida = repo.git.log(
+            '--all', '--oneline', '--diff-filter=D', '-1',
+            '--', f'{folder_name}/{base}.txt'
+        ).strip()
+    except Exception as e:
+        logger.warning(f"TRASH: git log ebaõnnestus {folder_name}/{base}: {e}")
+        return None, None
+    if not rida:
+        return None, None
+    commit_hash = rida.split(' ', 1)[0]
+    try:
+        return commit_hash, repo.commit(commit_hash).message
+    except Exception:
+        return commit_hash, None
+
+
 def list_deleted_pages(work_id, folder_name):
     """Loetleb teose kustutatud leheküljed (._trash/{work_id}/pages/)."""
     trash_pages_dir = os.path.join(TRASH_DIR, work_id, 'pages')
@@ -195,32 +223,36 @@ def list_deleted_pages(work_id, folder_name):
     pages = []
 
     for fname in sorted(os.listdir(trash_pages_dir)):
+        tee = os.path.join(trash_pages_dir, fname)
+        # Kataloogid (nt `.thumbs` cache) ei ole kirjed.
+        if not os.path.isfile(tee):
+            continue
         if not fname.lower().endswith(('.jpg', '.jpeg', '.png')):
             continue
         base = os.path.splitext(fname)[0]
 
+        commit_hash, sonum = leia_kustutamise_commit(repo, folder_name, base)
+        liik = liigita(sonum)
         item = {
             'filename': fname,
             'base_name': base,
             'deleted_at': None,
             'deleted_by': None,
-            'commit_hash': None,
+            'commit_hash': commit_hash,
+            'reason': liik,
+            # Serveri otsus, mitte kliendi tuletus — sama reegel juhib endpointi.
+            'restorable': on_taastatav(liik),
+            # Pisipildi versioon: failinimi EI OLE muutumatuse garantii, sest
+            # taastatud+muudetud+uuesti kustutatud leht jõuab sama tee peale.
+            'v': os.stat(tee).st_mtime_ns,
         }
-
-        try:
-            log_output = repo.git.log(
-                '--all', '--oneline',
-                '--grep', f'{folder_name}/{base}'
-            ).strip()
-            if log_output:
-                first_line = log_output.split('\n')[0]
-                commit_hash = first_line.split(' ', 1)[0]
+        if commit_hash:
+            try:
                 commit = repo.commit(commit_hash)
-                item['commit_hash'] = commit_hash
                 item['deleted_at'] = commit.committed_datetime.isoformat()
                 item['deleted_by'] = commit.author.name
-        except Exception as e:
-            logger.warning(f"TRASH: Ei leidnud leheküljecommiti {folder_name}/{base}: {e}")
+            except Exception as e:
+                logger.warning(f"TRASH: commiti {commit_hash} lugemine ebaõnnestus: {e}")
 
         pages.append(item)
 
@@ -251,17 +283,10 @@ def restore_deleted_page(work_id, folder_name, filename, username="VUTT Server")
     repo = get_or_init_repo()
 
     # 1. Leia kustutamise commit
-    try:
-        log_output = repo.git.log(
-            '--all', '--oneline',
-            '--grep', f'{folder_name}/{base}'
-        ).strip()
-        if not log_output:
-            return {'ok': False, 'error': 'Git kustutamise committi ei leitud'}
-        first_line = log_output.split('\n')[0]
-        commit_hash = first_line.split(' ', 1)[0]
-    except Exception as e:
-        return {'ok': False, 'error': f'Git otsing ebaõnnestus: {e}'}
+    commit_hash, sonum = leia_kustutamise_commit(repo, folder_name, base)
+    if not commit_hash:
+        return {'ok': False, 'reason': 'unknown',
+                'error': 'Kustutamise committi ei leitud — lehte ei saa taastada'}
 
     # 2. Taasta .txt ja .json parent commitist
     restored = []

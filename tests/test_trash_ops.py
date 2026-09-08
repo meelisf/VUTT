@@ -247,3 +247,83 @@ def test_list_deleted_works_ristviitab_gitiga(trash_repo):
     assert item["jpg_count"] == 2
     assert item["commit_hash"] is not None
     assert item["deleted_by"] == "kustutaja"
+
+
+# =========================================================
+# Teepõhine git-jälg + liik loendis (#325, Task 3)
+# =========================================================
+
+def test_list_deleted_pages_leiab_commiti_ka_ilma_failinimeta_sonumis(trash_repo):
+    """Tootmises on 303 kirjet 462-st, mille sõnumis failinime EI OLE.
+
+    Vana `--grep {kaust}/{base}` ei leidnud neid: kustutamise sõnum on
+    „Kustuta 2 lehte: {kaust}". Teepõhine otsing leiab.
+    """
+    repo = trash_repo["repo"]
+    base_dir = trash_repo["base_dir"]
+    trash_root = trash_repo["trash_root"]
+    work_id, folder = "page_w2", "1691-w2"
+    folder_path = base_dir / folder
+    folder_path.mkdir()
+    for pn in ("pg1", "pg2"):
+        (folder_path / f"{pn}.txt").write_text(f"{pn}-sisu", encoding="utf-8")
+        (folder_path / f"{pn}.json").write_text("{}", encoding="utf-8")
+        (folder_path / f"{pn}.jpg").write_bytes(b"\xff\xd8jpg")
+    repo.index.add([f"{folder}/{p}.{e}" for p in ("pg1", "pg2") for e in ("txt", "json")])
+    repo.index.commit("init")
+
+    trash_pages = trash_root / work_id / "pages"
+    trash_pages.mkdir(parents=True)
+    import shutil
+    shutil.move(str(folder_path / "pg1.jpg"), str(trash_pages / "pg1.jpg"))
+    repo.git.rm(f"{folder}/pg1.txt", f"{folder}/pg1.json")
+    actor = Actor("kustutaja", "k@vutt.local")
+    # Sõnum EI SISALDA failinime — täpselt nagu tootmises
+    repo.index.commit(f"Kustuta 1 lehte: {folder} [{work_id}]", author=actor, committer=actor)
+
+    kirjed = trash_ops.list_deleted_pages(work_id, folder)
+
+    assert len(kirjed) == 1
+    assert kirjed[0]["commit_hash"], "teepõhine otsing ei leidnud kustutamise commiti"
+    assert kirjed[0]["deleted_by"] == "kustutaja"
+    assert kirjed[0]["reason"] == "deleted"
+    assert kirjed[0]["restorable"] is True
+    assert kirjed[0]["v"] > 0, "pisipildi versioon (mtime_ns) puudub"
+
+
+def test_list_deleted_pages_margib_poolituse_jaagi(trash_repo):
+    """Poolituse jääk EI OLE taastatav — tema tagasitoomine annaks duplikaadi."""
+    repo = trash_repo["repo"]
+    base_dir = trash_repo["base_dir"]
+    trash_root = trash_repo["trash_root"]
+    work_id, folder = "page_w3", "1692-w3"
+    folder_path = base_dir / folder
+    folder_path.mkdir()
+    (folder_path / "orig.txt").write_text("terve", encoding="utf-8")
+    (folder_path / "orig.json").write_text("{}", encoding="utf-8")
+    (folder_path / "orig.jpg").write_bytes(b"\xff\xd8jpg")
+    repo.index.add([f"{folder}/orig.txt", f"{folder}/orig.json"])
+    repo.index.commit("init")
+
+    trash_pages = trash_root / work_id / "pages"
+    trash_pages.mkdir(parents=True)
+    import shutil
+    shutil.move(str(folder_path / "orig.jpg"), str(trash_pages / "orig.jpg"))
+    repo.git.rm(f"{folder}/orig.txt", f"{folder}/orig.json")
+    actor = Actor("poolitaja", "p@vutt.local")
+    repo.index.commit(f"Lõika leht 3 ({folder}): eemalda originaal [{work_id}]",
+                      author=actor, committer=actor)
+
+    kirjed = trash_ops.list_deleted_pages(work_id, folder)
+
+    assert kirjed[0]["reason"] == "split"
+    assert kirjed[0]["restorable"] is False
+
+
+def test_list_deleted_pages_jatab_kataloogid_vahele(monkeypatch, tmp_path):
+    """`.thumbs` cache elab `pages/` KÕRVAL, aga loendaja peab olema kindel."""
+    trash = tmp_path / "._trash" / "w9" / "pages"
+    trash.mkdir(parents=True)
+    (trash / "alamkaust").mkdir()
+    monkeypatch.setattr(trash_ops, "TRASH_DIR", str(tmp_path / "._trash"))
+    assert trash_ops.list_deleted_pages("w9", "1693-w9") == []
