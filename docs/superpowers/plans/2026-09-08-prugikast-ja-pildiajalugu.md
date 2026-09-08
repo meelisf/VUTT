@@ -475,9 +475,32 @@ def test_restore_keeldub_poolituse_jaagist_ja_ei_puutu_faile(trash_repo):
     assert not (folder_path / "orig.jpg").exists()
 ```
 
+```python
+def test_restore_keeldub_tundmatust_kirjest(trash_repo):
+    """Git-jälge ei ole → ei tea, kas kustutatud leht või poolituse jääk.
+
+    Tundmatu päritoluga faili tagasitoomine võib teha duplikaadi; alles
+    jätmine ei tee midagi.
+    """
+    base_dir = trash_repo["base_dir"]
+    trash_root = trash_repo["trash_root"]
+    work_id, folder = "page_w5", "1695-w5"
+    (base_dir / folder).mkdir()
+    trash_pages = trash_root / work_id / "pages"
+    trash_pages.mkdir(parents=True)
+    # Fail on prügikastis, aga gitis pole teda kunagi olnud
+    (trash_pages / "orb.jpg").write_bytes(b"\xff\xd8jpg")
+
+    res = trash_ops.restore_deleted_page(work_id, folder, "orb.jpg", username="taastaja")
+
+    assert res["ok"] is False
+    assert res["reason"] == "unknown"
+    assert (trash_pages / "orb.jpg").exists()
+```
+
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `.venv/bin/pytest tests/test_trash_ops.py::test_restore_keeldub_poolituse_jaagist_ja_ei_puutu_faile -q`
+Run: `.venv/bin/pytest tests/test_trash_ops.py -k "keeldub" -q`
 Expected: FAIL — `res["ok"] is True` ja failid liigutatud (praegu taastab)
 
 - [ ] **Step 3: Write minimal implementation**
@@ -497,14 +520,20 @@ Expected: FAIL — `res["ok"] is True` ja failid liigutatud (praegu taastab)
         return {'ok': False, 'reason': liik, 'error': selgitus}
 ```
 
-`server/routers/admin.py` restore-route (praegu tagastab `res` otse):
+`server/routers/admin.py` restore-route. **Vastuseleping peab jääma samaks:**
+route tagastab õnnestumisel `{"status": "success"}` (mitte `res`) ja vea korral
+`HTTPException` — `handleRestorePage` kontrollib `data.status === 'success'`
+(`WorkManage.tsx:610`). `res` otse tagastamine annaks `{"ok": true}`: leht
+taastuks, aga kasutaja näeks viga ja loend ei uueneks. Muutub AINULT veakood:
 
 ```python
     res = restore_deleted_page(work_id, os.path.basename(path), filename, username=user["username"])
-    if not res.get("ok") and res.get("reason") in ("split", "unknown"):
-        # 409: päring on korrektne, aga selle kirje liigiga see operatsioon ei käi.
-        raise HTTPException(status_code=409, detail=res.get("error"))
-    return res
+    if not res["ok"]:
+        # 409 = päring on korrektne, aga selle kirje LIIGIGA see operatsioon ei käi.
+        # Muud vead (fail puudub, git ei anna) jäävad 400-ks nagu enne.
+        kood = 409 if res.get("reason") in ("split", "unknown") else 400
+        raise HTTPException(status_code=kood, detail=res["error"])
+    return {"status": "success"}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -512,11 +541,53 @@ Expected: FAIL — `res["ok"] is True` ja failid liigutatud (praegu taastab)
 Run: `.venv/bin/pytest tests/test_trash_ops.py -q`
 Expected: PASS (sh `test_restore_deleted_page_full_flow` — keeld ei tohi tabada õiget juhtu)
 
-- [ ] **Step 5: Käivita KÕIK väravad ja commit**
+- [ ] **Step 5: Route'i lepingutestid (kõik kolm tulemust)**
+
+Kiht, kus regressioon tekiks, on route — testi teda otse, `restore_deleted_page`
+asendatud. Lisa `tests/test_backend_smoke.py` lõppu (kasutab olemasolevat
+`client` + `login` fixture'it):
+
+```python
+def test_restore_route_leping_kolmel_tulemusel(client, login, monkeypatch):
+    """Õnnestumine PEAB andma {"status": "success"} — frontend kontrollib just seda.
+
+    Liigiviga on 409, ülejäänud vead jäävad 400-ks. `res` otse tagastamine
+    (`{"ok": true}`) taastaks lehe, aga näitaks kasutajale viga.
+    """
+    import server.routers.admin as admin_router
+    monkeypatch.setattr(admin_router, "find_directory_by_id", lambda wid: "/tmp/1690-w1")
+    token = login("admin", "adminpass")
+    p = {"headers": {"Authorization": f"Bearer {token}"}}
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": True})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 200 and r.json() == {"status": "success"}
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": False, "reason": "split", "error": "jääk"})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 409 and r.json()["detail"] == "jääk"
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": False, "reason": "unknown", "error": "tundmatu"})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 409
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": False, "error": "Kustutatud faili ei leitud"})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 400, "muu viga ei tohi muutuda 409-ks ega 200-ks"
+```
+
+Run: `.venv/bin/pytest tests/test_backend_smoke.py -q`
+Expected: PASS
+
+- [ ] **Step 6: Käivita KÕIK väravad ja commit**
 
 ```bash
 .venv/bin/pytest tests/ -q && npm run typecheck && npx vitest run && npm run lint:ci
-git add server/trash_ops.py server/routers/admin.py tests/test_trash_ops.py
+git add server/trash_ops.py server/routers/admin.py tests/test_trash_ops.py tests/test_backend_smoke.py
 git commit -m "fix(trash): poolituse jääki ja tundmatut kirjet ei taastata (#325)"
 ```
 
@@ -595,6 +666,32 @@ def test_teekonna_pogenemine_ja_tundmatu_liik(tmp_path, monkeypatch):
         history_thumbs.ajaloo_pisipilt("w1", "trash", "../../etc/passwd")
     with pytest.raises(ValueError):
         history_thumbs.ajaloo_pisipilt("w1", "muu", "leht.jpg")
+    with pytest.raises(ValueError):
+        history_thumbs.ajaloo_pisipilt("../w1", "trash", "leht.jpg")
+
+
+def test_symbollink_lubatud_kaustast_valja_keelatakse(tmp_path, monkeypatch):
+    """`_is_safe_image_path` lahendab realpath'i — nimi üksi ei tõesta asukohta."""
+    monkeypatch.setattr(history_thumbs, "BASE_DIR", str(tmp_path))
+    valine = tmp_path / "valine.jpg"
+    _pilt(valine)
+    trash = tmp_path / "._trash" / "w1" / "pages"
+    trash.mkdir(parents=True)
+    (trash / "link.jpg").symlink_to(valine)
+
+    with pytest.raises(ValueError):
+        history_thumbs.ajaloo_pisipilt("w1", "trash", "link.jpg")
+
+
+def test_praeguse_lehe_pisipilt(tmp_path, monkeypatch):
+    """Liik `current` = teose enda kaust; tema mtime MUUTUB originaali taastamisel."""
+    monkeypatch.setattr(history_thumbs, "BASE_DIR", str(tmp_path))
+    töö = tmp_path / "1700-w1"
+    _pilt(töö / "leht.jpg")
+    monkeypatch.setattr(history_thumbs, "find_directory_by_id", lambda wid: str(töö))
+
+    tee = history_thumbs.ajaloo_pisipilt("w1", "current", "leht.jpg")
+    assert tee and os.path.isfile(tee)
 
 
 def test_puuduv_fail_annab_none(tmp_path, monkeypatch):
@@ -611,52 +708,69 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'server.history_thumbs'
 
 ```python
 # server/history_thumbs.py
-"""Pisipildid prügikasti ja originaalide kaustadest (#325).
+"""Pisipildid prügikasti, originaalide ja praeguse lehe kaustast (#325).
 
-Need failid ei ole avalikud, seega pildiserver (port 8001) neid ei serveeri —
-tee käib admin-endpointist. Originaal on ~2 MB ja kirjeid on teoses kuni sadu,
-seega saadetakse alati vähendatud koopia.
+Prügikasti ja originaalide failid ei ole avalikud, seega pildiserver (port 8001)
+neid ei serveeri — tee käib admin-endpointist. Originaal on ~2 MB ja kirjeid on
+teoses kuni sadu, seega saadetakse alati vähendatud koopia.
 """
 import os
+import re
+import uuid
 from typing import Optional
 
 from PIL import Image
 
 from .config import BASE_DIR, get_logger
+from .image_server import _is_safe_image_path
+from .utils import find_directory_by_id
 
 logger = get_logger(__name__)
 
 THUMB_MAX_PX = 400
-LIIGID = {
-    "trash": ("._trash", "pages"),
-    "original": ("._originals", None),
-}
+# work_id on nanoid; teda liidetakse teesse, seega ta valideeritakse enne kasutamist.
+_WORK_ID = re.compile(r'^[A-Za-z0-9_-]{1,32}$')
+LIIGID = ("trash", "original", "current")
 
 
-def _lahte_kaust(work_id: str, kind: str) -> str:
+def _lahte_kaust(work_id: str, kind: str) -> Optional[str]:
+    """Lubatud lähtekaust liigi kohta, või None kui teost ei ole."""
     if kind not in LIIGID:
         raise ValueError(f"Tundmatu liik: {kind}")
-    juur, alam = LIIGID[kind]
-    osad = [BASE_DIR, juur, work_id]
-    if alam:
-        osad.append(alam)
-    return os.path.join(*osad)
+    if not _WORK_ID.match(work_id or ""):
+        raise ValueError("Vigane work_id")
+    if kind == "trash":
+        return os.path.join(BASE_DIR, "._trash", work_id, "pages")
+    if kind == "original":
+        return os.path.join(BASE_DIR, "._originals", work_id)
+    return find_directory_by_id(work_id)  # "current" — teose enda kaust
 
 
 def ajaloo_pisipilt(work_id: str, kind: str, filename: str) -> Optional[str]:
-    """Tagastab pisipildi tee, luues selle vajadusel. None = lähtefaili ei ole."""
-    if os.path.basename(filename) != filename or filename.startswith('.'):
+    """Tagastab pisipildi tee, luues selle vajadusel. None = lähtefaili ei ole.
+
+    Valideerimine elab SIIN, mitte ainult route'is: route'i `os.path.basename`
+    peidaks vigase sisendi selle funktsiooni eest ära ja kaitse jääks
+    kontrollimata. `_is_safe_image_path` katab ka sümbollingi, mis näitab
+    lubatud kaustast välja.
+    """
+    if os.path.basename(filename) != filename or filename.startswith('.') or not filename:
         raise ValueError("Vigane failinimi")
     kaust = _lahte_kaust(work_id, kind)
+    if not kaust:
+        return None
     allikas = os.path.join(kaust, filename)
+    if not _is_safe_image_path(allikas, kaust):
+        raise ValueError("Tee viib lubatud kaustast välja")
     if not os.path.isfile(allikas):
         return None
 
-    # Versioon = lähtefaili mtime_ns. Failinimi ei muutu (replace-image
-    # säilitab selle), seega ainult sisu muutus eristab variante.
+    # Versioon = lähtefaili mtime_ns. Failinimi ei muutu (replace-image säilitab
+    # selle ja clear_original_backup kustutab vana originaali), seega ainult
+    # sisu muutus eristab variante.
     versioon = os.stat(allikas).st_mtime_ns
     base = os.path.splitext(filename)[0]
-    # Cache elab `pages/` KÕRVAL (`._trash/{wid}/.thumbs`), mitte sees — muidu
+    # Cache elab lähtekausta KÕRVAL (`._trash/{wid}/.thumbs`), mitte sees — muidu
     # ilmuks pisipilt prügikasti loendisse omaette kirjena.
     cache_juur = os.path.dirname(kaust) if kind == "trash" else kaust
     cache_kaust = os.path.join(cache_juur, ".thumbs")
@@ -665,22 +779,33 @@ def ajaloo_pisipilt(work_id: str, kind: str, filename: str) -> Optional[str]:
     if os.path.isfile(siht):
         return siht
 
-    # Vanad variandid samast lähtefailist ära
-    for vana in os.listdir(cache_kaust):
-        if vana.startswith(f"{base}_") and vana.endswith(".jpg"):
-            try:
-                os.remove(os.path.join(cache_kaust, vana))
-            except OSError:
-                pass
-
+    # Kirjuta ajutisse faili ja alles siis kohale: kaks samaaegset päringut
+    # leiaksid poolikult kirjutatud lõppfaili olemasolevana ja serveeriksid
+    # katkise JPEG-i. `os.replace` on samas failisüsteemis atomaarne.
+    tmp = os.path.join(cache_kaust, f".{base}_{uuid.uuid4().hex}.tmp")
     try:
         with Image.open(allikas) as raw:
             img = raw.convert("RGB")
             img.thumbnail((THUMB_MAX_PX, THUMB_MAX_PX))
-            img.save(siht, "JPEG", quality=80)
+            img.save(tmp, "JPEG", quality=80)
+        os.replace(tmp, siht)
     except Exception as e:
         logger.warning(f"AJALUGU: pisipildi loomine ebaõnnestus {allikas}: {e}")
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
         return None
+
+    # Vanad variandid ära — ALLES pärast uue kohalejõudmist ja mitte kunagi
+    # praegust. Paralleelne päring võib sama faili juba kustutanud olla.
+    for vana in os.listdir(cache_kaust):
+        if vana.startswith(f"{base}_") and vana.endswith(".jpg") \
+                and vana != os.path.basename(siht):
+            try:
+                os.remove(os.path.join(cache_kaust, vana))
+            except OSError:
+                pass
     return siht
 ```
 
@@ -704,7 +829,9 @@ def admin_history_thumb(work_id: str, kind: str, filename: str,
     query-parameetrist (`deps.py:29`), seega klient lisab `?token=`.
     """
     try:
-        tee = ajaloo_pisipilt(work_id, kind, os.path.basename(filename))
+        # ALGNE failinimi, mitte basename: valideerimine kuulub abifunktsiooni,
+        # ja basename siin peidaks vigase sisendi tema eest ära.
+        tee = ajaloo_pisipilt(work_id, kind, filename)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not tee:
@@ -746,7 +873,7 @@ git commit -m "feat(trash): ajaloo-pisipildi endpoint versioonitud cache'iga (#3
 
 **Interfaces:**
 - Consumes: `server.utils.find_directory_by_id`, `server.admin_page_ops.get_sorted_images`
-- Produces: `parsi_logirida(rida: str) -> Optional[dict]` (→ `{"at", "by", "work_id", "filename", "action": list}`); `muudetud_pildid(work_id: str) -> list`; route `GET /admin/work/{work_id}/modified-images`
+- Produces: `parsi_logirida(rida: str) -> Optional[dict]` (→ `{"at", "by", "work_id", "filename", "action": list}`); `muudetud_pildid(work_id: str) -> list` (kirje: `filename`, `page`, `action`, `at`, `by`, `v`, `v_current`); route `GET /admin/work/{work_id}/modified-images`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -756,7 +883,8 @@ git commit -m "feat(trash): ajaloo-pisipildi endpoint versioonitud cache'iga (#3
 
 Logireal on angle/crop/quad ALATI kohal, ka väärtustega 0.0 ja None — tegevus
 tuleb tuletada VÄÄRTUSEST, mitte võtme olemasolust. Üks salvestus võib
-sisaldada mitut teisendust. `split_page` ei kirjuta siia ridagi.
+sisaldada mitut teisendust. `split_page` ei kirjuta siia ridagi — aga rea puudumine EI TÕESTA poolitust
+(logi võib puududa või olla katki), seega logita kirje jääb neutraalseks.
 """
 import sys
 from pathlib import Path
@@ -800,8 +928,33 @@ def test_katkine_rida_ei_kuku():
     assert image_history.parsi_logirida("") is None
 
 
-def test_muudetud_pildid_filtreerib_ja_margib_poolituse(tmp_path, monkeypatch):
-    """Kolm asja korraga: kadunud fail välja, logita kirje = poolitusest,
+def test_puuduv_logi_ei_kuku_ja_jatab_koik_neutraalseks(tmp_path, monkeypatch):
+    """Logifaili ei ole → kirjed on ikka nähtaval, ilma vale sildita.
+
+    Just siin läheks „logireata = poolitusest" valeks: kärbitud ja pööratud
+    lehed saaksid kõik sildi „poolitusest".
+    """
+    data = tmp_path
+    töö = data / "1701-w2"
+    töö.mkdir()
+    (töö / "a.jpg").write_bytes(b"\xff\xd8jpg")
+    originals = data / "._originals" / "w2"
+    originals.mkdir(parents=True)
+    (originals / "a.jpg").write_bytes(b"\xff\xd8jpg")
+    # transform_image.log PUUDUB
+
+    monkeypatch.setattr(image_history, "BASE_DIR", str(data))
+    monkeypatch.setattr(image_history, "find_directory_by_id", lambda wid: str(töö))
+
+    kirjed = image_history.muudetud_pildid("w2")
+
+    assert len(kirjed) == 1
+    assert kirjed[0]["action"] == []
+    assert kirjed[0]["at"] is None and kirjed[0]["by"] is None
+
+
+def test_muudetud_pildid_filtreerib_ja_jaab_logita_neutraalseks(tmp_path, monkeypatch):
+    """Kolm asja korraga: kadunud fail välja, logita kirje neutraalne,
     lehekülje number tuleb teose kausta järjekorrast."""
     data = tmp_path
     töö = data / "1700-w1"
@@ -825,10 +978,11 @@ def test_muudetud_pildid_filtreerib_ja_margib_poolituse(tmp_path, monkeypatch):
     assert set(kirjed) == {"a.jpg", "b.jpg"}, "kadunud fail ei tohi loendis olla"
     assert kirjed["a.jpg"]["action"] == ["crop"] and kirjed["a.jpg"]["by"] == "meelis"
     assert kirjed["a.jpg"]["page"] == 1 and kirjed["b.jpg"]["page"] == 2
-    # Logireata kirje = poolitusest (split_page populeerib ._originals, aga ei logi)
-    assert kirjed["b.jpg"]["action"] == ["split"]
+    # Logireata kirje jääb NEUTRAALSEKS. „Poolitusest" vajaks positiivset tõendit;
+    # puuduv või katkine logi märgistaks muidu ka kärbitud lehed valesti.
+    assert kirjed["b.jpg"]["action"] == []
     assert kirjed["b.jpg"]["by"] is None and kirjed["b.jpg"]["at"] is None
-    assert kirjed["b.jpg"]["v"] > 0
+    assert kirjed["b.jpg"]["v"] > 0 and kirjed["b.jpg"]["v_current"] > 0
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -935,15 +1089,20 @@ def muudetud_pildid(work_id: str) -> list:
         if nimi not in jarjekord:
             continue
         kirje = logi.get(nimi)
+        praegune = os.path.join(tee, nimi)
         kirjed.append({
             "filename": nimi,
             "page": jarjekord[nimi],
-            # Logireata kirje tuleb poolitusest: `split_page` populeerib
-            # ._originals mõlemale poolele, aga ei kirjuta logisse.
-            "action": kirje["action"] if kirje else ["split"],
+            # Tühi loend = „muudetud" ilma täpsustuseta. `split_page` ei kirjuta
+            # logisse, AGA sama seis tekib ka puuduva või katkise logi korral —
+            # „poolitusest" vajaks positiivset tõendit, mida meil ei ole.
+            "action": kirje["action"] if kirje else [],
             "at": kirje["at"] if kirje else None,
             "by": kirje["by"] if kirje else None,
+            # Kaks versiooni: `v` = originaal („enne"), `v_current` = praegune
+            # pilt („pärast"). Originaali taastamine muudab AINULT teist.
             "v": os.stat(allikas).st_mtime_ns,
+            "v_current": os.stat(praegune).st_mtime_ns,
         })
     return kirjed
 ```
@@ -1060,8 +1219,10 @@ export function ruhmita(pages: DeletedWorkPage[]): {
 /** `<img src>` ei saa saata Authorization päist → token käib query-parameetris
  *  (server toetab seda `deps.py`-s). `v` on lähtefaili mtime_ns: failinimi ei
  *  muutu, seega ilma selleta näitaks brauser asendatud pildi asemel vana. */
+export type ThumbKind = 'trash' | 'original' | 'current';
+
 export function historyThumbUrl(
-  workId: string, kind: 'trash' | 'original', filename: string,
+  workId: string, kind: ThumbKind, filename: string,
   v: number, token: string | null,
 ): string {
   const base = `${FILE_API_URL}/admin/work/${workId}/history-thumb/${kind}/${encodeURIComponent(filename)}`;
@@ -1089,10 +1250,14 @@ export interface DeletedWorkPage {
 export interface ModifiedImage {
   filename: string;
   page: number;
+  /** Tühi loend = „muudetud" ilma täpsustuseta (logirida puudub). */
   action: string[];
   at: string | null;
   by: string | null;
+  /** Originaali („enne") versioon. */
   v: number;
+  /** Praeguse pildi („pärast") versioon — MUUTUB originaali taastamisel. */
+  v_current: number;
 }
 
 export interface ModifiedImagesResponse extends ApiStatusResponse {
@@ -1124,13 +1289,15 @@ alla lisandub:
   "actionRotate": "pööratud",
   "actionQuad": "sirgestatud",
   "actionRestore": "originaal taastatud",
-  "actionSplit": "poolitusest",
+  "actionModified": "muudetud",
+  "beforeLabel": "enne",
+  "afterLabel": "pärast",
   "restoreOriginal": "Taasta originaal",
   "pageLabel": "lk {{page}}"
 }
 ```
 
-Inglise vasted: `"Trash and image history"`, `"Deleted pages"`, `"Modified images"`, `"Split remnants"`, `"Show"`, `"Hide"`, `"Origin unknown"`, `"Cannot tell whether this is a deleted page or a split remnant — restoring it may create a duplicate."`, `"These are the SOURCE images of split pages, not deleted pages. To undo a split: 1) open the left half in the image editor → \"Restore original\"; 2) move the right half's text into the left page (after <pb/>); 3) delete the right half; 4) split again if needed."`, `"cropped"`, `"rotated"`, `"deskewed"`, `"original restored"`, `"from a split"`, `"Restore original"`, `"p. {{page}}"`.
+Inglise vasted: `"Trash and image history"`, `"Deleted pages"`, `"Modified images"`, `"Split remnants"`, `"Show"`, `"Hide"`, `"Origin unknown"`, `"Cannot tell whether this is a deleted page or a split remnant — restoring it may create a duplicate."`, `"These are the SOURCE images of split pages, not deleted pages. To undo a split: 1) open the left half in the image editor → \"Restore original\"; 2) move the right half's text into the left page (after <pb/>); 3) delete the right half; 4) split again if needed."`, `"cropped"`, `"rotated"`, `"deskewed"`, `"original restored"`, `"modified"`, `"before"`, `"after"`, `"Restore original"`, `"p. {{page}}"`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1199,7 +1366,7 @@ const TrashDeletedPages: React.FC<Props> = ({
               src={historyThumbUrl(workId, 'trash', p.filename, p.v, token)}
               alt=""
               loading="lazy"
-              className="h-16 w-12 flex-shrink-0 rounded border border-gray-200 bg-gray-50 object-cover"
+              className="h-16 w-12 flex-shrink-0 rounded border border-gray-200 bg-gray-50 object-contain"
             />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-700 font-mono truncate">{p.filename}</p>
@@ -1268,7 +1435,6 @@ const TEGEVUSE_VOTI: Record<string, string> = {
   rotate: 'manage.trash.actionRotate',
   quad: 'manage.trash.actionQuad',
   restore: 'manage.trash.actionRestore',
-  split: 'manage.trash.actionSplit',
 };
 
 const TrashModifiedImages: React.FC<Props> = ({
@@ -1286,21 +1452,43 @@ const TrashModifiedImages: React.FC<Props> = ({
       <div className="divide-y divide-gray-100">
         {images.map((i) => (
           <div key={i.filename} className="flex items-center gap-3 px-5 py-3">
-            <img
-              src={historyThumbUrl(workId, 'original', i.filename, i.v, token)}
-              alt=""
-              loading="lazy"
-              className="h-16 w-12 flex-shrink-0 rounded border border-gray-200 bg-gray-50 object-cover"
-            />
+            {/* Enne JA pärast kõrvuti: just siin peab inimene ära tundma, mis
+                kadus. `object-contain`, sest `object-cover` lõikaks topeltlehe
+                servad — täpselt selle info, mida vaadatakse. Klõps avab
+                pisipildi omaette aknas. */}
+            <div className="flex flex-shrink-0 items-end gap-2">
+              {([['original', i.v, 'manage.trash.beforeLabel'],
+                 ['current', i.v_current, 'manage.trash.afterLabel']] as const).map(
+                ([kind, versioon, silt]) => (
+                  <figure key={kind} className="m-0 w-16">
+                    <a
+                      href={historyThumbUrl(workId, kind, i.filename, versioon, token)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <img
+                        src={historyThumbUrl(workId, kind, i.filename, versioon, token)}
+                        alt=""
+                        loading="lazy"
+                        className="h-20 w-16 rounded border border-gray-200 bg-gray-50 object-contain"
+                      />
+                    </a>
+                    <figcaption className="mt-0.5 text-center text-[10px] uppercase tracking-wide text-gray-400">
+                      {t(silt)}
+                    </figcaption>
+                  </figure>
+                ),
+              )}
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-700">
                 {t('manage.trash.pageLabel', { page: i.page })}
-                {i.action.length > 0 && (
-                  <span className="text-gray-500">
-                    {' · '}
-                    {i.action.map((a) => (TEGEVUSE_VOTI[a] ? t(TEGEVUSE_VOTI[a]) : a)).join(', ')}
-                  </span>
-                )}
+                <span className="text-gray-500">
+                  {' · '}
+                  {i.action.length > 0
+                    ? i.action.map((a) => (TEGEVUSE_VOTI[a] ? t(TEGEVUSE_VOTI[a]) : a)).join(', ')
+                    : t('manage.trash.actionModified')}
+                </span>
               </p>
               <p className="text-xs text-gray-400 mt-0.5 font-mono truncate">{i.filename}</p>
               {i.at && (
@@ -1380,7 +1568,7 @@ const TrashSplitRemnants: React.FC<Props> = ({ pages, workId, token, t }) => {
                   src={historyThumbUrl(workId, 'trash', p.filename, p.v, token)}
                   alt=""
                   loading="lazy"
-                  className="h-16 w-12 flex-shrink-0 rounded border border-gray-200 bg-gray-50 object-cover"
+                  className="h-16 w-12 flex-shrink-0 rounded border border-gray-200 bg-gray-50 object-contain"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-700 font-mono truncate">{p.filename}</p>
@@ -1429,14 +1617,24 @@ export default TrashSplitRemnants;
 
 ```tsx
 const [modifiedImages, setModifiedImages] = useState<ModifiedImage[]>([]);
+const [restoringOriginal, setRestoringOriginal] = useState<string | null>(null);
 // loadTrashPages sees, olemasoleva trash-päringu kõrvale:
 const mi = await getModifiedImages(workId, authToken);
 setModifiedImages(mi.images ?? []);
 ```
 
 `handleRestoreOriginal` on uus: `restoreOriginalPageImage(workId, filename, authToken)`
-(`src/services/pageService.ts:204`), hoiab `restoringOriginal` olekut ja laeb pärast
-õnnestumist `loadTrashPages` uuesti (pisipildi `v` muutub, sest lähtefail muutus).
+(`src/services/pageService.ts:204`) ja hoiab `restoringOriginal` olekut. Kolm asja,
+mida ta peab tegema:
+
+1. **Käsitleb kõiki vastuse kujusid**, nagu pildiredaktor juba teeb:
+   `{"found": false}` ja `{"success": true, "restored": false, "reason": "no_original"}`
+   EI OLE õnnestumine — kuva `restoreError`, ära pühi kirjet loendist.
+2. **Laeb loendi uuesti** (`loadTrashPages` + `getModifiedImages`). Taastamine EI
+   muuda `._originals` faili, seega `v` jääb samaks — muutub `v_current`, ja just
+   see toob „pärast"-pildi värskena.
+3. **Tõstab `thumbCacheBust`-i** (`WorkManage.tsx:79`), sest lehekülgede loendi ja
+   pildiredaktori pildid tulevad pildiserverist ega tea sellest muudatusest midagi.
 
 `handleRestorePage` veaharu peab 409 puhul näitama serveri `detail` teksti (mitte üldist
 „taastamine ebaõnnestus") — see on koht, kus kasutaja saab teada, MIKS jääki ei taastata.
