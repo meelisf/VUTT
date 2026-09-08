@@ -871,6 +871,11 @@ def _parse_commit_meta(output):
         if len(fields) < 3:
             continue
         hexsha, author, iso = fields[0].strip(), fields[1], fields[2].strip()
+        # Python 3.9 `fromisoformat` EI aktsepteeri `Z`-lõppu, git aga väljastab
+        # UTC-commiti just nii (`2026-09-08T14:39:33Z`). Ilma teisenduseta jäi
+        # KOGU nimekiri tühjaks — iga kirje kukkus vaikselt välja.
+        if iso.endswith(("Z", "z")):
+            iso = iso[:-1] + "+00:00"
         try:
             date = datetime.fromisoformat(iso)
         except ValueError:
