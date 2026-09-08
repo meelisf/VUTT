@@ -107,7 +107,8 @@ const Review: React.FC = () => {
   const { user, authToken: token, isLoading: userLoading } = useUser();
   // Kollektsioonivalik tuleb päisest (sama valik nagu Dashboardil) — Review
   // ei kasva oma teist rippmenüüd, aga näitab filtrit nähtavalt (vt allpool).
-  const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+  const { selectedCollection, setSelectedCollection, getCollectionName, collections,
+    isLoading: collectionsLoading } = useCollection();
   const navigate = useNavigate();
 
   const [commits, setCommits] = useState<RecentCommit[]>([]);
@@ -127,6 +128,10 @@ const Review: React.FC = () => {
   const [reocrJobs, setReocrJobs] = useState<OcrJob[]>([]);
   const [reocrLoading, setReocrLoading] = useState(false);
   const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Iga muudatuste-päring saab numbri; vastus kirjutab olekusse ainult siis,
+  // kui ta on ikka veel viimane. `fetch` ei tea filtrist midagi — ilma selleta
+  // otsustab vaate sisu see, milline päring juhtus viimasena valmis saama.
+  const loadGeneration = useRef(0);
   const [reocrLog, setReocrLog] = useState<ReocrJob[]>([]);
   const [reocrLogOffset, setReocrLogOffset] = useState(0);
   const [reocrLogHasMore, setReocrLogHasMore] = useState(false);
@@ -139,16 +144,23 @@ const Review: React.FC = () => {
     }
   }, [user, token, userLoading, navigate]);
 
-  // Lae muudatused kui kasutaja on olemas
+  // Lae muudatused kui kasutaja on olemas.
+  //
+  // `collectionsLoading` on VÄRAV, mitte mugavus: enne kogude laadimist on
+  // `selectedCollection` alati `null` ehk „kõik tööd". Ilma väravata läks
+  // igal Review avamisel välja FILTREERIMATA päring ja alles seejärel
+  // filtreeritud — kaks päringut, kaks vastust, võitis viimasena saabunu.
+  // Sellest tuli filtreeritud vaade, mis näitas teiste kollektsioonide
+  // muudatusi (#335). Filtreeritud päring on aeglasem (skanniaken laieneb),
+  // seega saabumisjärjekord ei ole ennustatav.
   useEffect(() => {
-    if (user && token) {
-      // Kasutajafiltri vahetamine nullib nimekirja
-      setCommits([]);
-      setOffset(0);
-      setHasMore(false);
-      loadRecentEdits(0, false);
-    }
-  }, [user, token, selectedUser, selectedCollection]);
+    if (!user || !token || collectionsLoading) return;
+    // Filtri vahetamine nullib nimekirja
+    setCommits([]);
+    setOffset(0);
+    setHasMore(false);
+    loadRecentEdits(0, false);
+  }, [user, token, selectedUser, selectedCollection, collectionsLoading]);
 
   // Lae kõigi kasutajate nimekiri admin jaoks
   useEffect(() => {
@@ -255,6 +267,8 @@ const Review: React.FC = () => {
 
   const loadRecentEdits = async (fromOffset: number, append: boolean) => {
     if (!token) return;
+    const generation = ++loadGeneration.current;
+    const isStale = () => generation !== loadGeneration.current;
 
     if (append) {
       setLoadingMore(true);
@@ -283,6 +297,7 @@ const Review: React.FC = () => {
         timeout: 30000
       });
       const data = await response.json();
+      if (isStale()) return;
 
       if (data.status === 'success') {
         if (append) {
@@ -298,10 +313,13 @@ const Review: React.FC = () => {
       }
     } catch (err) {
       console.error('Muudatuste laadimine ebaõnnestus:', err);
-      setError(t('error'));
+      if (!isStale()) setError(t('error'));
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      // Aegunud päring ei tohi ka laadimisolekut lõpetada — värskem käib veel.
+      if (!isStale()) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
