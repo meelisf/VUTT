@@ -26,6 +26,29 @@ export interface DeletedWorkPage {
   deleted_at: string | null;
   deleted_by: string | null;
   commit_hash: string | null;
+  /** 'deleted' | 'split' | 'unknown' — serveri liigitus commiti sõnumist. */
+  reason: string;
+  /** Serveri otsus. Klient EI tuleta seda liigist — reegel elab ühes kohas. */
+  restorable: boolean;
+  /** Lähtefaili mtime_ns pisipildi URL-i jaoks. */
+  v: number;
+}
+
+export interface ModifiedImage {
+  filename: string;
+  page: number;
+  /** Tühi loend = „muudetud" ilma täpsustuseta (logirida puudub). */
+  action: string[];
+  at: string | null;
+  by: string | null;
+  /** Originaali („enne") versioon. */
+  v: number;
+  /** Praeguse pildi („pärast") versioon — MUUTUB originaali taastamisel. */
+  v_current: number;
+}
+
+export interface ModifiedImagesResponse extends ApiStatusResponse {
+  images?: ModifiedImage[];
 }
 
 export interface WorkPagesResponse extends ApiStatusResponse {
@@ -121,6 +144,10 @@ export function getWorkPages(workId: string, token: string): Promise<WorkPagesRe
 
 export function getDeletedWorkPages(workId: string, token: string): Promise<DeletedWorkPagesResponse> {
   return apiGet<DeletedWorkPagesResponse>(`/admin/work/${workId}/trash-pages`, auth(token));
+}
+
+export function getModifiedImages(workId: string, token: string | null): Promise<ModifiedImagesResponse> {
+  return apiGet<ModifiedImagesResponse>(`/admin/work/${workId}/modified-images`, auth(token));
 }
 
 export function getWorkMetadata(workId: string, token: string): Promise<WorkMetadataResponse> {
