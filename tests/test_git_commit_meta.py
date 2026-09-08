@@ -62,3 +62,22 @@ def test_vigane_kuupaev_ei_kukuta_lugemist():
 
 def test_tuhi_valjund():
     assert _parse_commit_meta("") == []
+
+
+def test_z_lopuga_kuupaev_utc():
+    """Git väljastab UTC-commiti `Z`-lõpuga; Python 3.9 fromisoformat ei võta seda vastu.
+
+    Ilma teisenduseta kukkus IGA kirje vaikselt välja ja nimekiri jäi tühjaks —
+    tootmises tähendas see tühja „Viimased muudatused" vaadet.
+    """
+    from datetime import timezone
+    got = _parse_commit_meta(rec("a" * 40, "meelis", "2026-09-08T14:39:33Z", "Muuda: x.txt"))
+    assert len(got) == 1
+    assert got[0]["date"].utcoffset() == timezone.utc.utcoffset(None)
+    assert got[0]["date"].hour == 14
+
+
+def test_nihkega_kuupaev_sailitab_nihke():
+    got = _parse_commit_meta(rec("b" * 40, "meelis", "2026-09-08T14:39:33+03:00", "m"))
+    assert got[0]["date"].hour == 14
+    assert got[0]["date"].utcoffset().total_seconds() == 3 * 3600
