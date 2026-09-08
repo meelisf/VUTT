@@ -80,7 +80,7 @@ def test_import_as_work_kirjutab_ada_provenance_oigele_lehele(tmp_path, monkeypa
 
     (uploads / "impada" / "state.json").write_text(json.dumps({
         "id": "impada", "status": "reviewing",
-        "meta": {"title": "ADA teos", "year": "1812", "slug": "ada-teos", "work_id": "widada"},
+        "meta": {"title": "ADA teos", "year": "1812", "slug": "ada-teos", "work_id": "widada", "dating": {"start": "1812-12-31", "calendar": "julian", "source_text": "31. dets.1812"}},
         "remote_staging_path": "AUTO-OCR/print/impada",
         "remote_work_path": "AUTO-OCR/print/impada/ada-teos",
         "files": [
@@ -104,6 +104,9 @@ def test_import_as_work_kirjutab_ada_provenance_oigele_lehele(tmp_path, monkeypa
 
     tulemus = upload_ops.import_as_work("impada", username="admin")
     assert tulemus["slug"] == "ada-teos"
+    metadata = json.loads((data_dir / "ada-teos" / "_metadata.json").read_text())
+    assert metadata["dating"] == {"start": "1812-12-31", "calendar": "julian", "source_text": "31. dets.1812"}
+    assert metadata["year_display"] == "1812-12-31"
 
     def _leht_json(n):
         path = next((data_dir / "ada-teos").glob(f"*-{n:03d}.json"))

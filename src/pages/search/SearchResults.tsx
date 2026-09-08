@@ -1,3 +1,4 @@
+import { hasImpreciseDating, parseDatingText } from '../../utils/workDating';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -81,8 +82,8 @@ export interface SearchResultsProps {
     error: string | null;
     queryParam: string;
     workIdParam: string;
-    yearStartParam?: number;
-    yearEndParam?: number;
+    yearStartParam?: number | string;
+    yearEndParam?: number | string;
     scopeParam: 'all' | 'original' | 'annotation';
     vocabularies: Vocabularies | null;
     onAuthorFilter: (authorName: string) => void;
@@ -440,14 +441,17 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                                     {/* Aasta */}
                                                     <button
                                                         onClick={() => {
-                                                            const range = parseYearDisplayRange(firstHit.year, (firstHit as any).year_display);
+                                                            const dating = firstHit.dating ?? parseDatingText(firstHit.year_display || '');
+                                                            if (dating) { onYearFilter(dating.start, dating.end || dating.start); return; }
+                                                            const range = parseYearDisplayRange(firstHit.year, firstHit.year_display);
                                                             if (range) onYearFilter(range.start.toString(), range.end.toString());
                                                         }}
                                                         className="text-gray-700 flex items-center gap-1 hover:text-primary-600 transition-colors text-left"
                                                         title={t('results.searchYearWorks')}
                                                     >
                                                         <Calendar size={12} className="text-gray-400" />
-                                                        <span className="hover:underline">{formatYearDisplay((firstHit as any).year_display, firstHit.year ?? (firstHit as any).aasta, t) || '...'}</span>
+                                                        <span className="hover:underline">{formatYearDisplay(firstHit.year_display, firstHit.year ?? (firstHit as any).aasta, t, firstHit.dating) || '...'}</span>
+                                                        {[yearStartParam, yearEndParam].some(v => String(v ?? '').includes('-')) && hasImpreciseDating(firstHit.dating, firstHit.year_display) && <span className="text-xs text-gray-500"> · {t('common:dating.imprecise')}</span>}
                                                     </button>
 
                                                     {/* Žanr */}

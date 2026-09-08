@@ -1,3 +1,4 @@
+from ..work_dating import dating_updates
 import asyncio
 import os
 from typing import Optional
@@ -407,6 +408,10 @@ async def admin_upload_get_meta(upload_id: str, user=Depends(require_role("admin
 @router.patch("/admin/upload/{upload_id}/meta")
 async def admin_upload_update_meta(upload_id: str, request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
+    try:
+        data = dating_updates(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not await run_in_threadpool(update_upload_meta, upload_id, data):
         raise HTTPException(status_code=404, detail="Upload ei leitud")
     return {"status": "success"}

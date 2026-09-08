@@ -1,3 +1,4 @@
+import DateRangeInput from '../components/DateRangeInput';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
@@ -217,8 +218,8 @@ const Dashboard: React.FC = () => {
   // Sünkrooni filtrite state URL-iga (nt tagasi-navigatsioon või WorkCardilt naasmine).
   useEffect(() => {
     setInputValue(queryParam);
-    if (yearStartParam) setYearStart(yearStartParam);
-    if (yearEndParam) setYearEnd(yearEndParam);
+    setYearStart(yearStartParam || '');
+    setYearEnd(yearEndParam || '');
     if (sortParam) setSort(sortParam);
     setSelectedTags(teoseTagsParam);
     setSelectedGenre(genreParam);
@@ -444,8 +445,8 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const start = parseInt(yearStart) || undefined;
-        const end = parseInt(yearEnd) || undefined;
+        const start = yearStart || undefined;
+        const end = yearEnd || undefined;
 
         // Pass filter options to the API (including status filter - server-side)
         const result = await searchWorks(index, queryParam, {
@@ -687,23 +688,7 @@ const Dashboard: React.FC = () => {
                 {/* Year Filter */}
                 <div className="flex items-center gap-3">
                   <span className="hidden sm:inline text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{t('search.timeRange')}</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={yearStart}
-                      onChange={(e) => setYearStart(e.target.value)}
-                      className="w-20 p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none text-center"
-                      placeholder="1630"
-                    />
-                    <span className="text-gray-300 font-bold">-</span>
-                    <input
-                      type="number"
-                      value={yearEnd}
-                      onChange={(e) => setYearEnd(e.target.value)}
-                      className="w-20 p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none text-center"
-                      placeholder="1710"
-                    />
-                  </div>
+                  <DateRangeInput start={yearStart} end={yearEnd} onStartChange={setYearStart} onEndChange={setYearEnd} />
                 </div>
 
                 <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>

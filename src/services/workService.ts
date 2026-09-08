@@ -63,7 +63,7 @@ export const getWorkMetadata = async (index: Index, workId: string): Promise<Wor
       filter: [`work_id = "${workId}"`],
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'id', 'title', 'year', 'year_display', 'location', 'location_object', 'publisher', 'publisher_object', 'publisher_id',
+        'work_id', 'id', 'title', 'year', 'year_display', 'dating', 'location', 'location_object', 'publisher', 'publisher_object', 'publisher_id',
         'type', 'type_object', 'genre', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'notes', 'languages',
         'series', 'series_title', 'ester_id', 'external_url', 'archive_refs',

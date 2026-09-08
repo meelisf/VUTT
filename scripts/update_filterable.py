@@ -22,44 +22,10 @@ MEILI_URLS = [
 # Eemalda None väärtused ja duplikaadid
 MEILI_URLS = list(dict.fromkeys([u for u in MEILI_URLS if u]))
 
-FILTERABLE_ATTRS = [
-    'author_names',
-    'authors_text',
-    'collection',
-    'collections',
-    'collections_hierarchy',
-    'creator_ids',
-    'creators',
-    'genre',
-    'genre_en',
-    'genre_et',
-    'genre_ids',
-    'languages',
-    'lehekylje_number',
-    'location',
-    'location_id',
-    'originaal_kataloog',
-    'page_tags',
-    'page_tags_et',
-    'page_tags_en',
-    'page_tags_ids',
-    'publisher',
-    'publisher_id',
-    'respondens_names',
-    'status',
-    'tags',
-    'tags_en',
-    'tags_et',
-    'tags_ids',
-    'teose_staatus',
-    'title',
-    'type',
-    'type_en',
-    'type_et',
-    'type_ids',
-    'work_id',
-    'year',
-]
+# Sama tõeallikas nagu seed ja runtime; uuendamine ei tohi dateeringufiltreid eemaldada.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from server.meili_settings import FILTERABLE_ATTRIBUTES as FILTERABLE_ATTRS
+
 
 def main():
     if not MEILI_KEY:

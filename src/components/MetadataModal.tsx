@@ -1,3 +1,5 @@
+import WorkDatingInput from './WorkDatingInput';
+import { datingError, WorkDating } from '../utils/workDating';
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -30,6 +32,7 @@ interface MetadataModalProps {
 
 interface MetadataForm {
   title: string;
+  dating?: WorkDating | null;
   yearInput: string;                  // Üks tekstilahter: 1680 | ca. 1680 | 1670–1690 | 17. saj (vt deriveYearFields)
   type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
   genre: (string | LinkedEntity)[];  // Mitu žanrit
@@ -272,6 +275,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     setMetaForm({
       title: work?.title || page.title || '',
       yearInput: initYearInput,
+      dating: work?.dating ?? page.dating ?? null,
       type: work?.type || page.type || null,
       genre: (() => { const g = work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
       tags: work?.tags || page.tags || [],
@@ -378,6 +382,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         setMetaForm({
           title: title,
           yearInput: m.year_display || (year ? String(year) : ''),
+          dating: m.dating ?? null,
           type: m.type || null,
           genre: (() => { const g = m.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
           tags: Array.isArray(tags) ? tags : [],
@@ -401,6 +406,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   };
 
   const handleSave = async () => {
+    if (datingError(metaForm.dating)) { setSaveStatus('error'); return; }
     const saveStartedAt = performance.now();
     setIsSaving(true);
     setSaveStatus('idle');
@@ -424,6 +430,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           title: m.title,
           year: m.year,
           year_display: m.year_display,
+          dating: m.dating,
           type: m.type as LinkedEntity | null,
           genre: m.genre as LinkedEntity[] | null,
           creators: m.creators,
@@ -588,23 +595,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           {/* Grupp 2: Kolofoon */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
             <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.colophon', 'Kolofoon')}</h4>
-            {/* Aasta — üks tekstilahter (aasta-välja ühendamine, vt deriveYearFields).
-                Poole laiusega (grid'i vasak veerg), joondatud Koht/Trükkal reaga all. */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.year')}</label>
-                <input
-                  type="text"
-                  inputMode="text"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                  placeholder={t('metadata.yearInputPlaceholder', '1680, ca. 1680, 1670–1690, 17. saj')}
-                  value={metaForm.yearInput}
-                  onChange={e => setMetaForm({ ...metaForm, yearInput: e.target.value })}
-                />
-                {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
-                <YearInputPreview value={metaForm.yearInput} existing={existingYearRef.current} />
-              </div>
-            </div>
+
+            <WorkDatingInput value={metaForm.yearInput} dating={metaForm.dating}
+              onChange={(yearInput, dating) => setMetaForm({ ...metaForm, yearInput, dating })} />
             {/* Rida 2: Koht ja trükkal */}
             <div className="grid grid-cols-2 gap-3">
               <div>

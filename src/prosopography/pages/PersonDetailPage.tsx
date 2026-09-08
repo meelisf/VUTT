@@ -1,3 +1,4 @@
+import type { WorkDating } from '../../utils/workDating';
 import React, { useState, useEffect } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
@@ -258,7 +259,7 @@ const PersonDetailPage: React.FC = () => {
   const [person, setPerson] = useState<ProsopoRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; year_display: string | null; collections: string[]; restricted?: boolean }>>({});
+  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; year_display: string | null; dating?: WorkDating | null; collections: string[]; restricted?: boolean }>>({});
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
   const [tagsSaving, setTagsSaving] = useState(false);
@@ -342,14 +343,14 @@ const PersonDetailPage: React.FC = () => {
             const ids = batch.map((wid: string) => `"${wid}"`).join(', ');
             return index.search('', {
               filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
-              attributesToRetrieve: ['work_id', 'title', 'year', 'year_display', 'collections_hierarchy'],
+              attributesToRetrieve: ['work_id', 'title', 'year', 'year_display', 'dating', 'collections_hierarchy'],
               limit: BATCH,
             }).then(res => allHits.push(...res.hits)).catch(() => {});
           })).then(async () => {
-            const map: Record<string, { title: string; year: number | null; year_display: string | null; collections: string[]; restricted?: boolean }> = {};
+            const map: Record<string, { title: string; year: number | null; year_display: string | null; dating?: WorkDating | null; collections: string[]; restricted?: boolean }> = {};
             for (const hit of allHits) {
               if (hit.work_id && !map[hit.work_id]) {
-                map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, year_display: hit.year_display ?? null, collections: hit.collections_hierarchy ?? [] };
+                map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, year_display: hit.year_display ?? null, dating: hit.dating, collections: hit.collections_hierarchy ?? [] };
               }
             }
             // Kaitstud kollektsiooni teoseid Meilisearch ei tagasta (anon/õiguseta) —
@@ -729,7 +730,7 @@ const PersonDetailPage: React.FC = () => {
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
                 // Eelista kuvatavat aastat (nt "ca. 1750"); muidu number-aasta, kui see pole 0
-                const yearLabel = formatYearDisplay(meta?.year_display, meta?.year, t);
+                const yearLabel = formatYearDisplay(meta?.year_display, meta?.year, t, meta?.dating);
                 const inCollection = selectedCollection && meta?.collections?.includes(selectedCollection);
                 const colorClasses = inCollection ? getCollectionColorClasses(collections[selectedCollection!]) : null;
                 // Kaitstud kollektsiooni teos: kuva pealkiri, kuid ilma lingita (ligipääs puudub)

@@ -360,7 +360,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.year')}</span>
-                        <p className="text-gray-900">{formatYearDisplay(work.year_display, work.year, t)}</p>
+                        <p className="text-gray-900">{formatYearDisplay(work.year_display, work.year, t, work.dating)}</p>
                       </div>
                       {work.type && (
                         <div>

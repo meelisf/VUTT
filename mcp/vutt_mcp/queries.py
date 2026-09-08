@@ -179,9 +179,9 @@ def build_search_body(
     if collection:
         clauses.append(f"collections_hierarchy = {_quote(collection)}")
     if year_from is not None:
-        clauses.append(f"year >= {int(year_from)}")
+        clauses.append(f"year_end >= {int(year_from)}")
     if year_to is not None:
-        clauses.append(f"year <= {int(year_to)}")
+        clauses.append(f"year_start <= {int(year_to)}")
     if language:
         clauses.append(f"languages = {_quote(language)}")
     if genre_id:

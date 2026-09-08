@@ -1,3 +1,4 @@
+import { formatYearDisplay } from '../utils/yearDisplayUtils';
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -154,7 +155,7 @@ const SearchPage: React.FC = () => {
                                 {(urlParams.yearStart !== undefined || urlParams.yearEnd !== undefined) && (
                                     <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium border border-slate-200">
                                         <Calendar size={11} />
-                                        <span>{urlParams.yearStart ?? ''}–{urlParams.yearEnd ?? ''}</span>
+                                        <span>{formatYearDisplay(String(urlParams.yearStart ?? ''), null, t)} – {formatYearDisplay(String(urlParams.yearEnd ?? ''), null, t)}</span>
                                         <button
                                             type="button"
                                             onClick={() => {

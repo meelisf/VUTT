@@ -1,3 +1,4 @@
+from ..work_dating import dating_updates
 import json
 import os
 import re
@@ -146,6 +147,10 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 @router.post("/update-work-metadata")
 async def update_work_metadata(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
+    try:
+        data['metadata'] = dating_updates(data.get('metadata', {}))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
     meta_path = os.path.join(path, '_metadata.json')
     slug = os.path.basename(path)

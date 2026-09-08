@@ -28,10 +28,10 @@ def test_kollektsioonifilter():
     assert 'collections_hierarchy = "Disputatsioonid"' in body["filter"]
 
 
-def test_aastavahemik_kasutab_year_valja():
+def test_aastavahemik_kasutab_kattuvust():
     body = queries.build_search_body("x", year_from=1630, year_to=1650)
-    assert "year >= 1630" in body["filter"]
-    assert "year <= 1650" in body["filter"]
+    assert "year_end >= 1630" in body["filter"]
+    assert "year_start <= 1650" in body["filter"]
 
 
 def test_filtrid_kombineeruvad_AND_iga():

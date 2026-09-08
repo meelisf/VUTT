@@ -1,3 +1,4 @@
+import { parseDatingText, WorkDating } from './workDating';
 import type { TFunction } from 'i18next';
 
 // Parsib year_display stringi filtri aastaajavahemikuks.
@@ -129,8 +130,19 @@ function enOrdinal(n: number): string {
 export function formatYearDisplay(
   yearDisplay: string | null | undefined,
   year: number | string | null | undefined,
-  t: TFunction
+  t: TFunction,
+  dating?: WorkDating | null
 ): string {
+  const precise = dating ?? parseDatingText(yearDisplay || '');
+  if (precise && (dating || precise.start.includes('-') || precise.end?.includes('-'))) {
+    const format = (value: string) => {
+      const [y, m, d] = value.split('-').map(Number);
+      return `${d ? `${d}${t('common:dating.daySuffix')} ` : ''}${m ? `${t(`common:dating.months.${m}`)} ` : ''}${y}`;
+    };
+    const prefix = precise.approximate ? t('common:dating.approxPrefix') : precise.kind === 'uncertain' ? t('common:dating.uncertainPrefix') : '';
+    const calendar = precise.calendar ? ` (${t(`common:dating.${precise.calendar}`)})` : '';
+    return prefix + format(precise.start) + (precise.end ? ` – ${format(precise.end)}` : '') + calendar;
+  }
   if (yearDisplay) {
     const cm = yearDisplay.trim().match(CENTURY_RE);
     if (cm) {
