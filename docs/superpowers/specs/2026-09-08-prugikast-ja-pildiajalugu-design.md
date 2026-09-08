@@ -5,6 +5,12 @@
 ADR 0007 (tuletatud andmed on read-modelid); CLAUDE.md nginx-reegel (`/api/files/`
 proksib kõik backend-teed avalikult)
 **Staatus:** disain ülevaatamiseks, teostamata
+**Muudetud 2026-09-08 pärast ülevaatust:** avaldamise järjekord (A+B+C on ÜKS partii,
+sest teepõhine otsing avaks vahepeal jääkide „Taasta" nupu), poolituse tagasivõtmise
+täielik neljasammuline juhis, pisipildi cache versioonitakse `mtime_ns`-iga
+(failinimi ei ole muutumatuse garantii), `unknown` kirjete koht liideses, ajaloolised
+commit-prefiksid, logirea leping + parsimine serveris, `<img>` autentimine
+query-tokeniga ja 401 (mitte 403) rolliväravas.
 
 ## Probleem
 
@@ -56,12 +62,37 @@ vajutama), punkt 4 teeb taastamise võimatuks kahel kolmandikul kirjetest alati.
 - Kirje juures peab **pilti näha saama** — nanoid-failinimi ei ütle inimesele midagi.
 - **Versiooniloendit ei tule.** Algvariandi taastamisest piisab.
 - **Poolituse jääk ei ole taastatav, ta on ajalugu.** „Tühista poolitus" ei ole omaette
-  operatsioon: topeltleht on juba mõlema poole `._originals`-is olemas, seega õige tee
-  on avada kumbki pool → „Taasta originaal" → poolita uuesti.
+  operatsioon: topeltleht on juba mõlema poole `._originals`-is olemas. Tagasivõtmise
+  täielik juhis on allpool — lühivariant „taasta ja poolita uuesti" on eksitav.
 - **Tab jaguneb kolmeks plokiks** (mitte üheks sildistatud ajajooneks): kustutatud
   leheküljed, muudetud pildid, poolituse jäägid.
 - `._originals` ja `._trash/pages/` jäävad **tähtajatuks**. „90 päeva" lubadus oli
   tekstides, aga koristajat ei ole kunagi olnud; PR #326 eemaldas lubaduse.
+
+### Poolituse tagasivõtmise TÄIELIK juhis
+
+Lühivariant „taasta originaal ja poolita uuesti" on **eksitav** ja viib kasutaja teise
+duplikaadini: `restore_original_page_image` puudutab AINULT pilti, ja teine pool jääb
+omaette leheks alles. Kahest lehest saaks kolm.
+
+Poolitus A (vasak, `sequence` S) + B (parem, S+50) võetakse tagasi nii:
+
+1. Ava **A** pildiredaktoris → „Taasta originaal". A pilt on nüüd terve topeltleht,
+   A tekst on endiselt ainult vasak pool.
+2. Too **B tekst A-sse** (B lõppu `<pb/>` järele), sest A tekst katab ainult poolt
+   pilti.
+3. **Kustuta B** (Halda → vali leht → kustuta). Alles siis on lehti jälle üks.
+4. Kui vaja, poolita A uuesti — uus lõige käib `<pb/>` kohalt.
+
+See neljasammuline juhis on liidese tekst poolituse jääkide ploki päises (üks kord,
+mitte iga kirje juures). Samme ei automatiseerita: `sequence`, tekstipiirid ja
+kasutaja vahepealsed parandused teevad automaatsest „tühista poolitus"-est
+pöördumatu operatsiooni, mille all kaoks pärast poolitust tehtud töö.
+
+**Jääk ei viita oma pooltele.** Commit 2 sõnumis on poolitamise-aegne leheküljenumber,
+mis on vahepeal võinud nihkuda, ja päris viide nõuaks commit 1 lisatud failide
+parsimist. Kasutaja leiab pooled pisipildi järgi. Kui see osutub praktikas kitsaskohaks,
+on see eraldi samm.
 
 ## Mida EI tehta
 
@@ -103,17 +134,30 @@ tohiks tekkida, aga vana andmestik on vana), saab `commit_hash: None` ja liigi
 Uus moodul `server/trash_reason.py`:
 
 ```python
-SPLIT_COMMIT_PREFIX = "Lõika leht"      # split_page kasutab seda sõnumi koostamisel
-DELETE_COMMIT_PREFIX = "Kustuta"        # delete_pages / delete_page_from_git
+# Sõnumi algus, mida UUED commitid kasutavad.
+SPLIT_COMMIT_PREFIX = "Lõika leht"
+DELETE_COMMIT_PREFIX = "Kustuta"
+
+# AJALOOLINE FORMAAT — need stringid on juba git-ajaloos ja neid EI TOHI muuta ega
+# eemaldada. Uue sõnastuse kasutuselevõtt tähendab uue kirje LISAMIST, mitte vana
+# asendamist; vastasel korral muutuvad kõik varem tehtud commitid `unknown`-iks.
+SPLIT_PREFIXES_AJALUGU = ("Lõika leht",)
+DELETE_PREFIXES_AJALUGU = ("Kustuta",)
 
 def liigita(commit_sonum: Optional[str]) -> str:
     """→ 'split' | 'deleted' | 'unknown'. Tundmatu = EI ole taastatav."""
 ```
 
-`split_page` ja `delete_pages` impordivad prefiksi siit ja ehitavad sõnumi selle peale.
-Nii ei saa sõnastus ühes otsas muutuda ilma teiseta — sama muster nagu `server/ocr_err.py`
-ja `server/upload/page_status.py` (#261 punkt 1: kui väljavõte on võimalik, tee
-väljavõte, ära kirjuta dokumentatsiooni „muuda mõlemat").
+`split_page` ja `delete_pages` impordivad prefiksi siit ja ehitavad sõnumi selle peale;
+liigitaja loeb ajaloolist nimekirja. Nii ei saa sõnastus ühes otsas muutuda ilma
+teiseta — sama muster nagu `server/ocr_err.py` ja `server/upload/page_status.py`
+(#261 punkt 1: kui väljavõte on võimalik, tee väljavõte).
+
+Ühine konstant üksi EI kaitse vana ajalugu: git-commiti sõnumit ei saa tagantjärele
+muuta, seega konstandi ümbernimetamine teeks kõik olemasolevad kirjed tundmatuks.
+Seepärast on kaks asja lahus (praegune sõnastus vs ajalooline nimekiri) ja
+**testid kasutavad kirjapandud ajaloolisi stringe**, mitte samast konstandist
+koostatud sõnumeid — konstandist koostatud test kinnitaks ainult iseennast.
 
 Tundmatu sõnum liigitub `unknown`-iks ja **ei ole taastatav** — ettevaatlik suund:
 tundmatu päritoluga faili tagasitoomine võib teha duplikaadi, tema alles jätmine ei tee
@@ -145,14 +189,29 @@ GET /admin/work/{work_id}/history-thumb/{kind}/{filename}     kind ∈ trash | o
 
 - Tee ehitatakse serveris (`._trash/{work_id}/pages/` või `._originals/{work_id}/`),
   kliendi string läbib `os.path.basename` + `_is_safe_image_path` kontrolli.
+- Autentimine käib `require_role("admin")` kaudu, aga `<img src>` ei saa saata
+  `Authorization` päist → kasutatakse `?token=` query-parameetrit, mida `get_user`
+  just selleks toetab (`deps.py:29`, sama muster nagu upload'i pisipiltidel).
 - Vastus on **max 400 px JPEG**, mitte originaal: kirjeid on ühes teoses kuni sadu ja
   originaal on ~2 MB. Pisipilt genereeritakse esimesel päringul PIL-iga ja
-  cache'itakse `._trash/{work_id}/.thumbs/{nimi}` (vastavalt `._originals/{work_id}/.thumbs/`).
+  cache'itakse `._trash/{work_id}/.thumbs/` (vastavalt `._originals/{work_id}/.thumbs/`).
   Cache-kaust on `pages/` **kõrval**, mitte sees, ja mõlemad loendajad
   (`list_deleted_pages`, `modified-images`) jätavad kataloogid vahele — muidu ilmuks
   pisipilt loendisse omaette kirjena.
-- `Cache-Control: private, max-age=3600`; failinimi sisaldab nanoid'i, seega
-  cache-bustimist vaja ei ole.
+
+**Failinimi EI OLE muutumatuse garantii.** `replace-image` säilitab failinime ja kutsub
+`clear_original_backup`-i (`admin_page_ops.py:651`), mis kustutab `._originals/{wid}/{nimi}`;
+järgmine kärbe loob sama tee alla **teise pildi**. Sama kordub prügikastis: taastatud,
+muudetud ja uuesti kustutatud leht jõuab sama `._trash/{wid}/pages/{nimi}` peale.
+Seepärast:
+
+- cache-faili nimi on `{base}_{lähtefaili mtime_ns}.jpg`, ja generaator kustutab sama
+  baasi vanemad variandid;
+- loend tagastab iga kirje juures `v` (sama `mtime_ns`), klient paneb selle URL-i
+  (`?v=…&token=…`), vastus on `Cache-Control: private, max-age=86400, immutable`.
+
+Ilma versioonita näitaks liides pärast asendust vana pilti ja kettale jääks vale
+pisipilt — mõlemad vaikselt.
 
 Praegune pildiserver (port 8001) jääb puutumata: ta serveerib teose kausta avalikult
 token'iga, ja need failid ei ole avalikud.
@@ -180,20 +239,45 @@ seega plokid tulevad omaette komponentidena `src/pages/manage/` alla
 └──────────────────────────────────────────────┘
 ```
 
-- **Kustutatud leheküljed** — senine loend + pisipilt; „Taasta" nagu praegu.
+- **Kustutatud leheküljed** — senine loend + pisipilt; „Taasta" nagu praegu. **Siia
+  kuuluvad ka `unknown` kirjed** (git-jälge ei leitud): silt „Päritolu teadmata",
+  selgitus („ei tea, kas see on kustutatud leht või poolituse jääk — taastamine võib
+  teha duplikaadi") ja taastenuppu ei ole. Nad ei tohi kaduda: fail on kettal olemas ja
+  nähtamatu kirje on halvem kui sildistatud kirje.
 - **Muudetud pildid** — allikas `._originals/{work_id}/`, filtreeritud nendele, mille
   fail on veel teose kaustas (ülejäänud on hiljem kustutatud või poolitatud lehtede
   jäänukid ja nende näitamine eksitaks). Lehekülje number = indeks
-  `get_sorted_images(path)`-is. Kes/millal/mis tegevus loetakse
-  `data/transform_image.log`-ist (rea kuju:
-  `ISO | kasutaja | work_id | failinimi | angle=… crop=… quad=… | -> WxH`),
-  viimane rida faili kohta võidab; tegevuse nimi tuletatakse parameetritest
-  (`crop` → kärbitud, `angle` → pööratud, `quad` → sirgestatud,
-  `restore_original` → juba taastatud).
+  `get_sorted_images(path)`-is.
 - **Poolituse jäägid** — vaikimisi kokku klapitud (`<details>`-tüüpi, mitte eraldi
   päring: andmed tulevad samast loendist), avatuna pisipilt + üherealine selgitus.
   Taastenuppu EI OLE.
 - Pisipildid on `loading="lazy"`; kokkuklapitud plokk ei renderda ühtki `<img>`-i.
+
+### E2. `transform_image.log` leping (parsimine käib SERVERIS)
+
+Rea kuju on kaks varianti, mõlemad `admin_page_ops.py`-st:
+
+```
+ISO | kasutaja | work_id | failinimi | angle=0.0 crop={...} quad=None | -> 2384x3273
+ISO | kasutaja | work_id | failinimi | restore_original | -> restored
+```
+
+Kolm asja, mida naiivne lugemine valesti teeks:
+
+1. **Väljad on ALATI kohal.** `angle=`, `crop=` ja `quad=` esinevad igal teisendusreal,
+   ka väärtustega `0.0` / `None`. Tegevus tuletatakse **väärtusest**, mitte võtme
+   olemasolust: `angle` ≠ 0 → pööratud, `crop` ≠ `None` → kärbitud, `quad` ≠ `None` →
+   sirgestatud.
+2. **Üks toiming võib olla mitu tegevust korraga** (pööre + kärbe ühes salvestuses) →
+   `action` on **loend**, mitte string, ja liides kuvab need komaga.
+3. **`split_page` ei kirjuta siia ridagi.** Poolitatud poolel on `._originals` olemas
+   (`split_page` populeerib selle), aga logirida puudub → `action: ["split"]`,
+   kasutaja ja aeg puuduvad. Kirje näitab „poolitusest", mitte tühja rida.
+
+Parsimine elab backendis (`server/trash_ops.py` või oma väike moodul) ja API tagastab
+juba tuletatud väljad — frontend ei parsi serveri logivormingut. Fail loetakse ühe
+korra päringu kohta ja filtreeritakse `work_id` järgi; viimane rida failinime kohta
+võidab. Puuduv või katkine fail ei kuku päringut.
 
 ### F. Vastuse kuju
 
@@ -203,7 +287,8 @@ jäävad):
 ```json
 {"status": "success", "pages": [
   {"filename": "...jpg", "base_name": "...", "deleted_at": "...", "deleted_by": "...",
-   "commit_hash": "...", "reason": "deleted|split|unknown", "restorable": true}
+   "commit_hash": "...", "reason": "deleted|split|unknown", "restorable": true,
+   "v": 1757312345678901}
 ]}
 ```
 
@@ -214,8 +299,14 @@ Uus endpoint muudetud piltidele:
 
 ```
 GET /admin/work/{work_id}/modified-images
-→ {"images": [{"filename", "page": 7, "action": "crop", "at": "...", "by": "..."}]}
+→ {"images": [{"filename": "...jpg", "page": 7, "action": ["rotate", "crop"],
+               "at": "2026-09-07T12:54:49", "by": "raheltoomik",
+               "v": 1757312345678901}]}
 ```
+
+`action` on loend (üks toiming = mitu teisendust), `at`/`by` võivad olla `null`
+(poolitusest tulnud kirjel logirida puudub), `v` on lähtefaili `mtime_ns` pisipildi
+URL-i jaoks.
 
 ## Andmevoog
 
@@ -249,8 +340,12 @@ list_deleted_pages ──→ git log --diff-filter=D -- {kaust}/{base}.txt
 | `split_page` sõnum sisaldab `SPLIT_COMMIT_PREFIX`-it | Sõnastus ei triivi liigitajast lahku |
 | Teepõhine leidmine päris git-repos (tmp_path, kaks commiti) | Kustutamise commit leitakse ka siis, kui sõnumis failinime EI OLE |
 | `restore_deleted_page` jäägil → `ok: False`, failid puutumata | Punkt 2: duplikaat ei saa tekkida ka otse API kaudu |
+| `liigita` ajalooliste stringide peal (kirjapandult, mitte konstandist) | Konstandi ümbernimetamine ei tee vana ajalugu tundmatuks |
 | `restore_deleted_page` kustutatud lehel → töötab | Regressioon: keeldumine ei tohi tabada õiget juhtu |
-| `history-thumb` ilma admin-rollita → 403; `../` failinimes → 400 | Endpoint ei ava failisüsteemi |
+| `history-thumb` ilma tokenita → **401** (mitte 403 — `get_user` annab mõlemal juhul 401, `deps.py:41,45`); `../` failinimes → 400 | Endpoint ei ava failisüsteemi |
+| `history-thumb` cache uueneb, kui lähtefail muutub (sama nimi, uus `mtime_ns`) | Punkt: failinimi ei ole muutumatuse garantii |
+| Logirea parsimine: `angle=0.0 crop=None quad=None` → tegevusi EI OLE; pööre+kärbe → kaks tegevust; `._originals` ilma logireata → `["split"]` | Väärtus otsustab, mitte võtme olemasolu |
+| Rühmitamine: iga API kirje satub täpselt ühte plokki (sh `unknown`) | Ükski kirje ei kao liidesest |
 | `modified-images` filtreerib kadunud failid välja | Ei näidata kirjeid, mille lehte ei ole |
 | i18n pariteet (olemasolev valvur) | Uued võtmed mõlemas keeles |
 
@@ -259,12 +354,20 @@ kolmeks plokiks), mitte komponendipuud — sama joon nagu `impordiEdenemine` juu
 
 ## Teostuse järjekord
 
-1. **A + B** (teepõhine git-jälg + liigitus) — see üksi parandab 303 kirje kuupäeva,
-   autori ja taastatavuse. Iseseisvalt deploy'tav.
-2. **C** (keeldumine jäägil) — punkt 3 kinni, sõltub B-st.
-3. **D + E + F** (endpointid + liides) — punktid 1 ja 2.
+1. **A + B + C koos — üks avaldatav tervik.** A + B üksi EI TOHI tootmisse minna:
+   teepõhine otsing leiab commiti ka 253 poolituse jäägile, mille puhul senine
+   sõnumiotsing lihtsalt ebaõnnestus, ja avaks neil täna mittetoimiva „Taasta" nupu.
+   See suurendaks duplikaatide tekkimise võimalust just selle sammuga, mis peaks seda
+   vähendama. Keeldumine (C) peab jõudma tootmisse samas partiis.
 
-Kui töö tuleb pooleli jätta, on 1 kõige väärtuslikum ja 3 kõige suurem.
+   Selle sammu netotulemus: 462 kirjet saavad kuupäeva ja autori; **50** varem
+   leidmatut kustutatud lehte muutuvad taastatavaks; **320** poolituse jääki muutuvad
+   selgesõnaliselt mittetaastatavaks (varem: 67 neist „taastatav" liideses ja
+   duplikaadioht, 253 vaikselt katki).
+2. **D + F** (pisipildi-endpoint + vastuse väljad) — liidese eeldus.
+3. **E** (kolm plokki + juhis) — punktid 1 ja 2 liideses.
+
+Kui töö tuleb pooleli jätta, on samm 1 kõige väärtuslikum ja samm 3 kõige suurem.
 
 ## Lahtised otsad pärast seda
 
