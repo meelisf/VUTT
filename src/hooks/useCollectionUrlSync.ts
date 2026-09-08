@@ -1,23 +1,26 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useCollection } from '../contexts/CollectionContext';
-import { ALL_COLLECTIONS, COLLECTION_PARAM } from '../contexts/collectionUrl';
+import { COLLECTION_PARAM } from '../contexts/collectionUrl';
+import { decideCollectionSync } from '../contexts/collectionSync';
 
 /**
- * Hoiab aktiivse kogu URL-is (Context → URL; vastassuund on
- * `CollectionContext` init + Dashboardi/Statistika effect).
+ * Hoiab aktiivse kogu URL-i ja konteksti kooskõlas — MÕLEMAS suunas.
  *
- * Varem kirjutas see parameetri ainult siis, kui kogu VAHETUS. Kes oma kogus
- * juba oli ja lihtsalt filtreeris, sai aadressiribalt lingi ilma koguta —
- * ja saajal rakendusid filtrid tema enda kogus, tihti null vastet (#323).
- * Nüüd on parameeter olemas alati, kui kogu on teada.
+ * Kogu peab URL-is alati olema, muidu kannab jagatud link küll filtrid, aga
+ * rakendab need saaja kogus ja annab tihti null vastet (#323).
  *
- * `null` kirjutatakse sõnaselgelt `all`-ina: puuduv parameeter tähendab
- * „ei ütle midagi" ja saaja langeks tagasi oma valikule.
+ * Suuna valib `decideCollectionSync`, mitte see hook. Varem elas vastassuund
+ * eraldi effectina Dashboardis ja Statistikas; kaks peeglit teineteise vastas
+ * andsid lõputu URL-i vahetuse (#333). Ainus omanik on nüüd siin.
  */
 export function useCollectionUrlSync(): void {
-  const { selectedCollection, isLoading } = useCollection();
+  const { selectedCollection, setSelectedCollection, collections, isLoading } = useCollection();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Viimane väärtus, milles URL ja kontekst kokku leppisid. Selle järgi
+  // eristab otsustaja „kontekst liikus" olukorra „URL liikus väljastpoolt"
+  // omast — ilma selleta ei ole lahknemise põhjus loetav.
+  const agreed = useRef<string | null>(null);
   // Esimene kirjutus on olemasoleva vaate PEEGELDUS, edasised on VAHETUS.
   // Ainult vahetus tohib lehe 1-le lähtestada — muidu kaotaks `?page=3`-ga
   // saabunud link oma lehe kohe avamisel.
@@ -25,21 +28,32 @@ export function useCollectionUrlSync(): void {
 
   useEffect(() => {
     if (isLoading) return;
-    const want = selectedCollection ?? ALL_COLLECTIONS;
-    if (searchParams.get(COLLECTION_PARAM) === want) {
-      mirrored.current = true;
+    const urlValue = searchParams.get(COLLECTION_PARAM);
+    const action = decideCollectionSync(
+      urlValue, selectedCollection, agreed.current, mirrored.current, collections,
+    );
+    mirrored.current = true;
+
+    if (action.type === 'noop') {
+      agreed.current = urlValue;
       return;
     }
-    const isSwitch = mirrored.current;
-    mirrored.current = true;
+    if (action.type === 'adopt-url') {
+      // Omaksvõtt EI kirjuta URL-i: lahknemine lõpeb ühe sammuga ja jagatud
+      // lingi ülejäänud parameetrid (`page`, filtrid) jäävad puutumata.
+      agreed.current = urlValue;
+      setSelectedCollection(action.value);
+      return;
+    }
+    agreed.current = action.value;
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        next.set(COLLECTION_PARAM, want);
-        if (isSwitch) next.delete('page');
+        next.set(COLLECTION_PARAM, action.value);
+        if (action.resetPage) next.delete('page');
         return next;
       },
       { replace: true },
     );
-  }, [selectedCollection, isLoading, searchParams, setSearchParams]);
+  }, [selectedCollection, setSelectedCollection, collections, isLoading, searchParams, setSearchParams]);
 }
