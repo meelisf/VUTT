@@ -4,6 +4,7 @@ import shutil
 import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from ..auth import (
@@ -17,6 +18,8 @@ from ..auth import (
 from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
+from ..history_thumbs import ajaloo_pisipilt
+from ..image_history import muudetud_pildid
 from ..mail_templates import render_mail
 from ..mailer import send_mail
 from ..meilisearch_ops import delete_work_from_meilisearch
@@ -294,6 +297,33 @@ def admin_work_metadata(work_id: str, user=Depends(require_role("admin"))):
         return json.load(f)
 
 
+@router.get("/admin/work/{work_id}/history-thumb/{kind}/{filename}")
+def admin_history_thumb(work_id: str, kind: str, filename: str,
+                        user=Depends(require_role("admin"))):
+    """Pisipilt prügikasti või originaalide kaustast.
+
+    `<img src>` ei saa saata Authorization päist — `get_user` võtab tokeni ka
+    query-parameetrist (`deps.py:29`), seega klient lisab `?token=`.
+    """
+    try:
+        # ALGNE failinimi, mitte basename: valideerimine kuulub abifunktsiooni,
+        # ja basename siin peidaks vigase sisendi tema eest ära.
+        tee = ajaloo_pisipilt(work_id, kind, filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not tee:
+        raise HTTPException(status_code=404)
+    return FileResponse(tee, media_type="image/jpeg", headers={
+        "Cache-Control": "private, max-age=86400, immutable",
+    })
+
+
+@router.get("/admin/work/{work_id}/modified-images")
+def admin_modified_images(work_id: str, user=Depends(require_role("admin"))):
+    """Lehed, mille pilti on muudetud ja mille originaal on alles."""
+    return {"status": "success", "images": muudetud_pildid(work_id)}
+
+
 @router.get("/admin/work/{work_id}/trash-pages")
 def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
     """Loetleb teose kustutatud leheküljed."""
@@ -311,7 +341,10 @@ def admin_restore_page(work_id: str, filename: str, user=Depends(require_role("a
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     res = restore_deleted_page(work_id, os.path.basename(path), filename, username=user["username"])
     if not res["ok"]:
-        raise HTTPException(status_code=400, detail=res["error"])
+        # 409 = päring on korrektne, aga selle kirje LIIGIGA see operatsioon ei käi.
+        # Muud vead (fail puudub, git ei anna) jäävad 400-ks nagu enne.
+        kood = 409 if res.get("reason") in ("split", "unknown") else 400
+        raise HTTPException(status_code=kood, detail=res["error"])
     return {"status": "success"}
 
 

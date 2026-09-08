@@ -867,3 +867,41 @@ def test_create_upload_stores_username(backend_env):
     # ilma username'ita → None (tagurpidiühilduv)
     state2 = upload_ops.create_upload({"title": "T2", "year": "", "slug": "t2"})
     assert state2["username"] is None
+
+
+def test_restore_route_leping_kolmel_tulemusel(client, login, monkeypatch):
+    """Õnnestumine PEAB andma {"status": "success"} — frontend kontrollib just seda.
+
+    Liigiviga on 409, ülejäänud vead jäävad 400-ks. `res` otse tagastamine
+    (`{"ok": true}`) taastaks lehe, aga näitaks kasutajale viga.
+    """
+    import server.routers.admin as admin_router
+    monkeypatch.setattr(admin_router, "find_directory_by_id", lambda wid: "/tmp/1690-w1")
+    token = login("admin", "adminpass")
+    p = {"headers": {"Authorization": f"Bearer {token}"}}
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": True})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 200 and r.json() == {"status": "success"}
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": False, "reason": "split", "error": "jääk"})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 409 and r.json()["detail"] == "jääk"
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": False, "reason": "unknown", "error": "tundmatu"})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 409
+
+    monkeypatch.setattr(admin_router, "restore_deleted_page",
+                        lambda *a, **kw: {"ok": False, "error": "Kustutatud faili ei leitud"})
+    r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
+    assert r.status_code == 400, "muu viga ei tohi muutuda 409-ks ega 200-ks"
+
+
+def test_history_thumb_ilma_tokenita_on_401(client):
+    """`get_user` annab NII puuduva tokeni KUI liiga madala rolli korral 401."""
+    r = client.get("/admin/work/w1/history-thumb/trash/leht.jpg")
+    assert r.status_code == 401

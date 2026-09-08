@@ -23,6 +23,7 @@ from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, dele
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import update_page_person_mentions
+from .trash_reason import SPLIT_COMMIT_PREFIX, DELETE_COMMIT_PREFIX
 
 logger = get_logger(__name__)
 
@@ -417,7 +418,7 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
         # Git commit 1: lisa mõlemad uued lehed ühes commitinas
         save_with_git(
             left_txt_path, left_txt, username,
-            message=f"Lõika leht {page_num} ({folder_name}): vasakpoolne [{work_id}]",
+            message=f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): vasakpoolne [{work_id}]",
             additional_files=[
                 (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
                 (right_txt_path, right_txt),
@@ -446,7 +447,7 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
         # Git commit 2: eemalda originaali .txt ja .json
         delete_page_from_git(
             folder_name, orig_base,
-            f"Lõika leht {page_num} ({folder_name}): eemalda originaal [{work_id}]",
+            f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): eemalda originaal [{work_id}]",
             username
         )
 
@@ -1026,7 +1027,7 @@ def delete_pages(work_id, base_names, username):
                 moved.append((src, dst))
 
         try:
-            commit_msg = f"Kustuta {len(base_names)} lehte: {folder_name} [{work_id}]"
+            commit_msg = f"{DELETE_COMMIT_PREFIX} {len(base_names)} lehte: {folder_name} [{work_id}]"
             delete_pages_from_git(folder_name, base_names, commit_msg, username=username)
         except Exception:
             # Rollback: pildid prügikastist tagasi
