@@ -246,6 +246,7 @@
     "invalid": "Kontrolli kuupäeva ja vahemiku järjekorda.",
     "reversed": "Vahemiku lõpp peab olema algusega samal ajal või hiljem.",
     "overlapHint": "Kaasatakse ka kattuva, vähem täpse dateeringuga teosed.",
+    "yearFirst": "Kuu ja päev avanevad pärast aasta sisestamist.",
     "source": "Algne dateering",
     "addEnd": "Lisa vahemiku lõpp",
     "removeEnd": "Eemalda lõpp",

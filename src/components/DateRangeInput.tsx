@@ -4,10 +4,13 @@ import { dateBound, parsePartialDate } from '../utils/workDating';
 
 const fieldClass = 'min-w-0 w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white';
 
-export function DatePartsInput({ value, onChange, label, detailed, calendar, inline, parts = 'all' }: {
+export function DatePartsInput({ value, onChange, label, detailed, calendar, inline, parts = 'all', unknownMonth }: {
   value: string; onChange: (value: string) => void; label: string; detailed: boolean; calendar?: string;
   /** Filtriribal jagatakse väli kahe rea vahel: aasta üleval, kuu+päev all. */
   parts?: 'all' | 'year' | 'subyear';
+  /** Tühi kuu tähendab „teadmata" (metaandmete vorm: väide allika kohta), mitte
+   *  „ükskõik mis" (filter). Vaikimisi neutraalne — filtreid on rohkem. */
+  unknownMonth?: boolean;
   /** Silt kastide ETTE samale reale (filtririba), mitte nende peale (vorm).
    *  Ribal tegi sildirida rühma teistest juhtelementidest kõrgemaks ja jättis
    *  siltide alla tühja ruumi; vormis on silt kastide kohal õigem. */
@@ -28,9 +31,9 @@ export function DatePartsInput({ value, onChange, label, detailed, calendar, inl
         <select aria-label={`${label}: ${t('dating.month')}`} className={`${fieldClass} !w-auto`} value={month} disabled={!year}
           onChange={e => set(year, e.target.value, '')}>
           {/* Filtris tähendab tühi kuu „ükskõik mis", mitte „teadmata" — ja
-              „Kuu teadmata" oli ühtlasi kõige laiem valik, mis venitas kogu
-              rippmenüü ~60 px võrra ja lükkas sortimise teisele reale. */}
-          <option value="">{t(inline ? 'dating.month' : 'dating.monthUnknown')}</option>
+              „Kuu teadmata" oli ühtlasi kõige laiem valik, mis venitas rippmenüü
+              ~60 px võrra ja lükkas sortimise teisele reale. */}
+          <option value="">{t(unknownMonth ? 'dating.monthUnknown' : 'dating.month')}</option>
           {Array.from({ length: 12 }, (_, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{t(`dating.months.${i + 1}`)}</option>)}
         </select>
         <select aria-label={`${label}: ${t('dating.day')}`} aria-invalid={invalid}
@@ -63,6 +66,11 @@ export default function DateRangeInput({ start, end, onStartChange, onEndChange,
   };
   const kokkuvote = precise && <span className="text-xs text-gray-600 whitespace-nowrap">{summary(start)} – {summary(end)}</span>;
   const tagurpidi = start && end && dateBound(start)! > dateBound(end, true)!;
+  // Kuu- ja päevavali on väljas, kuni aasta puudub (`DatePartsInput`: piir
+  // koostatakse kujul aasta-kuu-päev). Ilma selgituseta näevad nad välja nagu
+  // katkised kohatäited — nii see tootmises ka paistis.
+  const aastataVeel = !start && !end;
+  const vihje = aastataVeel ? t('dating.yearFirst') : t('dating.overlapHint');
   const nupp = <button type="button" aria-expanded={expanded}
     className="text-xs text-primary-600 hover:underline whitespace-nowrap" onClick={() => setExpanded(!expanded)}>
     {t(expanded ? 'dating.collapse' : 'dating.refine')}
@@ -83,7 +91,7 @@ export default function DateRangeInput({ start, end, onStartChange, onEndChange,
       {expanded && <>
         <DatePartsInput value={start} onChange={onStartChange} label={t('dating.from')} detailed inline parts="subyear" />
         <DatePartsInput value={end} onChange={onEndChange} label={t('dating.until')} detailed inline parts="subyear" />
-        <span className="text-xs text-gray-500">{t('dating.overlapHint')}</span>
+        <span className="text-xs text-gray-500">{vihje}</span>
       </>}
       {tagurpidi && <span role="alert" className="text-xs text-red-600">{t('dating.reversed')}</span>}
     </div>}
@@ -98,6 +106,6 @@ export default function DateRangeInput({ start, end, onStartChange, onEndChange,
     {nupp}
     {!expanded && kokkuvote}
     {tagurpidi && <p role="alert" className="text-xs text-red-600">{t('dating.reversed')}</p>}
-    {expanded && <p className="text-xs text-gray-500">{t('dating.overlapHint')}</p>}
+    {expanded && <p className="text-xs text-gray-500">{vihje}</p>}
   </div>;
 }

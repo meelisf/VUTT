@@ -25,9 +25,9 @@ export default function WorkDatingInput({ value, dating, onChange }: {
     {!expanded && dating ? <p className="text-sm">{formatYearDisplay(value, null, t, dating)}</p> : !expanded ? <input aria-label={t('dating.label')} className="w-full border border-gray-300 rounded px-3 py-2 text-sm" value={value}
       placeholder="1803, ca. 1803, 1803–1804" onChange={e => onChange(e.target.value, null)} /> : <>
       {!inferred && value && <p className="text-xs text-gray-500">{t('dating.source')}: {value}</p>}
-      <DatePartsInput label={t('dating.start')} value={current.start} onChange={start => set({ start })} detailed calendar={current.calendar} />
+      <DatePartsInput label={t('dating.start')} value={current.start} onChange={start => set({ start })} detailed calendar={current.calendar} unknownMonth />
       {current.end !== undefined ? <div className="space-y-1">
-        <DatePartsInput label={t('dating.end')} value={current.end} onChange={end => set({ end })} detailed calendar={current.calendar} />
+        <DatePartsInput label={t('dating.end')} value={current.end} onChange={end => set({ end })} detailed calendar={current.calendar} unknownMonth />
         <button type="button" className="text-xs text-primary-600" onClick={() => set({ end: undefined, kind: undefined })}>{t('dating.removeEnd')}</button>
       </div> : <button type="button" className="text-xs text-primary-600 hover:underline" onClick={() => set({ end: '' })}>{t('dating.addEnd')}</button>}
       <details className="text-sm" open={current.calendar || current.approximate || current.note || current.kind ? true : undefined}>
