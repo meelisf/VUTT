@@ -28,6 +28,39 @@ export function resolveInitialCollection(
   if (urlValue === ALL_COLLECTIONS) return null;
   if (urlValue && collections[urlValue]) return urlValue;
   if (stored && collections[stored]) return stored;
-  if (!stored && collections[defaultCollection]) return defaultCollection;
+  // Salvestatud väärtus, mida kogude hulgas ei ole, EI ole valik — ta on
+  // jäänuk kustutatud kogust. Varem langes selline kasutaja „kõigi kogude"
+  // peale (terve korpus), samal ajal kui uus kasutaja sai vaikekogu.
+  if (collections[defaultCollection]) return defaultCollection;
   return null;
+}
+
+/** Mida teha `localStorage`-i kirjega pärast valiku lahendamist. */
+export type StoredCollectionUpdate =
+  | { action: 'keep' }
+  | { action: 'write'; value: string }
+  | { action: 'clear' };
+
+/**
+ * `localStorage` peab kehtivat valikut PEEGELDAMA.
+ *
+ * Kaks juhtu nõuavad kirjutamist:
+ * 1. **Jäänuk** — salvestatud kogu ei ole enam olemas. Ilma parandamiseta
+ *    kordub vale vaade igal laadimisel, sest lahendus elab ainult mälus.
+ * 2. **Link** — URL kandis valikut; see jääb kehtima nagu käsitsi valimine,
+ *    muidu hüppaks järgmine leht tagasi.
+ *
+ * Vaikekogu salvestamata kasutajal jääb kirjutamata: vaikeväärtus ei ole
+ * valik ja kinnistamine jätaks ta vaikekogu muutumisel vanasse kinni.
+ */
+export function decideStoredCollection(
+  urlValue: string | null,
+  stored: string | null,
+  collections: Collections,
+  resolved: string | null,
+): StoredCollectionUpdate {
+  const isStale = stored !== null && !collections[stored];
+  if (!isStale && urlValue === null) return { action: 'keep' };
+  if (resolved === stored) return { action: 'keep' };
+  return resolved ? { action: 'write', value: resolved } : { action: 'clear' };
 }

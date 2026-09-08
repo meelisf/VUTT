@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { getCollections, Collections } from '../services/collectionService';
-import { COLLECTION_PARAM, resolveInitialCollection } from './collectionUrl';
+import { COLLECTION_PARAM, decideStoredCollection, resolveInitialCollection } from './collectionUrl';
 
 interface CollectionContextType {
   // Valitud kollektsiooni ID (null = kõik tööd)
@@ -43,12 +43,12 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
         const fromUrl = new URLSearchParams(window.location.search).get(COLLECTION_PARAM);
         const initial = resolveInitialCollection(fromUrl, stored, data, DEFAULT_COLLECTION);
         setSelectedCollectionState(initial);
-        // Lingiga tulnud valik jääb kehtima ka edasi — sama, mis oleks
-        // kogu käsitsi valimine. Ilma selleta hüppaks järgmine leht tagasi.
-        if (fromUrl && initial !== stored) {
-          if (initial) localStorage.setItem(STORAGE_KEY, initial);
-          else localStorage.removeItem(STORAGE_KEY);
-        }
+        // Salvestatud kirje peab lahendust PEEGELDAMA: lingiga tulnud valik
+        // jääb kehtima ja kustutatud kogu jäänuk parandatakse ära. Ilma
+        // parandamiseta kordub vale vaade igal laadimisel.
+        const update = decideStoredCollection(fromUrl, stored, data, initial);
+        if (update.action === 'write') localStorage.setItem(STORAGE_KEY, update.value);
+        else if (update.action === 'clear') localStorage.removeItem(STORAGE_KEY);
       } catch (e) {
         console.error('Failed to load collections:', e);
       } finally {
