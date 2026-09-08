@@ -32,7 +32,7 @@ import {
   deleteUpload,
   getReplaceWorkMetadata,
   getUploadStatus,
-  importUpload,
+  importUploadWithRecovery,
   listUploads,
   replaceWorkUpload,
   uploadImagePage,
@@ -41,7 +41,10 @@ import {
 import type { AdaLookupResult, PollResult, SavedUpload } from './types';
 
 /** Staatused, mille korral OCR-i pool on käigus → viisardi 4. samm. */
-const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done'];
+// `importing` kuulub siia: import kestab suurel teosel minuteid ja
+// vahepealne lehe värskendus peab tooma kasutaja tagasi ülevaatusele,
+// mitte viisardi algusse.
+const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done', 'importing'];
 
 export function useUploadWizard() {
   const { t } = useTranslation(['upload', 'common']);
@@ -208,6 +211,9 @@ export function useUploadWizard() {
     }
   }, []);
 
+  // Import käib SELLES kliendis. Poll ei tohi siis `done` peale seisma jääda.
+  const importInFlightRef = useRef(false);
+
   const fetchStatus = useCallback(
     async (id: string) => {
       if (!authToken) return;
@@ -241,7 +247,11 @@ export function useUploadWizard() {
             setProcessingStartedAt(Date.now());
           }
         }
-        if (['done', 'error', 'imported'].includes(d.status)) {
+        // `done` peatab pollimise ainult siis, kui import EI käi: impordi ajal
+        // on poll ainus tee, mida mööda edenemine kasutajani jõuab, ja ta on
+        // siis odav (server ei ava SFTP-d, ADR 0036).
+        if (['error', 'imported'].includes(d.status)
+            || (d.status === 'done' && !importInFlightRef.current)) {
           stopPolling();
         }
       } catch {
@@ -479,8 +489,12 @@ export function useUploadWizard() {
     if (!uploadId || !authToken) return;
     setImportLoading(true);
     setImportError('');
+    // Kiire poll impordi ajaks: server kirjutab faasi ja loenduri state'i,
+    // kasutaja näeb neid nupu juures.
+    importInFlightRef.current = true;
+    startPolling(uploadId, POLL_FAST_MS);
     try {
-      const d = await importUpload(uploadId, authToken);
+      const d = await importUploadWithRecovery(uploadId, authToken);
       stopPolling();
       setFileUploading(false);
       const uploadWarning = d.warning || (d.git_committed === false ? t('step3.gitCommitWarning') : undefined);
@@ -488,7 +502,9 @@ export function useUploadWizard() {
       navigate(`/work/${d.work_id}`, uploadWarning ? { state: { uploadWarning } } : undefined);
     } catch (e) {
       setImportError(e instanceof Error ? e.message : t('step3.importError'));
+      stopPolling();
     } finally {
+      importInFlightRef.current = false;
       setImportLoading(false);
     }
   }

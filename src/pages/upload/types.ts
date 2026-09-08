@@ -43,6 +43,11 @@ export interface PollResult {
   };
   error?: string;
   stalled?: boolean;
+  /** Imporditud teose ID. Katkenud /import päringu järel on see tulemuse
+   *  tõene allikas — vt `importUploadWithRecovery`. */
+  work_id?: string | null;
+  /** Impordi faas ja loendur, kui staatus on `importing`. */
+  import_progress?: { phase: string; done: number; total: number } | null;
 }
 
 export interface UploadType {

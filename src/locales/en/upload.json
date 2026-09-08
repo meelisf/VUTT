@@ -69,6 +69,10 @@
     "done": "OCR complete",
     "processing": "OCR running...",
     "applying": "Rendering and sending pages… {{done}}/{{total}}",
+    "importDownloading": "Importing pages… {{done}}/{{total}}",
+    "importGit": "Saving to version history…",
+    "importMeili": "Indexing for search…",
+    "importRunning": "Import in progress…",
     "canLeaveNote": "OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
     "canLeaveNoteUnknown": "OCR processing runs in the background; the duration depends on the page count (approx. 2–3 pages/min). You can leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
     "editMetaTitle": "Fill in metadata while OCR is running",
@@ -176,7 +180,11 @@
     "skipped": "Skipped (not a PDF): {{files}}",
     "duplicate": "This record appears to have been imported already: \"{{title}}\". A repeat import may be intentional (e.g. a better scan).",
     "duplicateLink": "View existing work",
-    "precision": { "1": "month only", "2": "year only", "3": "undated" },
+    "precision": {
+      "1": "month only",
+      "2": "year only",
+      "3": "undated"
+    },
     "machineTranslation": "machine translation, please check",
     "takeAda": "use ADA's value",
     "downloading": "Downloading from ADA",

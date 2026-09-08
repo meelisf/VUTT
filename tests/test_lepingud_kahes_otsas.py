@@ -145,3 +145,35 @@ def test_frontend_klassifitseerib_iga_upload_staatuse():
     assert not katmata, (
         "backend võib kirjutada staatuse, mida frontend ei klassifitseeri: {}".format(
             sorted(katmata)))
+
+
+# ---------------------------------------------------------------------------
+# 6. Impordi ooteaeg: nginx ↔ frontend
+# ---------------------------------------------------------------------------
+
+def test_impordi_lagi_mahub_nginxi_ooteaega():
+    """Kliendi lagi ei tohi olla suurem kui nginx-i oma — ja kumbki ei tohi
+    puududa.
+
+    524-leheline teos importis 75 s. Kumbki pool ei deklareerinud ooteaega
+    (nginx vaikimisi 60 s, klient 60 s), nii et suur import andis GARANTEERITULT
+    504 valmis teose kohta. Vaikeväärtus ei ole leping: kui `proxy_read_timeout`
+    rida kaob, tuleb viga tagasi ilma ühegi hoiatuseta.
+    """
+    conf = _loe("nginx.host.conf")
+    admin = re.search(r"location /api/files/admin/ \{(.*?)\n    \}", conf, re.S)
+    assert admin, "nginx.host.conf-ist ei leitud /api/files/admin/ blokki"
+    m = re.search(r"proxy_read_timeout\s+(\d+)s", admin.group(1))
+    assert m, ("/api/files/admin/ blokis puudub proxy_read_timeout — nginx-i "
+               "vaikimisi 60 s katkestab pika impordi ja kasutaja näeb viga "
+               "valmis teose kohta")
+    nginx_s = int(m.group(1))
+
+    ts = _loe("src/pages/upload/uploadApi.ts")
+    k = re.search(r"IMPORT_TIMEOUT_MS\s*=\s*([\d_]+)", ts)
+    assert k, "uploadApi.ts-st ei leitud IMPORT_TIMEOUT_MS-i"
+    kliendi_s = int(k.group(1).replace("_", "")) / 1000
+
+    assert kliendi_s <= nginx_s, (
+        "klient ootab {} s, nginx katkestab {} s — klient ei näeks kunagi "
+        "serveri vastust".format(kliendi_s, nginx_s))

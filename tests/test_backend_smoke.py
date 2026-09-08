@@ -141,6 +141,9 @@ def test_admin_upload_status_returns_staged_state(client, login, make_upload):
         "planned_pages": 3,
         # Apply edenemine — viisard näitab seda `applying` faasis (ADR 0028).
         "applied_done": 0,
+        # Impordi taaste loeb tulemuse siit, kui /import päring katkes (#327).
+        "work_id": None,
+        "import_progress": None,
         "files": state["files"],
         "ready": 0,
         "total": 0,

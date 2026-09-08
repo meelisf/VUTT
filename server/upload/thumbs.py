@@ -128,6 +128,12 @@ def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -
         # `applying` ajal — see faas on „renderdan ja saadan", mitte „OCR
         # töötleb" (ADR 0028).
         "applied_done": (state.get("prepress") or {}).get("applied_done", 0),
+        # Klient vajab seda impordi TAASTEKS: kui 504 katkestas /import päringu,
+        # loeb viisard tulemuse siit, mitte katkenud vastusest.
+        "work_id": state.get("work_id"),
+        # Impordi faas ja loendur (`importing` ajal). Poll on siis LUGEJA ega
+        # tee SFTP-d, seega on see edenemise ainus tee kasutajani.
+        "import_progress": state.get("import_progress"),
     }
     payload.update(lisa)
     return payload
@@ -161,8 +167,14 @@ def poll_and_sync_thumbs(
 
     # Uploading/pending/collecting_images/error: SFTP-d pole vaja
     # PREPRESS_IDLE_STATUSES: fail on VUTT-i poolel, OCR-serveris pole veel midagi
+    # `importing` käitub siin nagu `imported`: importija OMAB elutsükli-staatust
+    # (sama valvur nagu I1 `applying` juures, ADR 0028). Ilma selleta kirjutaks
+    # viisardi 5-sekundiline poll `importing` kohe `reviewing`/`done`-iks tagasi
+    # ja järgmine klikk pääseks CAS-ist läbi teise impordi alustama. SFTP-d ka
+    # ei ole vaja: import ise loeb kaugkausta ja koristab selle lõpus ära.
     if current_status in (
-        "pending", "uploading", "error", "imported", "collecting_images",
+        "pending", "uploading", "error", "importing", "imported",
+        "collecting_images",
         # ADA allalaadimine käib VUTT-i poolel; OCR-serveris ei ole veel midagi.
         "ada_fetching", "ada_error",
     ) + upload_state.PREPRESS_IDLE_STATUSES:

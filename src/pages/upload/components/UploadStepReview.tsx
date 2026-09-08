@@ -4,6 +4,7 @@ import UploadMetaForm from '../../../components/UploadMetaForm';
 import { FILE_API_URL } from '../../../config';
 import type { Collections } from '../../../services/collectionService';
 import type { FileEntry, PollResult } from '../types';
+import { impordiEdenemine } from '../utils';
 
 /** Kohatäide lehele, mille pilti veel ei ole — näitab töö KUJU kohe. */
 const PlaceholderCard: React.FC<{ page: number }> = ({ page }) => (
@@ -155,7 +156,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
             <AlertTriangle size={16} />
             {t('status.error')}
           </span>
-        ) : status === 'done' ? (
+        ) : status === 'done' || status === 'importing' ? (
           <span className="flex items-center gap-1 text-green-600 font-medium">
             <CheckCircle size={16} />
             {t('step3.done')}
@@ -287,6 +288,29 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
       </div>
     )}
 
+    {/* Impordi edenemine — NUPU JUURES, mitte päises: suure teose puhul on
+        päis sadade pisipiltide taga ja kasutaja ei näe seda. */}
+    {(() => {
+      const edenemine = impordiEdenemine(pollResult?.import_progress, t);
+      if (!edenemine) return null;
+      return (
+        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+          <div className="flex items-center gap-2">
+            <Loader2 size={16} className="shrink-0 animate-spin" />
+            <span>{edenemine.label}</span>
+          </div>
+          {edenemine.pct !== null && (
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-100">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                style={{ width: `${edenemine.pct}%` }}
+              />
+            </div>
+          )}
+        </div>
+      );
+    })()}
+
     {/* Impordi nupp */}
     {importError && (
       <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -301,7 +325,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
         title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
         className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
       >
-        {importLoading ? (
+        {importLoading || status === 'importing' ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <AlertTriangle size={16} />
@@ -315,7 +339,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
         title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
         className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
       >
-        {importLoading ? (
+        {importLoading || status === 'importing' ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <CheckCircle size={16} />

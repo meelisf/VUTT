@@ -77,6 +77,11 @@ async def lifespan(app: FastAPI):
     from .upload.apply_recovery import taasta_rippuvad_applyd
     threading.Thread(target=taasta_rippuvad_applyd, daemon=True,
                      name="apply-recovery").start()
+    # Rippuv `importing` → eelmine staatus. Sama põhjus: restart tapab
+    # impordi-lõime enne except-haru ja CAS keelaks iga uue katse.
+    from .upload.import_work import taasta_rippuvad_impordid
+    threading.Thread(target=taasta_rippuvad_impordid, daemon=True,
+                     name="import-recovery").start()
     yield
     print("VUTT FastAPI sulgemine.")
 

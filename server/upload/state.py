@@ -219,6 +219,7 @@ ALL_STATUSES = (
     "processing",          # OCR-server töötab
     "reviewing",           # osa lehti valmis, ülevaatus võimalik
     "done",                # kõik lehed lahendatud
+    "importing",           # import käib (CAS: done|reviewing → importing)
     "imported",            # teoseks imporditud (lõppseisund)
     "error",               # tõrge
 )
