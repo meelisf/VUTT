@@ -19,6 +19,7 @@ from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
 from ..history_thumbs import ajaloo_pisipilt
+from ..image_history import muudetud_pildid
 from ..mail_templates import render_mail
 from ..mailer import send_mail
 from ..meilisearch_ops import delete_work_from_meilisearch
@@ -315,6 +316,12 @@ def admin_history_thumb(work_id: str, kind: str, filename: str,
     return FileResponse(tee, media_type="image/jpeg", headers={
         "Cache-Control": "private, max-age=86400, immutable",
     })
+
+
+@router.get("/admin/work/{work_id}/modified-images")
+def admin_modified_images(work_id: str, user=Depends(require_role("admin"))):
+    """Lehed, mille pilti on muudetud ja mille originaal on alles."""
+    return {"status": "success", "images": muudetud_pildid(work_id)}
 
 
 @router.get("/admin/work/{work_id}/trash-pages")
