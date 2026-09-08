@@ -9,11 +9,16 @@ import re
 from typing import Optional
 
 from .config import BASE_DIR, get_logger
+from .trash_reason import SPLIT_PREFIXES_AJALUGU
 from .utils import find_directory_by_id
 
 logger = get_logger(__name__)
 
 LOGI_NIMI = "transform_image.log"
+
+# Eraldaja git-logi commitide vahel. Ei tohi olla NULL-bait (subprocess argv ei
+# luba embedded null'i) ega midagi, mis päris commit-sõnumis ette tuleks.
+_GIT_LOG_DELIM = "\x01VUTT_SPLIT_LOG\x01"
 
 # 5 välja torudega: aeg | kasutaja | work_id | failinimi | parameetrid | -> tulemus
 _RIDA = re.compile(r'^([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|(.*)\|([^|]*)$')
@@ -69,8 +74,58 @@ def _viimased_logikirjed(work_id: str) -> dict:
     return tulemus
 
 
+def _splitust_sundinud_alused(work_id: str, folder_name: str) -> set:
+    """Baasnimed (ilma laiendita), mille LISAMISE commit on poolituse commit.
+
+    Positiivne tõend gitist: `split_page` kirjutab MÕLEMA poole ._originals
+    kirje, ilma et transform_image.log'is oleks rida — logirea puudumine üksi
+    ei tõesta midagi (vt `muudetud_pildid`). Siin loeme, kes faili LISAS
+    (`--diff-filter=A`), mitte kes seda viimati muutis — nii ei sega
+    hilisemad tavalised commitid (nt ümberjärjestus) tõendit.
+
+    ÜKS git-käsk terve teose kohta, mitte üks faili kohta: teosel võib olla
+    sadu ._originals kirjeid ja per-faili git log teeks admin-paneeli
+    aeglaseks.
+    """
+    from .git_ops import get_or_init_repo
+
+    tulemus = set()
+    try:
+        repo = get_or_init_repo()
+        valjund = repo.git.log(
+            '--all', '--diff-filter=A', '--name-only',
+            f'--pretty=format:{_GIT_LOG_DELIM}%s',
+            '--', folder_name + '/',
+        )
+        for plokk in valjund.split(_GIT_LOG_DELIM):
+            if not plokk.strip():
+                continue
+            read = plokk.split('\n')
+            sonum = read[0]
+            if not sonum.startswith(SPLIT_PREFIXES_AJALUGU):
+                continue
+            for failitee in read[1:]:
+                failitee = failitee.strip()
+                if not failitee:
+                    continue
+                base = os.path.splitext(os.path.basename(failitee))[0]
+                tulemus.add(base)
+    except Exception as e:
+        # Git-viga ei tohi prügikasti/ajaloopaneeli kukutada — kirjed jäävad
+        # lihtsalt filtreerimata (neutraalne, mitte vale-negatiivne suund).
+        logger.warning(f"AJALUGU: poolituse tuvastus git-logist ebaõnnestus ({work_id}): {e}")
+        return set()
+    return tulemus
+
+
 def muudetud_pildid(work_id: str) -> list:
-    """Lehed, millel on pristine originaal alles JA mis on veel teoses olemas."""
+    """Lehed, millel on pristine originaal alles JA mis on veel teoses olemas.
+
+    Poolituse mõlemad pooled JÄETAKSE VÄLJA (vt `_splitust_sundinud_alused`):
+    neil on ._originals kirje, aga „Taasta originaal" tooks tagasi terve
+    poolitamata topeltlehe, samal ajal kui tekst on juba poolitatud lehe
+    järgi kahte kohta jagatud.
+    """
     from .admin_page_ops import get_sorted_images
 
     kaust = os.path.join(BASE_DIR, "._originals", work_id)
@@ -82,6 +137,8 @@ def muudetud_pildid(work_id: str) -> list:
 
     jarjekord = {nimi: i + 1 for i, nimi in enumerate(get_sorted_images(tee))}
     logi = _viimased_logikirjed(work_id)
+    folder_name = os.path.basename(tee)
+    splitud_alused = _splitust_sundinud_alused(work_id, folder_name)
 
     kirjed = []
     for nimi in sorted(os.listdir(kaust)):
@@ -91,6 +148,9 @@ def muudetud_pildid(work_id: str) -> list:
             continue
         # Kadunud leht: originaal kuulub hiljem kustutatud või poolitatud lehele.
         if nimi not in jarjekord:
+            continue
+        # Poolituse jääk: positiivselt tõestatud gitist, mitte logirea puudumisest.
+        if os.path.splitext(nimi)[0] in splitud_alused:
             continue
         kirje = logi.get(nimi)
         praegune = os.path.join(tee, nimi)

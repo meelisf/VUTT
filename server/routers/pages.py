@@ -27,6 +27,7 @@ from ..deps import get_json_data, require_role
 from ..git_ops import delete_page_from_git, save_with_git
 from ..image_server import generate_thumbnail, invalidate_cover
 from ..meilisearch_ops import sync_work_to_meilisearch
+from ..trash_reason import DELETE_COMMIT_PREFIX
 from ..utils import find_directory_by_id
 
 logger = get_logger(__name__)
@@ -98,8 +99,9 @@ def admin_delete_page(work_id: str, page_num: int, user=Depends(require_role("ad
         if os.path.exists(img_path):
             shutil.move(img_path, os.path.join(trash_dir, img_name))
 
-        # Kustuta .txt ja .json gitist
-        commit_msg = f"Kustuta leht {page_num}: {folder_name}/{base} [{work_id}]"
+        # Kustuta .txt ja .json gitist. Prefiks tuleb `trash_reason`-ist —
+        # sama konstant, mida `liigita()` prügikasti kirje liigitamisel loeb.
+        commit_msg = f"{DELETE_COMMIT_PREFIX} leht {page_num}: {folder_name}/{base} [{work_id}]"
         delete_page_from_git(folder_name, base, commit_msg, username=user["username"])
 
         # Sünkroniseeri Meilisearch (leheküljed renumberdatakse)

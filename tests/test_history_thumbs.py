@@ -72,7 +72,12 @@ def test_symbollink_lubatud_kaustast_valja_keelatakse(tmp_path, monkeypatch):
 
 
 def test_praeguse_lehe_pisipilt(tmp_path, monkeypatch):
-    """Liik `current` = teose enda kaust; tema mtime MUUTUB originaali taastamisel."""
+    """Liik `current` = teose enda kaust; tema mtime MUUTUB originaali taastamisel.
+
+    Cache ei tohi maanduda teose kausta SISSE: pildiserver serveerib
+    `_metadata.json`-ita kataloogi piiramatuna, seega `{teos}/.thumbs` oleks
+    anonüümselt serveeritav ka piiratud kollektsiooni teosele (vt #325 review).
+    """
     monkeypatch.setattr(history_thumbs, "BASE_DIR", str(tmp_path))
     töö = tmp_path / "1700-w1"
     _pilt(töö / "leht.jpg")
@@ -80,6 +85,8 @@ def test_praeguse_lehe_pisipilt(tmp_path, monkeypatch):
 
     tee = history_thumbs.ajaloo_pisipilt("w1", "current", "leht.jpg")
     assert tee and os.path.isfile(tee)
+    assert not tee.startswith(str(töö)), "pisipildi cache ei tohi olla teose kausta sees"
+    assert tee.startswith(str(tmp_path / "._thumbcache" / "w1"))
 
 
 def test_puuduv_fail_annab_none(tmp_path, monkeypatch):

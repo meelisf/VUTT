@@ -60,10 +60,18 @@ def ajaloo_pisipilt(work_id: str, kind: str, filename: str) -> Optional[str]:
     # sisu muutus eristab variante.
     versioon = os.stat(allikas).st_mtime_ns
     base = os.path.splitext(filename)[0]
-    # Cache elab lähtekausta KÕRVAL (`._trash/{wid}/.thumbs`), mitte sees — muidu
-    # ilmuks pisipilt prügikasti loendisse omaette kirjena.
-    cache_juur = os.path.dirname(kaust) if kind == "trash" else kaust
-    cache_kaust = os.path.join(cache_juur, ".thumbs")
+    if kind == "trash":
+        # Cache elab lähtekausta KÕRVAL (`._trash/{wid}/.thumbs`), mitte sees —
+        # muidu ilmuks pisipilt prügikasti loendisse omaette kirjena.
+        cache_kaust = os.path.join(os.path.dirname(kaust), ".thumbs")
+    elif kind == "current":
+        # EI TOHI olla elava teose kausta sees: pildiserver (port 8001)
+        # käsitleb `_metadata.json`-ita kataloogi piiramatuna, seega
+        # `{teos}/.thumbs` oleks anonüümselt serveeritav ka piiratud
+        # kollektsiooni teosele. Cache elab seega täiesti eraldi puus.
+        cache_kaust = os.path.join(BASE_DIR, "._thumbcache", work_id)
+    else:
+        cache_kaust = os.path.join(kaust, ".thumbs")
     os.makedirs(cache_kaust, exist_ok=True)
     siht = os.path.join(cache_kaust, f"{base}_{versioon}.jpg")
     if os.path.isfile(siht):

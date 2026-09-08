@@ -60,3 +60,17 @@ def test_split_page_sonum_algab_ajaloolise_prefiksiga():
     # Kõvakodeeritud vanu sõnumeid ei tohi järele jääda
     assert '"Lõika leht {' not in kood and "f\"Lõika leht" not in kood, (
         "leidus kõvakodeeritud „Lõika leht\" sõnum")
+
+
+def test_yksiku_lehe_kustutus_kasutab_prefiksit():
+    """`routers/pages.py::admin_delete_page` on TEINE kustutamise commiti kirjutaja
+    (kõrval `admin_page_ops.py::delete_pages`) — mõlemad peavad konstandist lähtuma,
+    muidu muudaks konstandi ümbernimetamine ühe kirjutaja sõnumid vaikselt `unknown`-iks.
+    """
+    juur = Path(__file__).resolve().parents[1]
+    kood = (juur / "server" / "routers" / "pages.py").read_text(encoding="utf-8")
+
+    assert 'DELETE_COMMIT_PREFIX' in kood, (
+        "admin_delete_page ei impordi prefiksit trash_reason-ist")
+    assert '"Kustuta leht {' not in kood and "f\"Kustuta leht" not in kood, (
+        "leidus kõvakodeeritud „Kustuta leht\" sõnum")

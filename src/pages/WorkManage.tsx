@@ -660,9 +660,11 @@ const WorkManage: React.FC = () => {
       // pildid pildiserverist ega tea sellest muudatusest midagi.
       await loadTrashPages();
       setThumbCacheBust(Date.now());
-    } catch (e) {
-      const detail = e instanceof ApiError ? e.message : null;
-      setRestoreMessage({ text: detail || t('manage.trash.restoreError'), ok: false });
+    } catch {
+      // Erinevalt `handleRestorePage`-ist viskab `restoreOriginalPageImage`
+      // (pageService.ts) alati lihtsa `Error`-i, mitte `ApiError`-i — serveri
+      // `detail` siia kunagi ei jõua, seega jääbki üldsõnum ainsaks võimaluseks.
+      setRestoreMessage({ text: t('manage.trash.restoreError'), ok: false });
     } finally {
       setRestoringOriginal(null);
     }
