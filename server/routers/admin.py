@@ -4,6 +4,7 @@ import shutil
 import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from ..auth import (
@@ -17,6 +18,7 @@ from ..auth import (
 from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
+from ..history_thumbs import ajaloo_pisipilt
 from ..mail_templates import render_mail
 from ..mailer import send_mail
 from ..meilisearch_ops import delete_work_from_meilisearch
@@ -292,6 +294,27 @@ def admin_work_metadata(work_id: str, user=Depends(require_role("admin"))):
         raise HTTPException(status_code=404, detail="Metaandmete fail puudub")
     with open(meta_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+@router.get("/admin/work/{work_id}/history-thumb/{kind}/{filename}")
+def admin_history_thumb(work_id: str, kind: str, filename: str,
+                        user=Depends(require_role("admin"))):
+    """Pisipilt prügikasti või originaalide kaustast.
+
+    `<img src>` ei saa saata Authorization päist — `get_user` võtab tokeni ka
+    query-parameetrist (`deps.py:29`), seega klient lisab `?token=`.
+    """
+    try:
+        # ALGNE failinimi, mitte basename: valideerimine kuulub abifunktsiooni,
+        # ja basename siin peidaks vigase sisendi tema eest ära.
+        tee = ajaloo_pisipilt(work_id, kind, filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not tee:
+        raise HTTPException(status_code=404)
+    return FileResponse(tee, media_type="image/jpeg", headers={
+        "Cache-Control": "private, max-age=86400, immutable",
+    })
 
 
 @router.get("/admin/work/{work_id}/trash-pages")

@@ -899,3 +899,9 @@ def test_restore_route_leping_kolmel_tulemusel(client, login, monkeypatch):
                         lambda *a, **kw: {"ok": False, "error": "Kustutatud faili ei leitud"})
     r = client.post("/admin/work/w1/trash-pages/a.jpg/restore", **p)
     assert r.status_code == 400, "muu viga ei tohi muutuda 409-ks ega 200-ks"
+
+
+def test_history_thumb_ilma_tokenita_on_401(client):
+    """`get_user` annab NII puuduva tokeni KUI liiga madala rolli korral 401."""
+    r = client.get("/admin/work/w1/history-thumb/trash/leht.jpg")
+    assert r.status_code == 401
