@@ -232,6 +232,14 @@ teksti muutma). Komponendisisene olek, mis varem lähtestus remountiga (`isDirty
 kerimispositsioon), tuleb lehevahetuse effectis **selgesõnaliselt** lähtestada. Üldisemalt:
 remount on vaikiv olekulähtestaja — early-returni eemaldamisel auditeeri kogu komponendi olek.
 
+**Aktiivne kogu URL-is (ADR 0038)** — kogu sünkroniseerimine URL-i ja `CollectionContext`-i
+vahel elab AINULT `useCollectionUrlSync`-is; suuna otsustab puhas `decideCollectionSync`
+(`src/contexts/collectionSync.ts`). Ära lisa lehele oma vastassuunalist effecti: kaks
+tingimusteta peeglit reageerivad teineteise EELMISELE väärtusele ja ühe sammu faasivahest
+sünnib lõputu URL-i vahetus (#333). Omaksvõtt (URL → kontekst) EI kirjuta URL-i tagasi.
+Leht lähtestatakse 1-le ainult päris vahetusel, mitte peegeldusel ega katkise lingi
+parandusel.
+
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
 allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `urlTransform`

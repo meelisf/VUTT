@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag, Link2, Check } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -10,7 +10,6 @@ import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
 import { getGenreFacets, getGenreLabelMap } from '../services/searchService';
-import { ALL_COLLECTIONS } from '../contexts/collectionUrl';
 
 interface StatusCount {
   name: string;
@@ -25,22 +24,12 @@ interface YearCount {
 
 const Statistics: React.FC = () => {
   const { t, i18n } = useTranslation(['statistics', 'common']);
-  const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+  const { selectedCollection, getCollectionName, collections } = useCollection();
   const index = useMeiliIndex();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
-  // Sünkroonib kollektsiooni URL ?collection= parameetriga (mõlemas suunas)
+  // Hoiab kogu URL-i ja konteksti kooskõlas (mõlemas suunas, #333)
   useCollectionUrlSync();
-  useEffect(() => {
-    const collectionParam = searchParams.get('collection');
-    if (collectionParam === ALL_COLLECTIONS) {
-      // Sõnaselge „kõik kogud" lingist — muidu jääks saaja oma kogusse.
-      if (selectedCollection !== null) setSelectedCollection(null);
-    } else if (collectionParam && collections[collectionParam] && collectionParam !== selectedCollection) {
-      setSelectedCollection(collectionParam);
-    }
-  }, [searchParams.get('collection'), collections]);
   const lang = getLangCode(i18n.language);
   const [collectionLinkCopied, setCollectionLinkCopied] = useState(false);
 

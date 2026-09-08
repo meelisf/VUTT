@@ -57,3 +57,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0035](0035-uue-konto-vaikeroll-on-kitsam.md) | Uue konto vaikeroll on `contributor`; iga muu väärtus peale contributor/editor annab kitsama rolli | kehtib |
 | [0036](0036-katkenud-vastus-ei-ole-ebaonnestunud-too.md) | Katkenud vastus ei ole ebaõnnestunud töö; pikk töö deklareerib, et ta käib, ja ooteaeg on leping kahe otsa vahel | kehtib |
 | [0037](0037-work-dating.md) | Teose dateering säilitab allika kuupäeva, täpsuse ja valikulise kalendri; otsing kasutab vahemike kattuvust | kehtib |
+| [0038](0038-kahe-peegli-vahel-peab-olema-ulimuslikkus.md) | Kaks kohta, mis peavad kokku langema, ei tohi teineteist tingimusteta peegeldada; üks pool peab suutma öelda, kumb liikus | kehtib |
