@@ -136,7 +136,8 @@ def admin_replace_page_image(
     user=Depends(require_role("admin")),
 ):
     """
-    Asendab lehekülje pildi uuega. Vana pilt säilitatakse prügikastis 90 päeva.
+    Asendab lehekülje pildi uuega. Vana pilt säilitatakse prügikastis (tähtajatult:
+    see on ainus koopia, sest asendus kustutab ._originals kirje).
     Body: multipart — file (JPG/PNG)
     """
     path = find_directory_by_id(work_id)

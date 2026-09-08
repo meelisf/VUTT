@@ -47,14 +47,22 @@ def test_transform_rotate_90_changes_dimensions(tf_work):
 
 
 def test_transform_backup_is_old_image_before_overwrite(tf_work):
+    """Varukoopia on VANA pilt, ja ta elab ._originals-is — mitte prügikastis.
+
+    Teisendus EI kirjuta ._trash/{work_id}/replaced_images/ alla (#325): see kiht
+    kasvas piiramatult (uus fail iga kärpe kohta), kuigi ._originals hoiab juba
+    sama teavet ühe failina lehe kohta.
+    """
     from PIL import Image as PILImage
     from server.admin_page_ops import transform_page_image
     transform_page_image(tf_work["work_id"], tf_work["filename"], angle=90.0, username="admin")
-    trash = tf_work["folder"].parent / "._trash" / tf_work["work_id"] / "replaced_images"
-    backups = list(trash.glob("*"))
-    assert len(backups) == 1
-    with PILImage.open(str(backups[0])) as im:
+
+    orig = tf_work["folder"].parent / "._originals" / tf_work["work_id"] / tf_work["filename"]
+    with PILImage.open(str(orig)) as im:
         assert (im.width, im.height) == (200, 100)  # VANA pilt, mitte uus
+
+    trash = tf_work["folder"].parent / "._trash" / tf_work["work_id"] / "replaced_images"
+    assert not trash.exists() or list(trash.glob("*")) == []
 
 
 def test_transform_writes_pristine_original_once(tf_work):
