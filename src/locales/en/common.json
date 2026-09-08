@@ -246,6 +246,7 @@
     "invalid": "Check the date and range order.",
     "reversed": "The end must be on or after the start.",
     "overlapHint": "Includes works with overlapping, less precise dates.",
+    "yearFirst": "Month and day open once you enter a year.",
     "source": "Original date",
     "addEnd": "Add range end",
     "removeEnd": "Remove end",
