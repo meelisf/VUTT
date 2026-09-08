@@ -43,6 +43,7 @@ _work_ids_cache = {}
 
 # Cache teose info jaoks (kausta nimi -> {work_id, slug, title, year, author})
 _work_info_cache = {}
+_repo_init_lock = threading.Lock()
 
 
 def _decode_git_path(fp: str) -> str:
@@ -240,6 +241,14 @@ def get_or_init_repo():
     if _git_repo is not None:
         return _git_repo
 
+    with _repo_init_lock:
+        if _git_repo is not None:
+            return _git_repo
+        return _init_repo_locked()
+
+
+def _init_repo_locked():
+    global _git_repo
     try:
         _git_repo = Repo(BASE_DIR)
         logger.info(f"Git repo leitud: {BASE_DIR}")
@@ -490,7 +499,7 @@ def get_file_git_history(paths, max_count=50):
     repo = get_or_init_repo()
 
     try:
-        commits = list(repo.iter_commits(paths=paths, max_count=max_count))
+        commits = _read_commit_meta(repo, max_commits=max_count, paths=paths)
     except Exception:
         return []
 
@@ -498,18 +507,18 @@ def get_file_git_history(paths, max_count=50):
         return []
 
     # Esimene commit (kõige vanem) on originaal
-    original_hash = commits[-1].hexsha if commits else None
+    original_hash = commits[-1]["hexsha"] if commits else None
 
     history = []
     for commit in commits:
         history.append({
-            "hash": commit.hexsha[:8],
-            "full_hash": commit.hexsha,
-            "author": commit.author.name,
-            "date": commit.committed_datetime.isoformat(),
-            "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
-            "message": commit.message.strip(),
-            "is_original": commit.hexsha == original_hash
+            "hash": commit["hexsha"][:8],
+            "full_hash": commit["hexsha"],
+            "author": commit["author"],
+            "date": commit["date"].isoformat(),
+            "formatted_date": commit["date"].strftime("%d.%m.%Y %H:%M"),
+            "message": commit["message"],
+            "is_original": commit["hexsha"] == original_hash
         })
 
     return history
@@ -575,13 +584,15 @@ def get_commit_diff(commit_hash, filepaths=None):
     EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
     try:
-        commit = repo.commit(commit_hash)
-
-        # Määra parent (esimese commiti puhul tühi puu)
-        parent_hash = commit.parents[0].hexsha if commit.parents else EMPTY_TREE
+        # Vanem loetakse TEKSTINA, mitte `commit.parents` kaudu: see on laisk
+        # lugemine jagatud objektibaasist ja võib samaaegsel päringul anda
+        # võõra commiti andmed (#337).
+        resolved = repo.git.rev_parse(commit_hash).strip()
+        parents = repo.git.log("-1", "--format=%P", resolved).split()
+        parent_hash = parents[0] if parents else EMPTY_TREE
 
         # Koosta argumentide list
-        args = [parent_hash, commit.hexsha, '--']
+        args = [parent_hash, resolved, '--']
         if filepaths:
             if isinstance(filepaths, list):
                 args.extend(filepaths)
@@ -593,7 +604,7 @@ def get_commit_diff(commit_hash, filepaths=None):
         
         # Loe statistika
         # numstat puhul peame samuti failid ette andma
-        stat_args = [parent_hash, commit.hexsha, '--numstat', '--']
+        stat_args = [parent_hash, resolved, '--numstat', '--']
         if filepaths:
             if isinstance(filepaths, list):
                 stat_args.extend(filepaths)
@@ -839,6 +850,64 @@ def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "V
         return False
 
 
+_COMMIT_FIELD_SEP = "\x1f"
+
+
+def _parse_commit_meta(output):
+    """Parsib ``git log`` metaandmete väljundi kirjeteks.
+
+    Vorming: ``%H<US>%an<US>%cI<US>%B<NUL>``. Kirje lõpetab NUL, sest ``%B``
+    võib sisaldada reavahetusi — reapõhine parsimine murduks mitmerealise
+    commit-sõnumi peal. NUL-i ei saa commit-sõnumis olla.
+
+    Tagastab listi ``{hexsha, author, date, message}``, git-i järjestuses.
+    """
+    records = []
+    for chunk in output.split("\0"):
+        chunk = chunk.lstrip("\n")
+        if not chunk:
+            continue
+        fields = chunk.split(_COMMIT_FIELD_SEP, 3)
+        if len(fields) < 3:
+            continue
+        hexsha, author, iso = fields[0].strip(), fields[1], fields[2].strip()
+        try:
+            date = datetime.fromisoformat(iso)
+        except ValueError:
+            continue
+        records.append({
+            "hexsha": hexsha,
+            "author": author,
+            "date": date,
+            "message": (fields[3] if len(fields) > 3 else "").strip(),
+        })
+    return records
+
+
+def _read_commit_meta(repo, max_commits=None, username=None, paths=None):
+    """Loeb commitite metaandmed ÜHE git-protsessiga.
+
+    Miks mitte ``repo.iter_commits`` + ``commit.author`` (#337): GitPythoni
+    Commit loeb autori, kuupäeva ja sõnumi **laisalt**, alles kasutamise
+    hetkel, jagatud objektibaasi (püsiv ``git cat-file --batch``) kaudu.
+    Review ja ajalugu jooksevad threadpool'is ühe jagatud ``Repo`` peal, seega
+    kaks samaaegset päringut said sama torust vahetusse: Commit-objekt jäi
+    õige hashiga, aga sai VÕÕRA commiti autori ja kuupäeva. Teos ja failitee
+    olid õiged, sest need tulevad eraldi ``git log`` tekstiväljundist — just
+    see kombinatsioon tegi vea nii segaseks.
+
+    Tekstiväljundis ei ole midagi laiska: mis loetakse, see on kirjas.
+    """
+    args = [f"--format=%H{_COMMIT_FIELD_SEP}%an{_COMMIT_FIELD_SEP}%cI{_COMMIT_FIELD_SEP}%B%x00"]
+    if max_commits is not None:
+        args.insert(0, f"--max-count={max_commits}")
+    args.extend(_author_log_args(username))
+    if paths:
+        args.append("--")
+        args.extend(paths if isinstance(paths, (list, tuple)) else [paths])
+    return _parse_commit_meta(repo.git.log(*args))
+
+
 def _get_changed_paths_by_commit(repo, max_commits, username=None):
     """Loeb commitite failiteed ühe git-protsessiga.
 
@@ -875,7 +944,7 @@ def _author_log_args(username):
     ``--fixed-strings`` on tahtlik: ``--author`` on muidu regex ja nimest
     tehtud muster võiks vaikselt MITTE sobituda (kasutaja näeks tühja ajalugu).
     Fikseeritud string sobitub alati üle, mitte alla — täpse nime kontrolli
-    teeb niikuinii Python (``commit.author.name == username``).
+    teeb niikuinii Python (``commit["author"] == username``).
     """
     if not username:
         return []
@@ -916,23 +985,19 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
     Tagastab (results, has_more, scanned), kus `scanned` on läbi vaadatud
     commitite arv — kutsuja järeldab sellest, kas ajalugu sai otsa.
     """
+    # Metaandmed ja failiteed tulevad KAHEST git-protsessist, aga mõlemad
+    # tekstina ja mõlemad hashi järgi seotud — mitte järjekorra järgi ja mitte
+    # laisalt jagatud objektibaasist (#337).
     try:
-        iter_kwargs = {}
-        if window is not None:
-            iter_kwargs["max_count"] = window
-        if username:
-            iter_kwargs["fixed_strings"] = True
-            iter_kwargs["author"] = username
-        all_commits = list(repo.iter_commits(**iter_kwargs))
+        all_commits = _read_commit_meta(repo, max_commits=window, username=username)
     except Exception:
         return [], False, 0
 
     try:
         changed_paths = _get_changed_paths_by_commit(repo, window, username)
     except Exception as e:
-        # Ühilduvusfallback ebatavalise/vana git-versiooni jaoks.
         logger.warning(f"Git failiteede koondlugemine ebaõnnestus: {e}")
-        changed_paths = None
+        changed_paths = {}
 
     results = []
     seen_files = set()  # Vältimaks duplikaate sama faili kohta
@@ -942,26 +1007,22 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
     for commit in all_commits:
         # Filtreeri kasutaja järgi (kui määratud). Git on juba kitsendanud,
         # aga --fixed-strings sobitub üle: siin käib täpne kontroll.
-        if username and commit.author.name != username:
+        if username and commit["author"] != username:
             continue
 
         # Jäta vahele automaatsed commitid
-        if commit.author.name == "Automaatne":
+        if commit["author"] == "Automaatne":
             continue
 
         # Leia muudetud failid selles commitis
         try:
             # Tavatee kasutab ülal ühe git-protsessiga loetud failinimesid.
             # Fallback käivitab vana GitPythoni stats-päringu commiti kaupa.
-            file_paths = (
-                changed_paths.get(commit.hexsha, [])
-                if changed_paths is not None
-                else list(commit.stats.files.keys())
-            )
+            file_paths = changed_paths.get(commit["hexsha"], [])
 
             # Impordi commit: sisaldab kõiki lehe txt-faile + _metadata.json.
             # Näitame ainult ÜHT kirjet teose kohta (change_type="import").
-            is_import_commit = commit.message.strip().startswith("Originaal OCR:")
+            is_import_commit = commit["message"].startswith("Originaal OCR:")
 
             for filepath in file_paths:
                 filepath = _decode_git_path(filepath)
@@ -996,7 +1057,7 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
                         continue
                     nanoid = filename.removesuffix(".json")
                     person_id = f"vutt:P{nanoid}"
-                    file_key = f"prosopo/{commit.hexsha[:8]}"  # üks kirje per commit (merge puhuks)
+                    file_key = f"prosopo/{commit['hexsha'][:8]}"  # üks kirje per commit (merge puhuks)
                     if file_key in seen_files:
                         continue
                     seen_files.add(file_key)
@@ -1004,12 +1065,12 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
                         skipped += 1
                         continue
                     results.append({
-                        "commit_hash": commit.hexsha[:8],
-                        "full_hash": commit.hexsha,
-                        "author": commit.author.name,
-                        "date": commit.committed_datetime.isoformat(),
-                        "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
-                        "message": commit.message.strip(),
+                        "commit_hash": commit["hexsha"][:8],
+                        "full_hash": commit["hexsha"],
+                        "author": commit["author"],
+                        "date": commit["date"].isoformat(),
+                        "formatted_date": commit["date"].strftime("%d.%m.%Y %H:%M"),
+                        "message": commit["message"],
                         "work_id": None,
                         "title": None,
                         "year": None,
@@ -1018,7 +1079,7 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
                         "filepath": filepath,
                         "change_type": "person",
                         "person_id": person_id,
-                        "person_name": _parse_person_name_from_message(commit.message.strip()),
+                        "person_name": _parse_person_name_from_message(commit["message"]),
                     })
                     if len(results) >= limit:
                         has_more = True
@@ -1064,12 +1125,12 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
                     continue
 
                 results.append({
-                    "commit_hash": commit.hexsha[:8],
-                    "full_hash": commit.hexsha,
-                    "author": commit.author.name,
-                    "date": commit.committed_datetime.isoformat(),
-                    "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
-                    "message": commit.message.strip(),
+                    "commit_hash": commit["hexsha"][:8],
+                    "full_hash": commit["hexsha"],
+                    "author": commit["author"],
+                    "date": commit["date"].isoformat(),
+                    "formatted_date": commit["date"].strftime("%d.%m.%Y %H:%M"),
+                    "message": commit["message"],
                     "work_id": work_info['work_id'],
                     "title": work_info['title'],
                     "year": work_info['year'],
@@ -1088,7 +1149,7 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
                 break
 
         except Exception as e:
-            logger.warning(f"Viga commiti {commit.hexsha[:8]} töötlemisel: {e}")
+            logger.warning(f"Viga commiti {commit['hexsha'][:8]} töötlemisel: {e}")
             continue
 
     return results, has_more, len(all_commits)
