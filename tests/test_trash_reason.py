@@ -42,3 +42,21 @@ def test_praegune_prefiks_kuulub_ajaloo_nimekirja():
     """Uus sõnastus tuleb LISADA ajaloo nimekirja, mitte asendada vana."""
     assert trash_reason.SPLIT_COMMIT_PREFIX in trash_reason.SPLIT_PREFIXES_AJALUGU
     assert trash_reason.DELETE_COMMIT_PREFIX in trash_reason.DELETE_PREFIXES_AJALUGU
+
+
+def test_split_page_sonum_algab_ajaloolise_prefiksiga():
+    """Kirjutaja ja liigitaja peavad kokku käima — dokumentatsioon ei jõusta midagi.
+
+    Loeme lähtekoodist, sest sõnum sünnib f-stringis keset pikka funktsiooni ja
+    tema väljakutsumine nõuaks tervet git-repot + Pillow'd.
+    """
+    juur = Path(__file__).resolve().parents[1]
+    kood = (juur / "server" / "admin_page_ops.py").read_text(encoding="utf-8")
+
+    assert 'SPLIT_COMMIT_PREFIX' in kood, (
+        "split_page ei impordi prefiksit trash_reason-ist — sõnastus saab lahku triivida")
+    assert 'DELETE_COMMIT_PREFIX' in kood, (
+        "delete_pages ei impordi prefiksit trash_reason-ist")
+    # Kõvakodeeritud vanu sõnumeid ei tohi järele jääda
+    assert '"Lõika leht {' not in kood and "f\"Lõika leht" not in kood, (
+        "leidus kõvakodeeritud „Lõika leht\" sõnum")
