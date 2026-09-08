@@ -31,6 +31,8 @@ SEARCHABLE_ATTRIBUTES = [
 FILTERABLE_ATTRIBUTES = [
     "work_id",
     "year",
+    "date_start",
+    "date_end",
     "year_start",
     "year_end",
     "title",
@@ -76,6 +78,7 @@ FILTERABLE_ATTRIBUTES = [
 ]
 
 SORTABLE_ATTRIBUTES = [
+    "date_sort",
     "year",
     "lehekylje_number",
     "last_modified",
@@ -93,6 +96,8 @@ RUNTIME_REQUIRED_FILTERABLE = {
     "shareable",
     "collections_hierarchy",
     "collections",
+    "date_start",
+    "date_end",
     "year_start",
     "year_end",
     "external_url",

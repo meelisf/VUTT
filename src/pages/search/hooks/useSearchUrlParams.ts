@@ -9,8 +9,8 @@ export interface SearchUrlParams {
     q: string;
     page: number;
     workId: string;
-    yearStart: number | undefined;
-    yearEnd: number | undefined;
+    yearStart: number | string | undefined;
+    yearEnd: number | string | undefined;
     scope: 'all' | 'original' | 'annotation';
     teoseTags: string[];
     pageTags: string[];
@@ -27,8 +27,8 @@ export function useSearchUrlParams(): SearchUrlParams {
         q: searchParams.get('q') || '',
         page: parseInt(searchParams.get('p') || '1', 10),
         workId: searchParams.get('work') || '',
-        yearStart: searchParams.get('ys') ? parseInt(searchParams.get('ys')!) : undefined,
-        yearEnd: searchParams.get('ye') ? parseInt(searchParams.get('ye')!) : undefined,
+        yearStart: searchParams.get('ys') ? parseDateParam(searchParams.get('ys')!) : undefined,
+        yearEnd: searchParams.get('ye') ? parseDateParam(searchParams.get('ye')!) : undefined,
         scope: (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all',
         teoseTags: parseListParam(searchParams.get('teoseTags')),
         pageTags: parseListParam(searchParams.get('pageTags')),
@@ -38,4 +38,9 @@ export function useSearchUrlParams(): SearchUrlParams {
         author: searchParams.get('author') || '',
         subjectPerson: searchParams.get('subjectPerson') || '',
     };
+}
+
+// Preserve partial dates in URLs; keep legacy year-only callers numeric.
+export function parseDateParam(value: string): number | string {
+    return /^\d{3,4}$/.test(value) ? Number(value) : value;
 }

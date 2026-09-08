@@ -1,3 +1,4 @@
+import type { WorkDating } from './utils/workDating';
 /**
  * =============================================================================
  * TÜÜBID - Work, Page, Creator jne
@@ -103,6 +104,7 @@ export interface Work {
   // Teose põhiandmed
   title: string;            // Pealkiri
   year: number | null;      // Ilmumisaasta (number filtri/sortimise jaoks)
+  dating?: WorkDating | null;
   year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
   location?: LinkedEntity | null; // Trükikoht (LinkedEntity objekt)
   publisher?: LinkedEntity | null; // Trükkal (LinkedEntity objekt)
@@ -227,6 +229,7 @@ export interface Page {
   // =========================================================
   title?: string;
   year?: number | null;
+  dating?: WorkDating | null;
   year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
   location?: LinkedEntity | null;
   publisher?: LinkedEntity | null;
@@ -278,8 +281,8 @@ export interface SearchFilters {
 }
 
 export interface ContentSearchOptions {
-  yearStart?: number;
-  yearEnd?: number;
+  yearStart?: number | string;
+  yearEnd?: number | string;
   catalog?: string;
   workId?: string;
   scope?: 'all' | 'annotation' | 'original';
@@ -301,6 +304,8 @@ export interface ContentSearchOptions {
  * ⚠️  OLULINE: Kasuta AINULT v2 välju uues koodis!
  */
 export interface ContentSearchHit {
+  year_display?: string | null;
+  dating?: WorkDating | null;
   id: string;
   work_id: string;
   lehekylje_number: number | string;

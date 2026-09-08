@@ -231,7 +231,7 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str,
             or esimene.get("autor")
             or ""
         )
-        year = esimene.get("aasta") or esimene.get("year_display") or ""
+        year = esimene.get("year_display") or esimene.get("aasta") or ""
         place = esimene.get("location") or ""
         title = f'"{_short_title(esimene.get("title", ""))}"'
         # Ilma loojata teosel ei tohi jääda rippuvat eraldajat („[2]  · ...").

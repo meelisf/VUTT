@@ -1,3 +1,4 @@
+import { dateBound } from '../utils/workDating';
 /**
  * Otsing, sirvimis- ja facet-päringud Meilisearchist
  */
@@ -30,9 +31,15 @@ export const normalizeSearchQuery = (query: string): string =>
 // Aastafilter vahemike kattuvusena: teose [year_start, year_end] kattub kasutaja vahemikuga.
 // Kattuvus: A.end >= B.start AND A.start <= B.end.
 // Aastata teosed (year_start=year_end=0) käituvad nagu varasem year=0.
-const pushYearFilter = (filter: string[], yearStart?: number, yearEnd?: number): void => {
-  if (yearStart) filter.push(`year_end >= ${yearStart}`);
-  if (yearEnd) filter.push(`year_start <= ${yearEnd}`);
+export const pushYearFilter = (filter: string[], yearStart?: number | string, yearEnd?: number | string): void => {
+  const precise = String(yearStart ?? '').includes('-') || String(yearEnd ?? '').includes('-');
+  const start = dateBound(yearStart), end = dateBound(yearEnd, true);
+  if ((yearStart && start === null) || (yearEnd && end === null) || (start && end && start > end)) {
+    filter.push('year_start < 0'); // Invalid input must never broaden a search silently.
+    return;
+  }
+  if (start) filter.push(precise ? `date_end >= ${start}` : `year_end >= ${Math.floor(start / 10000)}`);
+  if (end) filter.push(precise ? `date_start <= ${end}` : `year_start <= ${Math.floor(end / 10000)}`);
 };
 
 const isAbortError = (error: unknown): boolean =>
@@ -41,8 +48,8 @@ const isAbortError = (error: unknown): boolean =>
 
 // Interface for dashboard search options
 export interface DashboardSearchOptions {
-  yearStart?: number;
-  yearEnd?: number;
+  yearStart?: number | string;
+  yearEnd?: number | string;
   sort?: string;
   author?: string;
   respondens?: string;
@@ -87,8 +94,8 @@ export const getTeoseTagsFacets = async (
   index: Index,
   collection?: string,
   _lang: string = 'et',
-  yearStart?: number,
-  yearEnd?: number,
+  yearStart?: number | string,
+  yearEnd?: number | string,
   signal?: AbortSignal
 ): Promise<{ tag: string; count: number }[]> => {
   checkMixedContent();
@@ -130,8 +137,8 @@ export const getGenreFacets = async (
   index: Index,
   collection?: string,
   _lang: string = 'et',
-  yearStart?: number,
-  yearEnd?: number,
+  yearStart?: number | string,
+  yearEnd?: number | string,
   signal?: AbortSignal
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
@@ -172,8 +179,8 @@ export const getTypeFacets = async (
   index: Index,
   collection?: string,
   _lang: string = 'et',
-  yearStart?: number,
-  yearEnd?: number,
+  yearStart?: number | string,
+  yearEnd?: number | string,
   signal?: AbortSignal
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
@@ -306,8 +313,8 @@ export const getTagsLabelMap = (
 export const getAuthorFacets = async (
   index: Index,
   collection?: string,
-  yearStart?: number,
-  yearEnd?: number,
+  yearStart?: number | string,
+  yearEnd?: number | string,
   signal?: AbortSignal
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
@@ -399,7 +406,7 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
 
     const searchParams: any = {
       attributesToRetrieve: [
-        'id', 'work_id', 'title', 'year', 'year_display', 'publisher_id',
+        'id', 'work_id', 'title', 'year', 'year_display', 'dating', 'publisher_id',
         'publisher_object', 'location_object',
         'type_object', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags_object', 'languages',
@@ -445,10 +452,10 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
           // Meilisearch kasutab relevantsust kui sort pole määratud
           break;
         case 'year_asc':
-          searchParams.sort = ['year:asc'];
+          searchParams.sort = ['date_sort:asc'];
           break;
         case 'year_desc':
-          searchParams.sort = ['year:desc'];
+          searchParams.sort = ['date_sort:desc'];
           break;
         case 'az':
           searchParams.sort = ['title:asc'];
@@ -457,12 +464,12 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
           searchParams.sort = ['last_modified:desc'];
           break;
         default:
-          searchParams.sort = ['year:asc'];
+          searchParams.sort = ['date_sort:asc'];
           break;
       }
     } else {
       // Vaikimisi sorteeri aasta järgi kasvavalt (kui sort pole määratud)
-      searchParams.sort = ['year:asc'];
+      searchParams.sort = ['date_sort:asc'];
     }
 
     const response = await index.search(query, searchParams, options?.signal ? { signal: options.signal } : undefined);
@@ -662,7 +669,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
         highlightPreTag: HIGHLIGHT_PRE_TAG,
@@ -711,8 +718,8 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
-          sort: ['year:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+          sort: ['date_sort:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         }, requestConfig)
       ]);
@@ -767,7 +774,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
@@ -859,7 +866,7 @@ export const searchWorkHits = async (index: Index, rawQuery: string, workId: str
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],

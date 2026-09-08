@@ -364,3 +364,23 @@ def test_save_page_changed_text_commits(tmp_path, monkeypatch):
     assert result["changed"] is True
     assert calls["git"] == 1
     assert len(tasks.tasks) >= 1
+
+
+def test_structured_dating_save_derives_years_and_schedules_index(meta_work):
+    from server.metadata_ops import save_work_metadata
+    path, calls = meta_work
+    dating = {'start': '1803-05-15', 'end': '1804-06', 'calendar': 'julian', 'source_text': 'as written'}
+    meta, changed = save_work_metadata(path, {'dating': dating}, 'tester', 'Date')
+    assert changed
+    assert meta['dating'] == dating
+    assert meta['year'] == 1803
+    assert meta['year_display'] == '1803-05-15 / 1804-06'
+    assert calls['git'] == calls['meili'] == 1
+
+
+def test_invalid_dating_does_not_write_or_sync(meta_work):
+    from server.metadata_ops import save_work_metadata
+    path, calls = meta_work
+    with pytest.raises(ValueError):
+        save_work_metadata(path, {'dating': {'start': '1803-02-31'}}, 'tester', 'Date')
+    assert calls == {'git': 0, 'collections': 0, 'ptw': 0, 'meili': 0}

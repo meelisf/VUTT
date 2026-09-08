@@ -297,7 +297,7 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
     work_id = first.get("work_id", "")
     header = fmt.format_fields([
         ("pealkiri", first.get("title")),
-        ("aasta", first.get("aasta") or first.get("year_display")),
+        ("aasta", first.get("year_display") or first.get("aasta")),
         ("koht", first.get("location")),
         ("žanr", _zanr_koodiga(first)),
         ("keeled", first.get("languages")),

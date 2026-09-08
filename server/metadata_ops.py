@@ -4,6 +4,7 @@ Metaandmete kirjutamise ühtne loogika.
 save_work_metadata() on ainus koht kus _metadata.json uuendatakse —
 git commit, person_to_works indeks ja Meilisearch sync ühes kohas.
 """
+from .work_dating import dating_updates
 import copy
 import json
 import os
@@ -22,7 +23,7 @@ logger = get_logger(__name__)
 
 # Lubatud metaandmete väljad (v2 standard)
 ALLOWED_METADATA_FIELDS = {
-    "title", "year", "year_display", "location", "publisher", "creators", "tags", "notes",
+    "title", "year", "year_display", "dating", "location", "publisher", "creators", "tags", "notes",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
     "series", "relations", "archive_refs", "shareable",
 }
@@ -101,7 +102,7 @@ def bulk_update_works(
 
             meta = pending[meta_path]
             try:
-                updates = transform(meta)
+                updates = dating_updates(transform(meta))
                 clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
                 meta.update(clean)
                 for field in _V1_FIELDS:
@@ -194,6 +195,7 @@ def save_work_metadata(
     muutusteta — sel juhul jäävad Git commit, tuletatud indeksid ja Meilisearchi
     sünk tegemata (#173).
     """
+    updates = dating_updates(updates)
     started = time.monotonic()
     slug = os.path.basename(os.path.dirname(meta_path))
 

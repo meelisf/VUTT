@@ -4,6 +4,7 @@
 import meilisearch
 import os
 import sys
+import types
 from dotenv import load_dotenv
 
 # Lae .env fail
@@ -22,44 +23,21 @@ MEILI_URLS = [
 # Eemalda None väärtused ja duplikaadid
 MEILI_URLS = list(dict.fromkeys([u for u in MEILI_URLS if u]))
 
-FILTERABLE_ATTRS = [
-    'author_names',
-    'authors_text',
-    'collection',
-    'collections',
-    'collections_hierarchy',
-    'creator_ids',
-    'creators',
-    'genre',
-    'genre_en',
-    'genre_et',
-    'genre_ids',
-    'languages',
-    'lehekylje_number',
-    'location',
-    'location_id',
-    'originaal_kataloog',
-    'page_tags',
-    'page_tags_et',
-    'page_tags_en',
-    'page_tags_ids',
-    'publisher',
-    'publisher_id',
-    'respondens_names',
-    'status',
-    'tags',
-    'tags_en',
-    'tags_et',
-    'tags_ids',
-    'teose_staatus',
-    'title',
-    'type',
-    'type_en',
-    'type_et',
-    'type_ids',
-    'work_id',
-    'year',
-]
+# Sama tõeallikas nagu seed ja runtime; uuendamine ei tohi dateeringufiltreid eemaldada.
+#
+# Fake-package muster: registreerime AINULT `server.meili_settings`, ilma et
+# `server/__init__.py` käivituks. Muidu tõmbaks import kaasa FastAPI, PyJWT ja
+# gitpythoni, mida hosti venv-is ei ole — see skript on mõeldud jooksma HOSTIS
+# (`~/VUTT/.venv/bin/python3 scripts/update_filterable.py`), mitte konteineris.
+_JUUR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if 'server' not in sys.modules:
+    _pkg = types.ModuleType('server')
+    _pkg.__path__ = [os.path.join(_JUUR, 'server')]
+    _pkg.__package__ = 'server'
+    sys.modules.setdefault('server', _pkg)
+sys.path.insert(0, _JUUR)
+from server.meili_settings import FILTERABLE_ATTRIBUTES as FILTERABLE_ATTRS
+
 
 def main():
     if not MEILI_KEY:

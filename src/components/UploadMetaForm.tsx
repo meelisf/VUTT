@@ -1,3 +1,5 @@
+import WorkDatingInput from './WorkDatingInput';
+import { datingError, WorkDating } from '../utils/workDating';
 /**
  * UploadMetaForm — metaandmete vorm upload samm 3-s (OCR ootamise ajal).
  *
@@ -11,7 +13,7 @@ import { Creator, CreatorRole, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Collections, getVocabularies, Vocabularies } from '../services/collectionService';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
-import { CollectionDropdown, YearInputPreview } from './MetadataModal';
+import { CollectionDropdown } from './MetadataModal';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
@@ -37,6 +39,7 @@ interface UploadMetaFormProps {
 
 interface MetaForm {
   title: string;
+  dating?: WorkDating | null;
   yearInput: string;          // Üks tekstilahter: 1680 | ca. 1680 | 1670–1690 | 17. saj (vt deriveYearFields)
   type: string | LinkedEntity | null;
   genre: (string | LinkedEntity)[];
@@ -136,6 +139,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           setForm({
             title: m.title || initialTitle,
             yearInput,
+            dating: m.dating ?? null,
             type: m.type ?? null,
             genre: (() => {
               const g = m.genre;
@@ -204,6 +208,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
   }, [uploadId, authToken]);
 
   const handleSave = async () => {
+    if (datingError(form.dating)) { setSaveError(t('common:dating.invalid')); return; }
     setSaving(true);
     setSaveOk(false);
     setSaveError('');
@@ -214,6 +219,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
       title: form.title.trim(),
       year,
       year_display: year_display || null,
+      dating: form.dating ?? null,
       type: form.type || null,
       genre: form.genre.length > 0 ? form.genre : null,
       tags: cleanTags(form.tags),
@@ -385,24 +391,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">
             {t('workspace:metadata.colophon', 'Kolofoon')}
           </h4>
-          {/* Aasta — üks tekstilahter (aasta-välja ühendamine, vt deriveYearFields).
-              Poole laiusega (grid'i vasak veerg), nagu MetadataModal-is. */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                {t('workspace:metadata.year')}
-              </label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                placeholder={t('workspace:metadata.yearInputPlaceholder', '1680, ca. 1680, 1670–1690, 17. saj')}
-                value={form.yearInput}
-                onChange={(e) => setForm({ ...form, yearInput: e.target.value })}
-              />
-              {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
-              <YearInputPreview value={form.yearInput} existing={existingYearRef.current} />
-            </div>
-          </div>
+
+          <WorkDatingInput value={form.yearInput} dating={form.dating}
+            onChange={(yearInput, dating) => setForm({ ...form, yearInput, dating })} />
           <div className="grid grid-cols-2 gap-3">
             <EntityPicker
               label={t('workspace:metadata.place')}

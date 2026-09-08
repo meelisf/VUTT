@@ -56,3 +56,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0034](0034-kirjad-hosti-postfixi-kaudu.md) | Kirjad lähevad hosti postfixi kaudu (`mailhost.ut.ee`); saatmisviga ei kaota juba loodud linki | kehtib |
 | [0035](0035-uue-konto-vaikeroll-on-kitsam.md) | Uue konto vaikeroll on `contributor`; iga muu väärtus peale contributor/editor annab kitsama rolli | kehtib |
 | [0036](0036-katkenud-vastus-ei-ole-ebaonnestunud-too.md) | Katkenud vastus ei ole ebaõnnestunud töö; pikk töö deklareerib, et ta käib, ja ooteaeg on leping kahe otsa vahel | kehtib |
+| [0037](0037-work-dating.md) | Teose dateering säilitab allika kuupäeva, täpsuse ja valikulise kalendri; otsing kasutab vahemike kattuvust | kehtib |

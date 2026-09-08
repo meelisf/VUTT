@@ -19,6 +19,7 @@ Väljanimede ORTOGRAAFIA: Meilisearch kasutab vanemat 'y'-ortograafiat
 (lehekylje_tekst, teose_lehekylgede_arv jne). Neid EI TOHI ümber nimetada —
 otsingufiltrid eeldavad neid (vt issue #16, CLAUDE.md).
 """
+from .work_dating import index_dating, dating_updates
 import os
 import re
 import json
@@ -390,6 +391,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "year_display": work_ctx['year_display'],
         "year_start": work_ctx['year_start'],  # Filtreerimiseks (vahemike kattuvus)
         "year_end": work_ctx['year_end'],
+        **{key: work_ctx.get(key) for key in ("dating", "date_start", "date_end", "date_sort")},
         "lehekylje_number": page_num,
         "teose_lehekylgede_arv": work_ctx['teose_lehekylgede_arv'],
         "lehekylje_tekst": lehekylje_tekst,               # OTSING: põhitekst ILMA marginaaliata
@@ -542,6 +544,10 @@ def get_work_metadata(doc_path, dir_name, collections):
         'year_display': None,
         'year_start': 0,
         'year_end': 0,
+        'date_start': 0,
+        'date_end': 0,
+        'date_sort': 0,
+        'dating': None,
         'location': None,
         'publisher': None,
         'creators': [],
@@ -568,6 +574,7 @@ def get_work_metadata(doc_path, dir_name, collections):
         print(f"Viga _metadata.json lugemisel {metadata_json_path}: {e}")
         return teose_id, result
 
+    meta = dating_updates(meta)
     result['id'] = meta.get('id')
     result['slug'] = meta.get('slug', teose_id)
     teose_id = result['slug']  # Kasuta slug'i teose ID-na (fallback nanoidile)
@@ -588,6 +595,7 @@ def get_work_metadata(doc_path, dir_name, collections):
     result['year'] = year
     result['year_start'] = _yr[0] if _yr else 0
     result['year_end'] = _yr[1] if _yr else 0
+    result.update(index_dating(meta, _yr))
 
     result['location'] = meta.get('location')
     result['publisher'] = meta.get('publisher')
@@ -655,6 +663,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         'year_display': doc_metadata.get('year_display'),
         'year_start': doc_metadata.get('year_start', 0),
         'year_end': doc_metadata.get('year_end', 0),
+        **{key: doc_metadata.get(key) for key in ('dating', 'date_start', 'date_end', 'date_sort')},
         'teose_lehekylgede_arv': len(jpg_files),
         'tags': tags,
         'notes': doc_metadata.get('notes'),

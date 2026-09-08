@@ -1,8 +1,9 @@
+import { hasImpreciseDating, parseDatingText } from '../utils/workDating';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
 import { BookOpen, Calendar, User, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, Check } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import { useCollection } from '../contexts/CollectionContext';
@@ -25,6 +26,8 @@ interface WorkCardProps {
 const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect, isPriority = false }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'workspace']);
   const navigate = useNavigate();
+  const [dateParams] = useSearchParams();
+  const preciseFilter = [dateParams.get('ys'), dateParams.get('ye')].some(v => v?.includes('-'));
   const { collections, getCollectionName } = useCollection();
   const { authToken } = useUser();
   const [thumbnailSrc, setThumbnailSrc] = useState(work.thumbnail_url);
@@ -340,6 +343,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           <button
             onClick={(e) => {
               e.preventDefault();
+              const dating = work.dating ?? parseDatingText(work.year_display || '');
+              if (dating) { navigate(`/?ys=${dating.start}&ye=${dating.end || dating.start}`); return; }
               const range = parseYearDisplayRange(work.year, work.year_display);
               if (range) navigate(`/?ys=${range.start}&ye=${range.end}`);
             }}
@@ -347,7 +352,9 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             title={t('workCard.filterByYear')}
           >
             <Calendar size={14} />
-            <span>{formatYearDisplay(work.year_display, work.year, t)}</span>
+            <span>{formatYearDisplay(work.year_display, work.year, t, work.dating)}
+              {preciseFilter && hasImpreciseDating(work.dating, work.year_display) && <span className="block text-xs text-gray-500">{t('common:dating.imprecise')}</span>}
+            </span>
           </button>
           <div className="flex items-center gap-2">
             <BookOpen size={14} />

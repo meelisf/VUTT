@@ -1,9 +1,11 @@
+import { datingError, WorkDating } from './workDating';
 import { Creator, CreatorRole, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { deriveYearFields } from './yearDisplayUtils';
 
 export interface MetadataFormData {
   title: string;
+  dating?: WorkDating | null;
   yearInput: string;          // Üks tekstilahter: puhas aasta, ca., vahemik või sajand (vt deriveYearFields)
   type: string | LinkedEntity | null;
   genre: (string | LinkedEntity)[];
@@ -32,6 +34,7 @@ export interface MetadataPayload {
     title: string;
     year: number;
     year_display: string | null;
+    dating?: WorkDating | null;
     type: string | LinkedEntity | null;
     genre: (string | LinkedEntity)[] | null;
     creators: CleanedCreator[];
@@ -98,6 +101,7 @@ export function buildMetadataPayload(
   originaalKataloog?: string | null,
   existing?: YearFieldsExisting,
 ): MetadataPayload {
+  if (datingError(form.dating)) throw new Error('Invalid dating');
   const { year, year_display } = deriveYearFields(form.yearInput, existing);
   const payload: MetadataPayload = {
     work_id: workId,
@@ -105,6 +109,7 @@ export function buildMetadataPayload(
       title: form.title,
       year,
       year_display: year_display || null,
+      ...(form.dating !== undefined ? { dating: form.dating } : {}),
       type: form.type || null,
       genre: form.genre.length > 0 ? form.genre : null,
       creators: cleanCreators(form.creators),

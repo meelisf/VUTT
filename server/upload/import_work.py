@@ -4,6 +4,7 @@ Moodul hoiab import_as_work äriloogika upload_ops koordinaatorist eraldi.
 Avalik compatibility-wrapper jääb server/upload_ops.py-sse, et testide/routerite
 senised monkeypatchid (_sftp_open, BASE_DIR jne) edasi töötaksid.
 """
+from ..work_dating import dating_updates
 import json
 import os
 import shutil
@@ -278,7 +279,7 @@ def _teosta_import(
     edenemine = _Edenemine(upload_id, get_upload_lock_func, read_state_func,
                            write_state_func)
 
-    meta = state['meta']
+    meta = dating_updates(state['meta'])
     title = meta['title']
     slug = meta['slug']
     work_collections = meta.get('collections') or []
@@ -413,7 +414,7 @@ def _teosta_import(
         "creators", "tags",
         "type", "genre",
         "location", "publisher",
-        "ester_id", "external_url", "year_display",
+        "ester_id", "external_url", "year_display", "dating",
         "archive_refs",
     ]
     metadata = {

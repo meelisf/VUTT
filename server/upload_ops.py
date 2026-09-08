@@ -5,6 +5,7 @@ Etapp 1: staging haldus, state.json loogika, slug kontroll.
 Etapp 2: SFTP transport, polling, thumbnailid, OCR jälgimine.
 Etapp 4 lisab: import_as_work, cleanup_upload.
 """
+from .work_dating import dating_updates
 import json
 import os
 import shutil
@@ -224,6 +225,7 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
             # mitte ainult hilisemast PATCH-ist. external_url kadumine oleks eriti
             # halb: see on duplikaadihoiatuse ainus filtriväli.
             "year_display": meta.get('year_display'),
+            "dating": meta.get('dating'),
             "ester_id": meta.get('ester_id'),
             "archive_refs": meta.get('archive_refs', []),
             "external_url": meta.get('external_url'),
@@ -258,13 +260,14 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
     # tundmatu väli visatakse vaikselt ära (vastus on ikka 200 OK) ja kaob
     # impordil. external_url ja ester_id jäid varem just nii salvestumata.
     allowed = {
-        'title', 'year', 'year_display', 'collections', 'languages',
+        'title', 'year', 'year_display', 'dating', 'collections', 'languages',
         'type', 'genre',
         'creators', 'location',
         'publisher', 'tags',
         'ester_id', 'external_url',
         'archive_refs',
     }
+    updates = dating_updates(updates)
     lock = _get_upload_lock(upload_id)
     with lock:
         state = _read_state(upload_id)
@@ -727,7 +730,7 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
         OPTIONAL_META_FIELDS = [
             "creators", "genre", "type", "tags",
             "location", "publisher",
-            "ester_id", "external_url", "year_display",
+            "ester_id", "external_url", "year_display", "dating",
             "archive_refs",
         ]
         updates = {}

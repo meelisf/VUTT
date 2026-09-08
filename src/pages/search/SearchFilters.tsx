@@ -1,3 +1,4 @@
+import DateRangeInput from '../../components/DateRangeInput';
 import React, { useRef } from 'react';
 import { type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -185,26 +186,8 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                     defaultOpen={true}
                     badge={yearStart || yearEnd ? 1 : undefined}
                 >
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">{t('filters.from')}</label>
-                            <input
-                                type="number"
-                                value={yearStart}
-                                onChange={(e) => onYearStartChange(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded text-sm text-center"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs text-gray-400 mb-1 block">{t('filters.until')}</label>
-                            <input
-                                type="number"
-                                value={yearEnd}
-                                onChange={(e) => onYearEndChange(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded text-sm text-center"
-                            />
-                        </div>
-                    </div>
+                    <DateRangeInput start={yearStart} end={yearEnd}
+                        onStartChange={onYearStartChange} onEndChange={onYearEndChange} />
                 </CollapsibleSection>
 
                 {/* Žanri filter */}
