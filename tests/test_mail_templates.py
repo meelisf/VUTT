@@ -136,3 +136,35 @@ def test_password_reset_fits_mailto_budget(lang):
     subject, body = render_mail("password_reset", lang, **RESET_CONTEXT)
     encoded = len(quote(subject)) + len(quote(body))
     assert encoded < MAILTO_BUDGET, f"{lang}: {encoded} märki, eelarve {MAILTO_BUDGET}"
+
+
+@pytest.mark.parametrize("template", ["invite", "password_reset"])
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_subject_is_pure_ascii(template, lang):
+    """Teemarida peab jääma ASCII-ks, et `Subject:` ei sisaldaks RFC 2047
+    kodeeritud sõna.
+
+    Mõõdetud tootmises (2026-09-07): mõttekriips teemas andis päise
+    `Subject: VUTT =?utf-8?b?4oCT?= account activation link` — enamasti ASCII
+    rida, mille keskel üksik base64-plokk ainult kirjavahemärgi ümber. Eesti
+    tähtede kodeerimine kehas on normaalne ja lubatud; siin on tegu
+    KAUNISTUSEGA, mille kodeerimisest ei võida keegi.
+    """
+    context = INVITE_CONTEXT if template == "invite" else RESET_CONTEXT
+    subject, _ = render_mail(template, lang, **context)
+    assert subject.isascii(), f"Teemarida ei ole ASCII: {subject!r}"
+
+
+@pytest.mark.parametrize("template", ["invite", "password_reset"])
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_subject_header_has_no_encoded_word(template, lang):
+    """Sama leping päise tasemel — see on see, mida saaja filter näeb."""
+    from server.mailer import build_message
+
+    context = INVITE_CONTEXT if template == "invite" else RESET_CONTEXT
+    subject, body = render_mail(template, lang, **context)
+    # `msg["Subject"]` annab DEKODEERITUD väärtuse — kodeeringut on näha
+    # ainult seerialiseeritud kirjas, mis on ka see, mis välja läheb.
+    raw = build_message("keegi@example.com", subject, body).as_string()
+    header = next(r for r in raw.split("\n") if r.startswith("Subject:"))
+    assert "=?" not in header, f"Teemareas on kodeeritud sõna: {header!r}"
