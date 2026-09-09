@@ -1,13 +1,17 @@
-VUTT – account activation link
+VUTT - your access request has been approved
 
 Dear $name,
 
-Your request for access to the VUTT platform has been approved.
+On $submitted_on you requested access to VUTT, the transcription workbench for early modern texts at the University of Tartu Library. Your request has now been approved.
 
 Your username is: $username
 
-Please set your password using the link below (the link is valid for $expires_hours hours):
+You can set your password at the address below (valid for $expires_hours hours):
 $url
 
-Kind regards,
-On behalf of the VUTT team
+VUTT will never ask for your password by email or by phone.
+
+If you have any questions, please write to vutt-abi@ut.ee — a person will answer.
+
+University of Tartu Library
+https://vutt.utlib.ut.ee

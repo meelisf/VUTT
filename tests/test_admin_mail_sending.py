@@ -91,7 +91,7 @@ def test_taastekiri_kasutaja_keeles(client, login, backend_env, saadetud):
 
 def test_taastekiri_vaikimisi_eesti_keeles(client, login, saadetud):
     data = _reset(client, login).json()
-    assert "parooli taastamise" in data["mail_subject"].lower()
+    assert "parooli taastamine" in data["mail_subject"].lower()
 
 
 def test_taaste_saatmisviga_ei_kaota_linki(client, login, monkeypatch):
