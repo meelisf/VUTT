@@ -8,9 +8,11 @@ ei ole vaja.
 Kuupäevi mallides ei ole — kuupäev on lokaaditundlik ja tekitaks küsimuse,
 kas vormindada „05.09.2026 kell 18:00" või „Sep 5, 2026". Kui mall siiski
 kunagi kuupäeva vajab, vormindab selle KUTSUJA saaja keeles ja annab mallile
-valmis stringi; `render_mail` ei võta vastu `datetime`-i.
+valmis stringi; `render_mail` ei võta vastu `datetime`-i. Vormindaja ise elab
+siin (`format_mail_date`), et kuupäeva kuju oleks testitav ilma routerita.
 """
 import os
+from datetime import datetime
 from string import Template
 from typing import Tuple
 
@@ -24,6 +26,43 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "email_templates")
 # mailto: URL-i eelarve. Outlook lõikab pika URL-i vaikselt katki, seega on
 # see mõõdetav lävi (vt tests/test_mail_templates.py), mitte soovitus.
 MAILTO_BUDGET = 1800
+
+
+# Kuupäev kirjas on ÄRATUNDMISEKS („kas ma tõesti esitasin taotluse siis?"),
+# mitte auditiks, seega KELLAAEGA EI OLE. Backend-konteiner jookseb UTC-s ja
+# host EEST-is; kellaaja näitamine tähendaks kolme tunni võrra vale numbrit
+# ilma ajavööndi-teisenduseta, mida selles koodibaasis kuskil ei tehta.
+# Sama põhjusega on hilisõhtune taotlus võimalik näidata eelmise päevaga —
+# äratundmiseks piisab, täpsuseks ei kõlba.
+_MONTHS_ET = (
+    "jaanuaril", "veebruaril", "märtsil", "aprillil", "mail", "juunil",
+    "juulil", "augustil", "septembril", "oktoobril", "novembril", "detsembril",
+)
+_MONTHS_EN = (
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)
+
+
+def format_mail_date(value, lang) -> str:
+    """Kuupäev saaja keeles: „5. septembril 2026" / „5 September 2026".
+
+    `value` on `datetime` või ISO-string (`submitted_at` on kettal stringina).
+    Loetamatu väärtus annab tühja stringi, MITTE erindi: kuupäev on kirjas
+    kaunistus ja tema pärast ei tohi kutse saatmata jääda.
+    """
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            logger.warning("Kirja kuupäeva ei õnnestunud lugeda: %r", value)
+            return ""
+    if not isinstance(value, datetime):
+        return ""
+
+    if normalize_language(lang) == "et":
+        return f"{value.day}. {_MONTHS_ET[value.month - 1]} {value.year}"
+    return f"{value.day} {_MONTHS_EN[value.month - 1]} {value.year}"
 
 
 def _template_path(template_name: str, lang: str) -> str:

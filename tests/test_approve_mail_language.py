@@ -30,7 +30,7 @@ def _approve(client, login, backend_env, monkeypatch, language=None, approve_lan
 def test_mail_rendered_in_requested_language(client, login, backend_env, monkeypatch):
     data = _approve(client, login, backend_env, monkeypatch, language="en")
     assert data["language"] == "en"
-    assert "activation" in data["mail_subject"].lower()
+    assert "approved" in data["mail_subject"].lower()
     assert data["username"] in data["mail_body"]
     assert data["invite_url"] in data["mail_body"]
     assert "$" not in data["mail_body"]
@@ -39,14 +39,14 @@ def test_mail_rendered_in_requested_language(client, login, backend_env, monkeyp
 def test_mail_defaults_to_estonian(client, login, backend_env, monkeypatch):
     data = _approve(client, login, backend_env, monkeypatch)
     assert data["language"] == "et"
-    assert "aktiveerimise" in data["mail_subject"].lower()
+    assert "kinnitatud" in data["mail_subject"].lower()
 
 
 def test_admin_can_override_language_at_approval(client, login, backend_env, monkeypatch):
     """Admin teab, et tegemist on väliskülalisega, kes täitis vormi ET lehel."""
     data = _approve(client, login, backend_env, monkeypatch, language="et", approve_language="en")
     assert data["language"] == "en"
-    assert "activation" in data["mail_subject"].lower()
+    assert "approved" in data["mail_subject"].lower()
 
 
 def test_mail_body_contains_absolute_url(client, login, backend_env, monkeypatch):

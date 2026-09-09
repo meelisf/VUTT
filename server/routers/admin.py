@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import threading
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -20,7 +21,7 @@ from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
 from ..history_thumbs import ajaloo_pisipilt
 from ..image_history import muudetud_pildid
-from ..mail_templates import render_mail
+from ..mail_templates import format_mail_date, render_mail
 from ..mailer import send_mail
 from ..meilisearch_ops import delete_work_from_meilisearch
 from ..people_ops import get_refresh_status, refresh_all_people_safe
@@ -145,6 +146,10 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         username=token_data["username"],
         url=invite_absolute_url,
         expires_hours=INVITE_EXPIRY_HOURS,
+        # Taotluse kuupäev on kontekst, mida massipostitajal ei ole: saaja saab
+        # kirja seostada oma enda tegevusega. Vormindab KUTSUJA saaja keeles
+        # (mail_templates docstring) — mall ei tohi `datetime`-i näha.
+        submitted_on=format_mail_date(reg.get("submitted_at"), language),
     ))
     return response
 
@@ -267,6 +272,11 @@ async def admin_reset_password(request: Request, user=Depends(require_role("admi
         username=token_data["username"],
         url=reset_absolute_url,
         expires_hours=RESET_TOKEN_TTL_HOURS,
+        # Parooli taastamine on ainus meie kiri, mille tegevust saaja ISE ei
+        # algatanud — seega peab kirjas seisma, kes ja millal. Ilma selleta on
+        # see kiri saaja jaoks eristamatu ründest.
+        initiated_by=user["username"],
+        initiated_on=format_mail_date(datetime.now(), language),
     ))
     return response
 

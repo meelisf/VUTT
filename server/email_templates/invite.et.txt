@@ -1,13 +1,18 @@
-VUTT - konto aktiveerimise link
+VUTT - juurdepääsutaotlus on kinnitatud
 
 Tere $name,
 
-Juurdepääsutaotlus VUTT platvormile on kinnitatud.
+Esitasid $submitted_on Varauusaegsete tekstide transkriptsioonitöölauale
+(VUTT) juurdepääsutaotluse. See on nüüd kinnitatud.
 
 Kasutajanimi on: $username
 
-Parooli saab seadistada alloleva lingi kaudu (link kehtib $expires_hours tundi):
+Parooli saad seada alloleval aadressil (kehtib $expires_hours tundi):
 $url
 
-Tervitustega ja jõudu soovides,
-VUTTi meeskond
+VUTT ei küsi Sinu parooli kunagi e-kirja ega telefoni teel.
+
+Küsimuste korral kirjuta palun vutt-abi@ut.ee — sealt vastab inimene.
+
+Tartu Ülikooli raamatukogu
+https://vutt.utlib.ut.ee

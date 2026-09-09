@@ -23,6 +23,7 @@ INVITE_CONTEXT = {
     "username": "mmaasikas",
     "url": "https://vutt.utlib.ut.ee/set-password?token=abc123",
     "expires_hours": INVITE_EXPIRY_HOURS,
+    "submitted_on": "5. septembril 2026",
 }
 
 
@@ -102,6 +103,8 @@ RESET_CONTEXT = {
     "username": "mmaasikas",
     "url": "https://vutt.utlib.ut.ee/set-password?token=abc123&reset=1",
     "expires_hours": RESET_TOKEN_TTL_HOURS,
+    "initiated_by": "mfriedenthal",
+    "initiated_on": "9. septembril 2026",
 }
 
 
@@ -140,31 +143,109 @@ def test_password_reset_fits_mailto_budget(lang):
 
 @pytest.mark.parametrize("template", ["invite", "password_reset"])
 @pytest.mark.parametrize("lang", ["et", "en"])
-def test_subject_is_pure_ascii(template, lang):
-    """Teemarida peab jääma ASCII-ks, et `Subject:` ei sisaldaks RFC 2047
-    kodeeritud sõna.
+def test_subject_has_no_non_ascii_punctuation(template, lang):
+    """Teemareas ei tohi olla mitte-ASCII KIRJAVAHEMÄRKI ega sümbolit.
 
     Mõõdetud tootmises (2026-09-07): mõttekriips teemas andis päise
     `Subject: VUTT =?utf-8?b?4oCT?= account activation link` — enamasti ASCII
-    rida, mille keskel üksik base64-plokk ainult kirjavahemärgi ümber. Eesti
-    tähtede kodeerimine kehas on normaalne ja lubatud; siin on tegu
-    KAUNISTUSEGA, mille kodeerimisest ei võida keegi.
+    rida, mille keskel üksik base64-plokk ainult kirjavahemärgi ümber.
+
+    Reegel on tahtlikult KITSAS. „Teemarida peab olema ASCII" oleks lihtsam,
+    aga keelaks ka `juurdepääsutaotlus` — eesti tähtede kodeerimine on igas
+    Euroopa keeles tavaline ja täiesti korras. Kodeerida ei ole mõtet ainult
+    KAUNISTUST, millest ei võida keegi.
     """
     context = INVITE_CONTEXT if template == "invite" else RESET_CONTEXT
     subject, _ = render_mail(template, lang, **context)
-    assert subject.isascii(), f"Teemarida ei ole ASCII: {subject!r}"
+    kahtlased = [c for c in subject if not c.isascii() and not c.isalpha()]
+    assert not kahtlased, f"Teemareas on mitte-ASCII kirjavahemärk {kahtlased!r}: {subject!r}"
+
+
+@pytest.mark.parametrize("template", ["invite", "password_reset"])
+def test_ascii_subject_stays_unencoded_in_header(template):
+    """Ingliskeelsed teemad on puhas ASCII ja peavad päises kodeerimata jääma.
+
+    Kontrollib SEERIALISEERITUD kirja, sest `msg["Subject"]` annab
+    dekodeeritud väärtuse ega näeks kodeeringut üldse.
+    """
+    from server.mailer import build_message
+
+    context = INVITE_CONTEXT if template == "invite" else RESET_CONTEXT
+    subject, body = render_mail(template, "en", **context)
+    raw = build_message("keegi@example.com", subject, body).as_string()
+    header = next(r for r in raw.split("\n") if r.startswith("Subject:"))
+    assert "=?" not in header, f"Teemareas on kodeeritud sõna: {header!r}"
+
+
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_invite_names_the_request_date(lang):
+    """Taotluse kuupäev on kontekst, mida massipostitajal ei ole — see on
+    kogu tase-1 muudatuse mõte, seega valvur, mitte hea tahe."""
+    subject, body = render_mail("invite", lang, **INVITE_CONTEXT)
+    assert INVITE_CONTEXT["submitted_on"] in body
+
+
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_password_reset_names_initiator_and_date(lang):
+    """Parooli taastamine on ainus kiri, mille tegevust saaja ise ei
+    algatanud: kes ja millal PEAB kirjas olema."""
+    subject, body = render_mail("password_reset", lang, **RESET_CONTEXT)
+    assert RESET_CONTEXT["initiated_by"] in body
+    assert RESET_CONTEXT["initiated_on"] in body
 
 
 @pytest.mark.parametrize("template", ["invite", "password_reset"])
 @pytest.mark.parametrize("lang", ["et", "en"])
-def test_subject_header_has_no_encoded_word(template, lang):
-    """Sama leping päise tasemel — see on see, mida saaja filter näeb."""
-    from server.mailer import build_message
-
+def test_states_password_is_never_requested_by_mail(template, lang):
+    """„Me ei küsi kunagi parooli" on lubadus, mille rikkumine peab kukkuma
+    testis, mitte kasutaja usalduses."""
     context = INVITE_CONTEXT if template == "invite" else RESET_CONTEXT
-    subject, body = render_mail(template, lang, **context)
-    # `msg["Subject"]` annab DEKODEERITUD väärtuse — kodeeringut on näha
-    # ainult seerialiseeritud kirjas, mis on ka see, mis välja läheb.
-    raw = build_message("keegi@example.com", subject, body).as_string()
-    header = next(r for r in raw.split("\n") if r.startswith("Subject:"))
-    assert "=?" not in header, f"Teemareas on kodeeritud sõna: {header!r}"
+    _, body = render_mail(template, lang, **context)
+    oodatud = "ei küsi" if lang == "et" else "never ask"
+    assert oodatud in body
+    assert "vutt-abi@ut.ee" in body
+
+
+# --- format_mail_date -------------------------------------------------------
+
+def test_format_mail_date_estonian_uses_month_in_adessive():
+    from datetime import datetime
+
+    from server.mail_templates import format_mail_date
+
+    assert format_mail_date(datetime(2026, 9, 5), "et") == "5. septembril 2026"
+    assert format_mail_date(datetime(2026, 1, 31), "et") == "31. jaanuaril 2026"
+
+
+def test_format_mail_date_english():
+    from datetime import datetime
+
+    from server.mail_templates import format_mail_date
+
+    assert format_mail_date(datetime(2026, 9, 5), "en") == "5 September 2026"
+
+
+def test_format_mail_date_accepts_iso_string():
+    """`submitted_at` on kettal ISO-stringina, mitte datetime'ina."""
+    from server.mail_templates import format_mail_date
+
+    assert format_mail_date("2026-09-05T18:22:41.123456", "et") == "5. septembril 2026"
+
+
+@pytest.mark.parametrize("value", [None, "", "eile", 12345, "2026-13-45"])
+def test_format_mail_date_never_raises(value):
+    """Kuupäev on kirjas kaunistus: loetamatu väärtus annab tühja stringi,
+    MITTE erindi. Vastasel juhul jääks kutse tema pärast saatmata."""
+    from server.mail_templates import format_mail_date
+
+    assert format_mail_date(value, "et") == ""
+
+
+def test_format_mail_date_has_no_clock_time():
+    """Backend-konteiner on UTC, host EEST — kellaaeg oleks kolm tundi vale."""
+    from datetime import datetime
+
+    from server.mail_templates import format_mail_date
+
+    rendered = format_mail_date(datetime(2026, 9, 5, 18, 22), "et")
+    assert ":" not in rendered and "18" not in rendered
