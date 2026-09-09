@@ -2,9 +2,7 @@ VUTT - your access request has been approved
 
 Dear $name,
 
-On $submitted_on you requested access to VUTT, the transcription workbench for
-early modern texts at the University of Tartu Library. Your request has now
-been approved.
+On $submitted_on you requested access to VUTT, the transcription workbench for early modern texts at the University of Tartu Library. Your request has now been approved.
 
 Your username is: $username
 

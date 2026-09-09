@@ -2,8 +2,7 @@ VUTT - juurdepääsutaotlus on kinnitatud
 
 Tere $name,
 
-Esitasid $submitted_on Varauusaegsete tekstide transkriptsioonitöölauale
-(VUTT) juurdepääsutaotluse. See on nüüd kinnitatud.
+Esitasid $submitted_on Varauusaegsete tekstide transkriptsioonitöölauale (VUTT) juurdepääsutaotluse. See on nüüd kinnitatud.
 
 Kasutajanimi on: $username
 

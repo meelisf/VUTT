@@ -249,3 +249,59 @@ def test_format_mail_date_has_no_clock_time():
 
     rendered = format_mail_date(datetime(2026, 9, 5, 18, 22), "et")
     assert ":" not in rendered and "18" not in rendered
+
+
+@pytest.mark.parametrize("template", ["invite", "password_reset"])
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_paragraphs_are_not_hard_wrapped(template, lang):
+    """Lõik peab olema ÜHEL real — kliendi murda, mitte meie.
+
+    Mõõdetud päris kirjas (2026-09-09, Gmail): mallis 80 märgi pealt käsitsi
+    murtud lõik andis telefonis rebenenud teksti, sest kitsas klient murrab
+    juba niigi ja meie reavahetus tuli sellele otsa. QP kodeering murrab
+    juhtme peal 76 märgi pealt ise, seega pikk loogiline rida on korras.
+
+    Reegel: mitte-tühja rea järel ei tohi tulla rida, mis algab väiketähe või
+    sulguga — see on katkestatud lause. Erandid on aadressiread, mis KUULUVAD
+    eelmise rea juurde.
+    """
+    context = INVITE_CONTEXT if template == "invite" else RESET_CONTEXT
+    _, body = render_mail(template, lang, **context)
+    read = body.split("\n")
+    for eelmine, jargmine in zip(read, read[1:]):
+        if not eelmine.strip() or not jargmine.strip():
+            continue
+        if jargmine.startswith(("http", "$")):
+            continue
+        algus = jargmine[0]
+        assert not (algus.islower() or algus == "("), (
+            f"Lõik on käsitsi murtud: {eelmine!r} → {jargmine!r}"
+        )
+
+
+@pytest.mark.parametrize("template", ["invite", "password_reset"])
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_paragraphs_are_not_hard_wrapped(template, lang):
+    """Lõik peab olema ÜHEL real — kliendi murda, mitte meie.
+
+    Mõõdetud päris kirjas (2026-09-09, Gmail): mallis 80 märgi pealt käsitsi
+    murtud lõik andis kitsal ekraanil rebenenud teksti, sest klient murrab
+    juba niigi ja meie reavahetus tuli sellele otsa. QP kodeering murrab
+    juhtme peal 76 märgi pealt ise, seega pikk loogiline rida on korras.
+
+    Reegel: mitte-tühja rea järel ei tohi tulla rida, mis algab väiketähe või
+    sulguga — see on katkestatud lause. Erandid on aadressiread, mis KUULUVAD
+    eelmise rea juurde.
+    """
+    context = INVITE_CONTEXT if template == "invite" else RESET_CONTEXT
+    _, body = render_mail(template, lang, **context)
+    read = body.split("\n")
+    for eelmine, jargmine in zip(read, read[1:]):
+        if not eelmine.strip() or not jargmine.strip():
+            continue
+        if jargmine.startswith(("http", "$")):
+            continue
+        algus = jargmine[0]
+        assert not (algus.islower() or algus == "("), (
+            f"Lõik on käsitsi murtud: {eelmine!r} → {jargmine!r}"
+        )
