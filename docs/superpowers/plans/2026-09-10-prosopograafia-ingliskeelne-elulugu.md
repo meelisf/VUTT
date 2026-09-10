@@ -45,6 +45,7 @@
 | `server/prosopography/merge_ops.py` | Kolm tekstivälja + ankru nullimine. |
 | `server/prosopography/git_history.py` | Ankrud ignoreeritud väljade hulka. |
 | `server/prosopography/enrichment.py` | AA raw_text → `aa_raw`. |
+| `scripts/match_aa_duplicates.py`, `match_comma_duplicates.py` | Sama võtme tarbijad (T9) — muidu vaikne no-op. |
 | `server/prosopography/router.py` | `POST /translate`, `GET /{id}/source-diff`. |
 | `server/text_translate.py` | **uus.** Olekuta tõlkeklient. |
 | `server/metadata_handler.py` | SEO-prerenderi väljakaardistus. |
@@ -1261,6 +1262,35 @@ from ..prosopo_biography_fields import (
                 raise ValueError("legacy_biography_changed")
 ```
 
+**`apply_enrichment` on TEINE kirjutustee, mis saab välja taastekitada.**
+`apply_enrichment` (`person_crud.py`, ~rida 470) teeb `_deep_set(person, field_path, value)`
+KLIENDILT tulnud väljateede kaupa — `update_person`-i reeglist ta mööda. Pärast passi B
+paneks aegunud vorm ühe „Rakenda rikastus" vajutusega `biography` võtme tagasi. Väli, mille
+teine tee saab taastekitada, ei ole skeemist kadunud.
+
+Lisa `apply_enrichment`-i, kohe pärast rida `scheme = approved_fields.pop("_enrichment_scheme", None)`:
+
+```python
+        # Pärandväli ei tohi ühegi tee kaudu tagasi tekkida (ADR 0039). Siin
+        # VAIKSELT maha, mitte 409: rikastus on masina ettepanek, mitte kasutaja
+        # kirjutatud tekst — tema pärast dialoogi ei visata.
+        approved_fields.pop(LEGACY_BIOGRAPHY, None)
+```
+
+Ja lisa test `tests/test_prosopo_legacy_biography.py`-sse:
+
+```python
+def test_rikastus_ei_saa_parandvalja_tagasi_tekitada(kaart):
+    person_crud.apply_enrichment(
+        "vutt:Pabc", {"biography": "Rikastus üritab", "_enrichment_scheme": "album_academicum"},
+        "kasutaja")
+    assert kaart["person"].get("biography") == "Eesti tekst."   # muutumatu, mitte üle kirjutatud
+```
+
+> **NB:** `tests/test_prosopography_side_writes.py:67-73` kinnitab täna vastupidist —
+> et `apply_enrichment` KIRJUTAB `biography` välja. Uuenda see test: väli on skeemist
+> eemaldatud, nii et ootus muutub. Ära kustuta testi, muuda selle väidet.
+
 `server/prosopography/router.py`, `prosopography_update` — lisa `except ValueError as e` haru `conflict:` kontrolli JÄRELE:
 
 ```python
@@ -1736,9 +1766,43 @@ _DIFF_IGNORED_FIELDS = frozenset({
 
 (lisa faili algusesse `from ..prosopo_biography_fields import AA_RAW`)
 
-**Ja `src/prosopography/components/personForm/EnrichExistingSection.tsx`-i vaste
-tehakse ülesandes 18** — `_fetch_aa` tagastab võtme, mille vormipool loeb; kui
-ainult üks pool muutub, kaob AA-autotäide vaikselt ära.
+**Sama võtit loevad KOLM tarbijat — kõik peavad kaasa tulema.** `_fetch_aa` tulemus
+jõuab `fetch_and_diff` kaudu nii vormi kui kahte admin-skripti. Kontrollitud grepiga
+(kontroller, 2026-09-10):
+
+| Tarbija | Koht | Kes muudab |
+|---|---|---|
+| Vormi autotäide | `helpers.ts:102`, `EnrichExistingSection.tsx:33` | **ülesanne 18** |
+| `scripts/match_aa_duplicates.py` | rida 117–118 | **SIIN, ülesanne 9** |
+| `scripts/match_comma_duplicates.py` | rida 107–108 | **SIIN, ülesanne 9** |
+
+Mõlemas skriptis on sama plokk — asenda:
+
+```python
+    # Biograafia — ainult kui tühi
+    if auto_filled.get("biography") and not (p.get("biography") or "").strip():
+        p["biography"] = auto_filled["biography"]
+```
+
+sellega:
+
+```python
+    # AA-toorik — ainult kui tühi. Võti on `aa_raw`, mitte `biography` (ADR 0039):
+    # AA `raw_text` on KIRJE, mitte elulugu.
+    if auto_filled.get(AA_RAW) and not (p.get(AA_RAW) or "").strip():
+        p[AA_RAW] = auto_filled[AA_RAW]
+```
+
+(mõlemas skriptis ka import — need kasutavad juba `sys.path` juurehäkki, nii et
+`from server.prosopo_biography_fields import AA_RAW` töötab)
+
+> **Miks see on kohustuslik, mitte kena:** skriptid loevad `auto_filled.get("biography")`
+> võtit, mida `_fetch_aa` pärast seda ülesannet enam ei tagasta. Ilma paranduseta ei anna
+> nad viga — nad lakkavad vaikselt elulugu kopeerimast. Täpselt see vaikne no-op, mille
+> vastu `feedback_vaikne_fallback_ahel` hoiatab.
+
+Testid `tests/test_match_aa_duplicates.py:61-69,154-156` kinnitavad täna vana võtit —
+uuenda nende väited `aa_raw` peale. Ära kustuta teste.
 
 `server/metadata_handler.py` — lisa mooduli tasemele:
 
