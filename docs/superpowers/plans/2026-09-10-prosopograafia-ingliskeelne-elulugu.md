@@ -3584,6 +3584,10 @@ Expected: FAIL — `draft.biography_et` on `undefined`
     })(),
 ```
 
+`PersonEditPage.tsx:624` kasutab veel `draft.biography`-t — typecheck kukub. Silda see
+ajutiselt `biography_et` peale (`value={draft.biography_et}` / `set({ biography_et: v })`);
+**ülesanne 20 asendab kogu ploki keeletabidega.**
+
 `EnrichExistingSection.tsx:33` — `FIELD_I18N`-is asenda `biography: 'biography',`:
 
 ```ts
