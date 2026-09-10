@@ -3,7 +3,7 @@
 **Kuupäev:** 2026-08-25
 **Staatus:** vastu võetud
 **Issue:** #255 · **Asendab osaliselt:** ADR 0017
-**Spekk:** `docs/superpowers/specs/2026-08-24-upload-lehtede-ulevaatus-design.md`
+**Spekk:** `docs/_archive/superpowers/specs/done/2026-08-24-upload-lehtede-ulevaatus-design.md`
 
 > **Osaliselt asendatud:** [ADR 0028](0028-vutt-materialiseerib-ocr-lehed.md) —
 > 300 DPI läbikäik EI OLE enam opt-in; VUTT materialiseerib lehed alati ja

@@ -16,7 +16,7 @@ tööriista **ainult siis, kui indeksifail on olemas**.
 Local API), `pypdf` (ainult `/PageLabels` lugemiseks), poppler `pdftotext`,
 MCP SDK v2, pytest.
 
-**Spec:** `docs/superpowers/specs/2026-08-19-kirjanduse-kogu-mcp-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-08-19-kirjanduse-kogu-mcp-design.md`
 
 ## Kust jätkata (seis 2026-08-19)
 

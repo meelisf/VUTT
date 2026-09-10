@@ -8,7 +8,7 @@
 
 **Tech Stack:** FastAPI (Python 3.9 ühilduvus!), pytest, React 19 + TypeScript, vitest, i18next.
 
-**Spec:** `docs/superpowers/specs/2026-09-05-kasutaja-keel-ja-serveripoolne-tekst-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-09-05-kasutaja-keel-ja-serveripoolne-tekst-design.md`
 
 ## Global Constraints
 
@@ -1407,7 +1407,7 @@ git commit -m "feat(i18n): teavituse masina-lause renderdatakse lugeja keeles"
 **Files:**
 - Create: `docs/decisions/0033-serveripoolne-kasutajale-nahtav-tekst.md`
 - Modify: `docs/decisions/README.md` (registririda)
-- Modify: `docs/superpowers/specs/2026-09-05-kasutaja-keel-ja-serveripoolne-tekst-design.md` (UserMenu täpsustus)
+- Modify: `docs/_archive/superpowers/specs/done/2026-09-05-kasutaja-keel-ja-serveripoolne-tekst-design.md` (UserMenu täpsustus)
 
 - [ ] **Step 1: Kirjuta ADR**
 

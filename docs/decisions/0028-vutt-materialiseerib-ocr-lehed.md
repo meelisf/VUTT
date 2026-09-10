@@ -3,7 +3,7 @@
 **Kuupäev:** 2026-08-31
 **Staatus:** vastu võetud
 **Issue:** #278 · **Asendab osaliselt:** ADR 0017, ADR 0026
-**Spekk:** `docs/superpowers/specs/2026-08-31-uks-tee-vutt-renderdab-design.md`
+**Spekk:** `docs/_archive/superpowers/specs/done/2026-08-31-uks-tee-vutt-renderdab-design.md`
 
 ## Kontekst
 

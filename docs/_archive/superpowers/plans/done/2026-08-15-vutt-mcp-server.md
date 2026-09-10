@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, `mcp>=2,<3` (MCPServer, mitte v1 FastMCP), `httpx`, `pytest`. Andmeallikad: Meilisearch (indeks `teosed`, lehekülje-põhine) ja FastAPI prosopograafia-endpointid.
 
-**Spec:** `docs/superpowers/specs/2026-08-15-vutt-mcp-server-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-08-15-vutt-mcp-server-design.md`
 
 ## Global Constraints
 
@@ -2392,7 +2392,7 @@ Codex CLI, Gemini CLI ja Antigravity: lisa oma MCP-konfi stdio-server käsuga
 .venv/bin/pytest mcp/tests/ -m live            # päris API vastu
 ```
 
-**Invariandid** (vt `docs/superpowers/specs/2026-08-15-vutt-mcp-server-design.md`):
+**Invariandid** (vt `docs/_archive/superpowers/specs/done/2026-08-15-vutt-mcp-server-design.md`):
 
 - `vutt_mcp` EI TOHI importida `server`-it runtime'is (pipx-venv on isoleeritud);
   testid tohivad.

@@ -147,7 +147,7 @@ Funktsiooni eemaldamisel kontrolli ka `server/__init__.py` re-eksporte.
 
 Eraldi pakett `vutt_mcp` — agentide (Claude Code, Codex, Gemini, Antigravity) read-only
 ligipääs korpusele üle avaliku API. Seitse tööriista, stdio-transport. Vt `mcp/README.md`
-ja spekk `docs/superpowers/specs/2026-08-15-vutt-mcp-server-design.md`.
+ja spekk `docs/_archive/superpowers/specs/done/2026-08-15-vutt-mcp-server-design.md`.
 
 Neli asja, mis on juba korra katki läinud:
 - **Ei tohi importida `server`-it runtime'is** — pipx-venv on isoleeritud. Testid tohivad.
