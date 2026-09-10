@@ -27,5 +27,11 @@ stardil taustalõimes). Sama põhimõte kehtib Meilisearchi indeksile
   välja indeksisse, lisa see MÕLEMASSE teesse (sama lõks nagu ADR 0006).
 - Kahtluse korral („indeks tundub vale") on esimene samm rebuild, mitte
   silumine.
+- **Indeksifailid EI OLE `data/` gitis** (alates 2026-09-10). `rebuild_indices()`
+  kirjutab nad iga serveri stardi ajal üle, seega olid nad repos pidevalt
+  „muudetud" ja see püsiv müra peitis päris muudatusi: 437 committimata
+  lehteksti seisid märkamatult, sest `git status` ei olnud kunagi puhas.
+  `data/.gitignore` ignoreerib neid nüüd; failid elavad kettal ja varunduses.
+  Sama põhjendus mis ülal — nad on nullist taastatavad, ajaloos ei ole neist kasu.
 - Piir: täisfaili-ülekirjutus + mälus-filtreerimine kannab ~kümneid
   tuhandeid kirjeid; sealt edasi SQLite (vt ADR 0001, issue #132).
