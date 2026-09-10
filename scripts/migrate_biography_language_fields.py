@@ -193,6 +193,44 @@ def apply_pass_a(persons: List[dict], mapping: dict) -> dict:
     return {"written": written, "skipped": skipped, "error": None}
 
 
+def apply_pass_b(persons: List[dict], mapping: dict) -> dict:
+    """Eemaldab `biography` võtme. Contract-samm — jookseb PÄRAST tootmiskontrolli.
+
+    Kolm juhtu:
+      - väärtus tühi/None → võti maha (need on need ~2018 kaarti, mida
+        vastenduses ei ole);
+      - vastenduses olemas JA sihtväli täidetud → võti maha. Sihtvälja sisu
+        EI võrrelda `biography`-ga: toimetaja võis seda passide vahel muuta ja
+        see on oodatud, uus väli on autoriteet;
+      - täidetud, aga migreerimata → PEATU. Võtme eemaldamine oleks andmekadu.
+    """
+    sihid = {e["id"]: e["target"] for e in mapping.get("entries", [])}
+    written = []
+    skipped = 0
+
+    for person in persons:
+        if LEGACY_BIOGRAPHY not in person:
+            skipped += 1
+            continue
+
+        tekst = person.get(LEGACY_BIOGRAPHY)
+        if not tekst or not tekst.strip():
+            person.pop(LEGACY_BIOGRAPHY)
+            written.append(person)
+            continue
+
+        target = sihid.get(person["id"])
+        if not target or not person.get(target):
+            return {"written": [], "skipped": skipped, "error": (
+                f"{person['id']}: `biography` on täidetud, aga migreeritud ei ole "
+                f"(sihtväli {target or '—'} tühi). Jooksuta enne --pass a.")}
+
+        person.pop(LEGACY_BIOGRAPHY)
+        written.append(person)
+
+    return {"written": written, "skipped": skipped, "error": None}
+
+
 def _save(prosopo_dir: str, person: dict) -> str:
     """Kirjutab kaardi tagasi. Tagastab faili tee (commiti lavastamiseks)."""
     nanoid = person["id"].removeprefix("vutt:P")
@@ -255,11 +293,9 @@ def main() -> int:
         pass_nimi = "pass A"
         sonum = "refactor(prosopo): biography → keelega väljad, pass A ({n} kaarti)"
     else:
-        # Pass B sünnib ülesandes 4. SIIN peab olema selge viga, mitte kutse
-        # funktsioonile, mida veel ei ole — muidu annab `--pass b` selle ja
-        # järgmise commiti vahel `NameError`-i.
-        print("VIGA: --pass b ei ole veel teostatud", file=sys.stderr)
-        return 1
+        tulem = apply_pass_b(persons, mapping)
+        pass_nimi = "pass B"
+        sonum = "refactor(prosopo): `biography` eemaldatud, pass B ({n} kaarti)"
 
     if tulem["error"]:
         print(f"PEATUTUD ({pass_nimi}): {tulem['error']}", file=sys.stderr)

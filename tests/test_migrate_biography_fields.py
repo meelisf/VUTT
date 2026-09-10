@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from migrate_biography_language_fields import (  # noqa: E402
-    apply_pass_a, build_mapping, format_report, load_persons,
+    apply_pass_a, apply_pass_b, build_mapping, format_report, load_persons,
 )
 from server.prosopo_biography_fields import AA_RAW, BIOGRAPHY_ET, text_hash  # noqa: E402
 
@@ -139,3 +139,50 @@ def test_pass_a_austab_kasitsi_muudetud_sihtvalja_vastenduses():
     assert tulem["error"] is None
     assert persons[0][BIOGRAPHY_ET] == AA_TEKST
     assert AA_RAW not in persons[0]
+
+
+def test_pass_b_eemaldab_migreeritud_kaardilt():
+    persons = [_person("vutt:Pb", "Ludenius", PROOSA_TEKST)]
+    mapping = _mapping_for(persons)
+    apply_pass_a(persons, mapping)
+    tulem = apply_pass_b(persons, mapping)
+    assert tulem["error"] is None
+    assert "biography" not in persons[0]
+    assert persons[0][BIOGRAPHY_ET] == PROOSA_TEKST
+
+
+def test_pass_b_eemaldab_tuhja_valja_ka_vastenduses_puuduvalt_kaardilt():
+    persons = [{"id": "vutt:Pc", "name": {"label": "Tühi"}, "biography": None}]
+    tulem = apply_pass_b(persons, {"entries": []})
+    assert tulem["error"] is None
+    assert "biography" not in persons[0]
+    assert len(tulem["written"]) == 1
+
+
+def test_pass_b_ei_puuduta_migreerimata_taidetud_kirjet():
+    persons = [_person("vutt:Pz", "Migreerimata", PROOSA_TEKST)]
+    tulem = apply_pass_b(persons, {"entries": []})
+    assert tulem["error"] is not None
+    assert persons[0]["biography"] == PROOSA_TEKST
+
+
+def test_pass_b_on_idempotentne():
+    persons = [_person("vutt:Pb", "Ludenius", PROOSA_TEKST)]
+    mapping = _mapping_for(persons)
+    apply_pass_a(persons, mapping)
+    apply_pass_b(persons, mapping)
+    teine = apply_pass_b(persons, mapping)
+    assert teine["error"] is None
+    assert teine["written"] == []
+
+
+def test_pass_b_lubab_vahepeal_toimetatud_sihtvalja():
+    # Toimetaja parandas `biography_et`-d pärast passi A — see on OODATUD,
+    # uus väli on autoriteet ja `biography` on lihtsalt jäänuk.
+    persons = [_person("vutt:Pb", "Ludenius", PROOSA_TEKST)]
+    mapping = _mapping_for(persons)
+    apply_pass_a(persons, mapping)
+    persons[0][BIOGRAPHY_ET] = PROOSA_TEKST + " Toimetaja täiendas."
+    tulem = apply_pass_b(persons, mapping)
+    assert tulem["error"] is None
+    assert "biography" not in persons[0]
