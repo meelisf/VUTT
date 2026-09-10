@@ -30,7 +30,7 @@ _SYNC_NAMES = {
     "_load_person_aliases",
     "_id_to_path",
     "_person_image_path",
-    "_make_snippet",
+    "_make_snippets",
     "_collection_descendants",
     "_persons_in_collection",
     "_person_collections",

@@ -7,7 +7,7 @@ from typing import Optional
 
 from . import state
 from .indices import ACADEMIA_INSTITUTION_NAMES, _load_index, _persons_in_collection, _person_collections
-from .person_crud import _make_snippet, get_person
+from .person_crud import _make_snippets, get_person
 from .relations import get_person_relation_network_ids
 from ._compat import sync_from_facade
 
@@ -686,7 +686,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "verification_level": person.get("verification_level", "draft"),
         "updated_at": person.get("updated_at"),
         "work_count": work_count,
-        "biography_snippet": _make_snippet(person),
+        **_make_snippets(person),
         "image_url": person.get("image_url"),
         "aliases": aliases,
         "occupations": occupations,
