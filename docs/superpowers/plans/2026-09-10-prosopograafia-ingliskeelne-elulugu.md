@@ -22,6 +22,11 @@
 - **Testide käivitamine:** venv elab PÕHIKAUSTAS, mitte tööpuus — käivita
   `/home/mf/LLM/VUTT/.venv/bin/pytest tests/ -q` tööpuu juurest. Süsteemi `python3`-l
   puuduvad sõltuvused. Plaanis on lühiduse mõttes `.venv/bin/pytest` — asenda see teega ülal.
+- **MCP-testid TÖÖPUUS vajavad `PYTHONPATH`-i.** Venv-is on `vutt_mcp` editable-paigaldus,
+  mis osutab PÕHIKAUSTALE (`/home/mf/LLM/VUTT/mcp`), ja `mcp/tests/` ei ole pakett — seega
+  impordib `pytest mcp/tests/` tööpuus vaikimisi PÕHIKAUSTA koodi ja sinu muudatust ei
+  testita (roheline pakett valetab). Käivita `cd mcp && PYTHONPATH=$PWD
+  /home/mf/LLM/VUTT/.venv/bin/pytest tests/ -q`.
 - **Frontendi testid on PUHTA LOOGIKA testid.** `@testing-library/react` ei ole
   projektis olemas ja `vitest.config.ts` on `environment: 'node'` — ühtki
   komponenditesti ei eksisteeri. Ära lisa komponenditestimise stäki. Testitav otsus
