@@ -54,9 +54,6 @@ export interface ProsopoIndexEntry {
   biography_snippet_en: string;
   notes_snippet: string;
   aa_snippet: string;
-  /** @deprecated Kaob ülesandes 20. Hoiab typecheck'i rohelisena, kuni tarbijad
-   *  on üle viidud — ära kirjuta uut koodi, mis seda loeb. */
-  biography_snippet?: string;
   image_url: string | null;
   aliases: string[];
   occupations?: { id: string | null; label: string; labels?: Record<string, string> | null }[];
@@ -211,8 +208,6 @@ export interface ProsopoRecord {
   /** Vananemisankur: „keegi kinnitas vastavust teise keele tekstile, mis nägi välja nii." */
   biography_et_src: TranslationAnchor | null;
   biography_en_src: TranslationAnchor | null;
-  /** @deprecated Kaob ülesandes 20. Vt `biography_snippet` kommentaari ülal. */
-  biography?: string | null;
   notes: string | null;
   image_url: string | null;
   source_data: Record<string, any>;
