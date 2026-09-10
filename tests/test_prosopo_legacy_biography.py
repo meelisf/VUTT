@@ -5,7 +5,6 @@ vorm välja uuesti ka pärast passi B ja skeem lahkneks vaikselt.
 """
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -14,18 +13,16 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from server.prosopography import person_crud  # noqa: E402
-from server.prosopo_biography_fields import BIOGRAPHY_ET, SRC_EN  # noqa: E402
+from server.prosopo_biography_fields import BIOGRAPHY_ET, SRC_EN, SRC_ET  # noqa: E402
 
 
-@pytest.fixture
-def kaart(tmp_path, monkeypatch):
-    """Üks salvestatud kaart; `save_with_git` ja indeksid on mockitud."""
+def _build_kaart(monkeypatch, tmp_path, person):
+    """Ehitab ühe salvestatud kaardi; `save_with_git` ja indeksid on mockitud.
+
+    Jagatud `kaart`-fikstuuri ja erijuhtude testide (nt puuduva `biography`-ga
+    kaart) vahel, et mock'imismuster ei duplikeeruks.
+    """
     salvestatud = {}
-    person = {
-        "id": "vutt:Pabc", "updated_at": "2026-09-10T10:00:00+00:00",
-        "name": {"label": "Test"}, BIOGRAPHY_ET: "Eesti tekst.",
-        "biography": "Eesti tekst.",
-    }
     # sync_from_facade() on update_person'i ESIMENE rida ja võib (kui mõni varasem
     # test on ops.py fassaadi peal midagi patch'inud, vt _compat.py _FACADE_DIRTY)
     # tagasi kirjutada meie enda get_person/_id_to_path monkeypatch'id — sama
@@ -43,6 +40,17 @@ def kaart(tmp_path, monkeypatch):
         "I", (), {"_update_index_entry": staticmethod(lambda p: None),
                   "_update_aliases_entry": staticmethod(lambda p: None)})())
     return salvestatud
+
+
+@pytest.fixture
+def kaart(tmp_path, monkeypatch):
+    """Üks salvestatud kaart; `save_with_git` ja indeksid on mockitud."""
+    person = {
+        "id": "vutt:Pabc", "updated_at": "2026-09-10T10:00:00+00:00",
+        "name": {"label": "Test"}, BIOGRAPHY_ET: "Eesti tekst.",
+        "biography": "Eesti tekst.",
+    }
+    return _build_kaart(monkeypatch, tmp_path, person)
 
 
 # NB: `update_person` kutsub lisaks `sync_from_facade()`, `person_lock()` ja
@@ -88,3 +96,35 @@ def test_rikastus_ei_saa_parandvalja_tagasi_tekitada(kaart):
         "vutt:Pabc", {"biography": "Rikastus üritab", "_enrichment_scheme": "album_academicum"},
         "kasutaja")
     assert kaart["person"].get("biography") == "Eesti tekst."   # muutumatu, mitte üle kirjutatud
+
+
+def test_rikastus_ei_saa_ankrut_voltsida(kaart):
+    """Klient ei tohi `/enrich` kaudu ise „originaaltekst ei ole muutunud" kinnitust kirjutada.
+
+    `apply_enrichment` teeb `_deep_set`-i suvaliste `{field_path: value}` paaride
+    peal — ankur on SERVERI TULETIS ka siin, mitte ainult `update_person`-is.
+    """
+    person_crud.apply_enrichment(
+        "vutt:Pabc",
+        {SRC_ET: {"hash": "deadbeefcafe", "at": "2026-09-10T00:00:00+00:00"},
+         "_enrichment_scheme": "album_academicum"},
+        "kasutaja")
+    assert kaart["person"].get(SRC_ET) is None
+
+
+def test_tyhi_string_puuduva_salvestatud_vaartuse_vastu_ei_anna_vea(tmp_path, monkeypatch):
+    """Vana vorm tühja tekstiväljaga vs juba migreeritud kaart (`biography` puudub).
+
+    `(saadetud or None) != (salvestatud or None)` normaliseerib mõlemad
+    „tühjaks" — see peab jääma vaikseks mahatõmbamiseks, mitte 409-ks.
+    """
+    person = {
+        "id": "vutt:Pabc", "updated_at": "2026-09-10T10:00:00+00:00",
+        "name": {"label": "Test"}, BIOGRAPHY_ET: "Eesti tekst.",
+        # `biography` PUUDUB täielikult — kaart on juba migreeritud.
+    }
+    salvestatud = _build_kaart(monkeypatch, tmp_path, person)
+
+    person_crud.update_person("vutt:Pabc", _payload(biography=""), "kasutaja")
+
+    assert "biography" not in salvestatud["person"]

@@ -543,6 +543,12 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         # kirjutatud tekst — tema pärast dialoogi ei visata.
         approved_fields.pop(LEGACY_BIOGRAPHY, None)
 
+        # Ankur on SERVERI TULETIS ka siin — ilma selleta saaks klient ise
+        # "originaaltekst ei ole muutunud" kinnituse võltsida (spekk, „Avaliku
+        # API üleminek": ankrud visatakse ALATI ära, nagu `id`/`created_at`).
+        for key in ANCHOR_FIELDS:
+            approved_fields.pop(key, None)
+
         for field_path, value in approved_fields.items():
             _deep_set(person, field_path, value)
 
