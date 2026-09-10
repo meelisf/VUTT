@@ -68,3 +68,18 @@ export function translateErrorKey(kind: 'blocked' | 'rate_limited' | 'other'): s
   if (kind === 'rate_limited') return 'form.translateRateLimited';
   return 'form.translateError';
 }
+
+/**
+ * „Vaata, mis muutus" — mida millega võrrelda.
+ *
+ * Vana pool on ankru-aegne LÄHTEtekst (serverist), uus pool on lähtevälja
+ * PRAEGUNE sisu. Sihtvälja siia ei puutu: küsimus on „mis muutus originaalis
+ * pärast seda, kui tõlge kinnitati", mitte „kuidas tõlge originaalist erineb".
+ */
+export function sourceDiffPair(
+  diff: { found: boolean; text: string | null } | null,
+  currentSource: string,
+): { old: string; current: string } | null {
+  if (!diff || !diff.found) return null;
+  return { old: diff.text ?? '', current: currentSource };
+}

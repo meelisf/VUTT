@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONFIRM_KEY, OTHER_FIELD, confirmClearPatch, isAnchorStale, isStaleResult,
-  needsOverwriteConfirm, translateErrorKey,
+  needsOverwriteConfirm, sourceDiffPair, translateErrorKey,
 } from '../translationFlow';
 
 describe('needsOverwriteConfirm', () => {
@@ -73,5 +73,20 @@ describe('kaardistused ja veavõtmed', () => {
     const kõik = (['blocked', 'rate_limited', 'other'] as const).map(translateErrorKey);
     expect(new Set(kõik).size).toBe(3);
     expect(kõik.every(k => k.startsWith('form.'))).toBe(true);
+  });
+});
+
+describe('sourceDiffPair', () => {
+  it('võrdleb ankru-aegset LÄHTEteksti lähtevälja PRAEGUSE sisuga', () => {
+    const diff = { found: true, text: 'Vana eesti tekst.' };
+    expect(sourceDiffPair(diff, 'Uus eesti tekst.'))
+      .toEqual({ old: 'Vana eesti tekst.', current: 'Uus eesti tekst.' });
+  });
+
+  it('leidmata lähteversioon → null, mitte tühi võrdlus', () => {
+    // `found: false` tähendab „ajalugu kärbitud" — tühja vastu võrdlemine
+    // näitaks kogu teksti lisatuna, mis on vale väide.
+    expect(sourceDiffPair({ found: false, text: null }, 'Uus tekst.')).toBeNull();
+    expect(sourceDiffPair(null, 'Uus tekst.')).toBeNull();
   });
 });

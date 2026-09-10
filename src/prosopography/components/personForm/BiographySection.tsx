@@ -2,6 +2,7 @@ import { Languages, Loader2, AlertTriangle } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import MarkdownEditor from '../../../components/MarkdownEditor';
+import { lineDiff } from '../../../utils/lineDiff';
 import {
   TranslateFailed, fetchSourceDiff, translateText, type SourceDiff,
 } from '../../services/prosopographyService';
@@ -9,7 +10,7 @@ import type { TranslationAnchor } from '../../types';
 import { textHash } from '../../utils/textHash';
 import {
   CONFIRM_KEY, OTHER_FIELD, confirmClearPatch, isAnchorStale, isStaleResult,
-  needsOverwriteConfirm, translateErrorKey, type BioField,
+  needsOverwriteConfirm, sourceDiffPair, translateErrorKey, type BioField,
 } from '../../utils/translationFlow';
 import type { FormDraft } from './types';
 
@@ -146,18 +147,44 @@ const BiographySection: React.FC<Props> = ({
         </div>
       )}
 
-      {diff && (
-        <div className="text-xs bg-gray-50 border border-gray-200 rounded p-3 mb-3">
-          {diff.found ? (
-            <>
-              <p className="font-medium text-gray-700 mb-1">{t('form.sourceVersionTitle')}</p>
-              <pre className="whitespace-pre-wrap font-sans text-gray-600">{diff.text}</pre>
-            </>
-          ) : (
-            <p className="text-gray-600">{t('form.sourceVersionNotFound')}</p>
-          )}
-        </div>
-      )}
+      {diff && (() => {
+        const paar = sourceDiffPair(diff, draft[source]);
+        if (!paar) {
+          return (
+            <div className="text-xs bg-gray-50 border border-gray-200 rounded p-3 mb-3">
+              <p className="text-gray-600">{t('form.sourceVersionNotFound')}</p>
+            </div>
+          );
+        }
+        // Sama punane/roheline kuju mis `CommentHistoryPanel`-il ja git-diffidel
+        // mujal — „-" on ankru-aegne lähtetekst, „+" praegune.
+        return (
+          <div className="bg-gray-50 border border-gray-200 rounded overflow-hidden mb-3">
+            <p className="font-medium text-gray-700 text-xs px-3 py-2 border-b border-gray-200">
+              {t('form.sourceVersionTitle')}
+            </p>
+            <div>
+              {lineDiff(paar.old, paar.current).map((d, idx) => (
+                <div
+                  key={idx}
+                  className={`font-mono text-xs whitespace-pre-wrap break-words px-2 py-0.5 border-l-2 ${
+                    d.type === 'add'
+                      ? 'bg-green-50 text-green-900 border-green-400'
+                      : d.type === 'del'
+                        ? 'bg-red-50 text-red-900 border-red-300'
+                        : 'text-gray-500 border-transparent'
+                  }`}
+                >
+                  <span className="select-none opacity-60 mr-1">
+                    {d.type === 'add' ? '+' : d.type === 'del' ? '\u2212' : ' '}
+                  </span>
+                  {d.text || ' '}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <MarkdownEditor
         value={draft[tab]}
