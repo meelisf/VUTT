@@ -70,3 +70,17 @@ def test_load_persons_jatab_pildikausta_vahele(tmp_path):
     (tmp_path / "katki.json").write_text("{ see ei ole json", encoding="utf-8")
     persons = load_persons(str(tmp_path))
     assert [p["id"] for p in persons] == ["vutt:Pabc"]
+
+
+def test_katkine_json_annab_nahtava_hoiatuse_ja_jalje(tmp_path, capsys):
+    (tmp_path / "katki.json").write_text("{ see ei ole json", encoding="utf-8")
+    skipped = []
+    persons = load_persons(str(tmp_path), skipped=skipped)
+    assert persons == []
+    # Vahelejäetud failinimi peab olema jäljendatud, mitte lihtsalt kadunud.
+    assert skipped == ["katki.json"]
+    # Hoiatus peab olema nähtav (stderr), mitte vaikne — see on kuivkäivituse
+    # tõenduse alus, kui operaator loeb ainult stdout'i aruannet.
+    err = capsys.readouterr().err
+    assert "katki.json" in err
+    assert "JSONDecodeError" in err

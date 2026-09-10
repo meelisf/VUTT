@@ -45,12 +45,18 @@ IMAGES_DIR_NAME = "images"
 
 def _prosopo_dir() -> str:
     """Isikukaartide kaust. `server.config` on ainuõige allikas (CLAUDE.md)."""
-    from server.config import DATA_CONFIG_DIR
-    return os.path.join(DATA_CONFIG_DIR, "prosopography")
+    from server.config import PROSOPOGRAPHY_DIR
+    return PROSOPOGRAPHY_DIR
 
 
-def load_persons(prosopo_dir: str) -> List[dict]:
-    """Laeb kõik isikukaardid. Pildikaust ja katkine JSON jäetakse vahele."""
+def load_persons(prosopo_dir: str, skipped: Optional[List[str]] = None) -> List[dict]:
+    """Laeb kõik isikukaardid. Pildikaust jäetakse vahele.
+
+    Loetamatu/katkine JSON jäetakse samuti vahele, AGA mitte vaikides — see
+    skript on migratsiooni inimülevaatuse värav ja spekk nõuab, et aruanne
+    kataks KÕIK täidetud kirjed. Kui `skipped` on antud, lisatakse sinna
+    vahelejäetud failinimed (aruanne saab siis näidata, et midagi puudu jäi).
+    """
     persons = []
     for entry in sorted(os.scandir(prosopo_dir), key=lambda e: e.name):
         if not entry.is_file() or not entry.name.endswith(".json"):
@@ -60,7 +66,13 @@ def load_persons(prosopo_dir: str) -> List[dict]:
         try:
             with open(entry.path, encoding="utf-8") as f:
                 doc = json.load(f)
-        except Exception:
+        except Exception as e:
+            # Ainult failinimi + veatüüp stderr'i — mitte sisu ega teed
+            # (vt „Saladused tool-outputis" — isikuandmed ei kuulu logisse).
+            print(f"HOIATUS: {entry.name} loetamatu ({type(e).__name__}), jäetakse vahele",
+                  file=sys.stderr)
+            if skipped is not None:
+                skipped.append(entry.name)
             continue
         if isinstance(doc, dict) and doc.get("id"):
             persons.append(doc)
@@ -121,8 +133,11 @@ def format_report(mapping: dict) -> str:
         f"  → elulugu:    {sum(1 for e in entries if e['target'] != AA_RAW)}",
         f"  lipuga:       {len(lipuga)}",
         f"  AA mediaanpikkus: {mapping['aa_median_length']}",
-        "",
     ]
+    vahele_jaetud = mapping.get("skipped_count", 0)
+    if vahele_jaetud:
+        read.append(f"  vahele jäetud (loetamatu): {vahele_jaetud}")
+    read.append("")
     for pealkiri, grupp in (("LIPUGA (vaata üle)", lipuga), ("PUHTAD", puhtad)):
         read.append(f"── {pealkiri} ──")
         for e in grupp:
@@ -149,7 +164,9 @@ def main() -> int:
         return 1
 
     if not args.apply:
-        mapping = build_mapping(load_persons(prosopo_dir))
+        skipped: List[str] = []
+        mapping = build_mapping(load_persons(prosopo_dir, skipped=skipped))
+        mapping["skipped_count"] = len(skipped)
         with open(args.mapping, "w", encoding="utf-8") as f:
             json.dump(mapping, f, ensure_ascii=False, indent=2)
         print(format_report(mapping))
