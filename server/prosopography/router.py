@@ -848,6 +848,15 @@ async def prosopography_update(
                     "current_updated_at": current_updated_at,
                 },
             )
+        if msg == "legacy_biography_changed":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "stale_form",
+                    "message": "Vorm on aegunud (väli `biography` on skeemist eemaldatud). "
+                               "Laadi leht uuesti.",
+                },
+            )
         raise HTTPException(status_code=400, detail=msg)
     # Sünkroniseeri vastastikused seosed (best-effort — viga ei blokeeri 200 vastust)
     try:

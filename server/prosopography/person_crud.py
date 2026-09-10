@@ -13,7 +13,9 @@ from ._compat import sync_from_facade
 from .ext_ids import normalize_ext_id
 from .locks import person_lock
 from ..entity_labels_ops import fill_person_labels_from_registry
-from ..prosopo_biography_fields import AA_RAW, BIOGRAPHY_EN, BIOGRAPHY_ET, SRC_EN, SRC_ET
+from ..prosopo_biography_fields import (
+    AA_RAW, ANCHOR_FIELDS, BIOGRAPHY_EN, BIOGRAPHY_ET, LEGACY_BIOGRAPHY, SRC_EN, SRC_ET,
+)
 
 
 def _normalize_identifiers(identifiers) -> list:
@@ -326,6 +328,22 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
                     "import_batch_ids", "merged_into") + SECRET_FIELDS:
             data.pop(key, None)
 
+        # Ankur on SERVERI TULETIS: kliendi saadetu visatakse alati ära, nagu
+        # `id` ja `created_at`. Lubadus, et uus frontend seda ei saada, ei ole
+        # kaitse (spekk, „Avaliku API üleminek").
+        for key in ANCHOR_FIELDS:
+            data.pop(key, None)
+
+        # Pärandväli: vana avatud vorm saadab `biography` tagasi ja tekitaks
+        # välja uuesti ka pärast migratsiooni passi B.
+        if LEGACY_BIOGRAPHY in data:
+            saadetud = data.pop(LEGACY_BIOGRAPHY)
+            salvestatud = person.get(LEGACY_BIOGRAPHY)
+            if (saadetud or None) != (salvestatud or None):
+                # Vaikne teisendus `biography_et`-sse võiks üle kirjutada teksti,
+                # mida uus vorm vahepeal muutis — seepärast 409, mitte parandus.
+                raise ValueError("legacy_biography_changed")
+
         if "identifiers" in data:
             data["identifiers"] = _normalize_identifiers(data["identifiers"])
         person.update(data)
@@ -519,6 +537,12 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         # Koopia väldib kutsuja request-dict'i muteerimist.
         approved_fields = dict(approved)
         scheme = approved_fields.pop("_enrichment_scheme", None)
+
+        # Pärandväli ei tohi ühegi tee kaudu tagasi tekkida (ADR 0039). Siin
+        # VAIKSELT maha, mitte 409: rikastus on masina ettepanek, mitte kasutaja
+        # kirjutatud tekst — tema pärast dialoogi ei visata.
+        approved_fields.pop(LEGACY_BIOGRAPHY, None)
+
         for field_path, value in approved_fields.items():
             _deep_set(person, field_path, value)
 

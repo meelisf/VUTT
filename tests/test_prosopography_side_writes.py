@@ -70,5 +70,7 @@ def test_enrichment_scheme_is_not_persisted(monkeypatch, tmp_path):
 
     saved = json.loads(path.read_text())
     assert result["identifiers"][0]["checked_at"] is not None
-    assert saved["biography"] == "Uus elulugu"
+    # `biography` on pärandväli (spekk, „Pärandvälja reegel") — rikastustee ei
+    # tohi seda enam tagasi tekitada, seega ei jõua see salvestatud kirjesse.
+    assert "biography" not in saved
     assert "_enrichment_scheme" not in saved
