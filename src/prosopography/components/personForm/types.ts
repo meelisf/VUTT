@@ -53,7 +53,13 @@ export interface FormDraft {
   tags: TagDraft[];
   relations: RelationDraft[];
   sources: SourceDraft[];
-  biography: string;
+  biography_et: string;
+  biography_en: string;
+  /** AA-toorik. Vormis kirjutamiseks EI avata, aga käib ümarreisi kaasa. */
+  aa_raw: string;
+  /** Kinnitusruudud — ajutine vormiolek, kaardile ei salvestu. */
+  confirm_et: boolean;
+  confirm_en: boolean;
   notes: string;
   wikidata_id: string;
   gnd_id: string;
@@ -80,7 +86,11 @@ export const emptyDraft = (): FormDraft => ({
   tags: [],
   relations: [],
   sources: [],
-  biography: '',
+  biography_et: '',
+  biography_en: '',
+  aa_raw: '',
+  confirm_et: false,
+  confirm_en: false,
   notes: '',
   wikidata_id: '',
   gnd_id: '',

@@ -620,9 +620,10 @@ const PersonEditPage: React.FC = () => {
           <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">
             {t('biography', 'Elulugu')}
           </label>
+          {/* Ajutine sild: ülesanne 20 asendab selle keeletabidega. */}
           <MarkdownEditor
-            value={draft.biography}
-            onChange={v => set({ biography: v })}
+            value={draft.biography_et}
+            onChange={v => set({ biography_et: v })}
             minRows={8}
             placeholder={t('form.biographyPlaceholder')}
           />
