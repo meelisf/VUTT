@@ -1061,13 +1061,11 @@ def _make_snippets(person: dict) -> dict:
     }
 ```
 
-Lisa faili algusesse import:
+Lisa faili algusesse import — **ainult see, mida SEE ülesanne kasutab.**
+Ülesanded 6 ja 7 laiendavad seda rida ise; kasutamata import oleks ülevaatuse leid:
 
 ```python
-from ..prosopo_biography_fields import (
-    AA_RAW, ANCHOR_FIELDS, ANCHOR_OF, ANCHOR_SOURCE, BIOGRAPHY_EN, BIOGRAPHY_ET,
-    LEGACY_BIOGRAPHY, SRC_ET, SRC_EN, TEXT_FIELDS, text_hash,
-)
+from ..prosopo_biography_fields import AA_RAW, BIOGRAPHY_EN, BIOGRAPHY_ET, SRC_EN, SRC_ET
 ```
 
 `create_person` — asenda rida `"biography": None,`:
@@ -1213,7 +1211,15 @@ Expected: FAIL — `test_erinev_parandvali_annab_vea` ei viska `ValueError`-it; 
 
 - [ ] **Step 3: Lisa reegel `update_person`-isse**
 
-`server/prosopography/person_crud.py`, `update_person` — pärast olemasolevat `for key in (...)` pop-tsüklit, ENNE `person.update(data)`:
+`server/prosopography/person_crud.py` — **laienda ülesandes 5 lisatud importi** kahe nimega:
+
+```python
+from ..prosopo_biography_fields import (
+    AA_RAW, ANCHOR_FIELDS, BIOGRAPHY_EN, BIOGRAPHY_ET, LEGACY_BIOGRAPHY, SRC_EN, SRC_ET,
+)
+```
+
+`update_person` — pärast olemasolevat `for key in (...)` pop-tsüklit, ENNE `person.update(data)`:
 
 ```python
         # Ankur on SERVERI TULETIS: kliendi saadetu visatakse alati ära, nagu
@@ -1392,8 +1398,18 @@ Expected: FAIL — ankur jääb `None`-iks (`test_kinnitus_kirjutab_ankru_teise_
 
 - [ ] **Step 3: Teosta ankru loogika**
 
-`server/prosopography/person_crud.py`, `update_person` — võta kinnitus VÄLJA enne
-`person.update(data)` (samas plokis, kus ankru pop):
+`server/prosopography/person_crud.py` — **laienda importi** kolme nimega
+(`ANCHOR_OF`, `ANCHOR_SOURCE`, `text_hash`):
+
+```python
+from ..prosopo_biography_fields import (
+    AA_RAW, ANCHOR_FIELDS, ANCHOR_OF, ANCHOR_SOURCE, BIOGRAPHY_EN, BIOGRAPHY_ET,
+    LEGACY_BIOGRAPHY, SRC_EN, SRC_ET, text_hash,
+)
+```
+
+`update_person` — võta kinnitus VÄLJA enne `person.update(data)`
+(samas plokis, kus ankru pop):
 
 ```python
         # Kinnitusruut („Vastab eestikeelsele tekstile"). Ajutine võti — kaardile
