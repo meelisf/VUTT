@@ -1837,7 +1837,9 @@ Expected: PASS; kogu pakett roheline
 
 ```bash
 git add server/prosopography/git_history.py server/prosopography/enrichment.py \
-        server/metadata_handler.py tests/test_prosopo_biography_touchpoints.py
+        server/metadata_handler.py tests/test_prosopo_biography_touchpoints.py \
+        scripts/match_aa_duplicates.py scripts/match_comma_duplicates.py \
+        tests/test_match_aa_duplicates.py
 git commit -m "feat(prosopo): ankrud ajaloost välja, AA-rikastus ja SEO-kirjeldus uutele väljadele"
 ```
 
