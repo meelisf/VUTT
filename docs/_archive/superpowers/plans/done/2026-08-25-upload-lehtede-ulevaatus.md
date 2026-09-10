@@ -8,7 +8,7 @@
 
 **Tech Stack:** FastAPI + Python 3.9 (backend), React 19 + TypeScript + Tailwind + Vite (frontend), poppler-utils (`pdfseparate`/`pdfunite`, juba Dockerfile'is), pytest + vitest.
 
-**Spec:** `docs/superpowers/specs/2026-08-24-upload-lehtede-ulevaatus-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-08-24-upload-lehtede-ulevaatus-design.md`
 
 ## Global Constraints
 
@@ -1342,7 +1342,7 @@ git commit -m "feat(upload): OCR-mudel omas state-väljas; vahetus ühe CAS-i al
 - [ ] **Step 9: Märgi vana plaan asendatuks**
 
 ```bash
-git show feat/upload-ocr-katkestamine:docs/superpowers/plans/2026-08-08-upload-ocr-katkestamine.md > /tmp/vana.md
+git show feat/upload-ocr-katkestamine:docs/_archive/superpowers/plans/done/2026-08-08-upload-ocr-katkestamine.md > /tmp/vana.md
 ```
 Lisa selle haru plaani Task 7 pealkirja alla üks rida (eraldi commit sinna harusse,
 kui haru veel elab): **„ASENDATUD 2026-08-25 plaani Task 5-ga — `meta.type` jääb

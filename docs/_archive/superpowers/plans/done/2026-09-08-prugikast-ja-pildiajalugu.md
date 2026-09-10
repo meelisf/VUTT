@@ -8,7 +8,7 @@
 
 **Tech Stack:** FastAPI (Python 3.9 ühilduvus!), GitPython, Pillow, React 19 + TypeScript, vitest, pytest.
 
-**Spec:** `docs/superpowers/specs/2026-09-08-prugikast-ja-pildiajalugu-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-09-08-prugikast-ja-pildiajalugu-design.md`
 
 ## Global Constraints
 

@@ -3,7 +3,7 @@
 **Kuupäev:** 2026-09-05
 **Staatus:** vastu võetud
 **Seotud:** ADR 0011 (i18n), ADR 0002 (blokeeriv I/O), ADR 0021 (env-nimed)
-**Spekk:** `docs/superpowers/specs/2026-09-05-kasutaja-keel-ja-serveripoolne-tekst-design.md`
+**Spekk:** `docs/_archive/superpowers/specs/done/2026-09-05-kasutaja-keel-ja-serveripoolne-tekst-design.md`
 
 ## Kontekst
 

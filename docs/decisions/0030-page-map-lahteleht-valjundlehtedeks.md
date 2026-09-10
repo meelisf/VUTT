@@ -4,7 +4,7 @@
 **Staatus:** vastu võetud
 **Seotud:** ADR 0028 (VUTT materialiseerib OCR-i lehed), ADR 0022 (välise ID
 kanooniline kuju)
-**Spekk:** `docs/superpowers/specs/2026-09-03-ada-handle-import-design.md`
+**Spekk:** `docs/_archive/superpowers/specs/done/2026-09-03-ada-handle-import-design.md`
 
 ## Kontekst
 

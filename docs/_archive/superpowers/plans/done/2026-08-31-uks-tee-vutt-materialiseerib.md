@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.9 (`Optional[dict]`, mitte `dict | None`), FastAPI, paramiko SFTP, Pillow, poppler (`pdftoppm`); frontend React 19 + TypeScript.
 
-**Spec:** `docs/superpowers/specs/2026-08-31-uks-tee-vutt-renderdab-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-08-31-uks-tee-vutt-renderdab-design.md`
 
 ## Global Constraints
 

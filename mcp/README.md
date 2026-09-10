@@ -237,7 +237,7 @@ VUTT_MEILI_SEARCH_KEY=… .venv/bin/pytest mcp/tests/ -m live   # päris API vas
 CI jooksutab `pytest tests/ mcp/tests/` — selgesõnaline tee, sest `testpaths`
 üksi ei kataks seda.
 
-**Invariandid** (vt `docs/superpowers/specs/2026-08-15-vutt-mcp-server-design.md`):
+**Invariandid** (vt `docs/_archive/superpowers/specs/done/2026-08-15-vutt-mcp-server-design.md`):
 
 - `vutt_mcp` EI TOHI importida `server`-it runtime'is — pipx-venv on isoleeritud.
   Testid tohivad (`mcp/tests/conftest.py` lisab repo juure sys.path'i).

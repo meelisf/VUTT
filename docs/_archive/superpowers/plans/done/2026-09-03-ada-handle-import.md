@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.9 (FastAPI, requests, poppler-utils `pdfunite`/`pdfinfo`), React 19 + TypeScript + Tailwind, pytest, vitest.
 
-**Spec:** `docs/superpowers/specs/2026-09-03-ada-handle-import-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-09-03-ada-handle-import-design.md`
 
 ## Global Constraints
 

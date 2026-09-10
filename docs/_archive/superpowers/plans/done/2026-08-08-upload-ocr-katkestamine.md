@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.9 (FastAPI, threading, paramiko SFTP), pytest; React 19 + TypeScript + i18next.
 
-**Spekk:** `docs/superpowers/specs/2026-08-08-upload-ocr-katkestamine-design.md`
+**Spekk:** `docs/_archive/superpowers/specs/done/2026-08-08-upload-ocr-katkestamine-design.md`
 **Issue:** #225 (Task 1) · **Haru:** `feat/upload-ocr-katkestamine`
 
 ## Global Constraints
