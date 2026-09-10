@@ -37,6 +37,7 @@ from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo
 from ..rate_limit import get_client_ip, check_rate_limit
 from ..utils import find_directory_by_id
 from ..access_ops import is_work_public
+from ..text_translate import MAX_INPUT_CHARS, SUPPORTED_LANGS, TranslateError, translate
 from urllib.parse import quote
 
 logger = get_logger(__name__)
@@ -339,6 +340,51 @@ async def prosopography_work_titles(request: Request):
     # Kuni 200 metadata-faili lugemine — event-loopis blokeeriks kõiki teisi päringuid.
     result = await run_in_threadpool(_collect_work_titles, work_ids)
     return {"titles": result}
+
+
+@router.post("/translate")
+async def prosopography_translate(
+    request: Request,
+    user=Depends(_require_role("editor")),
+):
+    """Tõlgib teksti. OLEKUTA: kaarti ei avata, git-i ei commitita, lukku ei võeta.
+
+    Salvestamine käib tavalist `update_person` teed — teine kirjutaja tähendaks
+    teist võimalust optimistlikust konkurentsikontrollist mööda minna (ADR 0039).
+    """
+    allowed, retry_after = check_rate_limit(
+        user["username"], '/prosopography/translate')
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Liiga palju tõlkepäringuid, proovi uuesti {retry_after}s pärast",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    data = await _get_json(request)
+    source_lang = (data.get("source_lang") or "").strip()
+    target_lang = (data.get("target_lang") or "").strip()
+    text = data.get("text") or ""
+
+    try:
+        # Blokeeriv pakkujakutse EI TOHI event-loopis joosta (ADR 0002).
+        tolge, usage = await run_in_threadpool(translate, text, source_lang, target_lang)
+    except TranslateError as e:
+        sonum = str(e)
+        # Valideerimisvead on kliendi oma (400), pakkuja omad on 502. Eristame
+        # SISENDI järgi, mitte veasõnumit parsides — sõnum on inimtekst ja
+        # muutub, sisendi kuju on leping.
+        sisu = (text or "").strip()
+        klient_eksis = (
+            source_lang not in SUPPORTED_LANGS
+            or target_lang not in SUPPORTED_LANGS
+            or source_lang == target_lang
+            or not sisu
+            or len(sisu) > MAX_INPUT_CHARS
+        )
+        raise HTTPException(status_code=400 if klient_eksis else 502, detail=sonum)
+
+    return {"status": "ok", "text": tolge, "usage": usage}
 
 
 @router.post("")

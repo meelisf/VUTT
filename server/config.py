@@ -272,6 +272,9 @@ RATE_LIMITS = {
     # jõuavad ülikooli pöördproksi tõttu eri kliendid sama IP-ga.
     '/prosopography/wikidata': (30, 60),  # 30 Wikidata-proksi päringut minutis IP kohta (anonüümne)
     '/prosopography/map-regions': (120, 60),  # Kaardi liigutamine võib teha mitu cache'itud päringut
+    # Tõlge: võti on KASUTAJANIMI, mitte IP (pöördproksi tõttu jagaksid kõik
+    # toimetajad ühte eelarvet). 60 tõlget tunnis kasutaja kohta.
+    '/prosopography/translate': (60, 3600),
 }
 
 # =========================================================
