@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from .config import BASE_DIR
 from .utils import find_directory_by_id
 from .text_reading import read_work_page_texts, _clean_search_text, work_latest_mtime
+from .prosopo_biography_fields import BIOGRAPHY_EN, BIOGRAPHY_ET
 
 SITE_URL = "https://vutt.utlib.ut.ee"
 logger = logging.getLogger(__name__)
@@ -497,6 +498,16 @@ def _person_entity_labels(values) -> list[str]:
     return labels
 
 
+def _person_biography_text(person: dict) -> str:
+    """Isiku elulugu SEO-kirjelduse jaoks. AA-toorik EI OLE eluloo varuvariant.
+
+    Bot-tee on läbivalt eestikeelne — seepärast eelistame `biography_et`-d.
+    AA-kirje on struktureeritud allikakirje, mille esitamine lehe kirjeldusena
+    annaks 308 kaardile loetamatu snippet'i.
+    """
+    return (person.get(BIOGRAPHY_ET) or person.get(BIOGRAPHY_EN) or "")
+
+
 def _person_origin_label(person: dict) -> str:
     origin = person.get("origin") or {}
     labels = origin.get("place_labels") or {}
@@ -556,7 +567,7 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
     occupations = _person_entity_labels(person.get("occupations"))
     education = _education_facts(person)
     identifiers = [i for i in (person.get("identifiers") or []) if isinstance(i, dict) and i.get("id")]
-    biography = _strip_html_tags(person.get("biography") or "")
+    biography = _strip_html_tags(_person_biography_text(person))
     notes = _strip_html_tags(person.get("notes") or "")
 
     description_parts = [str(title)]

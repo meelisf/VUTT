@@ -57,16 +57,16 @@ def test_no_parens():
 
 # ── apply_aa_to_person testid ─────────────────────────────────────────────
 
-def test_apply_biography_only_if_empty():
-    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "biography": ""}
-    result = apply_aa_to_person(person, {"biography": "Sündis 1610..."})
-    assert result["biography"] == "Sündis 1610..."
+def test_apply_aa_raw_only_if_empty():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "aa_raw": ""}
+    result = apply_aa_to_person(person, {"aa_raw": "154. Sündis 1610..."})
+    assert result["aa_raw"] == "154. Sündis 1610..."
 
 
-def test_apply_biography_not_overwritten():
-    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "biography": "Olemasolev bio"}
-    result = apply_aa_to_person(person, {"biography": "Uus bio"})
-    assert result["biography"] == "Olemasolev bio"
+def test_apply_aa_raw_not_overwritten():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "aa_raw": "Olemasolev kirje"}
+    result = apply_aa_to_person(person, {"aa_raw": "Uus kirje"})
+    assert result["aa_raw"] == "Olemasolev kirje"
 
 
 def test_apply_birth_date():
@@ -151,6 +151,6 @@ def test_apply_name_aliases_overwrites_existing():
 
 
 def test_apply_does_not_mutate_input():
-    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "biography": ""}
-    apply_aa_to_person(person, {"biography": "Uus bio"})
-    assert person["biography"] == ""
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "aa_raw": ""}
+    apply_aa_to_person(person, {"aa_raw": "Uus kirje"})
+    assert person["aa_raw"] == ""
