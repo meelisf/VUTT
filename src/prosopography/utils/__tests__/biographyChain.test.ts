@@ -5,7 +5,7 @@
  * kaotaks 308 kaarti nimekirjas katke ära.
  */
 import { describe, expect, it } from 'vitest';
-import { pickBiography, pickSnippet } from '../biographyChain';
+import { pickBiography, pickSnippet, snippetBadgeKey, type SnippetSource } from '../biographyChain';
 
 const rec = (et?: string | null, en?: string | null) =>
   ({ biography_et: et ?? null, biography_en: en ?? null }) as any;
@@ -61,5 +61,32 @@ describe('pickSnippet', () => {
 
   it('tagastab null, kui ühtki allikat ei ole', () => {
     expect(pickSnippet(entry({}), 'et')).toBeNull();
+  });
+});
+
+describe('snippetBadgeKey', () => {
+  it('oma keele katkel märget ei ole', () => {
+    const pick = pickSnippet(entry({ biography_snippet_et: 'Eesti' }), 'et')!;
+    expect(snippetBadgeKey(pick)).toBeNull();
+  });
+
+  it('teise keele katkel on keelemärge', () => {
+    const pick = pickSnippet(entry({ biography_snippet_en: 'English' }), 'et')!;
+    expect(snippetBadgeKey(pick)).toBe('snippetInEnglish');
+  });
+
+  it('märkmete ja AA katkel on oma märge, mitte keelemärge', () => {
+    const notes = pickSnippet(entry({ notes_snippet: 'Märkmed' }), 'et')!;
+    expect(snippetBadgeKey(notes)).toBe('snippetNotes');
+    const aa = pickSnippet(entry({ aa_snippet: '154. AA' }), 'et')!;
+    expect(snippetBadgeKey(aa)).toBe('snippetAaRecord');
+  });
+
+  it('kaardistus katab KÕIK allikad — uus allikas ei tohi vaikselt märketa jääda', () => {
+    const allikad: SnippetSource[] = ['biography_et', 'biography_en', 'notes', 'aa_raw'];
+    for (const source of allikad) {
+      expect(snippetBadgeKey({ text: 'x', source, lang: null, isFallback: true }))
+        .toEqual(expect.any(String));
+    }
   });
 });

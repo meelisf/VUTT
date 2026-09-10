@@ -69,3 +69,22 @@ export function pickSnippet(entry: ProsopoIndexEntry, lang: BioLang): SnippetPic
   }
   return null;
 }
+
+// Katke allikas → i18n võti. Kaardistus on TOTAALNE (`Record<SnippetSource, string>`):
+// uus allikas ei kompileeru enne, kui talle on märge antud.
+const BADGE_KEY: Record<SnippetSource, string> = {
+  biography_et: 'snippetInEstonian',
+  biography_en: 'snippetInEnglish',
+  notes: 'snippetNotes',
+  aa_raw: 'snippetAaRecord',
+};
+
+/**
+ * Märke i18n võti, või `null`, kui katke on lugeja enda keelest.
+ *
+ * Märge on AUSUSE küsimus: ilma selleta näeks lugeja võõrkeelset teksti või
+ * AA-kirjet nii, nagu oleks see tema keeles kirjutatud elulugu (ADR 0039).
+ */
+export function snippetBadgeKey(pick: SnippetPick): string | null {
+  return pick.isFallback ? BADGE_KEY[pick.source] : null;
+}
