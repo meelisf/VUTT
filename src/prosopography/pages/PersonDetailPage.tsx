@@ -5,9 +5,10 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatLifeDate, formatFloruit } from '../utils/personDates';
 import MarkdownView from '../../components/MarkdownView';
+import BiographyBlocks from '../components/BiographyBlocks';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
-  BookOpen, User, BookMarked, Users, StickyNote, Map, History, RotateCcw, Lock,
+  BookOpen, User, Users, StickyNote, Map, History, RotateCcw, Lock,
 } from 'lucide-react';
 import { isQCode } from '../../utils/qcodeUtils';
 import { formatYearDisplay, parseYearDisplayRange } from '../../utils/yearDisplayUtils';
@@ -687,13 +688,8 @@ const PersonDetailPage: React.FC = () => {
           )}
         </div>
 
-        {/* ── Elulugu ── */}
-        {person.biography && (
-          <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-            <CardHeader icon={<BookMarked size={18} />} title={t('biography', 'Elulugu')} />
-            <MarkdownView content={person.biography} className="text-sm text-gray-800 leading-relaxed" />
-          </div>
-        )}
+        {/* ── Elulugu + Album Academicumi kirje ── */}
+        <BiographyBlocks person={person} lang={lang === 'en' ? 'en' : 'et'} />
 
         {/* ── Seotud teosed ── */}
         {works.length > 0 && (
