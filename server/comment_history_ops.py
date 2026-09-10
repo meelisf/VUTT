@@ -1,7 +1,7 @@
 """Kommentaaride versiooniajaloo arvutus git-logist (on-demand, puhas loogika).
 
 Git on ainus tõeallikas — eraldi indeksit ei hoita. Vt
-`docs/superpowers/specs/2026-06-30-page-comments-markdown-git-restore-design.md`.
+`docs/_archive/superpowers/specs/done/2026-06-30-page-comments-markdown-git-restore-design.md`.
 """
 import json
 

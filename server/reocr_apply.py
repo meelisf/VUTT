@@ -2,7 +2,7 @@
 
 Eraldi moodul, sest reocr_ops.py orkestreerib OCR-serverit (SFTP, pollimine);
 siin on hoopis staging → päris fail + versioonihaldus. Vt spets
-docs/superpowers/specs/2026-08-07-reocr-hulgi-vastuvott-design.md.
+docs/_archive/superpowers/specs/done/2026-08-07-reocr-hulgi-vastuvott-design.md.
 """
 import os
 import unicodedata

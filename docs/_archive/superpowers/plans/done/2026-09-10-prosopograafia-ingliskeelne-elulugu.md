@@ -8,7 +8,7 @@
 
 **Tech Stack:** FastAPI (Python 3.9 ühilduvus!), GitPython, requests + Gemini API, React 19 + TypeScript, vitest, pytest.
 
-**Spec:** `docs/superpowers/specs/2026-09-10-prosopograafia-ingliskeelne-elulugu-design.md`
+**Spec:** `docs/_archive/superpowers/specs/done/2026-09-10-prosopograafia-ingliskeelne-elulugu-design.md`
 
 ## Global Constraints
 

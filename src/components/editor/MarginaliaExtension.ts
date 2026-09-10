@@ -2,7 +2,7 @@
 // Suletud plokid peidetakse block-replace'iga (ILMA CM-widgetita) ja renderdatakse
 // eraldi DOM-ülekattena (position:absolute .cm-scrolleris, coordsAtPos-põhine).
 // Avatud plokid (muutmisrežiim): täisrea taust + × nupp, toortekst inline nähtav.
-// Vt docs/superpowers/plans/2026-06-13-marginalia-overlay-rendering.md
+// Vt docs/_archive/superpowers/plans/done/2026-06-13-marginalia-overlay-rendering.md
 // Servajuhud (kustutamine, tühjad read), kaitsefilter ja test-harness:
 //   docs/marginalia-editor-harness-ja-servajuhud.md
 //

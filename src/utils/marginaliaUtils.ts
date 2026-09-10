@@ -1,7 +1,7 @@
 // src/utils/marginaliaUtils.ts
 // Marginaalia plokkide leidmine ja virnastamine — puhtad funktsioonid.
 // Kasutavad: MarginaliaExtension (editor). Vt spec:
-// docs/superpowers/specs/2026-06-11-marginalia-display-design.md
+// docs/_archive/superpowers/specs/done/2026-06-11-marginalia-display-design.md
 
 export interface MarginaliaBlock {
   /** '<m>' tägi algus */
