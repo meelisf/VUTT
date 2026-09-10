@@ -605,7 +605,7 @@ Esimesed kaks **peatavad jooksu**, kolmas jätab vahele (idempotentsus).
 **Interfaces:**
 - Consumes: Task 2 — `load_persons`, `build_mapping`
 - Produces:
-  - `apply_pass_a(persons: List[dict], mapping: dict) -> dict` → `{"written": [(person, path_key)], "skipped": int, "error": Optional[str]}`
+  - `apply_pass_a(persons: List[dict], mapping: dict) -> dict` → `{"written": [person, ...], "skipped": int, "error": Optional[str]}` — `written` on PALJASTE kaardi-dict'ide list, mitte paaride oma
   - `_git_commit(data_root: str, paths: List[str], message: str) -> bool`
 
 - [ ] **Step 1: Kirjuta kukkuvad testid**
