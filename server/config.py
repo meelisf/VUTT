@@ -306,6 +306,10 @@ GEMINI_MAX_REQUEST_BYTES = int(env("GEMINI_MAX_REQUEST_BYTES", str(15 * 1024 * 1
 GEMINI_MAX_PROMPT_BYTES = int(env("GEMINI_MAX_PROMPT_BYTES", "8192"))
 GEMINI_MAX_FEW_SHOT = int(env("GEMINI_MAX_FEW_SHOT", "3"))
 
+# Tõlkemudel omas env-nimes (ADR 0021: üks nimi ühe seade kohta). Võti, timeout
+# ja korduste arv jagatakse OCR-poolega — need on pakkuja, mitte kasutuskoha seaded.
+GEMINI_TRANSLATE_MODEL = env("GEMINI_TRANSLATE_MODEL", "gemini-3.8-flash")
+
 
 def gemini_enabled() -> bool:
     """Kas Gemini-tee on kasutatav? Ainus tingimus on seatud võti."""
