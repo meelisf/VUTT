@@ -41,6 +41,7 @@
 | `scripts/migrate_biography_language_fields.py` | **uus.** Kaks passi + kuivkäivitus + kinnitatud vastendus. |
 | `server/prosopography/person_crud.py` | Skeem, neli katget, pärandvälja reegel, ankru kirjutamine. |
 | `server/prosopography/person_search.py` | Indeksikirje neli katget. |
+| `server/prosopography/ops.py`, `_compat.py` | `_make_snippet` re-ekspordid (T5) — vahelejätmine = `ImportError`. |
 | `server/prosopography/merge_ops.py` | Kolm tekstivälja + ankru nullimine. |
 | `server/prosopography/git_history.py` | Ankrud ignoreeritud väljade hulka. |
 | `server/prosopography/enrichment.py` | AA raw_text → `aa_raw`. |
@@ -1078,7 +1079,28 @@ from ..prosopo_biography_fields import AA_RAW, BIOGRAPHY_EN, BIOGRAPHY_ET, SRC_E
         SRC_EN: None,
 ```
 
-`__all__` — asenda `'_make_snippet'` → `'_make_snippets'`.
+**`_make_snippet` on re-eksporditud NELJAS kohas — kõik peavad kaasa tulema.**
+CLAUDE.md hoiatab: „Funktsiooni eemaldamisel kontrolli ka re-eksporte." Kontrollitud
+grepiga (kontroller, 2026-09-10); ühegi vahelejätmine annab `ImportError`-i mooduli
+laadimisel, mis kukutab kogu backendi:
+
+| Fail | Rida | Mida teha |
+|---|---|---|
+| `server/prosopography/person_crud.py` | `__all__` (~653) | `'_make_snippet'` → `'_make_snippets'` |
+| `server/prosopography/person_search.py` | 10 | import `_make_snippets` |
+| `server/prosopography/ops.py` | 47 | import `_make_snippets` |
+| `server/prosopography/ops.py` | `__all__` (~114) | `'_make_snippet'` → `'_make_snippets'` |
+| `server/prosopography/_compat.py` | 33 | `_SYNC_NAMES`-is `"_make_snippet"` → `"_make_snippets"` |
+
+`_compat.py` `_SYNC_NAMES` on nimekiri, mida vanad testid võivad `server.prosopography.ops`
+peal patch'ida — kui nimi sealt puudu jääb, ei ole viga kohe nähtav, aga patch'imine
+lakkab vaikselt töötamast.
+
+Kontroll pärast muudatust — vasteid ei tohi jääda:
+
+```bash
+grep -rn "_make_snippet\b" server/ tests/ | grep -v "_make_snippets"
+```
 
 `server/prosopography/person_search.py` — rida 10 import ja rida 689:
 
