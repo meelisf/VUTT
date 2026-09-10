@@ -3747,9 +3747,9 @@ export async function textHash(text: string | null | undefined): Promise<string>
 
 Run uuesti: PASS (4 testi).
 
-> Kui `crypto.subtle` ei ole vitesti `node` keskkonnas defineeritud, kasuta
-> `globalThis.crypto` — Node 18+ pakub `crypto`-t globaalselt. Ära lisa polyfill'i
-> sõltuvust.
+> **Kontrollitud (kontroller, 2026-09-10):** Node v22.23.0, `crypto.subtle.digest` on
+> vitesti `node`-keskkonnas globaalselt olemas ja see teostus annab `'tekst'` peale
+> täpselt `324d0315d575` — sama mis Pythoni pool. Polyfill'i EI ole vaja.
 
 - [ ] **Step 3: Kirjuta `translationFlow` testid**
 
