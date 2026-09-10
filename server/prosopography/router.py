@@ -857,6 +857,10 @@ async def prosopography_update(
                                "Laadi leht uuesti.",
                 },
             )
+        if msg == "confirm_without_source":
+            raise HTTPException(
+                status_code=400,
+                detail="Tühja lähteteksti vastu ei saa tõlget kinnitada.")
         raise HTTPException(status_code=400, detail=msg)
     # Sünkroniseeri vastastikused seosed (best-effort — viga ei blokeeri 200 vastust)
     try:

@@ -14,7 +14,8 @@ from .ext_ids import normalize_ext_id
 from .locks import person_lock
 from ..entity_labels_ops import fill_person_labels_from_registry
 from ..prosopo_biography_fields import (
-    AA_RAW, ANCHOR_FIELDS, BIOGRAPHY_EN, BIOGRAPHY_ET, LEGACY_BIOGRAPHY, SRC_EN, SRC_ET,
+    AA_RAW, ANCHOR_FIELDS, ANCHOR_OF, ANCHOR_SOURCE, BIOGRAPHY_EN, BIOGRAPHY_ET,
+    LEGACY_BIOGRAPHY, SRC_EN, SRC_ET, text_hash,
 )
 
 
@@ -334,6 +335,11 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
         for key in ANCHOR_FIELDS:
             data.pop(key, None)
 
+        # Kinnitusruut („Vastab eestikeelsele tekstile"). Ajutine võti — kaardile
+        # ei jõua. Väärtus on sihtväljade loend: `biography_en` tähendab, et
+        # kinnitatakse `biography_en` vastavust `biography_et`-le.
+        confirm = data.pop("_confirm_translation", None) or []
+
         # Pärandväli: vana avatud vorm saadab `biography` tagasi ja tekitaks
         # välja uuesti ka pärast migratsiooni passi B.
         if LEGACY_BIOGRAPHY in data:
@@ -349,6 +355,20 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
         person.update(data)
         person["updated_at"] = now
         person["updated_by"] = username
+
+        # Ankur on serveri tuletis: räsi arvutatakse SIIN, salvestatava seisu
+        # pealt. Klient räsi ei saada (vt ANCHOR pop ülal).
+        for field in (BIOGRAPHY_ET, BIOGRAPHY_EN):
+            anchor_field = ANCHOR_OF[field]
+            if field in confirm:
+                source_text = (person.get(ANCHOR_SOURCE[anchor_field]) or "").strip()
+                if not source_text:
+                    raise ValueError("confirm_without_source")
+                person[anchor_field] = {"hash": text_hash(source_text), "at": now}
+            elif not (person.get(field) or "").strip():
+                # Tühjaks jäänud tekstil ei ole midagi kinnitada — jäänud ankur
+                # tekitaks hoiatuse tekstile, mida ei ole.
+                person[anchor_field] = None
 
         origin = person.get("origin") or {}
         if origin.get("place"):
