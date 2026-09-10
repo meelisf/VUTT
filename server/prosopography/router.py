@@ -38,6 +38,7 @@ from ..rate_limit import get_client_ip, check_rate_limit
 from ..utils import find_directory_by_id
 from ..access_ops import is_work_public
 from ..text_translate import MAX_INPUT_CHARS, SUPPORTED_LANGS, TranslateError, translate
+from ..prosopo_biography_fields import ANCHOR_OF, ANCHOR_SOURCE, text_hash
 from urllib.parse import quote
 
 logger = get_logger(__name__)
@@ -614,6 +615,55 @@ def person_diff(person_id: str, commit: str, user=Depends(_require_role("editor"
 
     from .git_history import compute_person_diff
     return {"status": "ok", "changes": compute_person_diff(before, after)}
+
+
+@router.get("/{person_id:path}/source-diff")
+def person_source_diff(person_id: str, field: str, user=Depends(_require_role("editor"))):
+    """Ankru-aegne LÄHTETEKST („vaata, mis muutus").
+
+    EI OLE `GET /{id}/diff`: too võrdleb commit'i tema VANEMAGA. Siin käiakse
+    ajalugu uuest vanemani läbi ja otsitakse värskeim commit, mille lähtevälja
+    räsi võrdub ankru räsiga — nii osutab tulemus alati täpselt sellele tekstile,
+    mille räsi ankrus on (ADR 0039).
+
+    Sünkroonne `def`: git-I/O on blokeeriv, FastAPI viib route'i ise threadpooli.
+    """
+    if field not in ANCHOR_OF:
+        raise HTTPException(
+            status_code=400,
+            detail="Lubatud väljad: {}".format(", ".join(sorted(ANCHOR_OF))))
+    try:
+        nanoid = _safe_nanoid(person_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+
+    person = get_person(person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+
+    tyhi = {"found": False, "commit": None, "date": None, "text": None}
+    anchor = person.get(ANCHOR_OF[field])
+    if not isinstance(anchor, dict) or not anchor.get("hash"):
+        return tyhi
+
+    source_field = ANCHOR_SOURCE[ANCHOR_OF[field]]
+    relative_path = f"config/prosopography/{nanoid}.json"
+
+    for commit in get_file_git_history(relative_path, max_count=50):
+        content = get_file_at_commit(relative_path, commit["full_hash"])
+        if not content:
+            continue
+        try:
+            doc = json.loads(content)
+        except json.JSONDecodeError:
+            continue
+        tekst = doc.get(source_field)
+        if text_hash(tekst) == anchor["hash"]:
+            return {"found": True, "commit": commit["hash"],
+                    "date": commit["date"], "text": tekst}
+
+    # Ajalugu kärbitud või kaart taastatud — aus „ei leidnud", mitte vale diff.
+    return tyhi
 
 
 @router.post("/{person_id:path}/restore")
