@@ -15,6 +15,21 @@ MAX_RELATIONS = 50
 LIST_PATH = "/prosopography"
 
 
+# Katke varuvariandi ahel. Indeks kannab iga allika kohta oma katget (ADR 0039);
+# valiku teeb TARBIJA, sest ainult tema teab, mida ta näidata tahab.
+_SNIPPET_CHAIN = ("biography_snippet_et", "biography_snippet_en",
+                  "notes_snippet", "aa_snippet")
+
+
+def _snippet_of(entry: dict) -> str:
+    """Esimene mittetühi katke ahelast."""
+    for key in _SNIPPET_CHAIN:
+        value = (entry.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
 def search(client, base_url: str, **filters) -> str:
     """Isikuotsing. Tühjad filtrid jäetakse päringust välja."""
     params = {k: v for k, v in filters.items() if v not in (None, "")}
@@ -47,7 +62,7 @@ def search(client, base_url: str, **filters) -> str:
             meta.append(f"päritolu={person['origin_place']}")
 
         block = [head, "    " + " · ".join(meta)]
-        snippet = (person.get("biography_snippet") or "").strip()
+        snippet = _snippet_of(person)
         if snippet:
             block.append(f"    {snippet}")
         block.append(
@@ -80,7 +95,11 @@ def detail(client, base_url: str, person_id: str, include_relations: bool) -> st
         ("staatused", _labels(person.get("statuses"))),
         ("konfessioonid", _labels(person.get("confessions"))),
         ("sildid", person.get("tags")),
-        ("elulugu", (person.get("biography") or "").strip() or None),
+        # Keel on VÄLJANIMES: ainult `biography_et` peidaks ingliskeelsena
+        # kirjutatud eluloo. AA-kirje on eraldi liik sisu, mitte eluloo variant.
+        ("elulugu_et", (person.get("biography_et") or "").strip() or None),
+        ("elulugu_en", (person.get("biography_en") or "").strip() or None),
+        ("album_academicum", (person.get("aa_raw") or "").strip() or None),
         ("märkmed", (person.get("notes") or "").strip() or None),
         ("vaata", fmt.person_url(person.get("id", ""), base_url=base_url)),
     ])]

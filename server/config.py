@@ -272,6 +272,9 @@ RATE_LIMITS = {
     # jõuavad ülikooli pöördproksi tõttu eri kliendid sama IP-ga.
     '/prosopography/wikidata': (30, 60),  # 30 Wikidata-proksi päringut minutis IP kohta (anonüümne)
     '/prosopography/map-regions': (120, 60),  # Kaardi liigutamine võib teha mitu cache'itud päringut
+    # Tõlge: võti on KASUTAJANIMI, mitte IP (pöördproksi tõttu jagaksid kõik
+    # toimetajad ühte eelarvet). 60 tõlget tunnis kasutaja kohta.
+    '/prosopography/translate': (60, 3600),
 }
 
 # =========================================================
@@ -305,6 +308,10 @@ GEMINI_REQUEST_TIMEOUT = int(env("GEMINI_REQUEST_TIMEOUT", "120"))
 GEMINI_MAX_REQUEST_BYTES = int(env("GEMINI_MAX_REQUEST_BYTES", str(15 * 1024 * 1024)))
 GEMINI_MAX_PROMPT_BYTES = int(env("GEMINI_MAX_PROMPT_BYTES", "8192"))
 GEMINI_MAX_FEW_SHOT = int(env("GEMINI_MAX_FEW_SHOT", "3"))
+
+# Tõlkemudel omas env-nimes (ADR 0021: üks nimi ühe seade kohta). Võti, timeout
+# ja korduste arv jagatakse OCR-poolega — need on pakkuja, mitte kasutuskoha seaded.
+GEMINI_TRANSLATE_MODEL = env("GEMINI_TRANSLATE_MODEL", "gemini-3.8-flash")
 
 
 def gemini_enabled() -> bool:

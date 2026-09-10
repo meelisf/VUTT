@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import PersonSnippet from './PersonSnippet';
 import { MapPin, ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
 import type { VocabularySeisusItem } from '../../services/collectionService';
@@ -206,12 +207,8 @@ const CardInner: React.FC<{
           </p>
         )}
 
-        {/* Biograafia snippet */}
-        {person.biography_snippet && (
-          <p className="text-xs text-gray-500 italic leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-2 mt-2">
-            „{person.biography_snippet}…"
-          </p>
-        )}
+        {/* Katke: ahela valib vaade, mitte indeks */}
+        <PersonSnippet entry={person} lang={i18n.language?.startsWith('en') ? 'en' : 'et'} />
 
       </div>
 

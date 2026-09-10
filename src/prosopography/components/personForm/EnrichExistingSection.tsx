@@ -30,7 +30,7 @@ const FIELD_I18N: Record<string, string> = {
   status: 'status',
   'name.label': 'nameLabel',
   'name.aliases': 'nameAliases',
-  biography: 'biography',
+  aa_raw: 'biography',
   _linked_wikidata: 'linkedWikidata',
   _linked_gnd: 'linkedGnd',
   _aa_education: 'education',

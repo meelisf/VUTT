@@ -556,3 +556,71 @@ export async function restorePerson(
   if (!resp.ok) throw new Error(`restorePerson: ${resp.status}`);
   return resp.json();
 }
+
+/** Tõlke veaklass. `kind` tuleb SERVERI koodist, mitte sõnumi sisust. */
+export class TranslateFailed extends Error {
+  readonly kind: 'blocked' | 'rate_limited' | 'other';
+  constructor(kind: 'blocked' | 'rate_limited' | 'other', message: string) {
+    super(message);
+    this.name = 'TranslateFailed';
+    this.kind = kind;
+  }
+}
+
+// Masinloetav prefiks, mille backend paneb sisufiltri keeldumise ette (#292).
+// Sama string on `server/ocr_providers/gemini.py` CONTENT_BLOCKED — kaks keelt,
+// üks reegel.
+const CONTENT_BLOCKED_PREFIX = 'content_blocked';
+
+/**
+ * Tõlgib teksti. OLEKUTA — kaarti ei puudutata, salvestamine käib eraldi.
+ *
+ * Timeout on 120 s: Gemini päring ise võib võtta kuni `GEMINI_REQUEST_TIMEOUT`
+ * (120 s) ja lühem klienditimeout annaks „server 200 + klient viga" mustri.
+ */
+export async function translateText(
+  text: string,
+  sourceLang: 'et' | 'en',
+  targetLang: 'et' | 'en',
+  token: string,
+): Promise<string> {
+  const resp = await fetchWithTimeout(`${BASE}/translate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify({ source_lang: sourceLang, target_lang: targetLang, text }),
+    timeout: 120000,
+  });
+
+  if (resp.status === 429) {
+    throw new TranslateFailed('rate_limited', 'rate limited');
+  }
+  if (!resp.ok) {
+    const detail = await resp.json().then(b => String(b?.detail ?? '')).catch(() => '');
+    throw new TranslateFailed(
+      detail.startsWith(CONTENT_BLOCKED_PREFIX) ? 'blocked' : 'other', detail);
+  }
+  const body = await resp.json();
+  return body.text as string;
+}
+
+export interface SourceDiff {
+  found: boolean;
+  commit: string | null;
+  date: string | null;
+  text: string | null;
+}
+
+/** Ankru-aegne lähtetekst („vaata, mis muutus"). `found: false` EI ole viga. */
+export async function fetchSourceDiff(
+  personId: string,
+  field: 'biography_et' | 'biography_en',
+  token: string,
+): Promise<SourceDiff> {
+  const encoded = encodeURIComponent(personId);
+  const resp = await fetchWithTimeout(
+    `${BASE}/${encoded}/source-diff?field=${field}`,
+    { headers: getAuthHeaders(token), timeout: 15000 },
+  );
+  if (!resp.ok) throw new Error(`fetchSourceDiff: ${resp.status}`);
+  return resp.json();
+}

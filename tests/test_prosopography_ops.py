@@ -564,3 +564,12 @@ def test_index_entry_confession_legacy_fallback():
     }
     entry = _build_entry(person)
     assert entry["confession_ids"] == ["Q75809"]
+
+
+def test_indeksikirje_kannab_nelja_katet():
+    from server.prosopography.person_search import _index_entry_from_person
+    kirje = _index_entry_from_person(
+        {"id": "vutt:Pa", "name": {"label": "Test"}, "biography_en": "English."}, 0)
+    assert kirje["biography_snippet_en"] == "English."
+    assert kirje["biography_snippet_et"] == ""
+    assert "biography_snippet" not in kirje       # vana võti on kadunud

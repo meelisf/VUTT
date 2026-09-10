@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowLeftRight, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
 import Header from '../../components/Header';
 import MarkdownEditor from '../../components/MarkdownEditor';
+import BiographySection from '../components/personForm/BiographySection';
 import EntityPicker from '../../components/EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
@@ -615,18 +616,18 @@ const PersonEditPage: React.FC = () => {
           />
         </div>
 
-        {/* ── Elulugu ── */}
-        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
-          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">
-            {t('biography', 'Elulugu')}
-          </label>
-          <MarkdownEditor
-            value={draft.biography}
-            onChange={v => set({ biography: v })}
-            minRows={8}
-            placeholder={t('form.biographyPlaceholder')}
-          />
-        </div>
+        {/* ── Elulugu (ET | EN) ── */}
+        <BiographySection
+          draft={draft}
+          set={set}
+          personId={id ?? null}
+          anchors={{
+            et: original?.biography_et_src ?? null,
+            en: original?.biography_en_src ?? null,
+          }}
+          token={token}
+          canEdit={!!canEdit}
+        />
 
         {/* ── Nimevariandid ja identifikaatorid (klapitav) ── */}
         <CollapsibleSection

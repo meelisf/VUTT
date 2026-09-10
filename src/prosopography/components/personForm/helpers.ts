@@ -99,8 +99,9 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   }
 
   // Biograafia (AA raw_text) — ainult kui tühi
-  if (autoFilled['biography'] && !draft.biography.trim()) {
-    patch.biography = autoFilled['biography'];
+  // AA raw_text on KIRJE, mitte elulugu — ta läheb `aa_raw`-sse (ADR 0039).
+  if (autoFilled['aa_raw'] && !draft.aa_raw.trim()) {
+    patch.aa_raw = autoFilled['aa_raw'];
   }
 
   // Päritolukoht AA-st
@@ -185,7 +186,11 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       reciprocal_auto: r.reciprocal_auto ?? undefined,
     })),
     sources: (p.sources ?? []).map((s: any) => ({ text: s.text ?? String(s), note: s.note ?? '' })),
-    biography: p.biography ?? '',
+    biography_et: p.biography_et ?? '',
+    biography_en: p.biography_en ?? '',
+    aa_raw: p.aa_raw ?? '',
+    confirm_et: false,
+    confirm_en: false,
     notes: p.notes ?? '',
     wikidata_id: ident('wikidata'),
     gnd_id: ident('gnd'),
@@ -312,7 +317,18 @@ export function draftToPayload(
       text: s.text.trim(),
       ...(s.note.trim() ? { note: s.note.trim() } : {}),
     })),
-    biography: draft.biography.trim() || null,
+    biography_et: draft.biography_et.trim() || null,
+    biography_en: draft.biography_en.trim() || null,
+    aa_raw: draft.aa_raw.trim() || null,
+    // Kinnitus on ajutine võti, mitte kaardi väli — server popib ta ära ja
+    // arvutab räsi ise. Ankruid me EI saada (server viskaks need niikuinii ära).
+    ...(() => {
+      const confirmed = [
+        ...(draft.confirm_et ? ['biography_et'] : []),
+        ...(draft.confirm_en ? ['biography_en'] : []),
+      ];
+      return confirmed.length ? { _confirm_translation: confirmed } : {};
+    })(),
     notes: draft.notes.trim() || null,
     identifiers,
     ...(original ? { updated_at: original.updated_at } : {}),

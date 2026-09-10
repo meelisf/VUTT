@@ -11,6 +11,44 @@ from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, 
 from .person_crud import _id_to_path, get_person
 from .locks import merge_operation_lock, person_lock
 from ._compat import sync_from_facade
+from ..prosopo_biography_fields import (
+    ANCHOR_FIELDS, BIOGRAPHY_EN, BIOGRAPHY_ET, TEXT_FIELDS,
+)
+
+
+def _merge_biography_fields(source: dict, target: dict) -> bool:
+    """Kolm tekstivälja + ankrud. Tagastab, kas sihtmärk muutus.
+
+    Tekstiväljad: tavaline „allikas täidab ainult tühja sihtvälja" reegel.
+    Ankrud: pärast ühendamist on MÕLEMAD `None`, välja arvatud kui mõlemad
+    keeleväljad tulid samalt kaardilt tühjale sihtmärgile. Kahtluse korral
+    `None` — kaotatud kinnitus on üks märkeruudu vajutus, vale kinnitus on
+    vaikne viga (ADR 0039).
+    """
+    # Seis ENNE kopeerimist: pärast on mõlemad väljad täidetud ja tingimust
+    # ei saaks enam hinnata.
+    sihil_oli_elulugu = bool(target.get(BIOGRAPHY_ET)) or bool(target.get(BIOGRAPHY_EN))
+
+    changed = False
+    for field in TEXT_FIELDS:
+        if source.get(field) and not target.get(field):
+            target[field] = source[field]
+            changed = True
+
+    molemad_allikast = (
+        not sihil_oli_elulugu
+        and bool(source.get(BIOGRAPHY_ET))
+        and bool(source.get(BIOGRAPHY_EN))
+    )
+    for anchor in ANCHOR_FIELDS:
+        uus = source.get(anchor) if molemad_allikast else None
+        if target.get(anchor) != uus:
+            changed = True
+        # Seatakse ALATI: skeem hoiab mõlemat ankrut olemas (person_crud
+        # `create_person`), ja puuduv võti annaks lugejale KeyError'i.
+        target[anchor] = uus
+
+    return changed
 
 
 def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
@@ -87,8 +125,7 @@ def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
             target["occupations"] = tgt_occs + added_occs
             target_changed = True
 
-    if source.get("biography") and not target.get("biography"):
-        target["biography"] = source["biography"]
+    if _merge_biography_fields(source, target):
         target_changed = True
 
     src_notes = (source.get("notes") or "").strip()

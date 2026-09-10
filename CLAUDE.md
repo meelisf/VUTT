@@ -240,6 +240,17 @@ sünnib lõputu URL-i vahetus (#333). Omaksvõtt (URL → kontekst) EI kirjuta U
 Leht lähtestatakse 1-le ainult päris vahetusel, mitte peegeldusel ega katkise lingi
 parandusel.
 
+**Eluloo keeleväljad (ADR 0039)** — sisuvälja keel on VÄLJANIMES: `biography_et`,
+`biography_en`, `aa_raw`. `biography` on skeemist eemaldatud ja `update_person`
+lükkab ta tagasi (identne → vaikselt maha, erinev → 409). Vananemisankur
+(`biography_et_src` / `biography_en_src`) kirjutatakse AINULT selgesõnalise
+kinnituse peale (`_confirm_translation`) ja kannab **teise keele** teksti räsi;
+`null` = „seost ei ole salvestatud", mitte „originaal". Ankru pop kliendi
+sisendist on kohustuslik. Indeks kannab NELJA katget
+(`biography_snippet_et/_en`, `notes_snippet`, `aa_snippet`) — varuvariandi valib
+VAADE (`biographyChain.ts`), mitte indeks. AA-kirje ei ole KUNAGI eluloo
+varuvariant, aga on katke ahela lõpp.
+
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
 allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `urlTransform`
@@ -351,6 +362,10 @@ Värvid on Tailwindi värvinimed (vaikimisi `indigo`):
 ```tsx
 const { bg, text, border, hoverBg } = getCollectionColorClasses(collection);
 ```
+
+**Album Academicumi toorik** — `aa_raw` on KIRJE, mitte tekst: masinkopeeritud
+struktureeritud allikakirje saksakeelsete lühenditega. Seda **ei tõlgita**,
+ta ei ole eluloo varuvariant ja vormis kirjutamiseks teda ei avata.
 
 **Isikute nimevariandid** — *Lorenz Luden* vs *Laurentius Ludenius*: admin salvestab Wikidata/GND
 ID, `people_ops.py` tõmbab taustal aliased (`et, en, de, la`) → `person_aliases.json` →

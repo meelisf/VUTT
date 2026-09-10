@@ -13,6 +13,10 @@ from ._compat import sync_from_facade
 from .ext_ids import normalize_ext_id
 from .locks import person_lock
 from ..entity_labels_ops import fill_person_labels_from_registry
+from ..prosopo_biography_fields import (
+    AA_RAW, ANCHOR_FIELDS, ANCHOR_OF, ANCHOR_SOURCE, BIOGRAPHY_EN, BIOGRAPHY_ET,
+    LEGACY_BIOGRAPHY, SRC_EN, SRC_ET, text_hash,
+)
 
 
 def _normalize_identifiers(identifiers) -> list:
@@ -115,9 +119,24 @@ def _strip_markup(text: str) -> str:
     return re.sub(r"\s+", " ", out).strip()
 
 
-def _make_snippet(person: dict) -> str:
-    biography = person.get("biography") or person.get("notes") or ""
-    return _strip_markup(biography)[:120]
+SNIPPET_LENGTH = 120
+
+# Katke allikas → indeksi võtmenimi. Iga katke on tuletatud TÄPSELT ÜHEST
+# väljast; varuvariandi valib vaade (ADR 0039, spekk otsus 6).
+_SNIPPET_SOURCES = (
+    (BIOGRAPHY_ET, "biography_snippet_et"),
+    (BIOGRAPHY_EN, "biography_snippet_en"),
+    ("notes", "notes_snippet"),
+    (AA_RAW, "aa_snippet"),
+)
+
+
+def _make_snippets(person: dict) -> dict:
+    """Neli katget, igaüks ühest väljast. Puuduv allikas → tühi string."""
+    return {
+        key: _strip_markup(person.get(field) or "")[:SNIPPET_LENGTH]
+        for field, key in _SNIPPET_SOURCES
+    }
 
 
 def get_person(person_id: str) -> Optional[dict]:
@@ -187,7 +206,11 @@ def create_person(data: dict, username: str) -> dict:
         "burial": None,
         "relations": [],
         "sources": [],
-        "biography": None,
+        BIOGRAPHY_ET: None,
+        BIOGRAPHY_EN: None,
+        AA_RAW: None,
+        SRC_ET: None,
+        SRC_EN: None,
         "notes": data.get("notes"),
         "image_url": None,
         "source_data": {},
@@ -306,11 +329,46 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
                     "import_batch_ids", "merged_into") + SECRET_FIELDS:
             data.pop(key, None)
 
+        # Ankur on SERVERI TULETIS: kliendi saadetu visatakse alati ära, nagu
+        # `id` ja `created_at`. Lubadus, et uus frontend seda ei saada, ei ole
+        # kaitse (spekk, „Avaliku API üleminek").
+        for key in ANCHOR_FIELDS:
+            data.pop(key, None)
+
+        # Kinnitusruut („Vastab eestikeelsele tekstile"). Ajutine võti — kaardile
+        # ei jõua. Väärtus on sihtväljade loend: `biography_en` tähendab, et
+        # kinnitatakse `biography_en` vastavust `biography_et`-le.
+        confirm = data.pop("_confirm_translation", None) or []
+
+        # Pärandväli: vana avatud vorm saadab `biography` tagasi ja tekitaks
+        # välja uuesti ka pärast migratsiooni passi B.
+        if LEGACY_BIOGRAPHY in data:
+            saadetud = data.pop(LEGACY_BIOGRAPHY)
+            salvestatud = person.get(LEGACY_BIOGRAPHY)
+            if (saadetud or None) != (salvestatud or None):
+                # Vaikne teisendus `biography_et`-sse võiks üle kirjutada teksti,
+                # mida uus vorm vahepeal muutis — seepärast 409, mitte parandus.
+                raise ValueError("legacy_biography_changed")
+
         if "identifiers" in data:
             data["identifiers"] = _normalize_identifiers(data["identifiers"])
         person.update(data)
         person["updated_at"] = now
         person["updated_by"] = username
+
+        # Ankur on serveri tuletis: räsi arvutatakse SIIN, salvestatava seisu
+        # pealt. Klient räsi ei saada (vt ANCHOR pop ülal).
+        for field in (BIOGRAPHY_ET, BIOGRAPHY_EN):
+            anchor_field = ANCHOR_OF[field]
+            if field in confirm:
+                source_text = (person.get(ANCHOR_SOURCE[anchor_field]) or "").strip()
+                if not source_text:
+                    raise ValueError("confirm_without_source")
+                person[anchor_field] = {"hash": text_hash(source_text), "at": now}
+            elif not (person.get(field) or "").strip():
+                # Tühjaks jäänud tekstil ei ole midagi kinnitada — jäänud ankur
+                # tekitaks hoiatuse tekstile, mida ei ole.
+                person[anchor_field] = None
 
         origin = person.get("origin") or {}
         if origin.get("place"):
@@ -499,6 +557,18 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         # Koopia väldib kutsuja request-dict'i muteerimist.
         approved_fields = dict(approved)
         scheme = approved_fields.pop("_enrichment_scheme", None)
+
+        # Pärandväli ei tohi ühegi tee kaudu tagasi tekkida (ADR 0039). Siin
+        # VAIKSELT maha, mitte 409: rikastus on masina ettepanek, mitte kasutaja
+        # kirjutatud tekst — tema pärast dialoogi ei visata.
+        approved_fields.pop(LEGACY_BIOGRAPHY, None)
+
+        # Ankur on SERVERI TULETIS ka siin — ilma selleta saaks klient ise
+        # "originaaltekst ei ole muutunud" kinnituse võltsida (spekk, „Avaliku
+        # API üleminek": ankrud visatakse ALATI ära, nagu `id`/`created_at`).
+        for key in ANCHOR_FIELDS:
+            approved_fields.pop(key, None)
+
         for field_path, value in approved_fields.items():
             _deep_set(person, field_path, value)
 
@@ -650,4 +720,4 @@ def bulk_update_occupation(
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 
 
-__all__ = ['_safe_nanoid', '_id_to_path', '_strip_markup', '_make_snippet', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation']
+__all__ = ['_safe_nanoid', '_id_to_path', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation']

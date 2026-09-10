@@ -1,5 +1,11 @@
 // Prosopograafia tüübid — eraldiseisvad src/types.ts-ist
 
+export interface TranslationAnchor {
+  /** Teise keele teksti sha256 esimesed 12 hex-märki kinnituse hetkel. */
+  hash: string;
+  at: string;
+}
+
 export interface PlaceEntry {
   id: string | null;
   group?: string | null;
@@ -42,7 +48,12 @@ export interface ProsopoIndexEntry {
   record_status: 'draft' | 'reviewed' | 'verified' | 'tombstone';
   verification_level: 'draft' | 'reviewed' | 'verified';
   work_count: number;
-  biography_snippet: string;
+  // Iga katke on tuletatud TÄPSELT ÜHEST väljast — varuvariandi valib vaade
+  // (ADR 0039). Nii teab kaart, mida ta näitab, ja saab keelemärke ausalt valida.
+  biography_snippet_et: string;
+  biography_snippet_en: string;
+  notes_snippet: string;
+  aa_snippet: string;
   image_url: string | null;
   aliases: string[];
   occupations?: { id: string | null; label: string; labels?: Record<string, string> | null }[];
@@ -190,7 +201,13 @@ export interface ProsopoRecord {
   relations: { name: string; type?: string; target_id?: string | null }[];
   tags?: any[];
   sources: { text: string; note?: string | null }[];
-  biography: string | null;
+  biography_et: string | null;
+  biography_en: string | null;
+  /** Album Academicumi toorik — KIRJE, mitte tekst. Ei tõlgita. */
+  aa_raw: string | null;
+  /** Vananemisankur: „keegi kinnitas vastavust teise keele tekstile, mis nägi välja nii." */
+  biography_et_src: TranslationAnchor | null;
+  biography_en_src: TranslationAnchor | null;
   notes: string | null;
   image_url: string | null;
   source_data: Record<string, any>;

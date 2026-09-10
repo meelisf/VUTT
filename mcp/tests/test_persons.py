@@ -159,3 +159,29 @@ def test_detail_tundmatu_id_annab_selge_vea():
     with pytest.raises(VuttNotFound) as exc:
         persons.detail(client, BASE, "vutt:puudub", include_relations=False)
     assert "search_persons" in str(exc.value)
+
+
+def test_detail_kuvab_molemad_keeleväljad_ja_aa_eraldi():
+    client = FakeClient({"/prosopography/vutt:Pabc": {
+        "id": "vutt:Pabc", "name": {"label": "Lünaeus"},
+        "biography_et": "Eestikeelne elulugu.",
+        "biography_en": "English biography.",
+        "aa_raw": "154. Lünaeus, Emundus.",
+        "works": [],
+    }})
+    out = persons.detail(client, BASE, "vutt:Pabc", include_relations=False)
+    assert "Eestikeelne elulugu." in out
+    assert "English biography." in out
+    assert "154. Lünaeus" in out
+    # AA-kirje EI OLE elulugu — sildid peavad seda eristama.
+    assert "album_academicum" in out or "Album Academicum" in out
+
+
+def test_search_katke_langeb_ahelas_tagasi():
+    client = FakeClient({"/prosopography": {"total": 1, "results": [{
+        "id": "vutt:Pabc", "label": "Lünaeus",
+        "biography_snippet_et": "", "biography_snippet_en": "",
+        "notes_snippet": "", "aa_snippet": "154. Lünaeus, Emundus.",
+    }]}})
+    out = persons.search(client, BASE)
+    assert "154. Lünaeus" in out

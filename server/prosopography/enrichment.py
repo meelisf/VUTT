@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 from typing import Optional
 
 from .ext_ids import normalize_ext_id
+from ..prosopo_biography_fields import AA_RAW
 
 logger = logging.getLogger(__name__)
 
@@ -714,11 +715,11 @@ def _fetch_aa(aa_id: str) -> Optional[dict]:
     except Exception:
         pass
 
-    # Raw text → biograafia
+    # Raw text → AA-toorik. AA `raw_text` on KIRJE, mitte elulugu (ADR 0039).
     try:
         raw = entry.get("raw_text", "").strip()
         if raw:
-            result["biography"] = raw
+            result[AA_RAW] = raw
     except Exception:
         pass
 

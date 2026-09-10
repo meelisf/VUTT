@@ -18,6 +18,8 @@ _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _BASE_DIR not in sys.path:
     sys.path.insert(0, _BASE_DIR)
 
+from server.prosopo_biography_fields import AA_RAW  # noqa: E402
+
 
 def extract_name_variants(label: str) -> list:
     """
@@ -113,9 +115,10 @@ def apply_aa_to_person(person: dict, auto_filled: dict) -> dict:
         dp = auto_filled["death.place"]
         death["place"] = {"id": dp.get("id"), "label": dp["label"]}
 
-    # Biograafia — ainult kui tühi
-    if auto_filled.get("biography") and not (p.get("biography") or "").strip():
-        p["biography"] = auto_filled["biography"]
+    # AA-toorik — ainult kui tühi. Võti on `aa_raw`, mitte `biography` (ADR 0039):
+    # AA `raw_text` on KIRJE, mitte elulugu.
+    if auto_filled.get(AA_RAW) and not (p.get(AA_RAW) or "").strip():
+        p[AA_RAW] = auto_filled[AA_RAW]
 
     # Seisus (aadel) — ainult kui tühi
     if auto_filled.get("status") and not p.get("status"):

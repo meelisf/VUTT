@@ -1,9 +1,13 @@
 """Isikukaartide ajaloo/diffi abifunktsioonid."""
 from __future__ import annotations
 
+from ..prosopo_biography_fields import SRC_EN, SRC_ET
+
 _DIFF_IGNORED_FIELDS = frozenset({
     "updated_at", "updated_by", "created_at", "created_by",
     "schema_version", "import_batch_ids", "id",
+    # Ankrud on serveri tuletis ja muutuvad igal kinnitusel — ajaloos on need müra.
+    SRC_ET, SRC_EN,
 })
 
 
