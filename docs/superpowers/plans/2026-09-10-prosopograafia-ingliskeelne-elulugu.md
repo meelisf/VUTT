@@ -22,6 +22,11 @@
 - **Testide käivitamine:** venv elab PÕHIKAUSTAS, mitte tööpuus — käivita
   `/home/mf/LLM/VUTT/.venv/bin/pytest tests/ -q` tööpuu juurest. Süsteemi `python3`-l
   puuduvad sõltuvused. Plaanis on lühiduse mõttes `.venv/bin/pytest` — asenda see teega ülal.
+- **Frontendi testid on PUHTA LOOGIKA testid.** `@testing-library/react` ei ole
+  projektis olemas ja `vitest.config.ts` on `environment: 'node'` — ühtki
+  komponenditesti ei eksisteeri. Ära lisa komponenditestimise stäki. Testitav otsus
+  tõstetakse `src/prosopography/utils/`-i puhtasse funktsiooni ja testitakse seal;
+  komponent jääb õhukeseks juhtmestikuks. (Eelkontrolli otsus R1.)
 - **Väravad enne igat commiti:** `/home/mf/LLM/VUTT/.venv/bin/pytest tests/ -q`, `npm run typecheck`, `npx vitest run`, `npm run lint:ci` (lävi `--max-warnings 49`).
 - **Ülesanded 1–4 (migratsiooniskript) EI muuda backendi** ja on tootmises käivitatavad enne backend-deploy'd — see on expand–migrate–contract eeldus, mitte mugavus.
 - **Avaldamise värav:** ülesanded 5–21 lähevad tootmisse ÜHE partiina (ülesanne 22, sammud 4–5);
@@ -43,7 +48,10 @@
 | `server/text_translate.py` | **uus.** Olekuta tõlkeklient. |
 | `server/metadata_handler.py` | SEO-prerenderi väljakaardistus. |
 | `mcp/vutt_mcp/persons.py` | Mõlemad keeleväljad + AA eraldi. |
-| `src/prosopography/utils/biographyChain.ts` | **uus.** Kuvamise ja katke varuvariandi ahel — ÜKS allikas kahele tarbijale. |
+| `src/prosopography/utils/biographyChain.ts` | **uus.** Kuvamise ja katke varuvariandi ahel + märke valik — ÜKS allikas kahele tarbijale. |
+| `src/prosopography/utils/biographyBlocks.ts` | **uus.** Isikulehe kahe ploki otsus puhta funktsioonina. |
+| `src/prosopography/utils/translationFlow.ts` | **uus.** Tõlkevoo kolm kaitset puhaste funktsioonidena. |
+| `src/prosopography/utils/textHash.ts` | **uus.** Serveri `text_hash`-i kliendipoolne kaksik. |
 | `src/prosopography/pages/PersonDetailPage.tsx` | Eluloo ahel + AA-plokk. |
 | `src/prosopography/components/PersonCard.tsx` | Katke ahel + keelemärge. |
 | `src/prosopography/pages/PersonEditPage.tsx` | Keeletabid, tõlkenupp, kinnitusruut, hoiatus. |
@@ -1647,10 +1655,12 @@ def test_seo_kirjeldus_votab_eluloo_mitte_aa_kirje():
     assert _person_biography_text({AA_RAW: "154. AA"}) == ""
 ```
 
-> **NB:** `enrichment.py`-s ei ole täna eraldi funktsiooni `_aa_entry_to_result` — rida 721
-> on suure funktsiooni sees. Kui teostuse käigus selgub, et selle väljatõstmine on suurem
-> töö kui üks rida, asenda test integratsioonitestiga, mis kutsub olemasolevat AA-kaardistuse
-> funktsiooni ja kontrollib sama väidet. Väide on `raw_text` → `aa_raw`, mitte `biography`.
+> **KOHUSTUSLIK (eelkontrolli otsus R5):** `_aa_entry_to_result` **ei eksisteeri** —
+> `enrichment.py:721` on suurema funktsiooni sees. Ülaltoodud test on kirjutatud
+> väljamõeldud nime vastu; **ära loo seda funktsiooni**. Leia `enrichment.py`-st
+> tegelik AA-kaardistuse funktsioon (see, mille sees rida 721 elab), kutsu SEDA ja
+> kohanda testi vastavalt. Väide jääb muutumatuks: `raw_text` → `aa_raw`, ja võtit
+> `biography` tulemuses EI OLE. Funktsiooni väljatõstmist ei nõuta ega soovita.
 
 - [ ] **Step 2: Käivita testid ja veendu, et need kukuvad**
 
@@ -2127,9 +2137,26 @@ def test_rate_limit_kirje_on_konfiguratsioonis():
     assert RATE_LIMITS["/prosopography/translate"] == (60, 3600)
 ```
 
-> **Fikstuurid `editor_token` / `contributor_token`:** vaata `tests/conftest.py`-st, kas
-> need on olemas. Kui ei ole, kirjuta need sinna olemasolevate auth-testide mustri järgi
-> (vt `tests/test_prosopography_ops.py` või muu router-test) — ära dubleeri neid siia faili.
+> **Fikstuurid (kontrollitud `tests/conftest.py`-s — otsus R4):** `editor_token` ja
+> `contributor_token` EI OLE olemas. Olemas on `client` (rida 223) ja `login` (rida 228)
+> ning seemnekasutajad `editor`/`editorpass` (roll `editor`) ja `contrib`/`contribpass`
+> (roll `contributor`). Kirjuta testifaili algusse olemasoleva mustri järgi (vrd
+> `tests/test_admin_role_endpoints.py`):
+>
+> ```python
+> @pytest.fixture
+> def editor_token(login):
+>     return login("editor", "editorpass")
+>
+>
+> @pytest.fixture
+> def contributor_token(login):
+>     return login("contrib", "contribpass")
+> ```
+>
+> **Ära** lisa neid `conftest.py`-sse ega loo uut auth-fikstuuri — `login` on juba
+> ainuõige allikas. `client` fikstuur tuleb `conftest.py`-st automaatselt; kustuta
+> plaani testifailist oma `client` fikstuuri definitsioon ja kasuta seda.
 
 - [ ] **Step 2: Käivita testid ja veendu, et need kukuvad**
 
@@ -2185,21 +2212,26 @@ async def prosopography_translate(
     except TranslateError as e:
         sonum = str(e)
         # Valideerimisvead on kliendi oma (400), pakkuja omad on 502. Eristame
-        # sisendi järgi, mitte sõnumit parsides.
-        if (source_lang not in SUPPORTED_LANGS or target_lang not in SUPPORTED_LANGS
-                or source_lang == target_lang or not (text or "").strip()
-                or len((text or "").strip()) > __import__(
-                    "server.text_translate", fromlist=["MAX_INPUT_CHARS"]).MAX_INPUT_CHARS):
-            raise HTTPException(status_code=400, detail=sonum)
-        raise HTTPException(status_code=502, detail=sonum)
+        # SISENDI järgi, mitte veasõnumit parsides — sõnum on inimtekst ja
+        # muutub, sisendi kuju on leping.
+        sisu = (text or "").strip()
+        klient_eksis = (
+            source_lang not in SUPPORTED_LANGS
+            or target_lang not in SUPPORTED_LANGS
+            or source_lang == target_lang
+            or not sisu
+            or len(sisu) > MAX_INPUT_CHARS
+        )
+        raise HTTPException(status_code=400 if klient_eksis else 502, detail=sonum)
 
     return {"status": "ok", "text": tolge, "usage": usage}
 ```
 
-> **Puhastus:** ülaltoodud `__import__` on kohmakas. Tee selle asemel ülemine import
-> `from ..text_translate import MAX_INPUT_CHARS, SUPPORTED_LANGS, TranslateError, translate`
-> ja kasuta `MAX_INPUT_CHARS`-i otse. Kirjutatud siia lahti ainult selleks, et
-> valideerimisvea ja pakkuja vea eristus oleks nähtav — sõnumi parsimine oleks vale.
+Ülemine import (üks rida, sisaldab ka `MAX_INPUT_CHARS`-i):
+
+```python
+from ..text_translate import MAX_INPUT_CHARS, SUPPORTED_LANGS, TranslateError, translate
+```
 
 - [ ] **Step 4: Käivita testid ja veendu, et need läbivad**
 
@@ -2689,6 +2721,9 @@ Expected: FAIL — `Cannot find module '../biographyChain'`
   biography_snippet_en: string;
   notes_snippet: string;
   aa_snippet: string;
+  /** @deprecated Kaob ülesandes 20. Hoiab typecheck'i rohelisena, kuni tarbijad
+   *  on üle viidud — ära kirjuta uut koodi, mis seda loeb. */
+  biography_snippet?: string;
 ```
 
 `ProsopoRecord`-s asenda `biography: string | null;`:
@@ -2701,7 +2736,15 @@ Expected: FAIL — `Cannot find module '../biographyChain'`
   /** Vananemisankur: „keegi kinnitas vastavust teise keele tekstile, mis nägi välja nii." */
   biography_et_src: TranslationAnchor | null;
   biography_en_src: TranslationAnchor | null;
+  /** @deprecated Kaob ülesandes 20. Vt `biography_snippet` kommentaari ülal. */
+  biography?: string | null;
 ```
+
+> **Miks pärandväljad valikulisena alles jäävad (eelkontrolli otsus R2):** plaani
+> Global Constraints nõuab `npm run typecheck`-i enne IGAT commiti. Kui `biography`
+> siit kohe kaob, ei typecheck'i ükski commit ülesannete 14 ja 20 vahel. Kaks rida
+> `@deprecated` märkega hoiavad värava kehtivana; **ülesanne 20 kustutab mõlemad** ja
+> selle ülevaatus kontrollib, et need on tõesti kadunud.
 
 ja lisa tüüp faili:
 
@@ -2792,10 +2835,8 @@ export function pickSnippet(entry: ProsopoIndexEntry, lang: BioLang): SnippetPic
 - [ ] **Step 4: Käivita testid ja typecheck**
 
 Run: `npx vitest run src/prosopography/utils/__tests__/biographyChain.test.ts && npm run typecheck`
-Expected: testid PASS; `typecheck` kukub praegu **teadlikult** kohtades, kus `biography` /
-`biography_snippet` veel kasutuses on (`PersonDetailPage`, `PersonCard`, `personForm/*`,
-`PersonEditPage`) — need parandavad ülesanded 16–20. Kirjuta vigade nimekiri üles ja
-veendu, et see kattub täpselt nende failidega; ükski MUU fail ei tohi nimekirjas olla.
+Expected: mõlemad PASS. Typecheck PEAB olema puhas — pärandväljad jäid valikulisena
+alles just selleks (otsus R2). Kui typecheck kukub, on midagi valesti: ära liigu edasi.
 
 - [ ] **Step 5: Commit**
 
@@ -2923,65 +2964,116 @@ git commit -m "feat(i18n): eluloo keeletabide, tõlke ja kinnituse võtmed mõle
 Praegune `person.biography &&` (rida 691) **peidaks ära kirje, millel on ainult
 ingliskeelne tekst**. Ploki nähtavust kontrollitakse VALITUD TEKSTI järgi.
 
+> **Testimise kuju (eelkontrolli otsus R1):** projektis EI OLE
+> `@testing-library/react`-i ja `vitest.config.ts` on `environment: 'node'` — ühtki
+> komponenditesti ei eksisteeri, kõik frontend-testid on puhaste utiliitide omad.
+> Seda ei muudeta eluloo-featuuri kõrvalmõjuna. Seetõttu: ploki OTSUS elab puhtas
+> funktsioonis ja testitakse seal; komponent on õhuke juhtmestik, mida katab
+> typecheck ja ülesande 22 tootmiskontroll.
+
 **Files:**
+- Create: `src/prosopography/utils/biographyBlocks.ts`
+- Create: `src/prosopography/components/BiographyBlocks.tsx`
 - Modify: `src/prosopography/pages/PersonDetailPage.tsx:690-696`
-- Test: `src/prosopography/pages/__tests__/personBiographyBlocks.test.tsx`
+- Test: `src/prosopography/utils/__tests__/biographyBlocks.test.ts`
 
 **Interfaces:**
-- Consumes: Task 14 — `pickBiography`; Task 15 — i18n võtmed
-- Produces: —
+- Consumes: Task 14 — `pickBiography`, `BiographyPick`, `BioLang`; Task 15 — i18n võtmed
+- Produces:
+  - `export interface BiographyBlocksModel { biography: BiographyPick | null; aaRecord: string | null }`
+  - `export function biographyBlocksModel(person: Pick<ProsopoRecord, 'biography_et' | 'biography_en' | 'aa_raw'>, lang: BioLang): BiographyBlocksModel`
 
 - [ ] **Step 1: Kirjuta kukkuv test**
 
-```tsx
+```ts
 /**
  * Eluloo plokk + AA-plokk (spekk, otsus 4).
  *
  * AA-plokk on eluloo ahelast VÄLJAS ja renderdub ALATI, kui `aa_raw` on
  * täidetud — ka siis, kui elulugu on olemas.
  */
-import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import BiographyBlocks from '../../components/BiographyBlocks';
+import { biographyBlocksModel } from '../biographyBlocks';
 
 const person = (o: Record<string, unknown>) =>
   ({ biography_et: null, biography_en: null, aa_raw: null, ...o }) as any;
 
-describe('BiographyBlocks', () => {
-  it('näitab oma keele teksti ilma märketa', () => {
-    render(<BiographyBlocks person={person({ biography_et: 'Eesti lugu.' })} lang="et" />);
-    expect(screen.getByText('Eesti lugu.')).toBeInTheDocument();
-    expect(screen.queryByTestId('bio-fallback-note')).toBeNull();
+describe('biographyBlocksModel', () => {
+  it('oma keele tekst, ilma märketa, AA-plokki ei ole', () => {
+    const model = biographyBlocksModel(person({ biography_et: 'Eesti lugu.' }), 'et');
+    expect(model.biography).toEqual({ text: 'Eesti lugu.', lang: 'et', isFallback: false });
+    expect(model.aaRecord).toBeNull();
   });
 
-  it('näitab ainult ingliskeelset teksti eestikeelsele lugejale KOOS märkega', () => {
-    render(<BiographyBlocks person={person({ biography_en: 'English life.' })} lang="et" />);
-    expect(screen.getByText('English life.')).toBeInTheDocument();
-    expect(screen.getByTestId('bio-fallback-note')).toBeInTheDocument();
+  it('ainult ingliskeelne tekst eestikeelsele lugejale → märge', () => {
+    const model = biographyBlocksModel(person({ biography_en: 'English life.' }), 'et');
+    expect(model.biography).toEqual({ text: 'English life.', lang: 'en', isFallback: true });
   });
 
-  it('AA-plokk on nähtav KOOS elulooga', () => {
-    render(<BiographyBlocks
-      person={person({ biography_et: 'Eesti lugu.', aa_raw: '154. Lünaeus.' })} lang="et" />);
-    expect(screen.getByText('Eesti lugu.')).toBeInTheDocument();
-    expect(screen.getByTestId('aa-record-block')).toBeInTheDocument();
+  it('AA-plokk on olemas KOOS elulooga', () => {
+    const model = biographyBlocksModel(
+      person({ biography_et: 'Eesti lugu.', aa_raw: '154. Lünaeus.' }), 'et');
+    expect(model.biography?.text).toBe('Eesti lugu.');
+    expect(model.aaRecord).toBe('154. Lünaeus.');
   });
 
-  it('ilma sisuta ei renderda kumbagi plokki', () => {
-    const { container } = render(<BiographyBlocks person={person({})} lang="et" />);
-    expect(container).toBeEmptyDOMElement();
+  it('AA-kirje EI OLE eluloo varuvariant', () => {
+    const model = biographyBlocksModel(person({ aa_raw: '154. Lünaeus.' }), 'et');
+    expect(model.biography).toBeNull();
+    expect(model.aaRecord).toBe('154. Lünaeus.');
+  });
+
+  it('ilma sisuta on mõlemad null', () => {
+    const model = biographyBlocksModel(person({}), 'et');
+    expect(model).toEqual({ biography: null, aaRecord: null });
+  });
+
+  it('tühikutest koosnev AA-väli loeb tühjaks', () => {
+    expect(biographyBlocksModel(person({ aa_raw: '   \n ' }), 'et').aaRecord).toBeNull();
   });
 });
 ```
 
 - [ ] **Step 2: Käivita test ja veendu, et see kukub**
 
-Run: `npx vitest run src/prosopography/pages/__tests__/personBiographyBlocks.test.tsx`
-Expected: FAIL — `Cannot find module '../../components/BiographyBlocks'`
+Run: `npx vitest run src/prosopography/utils/__tests__/biographyBlocks.test.ts`
+Expected: FAIL — `Cannot find module '../biographyBlocks'`
 
-- [ ] **Step 3: Loo komponent ja ühenda lehega**
+- [ ] **Step 3: Kirjuta puhas mudel**
 
-Loo `src/prosopography/components/BiographyBlocks.tsx`:
+`src/prosopography/utils/biographyBlocks.ts`:
+
+```ts
+import type { ProsopoRecord } from '../types';
+import { pickBiography, type BioLang, type BiographyPick } from './biographyChain';
+
+export interface BiographyBlocksModel {
+  /** Eluloo ahela tulemus (ADR 0039, otsus 4) või null. */
+  biography: BiographyPick | null;
+  /** AA-toorik. EI OLE eluloo varuvariant — omaette plokk, alati kui täidetud. */
+  aaRecord: string | null;
+}
+
+/** Isikulehe kahe eluloo-ploki OTSUS ühes puhtas funktsioonis. */
+export function biographyBlocksModel(
+  person: Pick<ProsopoRecord, 'biography_et' | 'biography_en' | 'aa_raw'>,
+  lang: BioLang,
+): BiographyBlocksModel {
+  return {
+    biography: pickBiography(person, lang),
+    aaRecord: (person.aa_raw ?? '').trim() || null,
+  };
+}
+```
+
+- [ ] **Step 4: Käivita test ja veendu, et see läbib**
+
+Run: `npx vitest run src/prosopography/utils/__tests__/biographyBlocks.test.ts`
+Expected: PASS (6 testi)
+
+- [ ] **Step 5: Kirjuta komponent ja ühenda lehega**
+
+`src/prosopography/components/BiographyBlocks.tsx` — õhuke juhtmestik mudeli ümber:
 
 ```tsx
 import { BookMarked, ScrollText } from 'lucide-react';
@@ -2989,7 +3081,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import MarkdownView from '../../components/MarkdownView';
 import type { ProsopoRecord } from '../types';
-import { pickBiography, type BioLang } from '../utils/biographyChain';
+import { biographyBlocksModel } from '../utils/biographyBlocks';
+import type { BioLang } from '../utils/biographyChain';
 
 interface Props {
   person: Pick<ProsopoRecord, 'biography_et' | 'biography_en' | 'aa_raw'>;
@@ -3001,44 +3094,42 @@ const CARD = 'bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6';
 /**
  * Eluloo plokk + Album Academicumi plokk.
  *
- * Kaks eri asja: elulugu käib keeleahelat mööda, AA-kirje renderdub ALATI, kui
- * ta on täidetud. AA-kirje pealkiri on tõlgitud, sisu ei ole — see on
- * struktureeritud allikakirje, mitte tekst (ADR 0039).
+ * Otsuse teeb `biographyBlocksModel` (testitud); siin on ainult renderdus.
+ * AA-kirje pealkiri on tõlgitud, sisu ei ole — see on struktureeritud
+ * allikakirje, mitte tekst (ADR 0039).
  */
 const BiographyBlocks: React.FC<Props> = ({ person, lang }) => {
   const { t } = useTranslation(['prosopography']);
-  const pick = pickBiography(person, lang);
-  const aa = (person.aa_raw ?? '').trim();
+  const { biography, aaRecord } = biographyBlocksModel(person, lang);
 
-  if (!pick && !aa) return null;
+  if (!biography && !aaRecord) return null;
 
   return (
     <>
-      {pick && (
+      {biography && (
         <div className={CARD}>
           <div className="flex items-center gap-2 mb-3">
             <BookMarked size={18} className="text-gray-400" />
             <h2 className="text-sm font-medium text-gray-700">{t('biography')}</h2>
           </div>
-          {pick.isFallback && (
-            <p data-testid="bio-fallback-note"
-               className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-3">
-              {pick.lang === 'et' ? t('biographyOnlyEstonian') : t('biographyOnlyEnglish')}
+          {biography.isFallback && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-3">
+              {biography.lang === 'et' ? t('biographyOnlyEstonian') : t('biographyOnlyEnglish')}
             </p>
           )}
-          <MarkdownView content={pick.text} className="text-sm text-gray-800 leading-relaxed" />
+          <MarkdownView content={biography.text} className="text-sm text-gray-800 leading-relaxed" />
         </div>
       )}
 
-      {aa && (
-        <div className={CARD} data-testid="aa-record-block">
+      {aaRecord && (
+        <div className={CARD}>
           <div className="flex items-center gap-2 mb-3">
             <ScrollText size={18} className="text-gray-400" />
             <h2 className="text-sm font-medium text-gray-700">{t('aaRecord')}</h2>
           </div>
           {/* AA-kirje on kirje, mitte Markdown — reavahetused on sisulised. */}
           <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
-            {aa}
+            {aaRecord}
           </pre>
         </div>
       )}
@@ -3056,23 +3147,24 @@ export default BiographyBlocks;
         <BiographyBlocks person={person} lang={lang === 'en' ? 'en' : 'et'} />
 ```
 
-Lisa import ja eemalda kasutuks jäänud `BookMarked` import, kui seda mujal ei kasutata.
+Lisa import ja eemalda kasutuks jäänud `BookMarked` import, kui seda lehel mujal ei kasutata.
 
 > `lang` on lehel juba olemas (`PersonDetailPage` annab selle ka `EntityPicker`-ile ja
 > `usePersonTagSuggestions`-ile). Kui selle tüüp ei ole täpselt `'et' | 'en'`, kitsenda
 > kutsel nagu ülal — ära muuda lehe `lang` muutuja tüüpi, see mõjutaks teisi tarbijaid.
 
-- [ ] **Step 4: Käivita test ja typecheck**
+- [ ] **Step 6: Typecheck ja kogu frontend-testipakett**
 
-Run: `npx vitest run src/prosopography/pages/__tests__/personBiographyBlocks.test.tsx`
-Expected: PASS (4 testi)
+Run: `npm run typecheck && npx vitest run`
+Expected: mõlemad PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/prosopography/components/BiographyBlocks.tsx \
-        src/prosopography/pages/PersonDetailPage.tsx \
-        src/prosopography/pages/__tests__/personBiographyBlocks.test.tsx
+git add src/prosopography/utils/biographyBlocks.ts \
+        src/prosopography/utils/__tests__/biographyBlocks.test.ts \
+        src/prosopography/components/BiographyBlocks.tsx \
+        src/prosopography/pages/PersonDetailPage.tsx
 git commit -m "feat(prosopo): eluloo ahel ja AA-kirje eraldi plokina isikulehel"
 ```
 
@@ -3080,67 +3172,72 @@ git commit -m "feat(prosopo): eluloo ahel ja AA-kirje eraldi plokina isikulehel"
 
 ### Task 17: `PersonCard` — katke ahel ja keelemärge
 
+> **Testimise kuju (eelkontrolli otsus R1):** projektis ei ole komponenditestimise
+> stäki (`@testing-library/react` puudub, `vitest.config.ts` on `environment: 'node'`).
+> Märke VALIK on puhas funktsioon ja testitakse `biographyChain.test.ts`-is; komponent
+> on õhuke juhtmestik.
+
 **Files:**
+- Modify: `src/prosopography/utils/biographyChain.ts` (lisa `snippetBadgeKey`)
+- Modify: `src/prosopography/utils/__tests__/biographyChain.test.ts` (lisa testid)
+- Create: `src/prosopography/components/PersonSnippet.tsx`
 - Modify: `src/prosopography/components/PersonCard.tsx:209-214`
-- Test: `src/prosopography/components/__tests__/personCardSnippet.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 14 — `pickSnippet`; Task 15 — `snippetInEstonian`, `snippetInEnglish`, `snippetNotes`, `snippetAaRecord`
-- Produces: —
+- Consumes: Task 14 — `pickSnippet`, `SnippetPick`, `SnippetSource`, `BioLang`;
+  Task 15 — `snippetInEstonian`, `snippetInEnglish`, `snippetNotes`, `snippetAaRecord`
+- Produces: `export function snippetBadgeKey(pick: SnippetPick): string | null`
+  — i18n võti, või `null`, kui katke on lugeja enda keelest (märget ei ole)
 
-- [ ] **Step 1: Kirjuta kukkuv test**
+- [ ] **Step 1: Kirjuta kukkuvad testid**
 
-```tsx
-/** Kaart peab TEADMA, mida ta näitab — ja seda ausalt märkima (spekk, otsus 6). */
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import PersonSnippet from '../PersonSnippet';
+Lisa `src/prosopography/utils/__tests__/biographyChain.test.ts` lõppu:
 
-const entry = (o: Record<string, string>) =>
-  ({ biography_snippet_et: '', biography_snippet_en: '',
-     notes_snippet: '', aa_snippet: '', ...o }) as any;
+```ts
+import { snippetBadgeKey } from '../biographyChain';
 
-describe('PersonSnippet', () => {
-  it('oma keele katkel ei ole märget', () => {
-    render(<PersonSnippet entry={entry({ biography_snippet_et: 'Eesti katke' })} lang="et" />);
-    expect(screen.getByText(/Eesti katke/)).toBeInTheDocument();
-    expect(screen.queryByTestId('snippet-source-badge')).toBeNull();
+describe('snippetBadgeKey', () => {
+  it('oma keele katkel märget ei ole', () => {
+    const pick = pickSnippet(entry({ biography_snippet_et: 'Eesti' }), 'et')!;
+    expect(snippetBadgeKey(pick)).toBeNull();
   });
 
   it('teise keele katkel on keelemärge', () => {
-    render(<PersonSnippet entry={entry({ biography_snippet_en: 'English' })} lang="et" />);
-    expect(screen.getByTestId('snippet-source-badge')).toBeInTheDocument();
+    const pick = pickSnippet(entry({ biography_snippet_en: 'English' }), 'et')!;
+    expect(snippetBadgeKey(pick)).toBe('snippetInEnglish');
   });
 
-  it('AA-katkel on AA-märge, mitte keelemärge', () => {
-    render(<PersonSnippet entry={entry({ aa_snippet: '154. Lünaeus' })} lang="et" />);
-    expect(screen.getByTestId('snippet-source-badge')).toHaveTextContent(/AA/i);
+  it('märkmete ja AA katkel on oma märge, mitte keelemärge', () => {
+    const notes = pickSnippet(entry({ notes_snippet: 'Märkmed' }), 'et')!;
+    expect(snippetBadgeKey(notes)).toBe('snippetNotes');
+    const aa = pickSnippet(entry({ aa_snippet: '154. AA' }), 'et')!;
+    expect(snippetBadgeKey(aa)).toBe('snippetAaRecord');
   });
 
-  it('ilma katketa ei renderda midagi', () => {
-    const { container } = render(<PersonSnippet entry={entry({})} lang="et" />);
-    expect(container).toBeEmptyDOMElement();
+  it('kaardistus katab KÕIK allikad — uus allikas ei tohi vaikselt märketa jääda', () => {
+    const allikad: SnippetSource[] = ['biography_et', 'biography_en', 'notes', 'aa_raw'];
+    for (const source of allikad) {
+      expect(snippetBadgeKey({ text: 'x', source, lang: null, isFallback: true }))
+        .toEqual(expect.any(String));
+    }
   });
 });
 ```
 
-- [ ] **Step 2: Käivita test ja veendu, et see kukub**
+Lisa faili olemasolevasse importi `SnippetSource` (`import { pickBiography, pickSnippet, snippetBadgeKey, type SnippetSource } from '../biographyChain';`).
 
-Run: `npx vitest run src/prosopography/components/__tests__/personCardSnippet.test.tsx`
-Expected: FAIL — `Cannot find module '../PersonSnippet'`
+- [ ] **Step 2: Käivita testid ja veendu, et need kukuvad**
 
-- [ ] **Step 3: Loo komponent ja ühenda kaardiga**
+Run: `npx vitest run src/prosopography/utils/__tests__/biographyChain.test.ts`
+Expected: FAIL — `snippetBadgeKey is not a function` / eksporti ei ole
 
-`src/prosopography/components/PersonSnippet.tsx`:
+- [ ] **Step 3: Lisa `snippetBadgeKey` ahelamoodulisse**
 
-```tsx
-import React from 'react';
-import { useTranslation } from 'react-i18next';
-import type { ProsopoIndexEntry } from '../types';
-import { pickSnippet, type BioLang, type SnippetSource } from '../utils/biographyChain';
+`src/prosopography/utils/biographyChain.ts` lõppu:
 
-interface Props { entry: ProsopoIndexEntry; lang: BioLang }
-
+```ts
+// Katke allikas → i18n võti. Kaardistus on TOTAALNE (`Record<SnippetSource, string>`):
+// uus allikas ei kompileeru enne, kui talle on märge antud.
 const BADGE_KEY: Record<SnippetSource, string> = {
   biography_et: 'snippetInEstonian',
   biography_en: 'snippetInEnglish',
@@ -3148,18 +3245,46 @@ const BADGE_KEY: Record<SnippetSource, string> = {
   aa_raw: 'snippetAaRecord',
 };
 
+/**
+ * Märke i18n võti, või `null`, kui katke on lugeja enda keelest.
+ *
+ * Märge on AUSUSE küsimus: ilma selleta näeks lugeja võõrkeelset teksti või
+ * AA-kirjet nii, nagu oleks see tema keeles kirjutatud elulugu (ADR 0039).
+ */
+export function snippetBadgeKey(pick: SnippetPick): string | null {
+  return pick.isFallback ? BADGE_KEY[pick.source] : null;
+}
+```
+
+- [ ] **Step 4: Käivita testid ja veendu, et need läbivad**
+
+Run: `npx vitest run src/prosopography/utils/__tests__/biographyChain.test.ts`
+Expected: PASS
+
+- [ ] **Step 5: Loo komponent ja ühenda kaardiga**
+
+`src/prosopography/components/PersonSnippet.tsx`:
+
+```tsx
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import type { ProsopoIndexEntry } from '../types';
+import { pickSnippet, snippetBadgeKey, type BioLang } from '../utils/biographyChain';
+
+interface Props { entry: ProsopoIndexEntry; lang: BioLang }
+
 /** Nimekirja katke + aus märge selle kohta, MIS allikas see on. */
 const PersonSnippet: React.FC<Props> = ({ entry, lang }) => {
   const { t } = useTranslation(['prosopography']);
   const pick = pickSnippet(entry, lang);
   if (!pick) return null;
+  const badge = snippetBadgeKey(pick);
 
   return (
     <p className="text-xs text-gray-500 italic leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-2 mt-2">
-      {pick.isFallback && (
-        <span data-testid="snippet-source-badge"
-              className="not-italic text-[10px] uppercase tracking-wide text-gray-400 mr-1">
-          {t(BADGE_KEY[pick.source])}
+      {badge && (
+        <span className="not-italic text-[10px] uppercase tracking-wide text-gray-400 mr-1">
+          {t(badge)}
         </span>
       )}
       „{pick.text}…"
@@ -3177,17 +3302,18 @@ export default PersonSnippet;
         <PersonSnippet entry={person} lang={i18n.language?.startsWith('en') ? 'en' : 'et'} />
 ```
 
-- [ ] **Step 4: Käivita test**
+- [ ] **Step 6: Typecheck ja kogu frontend-testipakett**
 
-Run: `npx vitest run src/prosopography/components/__tests__/personCardSnippet.test.tsx`
-Expected: PASS (4 testi)
+Run: `npm run typecheck && npx vitest run`
+Expected: mõlemad PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/prosopography/components/PersonSnippet.tsx \
-        src/prosopography/components/PersonCard.tsx \
-        src/prosopography/components/__tests__/personCardSnippet.test.tsx
+git add src/prosopography/utils/biographyChain.ts \
+        src/prosopography/utils/__tests__/biographyChain.test.ts \
+        src/prosopography/components/PersonSnippet.tsx \
+        src/prosopography/components/PersonCard.tsx
 git commit -m "feat(prosopo): nimekirja katke valib ahela ja märgib allika"
 ```
 
@@ -3533,127 +3659,73 @@ Viimane frontendi tükk. Kolm kaitset, mida EI TOHI ära jätta:
 2. **hiline vastus** → mõlema välja hetktõmmis päringu alguses; muutus → ei rakenda automaatselt;
 3. **lähteteksti muutmine** → kustutab kinnitusruudu märke (sihtteksti toimetamine EI kustuta).
 
+> **Testimise kuju (eelkontrolli otsus R1):** komponenditestimise stäki projektis ei ole.
+> Kõik kolm kaitset on OTSUSED, mitte renderdus — need lähevad puhtasse moodulisse
+> `translationFlow.ts` ja testitakse seal. Komponent on juhtmestik. See on ühtlasi
+> parem disain: kaitsed on loetavad ühest failist, mitte laiali `useState`-ide vahel.
+
 **Files:**
+- Create: `src/prosopography/utils/textHash.ts`
+- Create: `src/prosopography/utils/translationFlow.ts`
 - Create: `src/prosopography/components/personForm/BiographySection.tsx`
+- Modify: `src/prosopography/types.ts` (kustuta R2 pärandväljad)
 - Modify: `src/prosopography/pages/PersonEditPage.tsx:617-629`
-- Test: `src/prosopography/components/personForm/__tests__/biographySection.test.tsx`
+- Test: `src/prosopography/utils/__tests__/textHash.test.ts`
+- Test: `src/prosopography/utils/__tests__/translationFlow.test.ts`
 
 **Interfaces:**
-- Consumes: Task 14 (`BioLang`), 15 (i18n), 18 (`FormDraft`), 19 (`translateText`, `fetchSourceDiff`)
-- Produces: `BiographySection` propsid:
-  ```ts
-  interface Props {
-    draft: FormDraft;
-    set: (patch: Partial<FormDraft>) => void;
-    personId: string | null;
-    anchors: { et: TranslationAnchor | null; en: TranslationAnchor | null };
-    token: string;
-    canEdit: boolean;
-  }
-  ```
+- Consumes: Task 14 (`BioLang`, `TranslationAnchor`), 15 (i18n), 18 (`FormDraft`), 19 (`translateText`, `fetchSourceDiff`, `TranslateFailed`)
+- Produces (`textHash.ts`): `export async function textHash(text: string | null | undefined): Promise<string>`
+- Produces (`translationFlow.ts`):
+  - `export type BioField = 'biography_et' | 'biography_en';`
+  - `export const OTHER_FIELD: Record<BioField, BioField>`
+  - `export const CONFIRM_KEY: Record<BioField, 'confirm_et' | 'confirm_en'>`
+  - `export interface BioSnapshot { biography_et: string; biography_en: string }`
+  - `export function needsOverwriteConfirm(targetText: string): boolean`
+  - `export function isStaleResult(snapshot: BioSnapshot, current: BioSnapshot): boolean`
+  - `export function confirmClearPatch(editedField: BioField, confirms: { confirm_et: boolean; confirm_en: boolean }): Partial<FormDraft>`
+  - `export function isAnchorStale(anchor: TranslationAnchor | null | undefined, currentSourceHash: string): boolean`
+  - `export function translateErrorKey(kind: 'blocked' | 'rate_limited' | 'other'): string`
 
-- [ ] **Step 1: Kirjuta kukkuvad testid**
+- [ ] **Step 1: Kirjuta `textHash` test**
 
-```tsx
-/** Kolm kaitset: ülekirjutuse kinnitus, hiline vastus, kinnitusruudu kustumine. */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import BiographySection from '../BiographySection';
-import { emptyDraft } from '../types';
-import * as service from '../../../services/prosopographyService';
+`src/prosopography/utils/__tests__/textHash.test.ts`:
 
-const setup = (overrides: Partial<ReturnType<typeof emptyDraft>> = {}) => {
-  let draft = { ...emptyDraft(), ...overrides };
-  const set = vi.fn((patch: any) => { draft = { ...draft, ...patch }; });
-  const view = render(
-    <BiographySection draft={draft} set={set} personId="vutt:Pabc"
-                      anchors={{ et: null, en: null }} token="TOKEN" canEdit />);
-  return { set, view, get: () => draft };
-};
+```ts
+/**
+ * Sama räsi mis serveril (`server/prosopo_biography_fields.py::text_hash`).
+ * Kaks teostust, üks reegel — see test ON nendevaheline leping.
+ */
+import { describe, expect, it } from 'vitest';
+import { textHash } from '../textHash';
 
-afterEach(() => vi.restoreAllMocks());
-
-describe('BiographySection', () => {
-  it('tõlge kirjutatakse sihtvälja ja märgib kinnitusruudu', async () => {
-    vi.spyOn(service, 'translateText').mockResolvedValue('English biography.');
-    const { set } = setup({ biography_et: 'Eesti lugu.' });
-    fireEvent.click(screen.getByTestId('translate-to-en'));
-    await waitFor(() => expect(set).toHaveBeenCalledWith(
-      expect.objectContaining({ biography_en: 'English biography.', confirm_en: true })));
+describe('textHash', () => {
+  it('lubjab ümbritseva tühiku ja annab 12 märki', async () => {
+    expect(await textHash('  tekst \n')).toBe(await textHash('tekst'));
+    expect(await textHash('tekst')).toHaveLength(12);
   });
 
-  it('täidetud sihtväli küsib kinnitust ENNE päringut', async () => {
-    const spy = vi.spyOn(service, 'translateText').mockResolvedValue('X');
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
-    setup({ biography_et: 'Eesti lugu.', biography_en: 'Olemas.' });
-    fireEvent.click(screen.getByTestId('translate-to-en'));
-    await waitFor(() => expect(window.confirm).toHaveBeenCalled());
-    expect(spy).not.toHaveBeenCalled();
+  it('vastab serveri väärtusele', async () => {
+    // Genereeritud serveri funktsiooniga, mitte välja mõeldud: sha256("tekst")[:12].
+    expect(await textHash('tekst')).toBe('324d0315d575');
   });
 
-  it('vahepeal muutunud väli → tõlget EI rakendata automaatselt', async () => {
-    let resolve!: (v: string) => void;
-    vi.spyOn(service, 'translateText').mockReturnValue(
-      new Promise<string>(r => { resolve = r; }));
-    const { set } = setup({ biography_et: 'Eesti lugu.' });
-    fireEvent.click(screen.getByTestId('translate-to-en'));
-    // Toimetaja muudab lähteteksti tõlke ajal.
-    fireEvent.change(screen.getByTestId('bio-input-et'), { target: { value: 'Muudetud.' } });
-    resolve('English biography.');
-    await waitFor(() => expect(screen.getByTestId('stale-translation')).toBeInTheDocument());
-    expect(set).not.toHaveBeenCalledWith(
-      expect.objectContaining({ biography_en: 'English biography.' }));
+  it('tühi, null ja undefined annavad sama räsi', async () => {
+    const tyhi = await textHash('');
+    expect(await textHash(null)).toBe(tyhi);
+    expect(await textHash(undefined)).toBe(tyhi);
   });
 
-  it('lähteteksti muutmine kustutab kinnitusruudu märke', () => {
-    const { set } = setup({ biography_et: 'Eesti lugu.', confirm_en: true });
-    fireEvent.change(screen.getByTestId('bio-input-et'), { target: { value: 'Uus tekst.' } });
-    expect(set).toHaveBeenCalledWith(expect.objectContaining({ confirm_en: false }));
-  });
-
-  it('sihtteksti toimetamine EI kustuta kinnitust', () => {
-    const { set } = setup({ biography_en: 'English.', confirm_en: true });
-    fireEvent.change(screen.getByTestId('bio-input-en'), { target: { value: 'English v2.' } });
-    expect(set).not.toHaveBeenCalledWith(expect.objectContaining({ confirm_en: false }));
-  });
-
-  it('vananenud ankur näitab hoiatust ja diffi nuppu', () => {
-    render(<BiographySection
-      draft={{ ...emptyDraft(), biography_et: 'Uus ET', biography_en: 'EN' }}
-      set={vi.fn()} personId="vutt:Pabc"
-      anchors={{ et: null, en: { hash: 'vananenud12', at: '2026-09-01T00:00:00+00:00' } }}
-      token="TOKEN" canEdit />);
-    expect(screen.getByTestId('source-changed-warning')).toBeInTheDocument();
-    expect(screen.getByTestId('view-source-diff')).toBeInTheDocument();
+  it('erinev tekst annab erineva räsi', async () => {
+    expect(await textHash('tekst')).not.toBe(await textHash('teksti'));
   });
 });
 ```
 
-- [ ] **Step 2: Käivita testid ja veendu, et need kukuvad**
+- [ ] **Step 2: Käivita ja veendu, et kukub; siis kirjuta `textHash.ts`**
 
-Run: `npx vitest run src/prosopography/components/personForm/__tests__/biographySection.test.tsx`
-Expected: FAIL — `Cannot find module '../BiographySection'`
-
-- [ ] **Step 3: Kirjuta komponent**
-
-Nõuded, mida teostus peab täitma (kirjuta komponent nende järgi — `MarkdownEditor` saab
-`data-testid` kas ümbritseva `div`-i või oma prop'i kaudu, vaata komponendi API-t):
-
-```tsx
-// src/prosopography/components/personForm/BiographySection.tsx
-//
-// Keeletabid ET | EN. Kumbki tab: MarkdownEditor + „Tõlgi [teisest keelest]"
-// + kinnitusruut + vananemishoiatus. AA-kirje EI ole siin — ta on eraldi
-// lugemisplokk (ADR 0039).
-//
-// Räsi arvutab SERVER. Klient võrdleb hoiatuse jaoks ainult seda, kas ankur
-// on olemas ja kas tema `hash` erineb praeguse lähteteksti räsist — selleks
-// on vaja SAMA räsifunktsiooni mis serveril.
-```
-
-Vajalikud tükid:
-
-1. **Räsi kliendipoolel** — loo `src/prosopography/utils/textHash.ts`:
+Run: `npx vitest run src/prosopography/utils/__tests__/textHash.test.ts`
+Expected: FAIL — `Cannot find module '../textHash'`
 
 ```ts
 /**
@@ -3673,66 +3745,245 @@ export async function textHash(text: string | null | undefined): Promise<string>
 }
 ```
 
-   Test `src/prosopography/utils/__tests__/textHash.test.ts`:
+Run uuesti: PASS (4 testi).
+
+> Kui `crypto.subtle` ei ole vitesti `node` keskkonnas defineeritud, kasuta
+> `globalThis.crypto` — Node 18+ pakub `crypto`-t globaalselt. Ära lisa polyfill'i
+> sõltuvust.
+
+- [ ] **Step 3: Kirjuta `translationFlow` testid**
+
+`src/prosopography/utils/__tests__/translationFlow.test.ts`:
 
 ```ts
+/**
+ * Tõlkevoo kolm kaitset (spekk, otsused 5 ja 8). Need on OTSUSED, mitte
+ * renderdus — seepärast on nad siin puhaste funktsioonidena testitavad.
+ */
 import { describe, expect, it } from 'vitest';
-import { textHash } from '../textHash';
+import {
+  CONFIRM_KEY, OTHER_FIELD, confirmClearPatch, isAnchorStale, isStaleResult,
+  needsOverwriteConfirm, translateErrorKey,
+} from '../translationFlow';
 
-describe('textHash', () => {
-  it('lubjab ümbritseva tühiku ja annab 12 märki', async () => {
-    expect(await textHash('  tekst \n')).toBe(await textHash('tekst'));
-    expect(await textHash('tekst')).toHaveLength(12);
+describe('needsOverwriteConfirm', () => {
+  it('tühi sihtväli ei vaja kinnitust', () => {
+    expect(needsOverwriteConfirm('')).toBe(false);
+    expect(needsOverwriteConfirm('   \n ')).toBe(false);
   });
-  it('vastab serveri väärtusele', async () => {
-    // Kontrollväärtus on GENEREERITUD serveri funktsiooniga, mitte välja
-    // mõeldud: sha256("tekst")[:12]. See test on kahe teostuse vaheline leping.
-    expect(await textHash('tekst')).toBe('324d0315d575');
+  it('täidetud sihtväli vajab kinnitust', () => {
+    expect(needsOverwriteConfirm('Olemasolev tõlge.')).toBe(true);
+  });
+});
+
+describe('isStaleResult', () => {
+  const snap = { biography_et: 'Eesti', biography_en: '' };
+  it('muutumatu olek ei ole aegunud', () => {
+    expect(isStaleResult(snap, { ...snap })).toBe(false);
+  });
+  it('LÄHTEteksti muutus tõlke ajal → aegunud', () => {
+    expect(isStaleResult(snap, { biography_et: 'Muudetud', biography_en: '' })).toBe(true);
+  });
+  it('SIHTteksti muutus tõlke ajal → samuti aegunud', () => {
+    // Mõlema välja hetktõmmis, mitte ainult lähte oma: toimetaja võis
+    // vahepeal sihtvälja ise kirjutama hakata.
+    expect(isStaleResult(snap, { biography_et: 'Eesti', biography_en: 'Käsitsi' })).toBe(true);
+  });
+});
+
+describe('confirmClearPatch', () => {
+  it('LÄHTEteksti muutmine kustutab teise keele kinnituse', () => {
+    expect(confirmClearPatch('biography_et', { confirm_et: false, confirm_en: true }))
+      .toEqual({ confirm_en: false });
+  });
+  it('SIHTteksti toimetamine EI kustuta kinnitust', () => {
+    // Toimetaja parandab tõlget — see on kinnituse SISU, mitte selle rikkumine.
+    expect(confirmClearPatch('biography_en', { confirm_et: false, confirm_en: true }))
+      .toEqual({});
+  });
+  it('juba märkimata ruut ei tekita tühja patchi', () => {
+    expect(confirmClearPatch('biography_et', { confirm_et: false, confirm_en: false }))
+      .toEqual({});
+  });
+});
+
+describe('isAnchorStale', () => {
+  it('ankruta väli EI ole vananenud', () => {
+    // `null` tähendab „seost ei ole salvestatud", MITTE „vananenud" (ADR 0039).
+    expect(isAnchorStale(null, 'abc123abc123')).toBe(false);
+    expect(isAnchorStale(undefined, 'abc123abc123')).toBe(false);
+  });
+  it('sama räsi → ei ole vananenud', () => {
+    expect(isAnchorStale({ hash: 'abc123abc123', at: 'x' }, 'abc123abc123')).toBe(false);
+  });
+  it('erinev räsi → vananenud', () => {
+    expect(isAnchorStale({ hash: 'abc123abc123', at: 'x' }, 'zzz999zzz999')).toBe(true);
+  });
+});
+
+describe('kaardistused ja veavõtmed', () => {
+  it('OTHER_FIELD ja CONFIRM_KEY on ristis õigetpidi', () => {
+    expect(OTHER_FIELD.biography_en).toBe('biography_et');
+    expect(OTHER_FIELD.biography_et).toBe('biography_en');
+    expect(CONFIRM_KEY.biography_en).toBe('confirm_en');
+  });
+  it('iga veatüüp annab oma i18n võtme', () => {
+    const kõik = (['blocked', 'rate_limited', 'other'] as const).map(translateErrorKey);
+    expect(new Set(kõik).size).toBe(3);
+    expect(kõik.every(k => k.startsWith('form.'))).toBe(true);
   });
 });
 ```
 
-2. **Hoiatuse arvutus** — `useEffect`, mis arvutab `textHash(lähtetekst)` ja võrdleb
-   `anchors[siht]?.hash`-iga. Hoiatus kuvatakse ainult siis, kui ankur EI ole `null` ja
-   räsi erineb. `anchors[siht] === null` → hoiatust EI ole (spekk: `null` tähendab „seost
-   ei ole salvestatud", mitte „vananenud").
+- [ ] **Step 4: Käivita ja veendu, et kukub; siis kirjuta `translationFlow.ts`**
 
-3. **Tõlkenupp** (`data-testid="translate-to-en"` / `"translate-to-et"`):
-   - kui sihtväli ei ole tühi → `window.confirm(t('form.translateOverwriteConfirm'))`;
-     `false` → **päringut ei saadeta**;
-   - enne päringut salvesta hetktõmmis: `const snapshot = { et: draft.biography_et, en: draft.biography_en }`;
-   - `translateText(...)`; vastuse saabudes võrdle hetktõmmist praeguse draftiga
-     (kasuta `useRef`-i, et effect näeks värsket väärtust) — erinevus → sea
-     `staleResult` olekusse ja renderda `data-testid="stale-translation"` koos nupuga
-     „Rakenda ikkagi" (`t('form.translateApplyAnyway')`), MITTE automaatne kirjutus;
-   - sama → `set({ [sihtväli]: tolge, [confirmVoti]: true })`.
-     Ruut märgitakse, sest tõlge tehti demonstreeritavalt sellest lähtetekstist ja
-     hetktõmmise valve kontrollis, et kumbki väli ei muutunud.
-   - veakäsitlus `TranslateFailed.kind` järgi: `blocked` → `t('form.translateBlocked')`,
-     `rate_limited` → `t('form.translateRateLimited')`, muu → `t('form.translateError')`.
+Run: `npx vitest run src/prosopography/utils/__tests__/translationFlow.test.ts`
+Expected: FAIL — `Cannot find module '../translationFlow'`
 
-4. **Kinnitusruut** (`t('form.confirmMatchesEstonian')` EN-tabil,
-   `t('form.confirmMatchesEnglish')` ET-tabil) — seob `draft.confirm_en` / `draft.confirm_et`.
+```ts
+import type { FormDraft } from '../components/personForm/types';
+import type { TranslationAnchor } from '../types';
 
-5. **Lähteteksti muutmine kustutab märke.** ET-välja `onChange`:
+export type BioField = 'biography_et' | 'biography_en';
 
-```tsx
-  onChange={v => set({
-    biography_et: v,
-    // Lähteteksti muutmine kustutab kinnituse: kinnituse SISU on „see tõlge
-    // vastab SELLELE tekstile". Sihtteksti toimetamine EI kustuta — toimetaja
-    // parandab tõlget, see on kinnituse sisu, mitte selle rikkumine.
-    ...(draft.confirm_en ? { confirm_en: false } : {}),
-  })}
+/** Keeleväli → teise keele väli. Tõlke LÄHE on alati teine keel. */
+export const OTHER_FIELD: Record<BioField, BioField> = {
+  biography_et: 'biography_en',
+  biography_en: 'biography_et',
+};
+
+/** Keeleväli → tema kinnitusruudu võti draftis. */
+export const CONFIRM_KEY: Record<BioField, 'confirm_et' | 'confirm_en'> = {
+  biography_et: 'confirm_et',
+  biography_en: 'confirm_en',
+};
+
+export interface BioSnapshot { biography_et: string; biography_en: string }
+
+/** Täidetud sihtväli → küsi kinnitust ENNE päringu saatmist. */
+export function needsOverwriteConfirm(targetText: string): boolean {
+  return targetText.trim().length > 0;
+}
+
+/**
+ * Kas mõni väli muutus tõlke ajal?
+ *
+ * Hetktõmmis võetakse MÕLEMAST väljast, mitte ainult lähtest: toimetaja võis
+ * ootamise ajal hakata sihtvälja ise kirjutama ja automaatne kirjutus sööks
+ * selle ära (spekk, otsus 8).
+ */
+export function isStaleResult(snapshot: BioSnapshot, current: BioSnapshot): boolean {
+  return snapshot.biography_et !== current.biography_et
+      || snapshot.biography_en !== current.biography_en;
+}
+
+/**
+ * Lähteteksti muutmine kustutab TEISE keele kinnituse märke.
+ *
+ * Sihtteksti toimetamine EI kustuta — toimetaja parandab tõlget, see on
+ * kinnituse sisu, mitte selle rikkumine (spekk, otsus 5).
+ */
+export function confirmClearPatch(
+  editedField: BioField,
+  confirms: { confirm_et: boolean; confirm_en: boolean },
+): Partial<FormDraft> {
+  const key = CONFIRM_KEY[OTHER_FIELD[editedField]];
+  return confirms[key] ? ({ [key]: false } as Partial<FormDraft>) : {};
+}
+
+/**
+ * Kas ankur on vananenud?
+ *
+ * `null`/`undefined` ankur EI ole vananenud: see tähendab „seost ei ole
+ * salvestatud", mitte „originaal on muutunud" (ADR 0039). Hoiatus tühja
+ * ankru peale oleks vale hoiatus.
+ */
+export function isAnchorStale(
+  anchor: TranslationAnchor | null | undefined,
+  currentSourceHash: string,
+): boolean {
+  return !!anchor?.hash && anchor.hash !== currentSourceHash;
+}
+
+/** Pakkuja veatüüp → i18n võti (ADR 0033: sõnum tuleb lugeja keeles). */
+export function translateErrorKey(kind: 'blocked' | 'rate_limited' | 'other'): string {
+  if (kind === 'blocked') return 'form.translateBlocked';
+  if (kind === 'rate_limited') return 'form.translateRateLimited';
+  return 'form.translateError';
+}
 ```
 
-   ja peegelpildis EN-välja `onChange`-is `confirm_et`.
+Run uuesti: PASS.
 
-6. **„Vaata, mis muutus"** (`data-testid="view-source-diff"`) — `fetchSourceDiff`;
-   `found: false` → `t('form.sourceVersionNotFound')`, muidu modaal/plokk pealkirjaga
+- [ ] **Step 5: Kirjuta `BiographySection` komponent**
+
+`src/prosopography/components/personForm/BiographySection.tsx` — keeletabid ET | EN,
+kummalgi `MarkdownEditor`, tõlkenupp, kinnitusruut, vananemishoiatus. AA-kirje EI ole
+siin (ta on isikulehe lugemisplokk, ADR 0039).
+
+Props:
+
+```tsx
+interface Props {
+  draft: FormDraft;
+  set: (patch: Partial<FormDraft>) => void;
+  personId: string | null;
+  anchors: { et: TranslationAnchor | null; en: TranslationAnchor | null };
+  token: string;
+  canEdit: boolean;
+}
+```
+
+Nõuded, mille komponent peab täitma — **kõik otsused tulevad `translationFlow`-st,
+komponent ei kirjuta oma loogikat**:
+
+1. **Vananemishoiatus.** `useEffect` arvutab `textHash(draft[OTHER_FIELD[tab]])` ja
+   annab selle `isAnchorStale(anchors[tab], hash)`-ile. `true` → kuva
+   `t('form.sourceChanged')` ja selle kõrval nupp `t('form.viewSourceDiff')`.
+2. **Tõlkenupp** `t('form.translateFromEstonian')` / `t('form.translateFromEnglish')`:
+   - `needsOverwriteConfirm(draft[siht])` → `window.confirm(t('form.translateOverwriteConfirm'))`;
+     `false` korral **päringut ei saadeta**;
+   - enne päringut `const snapshot = { biography_et: draft.biography_et, biography_en: draft.biography_en }`;
+     hoia värsket draft'i `useRef`-is, et vastuse saabudes näha praegust seisu;
+   - `translateText(draft[lähe], lähteKeel, sihtKeel, token)`;
+   - vastuse saabudes `isStaleResult(snapshot, refi praegune)` → **ära kirjuta**,
+     kuva `t('form.translateStaleResult')` ja nupp `t('form.translateApplyAnyway')`,
+     mis rakendab tulemuse käsitsi;
+   - muidu `set({ [siht]: tolge, [CONFIRM_KEY[siht]]: true })` — ruut märgitakse, sest
+     tõlge tehti demonstreeritavalt sellest lähtetekstist ja hetktõmmise valve kinnitas,
+     et kumbki väli ei muutunud;
+   - viga: `catch (e)` → `TranslateFailed` korral `t(translateErrorKey(e.kind))`,
+     muidu `t('form.translateError')`.
+3. **Kinnitusruut** — `t('form.confirmMatchesEstonian')` EN-tabil,
+   `t('form.confirmMatchesEnglish')` ET-tabil; seob `draft.confirm_en` / `draft.confirm_et`.
+4. **Teksti muutmine:**
+
+```tsx
+  onChange={v => set({ [tab]: v, ...confirmClearPatch(tab, draft) } as Partial<FormDraft>)}
+```
+
+   `confirmClearPatch` hoolitseb ise selle eest, et ainult LÄHTE muutmine kustutab märke.
+5. **„Vaata, mis muutus"** — `fetchSourceDiff(personId, tab, token)`;
+   `found: false` → `t('form.sourceVersionNotFound')`, muidu plokk pealkirjaga
    `t('form.sourceVersionTitle')` ja vana tekst praeguse kõrval.
 
-`PersonEditPage.tsx` — asenda read 617–629 (eluloo plokk):
+- [ ] **Step 6: Kustuta R2 pärandväljad ja ühenda leht**
+
+`src/prosopography/types.ts` — **kustuta** ülesandes 14 ajutiselt alles jäetud read:
+
+```ts
+  /** @deprecated Kaob ülesandes 20. … */
+  biography_snippet?: string;
+```
+```ts
+  /** @deprecated Kaob ülesandes 20. … */
+  biography?: string | null;
+```
+
+Kui typecheck pärast seda kukub, on mõni tarbija üle viimata — leia ja paranda,
+ära pane välja tagasi.
+
+`src/prosopography/pages/PersonEditPage.tsx` — asenda read 617–629:
 
 ```tsx
         {/* ── Elulugu (ET | EN) ── */}
@@ -3749,25 +4000,27 @@ describe('textHash', () => {
         />
 ```
 
-- [ ] **Step 4: Käivita testid, typecheck ja lint**
+- [ ] **Step 7: Kõik frontendi väravad**
 
-Run: `npx vitest run && npm run typecheck && npm run lint:ci`
-Expected: kõik PASS; `typecheck` on nüüd puhas (ülesanne 14 jättis vead teadlikult siia
-lahendamiseks); `lint:ci` `--max-warnings 49` all — kui uusi hoiatusi tekkis, paranda need,
-ära tõsta läve
+Run: `npx vitest run && npm run typecheck && npm run lint:ci && npm run build`
+Expected: kõik PASS. `lint:ci` lävi on `--max-warnings 49` — kui uusi hoiatusi tekkis,
+paranda need, **ära tõsta läve**.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/prosopography/components/personForm/BiographySection.tsx \
-        src/prosopography/utils/textHash.ts \
+git add src/prosopography/utils/textHash.ts \
+        src/prosopography/utils/translationFlow.ts \
         src/prosopography/utils/__tests__/textHash.test.ts \
-        src/prosopography/components/personForm/__tests__/biographySection.test.tsx \
+        src/prosopography/utils/__tests__/translationFlow.test.ts \
+        src/prosopography/components/personForm/BiographySection.tsx \
+        src/prosopography/types.ts \
         src/prosopography/pages/PersonEditPage.tsx
 git commit -m "feat(prosopo): eluloo keeletabid, tõlkenupp ja kinnitusruut vormis"
 ```
 
 ---
+
 ### Task 21: ADR 0039 ja dokumentatsiooni uuendus
 
 Uus invariant dokumenteeritakse ADR-i, mitte ainult vestlusesse (CLAUDE.md töökord).
