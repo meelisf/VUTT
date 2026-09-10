@@ -98,7 +98,8 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 `prosopography_index.json`, `person_to_works.json`, `works_creators_index.json`, `work_collections_index.json`.
 
 Tuletatud indeksid on read-modelid — nullist taastatavad (`rebuild_indices()` jookseb serveri
-stardil taustalõimes), vt ADR 0007. Skriptides:
+stardil taustalõimes), vt ADR 0007. **Nad EI OLE `data/` gitis** (`data/.gitignore`): iga start
+kirjutab nad üle ja jälgimine tegi `git status`-i püsivalt müraseks. Skriptides:
 
 ```python
 from server.config import DATA_CONFIG_DIR, STATE_DIR   # ← ainuõige allikas
