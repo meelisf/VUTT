@@ -148,6 +148,74 @@ def format_report(mapping: dict) -> str:
     return "\n".join(read)
 
 
+def apply_pass_a(persons: List[dict], mapping: dict) -> dict:
+    """Kirjutab `biography` sisu vastenduse sihtvälja. `biography` JÄÄB ALLES.
+
+    Peatub esimese lahknevuse peal ega kirjuta osaliselt: `written` on nimekiri
+    kaartidest, mis TULEB salvestada, ja kutsuja salvestab need alles siis, kui
+    `error` on None.
+    """
+    kaardid = {p["id"]: p for p in persons}
+    written = []
+    skipped = 0
+
+    for kirje in mapping["entries"]:
+        pid = kirje["id"]
+        target = kirje["target"]
+        person = kaardid.get(pid)
+        if person is None:
+            return {"written": [], "skipped": skipped,
+                    "error": f"{pid}: kaarti ei leitud"}
+
+        tekst = person.get(LEGACY_BIOGRAPHY)
+
+        # 3. Juba migreeritud? Sihtväli kannab sama teksti → vahele.
+        if person.get(target) == tekst:
+            skipped += 1
+            continue
+
+        # 1. Lähtetekst muutumata ülevaatusest saadik?
+        if text_hash(tekst) != kirje["source_hash"]:
+            return {"written": [], "skipped": skipped, "error": (
+                f"{pid}: `biography` on pärast ülevaatust muutunud "
+                f"(räsi {text_hash(tekst)} != {kirje['source_hash']}). "
+                f"Tee kuivkäivitus uuesti.")}
+
+        # 2. Sihtväli tühi?
+        if person.get(target):
+            return {"written": [], "skipped": skipped, "error": (
+                f"{pid}: sihtväli `{target}` on juba täidetud teise tekstiga — "
+                f"ei kirjuta üle. Lahenda käsitsi.")}
+
+        person[target] = tekst
+        written.append(person)
+
+    return {"written": written, "skipped": skipped, "error": None}
+
+
+def _save(prosopo_dir: str, person: dict) -> str:
+    """Kirjutab kaardi tagasi. Tagastab faili tee (commiti lavastamiseks)."""
+    nanoid = person["id"].removeprefix("vutt:P")
+    path = os.path.join(prosopo_dir, f"{nanoid}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(person, f, ensure_ascii=False, indent=2)
+    return path
+
+
+def _git_commit(data_root: str, paths: List[str], message: str) -> bool:
+    """Üks commit partii kohta. Laval AINULT selle jooksu failid.
+
+    `git add -A` oleks vale: jooksev backend uuendab `data/config/` tuletatud
+    indekseid pidevalt ja need satuksid vaikselt migratsiooni commiti sisse.
+    """
+    for cmd in (["git", "add", "--"] + paths, ["git", "commit", "-m", message]):
+        result = subprocess.run(cmd, cwd=data_root, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"VIGA: {' '.join(cmd[:3])} ebaõnnestus: {result.stderr}", file=sys.stderr)
+            return False
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mapping", default="biography_mapping.json",
@@ -177,8 +245,36 @@ def main() -> int:
     if not args.pass_:
         print("VIGA: --apply nõuab --pass a või --pass b", file=sys.stderr)
         return 1
-    print("VIGA: --apply ei ole veel teostatud (ülesanded 3–4)", file=sys.stderr)
-    return 1
+
+    with open(args.mapping, encoding="utf-8") as f:
+        mapping = json.load(f)
+    persons = load_persons(prosopo_dir)
+
+    if args.pass_ == "a":
+        tulem = apply_pass_a(persons, mapping)
+        pass_nimi = "pass A"
+        sonum = "refactor(prosopo): biography → keelega väljad, pass A ({n} kaarti)"
+    else:
+        # Pass B sünnib ülesandes 4. SIIN peab olema selge viga, mitte kutse
+        # funktsioonile, mida veel ei ole — muidu annab `--pass b` selle ja
+        # järgmise commiti vahel `NameError`-i.
+        print("VIGA: --pass b ei ole veel teostatud", file=sys.stderr)
+        return 1
+
+    if tulem["error"]:
+        print(f"PEATUTUD ({pass_nimi}): {tulem['error']}", file=sys.stderr)
+        return 1
+
+    paths = [_save(prosopo_dir, p) for p in tulem["written"]]
+    print(f"{pass_nimi}: kirjutatud {len(paths)}, vahele jäetud {tulem['skipped']}")
+
+    if args.commit and paths:
+        from server.config import DATA_CONFIG_DIR
+        data_root = os.path.dirname(DATA_CONFIG_DIR)
+        if not _git_commit(data_root, paths, sonum.format(n=len(paths))):
+            return 1
+        print("  Git commit loodud.")
+    return 0
 
 
 if __name__ == "__main__":

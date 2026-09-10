@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from migrate_biography_language_fields import (  # noqa: E402
-    build_mapping, format_report, load_persons,
+    apply_pass_a, build_mapping, format_report, load_persons,
 )
 from server.prosopo_biography_fields import AA_RAW, BIOGRAPHY_ET, text_hash  # noqa: E402
 
@@ -84,3 +84,58 @@ def test_katkine_json_annab_nahtava_hoiatuse_ja_jalje(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "katki.json" in err
     assert "JSONDecodeError" in err
+
+
+def _mapping_for(persons):
+    return build_mapping(persons)
+
+
+def test_pass_a_kirjutab_uue_valja_ja_jatab_vana_alles():
+    persons = [_person("vutt:Pb", "Ludenius", PROOSA_TEKST)]
+    tulem = apply_pass_a(persons, _mapping_for(persons))
+    assert tulem["error"] is None
+    assert persons[0][BIOGRAPHY_ET] == PROOSA_TEKST
+    assert persons[0]["biography"] == PROOSA_TEKST   # pass A EI eemalda
+    assert len(tulem["written"]) == 1
+
+
+def test_pass_a_peatub_kui_lahtetekst_on_muutunud():
+    persons = [_person("vutt:Pb", "Ludenius", PROOSA_TEKST)]
+    mapping = _mapping_for(persons)
+    persons[0]["biography"] = PROOSA_TEKST + " (toimetaja lisas vahepeal lause)"
+    tulem = apply_pass_a(persons, mapping)
+    assert tulem["error"] is not None
+    assert "vutt:Pb" in tulem["error"]
+    assert BIOGRAPHY_ET not in persons[0]      # midagi ei kirjutatud
+    assert tulem["written"] == []
+
+
+def test_pass_a_peatub_kui_sihtvali_on_taidetud_teise_tekstiga():
+    persons = [_person("vutt:Pb", "Ludenius", PROOSA_TEKST)]
+    mapping = _mapping_for(persons)
+    persons[0][BIOGRAPHY_ET] = "midagi muud, mille keegi käsitsi kirjutas"
+    tulem = apply_pass_a(persons, mapping)
+    assert tulem["error"] is not None
+    assert persons[0][BIOGRAPHY_ET] == "midagi muud, mille keegi käsitsi kirjutas"
+
+
+def test_pass_a_on_idempotentne():
+    persons = [_person("vutt:Pb", "Ludenius", PROOSA_TEKST)]
+    mapping = _mapping_for(persons)
+    esimene = apply_pass_a(persons, mapping)
+    teine = apply_pass_a(persons, mapping)
+    assert esimene["error"] is None and teine["error"] is None
+    assert teine["written"] == []
+    assert teine["skipped"] == 1
+
+
+def test_pass_a_austab_kasitsi_muudetud_sihtvalja_vastenduses():
+    # Inimene parandas aruandes `target`-i: AA-marker keset proosat → elulugu.
+    persons = [_person("vutt:Px", "Segane", AA_TEKST)]
+    mapping = _mapping_for(persons)
+    assert mapping["entries"][0]["target"] == AA_RAW
+    mapping["entries"][0]["target"] = BIOGRAPHY_ET       # inimese otsus
+    tulem = apply_pass_a(persons, mapping)
+    assert tulem["error"] is None
+    assert persons[0][BIOGRAPHY_ET] == AA_TEKST
+    assert AA_RAW not in persons[0]
