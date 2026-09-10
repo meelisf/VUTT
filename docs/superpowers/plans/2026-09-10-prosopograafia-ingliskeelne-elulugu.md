@@ -1638,8 +1638,10 @@ def _merge_biography_fields(source: dict, target: dict) -> bool:
     for anchor in ANCHOR_FIELDS:
         uus = source.get(anchor) if molemad_allikast else None
         if target.get(anchor) != uus:
-            target[anchor] = uus
             changed = True
+        # Seatakse ALATI: skeem hoiab mõlemat ankrut olemas (person_crud
+        # `create_person`), ja puuduv võti annaks lugejale KeyError'i.
+        target[anchor] = uus
 
     return changed
 ```
