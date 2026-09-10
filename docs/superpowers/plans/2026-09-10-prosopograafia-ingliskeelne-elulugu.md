@@ -1640,9 +1640,16 @@ def test_keeleväljad_ilmuvad_ajalukku_ilma_lisakoodita():
     assert [m["field"] for m in muutused] == [BIOGRAPHY_ET]
 
 
-def test_aa_rikastus_kirjutab_aa_raw_valja():
-    from server.prosopography.enrichment import _aa_entry_to_result
-    tulem = _aa_entry_to_result({"raw_text": "154. Lünaeus, Emundus."})
+def test_aa_rikastus_kirjutab_aa_raw_valja(monkeypatch):
+    # `_fetch_aa` (enrichment.py:650) loeb korpuse `_load_aa()` kaudu ja otsib
+    # kirje `entry_number` järgi — testime kaardistust võltsitud korpusega.
+    from server.prosopography import enrichment
+    monkeypatch.setattr(enrichment, "_load_aa", lambda: [{
+        "entry_number": 154,
+        "person": {"name": {"full": "Lünaeus, Emundus"}},
+        "raw_text": "154. Lünaeus, Emundus.",
+    }])
+    tulem = enrichment._fetch_aa("AA:154")
     assert tulem[AA_RAW] == "154. Lünaeus, Emundus."
     assert "biography" not in tulem
 
@@ -1655,12 +1662,12 @@ def test_seo_kirjeldus_votab_eluloo_mitte_aa_kirje():
     assert _person_biography_text({AA_RAW: "154. AA"}) == ""
 ```
 
-> **KOHUSTUSLIK (eelkontrolli otsus R5):** `_aa_entry_to_result` **ei eksisteeri** —
-> `enrichment.py:721` on suurema funktsiooni sees. Ülaltoodud test on kirjutatud
-> väljamõeldud nime vastu; **ära loo seda funktsiooni**. Leia `enrichment.py`-st
-> tegelik AA-kaardistuse funktsioon (see, mille sees rida 721 elab), kutsu SEDA ja
-> kohanda testi vastavalt. Väide jääb muutumatuks: `raw_text` → `aa_raw`, ja võtit
-> `biography` tulemuses EI OLE. Funktsiooni väljatõstmist ei nõuta ega soovita.
+> **Eelkontrolli otsus R5 (kontrollitud koodis):** plaani varasem mustand kutsus
+> funktsiooni `_aa_entry_to_result`, mida **ei eksisteeri**. Tegelik funktsioon on
+> **`_fetch_aa(aa_id: str) -> Optional[dict]`** (`enrichment.py:650`); rida 721 on
+> selle sees. `_fetch_aa` võtab AA-numbri (`"AA:154"`), laeb korpuse `_load_aa()`
+> kaudu ja otsib kirje `entry_number` järgi — seepärast patchib test `_load_aa`-d.
+> **Ära tõsta kaardistust eraldi funktsiooni** — muudetakse ainult rida 721.
 
 - [ ] **Step 2: Käivita testid ja veendu, et need kukuvad**
 
@@ -1682,13 +1689,18 @@ _DIFF_IGNORED_FIELDS = frozenset({
 })
 ```
 
-`server/prosopography/enrichment.py:721` — asenda `result["biography"] = raw`:
+`server/prosopography/enrichment.py:721` (funktsiooni `_fetch_aa` sees) — asenda
+`result["biography"] = raw`:
 
 ```python
             result[AA_RAW] = raw
 ```
 
 (lisa faili algusesse `from ..prosopo_biography_fields import AA_RAW`)
+
+**Ja `src/prosopography/components/personForm/EnrichExistingSection.tsx`-i vaste
+tehakse ülesandes 18** — `_fetch_aa` tagastab võtme, mille vormipool loeb; kui
+ainult üks pool muutub, kaob AA-autotäide vaikselt ära.
 
 `server/metadata_handler.py` — lisa mooduli tasemele:
 
