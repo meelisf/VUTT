@@ -1124,6 +1124,7 @@ Expected: PASS
 
 ```bash
 git add server/prosopography/person_crud.py server/prosopography/person_search.py \
+        server/prosopography/ops.py server/prosopography/_compat.py \
         tests/test_prosopo_biography_snippets.py tests/test_prosopography_ops.py
 git commit -m "feat(prosopo): keeleväljad skeemis, neli katget indeksis"
 ```
