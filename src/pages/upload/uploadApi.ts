@@ -261,12 +261,22 @@ export function startPrepress(uploadId: string, token: string | null): Promise<{
   return apiPost<{ status: string }>(`/admin/upload/${uploadId}/prepress/start`, {}, { token });
 }
 
+/** Poolitusplaani ja apply lagi. Kumbki ei oota tööd ennast: plaani salvestus
+ *  kirjutab state.json-i, apply on CAS + taustalõime start. Aga mõlemad
+ *  konkureerivad protsessis käiva 300 DPI eelvaate renderdusega (512 lk), ja
+ *  `fetchWithTimeout` vaikimisi 10 s andis kasutajale „The operation was
+ *  aborted." töö kohta, mis oli ainult ootel (#340). Vaikeväärtus ei ole
+ *  leping — sama õppetund mis ADR 0036 / #327, seal nginx-i 60 s. */
+const PREPRESS_TIMEOUT_MS = 120_000;
+
 export function savePrepress(
   uploadId: string,
   plan: Pick<PrepressPlan, 'default_split_x' | 'pages'>,
   token: string | null,
 ): Promise<PrepressSaveResult> {
-  return apiPost<PrepressSaveResult>(`/admin/upload/${uploadId}/prepress`, plan, { token });
+  return apiPost<PrepressSaveResult>(
+    `/admin/upload/${uploadId}/prepress`, plan, { token, timeout: PREPRESS_TIMEOUT_MS },
+  );
 }
 
 export function setOcrModel(
@@ -277,13 +287,71 @@ export function setOcrModel(
   return apiPost(`/admin/upload/${uploadId}/ocr-model`, { model }, { token });
 }
 
+/** Kui vastus siiski kaob, küsitakse tulemus staatusest. Apply päring võib
+ *  serverisse jõuda alles pärast kliendi abordi, seega eelarve on mõne
+ *  sekundi, mitte ühe päringu pikkune. */
+const APPLY_RECOVERY_POLL_MS = 2_000;
+const APPLY_RECOVERY_BUDGET_MS = 30_000;
+
+/** Staatused, mis tähendavad „apply LÄKS käima" — ka need, mis on juba
+ *  kaugemal: kasutaja võis vahepeal edasi liikuda või poll jõudis ette. */
+const APPLY_STARTED_STATUSES = ['applying', 'reviewing', 'done', 'importing', 'imported'];
+
 export function applyPrepress(
   uploadId: string,
   token: string | null,
 ): Promise<{ status: string; path: string }> {
   return apiPost<{ status: string; path: string }>(
-    `/admin/upload/${uploadId}/prepress/apply`, {}, { token },
+    `/admin/upload/${uploadId}/prepress/apply`, {}, { token, timeout: PREPRESS_TIMEOUT_MS },
   );
+}
+
+export interface ApplyRecoveryDeps {
+  doApply?: typeof applyPrepress;
+  checkStatus?: typeof getUploadStatus;
+  pollMs?: number;
+  budgetMs?: number;
+}
+
+/** Rakendab poolitusplaani ja EI usu katkenud päringut tõendina.
+ *
+ *  `start_apply` on ühekordne CAS + taustalõim: kliendi lahtiühendamine ei
+ *  katkesta seda. Katkenud vastus tähendab „ma ei tea", mitte „ebaõnnestus".
+ *  Kui staatus ütleb, et töö käib (või on juba kaugemal), on see õnnestumine;
+ *  kui töö eelarve jooksul käima ei lähe, jääb algne viga veaks ja kordus on
+ *  kasutaja otsustada — kordus ise on ohutu, teine apply annab 409.
+ */
+export async function applyPrepressWithRecovery(
+  uploadId: string,
+  token: string | null,
+  deps: ApplyRecoveryDeps = {},
+): Promise<{ status: string; path?: string; recovered?: boolean }> {
+  const {
+    doApply = applyPrepress,
+    checkStatus = getUploadStatus,
+    pollMs = APPLY_RECOVERY_POLL_MS,
+    budgetMs = APPLY_RECOVERY_BUDGET_MS,
+  } = deps;
+
+  try {
+    return await doApply(uploadId, token);
+  } catch (algne) {
+    const tahtaeg = Date.now() + budgetMs;
+    do {
+      let olek;
+      try {
+        olek = await checkStatus(uploadId, token);
+      } catch {
+        // Ka staatus ei vasta — algne viga on parem teade kui „staatus ei vasta".
+        throw algne;
+      }
+      if (APPLY_STARTED_STATUSES.includes(olek.status)) {
+        return { status: olek.status, recovered: true };
+      }
+      await maga(pollMs);
+    } while (Date.now() < tahtaeg);
+    throw algne;
+  }
 }
 
 /**
