@@ -210,6 +210,15 @@ def _update_index_entry(person: dict):
         state.atomic_write_json(state.PROSOPOGRAPHY_INDEX_FILE, index)
 
 
+def _on_kaardi_voti(key: str) -> bool:
+    """Kas see person_aliases.json võti kuulub kaardipõhisele kirjutajale?
+
+    Kaardipoole võtmed on isiku ID-d (`vutt:P…`); kõik muu on `people_ops`
+    kirjutatud välise ID (Wikidata Q-kood, GND-number) kirje (#347).
+    """
+    return isinstance(key, str) and key.startswith("vutt:")
+
+
 def _update_aliases_entry(person: dict):
     """Uuendab person_aliases.json — vutt:P ID → nimevariandid."""
     sync_from_facade()
@@ -391,6 +400,17 @@ def rebuild_indices():
         })
 
     with state._aliases_lock:
+        # person_aliases.json-il on KAKS kirjutajat eri võtmeruumis (#347):
+        # siin ehitatakse kaardipõhine pool (`vutt:P…`) nullist, aga
+        # `people_ops.update_person_async` kirjutab samasse faili Wikidata/GND
+        # võtmeid (`Q…`, GND-number). Tervikuna ülekirjutamine pühkis need iga
+        # serveri stardi ajal minema ja Meili `authors_text` jäi ilma
+        # nimevariantideta. Võõrad võtmed lähevad seetõttu muutmata edasi.
+        from .person_search import _load_person_aliases
+        olemasolev = _load_person_aliases()
+        for key, value in olemasolev.items():
+            if not _on_kaardi_voti(key):
+                aliases_data.setdefault(key, value)
         state.atomic_write_json(state.PERSON_ALIASES_FILE, aliases_data)
 
     # Väliste ID-de pöördindeks juba mällu laetud kaartidest — lisaskannita (#180).

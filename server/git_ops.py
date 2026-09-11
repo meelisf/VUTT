@@ -485,6 +485,22 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
                 return {"success": False, "error": error_text}
 
 
+def save_config_with_git(filepath, data, username, message=None, indent=2):
+    """Kirjutab autoriteetse konfiguratsioonifaili ja commitib selle (#346).
+
+    `data/config/` sisaldab kolme eri liiki faile. Autoriteetsed — kollektsioonid,
+    arhiivid, kohad, päritolugrupid — on admini otsused ja käivad siit läbi, et
+    igal muudatusel oleks autor, põhjus ja taastepunkt. Tuletatud read-modelid
+    (ADR 0007) ja välised cache'id ei ole gitis ega kasuta seda teed.
+
+    Vorming on sama mis `atomic_write_json`-il, et üleminek ei tekitaks
+    tervikfaili diffi. Commiti ebaõnnestumine EI kaota muudatust: fail on
+    kettale kirjutatud enne commiti ja viga läheb logisse.
+    """
+    content = json.dumps(data, ensure_ascii=False, indent=indent)
+    return save_with_git(filepath, content, username, message=message)
+
+
 def get_file_git_history(paths, max_count=50):
     """
     Tagastab faili(de) Git ajaloo.
