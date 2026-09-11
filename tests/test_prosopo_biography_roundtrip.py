@@ -44,7 +44,6 @@ def uus_isik(tmp_path, monkeypatch):
         Path(path).write_text(content, encoding="utf-8")
 
     monkeypatch.setattr(person_crud.state, "save_with_git", _save)
-    monkeypatch.setattr(person_crud, "sync_from_facade", lambda: None)
     monkeypatch.setattr(person_crud, "fill_person_labels_from_registry", lambda p: None)
     monkeypatch.setattr(person_crud, "_indices", lambda: type(
         "I", (), {"_update_index_entry": staticmethod(lambda p: None),

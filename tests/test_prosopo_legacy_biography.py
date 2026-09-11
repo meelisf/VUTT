@@ -23,11 +23,6 @@ def _build_kaart(monkeypatch, tmp_path, person):
     kaart) vahel, et mock'imismuster ei duplikeeruks.
     """
     salvestatud = {}
-    # sync_from_facade() on update_person'i ESIMENE rida ja võib (kui mõni varasem
-    # test on ops.py fassaadi peal midagi patch'inud, vt _compat.py _FACADE_DIRTY)
-    # tagasi kirjutada meie enda get_person/_id_to_path monkeypatch'id — sama
-    # muster mis `test_prosopography_side_writes.py`/`test_prosopo_secret_fields.py`.
-    monkeypatch.setattr(person_crud, "sync_from_facade", lambda: None)
     monkeypatch.setattr(person_crud, "get_person", lambda pid: dict(person))
     monkeypatch.setattr(person_crud, "_id_to_path", lambda pid: str(tmp_path / "abc.json"))
 
