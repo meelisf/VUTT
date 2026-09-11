@@ -1,6 +1,7 @@
 from ..work_dating import dating_updates
 import asyncio
 import os
+import time
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -237,7 +238,12 @@ def admin_prepress_preview(upload_id: str, page_num: int, rot: int = 0,
 @router.post("/admin/upload/{upload_id}/prepress")
 async def admin_prepress_save(upload_id: str, request: Request,
                               user=Depends(require_role("admin"))):
-    """Salvestab plaani. Kirjutab AINULT plaani välju (mutate_prepress)."""
+    """Salvestab plaani. Kirjutab AINULT plaani välju (mutate_prepress).
+
+    Kestus läheb logisse: klient katkestas varem päringu 10 s peale ja mehhanism
+    tuli oletada (#340). Mõõdetud number ütleb järgmine kord, kus aeg kulub.
+    """
+    algus = time.monotonic()
     data = await get_json_data(request)
     _load_prepress(upload_id)
 
@@ -278,6 +284,9 @@ async def admin_prepress_save(upload_id: str, request: Request,
     if plan is None:
         raise HTTPException(status_code=404, detail="Plaani ei leitud")
     page_count = len(plan.get("pages", []))
+    kestus = int((time.monotonic() - algus) * 1000)
+    if kestus > 1000:
+        logger.info("PREPRESS SAVE {}: {} ms ({} lk)".format(upload_id, kestus, page_count))
     return {
         "status": "saved",
         "output_page_count": prepress_plan.output_page_count(plan, page_count),
@@ -296,6 +305,7 @@ def admin_prepress_apply(upload_id: str, user=Depends(require_role("admin"))):
 
     Sync def — try_begin_applying on blokeeriv faililukk (ADR 0002).
     """
+    algus = time.monotonic()
     state, _plan = _load_prepress(upload_id)
 
     if not prepress_apply.start_apply(upload_id):
@@ -303,6 +313,8 @@ def admin_prepress_apply(upload_id: str, user=Depends(require_role("admin"))):
             status_code=409,
             content={"detail": "Töö juba käib", "status": state.get("status")},
         )
+    kestus = int((time.monotonic() - algus) * 1000)
+    logger.info("PREPRESS APPLY {}: CAS + lõime start {} ms".format(upload_id, kestus))
     return {"status": "applying", "path": "split"}
 
 

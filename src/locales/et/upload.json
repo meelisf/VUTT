@@ -145,7 +145,8 @@
       "resetToGlobal": "Lähtesta üldjoonele",
       "headerExcluded": "Lk {{n}} · {{total}}-st · jäetakse välja"
     },
-    "excludedExplain": "Ei OCR-ita ega poolitata — seda lehte teosesse ei teki"
+    "excludedExplain": "Ei OCR-ita ega poolitata — seda lehte teosesse ei teki",
+    "waitingRender": "Eelvaade lõpetab — nupp avaneb kohe ({{done}} / {{total}})"
   },
   "notice": {
     "title": "Üleslaadimine käib kahes järgus",

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import {
-  applyPrepress, getPrepress, savePrepress, setOcrModel, startPrepress,
+  applyPrepressWithRecovery, getPrepress, savePrepress, setOcrModel, startPrepress,
 } from '../uploadApi';
 import {
   applyDefaultSplitTo, clearDefaultSplit, countByMode, mergePreviewProgress,
@@ -170,7 +170,9 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
           token,
         );
       }
-      await applyPrepress(uploadId, token);
+      // Katkenud vastus ei ole ebaõnnestunud töö (#340 / ADR 0036): apply on
+      // CAS + taustalõim, tulemuse ütleb staatus.
+      await applyPrepressWithRecovery(uploadId, token);
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('errors.networkError'));
@@ -342,11 +344,18 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
         <button
           type="button"
           className="px-5 py-2 rounded bg-primary-600 text-white disabled:opacity-50"
-          disabled={applying}
+          disabled={applying || rendering}
           onClick={handleContinue}
         >
           {applying ? t('step3split.applying') : t('step3split.continue')}
         </button>
+        {rendering && !applying && (
+          <div className="mt-2 text-sm text-gray-600">
+            {t('step3split.waitingRender', {
+              done: plan.preview_done, total: plan.page_count,
+            })}
+          </div>
+        )}
       </div>
 
       <SplitActionBar

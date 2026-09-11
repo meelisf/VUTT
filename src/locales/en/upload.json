@@ -145,7 +145,8 @@
       "resetToGlobal": "Reset to global line",
       "headerExcluded": "Page {{n}} of {{total}} · excluded"
     },
-    "excludedExplain": "Not OCR’d and not split — this page will not appear in the work"
+    "excludedExplain": "Not OCR’d and not split — this page will not appear in the work",
+    "waitingRender": "Preview is finishing — the button unlocks shortly ({{done}} / {{total}})"
   },
   "notice": {
     "title": "Uploading happens in two stages",
