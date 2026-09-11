@@ -128,3 +128,18 @@ def test_put_place_commitib_muudatuse(repo, monkeypatch):
     salvestatud = json.loads(places_file.read_text(encoding="utf-8"))
     assert salvestatud["riga"]["labels"]["et"] == "Riia"
     assert "tartu" in salvestatud, "olemasolev koht ei tohi kaduda"
+
+
+def test_save_config_with_git_kirjutab_ka_ilma_repota(tmp_path, monkeypatch):
+    """Puuduv või katkine `data/` repo ei tohi admini muudatust kaotada (ADR 0040)."""
+    from git.exc import NoSuchPathError
+
+    monkeypatch.setattr(git_ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(git_ops, "get_or_init_repo",
+                        lambda: (_ for _ in ()).throw(NoSuchPathError(str(tmp_path / "puudub"))))
+
+    path = tmp_path / "config" / "collections.json"
+    tulemus = git_ops.save_config_with_git(str(path), {"a": {"name": "A"}}, "admin")
+
+    assert tulemus["success"] is False
+    assert json.loads(path.read_text(encoding="utf-8")) == {"a": {"name": "A"}}

@@ -12,7 +12,7 @@ from datetime import datetime
 from git import Repo, Actor
 from git.exc import InvalidGitRepositoryError, GitCommandError
 from .config import BASE_DIR, get_logger
-from .utils import atomic_write_text, sanitize_id
+from .utils import atomic_write_json, atomic_write_text, sanitize_id
 
 logger = get_logger(__name__)
 
@@ -498,7 +498,15 @@ def save_config_with_git(filepath, data, username, message=None, indent=2):
     kettale kirjutatud enne commiti ja viga läheb logisse.
     """
     content = json.dumps(data, ensure_ascii=False, indent=indent)
-    return save_with_git(filepath, content, username, message=message)
+    try:
+        return save_with_git(filepath, content, username, message=message)
+    except Exception as e:
+        # Commit võib kukkuda ka enne kirjutamist (repo puudub või on katki).
+        # Konfiguratsioonimuudatus ei tohi sellest kaduda: kirjuta fail ja
+        # jäta viga logisse. Git on siin ajalugu, mitte kirjutustee lüliti.
+        logger.error(f"Konfi commit EBAÕNNESTUS, kirjutan ilma gitita: {filepath}: {e}")
+        atomic_write_json(filepath, data, indent=indent)
+        return {"success": False, "error": str(e)}
 
 
 def get_file_git_history(paths, max_count=50):
