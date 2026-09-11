@@ -356,6 +356,12 @@ Workspace). `LoginModal` `isOpen` EI TOHI olla seotud `sessionExpired`-iga.
 
 ## Domeen
 
+**`type` kannab ALATI Q-koodi** — `Q1261026` (trükis) või `Q87167` (käsikiri), vt
+`src/pages/upload/constants.ts`. Silt on kuvand, Q-kood on väide: keelevahetus, OCR-mudeli
+valik (`upload_ops.py`, `reocr.py`) ja Meili `type_ids` fassett sõltuvad koodist, mitte sildist.
+Paljas string („Trükis") tähendab, et kirje on loodud enne viisardit — 8 sellist backfill'iti
+2026-09-11, tootmises on kate nüüd 1396/1396.
+
 **Linked data** — kõik metaandmeväljad toetavad `LinkedEntity`-objekte:
 `{ label, id, labels: {et, en}, source }`. Toetatud: `genre`, `type`, `location`, `publisher`,
 `tags`, `creators[]`. Allikad: Wikidata (`Q12345`), VIAF (`viaf:12345`), Album Academicum (`AA:123`).
