@@ -815,7 +815,7 @@ def places_meta():
 @router.post("/admin/places/refresh-labels")
 def places_refresh_labels(user=Depends(_require_role("admin"))):
     """Värskendab kõik places.json kohade labelid Wikidatast + taastab indeksid (admin)."""
-    count = refresh_all_place_labels()
+    count = refresh_all_place_labels(username=user["username"])
     import threading
     threading.Thread(target=rebuild_indices, daemon=True).start()
     return {"updated": count}
@@ -826,7 +826,7 @@ async def groups_put(key: str, request: Request, user=Depends(_require_role("adm
     """Lisab või uuendab gruppi (admin). Body: {labels, sort_order, parent}"""
     data = await _get_json(request)
     try:
-        return await run_in_threadpool(put_group, key, data)
+        return await run_in_threadpool(put_group, key, data, user["username"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -835,7 +835,7 @@ async def groups_put(key: str, request: Request, user=Depends(_require_role("adm
 def groups_delete(key: str, user=Depends(_require_role("admin"))):
     """Kustutab grupi (admin)."""
     try:
-        delete_group(key)
+        delete_group(key, username=user["username"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"deleted": key}
@@ -844,7 +844,7 @@ def groups_delete(key: str, user=Depends(_require_role("admin"))):
 @router.post("/admin/groups/auto-assign")
 def groups_auto_assign(user=Depends(_require_role("admin"))):
     """Rakendab automaatse parent seadmise teadaolevatele alamgruppidele."""
-    return auto_assign_group_parents()
+    return auto_assign_group_parents(username=user["username"])
 
 
 @router.delete("/admin/places/{key}")
@@ -854,7 +854,7 @@ def places_delete(
 ):
     """Kustutab koha places.json-st (admin). Blokeerib kui on alamkohti või isikuviiteid."""
     try:
-        delete_place(key)
+        delete_place(key, username=user["username"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"deleted": key}
@@ -875,7 +875,7 @@ async def places_put(
     """
     data = await _get_json(request)
     try:
-        entry = await run_in_threadpool(put_place, key, data)
+        entry = await run_in_threadpool(put_place, key, data, user["username"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

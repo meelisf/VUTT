@@ -1,4 +1,5 @@
 import os
+import glob
 import json
 import time
 import threading
@@ -213,18 +214,65 @@ def process_person_fields_metadata(meta):
         process_linked_entity(tag)
 
 
-def refresh_all_people():
-    """Uuendab kõigi isikute aliased Wikidatast/GND-st.
+def _external_source(entity_id, source=None):
+    """Tagastab 'wikidata' / 'gnd' / None — kas ID-ga saab üldse päringut teha.
 
-    Deduplitseerib primary_name järgi, eelistab Wikidata ID-d GND-le.
+    Sama otsus kui `update_person_async`-is. `vutt:P…` on VUTT-i sisemine
+    isiku-ID ja `AA:`/`viaf:` allikatele meil päringuteed ei ole — need ei ole
+    viga, vaid lihtsalt vahelejäetavad (#347).
+    """
+    if not entity_id or not isinstance(entity_id, str):
+        return None
+    if entity_id.startswith('Q'):
+        return 'wikidata'
+    if source == 'gnd' or (len(entity_id) > 5 and entity_id.isdigit()):
+        return 'gnd'
+    return None
+
+
+def collect_external_ids_from_works():
+    """Kogub teoste metaandmetest kõik välised ID-d: {id: source}.
+
+    Need on täpselt need võtmed, mille järgi `meili_doc.get_creator_aliases`
+    ja `normalize_creator` otsivad. Failist endast seemendamisest ei piisa:
+    `rebuild_indices` on need kirjed varem minema pühkinud (#347), ja siis ei
+    oleks taastel enam midagi, millest alustada.
+    """
+    found = {}
+    for path in glob.glob(os.path.join(BASE_DIR, "*", "_metadata.json")):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+        except Exception as e:
+            logger.warning(f"PEOPLE REFRESH: {path} lugemine ebaõnnestus: {e}")
+            continue
+        entities = [e for e in (meta.get('creators') or []) if isinstance(e, dict)]
+        publisher = meta.get('publisher')
+        if isinstance(publisher, dict):
+            entities.append(publisher)
+        entities += [t for t in (meta.get('tags') or []) if isinstance(t, dict)]
+        for entity in entities:
+            source = _external_source(entity.get('id'), entity.get('source'))
+            if source:
+                found.setdefault(entity['id'], source)
+    return found
+
+
+def refresh_all_people():
+    """Uuendab kõigi väliste ID-de aliased Wikidatast/GND-st.
+
+    Seeme tuleb teoste metaandmetest JA failis juba olevatest välistest ID-dest;
+    viimased deduplitseeritakse primary_name järgi, eelistades Wikidata ID-d.
     Tagastab: {"updated": N, "errors": N, "total": N}
     """
     with PEOPLE_LOCK:
         people_data = load_people_data()
 
-    # Deduplitseeri: primary_name → parim ID + source
+    # Deduplitseeri failis olevad välised kirjed: primary_name → parim ID + source
     seen = {}  # primary_name → (id, source)
     for person_id, info in people_data.items():
+        if not _external_source(person_id, None):
+            continue  # vutt:P… kirjed kirjutab prosopograafia, mitte see tee
         primary = info.get('primary_name', '')
         if not primary:
             continue
@@ -245,13 +293,19 @@ def refresh_all_people():
             if wikidata_id and current_source != 'wikidata':
                 seen[primary] = (wikidata_id, 'wikidata')
 
-    total = len(seen)
+    tasks = {}  # id → source
+    for best_id, source in seen.values():
+        tasks.setdefault(best_id, source)
+    for entity_id, source in collect_external_ids_from_works().items():
+        tasks.setdefault(entity_id, source)
+
+    total = len(tasks)
     updated = 0
     errors = 0
 
     logger.info(f"PEOPLE REFRESH: Alustan {total} isiku uuendamist...")
 
-    for primary_name, (best_id, source) in seen.items():
+    for best_id, source in tasks.items():
         try:
             new_info = None
             if best_id.startswith('Q'):
@@ -273,7 +327,7 @@ def refresh_all_people():
             else:
                 errors += 1
         except Exception as e:
-            logger.error(f"PEOPLE REFRESH: Viga isikul {best_id} ({primary_name}): {e}")
+            logger.error(f"PEOPLE REFRESH: Viga isikul {best_id}: {e}")
             errors += 1
 
         # Rate limit: 1 päring sekundis

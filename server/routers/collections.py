@@ -13,7 +13,8 @@ from ..config import ARCHIVES_FILE, BASE_DIR, COLLECTIONS_FILE, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import get_or_init_repo
 from ..meilisearch_ops import sync_work_to_meilisearch_async, update_collection_is_public_async
-from ..utils import atomic_write_json, find_directory_by_id, metadata_lock
+from ..git_ops import save_config_with_git
+from ..utils import find_directory_by_id, metadata_lock
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -47,7 +48,8 @@ async def create_archive(request: Request, user=Depends(require_role("admin"))):
     if url:
         entry["url"] = url
     archives[archive_id] = entry
-    await run_in_threadpool(atomic_write_json, ARCHIVES_FILE, archives)
+    await run_in_threadpool(save_config_with_git, ARCHIVES_FILE, archives, user["username"],
+                            f"Arhiiv: lisa {archive_id}")
     _invalidate_all_caches()
     return {"status": "success", "id": archive_id, "archive": entry}
 
@@ -67,7 +69,8 @@ async def update_archive(archive_id: str, request: Request, user=Depends(require
     if url:
         entry["url"] = url
     archives[archive_id] = entry
-    await run_in_threadpool(atomic_write_json, ARCHIVES_FILE, archives)
+    await run_in_threadpool(save_config_with_git, ARCHIVES_FILE, archives, user["username"],
+                            f"Arhiiv: uuenda {archive_id}")
     _invalidate_all_caches()
     return {"status": "success", "id": archive_id, "archive": entry}
 
@@ -89,7 +92,8 @@ def delete_archive(archive_id: str, force: bool = False, user=Depends(require_ro
                 detail=f"Arhiiv '{archive_id}' on kasutusel {len(in_use)} teoses: {', '.join(work_titles)}{extra}",
             )
     del archives[archive_id]
-    atomic_write_json(ARCHIVES_FILE, archives)
+    save_config_with_git(ARCHIVES_FILE, archives, user["username"],
+                         message=f"Arhiiv: kustuta {archive_id}")
     _invalidate_all_caches()
     return {"status": "success"}
 
@@ -143,7 +147,8 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
         return {"status": "error", "message": "visibility peab olema 'public' või 'restricted'"}
 
     # Kirjuta tagasi
-    await run_in_threadpool(atomic_write_json, COLLECTIONS_FILE, data)
+    await run_in_threadpool(save_config_with_git, COLLECTIONS_FILE, data, user["username"],
+                            f"Kollektsioon: uuenda {collection_id}")
 
     # Invalideerib cache → järgmine /collections päring laeb uued andmed
     _invalidate_all_caches()
@@ -230,7 +235,8 @@ async def admin_create_collection(request: Request, user=Depends(require_role("s
 
     data[collection_id] = new_col
 
-    await run_in_threadpool(atomic_write_json, COLLECTIONS_FILE, data)
+    await run_in_threadpool(save_config_with_git, COLLECTIONS_FILE, data, user["username"],
+                            f"Kollektsioon: lisa {collection_id}")
 
     _invalidate_all_caches()
     return {"status": "success"}
@@ -352,7 +358,8 @@ def admin_delete_collection(collection_id: str, background_tasks: BackgroundTask
     # Kustuta kollektsioonist
     del data[collection_id]
     _cleanup_allowed_collections_on_delete(collection_id)
-    atomic_write_json(COLLECTIONS_FILE, data)
+    save_config_with_git(COLLECTIONS_FILE, data, user["username"],
+                         message=f"Kollektsioon: kustuta {collection_id}")
 
     _invalidate_all_caches()
     return {"status": "success", "affected_works": len(affected)}

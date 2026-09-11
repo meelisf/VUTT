@@ -15,6 +15,7 @@ from typing import Optional
 
 from ..config import PLACES_FILE, ORIGIN_GROUPS_FILE, PROSOPOGRAPHY_DIR, get_logger
 from ..utils import atomic_write_json
+from ..git_ops import save_config_with_git
 from ..git_ops import save_with_git
 from .locks import merge_operation_lock, person_lock
 
@@ -328,7 +329,7 @@ def get_places_meta() -> dict:
     }
 
 
-def put_group(key: str, data: dict) -> dict:
+def put_group(key: str, data: dict, username: str = "Automaatne") -> dict:
     """Lisab või uuendab gruppi origin_groups.json-s."""
     if not key or not key.strip():
         raise ValueError("Grupi võti on kohustuslik")
@@ -345,12 +346,13 @@ def put_group(key: str, data: dict) -> dict:
         entry["sort_order"] = int(data["sort_order"])
     entry["parent"] = parent
     groups[key] = entry
-    atomic_write_json(ORIGIN_GROUPS_FILE, groups)
+    save_config_with_git(ORIGIN_GROUPS_FILE, groups, username,
+                         message=f"Päritolugrupp: uuenda {key}")
     _load_origin_groups(force_reload=True)
     return {"key": key, "entry": entry}
 
 
-def delete_group(key: str) -> None:
+def delete_group(key: str, username: str = "Automaatne") -> None:
     """Kustutab grupi origin_groups.json-st. Blokeerib kui kasutusel."""
     groups = _load_origin_groups(force_reload=True)
     if key not in groups:
@@ -368,7 +370,8 @@ def delete_group(key: str) -> None:
             f"Ei saa kustutada: grupil on alamgrupid: {', '.join(child_groups)}"
         )
     del groups[key]
-    atomic_write_json(ORIGIN_GROUPS_FILE, groups)
+    save_config_with_git(ORIGIN_GROUPS_FILE, groups, username,
+                         message=f"Päritolugrupp: kustuta {key}")
     _load_origin_groups(force_reload=True)
 
 
@@ -387,7 +390,7 @@ AUTO_PARENT_MAP = {
 }
 
 
-def auto_assign_group_parents() -> dict:
+def auto_assign_group_parents(username: str = "Automaatne") -> dict:
     """Rakendab AUTO_PARENT_MAP automaatselt teadaolevatele alamgruppidele."""
     groups = _load_origin_groups(force_reload=True)
     assigned = 0
@@ -401,13 +404,14 @@ def auto_assign_group_parents() -> dict:
             continue
         groups[child_key]["parent"] = parent_key
         assigned += 1
-    atomic_write_json(ORIGIN_GROUPS_FILE, groups)
+    save_config_with_git(ORIGIN_GROUPS_FILE, groups, username,
+                         message=f"Päritolugrupid: automaatne parent {assigned} grupile")
     _load_origin_groups(force_reload=True)
     logger.info("auto_assign_group_parents: %d uuendatud, %d vahele jäetud", assigned, len(skipped))
     return {"assigned": assigned, "skipped": skipped}
 
 
-def put_place(key: str, data: dict) -> dict:
+def put_place(key: str, data: dict, username: str = "Automaatne") -> dict:
     """
     Lisab või uuendab koha places.json-s.
     Valideerib type enum-i vastu.
@@ -435,7 +439,8 @@ def put_place(key: str, data: dict) -> dict:
         if field in data:
             entry[field] = data[field]
     places[key] = entry
-    atomic_write_json(PLACES_FILE, places)
+    save_config_with_git(PLACES_FILE, places, username,
+                         message=f"Koht: uuenda {key}")
     _load_places_cache(force_reload=True)
     return entry
 
@@ -598,7 +603,7 @@ LIMIT 20
     return {"labels": labels, "type": place_type, "coordinates": coordinates, "parents": parents}
 
 
-def refresh_all_place_labels() -> int:
+def refresh_all_place_labels(username: str = "Automaatne") -> int:
     """Värskendab kõik places.json kirjed Wikidatast mis omavad Q-koodi."""
     places = _load_places_cache(force_reload=True)
     updated = 0
@@ -611,7 +616,8 @@ def refresh_all_place_labels() -> int:
             places[key] = {**entry, "labels": result["labels"]}
             updated += 1
     if updated:
-        atomic_write_json(PLACES_FILE, places)
+        save_config_with_git(PLACES_FILE, places, username,
+                             message=f"Kohad: {updated} labelit Wikidatast")
         _load_places_cache(force_reload=True)
     return updated
 
@@ -689,7 +695,8 @@ def _merge_places_locked(source_key: str, target_key: str, username: str) -> dic
     # 3. Kustuta source
     del places[source_key]
 
-    atomic_write_json(PLACES_FILE, places)
+    save_config_with_git(PLACES_FILE, places, username,
+                         message=f"Kohad: liida {source_key} → {target_key}")
     _load_places_cache(force_reload=True)
 
     logger.info("merge_places: %s → %s, %d isikut ümber suunatud", source_key, target_key, redirected)
@@ -702,7 +709,7 @@ def merge_places(source_key: str, target_key: str, username: str = "system") -> 
         return _merge_places_locked(source_key, target_key, username)
 
 
-def delete_place(key: str) -> None:
+def delete_place(key: str, username: str = "Automaatne") -> None:
     """
     Kustutab koha places.json-st.
     Blokeerib kui kohale on seotud alamkohti või isikuid.
@@ -739,7 +746,8 @@ def delete_place(key: str) -> None:
         )
 
     del places[key]
-    atomic_write_json(PLACES_FILE, places)
+    save_config_with_git(PLACES_FILE, places, username,
+                         message=f"Koht: kustuta {key}")
     _load_places_cache(force_reload=True)
 
     logger.info("delete_place: %s kustutatud", key)

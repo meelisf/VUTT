@@ -106,6 +106,17 @@ from server.config import DATA_CONFIG_DIR, STATE_DIR   # ← ainuõige allikas
 # MITTE: os.path.join(os.path.dirname(__file__), "../state")
 ```
 
+**Jälgitav fail on autoriteetne fail (ADR 0040).** Autoriteetne konfiguratsioon
+(`collections.json`, `archives.json`, `places.json`, `origin_groups.json`, `vocabularies.json`)
+kirjutatakse AINULT `save_config_with_git`-iga (`git_ops.py`) — autor tuleb toimingust,
+taustateel `"Automaatne"`. Tuletatud read-modelid, `person_aliases.json` ja `labels.json`
+ei ole gitis ja kasutavad `atomic_write_json`-i. Valvur: `tests/test_config_git_commit.py`.
+
+`person_aliases.json`-il on KAKS kirjutajat eri võtmeruumis (#347): `rebuild_indices`
+omab `vutt:P…` võtmeid, `people_ops` Wikidata/GND võtmeid (`Q…`, GND-number). Kumbki
+ehitab oma poole nullist, aga EI TOHI teise võtmeid kustutada — `authors_text` Meilis
+otsib just väliste ID-de järgi (`meili_doc.get_creator_aliases`).
+
 Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json ./`
 
 ## Koodi paigutus
