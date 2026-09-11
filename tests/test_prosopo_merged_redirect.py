@@ -40,8 +40,6 @@ def tombstone_dir(tmp_path, monkeypatch):
     }, ensure_ascii=False), encoding="utf-8")
 
     monkeypatch.setattr(person_crud.state, "PROSOPOGRAPHY_DIR", str(d))
-    monkeypatch.setattr(person_crud, "sync_from_facade", lambda: None)
-    monkeypatch.setattr(relations, "sync_from_facade", lambda: None)
     return d
 
 

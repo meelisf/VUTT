@@ -31,11 +31,6 @@ def kaart(tmp_path, monkeypatch):
         BIOGRAPHY_ET: ET_TEKST, BIOGRAPHY_EN: EN_TEKST,
         SRC_ET: None, SRC_EN: None,
     }
-    # sync_from_facade() on update_person'i ESIMENE rida ja võib (kui mõni
-    # varasem test on ops.py fassaadi peal midagi patch'inud, vt _compat.py
-    # _FACADE_DIRTY) tagasi kirjutada meie enda get_person monkeypatch'i —
-    # sama muster mis test_prosopo_legacy_biography.py.
-    monkeypatch.setattr(person_crud, "sync_from_facade", lambda: None)
     monkeypatch.setattr(person_crud, "get_person", lambda pid: dict(seis))
     monkeypatch.setattr(person_crud, "_id_to_path", lambda pid: str(tmp_path / "abc.json"))
     monkeypatch.setattr(person_crud.state, "save_with_git",

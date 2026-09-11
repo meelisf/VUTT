@@ -59,6 +59,8 @@ _SYNC_NAMES = {
 _STATE_ORIGINALS = {name: getattr(state, name) for name in _SYNC_NAMES if hasattr(state, name)}
 _DEFAULT_FACADE: dict[str, Any] = {}
 _MODULE_ORIGINALS: dict[tuple[str, str], Any] = {}
+# Mida ME oleme moodulisse kirjutanud: (kirjutatud väärtus, mis seal enne oli).
+_APPLIED: dict[tuple[str, str], Any] = {}
 _FACADE_DIRTY = False
 
 # Domeenimoodulid, mille module-global'id võivad vanade ops.py monkeypatch'ide tõttu
@@ -98,14 +100,50 @@ def install_facade_patch_hook(module: ModuleType) -> None:
         module.__class__ = _PatchAwareModule
 
 
-def _sync_attr(module: ModuleType, name: str, facade_value: Any) -> None:
-    if not hasattr(module, name):
-        return
+def _module_default(module: ModuleType, name: str) -> Any:
+    """Domeenimooduli vaikeväärtus = ops.py impordil registreeritud objekt.
+
+    Mõõdetud: impordi hetkel on iga domeenimooduli atribuut sama objekt mis
+    fassaadi vaikimisi eksport (77 nime, 0 lahknevust). `_MODULE_ORIGINALS` on
+    ainult varutee nimedele, mida fassaad ei registreeri.
+    """
+    if name in _DEFAULT_FACADE:
+        return _DEFAULT_FACADE[name]
     key = (module.__name__, name)
     if key not in _MODULE_ORIGINALS:
         _MODULE_ORIGINALS[key] = getattr(module, name)
-    default = _DEFAULT_FACADE.get(name, _MODULE_ORIGINALS[key])
-    setattr(module, name, _MODULE_ORIGINALS[key] if facade_value is default else facade_value)
+    return _MODULE_ORIGINALS[key]
+
+
+def _apply(module: Any, name: str, facade_value: Any, default: Any) -> None:
+    """Kanna fassaadi patch domeenimoodulisse — ja AINULT fassaadi patch.
+
+    Vana versioon cache'is „originaali" laisalt esimesel sync'il: kui see hetk
+    tabas testi, mis oli domeenimoodulit OTSE patchinud, talletus mokk
+    originaalina ja kirjutati hiljem sõltumatusse testi tagasi (#342).
+
+    Nüüd on kaks muutust:
+      1. vaikeväärtus tuleb `_DEFAULT_FACADE`-ist (registreeritud ops.py impordil,
+         enne kui ükski test jõuab patchida);
+      2. kui fassaad KANNAB vaikeväärtust, ei puuduta me moodulit üldse — peale
+         selle, et võtame tagasi oma enda varasema kirjutise. Võõrast patchi me
+         ei kirjuta üle ega talleta.
+    """
+    if not hasattr(module, name):
+        return
+    key = (module.__name__, name)
+
+    if facade_value is default:
+        kirjutatud = _APPLIED.pop(key, None)
+        if kirjutatud is not None and getattr(module, name) is kirjutatud[0]:
+            setattr(module, name, kirjutatud[1])
+        return
+
+    if key not in _APPLIED:
+        _APPLIED[key] = (facade_value, getattr(module, name))
+    else:
+        _APPLIED[key] = (facade_value, _APPLIED[key][1])
+    setattr(module, name, facade_value)
 
 
 def sync_from_facade() -> None:
@@ -122,10 +160,10 @@ def sync_from_facade() -> None:
             continue
         value = getattr(facade, name)
         if name in _STATE_ORIGINALS:
-            default = _DEFAULT_FACADE.get(name, _STATE_ORIGINALS[name])
-            setattr(state, name, _STATE_ORIGINALS[name] if value is default else value)
+            _apply(state, name, value, _DEFAULT_FACADE.get(name, _STATE_ORIGINALS[name]))
         for module_name in _DOMAIN_MODULES:
             module = sys.modules.get(module_name)
-            if module is not None:
-                _sync_attr(module, name, value)
+            if module is None:
+                continue
+            _apply(module, name, value, _module_default(module, name))
     _FACADE_DIRTY = False

@@ -39,7 +39,6 @@ def _write_card(tmp_path, monkeypatch, extra: dict):
         json.dumps(card, ensure_ascii=False), encoding="utf-8"
     )
     monkeypatch.setattr(person_crud.state, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
-    monkeypatch.setattr(person_crud, "sync_from_facade", lambda: None)
     return person_crud, prosopo_dir
 
 
@@ -87,7 +86,6 @@ def test_get_person_with_works_ei_tagasta_salajast_valja(tmp_path, monkeypatch):
                           {"auth_token": "11111111-2222-3333"})
     from server.prosopography import relations
 
-    monkeypatch.setattr(relations, "sync_from_facade", lambda: None)
     monkeypatch.setattr(relations, "_load_person_to_works", lambda: {})
 
     person = relations.get_person_with_works("vutt:Pabc123")

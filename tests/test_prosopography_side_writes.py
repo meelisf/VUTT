@@ -25,7 +25,6 @@ def _configure_crud(monkeypatch, tmp_path, person):
 
     monkeypatch.setattr(person_crud.state, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
     monkeypatch.setattr(person_crud.state, "PROSOPOGRAPHY_IMAGES_DIR", str(images_dir))
-    monkeypatch.setattr(person_crud, "sync_from_facade", lambda: None)
     monkeypatch.setattr(person_crud, "get_person", lambda _pid: json.loads(path.read_text()))
     monkeypatch.setattr(person_crud, "_indices", lambda: type("I", (), {
         "_update_index_entry": staticmethod(lambda _p: None),
