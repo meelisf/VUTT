@@ -401,3 +401,128 @@ def test_teosepohine_loendur_ytleb_teosed():
     assert "lehekülge" not in out
     # „kuvatud N lk M teosest" on teosepõhises loendis eksitav
     assert "teosest" not in out
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# TOIMETAJAKIHT (ADR 0041): tekstisisesed annotatsioonid, kommentaarid, märksõnad
+# ══════════════════════════════════════════════════════════════════════════
+
+ANN = {"id": 2, "comment": "kahtlane!", "author": "Administraator",
+       "created_at": "2026-09-13T16:24:08.056Z"}
+
+
+def _lk(**extra):
+    page = {
+        "lehekylje_number": 439,
+        "lehekylje_tekst": "Soræ d. 9 Martij A.o 1662 tuus ex animo",
+        "status": "Töös",
+    }
+    page.update(extra)
+    return page
+
+
+def test_annotatsioon_renderdatakse_ankru_juures():
+    """Märge peab olema TEKSTI SEES.
+
+    Eraldi plokk allpool ei täida ülesannet: mudel, kes loeb „A.o 1662",
+    hakkab kummalise aastaarvu üle arutlema, ilma et teaks, et toimetaja on
+    selle juba kahtlaseks märkinud.
+    """
+    out = fmt.format_pages(
+        [_lk(lehekylje_tekst_ann="Soræ d. 9 Martij A.o <ann2>1662</ann2> tuus ex animo",
+             text_annotations=[ANN])],
+        base_url=BASE, work_id="o17ekb",
+    )
+    assert "1662 ← toimetaja: kahtlane!" in out
+    assert "<ann2>" not in out, "toorest tägi ei tohi vastusesse jääda"
+    # Ümbritsev tekst jääb terveks ja loetavaks
+    assert "Soræ d. 9 Martij" in out
+    assert "tuus ex animo" in out
+
+
+def test_annotatsiooni_autor_tuleb_kaasa():
+    out = fmt.format_pages(
+        [_lk(lehekylje_tekst_ann="A.o <ann2>1662</ann2>", text_annotations=[ANN])],
+        base_url=BASE, work_id="o17ekb",
+    )
+    assert "Administraator" in out
+
+
+def test_ilma_ankruvaljata_kasutatakse_tavalist_teksti():
+    """Enamikul lehtedel `lehekylje_tekst_ann` puudub — vastus ei tohi tühjeneda."""
+    out = fmt.format_pages([_lk()], base_url=BASE, work_id="o17ekb")
+    assert "Soræ d. 9 Martij A.o 1662" in out
+
+
+def test_ankruta_kirje_laheb_eraldi_plokki():
+    """Kirje, mille ankrut tekstis ei ole, ei tohi vaikselt kaduda."""
+    out = fmt.format_pages(
+        [_lk(text_annotations=[{"id": 1, "comment": "ankruta märkus",
+                                "author": "Külli", "created_at": ""}])],
+        base_url=BASE, work_id="o17ekb",
+    )
+    assert "ankruta märkus" in out
+    assert "Külli" in out
+
+
+def test_lehe_kommentaar_naidatakse():
+    out = fmt.format_pages(
+        [_lk(comments=[{"id": "1", "text": "käekiri raskesti loetav",
+                        "author": "Administraator", "created_at": ""}])],
+        base_url=BASE, work_id="o17ekb",
+    )
+    assert "käekiri raskesti loetav" in out
+    assert "kommentaar" in out.lower()
+
+
+def test_lehe_marksonad_naidatakse():
+    out = fmt.format_pages(
+        [_lk(page_tags=["Kiri", "Ladina keel"])],
+        base_url=BASE, work_id="o17ekb",
+    )
+    assert "Kiri" in out and "Ladina keel" in out
+
+
+def test_toimetajakihita_leht_ei_saa_uhtki_lisarida():
+    """Tühjad plokid on müra: 99 % lehtedest ei kanna ühtki märkust."""
+    out = fmt.format_pages([_lk()], base_url=BASE, work_id="o17ekb")
+    for silt in ("toimetaja", "kommentaar", "märksõna", "ankruta"):
+        assert silt not in out.lower()
+
+
+def test_mitu_ankrut_uhel_lehel():
+    out = fmt.format_pages(
+        [_lk(lehekylje_tekst_ann="<ann1>Kuusalu</ann1> ja <ann2>Robo</ann2>",
+             text_annotations=[
+                 {"id": 1, "comment": "koht", "author": "K", "created_at": ""},
+                 {"id": 2, "comment": "isik", "author": "K", "created_at": ""},
+             ])],
+        base_url=BASE, work_id="k9omnw",
+    )
+    assert "Kuusalu ← toimetaja: koht" in out
+    assert "Robo ← toimetaja: isik" in out
+
+
+def test_kirjeta_ankur_ei_jäta_seletamatut_margendit():
+    """Indeks peaks need juba välja filtreerima; renderdaja ei tohi neid kuvada."""
+    out = fmt.format_pages(
+        [_lk(lehekylje_tekst_ann="<ann1>a</ann1> ja <ann7>b</ann7>",
+             text_annotations=[{"id": 1, "comment": "olemas", "author": "K",
+                                "created_at": ""}])],
+        base_url=BASE, work_id="x",
+    )
+    assert "ja b" in out, "ankru sisu jääb, märgend kaob"
+    assert "ann7" not in out
+
+
+def test_otsingutulemus_margib_lehe_millel_on_markusi():
+    """Avastusfaasis peab mudel nägema, kus toimetaja on midagi öelnud."""
+    hit = dict(HIT)
+    hit["text_annotations"] = [ANN]
+    out = fmt.format_search_hits([hit], total=1, base_url=BASE)
+    assert "märkusi: 1" in out
+
+
+def test_otsingutulemus_ei_marki_markusteta_lehte():
+    out = fmt.format_search_hits([HIT], total=1, base_url=BASE)
+    assert "märkusi" not in out

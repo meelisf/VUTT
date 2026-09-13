@@ -90,12 +90,32 @@ def _normalize_comment_texts(comments):
     return out
 
 
-def clean_text_for_search(text):
+# Ajutised märgid `keep_ann`-režiimile. Eraala (U+E000…) ei esine korpuse
+# tekstis ega ole tühikuklassi liige — nii elab ankur puhastuse üle ja
+# taastub `_restore_ann_tags`-is täpselt endisel kujul.
+_ANN_OPEN = '\ue000'
+_ANN_CLOSE = '\ue001'
+_ANN_END = '\ue002'
+
+
+def _restore_ann_tags(text):
+    """Eraala-sentinelid tagasi `<annN>` / `</annN>` kujule."""
+    text = re.sub(_ANN_OPEN + r'(\d+)' + _ANN_END, r'<ann\1>', text)
+    return re.sub(_ANN_CLOSE + r'(\d+)' + _ANN_END, r'</ann\1>', text)
+
+
+def clean_text_for_search(text, keep_ann=False):
     """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
 
     Toetab mõlemat märgendusformaati:
     - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <fn>n</fn>, <pb/>
     - Vana pseudo-markdown: *italic*, **bold*, ~cs~, [[m:text]], --lk--, [^n]
+
+    `keep_ann=True` jätab `<annN>…</annN>` ankrud alles — kõik ÜLEJÄÄNUD
+    märgendus kaob ikka. Nii saab `lehekylje_tekst_ann`, mille peal agent
+    näeb, MILLISE kohta toimetaja märkuse tegi (ADR 0041). Vaikeväärtus on
+    `False`: `lehekylje_tekst` on otsinguväli ja peab jääma märgenditest
+    puhtaks.
     """
     if not text:
         return ""
@@ -104,6 +124,13 @@ def clean_text_for_search(text):
     # <fn>n</fn> ja <pb/> asendame tühikuga, ülejäänud tägid eemaldame
     text = re.sub(r'<fn>\d+</fn>', ' ', text)  # joonealuse viite marker
     text = re.sub(r'<pb/>', ' ', text)           # leheküljevahetus
+    if keep_ann:
+        # Ankur peab elama üle nii üldise tägi-eemaldaja (samm 1) kui ka
+        # poolituste liitmise (3) ja ws-kollapsi (4). Peidame ta ajutiselt
+        # Unicode'i eraalasse: need märgid ei esine korpuse tekstis, ei ole
+        # tühikuklassi liikmed ega satu ühegi allpoolse mustri alla.
+        text = re.sub(r'<ann(\d+)>', _ANN_OPEN + r'\1' + _ANN_END, text)
+        text = re.sub(r'</ann(\d+)>', _ANN_CLOSE + r'\1' + _ANN_END, text)
     text = re.sub(r'</?[a-z]+\d*>', '', text)    # avamis/sulgemistägid (<i>, </i>, <cs>, <ann1>, </ann1> jne)
 
     # 2. Vana pseudo-markdown (legacy, kui faile pole veel migreeritud)
@@ -122,7 +149,11 @@ def clean_text_for_search(text):
 
     # 5. ß → ss (#228). Käib PÄRAST poolituste liitmist, et „gro⸗\nße" liidetaks
     # enne normaliseerimist üheks sõnaks.
-    return normalize_eszett(text)
+    text = normalize_eszett(text)
+
+    # 6. Ankrud sentinelitest tagasi. Viimane samm: enne seda ei tohi `<`
+    # tekstis olla, muidu satuks ankur ise tägi-eemaldaja alla.
+    return _restore_ann_tags(text) if keep_ann else text
 
 
 def _clean_search_text(page_text):
@@ -139,6 +170,38 @@ def _clean_search_text(page_text):
     """
     main_text, marginalia_text = split_marginalia(page_text)
     return clean_text_for_search(main_text), clean_text_for_search(marginalia_text)
+
+
+def build_annotated_search_text(page_text, text_annotations):
+    """Põhitekst, mille `<annN>` ankrud on ALLES — või `None` (ADR 0041).
+
+    Tagastab `None`, kui lehel ei ole ühtki kirjega seotud ankrut. Väli on
+    seetõttu TINGIMUSLIK: korpuses on annotatsioone 171 lehel ~20 000-st, ja
+    tingimusteta väli tähendaks teise täisteksti koopiat igas dokumendis.
+
+    Kirjeta ankur (`<ann7>` ilma `text_annotations` kirjeta) EEMALDATAKSE:
+    mudelile näidatud märgend, mille kohta märkust ei ole, on seletamatu müra.
+    Andmed ise parandab `scripts/reconcile_annotations.py`.
+    """
+    ids = {
+        a["id"] for a in (text_annotations or [])
+        if isinstance(a, dict) and isinstance(a.get("id"), int)
+    } if isinstance(text_annotations, list) else set()
+    if not ids:
+        return None
+
+    main_text, _ = split_marginalia(page_text)
+    annotated = clean_text_for_search(main_text, keep_ann=True)
+    orvud = {
+        int(m.group(1)) for m in re.finditer(r"</?ann(\d+)>", annotated)
+    } - ids
+    if orvud:
+        annotated = re.sub(
+            r"</?ann(\d+)>",
+            lambda m: "" if int(m.group(1)) in orvud else m.group(0),
+            annotated,
+        )
+    return annotated if re.search(r"<ann\d+>", annotated) else None
 
 
 
@@ -503,6 +566,12 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
     ann_text = build_text_annotations_text(text_anns)
     if ann_text is not None:
         doc['text_annotations_text'] = ann_text
+
+    # Ankrutega otsingutekst. TINGIMUSLIK väli (ADR 0041): ilma kirjeteta ei
+    # kirjutata, muidu kannaks iga dokument teise täisteksti koopia.
+    annotated = build_annotated_search_text(page_text, text_anns)
+    if annotated is not None:
+        doc["lehekylje_tekst_ann"] = annotated
 
     return doc
 

@@ -348,3 +348,100 @@ async def test_search_works_next_offset(server_with):
     server, _ = server_with([{"hits": hits, "totalHits": 99}])
     out = await _call(server, "search_works", {"query": "x", "limit": 5})
     assert "offset=5" in out
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# TOIMETAJAKIHT (ADR 0041)
+# ══════════════════════════════════════════════════════════════════════════
+
+def _page_hit(**extra):
+    hit = {
+        "work_id": "o17ekb",
+        "lehekylje_number": 439,
+        "lehekylje_tekst": "Soræ d. 9 Martij A.o 1662",
+        "status": "Töös",
+    }
+    hit.update(extra)
+    return hit
+
+
+@pytest.mark.asyncio
+async def test_get_pages_kysib_toimetajakihi_valjad():
+    """Ilma nende väljadeta ei saa renderdaja märkusi näidata."""
+    fake = FakeClient([{"hits": [_page_hit()], "totalHits": 1}])
+    server = build_server(fake, BASE)
+    await server.call_tool("get_pages", {"work_id": "o17ekb",
+                                         "from_page": 439, "to_page": 439})
+    kysitud = set(fake.bodies[0]["attributesToRetrieve"])
+    for vali in ("lehekylje_tekst_ann", "text_annotations", "comments", "page_tags"):
+        assert vali in kysitud, f"{vali} jäi küsimata"
+
+
+@pytest.mark.asyncio
+async def test_get_pages_naitab_annotatsiooni_ankru_juures():
+    fake = FakeClient([{"hits": [_page_hit(
+        lehekylje_tekst_ann="Soræ d. 9 Martij A.o <ann2>1662</ann2>",
+        text_annotations=[{"id": 2, "comment": "kahtlane!",
+                           "author": "Administraator", "created_at": ""}],
+    )], "totalHits": 1}])
+    server = build_server(fake, BASE)
+    out = await server.call_tool("get_pages", {"work_id": "o17ekb",
+                                               "from_page": 439, "to_page": 439})
+    tekst = str(out)
+    assert "1662 ← toimetaja: kahtlane!" in tekst
+
+
+@pytest.mark.asyncio
+async def test_search_pages_vaikimisi_otsib_ainult_alliktekstist():
+    """Vaikekäitumine EI TOHI muutuda — vaste peab tulema allikast."""
+    fake = FakeClient([{"hits": [], "totalHits": 0}])
+    server = build_server(fake, BASE)
+    await server.call_tool("search_pages", {"query": "kahtlane"})
+    valjad = fake.bodies[0]["attributesToSearchOn"]
+    assert valjad == ["lehekylje_tekst", "marginaalia_tekst"]
+
+
+@pytest.mark.asyncio
+async def test_search_pages_scope_annotation_otsib_toimetajakihist():
+    fake = FakeClient([{"hits": [], "totalHits": 0}])
+    server = build_server(fake, BASE)
+    await server.call_tool("search_pages", {"query": "kahtlane",
+                                            "scope": "annotation"})
+    valjad = set(fake.bodies[0]["attributesToSearchOn"])
+    assert "text_annotations_text" in valjad
+    assert "comments.text" in valjad
+    assert "lehekylje_tekst" not in valjad, "allikatekst ei kuulu sellesse ulatusse"
+
+
+@pytest.mark.asyncio
+async def test_search_pages_scope_all_katab_molemad():
+    fake = FakeClient([{"hits": [], "totalHits": 0}])
+    server = build_server(fake, BASE)
+    await server.call_tool("search_pages", {"query": "kahtlane", "scope": "all"})
+    valjad = set(fake.bodies[0]["attributesToSearchOn"])
+    assert "lehekylje_tekst" in valjad
+    assert "text_annotations_text" in valjad
+
+
+@pytest.mark.asyncio
+async def test_search_pages_tundmatu_scope_annab_selge_vea():
+    """Vaikne tagasilangus vaikeulatusse annaks vale tulemuse ilma märguandeta."""
+    fake = FakeClient([{"hits": [], "totalHits": 0}])
+    server = build_server(fake, BASE)
+    with pytest.raises(ToolError) as exc:
+        await server.call_tool("search_pages", {"query": "x", "scope": "prügi"})
+    sonum = str(exc.value)
+    assert "scope" in sonum
+    assert "annotation" in sonum, "veateade peab lubatud väärtused välja ütlema"
+
+
+@pytest.mark.asyncio
+async def test_search_pages_margib_markustega_lehe():
+    fake = FakeClient([{"hits": [_page_hit(
+        text_annotations=[{"id": 2, "comment": "kahtlane!", "author": "A",
+                           "created_at": ""}],
+    )], "totalHits": 1}])
+    server = build_server(fake, BASE)
+    out = await server.call_tool("search_pages", {"query": "Martij",
+                                                  "work_id": "o17ekb"})
+    assert "märkusi: 1" in str(out)

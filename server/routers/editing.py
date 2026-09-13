@@ -1,7 +1,6 @@
 from ..work_dating import dating_updates
 import json
 import os
-import re
 import unicodedata
 from datetime import datetime
 
@@ -9,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import require_catalog_access
+from ..annotation_ops import apply_restored_annotations, split_page_json
 from ..auth import is_at_least
 from ..cache import get_cached_suggestions
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
@@ -400,19 +400,17 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
     )
     if os.path.exists(json_path):
         current_meta = await run_in_threadpool(_read_json_file, json_path)
-        if restored_json is not None:
-            try:
-                restored_meta = json.loads(restored_json)
-                restored_text_annotations = restored_meta.get('text_annotations', [])
-            except json.JSONDecodeError:
-                restored_text_annotations = None
-        elif not re.search(r"<ann\d+>", content):
-            restored_text_annotations = []
-
-        if restored_text_annotations is not None:
-            current_meta['text_annotations'] = restored_text_annotations
-            current_meta['updated_at'] = datetime.now().isoformat()
-            additional = [(json_path, json.dumps(current_meta, indent=2, ensure_ascii=False))]
+        # Tekst tuleb ühest commitist, kirjed teisest failist — lepitus hoiab
+        # nad ühes tõdes (ADR 0041). Ilma selleta jättis taaste ankruid ilma
+        # kirjeta ja kirjeid ilma ankruta.
+        content, uus_page_json, changed = apply_restored_annotations(
+            content, restored_json, current_meta
+        )
+        restored_meta, _ = split_page_json(uus_page_json)
+        restored_text_annotations = restored_meta.get('text_annotations', [])
+        if changed:
+            uus_page_json['updated_at'] = datetime.now().isoformat()
+            additional = [(json_path, json.dumps(uus_page_json, indent=2, ensure_ascii=False))]
 
     await run_in_threadpool(
         save_with_git,

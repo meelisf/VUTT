@@ -17,6 +17,9 @@ FACET_VALUE_CAP = 5000
 # Väljad, mida otsingutulemuses küsime
 SEARCH_RETRIEVE_FIELDS = [
     "work_id",
+    # Toimetaja märkuse OLEMASOLU juba avastusfaasis (ADR 0041) — ilma selleta
+    # ei tea agent, et lehel on inimese hinnang, mida get_pages näitaks.
+    "text_annotations",
     "title",
     "autor",
     "respondens",
@@ -37,7 +40,16 @@ PAGE_RETRIEVE_FIELDS = [
     "work_id",
     "lehekylje_number",
     "lehekylje_tekst",
+    # Sama tekst ankrutega. TINGIMUSLIK väli — olemas ainult annotatsioonidega
+    # lehel (korpuses 171 lehte ~20 000-st), seega enamik vastuseid ei kanna
+    # teist tekstikoopiat.
+    "lehekylje_tekst_ann",
     "marginaalia_tekst",
+    # Toimetajakiht: tekstisisesed märkused, lehe kommentaarid, lehe märksõnad.
+    # Kõik kolm on inimese hinnang tekstile ja olid MCP eest peidus.
+    "text_annotations",
+    "comments",
+    "page_tags",
     "status",
     "teose_lehekylgede_arv",
 ]
@@ -80,6 +92,40 @@ WORK_OVERVIEW_RETRIEVE_FIELDS = [
 # Sama jaotus nagu töölaual (searchService.ts, scope='original').
 PAGE_SEARCH_FIELDS = ["lehekylje_tekst", "marginaalia_tekst"]
 WORK_SEARCH_FIELDS = PAGE_SEARCH_FIELDS + ["title", "authors_text"]
+
+# Toimetajakihi otsinguulatus (ADR 0041). Need väljad on LEHE tasandil (mitte
+# teose metaandmed), seega ADR 0027 probleem — üks pealkirjavaste teeb kogu
+# teose vasteks — siin ei teki.
+ANNOTATION_SEARCH_FIELDS = [
+    "text_annotations_text",
+    "comments.text",
+    "page_tags_et",
+    "page_tags_en",
+]
+
+# `scope` → otsinguväljad. Vaikimisi "text": vaste peab tulema alliktekstist,
+# muidu loeks mudel toimetaja sõna („kahtlane") allika sõnaks.
+SEARCH_SCOPES = {
+    "text": PAGE_SEARCH_FIELDS,
+    "annotation": ANNOTATION_SEARCH_FIELDS,
+    "all": PAGE_SEARCH_FIELDS + ANNOTATION_SEARCH_FIELDS,
+}
+
+
+def scope_search_fields(scope: str) -> list[str]:
+    """Otsinguväljad ulatuse nime järgi. Tundmatu nimi → `ValueError`.
+
+    Vaikne tagasilangus vaikeulatusse annaks tulemuse, mis vastab teisele
+    küsimusele kui esitatu, ilma et keegi seda märkaks.
+    """
+    try:
+        return SEARCH_SCOPES[scope]
+    except KeyError:
+        raise ValueError(
+            "Tundmatu scope: {!r}. Lubatud: {}.".format(
+                scope, ", ".join(sorted(SEARCH_SCOPES))
+            )
+        ) from None
 
 # Kasutajale nähtav filtrinimi → Meili atribuut
 FACET_FIELDS = {
