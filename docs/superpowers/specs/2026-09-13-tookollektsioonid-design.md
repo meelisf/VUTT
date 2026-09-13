@@ -1,6 +1,6 @@
 # Töökollektsioonid: paindlikud valikud ühises töökeskkonnas
 
-Kuupäev: 2026-09-13 (rev 2)
+Kuupäev: 2026-09-13 (rev 3)
 Staatus: kokku lepitud suund; teostusjärjekord ja vastuvõtukriteeriumid all
 Seotud: #319; ADR 0031, 0038, 0040; `2026-09-13-kollektsioonide-kaks-telge-design.md` (**asendatud**)
 
@@ -85,11 +85,29 @@ avaldamine ja teose lisamine ei muuda teose `collections`, `is_public` ega `shar
 väärtust.
 
 Iga kasutaja näeb kogus ainult teoseid, mida tal on õigus lugeda. Varjatud teoste
-nimesid, ID-sid ega nende arvu talle ei tagastata — **server filtreerib ID-loendi
-`can_read_work`-iga enne tagastamist** ja tenant-token kaitseb lisaks otsingudokumente.
+nimesid, ID-sid ega nende arvu talle ei tagastata — server filtreerib ID-loendi enne
+tagastamist ja tenant-token kaitseb lisaks otsingudokumente.
+
+**Kaks lugemispredikaati, mis ei ole samad.** `can_read_work` (`access_ops.py:31`) tagastab
+tõese ka `shareable`-teose kohta, aga tenant-tokeni filter (`meilisearch_ops.py:586`) on
+`is_public = true OR collections_hierarchy IN [allowed_collections]` — `shareable` seal EI OLE
+ja ei tohi olla (jagatav teos on lingiga avatav, teadlikult mitte otsitav). Ilma otsuseta
+näitaks kogu arv ühte teost, mille sirvimine jääb tühjaks.
+
+Otsus: **ID-loend, mis läheb otsingufiltrisse, kasutab otsingus-nähtavuse predikaati**, mitte
+`can_read_work`-i. Tagajärjed:
+
+- Jagatav-aga-piiratud teos võib olla kogu **liige** (haldur tohib teda lisada, ta näeb teda
+  otselingiga), kuid ta ei kuulu selle kasutaja otsingunimekirja ega arvu.
+- Kogu arv ja sirvimistulemus on alati sama hulk — arv ei luba midagi, mida vaade ei näita.
+- Halduri vaates märgitakse selline liige eraldi („lingiga avatav, otsingus ei kuvata"),
+  et liikme kadumine vaatest ei näiks veana.
 Haldur võib lisada ainult talle loetavaid teoseid. Teose lugemisõiguse kaotamine ei
 eemalda liikmesust; vajadusel saab varjatud või kustutatud viite eemaldada admin.
-Eemaldamine ei nõua struktuurset kodu.
+**Lisamise ja eemaldamise valideerimine on lahus** (§7): lisamine nõuab, et teos eksisteerib ja
+on kutsujale loetav; eemaldamine nõuab ainult olemasolevat liikmesusviidet ja haldusõigust —
+teos ise ei pea enam eksisteerima. Vastasel juhul oleks kustutatud teose viide korraga
+„eemaldatav" ja „valideerimisel tagasi lükatav".
 
 Kollektsioonita teost võib töökollektsiooni lisada. Selle õigused jäävad praeguse
 `can_read_work` / `can_write_work` käitumise järgi määratuks; automaatset püsikogu ei lisata.
@@ -221,10 +239,16 @@ ID genereerib server ja see ei muutu koos nimega. Nõutud on vähemalt üks nimi
 kasutaja sisestatud sisu puuduvat tõlget kuvatakse olemasolevas keeles. Rakenduse
 enda i18n-võtmed lisatakse alati mõlemasse keelde (ADR 0011, `fallbackLng` on väljas).
 
-**Suuruse lagi: 1000 unikaalset liiget kogu kohta.** Piiri jõustab server unikaalsete
-liikmete arvul; piiri ületav lisamine lükatakse **tervikuna** tagasi (409 koos praeguse
-ja lisatava arvuga), mitte ei lisata osaliselt. Lagi on v1 valik, mis kaitseb ühe
+**Suuruse lagi: 1000 unikaalset liiget kogu kohta.** Piiri jõustab server kogu **tegeliku**
+unikaalsete liikmete arvu peal (mitte kutsujale nähtava osa peal); piiri ületav lisamine
+lükatakse **tervikuna** tagasi, mitte ei lisata osaliselt. Lagi on v1 valik, mis kaitseb ühe
 filtripäringu suurust — muutmine on seadistus, mitte arhitektuur.
+
+**Veavastus ei tohi lekitada varjatud liikmete arvu.** Kogu tegelik suurus on
+admin-tasandi info: kui haldur ei näe osa liikmetest, saaks ta arvuga 409-st nende hulga
+lahutamise teel tuletada. Seega: adminile 409 koos praeguse ja lisatava arvuga; mitte-adminile
+üldine mahupiiri viga ilma arvudeta. Sama reegel kehtib igal teel, kus kogu suurus välja
+paistab (§4 koguvalija arv näitab kutsujale nähtavat hulka, mitte tegelikku).
 
 Õiguste autoriteet on `access`, mitte dubleeritud kasutajakirjes. Kasutajahaldus
 loeb ja muudab samu määranguid. Kasutaja vormi salvestamine saadab ainult muudetud
@@ -283,20 +307,47 @@ vaja — liikmesust ei ole kusagil mujal.
 | `PUT /work-sets/{id}/access` | admin muudab sama õiguste allikat mõlemast haldusvaatest |
 | `DELETE /work-sets/{id}` | ainult avaldamata kogu kustutamine |
 
-Muudatused nõuavad oodatud `revision`-it. Liikmete hulgioperatsioon valideeritakse
-tervikuna enne kirjutamist: üks keelatud, tundmatu või laest välja viiv ID → ei rakendata
-ühtki. Korduv lisamine või eemaldamine on idempotentne. Identiteedi-, auditi- ja
+Muudatused nõuavad oodatud `revision`-it. Hulgioperatsioon valideeritakse tervikuna enne
+kirjutamist, kuid **lisamisel ja eemaldamisel on eri reeglid**:
+
+- **Lisamine:** iga ID peab olema olemasolev ja kutsujale loetav teos ning mahtuma lae sisse.
+  Üks keelatud, tundmatu või laest välja viiv ID → ei rakendata ühtki.
+- **Eemaldamine:** piisab olemasolevast liikmesusviitest ja haldusõigusest. Teos ise ei pea
+  eksisteerima — just nii koristatakse kustutatud teoste viiteid. Tundmatu või mitteliikme
+  ID eemaldamine on no-op, mitte viga.
+
+Korduv lisamine või eemaldamine on idempotentne. Identiteedi-, auditi- ja
 avaldamisajaloo väljad määrab server. Klient ei tee autoriseerimisotsust.
 
-`GET /work-sets/{id}/works` on kuum tee (iga otsing kasutab teda) — vastus on
-vahemälustatav kliendis kogu `revision`-i järgi ja serveris `cache.py` TTL-iga.
+`GET /work-sets/{id}/works` on kuum tee (iga otsing kasutab teda), aga **vastus sõltub
+kutsujast**, mitte ainult kogu seisust. Vahemälureeglid:
+
+- **Server autoriseerib iga päringu** — kogu ligipääs ja teoste lugemisõigus kontrollitakse
+  uuesti, TTL-ist ei piisa. Kogu `revision` ei muutu, kui muutub kasutaja õigus või teose
+  nähtavus, seega `revision` üksi ei ole kehtivuse tõend.
+- **`server/cache.py` EI SOBI** selle vastuse hoidmiseks: sealsed vahemälud on globaalsed
+  moodulitasandi muutujad (`_collections_cache`, TTL 300 s) ja kasutajapõhise loendi panek
+  sinna oleks risti-kasutaja leke. Kui serveripoolset vahemälu on vaja, on võti
+  `(set_id, revision, kasutaja, õiguste epohh)` ja õiguste muutus tühistab ta kohe.
+- **Klient hoiab loendit ainult aktiivse valiku jaoks** ja laeb uuesti, kui vahetub valik,
+  muutub liikmesus või muutub autentimisolek.
+
+**Mida aegunud kliendipoolne loend saab ja mida ei saa.** Ei saa anda ligipääsu ühelegi
+dokumendile: tenant-token piirab dokumente sõltumatult sellest, mis ID-d filtrisse pannakse.
+Saab lasta äsja eemaldatud liikmel jätkata **samade ID-de** filtreerimist kuni järgmise
+loendipäringuni — see on teadmine, mis tal juba oli, mitte uus ligipääs. Õiguste äravõtmine
+jõustub täielikult järgmisel loendipäringul; seda ei tohi kirjeldada kui „kohest" brauseris.
 
 Kõik uued teed elavad oma routeris (`server/routers/work_sets.py`), mitte `main.py`-s.
 Blokeeriv I/O `async def` sees on keelatud (ADR 0002).
 
 ## 8. Teostusjärjekord ja vastuvõtt
 
-1. Mõõta suure `work_id IN [...]` filtri jõudlus tekstiotsingus (§4). Tulemus otsustab lae.
+1. Mõõta **kogu ahel**, mitte ainult Meili päring: ID-loendi laadimine koos
+   õiguskontrollidega + tekstiotsing 1000 ID-ga filtriga, ning päise arvude laadimine mitme
+   töökollektsiooni korral (iga kogu arv on omaette serveripäring). Tulemus otsustab lae ja
+   selle, kas arvud tuleb laadida laisalt. Ainult 1000 ID-ga Meili päring ei kata uut
+   serveripoolset kulu.
 2. Salvestus, õigused, API, lukustus ja `revision`-kontroll.
 3. Admini loomine, liikmete haldus, kasutajahalduse õiguste plokk.
 4. Ühine kontekst, päisevalija, URL (`decideCollectionSync`), kõik §4 tabelis nimetatud vaated.
@@ -314,7 +365,12 @@ Vastuvõtukriteeriumid:
 - Päisevalik, otselink ja brauseri edasi/tagasi annavad kõigis vaadetes sama konteksti.
 - Õiguste kadumine ei lülita kasutajat vaikselt piiramata otsingule.
 - Teoste arvud ei sõltu lehekülgede arvust; lehel 2 leiduv tekstivaste läheb arvesse.
-- Samaaegsed muudatused ei kao (`revision` 409); lae ületamine ei jäta osalist tulemust.
+- Samaaegsed muudatused ei kao (`revision` 409); lae ületamine ei jäta osalist tulemust ja
+  mitte-admini veateade ei sisalda kogu tegelikku liikmete arvu.
+- Kustutatud teose viite saab kogust eemaldada; sama ID lisamine ebaõnnestub.
+- Kogu arv ja sirvimistulemus näitavad sama hulka ka siis, kui kogus on `shareable`-liige.
+- Kogust eemaldatud kasutaja järgmine loendipäring tagastab 403; aegunud kliendipoolne
+  ID-loend ei ava ühtki dokumenti, mida tenant-token ei lubaks.
 - Arhiveeritud link töötab; avaldatud kogu tavakustutamine on keelatud.
 - Senised kogu-URL-id, teosekaardid ja õiguskontrollid töötavad muutmata tähendusega.
 - Läbivad `npm run typecheck`, `npm test`, `.venv/bin/pytest tests/`. Võrreldakse
