@@ -24,6 +24,19 @@ MAX_PAGE_SPAN = 20
 _QKOOD = re.compile(r"^Q\d+$")
 
 
+def _scope_fields(scope: str) -> list[str]:
+    """`scope` → otsinguväljad; vigane nimi tuleb mudelini `VuttError`-ina.
+
+    `VuttError` (ToolError alamtüüp) sellepärast, et alates `mcp` 2.1.0-st
+    jõuab mudelini AINULT ToolError-i sõnum — muu asendub tekstiga „Error
+    executing tool X" ja agent kaotab juhise lubatud väärtuste kohta.
+    """
+    try:
+        return queries.scope_search_fields(scope)
+    except ValueError as e:
+        raise VuttError(str(e)) from None
+
+
 def build_server(client=None, base_url: str | None = None) -> MCPServer:
     """Koostab serveri. `client`/`base_url` on testide jaoks süstitavad."""
     if client is None:
@@ -71,6 +84,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         work_id: str | None = None,
         relax_matching: bool = False,
         compact: bool = False,
+        scope: str = "text",
         limit: int = 10,
         offset: int = 0,
     ) -> str:
@@ -101,9 +115,17 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         work_id on teose püsiv lühikood (nanoid, nt "v7Kq2mXp") — kasuta seda
         otsingu piiramiseks ühe teosega. Filtriväärtusi saad list_filter_values'ist.
 
+        scope valib, MILLEST otsitakse: "text" (vaikimisi) = alliktekst ja
+        marginaalia; "annotation" = toimetaja kiht (tekstisisesed märkused,
+        lehe kommentaarid, lehe märksõnad) — nii leiad lehed, mille kohta
+        keegi on midagi öelnud, nt märkuse "kahtlane"; "all" = mõlemad.
+        Toimetaja sõna EI OLE allika sõna, seepärast ei ole see vaikimisi sees.
+
         Tulemuse `seisund` ütleb, kui usaldusväärne transkriptsioon on
-        (skaala serveri juhendis).
+        (skaala serveri juhendis). `märkusi: N` lehereal tähendab, et lehel on
+        N tekstisisest toimetajamärkust — get_pages näitab neid ankru juures.
         """
+        search_fields = _scope_fields(scope)
         # Teoseülene otsing laotatakse teoste peale: tõmbame üle ja kärbime
         # kuni PAGES_PER_WORK lehte teose kohta. Teosesiseses otsingus
         # (work_id antud) on kapp vale — seal ongi küsimus „kus SELLES teoses".
@@ -117,7 +139,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             genre_id=genre_id,
             work_id=work_id,
             relax_matching=relax_matching,
-            search_fields=queries.PAGE_SEARCH_FIELDS,
+            search_fields=search_fields,
             limit=limit,
             offset=offset if work_id else 0,
         )
@@ -210,6 +232,15 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
 
         Korraga kuni 20 lehekülge. Marginaalia tagastatakse eraldi märgistatuna,
         sest see on füüsiliselt eraldi tekstikiht.
+
+        TOIMETAJA MÄRKUSED on tekstis kohapeal kujul
+        ⟦1662 ← toimetaja: kahtlane! (Administraator)⟧ — nooleni jääb
+        ALLIKATEKST, noolest edasi INIMESE märkus selle kohta. Märkus ei ole
+        allika osa: kui toimetaja on aastaarvu, nime või lugemi kahtlaseks
+        märkinud, siis on küsimus juba tõstatatud — ära arutle selle üle, nagu
+        oleks anomaalia märkamata. Teksti järel võivad olla lehe märksõnad,
+        lehe kommentaarid ja [ankruta märkus] (märkus, mille kinnituskoht
+        tekstis on kaotsi läinud).
         """
         span = int(to_page) - int(from_page) + 1
         if span < 1:

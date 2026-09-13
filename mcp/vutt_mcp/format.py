@@ -3,6 +3,8 @@
 Vorming on tahtlikult tihe: pikk agentne jooks teeb kümneid päringuid ja
 JSON-i korduvad võtmenimed sööksid konteksti enne, kui töö algab.
 """
+import re
+
 
 # Seisundite seletust vastuses EI OLE: see elab `instructions.py`-s, mille
 # klient süstib konteksti üks kord seansi kohta. Igas vastuses kordamine
@@ -187,6 +189,54 @@ def collapse_repeats(text: str) -> str:
     return " ".join(valjund) if muudetud else text
 
 
+# Toimetajakiht (ADR 0041). Ankur renderdatakse KOHAPEAL, mitte joonealuse
+# märkusena: mudel, kes loeb „A.o 1662", peab nägema sealsamas, et toimetaja
+# on aastaarvu kahtlaseks märkinud — vastasel juhul hakkab ta kummalise
+# aastaarvu üle arutlema, ehkki küsimus on juba vastatud. Allmärkuseplokk
+# ei täida seda: mudel loeb teksti järjest ja ei pöördu tagasi.
+_ANN_TAG_RE = re.compile(r"<ann(\d+)>([\s\S]*?)</ann\1>")
+# Eraala ei esine korpuse tekstis, seega ei saa märgendit kogemata tekitada.
+ANN_OPEN = "⟦"
+ANN_CLOSE = "⟧"
+
+
+def _ann_notes(page: dict) -> dict:
+    """`{ankru_id: kirje}` — ainult `id`-ga kirjed loevad."""
+    out = {}
+    for ann in page.get("text_annotations") or []:
+        if isinstance(ann, dict) and isinstance(ann.get("id"), int):
+            out[ann["id"]] = ann
+    return out
+
+
+def _ann_label(ann: dict) -> str:
+    """„kahtlane! (Administraator)" — autor sulgudes, kui teada."""
+    comment = (ann.get("comment") or "").strip()
+    author = (ann.get("author") or "").strip()
+    return f"{comment} ({author})" if author else comment
+
+
+def render_annotated_text(text: str, notes: dict) -> tuple[str, set]:
+    """Ankrud tekstis märkusteks. Tagastab `(tekst, kasutatud_id-d)`.
+
+    Kirjeta ankur (`<ann7>` ilma kirjeta) kaotab tägi ja jätab sisu alles:
+    märgend, mille kohta märkust ei ole, oleks mudelile seletamatu müra.
+    Indeks filtreerib need juba välja, aga renderdaja ei tohi seda eeldada.
+    """
+    kasutatud = set()
+
+    def _asenda(match):
+        ann_id = int(match.group(1))
+        sisu = match.group(2)
+        ann = notes.get(ann_id)
+        if ann is None:
+            return sisu
+        kasutatud.add(ann_id)
+        return f"{ANN_OPEN}{sisu} ← toimetaja: {_ann_label(ann)}{ANN_CLOSE}"
+
+    return _ANN_TAG_RE.sub(_asenda, text), kasutatud
+
+
 def format_search_hits(hits: list[dict], total: int, *, base_url: str,
                        compact: bool = False,
                        unit: str = "pages",
@@ -265,6 +315,12 @@ def format_search_hits(hits: list[dict], total: int, *, base_url: str,
                 rida = f"    lk {page} ·" if page is not None else "    lk ? ·"
                 if hit.get("status"):
                     rida += f" seisund={hit['status']} ·"
+                # Toimetaja märkuse OLEMASOLU juba avastusfaasis: ilma selleta
+                # ei tea mudel, et lehel on inimese hinnang, mida get_pages
+                # näitaks — ja ei tule seda küsima.
+                markusi = len(_ann_notes(hit))
+                if markusi:
+                    rida += f" märkusi: {markusi} ·"
                 block.append(rida + " " + work_url(work_id, page, base_url=base_url))
                 snippet = _snippet(hit)
                 if snippet:
@@ -314,13 +370,51 @@ def format_pages(pages: list[dict], *, base_url: str, work_id: str) -> str:
             f"── lk {num} · seisund={page.get('status', '?')} · "
             + work_url(work_id, num, base_url=base_url)
         )
-        blocks.append(collapse_repeats((page.get("lehekylje_tekst") or "").strip()))
+
+        notes = _ann_notes(page)
+        # `lehekylje_tekst_ann` on TINGIMUSLIK väli — olemas ainult
+        # annotatsioonidega lehel. Ilma selleta jääb tavaline otsingutekst.
+        annotated = (page.get("lehekylje_tekst_ann") or "").strip()
+        if annotated and notes:
+            tekst, kasutatud = render_annotated_text(annotated, notes)
+        else:
+            tekst, kasutatud = (page.get("lehekylje_tekst") or "").strip(), set()
+        blocks.append(collapse_repeats(tekst))
+
         marginalia = (page.get("marginaalia_tekst") or "").strip()
         if marginalia:
             # Marginaalia on füüsiliselt eraldi tekstikiht, mitte põhiteksti osa.
             blocks.append(f"[marginaalia] {marginalia}")
+
+        blocks.extend(_editorial_lines(page, notes, kasutatud))
         blocks.append("")
     return "\n".join(blocks)
+
+
+def _editorial_lines(page: dict, notes: dict, anchored: set) -> list[str]:
+    """Ankruta toimetajakiht teksti järel: märksõnad, kommentaarid, orvud.
+
+    Tühje plokke ei väljastata — 99 % lehtedest ei kanna ühtki märkust ja
+    tühi silt maksaks tokeneid iga lehe kohta.
+    """
+    read = []
+    tags = [str(t) for t in (page.get("page_tags") or []) if t]
+    if tags:
+        read.append("  [lehe märksõnad] " + " · ".join(tags))
+    for comment in page.get("comments") or []:
+        if not isinstance(comment, dict):
+            continue
+        text = (comment.get("text") or "").strip()
+        if not text:
+            continue
+        author = (comment.get("author") or "").strip()
+        read.append(f"  [kommentaar] {author + ': ' if author else ''}{text}")
+    # Ankruta kirje: tekstis kohta ei ole, aga inimese tähelepanek on olemas.
+    for ann_id, ann in notes.items():
+        if ann_id in anchored or not (ann.get("comment") or "").strip():
+            continue
+        read.append(f"  [ankruta märkus] {_ann_label(ann)}")
+    return read
 
 
 def format_page_index(pages: list[dict], *, base_url: str, work_id: str) -> str:
