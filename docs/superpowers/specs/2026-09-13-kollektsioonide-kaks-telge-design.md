@@ -3,7 +3,13 @@
 **Kuupäev:** 2026-09-13 (rev 2, arvustuse järel)
 **Seotud:** #319 (valiku-modaal ja haldus), ADR 0031 (kirjutamisõigus), ADR 0007 (read-modelid),
 ADR 0013 (Meili sünk teose kaupa), ADR 0040 (jälgitav fail on autoriteetne)
-**Staatus:** disain, ADR 0042 kirjutatakse teostusel
+**Staatus: ASENDATUD** (2026-09-13) → `2026-09-13-tookollektsioonid-design.md`.
+Mehhanismiks valiti eraldi töökollektsioon (indekseerimata liikmesus), mitte olemasoleva
+kollektsiooni laiendamine. Selle dokumendi mõõtmised ja leiud kehtivad edasi; struktuuripuu
+korrastamine (Keiserliku ülikooli juur, „Määramata", 69 kodutut teost) jääb eraldi tööks #319 all.
+Kandev põhjus asendamiseks: tenant-tokeni filter (`meilisearch_ops.py:586`) kasutab
+`collections_hierarchy`-t lugemisõiguse andmiseks, seega ei ole see väli „ainult otsing"
+ja O8 liitmine oleks jätnud õigusteteljele augu.
 
 ## Probleem
 
