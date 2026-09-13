@@ -1,25 +1,24 @@
-# Kollektsioonide kaks telge: struktuurne päritolu ja temaatiline kogu
+# Kollektsioonide kaks telge: struktuurne kodu ja temaatiline kogu
 
-**Kuupäev:** 2026-09-13
+**Kuupäev:** 2026-09-13 (rev 2, arvustuse järel)
 **Seotud:** #319 (valiku-modaal ja haldus), ADR 0031 (kirjutamisõigus), ADR 0007 (read-modelid),
-ADR 0040 (jälgitav fail on autoriteetne)
-**Staatus:** disain kinnitatud, ADR 0042 kirjutatakse teostusel
+ADR 0013 (Meili sünk teose kaupa), ADR 0040 (jälgitav fail on autoriteetne)
+**Staatus:** disain, ADR 0042 kirjutatakse teostusel
 
 ## Probleem
 
 Kasutajad tahavad koguda teoseid töö ümber: Fischeri konverents, Klingeriana, doktoritöö
-materjal. Osa neist on juba olemas (`pedagoogilis-filoloogilineseminar` on doktoritöö kogu),
-osa saabub. Tahame, et neid saaks juurde tulla ilma et neid saaks *ise* tekitada.
+materjal. Osa on juba olemas (`pedagoogilis-filoloogilineseminar` on doktoritöö kogu), osa
+saabub. Tahame, et neid saaks juurde tulla ilma et neid saaks *ise* tekitada.
 
-„Lubame lihtsalt rohkem kollektsioone" ei tööta, sest `collections` ei ole VUTT-is silt, vaid
-kolme süsteemi ühine võti:
+„Lubame lihtsalt rohkem kollektsioone" ei tööta, sest `collections` ei ole silt, vaid kolme
+süsteemi ühine võti:
 
-1. **Nähtavus** — `meili_doc.py:493`: `is_public = any(kogu on avalik)`. Uus kogu sünnib ilma
-   `visibility` väljata ehk avalikuna (`admin_create_collection`). Piiratud teose lisamine
-   uude kogusse teeks ta avalikuks.
+1. **Nähtavus** — `meili_doc.py:493`: `is_public = any(kogu on avalik)`; uus kogu sünnib ilma
+   `visibility` väljata ehk avalikuna. Klient kordab sama loogikat
+   (`WorkCard.tsx:104` `isRestrictedWork`, `HistoryTab.tsx:375`).
 2. **Kirjutamisulatus** — `can_write_work` (`access_ops.py`) nõuab contributor'ilt
-   `edit_collections ∩ work.collections`. Kommentaar failis ütleb otse: *„Kollektsioonita teos
-   ei ole contributor'ile kirjutatav (fail-closed)."*
+   `edit_collections ∩ work.collections`.
 3. **Nimeruum** — kogu-ID on globaalne: valiku-modaal, fassetid, statistika, MCP, URL-param.
 
 ## Mõõdetud lähteolukord (tootmine, 2026-09-13)
@@ -51,21 +50,29 @@ Kaks leidu, mis kujundasid disaini:
 
 ### O1 — Kollektsioonil on liik
 
-`collections.json`-i `type` väli laieneb: `"structural"` (vaikimisi, kui puudub) |
-`"thematic"` | `"virtual_group"` (olemas). TS-tüüp `collectionService.ts:20` laieneb samamoodi.
+`collections.json`-i `type`: `"structural"` (vaikimisi, kui väli puudub) | `"thematic"` |
+`"virtual_group"` (olemas). TS-tüüp `collectionService.ts:20` laieneb samamoodi.
 
-Piir ei ole suurus ega teema, vaid **funktsioon**:
+Piir on **funktsioon**, mitte suurus ega teema:
 
-- **Struktuurne** — ütleb, kust materjal pärineb. Määrab `is_public`-u ja kirjutamisulatuse.
-- **Temaatiline** — ütleb, mida materjal puudutab. Ei määra kumbagi.
+- **Struktuurne** — teose kodu korpuses. Määrab `is_public`-u ja kirjutamisulatuse.
+- **Temaatiline** — ristuv väide sisu kohta. Ei määra kumbagi.
 
-### O2 — Temaatiline kogu ei määra nähtavust ega ulatust
+### O2 — Temaatiline liikmesus ei jõua kunagi õiguste arvutusse
 
-Invariant, mis on ehituslik, mitte meeldejäetav: `access_ops` ja `is_public` loevad **ainult**
-`_metadata.json`-i `collections` välja, kuhu temaatiline liikmesus ei jõua (O3). Seega:
+Invariant on ehituslik, sest temaatiline liikmesus ei puutu kordagi neid andmeid, mille peal
+õigused arvutatakse. Kolm Meili välja, igal üks tähendus:
 
-- Temaatilisse kogusse lisamine ei saa teha piiratud teost avalikuks.
-- Kuraator ei saa teost oma kogusse tõmmates laiendada kolmanda inimese kirjutusõigust.
+| Väli | Sisu | Tarbija |
+|---|---|---|
+| `collections` | **ainult struktuurne** (= `_metadata.json`) | `is_public`, `WorkCard.isRestrictedWork`, `HistoryTab`, `WorkInfoPanel`, `MetadataModal` |
+| `collections_thematic` | **uus**, ainult temaatiline | kuvamine (kiibid) |
+| `collections_hierarchy` | struktuurne (koos esivanematega) **+ temaatiline** | AINULT otsing, filter, fassetid |
+
+Mõõdetud: kollektsioonifilter kasutab kõikjal eranditult `collections_hierarchy`-t
+(`searchService.ts` 6 kohta, `Statistics.tsx` 2), ja ükski facet ei käi `collections` peal.
+Seega ei ole vaja `collections` välja puutuda — ja kuna `is_public` ning kliendipoolne
+piirangukontroll loevad just seda, on nähtavus kaitstud struktuurselt, mitte reegliga.
 
 Temaatilisel kogul ei ole `visibility` ega `allowed_users` välja; haldus neid ei paku.
 
@@ -76,110 +83,176 @@ Temaatilisel kogul ei ole `visibility` ega `allowed_users` välja; haldus neid e
 | Struktuurne | `_metadata.json` → `collections[]` | teose kausta commit | `save_work_metadata` |
 | Temaatiline | `data/config/collection_members/{id}.json` | `data/` config-commit | `save_config_with_git` (ADR 0040) |
 
-„See teos kuulub Fischerianasse" on kogu kuraatori väide, mitte teose oma. Kolm tagajärge:
-õigus on õige suurusega (kogu-õigus, mitte 803 teose kirjutusõigus), teose git-ajalugu ei
-täitu siltidega, ja kogu kustutamine on üks fail, mitte skann üle 1396 teose.
+„See teos kuulub Fischerianasse" on kogu kuraatori väide, mitte teose oma. Õigus on õige
+suurusega (kogu-õigus, mitte 803 teose kirjutusõigus), teose git-ajalugu ei täitu siltidega ja
+kogu kustutamine on üks fail, mitte skann üle 1396 teose.
 
-### O4 — Temaatilise kogu liikmel peab olema struktuurne kodu
+### O4 — Lahusus jõustatakse KÕIGIS kirjutusteedes
 
-Valvur API-s ja test. Ilma selleta jääksid `is_public` ja ulatus määratlemata (69 teost 79-st
-oleks täna täpselt selles seisus). „Määramata" juur (O6) teeb nõude **alati täidetavaks** —
-uus materjal ei jää kunagi ukse taha sellepärast, et tema päris kodu on veel otsustamata.
+Neli valvurit, mitte üks:
+
+1. **Lisamine** (`POST /collections/{id}/works`): kogu peab olema temaatiline, kutsuja peab
+   teost nägema (`can_read_work`), teosel peab olema vähemalt üks struktuurne kogu.
+2. **Teose metaandmete salvestamine** (`save_work_metadata`): `collections[]` **tõrjub tagasi**
+   temaatilise ja `virtual_group` ID-d (400, nimeliselt). Ilma selleta saaks temaatilise kogu
+   metaandmete kaudu õiguste teljele tagasi tuua.
+3. **Viimase struktuurse kodu eemaldamine**: kui teosel on temaatiline liikmesus, tagastab
+   salvestus 409 ja nimetab kogud. Vaikset ümbertõstmist `maaramata`-sse EI tehta — kodu
+   valimine on kuraatori otsus.
+4. **Struktuurse kogu kustutamine**: teosed, kes jääksid ilma koduta, liiguvad `maaramata`-sse
+   (kustutamine on juba täna teoseid puudutav toiming ja kinnitatakse eraldi).
+
+Frontend: `getWritableCollectionOptions` (`collectionService.ts:242`) välistab täna ainult
+`virtual_group`-i — **peab välistama ka `thematic`-u**, muidu pakub UI temaatilist kogu
+kirjutamisulatuseks, mida `can_write_work` kunagi ei rahulda.
+
+Täpsustus: kollektsioonita teose nähtavus ei ole täna „määratlemata" — ta on **avalik**
+(`is_public` vaikeväärtus) ja contributor'ile **mittekirjutatav** (fail-closed). O4 ei paranda
+viga, vaid hoiab ära uue: temaatilise liikmesuse, mille all ei ole struktuurset alust.
 
 ### O5 — Kasv on kontrollitud kolme väljaga, mitte lubadusega
 
 - **Loomine ja kustutamine jääb superadminile.** Kogusid ei teki ise, nad tellitakse.
-- **`curators: [kasutajanimi]`** — kuraator täidab ja tühjendab oma temaatilist kogu. Ta ei saa
-  luua uut kogu, ei puuduta teiste omi ega saa teoste teksti muuta. „Lisan kogusse" ja
-  „toimetan teost" on kaks eri õigust.
-- **`status: "active" | "archived"`** — lõppenud konverentsi kogu kaob valiku-modaalist, aga
-  link `?collection=fischeriana` ja andmed jäävad. Ajutisus lahendatakse arhiveerimisega,
-  mitte kustutamisega; see on ainus aus vastus kogule, millele on viidatud artiklis.
+- **`curators: [kasutajanimi]`** — kuraator täidab ja tühjendab oma temaatilist kogu. Ei saa
+  luua uut kogu, ei puuduta teiste omi, ei muuda teoste teksti. „Lisan kogusse" ja „toimetan
+  teost" on kaks eri õigust.
+- **`status: "active" | "archived"`** — lõppenud konverentsi kogu kaob valikust, aga link
+  `?collection=fischeriana` ja andmed jäävad. Ajutisus lahendatakse arhiveerimisega, mitte
+  kustutamisega.
 
 ### O6 — Struktuuritelje juured
 
 | Juur | Sisu | Seis |
 |---|---|---|
-| `universitas-dorpatensis-1` (virtuaalgrupp) | AG + AGC + O9 laps | olemas |
-| `keiserlik-ulikool` „Keiserlik ülikool (1802–1918)" | Klingeriana, PFS | **uus** |
-| `vennastekoguduse-materjalid` | 52, piiratud | olemas, jääb juureks |
-| `maaramata` „Määramata" | ajutine hoiukoht | **uus** |
+| `universitas-dorpatensis-1` (virtuaalgrupp) | AG + AGC + `ulikooli-allikad` | olemas |
+| `keiserlik-ulikool` „Keiserlik ülikool (1802–1918)" | `klingeriana`, `pedagoogilis-filoloogilineseminar` | **uus** |
+| `vennastekoguduse-materjalid` | 52, piiratud | olemas |
+| `maaramata` „Määramata" | ajutine hoiukoht, `visibility: "public"` (selgesõnaline) | **uus** |
 
-**Klingeriana ja PFS ei ole temaatilised kogud** — nad on päritolu- ja institutsioonikogud,
-käituvad nagu AG (ainult väiksemalt) ja neil on päris kasutajad päris kirjutusulatusega.
-Mõlemad jäävad struktuurseks ja saavad `parent: keiserlik-ulikool`. Mõõtmine toetab:
-Klingeriana on tervikuna 1803–1831, PFS 1821–1836.
+**Klingeriana ja PFS jäävad struktuurseks.** Põhiargument on ühilduvus, mitte aastaarv: neil on
+päris kasutajad päris kirjutusulatusega (kolm contributorit), ja temaatiliseks muutmine võtaks
+selle ära ilma asenduseta. Aastavahemikud (1803–1831, 1821–1836) toetavad `parent`-i valikut,
+aga ei tõesta päritolu iseenesest.
 
-„Määramata" on **hoiukoht, mitte lõplik kodu**: halduses näitab arvu ja kihutab tagant; kui
-materjali koguneb (nt 1711–1801 või Liivimaa kirikutrükised), tehakse uus juur ja teosed
-liiguvad sinna. Vaikeväärtusena pakkumine on lubatud ainult impordil, kus kodu ei ole teada.
+`maaramata` on **hoiukoht, mitte vaikeväärtus**: halduses nähtav arv, mis kihutab tagant.
+Impordi tee teda automaatselt ei määra — teos jääb kodu valimiseni kollektsioonita, nagu täna.
+Nähtavus on selgesõnaliselt `public`, sest kõik praegused kodutud teosed on juba avalikud;
+piiratud materjal ei tohi kunagi `maaramata` kaudu korpusesse tulla.
 
-### O7 — Sorteerimine ja kuvamine on andmeleping, mitte heuristika
+### O7 — Sorteerimine ja loendamine on andmeleping
 
-#319 modaal rühmitab ja järjestab **nende väljade järgi**, ilma hierarhiat tõlgendamata:
+#319 modaal rühmitab ja järjestab nende väljade järgi, hierarhiat ise tõlgendamata:
 
-1. **Rühm** = `type`. Struktuurne (puuvaates, hierarhiaga) enne temaatilist (lame loend).
+1. **Rühm** = `type`. Struktuurne (puuvaade, hierarhiaga) enne temaatilist (lame loend).
    `virtual_group` on struktuurse puu sõlm, mitte oma rühm.
-2. **Järjekord rühma sees** = `order` kasvavalt, sama vanema laste hulgas. `order`-ita kogud
-   tulevad järjestatute järel, praeguse keele nime järgi tähestikuliselt. Deterministlik, ilma
-   „vaikimisi sorteerib nagu juhtub" olekuta.
-3. **`status: archived`** ei kuvata valikus; URL-iga ligipääs töötab; halduses on oma filter.
-4. **Arvud** tulevad Meili fassetist sama filtriahelaga, millega kasutaja ise otsib (#319
-   invariant). Temaatilised kogud loevad kaasa **ilma eraldi loendusteeta**, sest liitmine
-   toimub indekseerimisel (O8), mitte vaates.
+2. **Järjekord** = `order` kasvavalt sama vanema laste hulgas; `order`-ita kogud järjestatute
+   järel, praeguse keele nime järgi tähestikuliselt. Deterministlik ka siis, kui `order`
+   puudub (täna on ta 3 kogul 8-st). `order` tuleb PUT-iga hallatavaks.
+3. **`status: archived`** ei kuvata valikus; URL-iga ligipääs töötab; halduses oma filter.
+4. **Arv = unikaalseid TEOSEID**, mitte lehekülgi. Indeksis on üks dokument lehekülje kohta ja
+   `facetDistribution` ei arvesta `distinct`-iga (`searchService.ts:541`). Loendus käib
+   olemasolevat teed pidi — `fetchWorkLevelFacets`, mis piirab dokumendihulga iga teose
+   esimese leheküljega (`lehekylje_number = 1`; eeldus kontrollitud 1264/1264) — facet-väljaks
+   `collections_hierarchy`, filtriahel sama, millega kasutaja ise otsib (#319 invariant: muidu
+   lekib piiratud kogu suurus). Teos ilma leheküljeta 1 jääb loendurist välja; see on
+   olemasolev, dokumenteeritud puudujääk, mitte selle töö oma.
 
-`order` tuleb hallatavaks (praegu on väli olemas, aga PUT seda vastu ei võta ja UI ei kasuta).
+### O8 — Liitmine toimub indekseerimisel, ainult ühte välja
 
-### O8 — Liitmine toimub indekseerimisel
+`meili_doc.build_work_documents` saab kaardi `{work_id: [temaatilised kogud]}` **eraldi
+argumendina** ja kasutab teda AINULT `collections_thematic` ja `collections_hierarchy`
+täitmiseks. `is_public` ja `collections` arvutatakse muutumatult struktuursest sisendist.
+`meili_doc` jääb side-effect-vabaks: faili ta ise ei loe.
 
-`meili_doc.build_work_documents` saab kaardi `{work_id: [temaatilised kogud]}` argumendina ja
-liidab ta `collections` + `collections_hierarchy` väljadesse. Mõlemad indekseerimisteed
-(`meilisearch_ops.py` ja `scripts/1-1_consolidate_data.py`) peavad kaardi kaasa andma —
-CLAUDE.md invariant. `meili_doc` jääb side-effect-vabaks: faili ta ise ei loe.
+Mõlemad indekseerimisteed (`meilisearch_ops.py`, `scripts/1-1_consolidate_data.py`) peavad
+kaardi kaasa andma (CLAUDE.md invariant). `collections_thematic` lisandub
+`attributesToRetrieve` loenditesse seal, kus kiipe kuvatakse (`meiliService.ts`,
+`workService.ts`). Filtreeritavaks teda EI tehta — filter käib `collections_hierarchy` kaudu,
+üks tee.
 
-Tagajärg: otsing, fassetid, `?collection=`, statistika, MCP, `WorkCard` ei muutu üldse.
+`work_collections_index.json` (read-model, `/persons` filter) võtab temaatilise liikmesuse
+kaasa: `rebuild_indices()` loeb liikmefailid, `prosopography/indices.py` üksikuuendus samuti.
 
-`work_collections_index.json` (read-model, `/persons` filter) peab temaatilise liikmesuse
-kaasa võtma — `rebuild_indices()` loeb liikmefailid, `prosopography/indices.py` üksikuuendus
-samuti.
+Teadaolev kõrvalmõju: `Workspace.tsx:475` valib „otsi selle teose kogus" jaoks
+`collections_hierarchy[0]` — pärast liitmist võib see olla temaatiline kogu. Eelistus tuleb
+seada struktuursele (`collections[0]`, hierarhia varuvariandina).
 
-### O9 — Virtuaalgrupp ei kanna teoseid
+### O9 — Virtuaalgrupp ei kanna teoseid; struktuur on KODU, mitte päritolutõend
 
-`universitas-dorpatensis-1` kannab täna 1 teost otse (1698. a kirjad ülikoolile) ja sinna
-lisanduks `acad-sekundaar`-i 2 teost. See on kaks korda vale: virtuaalgrupi mõte on „endal
-teoseid ei ole", ja `collectionService.ts:246` jätab virtuaalgrupid **kirjutusulatuse
-valikust välja** — nende teoste jaoks ei saaks ulatust kunagi anda.
+`universitas-dorpatensis-1` kannab täna 1 teost otse (1698. a kirjad ülikoolile). See on kaks
+korda vale: virtuaalgrupi mõte on „endal teoseid ei ole", ja `collectionService.ts:242` jätab
+virtuaalgrupid kirjutusulatuse valikust välja — nende teoste jaoks ei saaks ulatust kunagi anda.
 
-Lahendus: uus struktuurne laps `universitas-dorpatensis-1` all — `ulikooli-allikad`
-„Ülikooli arhivaalid ja allikapublikatsioonid". Sinna lähevad 1698. a kirjad ning
-`acad-sekundaar`-i kaks teost (1932, 1984). Nende sisuline seos Rootsi aja ülikooliga on
-seejuures **temaatiline** väide, mida kannab `acad-sekundaar` (O10) — struktuurselt on nad
-20. sajandi väljaanded.
+Lahendus: uus struktuurne laps `ulikooli-allikad` „Ülikooli arhivaalid ja allikapublikatsioonid"
+`universitas-dorpatensis-1` all. Sinna lähevad 1698. a kirjad ja `acad-sekundaar`-i kaks teost
+(1932, 1984).
 
-### O10 — Migratsioon kahes laines
+**Määratluse täpsustus (arvustuse leid):** struktuurne telg tähendab **teose kodu korpuses** —
+administratiivset paigutust, mille kuju on enamasti päritolu, aga mitte tingimata. Kui telg
+tähendaks rangelt trükise päritolu, oleks 1932. ja 1984. a väljaande paigutamine Rootsi aja
+ülikooli alampuusse vastuolu. „Kodu" määratlus lubab selle ja on kooskõlas sellega, kuidas
+telg juba töötab (`vennastekoguduse-materjalid` on materjalikorpus, mitte trükikoda).
+Teosele jääb seejuures ka temaatiline väide `acad-sekundaar` („on sekundaarkirjandus /
+allikapublikatsioon"), mis on eri telg ja eri väide.
 
-**Laine 1 (selle töö osa):**
+### O10 — `type` ja `parent` muutmine on migratsioonileping, mitte tavaline PUT
+
+- **`type` vahetus on lubatud ainult tühjal, lasteta kogul.** Struktuurne → temaatiline muudab
+  liikmesuse asukohta, nähtavust ja kasutajate õigusi korraga; seda ei tohi teha ühe PUT-iga.
+  Olemasolevad üleminekud teeb migratsiooniskript (O11), mis liigutab liikmesuse, kontrollib
+  `is_public` muutumatust ja resünkib.
+- **`parent` valideerib tsükleid** (uus vanem ei tohi olla enda järeltulija) ja **keelab
+  temaatilise vanema** (temaatiline kogu on lame, tal ei ole `parent`-it ega lapsi).
+- **Alampuu resünk vajab järeltulijate läbimist.** `_find_works_with_collection` leiab ainult
+  otseliikmed; `parent`-i muutmisel tuleb koguda ID-d rekursiivselt (`_collect_descendants`) ja
+  resünkida iga järeltulija teosed, sest `collections_hierarchy` on tuletatud väli.
+
+### O11 — Samaaegsus, taastumine ja kustutamine
+
+- **Liikmefaili kirjutus on lukustatud loe-muuda-salvesta.** Uus `collection_members_lock`
+  (`threading.RLock`, sama muster nagu `metadata_lock`) + kliendilt kaasa tulev `updated_at`;
+  kui fail on vahepeal muutunud, 409 ja klient loeb uuesti. Ilma selleta kirjutavad kaks
+  kuraatorit teineteise muudatuse üle. **Piirang:** lukk on protsessi-lokaalne — mitme
+  workeriga gunicorni juures vajab protsessideülest lukku (sama hoiatus nagu
+  `RENDER_SEMAPHORE`).
+- **Osaline ebaõnnestumine.** Liikmefail on autoriteetne, indeksid tuletatud (ADR 0007):
+  kirjutus õnnestub → resünk puudutatud teostele ADR 0013 dirty-lipu teed pidi; kui resünk
+  kukub, jääb lipp püsti ja täisreindeks (`server_seed_data.sh`) taastab seisu failist.
+  Vastupidist suunda ei ole: indeksist liikmefaili ei ehitata.
+- **Kogu kustutamine** eemaldab liikmefaili, resünkib kõik endised liikmed (muidu jääb
+  `collections_hierarchy`-sse kummitus-ID) ja uuendab `work_collections_index.json`-i.
+  Sama tee käib `status: archived` puhul **läbi ainult siis**, kui arhiveerimine muudab
+  otsitavust — esimeses versioonis ei muuda: arhiveeritud kogu jääb indeksisse, kaob ainult
+  valiku-modaalist.
+- **Tundmatu `work_id`** liikmefailis (kustutatud teos) filtreeritakse lugemisel vaikselt
+  välja; kogu ei tohi katkise viite pärast tühjaks minna ega vigastada indekseerimist.
+
+### O12 — Migratsioon kahes laines
+
+**Laine 1 (selle töö osa), skriptiga, kuivkäivitus vaikimisi, jooksutatakse KONTEINERIST:**
 
 | Samm | Teoseid | Mõju |
 |---|---|---|
 | Uus juur `keiserlik-ulikool` | — | — |
-| `klingeriana`, `pedagoogilis-filoloogilineseminar` → `parent: keiserlik-ulikool` | 47 | alampuu Meili resünk; **liikmesus ja ulatus ei muutu** |
-| Uus juur `maaramata` | — | — |
+| `klingeriana`, `pedagoogilis-filoloogilineseminar` → `parent: keiserlik-ulikool` | 47 | alampuu resünk; **liikmesus ja ulatus ei muutu** |
+| Uus juur `maaramata` (`visibility: public`) | — | — |
 | Uus laps `ulikooli-allikad` | 3 | 1698 + 2 sekundaari teost saavad struktuurse kodu |
-| `acad-sekundaar` → `type: thematic`, liikmed faili | 2 | nähtavus muutumatu (mõlemad avalikud) |
-| `matusetrykised` → `type: thematic`, liikmed faili | 30 | 10-l on kodu (AG 7, AGC 3); **20 vajavad kodu enne** |
-| 20 kodutut matusetrükist → periood või `maaramata` | 20 | vaikimisi `maaramata`; trükikoja järgi AG/AGC või Keiserlik, kui kuraator selle määrab — aastaarv üksi ei ütle trükikoda |
-| 15 kollektsioonita teost → struktuurne kodu või `maaramata` | 15 | muudab nad contributor'ile ulatatavaks; `is_public` ei muutu |
+| `acad-sekundaar` → temaatiline, liikmed faili | 2 | `is_public` muutumatu (kontrollitakse enne/pärast) |
+| 20 kodutut matusetrükist → struktuurne kodu | 20 | vaikimisi `maaramata`; trükikoja järgi AG/AGC või Keiserlik, kui kuraator määrab — aastaarv üksi ei ütle trükikoda |
+| `matusetrykised` → temaatiline, liikmed faili | 30 | alles pärast eelmist sammu (O4 valvur) |
+| 15 kollektsioonita teost → `maaramata` või päris kodu | 15 | muudab nad ulatatavaks; `is_public` ei muutu (olid avalikud) |
 
-**Laine 2 (eraldi, pärast):** Fischeriana kui esimene sündinud-temaatiline kogu. Koodimuudatust
-ei vaja — ainult superadmini loomistoiming + kuraator.
+Skript logib enne ja pärast: iga puudutatud teose `is_public`, ja kolme contributori
+kirjutusõiguse **nimelise** loendi. Erinevus = katkesta.
+
+**Laine 2 (eraldi):** Fischeriana kui esimene sündinud-temaatiline kogu. Koodimuudatust ei vaja.
 
 **Ei migreeru:** `vennastekoguduse-materjalid` (määrab nähtavust), AG, AGC.
 
 ## Andmemudel
 
 ```jsonc
-// data/config/collections.json — kogu kirje
+// data/config/collections.json
 {
   "name": { "et": "Matusetrükised", "en": "Funeral prints" },
   "type": "thematic",              // structural (vaikimisi) | thematic | virtual_group
@@ -188,7 +261,7 @@ ei vaja — ainult superadmini loomistoiming + kuraator.
   "color": "amber",
   "curators": ["kasutajanimi"],    // ainult temaatilisel
   "description": { "et": "…", "en": "…" }
-  // temaatilisel EI OLE: visibility, allowed_users, parent
+  // temaatilisel EI OLE: visibility, allowed_users, parent, children
 }
 ```
 
@@ -202,48 +275,47 @@ ei vaja — ainult superadmini loomistoiming + kuraator.
 }
 ```
 
-Fail on **autoriteetne, mitte tuletatud** → `save_config_with_git` (ADR 0040), mitte
-`atomic_write_json`. Kustutatud teose `work_id` jääb faili kuni järgmise puudutuseni; lugemine
-filtreerib tundmatud ID-d vaikselt välja (kogu ei tohi katkise viite pärast tühjaks minna).
+Fail on **autoriteetne, mitte tuletatud** → `save_config_with_git` (ADR 0040).
 
 ## API
 
-| Endpoint | Roll | Märkus |
+| Endpoint | Roll | Valvurid |
 |---|---|---|
-| `POST /collections/{id}/works` | kuraator või admin | body `{work_ids: []}`; valvurid: kogu on temaatiline, kutsuja näeb teost (`can_read_work`), teosel on struktuurne kodu (O4) |
+| `POST /collections/{id}/works` | kuraator või admin | O4.1; `updated_at` (O11) |
 | `DELETE /collections/{id}/works` | kuraator või admin | sama |
-| `PUT /admin/collections/{id}` | superadmin | laieneb: `name`, `parent`, `order`, `type`, `curators`, `status` (praegu ainult kirjeldus/värv/nähtavus/kasutajad) |
-| `GET /admin/collections/{id}/works-count` | admin | arvestab temaatilist liikmesust |
-
-`parent` muutmine nõuab alampuu teoste Meili resünki (`_find_works_with_collection` on olemas).
-Temaatilise liikmesuse muutmine resünkib ainult puudutatud teosed.
+| `PUT /admin/collections/{id}` | superadmin | laieneb: `name`, `parent`, `order`, `type`, `curators`, `status`; `type` ainult tühjal lasteta kogul (O10); `parent` tsüklikontroll |
+| `GET /admin/collections/{collection_id}/works-count` | admin | arvestab temaatilist liikmesust |
 
 ## Väravad
 
-- **i18n** — uued võtmed **mõlemasse keelde korraga** (ADR 0011).
+- **i18n** — uued võtmed mõlemasse keelde korraga (ADR 0011).
 - `npm run typecheck`, `npm test`, `.venv/bin/pytest tests/`.
-- **Valvurtestid:** (a) temaatiline kogu ei muuda `is_public`-ut; (b) temaatiline liikmesus ei
-  anna `can_write_work`-i; (c) temaatilisse kogusse lisamine ilma struktuurse koduta = 400;
-  (d) mõlemad indekseerimisteed annavad sama `collections_hierarchy` (contract-test);
-  (e) sorteerimisreegel O7 on deterministlik `order`-ita kogude korral.
-- **Migratsiooniskript on kuivkäivitusega vaikimisi** ja käib KONTEINERIST (`data/` git commitib
-  root'ina).
-- Dashboardi esmalaadimise aeg enne/pärast — fasseti-päring ei tohi teda aeglustada (#319).
+- **Valvurtestid:**
+  (a) temaatiline kogu ei muuda `is_public`-ut ega `collections` välja;
+  (b) temaatiline liikmesus ei anna `can_write_work`-i;
+  (c) `save_work_metadata` tõrjub temaatilise/virtuaalse ID `collections`-ist;
+  (d) viimase struktuurse kodu eemaldamine temaatilise liikmesuse juures = 409;
+  (e) lisamine ilma struktuurse koduta = 400;
+  (f) mõlemad indekseerimisteed annavad sama `collections_hierarchy` (contract-test);
+  (g) sorteerimine on deterministlik `order`-ita kogude korral;
+  (h) `parent`-i tsükkel = 400; alampuu resünk puudutab järeltulijaid;
+  (i) paralleelne liikmefaili kirjutus ei kaota muudatust (`updated_at` 409);
+  (j) `getWritableCollectionOptions` ei paku temaatilist kogu.
+- Dashboardi esmalaadimise aeg enne/pärast (#319 nõue).
 
 ## Skoobist väljas
 
 - Isiklikud ajutised nimekirjad (üks kasutaja, jagamata) — eraldi mõiste, eraldi issue.
-- Avalik sirvimisleht `/collections` — #319 ütleb sama.
-- Kogu-ID muutmine ja migratsioon.
+- Avalik sirvimisleht `/collections`; kogu-ID muutmine.
 - #319 valiku-modaali sisu (arvud, kirjeldused, otsinguväli, klaviatuur) — see spekk annab
-  `type`, `order`, `status` lepingu, mille peal #319 ehitab; modaal ise jääb #319-sse.
+  `type`, `order`, `status` ja loendusühiku lepingu, modaal ise jääb #319-sse.
 
 ## Riskid
 
 - **Kaks liikmesuse allikat.** Projekt on selle mustri käes varem kannatanud
-  (`person_to_works`, `person_aliases`). Erinevus: võtmeruumid on lahus (kumbki ei kirjuta
-  teise faili) ja liitmine on ühesuunaline tuletatud välja (O8). Valvur = punkt (d).
-- **Migratsioon puudutab kirjutusõigust.** Klingeriana/PFS `parent`-i muutmine ei tohi
-  `collections` massiivi puutuda; kolme contributori ulatus kontrollitakse enne ja pärast
-  (nimeline loend logisse).
-- **„Määramata" muutub prügikastiks.** Vastumeede: halduses nähtav arv, mitte vaikevalik.
+  (`person_to_works`, `person_aliases`). Erinevus: võtmeruumid on lahus, liitmine ühesuunaline
+  tuletatud väljadesse (O8), ja õiguste pool ei näe temaatilist poolt üldse (O2).
+- **Migratsioon puudutab kirjutusõigust.** Kolme contributori ulatus logitakse nimeliselt enne
+  ja pärast; erinevus katkestab skripti.
+- **„Määramata" muutub prügikastiks.** Vastumeede: halduses nähtav arv, mitte vaikevalik, ja
+  import teda ei määra.
