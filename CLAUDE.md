@@ -29,7 +29,7 @@ Väravad (samad jooksevad CI-s, `.github/workflows/ci.yml`):
 |------|--------|
 | `npm run typecheck` | Vite EI typecheck'i — `build` üksi ei püüa tüübivigu |
 | `npm test` | vitest |
-| `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 49` — parandades LANGETA arvu |
+| `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 44` — parandades LANGETA arvu |
 | `.venv/bin/pytest tests/` | Kasuta ALATI projekti venv-i (`.venv/bin/python`), süsteemi `python3`-l puuduvad sõltuvused |
 
 CI käivitub ainult main'i-PR-idel: virnastatud PR checke ei saa (baasi ümbersuunamine EI käivita, close+reopen käivitab). Merge-stiil = merge-commit.
@@ -92,7 +92,7 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `user_settings/`, `notifications/` | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
-`labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`prosopography/{nanoid}.json`**
+`labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`work_sets/{id}.json`**, **`prosopography/{nanoid}.json`**
 (~2350 isikukaarti; **kaardid JA pildid (`prosopography/images/`) on siin** — pildid ei ole gitis,
 `data/.gitignore` ignoreerib `*.jpg`) ning tuletatud indeksid
 `prosopography_index.json`, `person_to_works.json`, `works_creators_index.json`, `work_collections_index.json`.
@@ -128,10 +128,11 @@ Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json
 
 | Asukoht | Sisu |
 |---|---|
-| `routers/` | `auth`, `admin`, `pages`, `editing`, `public`, `public_registries`, `collections`, `notifications`, `upload`, `reocr`, `ocr_jobs`, `user_settings` |
+| `routers/` | `auth`, `admin`, `pages`, `editing`, `public`, `public_registries`, `collections`, `work_sets`, `notifications`, `upload`, `reocr`, `ocr_jobs`, `user_settings` |
 | `prosopography/` | Oma alampakett + `router.py`: `person_crud`, `person_search`, `merge_ops`, `relations`, `reciprocal_ops`, `work_relations_ops`, `indices`, `places_ops`, `enrichment`, `git_history`, `locks` |
 | `config.py` | Kõik teed, pordid, rate-limitid, CORS, saladuste stardikontroll |
-| `deps.py` | `get_user`, `require_role`, `get_json_data` — üks tõene allikas |
+| `deps.py` | `get_user`, `require_role`, `get_json_data`, `optional_user` — üks tõene allikas |
+| `work_sets_ops.py`, `work_sets_access.py` | Töökollektsioonid (#354, ADR 0042): salvestus + `revision`-lukk; õiguste predikaadid |
 | `metadata_ops.py` | `save_work_metadata()` — **KÕIK `_metadata.json` uuendused** käivad siit (`sync_meili`, `call_ptw`, `background_tasks`) |
 | `meili_doc.py` | Puhas `_metadata.json` → Meili-dokument kaardistus (side-effect-vaba) |
 | `meilisearch_ops.py` | Meili sünk, ThreadPoolExecutor, keep-warm |
@@ -152,7 +153,7 @@ Funktsiooni eemaldamisel kontrolli ka `server/__init__.py` re-eksporte.
 | `prosopography/` | Oma alampuu: `pages/` (PersonsPage + detail/edit), `components/` (PersonCard, personForm, PersonsMap — kaardivaade on PersonsPage'i sees, laisalt laetud), `services/`, `utils/` |
 | `components/editor/` | TextEditor'i osad: CodeMirror-laiendid (`VuttMarkupExtension`, `MarginaliaExtension`), paneelid, hookid (`useEditorState`, `useEditorSave`) |
 | `services/meiliService.ts` | Kõik Meilisearch-operatsioonid (`normalizeWork()` mapib legacy väljanimed) |
-| `contexts/` | `UserContext`, `CollectionContext`, `MeilisearchContext` |
+| `contexts/` | `UserContext`, `CollectionContext` (`selection`: kõik / püsikogu / töökollektsioon), `MeilisearchContext` |
 | `components/` | `EntityPicker` (Wikidata), `MarkdownEditor`/`MarkdownView`, `UnsavedChangesDialog`, `Pagination`, `PageImageEditorModal` |
 
 ### MCP-server (`mcp/`)
@@ -244,13 +245,34 @@ teksti muutma). Komponendisisene olek, mis varem lähtestus remountiga (`isDirty
 kerimispositsioon), tuleb lehevahetuse effectis **selgesõnaliselt** lähtestada. Üldisemalt:
 remount on vaikiv olekulähtestaja — early-returni eemaldamisel auditeeri kogu komponendi olek.
 
+**Töökollektsioonid (ADR 0042)** — kureeritud teoste valik
+(`data/config/work_sets/<id>.json`), MITTE kollektsioon. Kolm reeglit:
+
+- **Liikmesus ei jõua Meilisearchi mitte kusagil** — ei uut välja, ei liitmist
+  `collections` / `collections_hierarchy` sisse. Server tagastab
+  `GET /work-sets/{id}/works` kutsujale **otsingus nähtavad** `work_id`-d ja
+  klient filtreerib `work_id IN [...]` olemasoleva ligipääsufiltri KÕRVAL.
+  Otsingus-nähtavus (`is_search_visible`) kordab tenant-tokeni filtrit, MITTE
+  `can_read_work`-i: `shareable`-teos on lingiga avatav, aga mitte otsitav.
+- **`server/cache.py` ei hoia kasutajapõhiseid vastuseid** — sealsed vahemälud on
+  globaalsed moodulitasandi muutujad; kogu ID-loend sõltub kutsujast → risti-kasutaja leke.
+- **Tühi ID-loend = null tulemust, mitte filtri ärajätmine.** Tühi kogu,
+  ligipääsu tõttu tühjaks filtreeritud kogu ja „kõik teosed" on kolm eri olekut.
+  Laadimata loend (`null`) VISKAB (`selectionFilterClause`) — vaikne tagasilangus
+  piiramata korpusele näitaks teoseid väljaspool valikut. Iga filtrikoht käib
+  `scopeClauses`-ist läbi (`src/services/selectionFilter.ts`), kutsuja ootab
+  `useSelectionScope().ready` ära. Lagi `WORK_SET_MAX_MEMBERS = 1000` (mõõdetud).
+
 **Aktiivne kogu URL-is (ADR 0038)** — kogu sünkroniseerimine URL-i ja `CollectionContext`-i
 vahel elab AINULT `useCollectionUrlSync`-is; suuna otsustab puhas `decideCollectionSync`
 (`src/contexts/collectionSync.ts`). Ära lisa lehele oma vastassuunalist effecti: kaks
 tingimusteta peeglit reageerivad teineteise EELMISELE väärtusele ja ühe sammu faasivahest
 sünnib lõputu URL-i vahetus (#333). Omaksvõtt (URL → kontekst) EI kirjuta URL-i tagasi.
 Leht lähtestatakse 1-le ainult päris vahetusel, mitte peegeldusel ega katkise lingi
-parandusel.
+parandusel. Töökollektsioon käib SAMA otsustaja kaudu ühe tokenina
+(`all` | `<kogu-id>` | `s:<kogu-id>`) — teist efekti `?set=` jaoks EI lisata.
+Püsikogu token on **paljas id**, mitte `c:<id>`: `agreed` võrdleb URL-ist loetud
+tokenit kirjutatuga ja kaks eri kuju ei jõuaks kunagi püsipunkti.
 
 **Eluloo keeleväljad (ADR 0039)** — sisuvälja keel on VÄLJANIMES: `biography_et`,
 `biography_en`, `aa_raw`. `biography` on skeemist eemaldatud ja `update_person`
