@@ -14,7 +14,7 @@ vi.mock('../apiClient', () => ({
 }));
 
 import { apiGet, apiPost } from '../apiClient';
-import { getWorkSetWorkIds, invalidateWorkSetIds, addWorks } from '../workSetService';
+import { getWorkSetWorkIds, invalidateWorkSetIds, addWorks, listWorkSetsSafe } from '../workSetService';
 
 const get = vi.mocked(apiGet);
 const post = vi.mocked(apiPost);
@@ -66,5 +66,32 @@ describe('getWorkSetWorkIds', () => {
     const [x, y] = await Promise.all([getWorkSetWorkIds('ws_1'), getWorkSetWorkIds('ws_1')]);
     expect(get).toHaveBeenCalledTimes(1);
     expect(x).toEqual(y);
+  });
+});
+
+/**
+ * #354 regressioon: `listWorkSets().catch(() => [])` muutis 401-i tühjaks
+ * loendiks. Tagajärg oli nähtamatu — „kogusid ei ole" ja „ei saanud teada"
+ * näevad UI-s ühtemoodi välja, ainult „Lisa" nupp kadus ära.
+ */
+describe('listWorkSetsSafe', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('õnnestumisel annab kogud ja error = null', async () => {
+    get.mockResolvedValue({ work_sets: [{ id: 'ws_1' }] } as never);
+    expect(await listWorkSetsSafe()).toEqual({ sets: [{ id: 'ws_1' }], error: null });
+  });
+
+  it('401 EI OLE tühi loend — viga tuleb kaasa', async () => {
+    const viga = Object.assign(new Error('keelatud'), { status: 401 });
+    get.mockRejectedValue(viga);
+    const r = await listWorkSetsSafe();
+    expect(r.sets).toEqual([]);
+    expect(r.error).toBe(viga);
+  });
+
+  it('päris tühi vastus annab error = null', async () => {
+    get.mockResolvedValue({ work_sets: [] } as never);
+    expect(await listWorkSetsSafe()).toEqual({ sets: [], error: null });
   });
 });

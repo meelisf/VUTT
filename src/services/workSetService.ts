@@ -92,6 +92,24 @@ export async function getWorkSetsForWork(workId: string): Promise<WorkSetSummary
   return data.work_sets;
 }
 
+/**
+ * Loend koos veaga, mitte vea asemel.
+ *
+ * `listWorkSets().catch(() => [])` on mürgine: „kogusid ei ole" ja „ei saanud
+ * teada" näevad UI-s ühtemoodi välja, aga esimene on fakt ja teine on rike.
+ * Aegunud tokeniga 401 muutus nii vaikselt tühjaks loendiks ja „Lisa" nupp
+ * kadus ilma ühegi veateateta (#354).
+ */
+export async function listWorkSetsSafe(
+  includeArchived = false,
+): Promise<{ sets: WorkSetSummary[]; error: Error | null }> {
+  try {
+    return { sets: await listWorkSets(includeArchived), error: null };
+  } catch (e) {
+    return { sets: [], error: e instanceof Error ? e : new Error(String(e)) };
+  }
+}
+
 export async function getWorkSet(setId: string): Promise<WorkSetSummary> {
   const data = await apiGet<{ work_set: WorkSetSummary }>(`/work-sets/${setId}`, AUTH);
   return data.work_set;

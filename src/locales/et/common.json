@@ -213,7 +213,8 @@
     "workPanelTitle": "Töökollektsioonid",
     "notInAny": "Teos ei kuulu ühtegi töökollektsiooni",
     "removeFromSet": "Eemalda kogust",
-    "loadFailed": "Töökollektsioonide laadimine ebaõnnestus"
+    "loadFailed": "Töökollektsioonide laadimine ebaõnnestus",
+    "retry": "Proovi uuesti"
   },
   "error": {
     "unknown": "Viga",
