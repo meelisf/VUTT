@@ -13,7 +13,8 @@
 import { canManageUser, isAtLeast } from '../../utils/roleUtils';
 import { RightsChange } from '../../services/collectionRightsService';
 
-export type RightsBasis = 'public' | 'assigned' | 'role_based' | 'inert';
+// `public` väärtust ei omistata kusagil — avaliku kogu jäänuk on `inert`.
+export type RightsBasis = 'assigned' | 'role_based' | 'inert';
 
 export interface RightsRow {
   username: string;

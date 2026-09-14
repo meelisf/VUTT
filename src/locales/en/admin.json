@@ -147,8 +147,6 @@
       "title": "Access",
       "readRight": "Read access",
       "writeScope": "Write scope",
-      "basisPublic": "Public",
-      "basisAssigned": "Assigned",
       "basisRoleBased": "Derives from role",
       "basisInert": "Currently has no effect: the collection is public",
       "publicNoRead": "This collection is public — a read access entry is neither needed nor allowed.",

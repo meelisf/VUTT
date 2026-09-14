@@ -147,8 +147,6 @@
       "title": "Ligipääs",
       "readRight": "Lugemisõigus",
       "writeScope": "Kirjutamisulatus",
-      "basisPublic": "Avalik",
-      "basisAssigned": "Määratud",
       "basisRoleBased": "Rollist tulenev",
       "basisInert": "Praegu ei mõju: kogu on avalik",
       "publicNoRead": "Kogu on avalik — lugemisõiguse määrangut ei ole vaja ega saa lisada.",

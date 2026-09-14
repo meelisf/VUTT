@@ -18,6 +18,7 @@ import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import {
   applyCollectionRights, getCollectionRights,
 } from '../services/collectionRightsService';
+import { searchUsers } from '../utils/userSearch';
 import {
   affectedUsernames, canAddAllowed, canAddEdit, rightsDelta, rightsRows,
   RightsBasis, RightsState, RightsUser,
@@ -85,15 +86,16 @@ const CollectionAccessPanel: React.FC<CollectionAccessPanelProps> = ({
 
   const lisatavad = useMemo(() => {
     if (!mustand) return [];
-    const q = otsing.trim().toLowerCase();
-    if (!q) return [];
-    return users.filter(u => {
+    if (!otsing.trim()) return [];
+    const lubatud = users.filter(u => {
       if (mustand.allowed.has(u.username) || mustand.edit.has(u.username)) return false;
       // Kui kumbki telg ei ole lubatud (nt virtuaalne rühm), ei pakuta teda
       // üldse: muidu saaks mustandisse määrang, mille server 400-ga tagasi lükkab.
-      if (!canAddAllowed(mustand) && !canAddEdit(mustand, u.role)) return false;
-      return `${u.name} ${u.username} ${u.email}`.toLowerCase().includes(q);
+      return canAddAllowed(mustand) || canAddEdit(mustand, u.role);
     });
+    // Diakriitikatundetu otsing on JAGATUD töökollektsiooni paneeliga: „jogi"
+    // peab leidma „Jõgi" mõlemas paneelis ühtemoodi (#318 koristus).
+    return searchUsers(lubatud, otsing);
   }, [users, mustand, otsing]);
 
   const lyliti = (username: string, field: 'allowed' | 'edit', peal: boolean) => {

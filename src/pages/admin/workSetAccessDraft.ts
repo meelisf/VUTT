@@ -7,7 +7,8 @@
  * Otsus tehakse serveris (`server/work_sets_access.py::check_access_diff`);
  * siin on ainult kuvamisloogika.
  */
-import { isAtLeast } from '../../utils/roleUtils';
+import { canManageUser, isAtLeast } from '../../utils/roleUtils';
+import { searchUsers as otsiKasutajaid } from '../../utils/userSearch';
 import { SetRole } from './workSetAccess';
 
 export type AccessEntryKind = 'normal' | 'role_based' | 'deleted_user';
@@ -32,14 +33,6 @@ export interface KnownUser {
 export interface Actor {
   username: string;
   role: string;
-}
-
-/** Serveri `can_manage_user` peegeldus: RANGELT madalam tase. */
-function tohibHallata(actorRole: string, targetRole: string): boolean {
-  const tasemed = ['contributor', 'editor', 'admin', 'superadmin'];
-  const a = tasemed.indexOf(actorRole);
-  const t = tasemed.indexOf(targetRole);
-  return a > -1 && t > -1 && a > t;
 }
 
 /**
@@ -78,10 +71,10 @@ export function classifyEntries(
       return {
         username, role, kind: 'role_based' as const,
         canChange: false,
-        canRemove: username === actor.username || tohibHallata(actor.role, sihtroll),
+        canRemove: username === actor.username || canManageUser(actor.role, sihtroll),
       };
     }
-    const tohib = tohibHallata(actor.role, sihtroll);
+    const tohib = canManageUser(actor.role, sihtroll);
     return { username, role, kind: 'normal' as const, canChange: tohib, canRemove: tohib };
   });
 }
@@ -93,24 +86,16 @@ export function addableUsers(
   return users.filter(u =>
     !(u.username in (access || {}))
     && !isAtLeast(u.role, 'admin')
-    && tohibHallata(actor.role, u.role));
+    && canManageUser(actor.role, u.role));
 }
 
-/** Diakriitikatundetu otsing nime, kasutajanime ja e-posti järgi. */
-export function searchUsers(users: KnownUser[], query: string): KnownUser[] {
-  const q = normaliseeri(query);
-  if (!q) return users;
-  return users.filter(u =>
-    normaliseeri(u.name).includes(q)
-    || normaliseeri(u.username).includes(q)
-    || normaliseeri(u.email).includes(q));
-}
-
-function normaliseeri(s: string): string {
-  // NFD + kombineerivate märkide eemaldus: „Jõgi" ja „Jogi" peavad leidma
-  // teineteist mõlemas suunas.
-  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-}
+/**
+ * Diakriitikatundetu kasutajaotsing.
+ *
+ * Taaseksport jagatud utiliidist: sama otsingut vajab ka kollektsiooni
+ * ligipääsupaneel ja kaks koopiat lahknesid juba korra (#318 koristus).
+ */
+export const searchUsers = otsiKasutajaid<KnownUser>;
 
 /** Kas mustand erineb laetud kaardist? Muutusteta salvestust ei pakuta. */
 export function draftChanged(
