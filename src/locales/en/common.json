@@ -213,7 +213,8 @@
     "workPanelTitle": "Work collections",
     "notInAny": "This work is not in any work collection",
     "removeFromSet": "Remove from collection",
-    "loadFailed": "Loading work collections failed"
+    "loadFailed": "Loading work collections failed",
+    "retry": "Try again"
   },
   "error": {
     "unknown": "Error",

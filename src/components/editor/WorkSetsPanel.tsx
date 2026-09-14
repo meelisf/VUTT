@@ -27,7 +27,7 @@ interface WorkSetsPanelProps {
 
 const WorkSetsPanel: React.FC<WorkSetsPanelProps> = ({ workId, lang, readOnly }) => {
   const { t } = useTranslation(['common']);
-  const { workSets, refreshWorkSets, setSelection } = useCollection();
+  const { workSets, workSetsError, refreshWorkSets, setSelection } = useCollection();
   const navigate = useNavigate();
   const keel = getLangCode(lang);
 
@@ -55,9 +55,11 @@ const WorkSetsPanel: React.FC<WorkSetsPanelProps> = ({ workId, lang, readOnly })
 
   // Paneel on nähtav ainult siis, kui on midagi näidata või midagi teha.
   // Anonüümsele lugejale, kes ühtki kogu ei näe, oleks tühi kast müra.
+  // ERAND: kogude loendi RIKE ei tohi paneeli peita — muidu näeb kasutaja
+  // ainult kadunud nuppu ja mitte ühtki põhjust (#354).
   if (!workId) return null;
   if (kuuluvus === null) return null;
-  if (kuuluvus.length === 0 && (!managesAny || readOnly)) return null;
+  if (kuuluvus.length === 0 && (!managesAny || readOnly) && !workSetsError) return null;
 
   const lisa = async (setId: string) => {
     setBusy(true);
@@ -112,6 +114,18 @@ const WorkSetsPanel: React.FC<WorkSetsPanelProps> = ({ workId, lang, readOnly })
       </div>
 
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+      {/* Kogude loend ei laadinud: „Lisa" nupp puudub PÕHJUSEGA, mitte vaikselt. */}
+      {workSetsError && !readOnly && (
+        <p className="text-sm text-amber-700 mb-2 flex items-center gap-2">
+          {t('workSets.loadFailed', 'Töökollektsioonide laadimine ebaõnnestus')}
+          <button
+            onClick={() => refreshWorkSets()}
+            className="underline hover:no-underline"
+          >
+            {t('workSets.retry', 'Proovi uuesti')}
+          </button>
+        </p>
+      )}
 
       {kuuluvus.length === 0 ? (
         <p className="text-sm text-gray-400">{t('workSets.notInAny', 'Teos ei kuulu ühtegi töökollektsiooni')}</p>

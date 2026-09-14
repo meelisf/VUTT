@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { getCollections, Collections } from '../services/collectionService';
-import { listWorkSets, WorkSetSummary } from '../services/workSetService';
+import { listWorkSetsSafe, invalidateWorkSetIds, WorkSetSummary } from '../services/workSetService';
+import { useUser } from './UserContext';
 import { CollectionSelection } from '../services/selectionFilter';
 import {
   decideStoredCollection,
@@ -29,6 +30,8 @@ interface CollectionContextType {
 
   // Kutsujale nähtavad töökollektsioonid (aktiivsed)
   workSets: WorkSetSummary[];
+  /** Loendi laadimise viga. `[]` + `null` = kogusid ei ole; `[]` + viga = ei saanud teada. */
+  workSetsError: Error | null;
   refreshWorkSets: () => Promise<void>;
 
   // Kollektsioonide andmed
@@ -52,6 +55,8 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
   const [selection, setSelectionState] = useState<CollectionSelection>({ kind: 'all' });
   const [collections, setCollections] = useState<Collections>({});
   const [workSets, setWorkSets] = useState<WorkSetSummary[]>([]);
+  const [workSetsError, setWorkSetsError] = useState<Error | null>(null);
+  const { authToken, isLoading: authLoading } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const selectedCollection = selection.kind === 'collection' ? selection.id : null;
 
@@ -62,12 +67,11 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
         // Kogud ja töökollektsioonid korraga: valiku lahendamine vajab MÕLEMAT.
         // Töökollektsioonide loendi ebaõnnestumine (nt anonüümne kasutaja) ei
         // tohi kogusid maha võtta — sellest saab tühi loend, mitte viga.
-        const [data, sets] = await Promise.all([
-          getCollections(),
-          listWorkSets().catch(() => [] as WorkSetSummary[]),
-        ]);
+        const [data, wsRes] = await Promise.all([getCollections(), listWorkSetsSafe()]);
+        const sets = wsRes.sets;
         setCollections(data);
         setWorkSets(sets);
+        setWorkSetsError(wsRes.error);
 
         // URL > localStorage > vaikekogu (#323). URL loetakse `window.location`-ist,
         // mitte `useSearchParams`-ist: provider istub Routerist väljaspool ja see
@@ -108,12 +112,32 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
   }, []);
 
   const refreshWorkSets = useCallback(async () => {
-    try {
-      setWorkSets(await listWorkSets());
-    } catch (e) {
-      console.error('Töökollektsioonide uuendamine ebaõnnestus:', e);
-    }
+    const { sets, error } = await listWorkSetsSafe();
+    setWorkSets(sets);
+    setWorkSetsError(error);
+    if (error) console.error('Töökollektsioonide uuendamine ebaõnnestus:', error);
   }, []);
+
+  /**
+   * Kogude loend SÕLTUB kutsujast, seega peab autentimisoleku muutus ta uuesti
+   * laadima. Ilma selleta jäi sisselogimise-eelne (tihti tühi või anonüümne)
+   * loend igavesti kehtima: deploy tappis sessioonid, mount'i päring sai 401 ja
+   * pärast uut sisselogimist ei laetud enam kunagi — „Lisa töökollektsiooni"
+   * nupp oli kadunud ilma ühegi veateateta.
+   *
+   * Esimene laadimine elab init-effectis; siin ainult MUUTUSED, et mount'il ei
+   * tehtaks kahte päringut.
+   */
+  const eelmineToken = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (authLoading) return;
+    if (eelmineToken.current === undefined) { eelmineToken.current = authToken; return; }
+    if (eelmineToken.current === authToken) return;
+    eelmineToken.current = authToken;
+    // Vana kasutaja ID-loendid EI TOHI uuele kasutajale jääda.
+    invalidateWorkSetIds();
+    refreshWorkSets();
+  }, [authToken, authLoading, refreshWorkSets]);
 
   // Laadib kollektsioonid uuesti (nt pärast admin muudatusi)
   const refreshCollections = useCallback(async () => {
@@ -172,14 +196,15 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
     setSelectedCollection,
     collections,
     workSets,
+    workSetsError,
     refreshWorkSets,
     isLoading,
     refreshCollections,
     getCollectionName,
     getCollectionPath
   }), [selection, setSelection, selectedCollection, setSelectedCollection, collections,
-       workSets, refreshWorkSets, isLoading, refreshCollections, getCollectionName,
-       getCollectionPath]);
+       workSets, workSetsError, refreshWorkSets, isLoading, refreshCollections,
+       getCollectionName, getCollectionPath]);
 
   return (
     <CollectionContext.Provider value={value}>
