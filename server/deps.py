@@ -11,11 +11,12 @@ Semantika (main.py päritolu):
 - ``optional_user``: loeb tokeni ``Authorization`` headerist; tagastab ``None``
   anonüümsele. Ei nõua autentimist.
 
-NB: ``server/prosopography/router.py``-s on eraldi ``_get_user``/``_optional_user``
-implementatsioonid, mis toetavad lisaks JSON body-st tokeni lugemist (legacy kanal)
-ja millel on natuke teistsugused semantikad (query-only optional). Need on teadlikult
-eraldi jäetud — nende ühendamine ``deps.py``-sse vajab hoolikat testimist (body stream
-topeltlugemise vältimine) ja tehakse eraldi sammuna.
+NB: ``server/prosopography/router.py``-s on veel eraldi ``_get_user``, mis toetab
+lisaks JSON body-st tokeni lugemist (legacy kanal). Selle ühendamine on #356 lahtine
+osa. Sealne ``_optional_user`` on KUSTUTATUD: ta luges tokeni ainult ``?token=``-ist,
+klient saadab päise, seega tagastas ta päris kasutaja päringul alati ``None``.
+Autentimata kutsuja loetakse prosopograafias nüüd siinse ``optional_user``-iga.
+Valvur: ``tests/test_token_lugeja_uks_reegel.py``.
 """
 from fastapi import HTTPException, Request
 
