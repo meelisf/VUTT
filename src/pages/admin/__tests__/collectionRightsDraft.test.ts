@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  affectedUsernames, canAddAllowed, canAddEdit, rightsDelta, rightsRows,
-  RightsState, RightsUser,
+  affectedUsernames, canAddAllowed, canAddEdit, rightsControl, rightsDelta, rightsRows,
+  rowVisible, RightsState, RightsUser,
 } from '../collectionRightsDraft';
 
 const USERS: RightsUser[] = [
@@ -125,5 +125,47 @@ describe('affectedUsernames', () => {
       { username: 'mari', collection_id: 'k', field: 'edit', action: 'add' },
       { username: 'juri', collection_id: 'k', field: 'allowed', action: 'remove' },
     ])).toEqual(['juri', 'mari']);
+  });
+});
+
+describe('rightsControl — lüliti ainult seal, kus lülitamine midagi muudab', () => {
+  const k = (p: Partial<Parameters<typeof rightsControl>[0]> = {}) =>
+    rightsControl({ basis: 'assigned', checked: false, canManage: true, canAdd: true, ...p });
+
+  it('määratud õigus on lüliti: selle saab maha võtta', () => {
+    expect(k({ basis: 'assigned', checked: true })).toBe('toggle');
+  });
+
+  it('märkimata määrang on lüliti ainult siis, kui lisada üldse saab', () => {
+    expect(k({ checked: false, canAdd: true })).toBe('toggle');
+    // Avalik kogu, virtuaalne rühm, toimetaja ulatus: server lükkaks lisamise
+    // tagasi. Hall kastike, mida ei saa märkida, on ainult müra.
+    expect(k({ checked: false, canAdd: false })).toBe('hidden');
+  });
+
+  it('rollist tulenev õigus ILMA salvestatud kirjeta ei kuvata', () => {
+    // See oli segaduse allikas: kastike, mille olek ei ütle midagi ja mille
+    // lülitamine ei muuda midagi.
+    expect(k({ basis: 'role_based', checked: false })).toBe('hidden');
+  });
+
+  it('salvestatud kirje, mis ei mõju, on koristatav väide', () => {
+    expect(k({ basis: 'role_based', checked: true })).toBe('remnant');
+    expect(k({ basis: 'inert', checked: true })).toBe('remnant');
+  });
+
+  it('ilma haldusõiguseta pole lülitit: olemasolev õigus on väide, puuduv kaob', () => {
+    expect(k({ basis: 'assigned', checked: true, canManage: false })).toBe('fact');
+    expect(k({ basis: 'assigned', checked: false, canManage: false })).toBe('hidden');
+    // Ka jäänukit ei saa koristada see, kes kasutajat hallata ei tohi.
+    expect(k({ basis: 'inert', checked: true, canManage: false })).toBe('fact');
+  });
+});
+
+describe('rowVisible', () => {
+  it('rida, millel ei ole ühtki nähtavat telge, jääb renderdamata', () => {
+    expect(rowVisible('hidden', 'hidden')).toBe(false);
+    expect(rowVisible('hidden', 'remnant')).toBe(true);
+    expect(rowVisible('toggle', 'hidden')).toBe(true);
   });
 });
