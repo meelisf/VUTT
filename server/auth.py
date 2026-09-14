@@ -12,7 +12,7 @@ import bcrypt
 from contextlib import contextmanager
 from datetime import datetime
 from .cache import get_cached_collections
-from .config import USERS_FILE, SESSION_DURATION
+from .config import USERS_FILE, SESSION_DURATION, DELETED_USERNAMES_FILE
 from .utils import atomic_write_json
 from .heartbeat import mark_error, mark_success, register_job
 
@@ -183,6 +183,61 @@ def users_transaction():
     """
     with users_lock:
         yield load_users()
+
+
+class DeletedUsernamesCorrupt(Exception):
+    """Register on olemas, aga loetamatu.
+
+    Tühjana käsitlemine annaks kustutatud nime uuesti välja — seepärast
+    katkestab see konto loomise ja kustutamise, mitte ei jää vaikselt vahele.
+    """
+
+
+_deleted_usernames_cache = None
+
+
+def _load_deleted_usernames_from_file():
+    if not os.path.exists(DELETED_USERNAMES_FILE):
+        return set()
+    try:
+        with open(DELETED_USERNAMES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        raise DeletedUsernamesCorrupt(str(e))
+    if not isinstance(data, list) or any(not isinstance(x, str) for x in data):
+        raise DeletedUsernamesCorrupt("oodatud on stringide list")
+    return set(data)
+
+
+def load_deleted_usernames():
+    """Mälus hoitav `set`: konto loomise nimekontroll on O(1) liikmesuskontroll,
+    mitte töökollektsioonide failide skann."""
+    global _deleted_usernames_cache
+    with users_lock:
+        if _deleted_usernames_cache is None:
+            _deleted_usernames_cache = _load_deleted_usernames_from_file()
+        return _deleted_usernames_cache
+
+
+def is_username_reserved(username):
+    return username in load_deleted_usernames()
+
+
+def reserve_username(username):
+    """Lisab nime registrisse. Cache avaldatakse alles EDUKA kirjutuse järel.
+
+    Kutsutakse ENNE konto eemaldamise salvestust: kui see kukub, jääb konto
+    alles ja kustutamist saab uuesti proovida. Vastupidises järjekorras jääks
+    konto kustutatuks ja nimi vabaks — just see, mida register välistab.
+    """
+    global _deleted_usernames_cache
+    with users_lock:
+        praegu = load_deleted_usernames()
+        if username in praegu:
+            return
+        uus = sorted(praegu | {username})
+        atomic_write_json(DELETED_USERNAMES_FILE, uus)
+        _deleted_usernames_cache = set(uus)
 
 
 # Lae cache serveri stardil
@@ -542,6 +597,13 @@ def delete_user(username, admin_user):
             return False, "Pole õigust seda kasutajat kustutada"
 
         deleted_name = users[username].get("name", username)
+        try:
+            # Reserveering ENNE konto eemaldamist (ADR 0043 p8): kirjutusviga
+            # jätab konto alles, mitte ei vabasta nime.
+            reserve_username(username)
+        except (DeletedUsernamesCorrupt, OSError) as e:
+            print(f"Kustutamine katkestatud: nimeregistri kirjutus ebaõnnestus ({username}): {e}")
+            return False, "Kasutajanime registreerimine ebaõnnestus, proovi uuesti"
         del users[username]
         save_users(users)
 

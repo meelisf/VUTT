@@ -146,6 +146,9 @@ USERS_FILE = os.path.join(_STATE_DIR, "users.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
 RESET_TOKENS_FILE = os.path.join(_STATE_DIR, "reset_tokens.json")
+# Kustutatud kasutajanimede püsiv reserveering (ADR 0043 p8): nime
+# taaskasutus pärandaks uuele kontole vanad access-kirjed.
+DELETED_USERNAMES_FILE = os.path.join(_STATE_DIR, "deleted_usernames.json")
 REOCR_LOG_FILE = os.path.join(_STATE_DIR, "reocr_log.json")
 
 # Konfiguratsioonifailid — data/config/ kaustas (sisemises gitis)

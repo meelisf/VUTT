@@ -32,6 +32,7 @@ def backend_env(tmp_path, monkeypatch):
     pending_registrations_file = state_dir / "pending_registrations.json"
     invite_tokens_file = state_dir / "invite_tokens.json"
     reset_tokens_file = state_dir / "reset_tokens.json"
+    deleted_usernames_file = state_dir / "deleted_usernames.json"
     collections_file = state_dir / "collections.json"
 
     users_file.write_text(
@@ -111,6 +112,8 @@ def backend_env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
     monkeypatch.setattr(auth, "_users_cache", None)
+    monkeypatch.setattr(auth, "DELETED_USERNAMES_FILE", str(deleted_usernames_file))
+    monkeypatch.setattr(auth, "_deleted_usernames_cache", None)
     auth.sessions.clear()
 
     monkeypatch.setattr(registration, "USERS_FILE", str(users_file))
@@ -177,6 +180,7 @@ def backend_env(tmp_path, monkeypatch):
             "users_file": users_file,
             "invite_tokens_file": invite_tokens_file,
             "reset_tokens_file": reset_tokens_file,
+            "deleted_usernames_file": deleted_usernames_file,
             "password_reset": password_reset,
             "collections_file": collections_file,
             "archives_file": archives_file,
