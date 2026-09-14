@@ -9,6 +9,7 @@ import threading
 import time
 import logging
 import bcrypt
+from contextlib import contextmanager
 from datetime import datetime
 from .cache import get_cached_collections
 from .config import USERS_FILE, SESSION_DURATION
@@ -164,6 +165,24 @@ def reload_users_cache():
         _users_cache = _load_users_from_file()
         print(f"Kasutajate cache uuesti laetud: {len(_users_cache)} kasutajat")
         return _users_cache
+
+
+@contextmanager
+def users_transaction():
+    """Kogu loe-kontrolli-muuda-salvesta tsükkel ühe luku all (ADR 0043 p3).
+
+    `load_users()` tagastab JAGATUD `_users_cache` objekti — mitte koopia.
+    Kui üks lõim muudab seda dicti sel ajal, kui teine seda `atomic_write_json`-is
+    serialiseerib, kirjutatakse ketta peale olek, mida kumbki kutsuja ei palunud.
+    `save_users` sees olev lukk kaitseb ainult kirjutamist, mitte kontrolli ja
+    muutmist enne seda.
+
+    `users_lock` on RLock, seega `save_users(users)` tohib olla bloki SEES.
+    Sisse EI panda aeglast kõrvaltegevust (sessioonid, tokenid, e-kiri,
+    parooliräsi) — see hoiaks lukku ilma põhjuseta.
+    """
+    with users_lock:
+        yield load_users()
 
 
 # Lae cache serveri stardil
@@ -340,20 +359,21 @@ def update_user_role(username, new_role, admin_user):
     if username == admin_user["username"]:
         return False, "Ei saa muuta enda rolli"
 
-    users = load_users()
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud"
 
-    if username not in users:
-        return False, "Kasutajat ei leitud"
+        target_current = users[username].get("role", "contributor")
+        # Invariant: tohib target-i puutuda JA tohib uut rolli määrata
+        if not can_change_role(admin_user["role"], target_current, new_role):
+            return False, "Pole õigust seda kasutajat sellele rollile määrata"
 
-    target_current = users[username].get("role", "contributor")
-    # Invariant: tohib target-i puutuda JA tohib uut rolli määrata
-    if not can_change_role(admin_user["role"], target_current, new_role):
-        return False, "Pole õigust seda kasutajat sellele rollile määrata"
+        old_role = target_current
+        users[username]["role"] = new_role
+        save_users(users)
 
-    old_role = target_current
-    users[username]["role"] = new_role
-    save_users(users)
-
+    # Sessioonide ja tokenite käsitlus on TEADLIKULT luku VÄLJAS: nad võtavad
+    # oma lukud ja pesastamine tekitaks lukujärjekorra-sõltuvuse.
     # Invalideeri kasutaja sessioonid, et uus roll jõustuks kohe (sessioon hoiab
     # user-hetktõmmist) — sama muster nagu delete_user. Kasutaja peab uuesti sisse logima.
     invalidated = delete_user_sessions(username)
@@ -387,33 +407,33 @@ def update_user_allowed_collections(username, collection_ids, admin_user):
     if not isinstance(collection_ids, list):
         return False, "Vigane kollektsioonide nimekiri", []
 
-    users = load_users()
-    if username not in users:
-        return False, "Kasutajat ei leitud", []
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud", []
 
-    # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
-    # Blokeerib võrdse/kõrgema taseme ja iseenda — admini piiramine oleks niikuinii mõttetu.
-    target_role = users[username].get("role", "contributor")
-    if not can_manage_user(admin_user["role"], target_role):
-        return False, "Pole õigust selle kasutaja kollektsioone muuta", []
+        # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
+        # Blokeerib võrdse/kõrgema taseme ja iseenda — admini piiramine oleks niikuinii mõttetu.
+        target_role = users[username].get("role", "contributor")
+        if not can_manage_user(admin_user["role"], target_role):
+            return False, "Pole õigust selle kasutaja kollektsioone muuta", []
 
-    # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad restricted-id-d,
-    # järjesta konfiguratsiooni restricted-kollektsioonide järjekorra järgi (stabiilne diff).
-    collections_config = get_cached_collections()
-    submitted = {c for c in collection_ids if isinstance(c, str)}
-    restricted_ordered = [
-        cid for cid, c in collections_config.items()
-        if c.get("visibility") == "restricted"
-    ]
-    sanitized = [cid for cid in restricted_ordered if cid in submitted]
+        # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad restricted-id-d,
+        # järjesta konfiguratsiooni restricted-kollektsioonide järjekorra järgi (stabiilne diff).
+        collections_config = get_cached_collections()
+        submitted = {c for c in collection_ids if isinstance(c, str)}
+        restricted_ordered = [
+            cid for cid, c in collections_config.items()
+            if c.get("visibility") == "restricted"
+        ]
+        sanitized = [cid for cid in restricted_ordered if cid in submitted]
 
-    # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
-    old = users[username].get("allowed_collections", [])
-    if old == sanitized:
-        return True, "Kollektsioonid uuendatud", sanitized
+        # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
+        old = users[username].get("allowed_collections", [])
+        if old == sanitized:
+            return True, "Kollektsioonid uuendatud", sanitized
 
-    users[username]["allowed_collections"] = sanitized
-    save_users(users)
+        users[username]["allowed_collections"] = sanitized
+        save_users(users)
     # Invalideeri sessioonid, et uus ligipääs jõustuks kohe (peegeldab kollektsiooni-poolset
     # CollectionEditor käitumist). Reset-tokeneid EI tühistata — ligipääs ei muuda rolli.
     delete_user_sessions(username)
@@ -469,28 +489,28 @@ def update_user_edit_collections(username, collection_ids, admin_user):
     if not isinstance(collection_ids, list):
         return False, "Vigane kollektsioonide nimekiri", []
 
-    users = load_users()
-    if username not in users:
-        return False, "Kasutajat ei leitud", []
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud", []
 
-    # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
-    target_role = users[username].get("role", "contributor")
-    if not can_manage_user(admin_user["role"], target_role):
-        return False, "Pole õigust selle kasutaja ulatust muuta", []
+        # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
+        target_role = users[username].get("role", "contributor")
+        if not can_manage_user(admin_user["role"], target_role):
+            return False, "Pole õigust selle kasutaja ulatust muuta", []
 
-    # Sanitiseerimine (KÕIGI kollektsioonide vastu, mitte ainult restricted;
-    # virtual_group välja jäetud) — ühine tee registreerimise omaga, vt
-    # sanitize_edit_collections.
-    collections_config = get_cached_collections()
-    sanitized = sanitize_edit_collections(collection_ids, collections_config)
+        # Sanitiseerimine (KÕIGI kollektsioonide vastu, mitte ainult restricted;
+        # virtual_group välja jäetud) — ühine tee registreerimise omaga, vt
+        # sanitize_edit_collections.
+        collections_config = get_cached_collections()
+        sanitized = sanitize_edit_collections(collection_ids, collections_config)
 
-    # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
-    old = users[username].get("edit_collections", [])
-    if old == sanitized:
-        return True, "Ulatus uuendatud", sanitized
+        # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
+        old = users[username].get("edit_collections", [])
+        if old == sanitized:
+            return True, "Ulatus uuendatud", sanitized
 
-    users[username]["edit_collections"] = sanitized
-    save_users(users)
+        users[username]["edit_collections"] = sanitized
+        save_users(users)
     # Sessioon kannab kasutajaobjekti hetktõmmist (require_token tagastab
     # session["user"]) — ilma invalideerimiseta jääks vana ulatus 24h kehtima.
     delete_user_sessions(username)
@@ -513,18 +533,17 @@ def delete_user(username, admin_user):
     if username == admin_user["username"]:
         return False, "Ei saa kustutada ennast"
 
-    users = load_users()
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud"
 
-    if username not in users:
-        return False, "Kasutajat ei leitud"
+        # Invariant: tohib kustutada ainult rangelt madalamat taset
+        if not can_manage_user(admin_user["role"], users[username].get("role", "contributor")):
+            return False, "Pole õigust seda kasutajat kustutada"
 
-    # Invariant: tohib kustutada ainult rangelt madalamat taset
-    if not can_manage_user(admin_user["role"], users[username].get("role", "contributor")):
-        return False, "Pole õigust seda kasutajat kustutada"
-
-    deleted_name = users[username].get("name", username)
-    del users[username]
-    save_users(users)
+        deleted_name = users[username].get("name", username)
+        del users[username]
+        save_users(users)
 
     # Eemalda kasutaja aktiivsed sessioonid (lukuga, vt delete_user_sessions)
     removed = delete_user_sessions(username)
