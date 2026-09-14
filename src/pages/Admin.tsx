@@ -121,6 +121,12 @@ const Admin: React.FC = () => {
       group: t('admin:groups.settings'),
       href: '/admin/places',
     },
+    {
+      key: 'workSets',
+      icon: <Users size={18} className="text-primary-600" />,
+      group: t('admin:groups.content'),
+      href: '/admin/work-sets',
+    },
   ];
 
   return (

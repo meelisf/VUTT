@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
-import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag, Link2, Check } from 'lucide-react';
+import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag, Link2, Check, Users } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
+import { useSelectionScope } from '../hooks/useSelectionScope';
+import { scopeClauses } from '../services/selectionFilter';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
@@ -24,13 +26,23 @@ interface YearCount {
 
 const Statistics: React.FC = () => {
   const { t, i18n } = useTranslation(['statistics', 'common']);
-  const { selectedCollection, getCollectionName, collections } = useCollection();
+  const { selection, selectedCollection, getCollectionName, collections, workSets } = useCollection();
+  const { scope, ready: scopeReady } = useSelectionScope();
+  // Valiku klauslid ühest kohast — statistika ei tohi kasutada oma
+  // teisendust, muidu lahkneb ta otsingust (#354).
+  const scopeFilter = useMemo(() => (scopeReady ? scopeClauses(scope) : []), [scope, scopeReady]);
   const index = useMeiliIndex();
   const navigate = useNavigate();
 
   // Hoiab kogu URL-i ja konteksti kooskõlas (mõlemas suunas, #333)
   useCollectionUrlSync();
   const lang = getLangCode(i18n.language);
+  // Aktiivse töökollektsiooni nimi: ta ei ole `collections`-is, seega
+  // `getCollectionName` ei tea temast midagi.
+  const workSetName = selection.kind === 'work_set'
+    ? (workSets.find(ws => ws.id === selection.id)?.name[lang]
+       ?? t('common:workSets.notFound', 'Töökollektsiooni ei leitud või puudub ligipääs'))
+    : null;
   const [collectionLinkCopied, setCollectionLinkCopied] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -59,12 +71,12 @@ const Statistics: React.FC = () => {
 
   // KPI + staatuse päring (kollektsioon + žanr)
   useEffect(() => {
-    if (!index) return;
+    if (!index || !scopeReady) return;
     const fetchStats = async () => {
       setIsLoading(true);
       try {
         const filter: string[] = [];
-        if (selectedCollection) filter.push(`collections_hierarchy = "${selectedCollection}"`);
+        filter.push(...scopeFilter);
         if (selectedGenre) filter.push(`genre_ids = "${selectedGenre}"`);
 
         const statusResult = await index.search('', {
@@ -100,39 +112,34 @@ const Statistics: React.FC = () => {
     };
 
     fetchStats();
-  }, [selectedCollection, selectedGenre, lang, index]);
+  }, [scopeFilter, scopeReady, selectedGenre, lang, index]);
 
   // Žanride päring
   useEffect(() => {
-    if (!index) return;
+    if (!index || !scopeReady) return;
     const fetchGenres = async () => {
       // Järjestikku, mitte paralleelselt: labelid lahendatakse täpselt nende Q-koodide
       // kohta, mis facetist tulid. Facet-päring on limit:0 (~9 ms) ja labelid tulevad
       // cache'itud registrist, seega järjestikkus on odavam kui vana 5000-hiti skann.
-      const result = await getGenreFacets(index, selectedCollection || undefined, lang);
+      const result = await getGenreFacets(index, scope, lang);
       const labelMap = await getGenreLabelMap(index, result.map(g => g.value), lang);
       setGenres(result);
       setGenreLabelMap(labelMap);
-      if (selectedGenre && !result.find(g => g.value === selectedGenre)) {
-        setSelectedGenre(null);
-      }
+      // Funktsionaalne uuendus, et efekt ei sõltuks `selectedGenre`-ist:
+      // žanri vahetus ei tohi žanriloendit uuesti laadida.
+      setSelectedGenre(prev => (prev && !result.find(g => g.value === prev) ? null : prev));
     };
     fetchGenres();
-  }, [selectedCollection, lang, index]);
+  }, [scope, scopeReady, lang, index]);
 
   // Ajajoone päring — vahemik ja andmed järjestikku (väldib race condition'it)
   useEffect(() => {
-    if (!index) return;
+    if (!index || !scopeReady) return;
     const fetchTimeline = async () => {
       setIsTimelineLoading(true);
       try {
-        const collectionFilter = selectedCollection
-          ? `collections_hierarchy = "${selectedCollection}"`
-          : null;
-
-        // Samm 1: kollektsiooni aasta vahemik (žanrita — annab täpse min/max)
-        const rangeFilter = ['lehekylje_number = 1'];
-        if (collectionFilter) rangeFilter.push(collectionFilter);
+        // Samm 1: valiku aasta vahemik (žanrita — annab täpse min/max)
+        const rangeFilter = ['lehekylje_number = 1', ...scopeFilter];
 
         const rangeResult = await index.search('', { limit: 0, facets: ['year'], filter: rangeFilter });
         const rangeYears = Object.keys(rangeResult.facetDistribution?.year || {})
@@ -154,8 +161,7 @@ const Statistics: React.FC = () => {
         setYearToInput(String(gMax));
 
         // Samm 2: andmed sama vahemiku jaoks (nüüd ka žanrifiltriga)
-        const dataFilter = ['lehekylje_number = 1'];
-        if (collectionFilter) dataFilter.push(collectionFilter);
+        const dataFilter = ['lehekylje_number = 1', ...scopeFilter];
         if (selectedGenre) dataFilter.push(`genre_ids = "${selectedGenre}"`);
 
         const dataResult = await index.search('', { limit: 0, facets: ['year'], filter: dataFilter });
@@ -178,7 +184,7 @@ const Statistics: React.FC = () => {
     };
 
     fetchTimeline();
-  }, [selectedCollection, selectedGenre, lang, index]);
+  }, [scopeFilter, scopeReady, selectedGenre, lang, index]);
 
   // Kuvatav alamhulk (slaiduri vahemik)
   const displayedData = useMemo(
@@ -259,6 +265,15 @@ const Statistics: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8 space-y-3 sm:space-y-6">
 
         {/* Kollektsiooni filter indikaator */}
+        {workSetName && (
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 sm:p-4 flex items-center gap-3">
+            <Users className="text-primary-600" size={20} />
+            <div>
+              <span className="text-sm text-primary-700">{t('common:workSets.section', 'Töökollektsioonid')}:</span>
+              <span className="ml-2 font-bold text-primary-800">{workSetName}</span>
+            </div>
+          </div>
+        )}
         {selectedCollection && (() => {
           const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
           return (
@@ -498,9 +513,11 @@ const Statistics: React.FC = () => {
         <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-200">
           <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 flex-wrap">
             <PieChartIcon size={20} className="text-gray-400 shrink-0" />
-            {selectedCollection
-              ? t('charts.pageStatusInCollection', { collection: getCollectionName(selectedCollection, lang) })
-              : t('charts.pageStatus')}
+            {workSetName
+              ? t('charts.pageStatusInCollection', { collection: workSetName })
+              : selectedCollection
+                ? t('charts.pageStatusInCollection', { collection: getCollectionName(selectedCollection, lang) })
+                : t('charts.pageStatus')}
             {selectedGenre && (
               <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 text-sm font-medium rounded-full">
                 {genreLabelMap[selectedGenre] || selectedGenre}

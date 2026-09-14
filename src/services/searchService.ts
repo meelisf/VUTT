@@ -1,3 +1,4 @@
+import { SelectionScope, scopeClauses } from './selectionFilter';
 import { dateBound } from '../utils/workDating';
 /**
  * Otsing, sirvimis- ja facet-päringud Meilisearchist
@@ -42,6 +43,15 @@ export const pushYearFilter = (filter: string[], yearStart?: number | string, ye
   if (end) filter.push(precise ? `date_start <= ${end}` : `year_start <= ${Math.floor(end / 10000)}`);
 };
 
+/**
+ * ÜKS tee: kõik valiku filtrikohad käivad siit läbi (#354). Kaks haru
+ * („kui selection, siis…, muidu collection") oleks vaikne fallback-ahel —
+ * laadimata loend langeks märkamatult piiramata korpusele.
+ */
+function pushSelectionFilter(filter: string[], scope?: SelectionScope): void {
+  filter.push(...scopeClauses(scope));
+}
+
 const isAbortError = (error: unknown): boolean =>
   (error instanceof DOMException && error.name === 'AbortError') ||
   (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError');
@@ -59,7 +69,7 @@ export interface DashboardSearchOptions {
   pageTags?: string[]; // Lehekülje märksõnad (AND loogika, page_tags_ids)
   onlyFirstPage?: boolean;
   // V2 väljad
-  collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
+  collection?: SelectionScope; // Valik: püsikogu id või töökollektsioon koos ID-loendiga (#354)
   genre?: string[]; // Žanri filter (OR loogika - mitu valikut lubatud)
   type?: string[]; // Tüübi filter (OR loogika - mitu valikut lubatud)
   languages?: string[]; // Teose keele filter (OR loogika, ISO 639-3: lat, grc, deu…)
@@ -92,7 +102,7 @@ export interface SearchWorksResult {
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getTeoseTagsFacets = async (
   index: Index,
-  collection?: string,
+  collection?: SelectionScope,
   _lang: string = 'et',
   yearStart?: number | string,
   yearEnd?: number | string,
@@ -106,9 +116,7 @@ export const getTeoseTagsFacets = async (
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
-    if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
-    }
+    pushSelectionFilter(filter, collection);
     pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
@@ -135,7 +143,7 @@ export const getTeoseTagsFacets = async (
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getGenreFacets = async (
   index: Index,
-  collection?: string,
+  collection?: SelectionScope,
   _lang: string = 'et',
   yearStart?: number | string,
   yearEnd?: number | string,
@@ -148,9 +156,7 @@ export const getGenreFacets = async (
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
-    if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
-    }
+    pushSelectionFilter(filter, collection);
     pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
@@ -177,7 +183,7 @@ export const getGenreFacets = async (
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getTypeFacets = async (
   index: Index,
-  collection?: string,
+  collection?: SelectionScope,
   _lang: string = 'et',
   yearStart?: number | string,
   yearEnd?: number | string,
@@ -190,9 +196,7 @@ export const getTypeFacets = async (
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
-    if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
-    }
+    pushSelectionFilter(filter, collection);
     pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
@@ -312,7 +316,7 @@ export const getTagsLabelMap = (
 // Autorite facetid (author_names väljast)
 export const getAuthorFacets = async (
   index: Index,
-  collection?: string,
+  collection?: SelectionScope,
   yearStart?: number | string,
   yearEnd?: number | string,
   signal?: AbortSignal
@@ -321,9 +325,7 @@ export const getAuthorFacets = async (
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
-    if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
-    }
+    pushSelectionFilter(filter, collection);
     pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
@@ -382,10 +384,9 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
     if (options?.teoseTags && options.teoseTags.length > 0) {
       for (const tag of options.teoseTags) filter.push(buildTagFilter(tag));
     }
-    // V2: Kollektsiooni filter (kasutab collections_hierarchy, et kaasata alamkollektsioonid)
-    if (options?.collection) {
-      filter.push(`collections_hierarchy = "${options.collection}"`);
-    }
+    // V2: Valiku filter — püsikogu `collections_hierarchy` või töökollektsiooni
+    // `work_id IN [...]` (#354).
+    pushSelectionFilter(filter, options?.collection);
     // V2: Žanri filter (Q-kood → genre_ids, label → bilinguaalne OR)
     if (options?.genre && options.genre.length > 0) {
       filter.push(buildMultiFilter(options.genre, buildGenreFilter));
@@ -619,10 +620,8 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
   if (options.pageTags && options.pageTags.length > 0) {
     for (const tag of options.pageTags) filter.push(buildPageTagFilter(tag));
   }
-  // V2: Kollektsiooni filter — kui workId on seatud, on teos juba piiratud, kollektsioon ei rakendu
-  if (options.collection && !options.workId) {
-    filter.push(`collections_hierarchy = "${options.collection}"`);
-  }
+  // V2: Valiku filter — kui workId on seatud, on teos juba piiratud, valik ei rakendu
+  if (!options.workId) pushSelectionFilter(filter, options.collection);
   // V2: Žanri filter
   if (options.genre && options.genre.length > 0) {
     filter.push(buildMultiFilter(options.genre, buildGenreFilter));
@@ -920,3 +919,5 @@ export const getAllTags = async (index: Index, lang: string = 'et'): Promise<{ l
     return [];
   }
 };
+
+export type { SelectionScope };

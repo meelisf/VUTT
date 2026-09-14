@@ -187,6 +187,13 @@ RUN_DIR_REAP_GRACE = 600   # s; mõõdetud batch (4 lk) ≈ 100 s, varu on tahtl
 PROSOPOGRAPHY_DIR = os.path.join(_DATA_CONFIG_DIR, "prosopography")
 PROSOPOGRAPHY_IMAGES_DIR = os.path.join(PROSOPOGRAPHY_DIR, "images")
 
+# Töökollektsioonid (#354, ADR 0042): kureeritud teoste valikud. Liikmesus on
+# autoriteetne konfiguratsioon (commititakse), MITTE tuletatud read-model.
+WORK_SETS_DIR = os.path.join(_DATA_CONFIG_DIR, "work_sets")
+# Mõõdetud tootmises (#354 Task 1): 1000 liiget = ~36 ms ID-loend + ~4 ms Meili
+# filtrit. Lagi ei ole jõudluspiirang, vaid kaitse ühe filtripäringu suuruse vastu.
+WORK_SET_MAX_MEMBERS = 1000
+
 # Album Academicum referentsandmed
 AA_FILE = os.path.join(_PROJECT_ROOT, "reference_data", "album_academicum.json")
 

@@ -1,11 +1,35 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { getCollections, Collections } from '../services/collectionService';
-import { COLLECTION_PARAM, decideStoredCollection, resolveInitialCollection } from './collectionUrl';
+import { listWorkSets, WorkSetSummary } from '../services/workSetService';
+import { CollectionSelection } from '../services/selectionFilter';
+import {
+  decideStoredCollection,
+  parseSelection,
+  readSelectionToken,
+  resolveInitialCollection,
+  serializeSelection,
+} from './collectionUrl';
 
 interface CollectionContextType {
-  // Valitud kollektsiooni ID (null = kõik tööd)
+  /**
+   * Aktiivne valik: kõik teosed, püsikogu või töökollektsioon (#354).
+   * See on ainus tõene allikas; `selectedCollection` on temast tuletatud.
+   */
+  selection: CollectionSelection;
+  setSelection: (selection: CollectionSelection) => void;
+
+  /**
+   * Valitud PÜSIKOGU ID (null = kõik tööd VÕI aktiivne töökollektsioon).
+   * Tagasiühilduv vaade `selection`-ile: kutsujad, kes töökollektsiooni ei
+   * tunne, käituvad tema ajal nagu „kõik teosed". Uus kood kasutagu
+   * `selection`-it — muidu näeb ta valikust mööda.
+   */
   selectedCollection: string | null;
   setSelectedCollection: (id: string | null) => void;
+
+  // Kutsujale nähtavad töökollektsioonid (aktiivsed)
+  workSets: WorkSetSummary[];
+  refreshWorkSets: () => Promise<void>;
 
   // Kollektsioonide andmed
   collections: Collections;
@@ -25,28 +49,53 @@ const STORAGE_KEY = 'vutt_collection';
 const DEFAULT_COLLECTION = 'universitas-dorpatensis-1';
 
 export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [selectedCollection, setSelectedCollectionState] = useState<string | null>(null);
+  const [selection, setSelectionState] = useState<CollectionSelection>({ kind: 'all' });
   const [collections, setCollections] = useState<Collections>({});
+  const [workSets, setWorkSets] = useState<WorkSetSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const selectedCollection = selection.kind === 'collection' ? selection.id : null;
 
   // Lae kollektsioonid ja taasta valik localStorage'ist
   useEffect(() => {
     const init = async () => {
       try {
-        const data = await getCollections();
+        // Kogud ja töökollektsioonid korraga: valiku lahendamine vajab MÕLEMAT.
+        // Töökollektsioonide loendi ebaõnnestumine (nt anonüümne kasutaja) ei
+        // tohi kogusid maha võtta — sellest saab tühi loend, mitte viga.
+        const [data, sets] = await Promise.all([
+          getCollections(),
+          listWorkSets().catch(() => [] as WorkSetSummary[]),
+        ]);
         setCollections(data);
+        setWorkSets(sets);
 
         // URL > localStorage > vaikekogu (#323). URL loetakse `window.location`-ist,
         // mitte `useSearchParams`-ist: provider istub Routerist väljaspool ja see
         // on ühekordne algväärtus, mitte jooksev sünkroniseerimine.
         const stored = localStorage.getItem(STORAGE_KEY);
-        const fromUrl = new URLSearchParams(window.location.search).get(COLLECTION_PARAM);
-        const initial = resolveInitialCollection(fromUrl, stored, data, DEFAULT_COLLECTION);
-        setSelectedCollectionState(initial);
+        const params = new URLSearchParams(window.location.search);
+        const token = readSelectionToken(params) ?? stored;
+        const kandidaat = parseSelection(token);
+
+        // Töökollektsioon kehtib ainult siis, kui ta on kutsujale NÄHTAV.
+        // Kadunud ligipääsuga kogu ei tohi jätta vaadet vaikselt tühjaks —
+        // siis kehtib tavaline kogu-lahendus.
+        if (kandidaat.kind === 'work_set' && sets.some(ws => ws.id === kandidaat.id)) {
+          setSelectionState(kandidaat);
+          localStorage.setItem(STORAGE_KEY, serializeSelection(kandidaat));
+          return;
+        }
+
+        // Töökollektsiooni token ei ole kogu-id: kogu-lahendus ei tohi teda näha.
+        const fromUrl = kandidaat.kind === 'collection'
+          && readSelectionToken(params) !== null ? kandidaat.id : null;
+        const storedCollection = stored && !stored.startsWith('s:') ? stored : null;
+        const initial = resolveInitialCollection(fromUrl, storedCollection, data, DEFAULT_COLLECTION);
+        setSelectionState(initial ? { kind: 'collection', id: initial } : { kind: 'all' });
         // Salvestatud kirje peab lahendust PEEGELDAMA: lingiga tulnud valik
         // jääb kehtima ja kustutatud kogu jäänuk parandatakse ära. Ilma
         // parandamiseta kordub vale vaade igal laadimisel.
-        const update = decideStoredCollection(fromUrl, stored, data, initial);
+        const update = decideStoredCollection(fromUrl, storedCollection, data, initial);
         if (update.action === 'write') localStorage.setItem(STORAGE_KEY, update.value);
         else if (update.action === 'clear') localStorage.removeItem(STORAGE_KEY);
       } catch (e) {
@@ -56,6 +105,14 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
       }
     };
     init();
+  }, []);
+
+  const refreshWorkSets = useCallback(async () => {
+    try {
+      setWorkSets(await listWorkSets());
+    } catch (e) {
+      console.error('Töökollektsioonide uuendamine ebaõnnestus:', e);
+    }
   }, []);
 
   // Laadib kollektsioonid uuesti (nt pärast admin muudatusi)
@@ -69,14 +126,19 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
   }, []);
 
   // Salvesta valik localStorage'i
-  const setSelectedCollection = useCallback((id: string | null) => {
-    setSelectedCollectionState(id);
-    if (id) {
-      localStorage.setItem(STORAGE_KEY, id);
-    } else {
+  const setSelection = useCallback((next: CollectionSelection) => {
+    setSelectionState(next);
+    if (next.kind === 'all') {
       localStorage.removeItem(STORAGE_KEY);
+    } else {
+      localStorage.setItem(STORAGE_KEY, serializeSelection(next));
     }
   }, []);
+
+  /** Tagasiühilduv sisend: kogu-id või null (= kõik teosed). */
+  const setSelectedCollection = useCallback((id: string | null) => {
+    setSelection(id ? { kind: 'collection', id } : { kind: 'all' });
+  }, [setSelection]);
 
   // Tagasta kollektsiooni nimi keele järgi
   const getCollectionName = useCallback((id: string, lang: 'et' | 'en' = 'et'): string => {
@@ -104,14 +166,20 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
   }, [collections]);
 
   const value = useMemo(() => ({
+    selection,
+    setSelection,
     selectedCollection,
     setSelectedCollection,
     collections,
+    workSets,
+    refreshWorkSets,
     isLoading,
     refreshCollections,
     getCollectionName,
     getCollectionPath
-  }), [selectedCollection, setSelectedCollection, collections, isLoading, refreshCollections, getCollectionName, getCollectionPath]);
+  }), [selection, setSelection, selectedCollection, setSelectedCollection, collections,
+       workSets, refreshWorkSets, isLoading, refreshCollections, getCollectionName,
+       getCollectionPath]);
 
   return (
     <CollectionContext.Provider value={value}>

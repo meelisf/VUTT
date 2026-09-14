@@ -110,6 +110,31 @@ async def _get_json(request: Request) -> dict:
     return await request.json()
 
 
+def _resolve_work_set_ids(set_id, request: Request):
+    """Töökollektsiooni ID-loend kutsuja jaoks, või None kui filtrit ei ole (#354).
+
+    Ligipääsu puudumine annab 404, MITTE filtri eiramist: eiramine tagastaks
+    kogu isikuloendi ja oleks vaikne leke. Sama vastus nagu puuduval kogul —
+    tundmatu link ei avalda kogu olemasolu.
+
+    Kasutaja loetakse `deps.optional_user`-iga, MITTE selle mooduli
+    `_optional_user`-iga: viimane loeb tokeni ainult query-parameetrist
+    (`?token=`), aga klient saadab `Authorization`-päise. Siin oleks vahe
+    vaikne ligipääsu-eitus.
+    """
+    if not set_id:
+        return None
+    from ..deps import optional_user
+    from ..work_sets_access import can_view_set, search_visible_work_ids
+    from ..work_sets_ops import load_work_set
+
+    user = optional_user(request)
+    ws = load_work_set(set_id)
+    if ws is None or not can_view_set(ws, user):
+        raise HTTPException(status_code=404, detail="Töökollektsiooni ei leitud")
+    return search_visible_work_ids(ws, user)
+
+
 # =========================================================
 # ENDPOINTID
 # =========================================================
@@ -134,12 +159,14 @@ def prosopography_list(
     ids: str = None,
     tag: Optional[List[str]] = Query(None),
     collection: str = None,
+    work_set: str = None,
     limit: int = 48,
     offset: int = 0,
     user=Depends(_optional_user),
 ):
     """Tagastab isikute nimekirja prosopography_index.json-st, pagineeritult."""
     id_list = [i for i in ids.split(",") if i] if ids else None
+    work_set_ids = _resolve_work_set_ids(work_set, request)
     return list_persons(
         q=q,
         gender=gender,
@@ -158,6 +185,7 @@ def prosopography_list(
         ids=id_list,
         tags=_normalize_tag_query(tag),
         collection=collection,
+        work_set_ids=work_set_ids,
         limit=limit,
         offset=offset,
     )
@@ -170,6 +198,7 @@ async def prosopography_query(request: Request):
     Väldib liiga pikka query stringi, kui ids massiiv on suur.
     """
     data = await _get_json(request)
+    work_set_ids = _resolve_work_set_ids(data.get("work_set"), request)
     return await run_in_threadpool(
         list_persons,
         q=data.get("q"),
@@ -188,6 +217,7 @@ async def prosopography_query(request: Request):
         ids=data.get("ids"),
         tags=_normalize_tag_query(data.get("tag")),
         collection=data.get("collection"),
+        work_set_ids=work_set_ids,
         limit=data.get("limit", 48),
         offset=data.get("offset", 0),
     )
@@ -212,10 +242,12 @@ def prosopography_map(
     tag: Optional[List[str]] = Query(None),
     related_to: str = None,
     collection: str = None,
+    work_set: str = None,
     user=Depends(_optional_user),
 ):
     """Tagastab koordinaadiga isikud päritolukoha järgi grupeeritud markeritena."""
     id_list = [i for i in ids.split(",") if i] if ids else None
+    work_set_ids = _resolve_work_set_ids(work_set, request)
     return get_person_map_markers(
         q=q,
         gender=gender,
@@ -233,6 +265,7 @@ def prosopography_map(
         tags=_normalize_tag_query(tag),
         related_to=related_to,
         collection=collection,
+        work_set_ids=work_set_ids,
     )
 
 
@@ -264,18 +297,24 @@ async def prosopography_map_regions(
 
 @router.get("/facets")
 def prosopography_facets(
+    request: Request,
     q: str = None,
     gender: str = None,
     ids: str = None,
     collection: str = None,
+    work_set: str = None,
 ):
     """Tagastab persons-lehe facetid filtripaneeli jaoks."""
     id_list = [i for i in ids.split(",") if i] if ids else None
+    # Facetid PEAVAD järgima sama piiri kui loend, muidu näitaks filtripaneel
+    # arve teoste kohta, mida loend ei sisalda.
+    work_set_ids = _resolve_work_set_ids(work_set, request)
     return get_person_facets(
         q=q,
         gender=gender,
         ids=id_list,
         collection=collection,
+        work_set_ids=work_set_ids,
     )
 
 
@@ -284,12 +323,14 @@ async def prosopography_facets_post(request: Request):
     """POST variant /facets — kasuta kui ids nimekiri on pikk (414 vältimiseks)."""
     data = await _get_json(request)
     id_list = data.get("ids") or None
+    work_set_ids = _resolve_work_set_ids(data.get("work_set"), request)
     return await run_in_threadpool(
         get_person_facets,
         q=data.get("q"),
         gender=data.get("gender"),
         ids=id_list,
         collection=data.get("collection"),
+        work_set_ids=work_set_ids,
     )
 
 

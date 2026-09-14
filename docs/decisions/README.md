@@ -61,3 +61,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0039](0039-sisuvalja-keel-on-valjanimes.md) | Sisuvälja keel on väljanimes (`biography_et`/`biography_en`/`aa_raw`); vananemisankur on kinnituse kirje, mitte salvestamise kõrvalmõju | kehtib |
 | [0040](0040-jalgitav-fail-on-autoriteetne-fail.md) | Jälgitav fail on autoriteetne fail: iga kirjutustee commitib, tuletatav ei ole gitis | kehtib |
 | [0041](0041-ankur-ja-kirje-on-uks-fakt.md) | Annotatsiooni ankur ja kirje on üks fakt kahes failis; toimetaja märkus renderdatakse teksti sees ankru juures | kehtib |
+| [0042](0042-tookollektsiooni-liikmesust-ei-indekseerita.md) | Töökollektsiooni liikmesust ei indekseerita Meilisse; otsing filtreerib serverilt saadud `work_id` loendiga | kehtib |

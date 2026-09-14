@@ -101,3 +101,64 @@ describe('süsteem läheneb püsipunkti', () => {
     }
   });
 });
+
+/**
+ * Töökollektsiooni valik käib SAMA otsustaja kaudu (#354).
+ *
+ * Teist sünkroniseerimisefekti `?set=` jaoks EI lisata: kaks tingimusteta
+ * peeglit reageerivad teineteise EELMISELE väärtusele (#333, ADR 0038).
+ * Valik serialiseeritakse üheks tokeniks ja antakse olemasolevale otsustajale.
+ */
+describe('decideCollectionSync: töökollektsioonid', () => {
+  const SETS = new Set(['ws_1', 'ws_2']);
+
+  it('töökollektsiooni valik kirjutab URL-i ja lähtestab lehe', () => {
+    const action = decideCollectionSync(ALL_COLLECTIONS, 's:ws_1', ALL_COLLECTIONS, true, {}, SETS);
+    expect(action).toEqual({ type: 'write-url', value: 's:ws_1', resetPage: true });
+  });
+
+  it('teadaolev töökollektsioon lingis võetakse konteksti', () => {
+    expect(decideCollectionSync('s:ws_2', 's:ws_1', 's:ws_1', true, COLLECTIONS, SETS))
+      .toEqual({ type: 'adopt-url', value: 's:ws_2' });
+  });
+
+  it('tundmatu töökollektsioon URL-is ei tühjenda vaadet vaikselt', () => {
+    // Ligipääsmatu või kustutatud kogu: URL parandatakse, vaade jääb.
+    const action = decideCollectionSync('s:ws_puudub', null, ALL_COLLECTIONS, true, COLLECTIONS, SETS);
+    expect(action.type).not.toBe('adopt-url');
+    expect(action).toEqual({ type: 'write-url', value: ALL_COLLECTIONS, resetPage: false });
+  });
+
+  it('vahetus töökollektsioonilt püsikogule läheb läbi', () => {
+    expect(decideCollectionSync('s:ws_1', C, 's:ws_1', true, COLLECTIONS, SETS))
+      .toEqual({ type: 'write-url', value: C, resetPage: true });
+  });
+
+  it('teadmata kogude hulk (loend veel laadimata) ei võta tokenit vastu', () => {
+    // Enne kui `listWorkSets` on vastanud, ei tohi `?set=` omaks võtta —
+    // muidu jääks kontekst kogusse, mida ei pruugi olemas olla.
+    expect(decideCollectionSync('s:ws_1', null, ALL_COLLECTIONS, true, COLLECTIONS, new Set()).type)
+      .not.toBe('adopt-url');
+  });
+
+  it('kõik algseisud jõuavad püsipunkti ka tokenitega', () => {
+    const run = (url: string | null, selected: string | null) => {
+      let agreed: string | null = null;
+      let mirrored = false;
+      for (let step = 0; step < 20; step++) {
+        const action = decideCollectionSync(url, selected, agreed, mirrored, COLLECTIONS, SETS);
+        mirrored = true;
+        if (action.type === 'noop') return;
+        if (action.type === 'adopt-url') { selected = action.value; agreed = url; }
+        else { url = action.value; agreed = action.value; }
+      }
+      throw new Error('ei jõudnud püsipunkti');
+    };
+    const values = [null, P, C, ALL_COLLECTIONS, 's:ws_1', 's:ws_puudub', 'kadunud'];
+    for (const url of values) {
+      for (const selected of [null, P, C, 's:ws_1', 's:ws_2']) {
+        expect(() => run(url, selected)).not.toThrow();
+      }
+    }
+  });
+});

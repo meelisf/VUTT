@@ -190,6 +190,17 @@
     "copyLink": "Copy link",
     "linkCopied": "Link copied!"
   },
+  "workSets": {
+    "section": "Work collections",
+    "permanent": "Permanent collections",
+    "create": "Create work collection",
+    "archived": "Archived",
+    "notFound": "Work collection not found or access denied",
+    "allWorks": "All works",
+    "empty": "No work collections",
+    "search": "Search collections by name",
+    "noMatches": "No collection matches the search"
+  },
   "error": {
     "unknown": "Error",
     "network": "Network error"

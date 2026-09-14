@@ -4,7 +4,7 @@ import { useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getWorkMetadata } from '../services/workService';
 import { getCollectionColorClasses } from '../services/collectionService';
-import { Search, Filter, Library, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar, Languages } from 'lucide-react';
+import { Search, Filter, Library, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar, Languages, Users } from 'lucide-react';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
@@ -15,6 +15,7 @@ import { resolveEntityLabel } from '../utils/labelUtils';
 import { useSearchUrlParams } from './search/hooks/useSearchUrlParams';
 import { useSearchResults } from './search/hooks/useSearchResults';
 import { useSearchFacets } from './search/hooks/useSearchFacets';
+import { useSelectionScope } from '../hooks/useSelectionScope';
 import { useQCodeMaps } from './search/hooks/useQCodeMaps';
 import { useFilterDraft } from './search/hooks/useFilterDraft';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
@@ -25,7 +26,8 @@ const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+    const { selection, selectedCollection, setSelectedCollection, getCollectionName, collections, workSets } = useCollection();
+    const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
     // Aktiivne kogu käib URL-iga kaasa (#323) — muidu avaneb jagatud link
     // saaja kogus ja annab null vastet.
     useCollectionUrlSync();
@@ -35,8 +37,8 @@ const SearchPage: React.FC = () => {
     const lang = i18n.language;
     const langCode = getLangCode(lang);
 
-    const { results, loading, error } = useSearchResults(urlParams, lang, selectedCollection);
-    const facets = useSearchFacets(urlParams, lang, selectedCollection, results);
+    const { results, loading, error } = useSearchResults(urlParams, lang, scope, scopeReady);
+    const facets = useSearchFacets(urlParams, lang, scope, scopeReady, results);
     const qCodeMaps = useQCodeMaps(results, lang, (location.state as any)?.pageTagsLabels);
 
     // Kollektsiooni järgi filtreeritud isikute nimekiri — kasutab availableTeoseTags faceti
@@ -146,7 +148,7 @@ const SearchPage: React.FC = () => {
                         </form>
 
                         {/* Aktiivsed filtrid otsinguriba all */}
-                        {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || selectedCollection || urlParams.scope !== 'all' ||
+                        {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || selectedCollection || selection.kind === 'work_set' || urlParams.scope !== 'all' ||
                             urlParams.pageTags.length > 0 || urlParams.genres.length > 0 || urlParams.types.length > 0 ||
                             urlParams.languages.length > 0 ||
                             urlParams.teoseTags.length > 0 || urlParams.yearStart !== undefined || urlParams.yearEnd !== undefined) && (
@@ -337,6 +339,24 @@ const SearchPage: React.FC = () => {
                                         </button>
                                     </div>
                                 )}
+                                {/* Töökollektsioon (#354) — oma kiip, sest ta ei ole `collections`-is */}
+                                {selection.kind === 'work_set' && (
+                                    <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-primary-100 text-primary-800 rounded-full text-xs font-medium border border-primary-200">
+                                        <Users size={11} />
+                                        <span className="truncate max-w-xs">
+                                            {workSets.find(ws => ws.id === selection.id)?.name[getLangCode(i18n.language)]
+                                                ?? t('common:workSets.notFound', 'Töökollektsiooni ei leitud või puudub ligipääs')}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedCollection(null)}
+                                            className="ml-0.5 hover:opacity-70 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={11} />
+                                        </button>
+                                    </div>
+                                )}
                                 {/* Kollektsioon */}
                                 {selectedCollection && (() => {
                                     const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
@@ -401,7 +421,9 @@ const SearchPage: React.FC = () => {
                 <SearchResults
                     results={results}
                     loading={loading}
-                    error={error}
+                    // Kadunud ligipääs töökollektsioonile on NÄHTAV viga, mitte
+                    // vaikne tühi tulemus (#354).
+                    error={error || scopeError?.message || null}
                     queryParam={urlParams.q}
                     workIdParam={urlParams.workId}
                     yearStartParam={urlParams.yearStart}

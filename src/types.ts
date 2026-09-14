@@ -1,3 +1,4 @@
+import type { SelectionScope } from './services/selectionFilter';
 import type { WorkDating } from './utils/workDating';
 /**
  * =============================================================================
@@ -289,7 +290,7 @@ export interface ContentSearchOptions {
   teoseTags?: string[];
   genre?: string[];       // V2: žanri filter (mitu valikut OR loogikaga)
   type?: string[];        // V2: tüübi filter (mitu valikut OR loogikaga)
-  collection?: string;    // V2: kollektsiooni filter (collections_hierarchy kaudu)
+  collection?: SelectionScope; // V2: valik — püsikogu või töökollektsioon (#354)
   languages?: string[];   // Teose keele filter (OR loogika, ISO 639-3: lat, grc, deu…)
   lang?: string;          // UI keel (et, en) siltide lahendamiseks — MITTE teose keele filter
   author?: string;        // V2: autori filter (creators massiivist)

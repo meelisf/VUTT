@@ -170,6 +170,25 @@ def _persons_in_collection(collection_id: str) -> set:
     return result
 
 
+def _persons_in_work_set(work_ids) -> set:
+    """Isikud, kes on seotud MÕNE antud teosega (#354).
+
+    Sisendiks tuleb juba KUTSUJALE NÄHTAV teoste loend (`search_visible_work_ids`) —
+    siin õigusi enam ei kontrollita. Erinevalt kollektsioonist ei ole
+    töökollektsioonil hierarhiat ega liikmesus-institutsioone: liikmesus on
+    sõnaselge loend, mitte tuletatud reegel.
+    """
+    sync_from_facade()
+    target = set(work_ids or ())
+    if not target:
+        return set()
+    ptw = _load_person_to_works()
+    return {
+        pid for pid, entries in ptw.items()
+        if any(e.get("work_id") in target for e in entries)
+    }
+
+
 def _person_collections(person_id: str) -> list:
     """Kollektsioonid, kuhu isiku teosed kuuluvad; dedup esmaesinemise järjekorras."""
     sync_from_facade()

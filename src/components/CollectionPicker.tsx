@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
-import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen } from 'lucide-react';
+import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen, Search, Users } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
+import { buildPickerEntries } from './pickerEntries';
+import { CollectionSelection } from '../services/selectionFilter';
 import { getLangCode } from '../utils/getLangCode';
 
 interface CollectionPickerProps {
@@ -26,8 +28,10 @@ const TreeNode: React.FC<{
   lang: 'et' | 'en';
   expandedIds: Set<string>;
   toggleExpanded: (id: string) => void;
-}> = ({ node, level, selectedId, onSelect, lang, expandedIds, toggleExpanded }) => {
-  const isExpanded = expandedIds.has(node.id);
+  /** Otsingu ajal: vaste ei tohi kokkuklapitud vanema taha peitu jääda. */
+  forceExpanded?: boolean;
+}> = ({ node, level, selectedId, onSelect, lang, expandedIds, toggleExpanded, forceExpanded }) => {
+  const isExpanded = forceExpanded || expandedIds.has(node.id);
   const hasChildren = node.children.length > 0;
   const isSelected = selectedId === node.id;
   const colorClasses = getCollectionColorClasses(node.collection);
@@ -82,6 +86,7 @@ const TreeNode: React.FC<{
               lang={lang}
               expandedIds={expandedIds}
               toggleExpanded={toggleExpanded}
+              forceExpanded={forceExpanded}
             />
           ))}
         </div>
@@ -98,7 +103,11 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
   title
 }) => {
   const { t, i18n } = useTranslation(['common']);
-  const { selectedCollection, setSelectedCollection, collections } = useCollection();
+  const { selection, setSelection, collections, workSets } = useCollection();
+  // Massilise määramise variandis (`onSelect`) valitakse teosele PÜSIKOGU;
+  // töökollektsioon ei ole teose omadus, seega seal seda jaotist ei ole.
+  const selectedCollection = selection.kind === 'collection' ? selection.id : null;
+  const [query, setQuery] = useState('');
   const { user } = useUser();
   const lang = getLangCode(i18n.language);
 
@@ -127,6 +136,13 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
 
   // Ehita puu
   const tree = useMemo(() => buildCollectionTree(visibleCollections), [visibleCollections]);
+  const { permanent, workSets: nahtavadKogud } = useMemo(
+    () => buildPickerEntries(tree, onSelect ? [] : workSets, query, lang),
+    [tree, workSets, query, lang, onSelect],
+  );
+  // Otsingu ajal peavad vasted olema NÄHTAVAD: kokkuklapitud vanem peidaks
+  // just selle lapse, mille kasutaja otsis.
+  const otsib = query.trim().length > 0;
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
@@ -146,15 +162,22 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
       onSelect(id);
     } else {
       // Globaalse konteksti variant (header)
-      setSelectedCollection(id);
+      setSelection(id ? { kind: 'collection', id } : { kind: 'all' });
     }
+    onClose();
+  };
+
+  const handleSelectSet = (next: CollectionSelection) => {
+    setSelection(next);
     onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    // Päis on `sticky z-[1200]` — `z-50` jättis modaali ülemise serva (ja
+    // sulgemisnupu) väikesel ekraanil päise alla.
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1300]">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="bg-primary-600 px-6 py-4 flex items-center justify-between">
@@ -170,6 +193,20 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
           </button>
         </div>
 
+        {/* Ühine otsinguväli — filtreerib mõlemat jaotist korraga */}
+        <div className="px-4 pt-4">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('workSets.search', 'Otsi kogu nime järgi')}
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+        </div>
+
         {/* Sisu */}
         <div className="flex-1 overflow-y-auto p-4">
           {/* "Kõik tööd" valik - ainult headeris */}
@@ -179,13 +216,13 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                 onClick={() => handleSelect(null)}
                 className={`
                   w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors mb-2
-                  ${selectedCollection === null ? 'bg-primary-100 text-primary-800' : 'hover:bg-gray-100'}
+                  ${selection.kind === 'all' ? 'bg-primary-100 text-primary-800' : 'hover:bg-gray-100'}
                 `}
               >
                 <span className="w-5" />
-                <Library size={18} className={selectedCollection === null ? 'text-primary-600' : 'text-gray-400'} />
+                <Library size={18} className={selection.kind === 'all' ? 'text-primary-600' : 'text-gray-400'} />
                 <span className="flex-1">{t('collections.all', 'Kõik tööd')}</span>
-                {selectedCollection === null && <Check size={18} className="text-primary-600" />}
+                {selection.kind === 'all' && <Check size={18} className="text-primary-600" />}
               </button>
               <div className="border-t border-gray-200 my-2" />
             </>
@@ -206,13 +243,20 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
             </>
           )}
 
-          {/* Puu */}
-          {tree.length === 0 ? (
+          {/* Püsikogud */}
+          {!onSelect && (
+            <h3 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {t('workSets.permanent', 'Püsikogud')}
+            </h3>
+          )}
+          {permanent.length === 0 ? (
             <p className="text-gray-500 text-center py-8">
-              {t('collections.empty', 'Kollektsioone pole veel lisatud')}
+              {otsib
+                ? t('workSets.noMatches', 'Ükski kogu ei vasta otsingule')
+                : t('collections.empty', 'Kollektsioone pole veel lisatud')}
             </p>
           ) : (
-            tree.map((node) => (
+            permanent.map((node) => (
               <TreeNode
                 key={node.id}
                 node={node}
@@ -222,8 +266,47 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                 lang={lang}
                 expandedIds={expandedIds}
                 toggleExpanded={toggleExpanded}
+                forceExpanded={otsib}
               />
             ))
+          )}
+
+          {/* Töökollektsioonid — ainult päise variandis (globaalne töökontekst) */}
+          {!onSelect && (
+            <>
+              <div className="border-t border-gray-200 my-3" />
+              <h3 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {t('workSets.section', 'Töökollektsioonid')}
+              </h3>
+              {nahtavadKogud.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-gray-500">
+                  {otsib
+                    ? t('workSets.noMatches', 'Ükski kogu ei vasta otsingule')
+                    : t('workSets.empty', 'Töökollektsioone ei ole')}
+                </p>
+              ) : (
+                nahtavadKogud.map((ws) => {
+                  const isSelected = selection.kind === 'work_set' && selection.id === ws.id;
+                  return (
+                    <button
+                      key={ws.id}
+                      onClick={() => handleSelectSet({ kind: 'work_set', id: ws.id })}
+                      className={`
+                        w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors
+                        ${isSelected ? 'bg-primary-100 text-primary-800' : 'hover:bg-gray-100'}
+                      `}
+                    >
+                      <span className="w-5" />
+                      <Users size={18} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
+                      <span className="flex-1 truncate">
+                        {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
+                      </span>
+                      {isSelected && <Check size={18} className="text-primary-600" />}
+                    </button>
+                  );
+                })
+              )}
+            </>
           )}
         </div>
 
