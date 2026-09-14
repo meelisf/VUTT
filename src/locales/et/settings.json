@@ -24,6 +24,13 @@
     "scopeNone": "ulatust pole määratud",
     "noneHint": "Sulle ei ole veel ühtki kollektsiooni määratud, seega ei saa sa tekste muuta. Pöördu administraatori poole.",
     "contributorHint": "Nendes kollektsioonides saad tekste toimetada. Mujal on tekst nähtav, aga redaktor on lukus.",
-    "allHint": "Sinu roll ei ole kollektsioonidega piiratud."
+    "allHint": "Sinu roll ei ole kollektsioonidega piiratud.",
+    "workSetsLabel": "Töökollektsioonid",
+    "workSetsAll": "kõik töökollektsioonid",
+    "workSetsNone": "isiklikku ligipääsu pole määratud",
+    "workSetsError": "Töökollektsioonide loendit ei õnnestunud laadida",
+    "workSetManager": "haldur",
+    "workSetViewer": "vaataja",
+    "workSetsHint": "Haldurina saad kogu sisu kureerida, vaatajana valida ta päises töökontekstiks. Avalikud kogud on nähtavad kõigile ka ilma isikliku ligipääsuta."
   }
 }

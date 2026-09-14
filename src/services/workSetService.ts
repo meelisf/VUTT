@@ -19,6 +19,12 @@ export interface WorkSetSummary {
   status: 'active' | 'archived';
   revision: number;
   can_manage: boolean;
+  /**
+   * Kutsuja OMA ligipääsu kirje, mitte tuletatud õigus. `null`/puudub =
+   * isiklikku kirjet ei ole: kogu on avalik või kutsuja näeb seda rolli tõttu.
+   * `can_manage` on LAIEM (admin haldab kõiki) — need kaks ei ole sünonüümid.
+   */
+  my_access?: 'viewer' | 'manager' | null;
   /** Ainult halduritele/adminile. */
   access?: Record<string, 'viewer' | 'manager'>;
   created_by?: string;

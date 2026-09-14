@@ -24,6 +24,13 @@
     "scopeNone": "no scope assigned",
     "noneHint": "No collection has been assigned to you yet, so you cannot edit any text. Please contact an administrator.",
     "contributorHint": "You can edit texts in these collections. Elsewhere the text is visible but the editor is locked.",
-    "allHint": "Your role is not limited to particular collections."
+    "allHint": "Your role is not limited to particular collections.",
+    "workSetsLabel": "Work collections",
+    "workSetsAll": "all work collections",
+    "workSetsNone": "no personal access assigned",
+    "workSetsError": "Could not load the list of work collections",
+    "workSetManager": "manager",
+    "workSetViewer": "viewer",
+    "workSetsHint": "As a manager you curate the contents; as a viewer you can pick the collection as your work context in the header. Public collections are visible to everyone without personal access."
   }
 }

@@ -5,13 +5,14 @@ import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
-import { describeWriteScope } from '../utils/roleUtils';
+import { WorkSetSummary } from '../services/workSetService';
+import { describeWriteScope, isAtLeast } from '../utils/roleUtils';
 import { Navigate } from 'react-router-dom';
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation(['settings', 'common']);
   const { user, userSettings, updateSettings } = useUser();
-  const { collections, getCollectionName } = useCollection();
+  const { collections, getCollectionName, workSets, workSetsError } = useCollection();
 
   // Kirjutamisulatus (ADR 0031) — sama fail-closed loogika mis canEditWork'il.
   // Hook'id peavad olema enne varajast Navigate'i, seega arvutus talub user=null.
@@ -22,6 +23,13 @@ const Settings: React.FC = () => {
   // null (UserContext hüdreerib effectis) ja algväärtus jääks igaveseks „lahti".
   const [scopeToggled, setScopeToggled] = useState<boolean | null>(null);
   const scopeOpen = scopeToggled ?? scope.kind === 'none';
+
+  // Töökollektsiooni õigus on ISIKLIK kirje (`my_access`), mitte `can_manage`:
+  // admin haldab kõiki kogusid rolli tõttu ja avalikku kogu näevad kõik — kumbki
+  // ei ole liikmesus. Loend tuleb `CollectionContext`-ist (aktiivsed kogud),
+  // et Seaded ei teeks sama päringut teist korda.
+  const adminRole = isAtLeast(user?.role, 'admin');
+  const myWorkSets = workSets.filter((ws) => ws.my_access);
 
   // Ainult autentitud kasutajatele
   if (!user) return <Navigate to="/" replace />;
@@ -41,6 +49,21 @@ const Settings: React.FC = () => {
       </span>
     );
   };
+
+  // Töökollektsiooni silt kannab rolli: „kogu X" üksi ei ütle, mida ta lubab.
+  const workSetChip = (ws: WorkSetSummary) => (
+    <span
+      key={ws.id}
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-gray-200 bg-gray-50 text-xs font-medium text-gray-700"
+    >
+      {ws.name[currentLang] || ws.name.et || ws.name.en || ws.id}
+      <span className="text-[10px] uppercase tracking-wide text-gray-500">
+        {t(ws.my_access === 'manager'
+          ? 'settings:permissions.workSetManager'
+          : 'settings:permissions.workSetViewer')}
+      </span>
+    </span>
+  );
 
   // Kokkuklapitud päises näita kuni kaks silti, ülejäänud loendurina —
   // pikk ulatus ei tohi päist lõhkuda.
@@ -116,6 +139,23 @@ const Settings: React.FC = () => {
                   )}
                 </div>
 
+                <div className="flex gap-3 text-sm">
+                  <span className="w-28 flex-shrink-0 text-xs font-medium text-gray-500 mt-0.5">
+                    {t('settings:permissions.workSetsLabel')}
+                  </span>
+                  {adminRole ? (
+                    <span className="text-gray-900">{t('settings:permissions.workSetsAll')}</span>
+                  ) : myWorkSets.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">{myWorkSets.map(workSetChip)}</div>
+                  ) : workSetsError ? (
+                    // Tühi loend ja „ei saanud teada" EI tohi näha ühesugused välja
+                    // (#354) — vaikne tühjus loeks kadunud ligipääsu õiguse puudumiseks.
+                    <span className="text-red-600">{t('settings:permissions.workSetsError')}</span>
+                  ) : (
+                    <span className="text-gray-900">{t('settings:permissions.workSetsNone')}</span>
+                  )}
+                </div>
+
                 <p className="text-xs text-gray-500">
                   {scope.kind === 'all'
                     ? t('settings:permissions.allHint')
@@ -123,6 +163,12 @@ const Settings: React.FC = () => {
                       ? t('settings:permissions.contributorHint')
                       : t('settings:permissions.noneHint')}
                 </p>
+
+                {!adminRole && myWorkSets.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {t('settings:permissions.workSetsHint')}
+                  </p>
+                )}
               </div>
             )}
           </div>

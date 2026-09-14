@@ -53,6 +53,12 @@ def _public_view(ws: dict, user) -> dict:
         "status": ws.get("status"),
         "revision": ws.get("revision"),
         "can_manage": can_manage_set(ws, user),
+        # Kutsuja OMA ligipääsu kirje (Seaded → „Minu õigused"). Ainult tema enda
+        # rida: kogu `access` loend jääb halduritele, sest see paljastaks teised
+        # kasutajanimed. `None` = isiklikku kirjet ei ole — kogu on kas avalik või
+        # kutsuja on admin, ja need kaks olekut ei ole „liikmesus".
+        "my_access": ((ws.get("access") or {}).get(user.get("username"))
+                      if user else None),
     }
     if base["can_manage"]:
         base["access"] = ws.get("access", {})

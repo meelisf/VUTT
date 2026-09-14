@@ -167,3 +167,23 @@ def test_avalikku_kogu_naeb_autentimata(client, work_sets, admin_token, ws_id):
     r = client.get(f"/work-sets/{ws_id}")
     assert r.status_code == 200
     assert r.json()["work_set"]["can_manage"] is False
+
+
+def test_my_access_kannab_kutsuja_oma_rolli(client, work_sets, viewer_token,
+                                            manager_token, ws_id):
+    """Seaded näitavad kutsuja OMA õigust; teiste ridu see väli ei avalda."""
+    vaataja = client.get(f"/work-sets/{ws_id}", headers=auth(viewer_token))
+    assert vaataja.json()["work_set"]["my_access"] == "viewer"
+    haldur = client.get(f"/work-sets/{ws_id}", headers=auth(manager_token))
+    assert haldur.json()["work_set"]["my_access"] == "manager"
+    assert "contrib" not in vaataja.text  # kogu access-loend jääb varjatuks
+
+
+def test_my_access_on_null_kui_isiklikku_kirjet_ei_ole(client, work_sets, admin_token,
+                                                       ws_id):
+    """Admin näeb kogu rolli, mitte liikmesuse tõttu — ja avalik kogu pole liikmesus."""
+    assert client.get(f"/work-sets/{ws_id}",
+                      headers=auth(admin_token)).json()["work_set"]["my_access"] is None
+    client.patch(f"/work-sets/{ws_id}", json={"visibility": "public", "revision": 2},
+                 headers=auth(admin_token))
+    assert client.get(f"/work-sets/{ws_id}").json()["work_set"]["my_access"] is None
