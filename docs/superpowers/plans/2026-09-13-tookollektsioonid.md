@@ -54,7 +54,7 @@
 
 Ainus ülesanne, millel ei ole testi: see on mõõtmine, mille tulemus otsustab lae. Ilma selleta on 1000 arvamus.
 
-- [ ] **Step 1: Kirjuta mõõteskript**
+- [x] **Step 1: Kirjuta mõõteskript**
 
 ```python
 """Mõõdab töökollektsiooni päringuahela maksumuse (#354, Task 1).
@@ -104,7 +104,7 @@ for n in (100, 500, 1000):
               % (n, q, statistics.median(kestused), res.get("totalHits")))
 ```
 
-- [ ] **Step 2: Jooksuta serveris**
+- [x] **Step 2: Jooksuta serveris**
 
 ```bash
 scp scripts/measure_work_set_filter.py vutt:/tmp/
@@ -113,17 +113,17 @@ ssh vutt 'cd ~/VUTT && set -a && . .env && set +a && .venv/bin/python3 /tmp/meas
 
 Oodatav: iga rida annab mediaani millisekundites. Võrdlusalus on sama päring ilma `work_id IN` filtrita.
 
-- [ ] **Step 3: Mõõda serveripoolne ID-loendi kulu**
+- [x] **Step 3: Mõõda serveripoolne ID-loendi kulu**
 
 Ajasta `search_visible_work_ids` prototüüp 1000 teose peal (loeb `_metadata.json`-e). Kui see ületab ~200 ms, tuleb Task 3-s loend ette arvutada kogu salvestamisel, mitte iga päringu peal koostada.
 
-- [ ] **Step 4: Kirjuta tulemus issue'sse ja otsusta lagi**
+- [x] **Step 4: Kirjuta tulemus issue'sse ja otsusta lagi**
 
 ```bash
 gh issue comment 354 --body "Jõudluskatse (Task 1), tootmine: <tabel>. Otsus: WORK_SET_MAX_MEMBERS = <arv>."
 ```
 
-- [ ] **Step 5: Kustuta skript**
+- [x] **Step 5: Kustuta skript**
 
 ```bash
 rm scripts/measure_work_set_filter.py
@@ -150,7 +150,7 @@ Kood ei jää alles — tulemus jääb.
   - `mutate_members(set_id, add, remove, username, expected_revision) -> dict`
   - erandid `WorkSetConflict` (409), `WorkSetLimit` (409), `WorkSetNotFound` (404)
 
-- [ ] **Step 1: Lisa konfiguratsioon**
+- [x] **Step 1: Lisa konfiguratsioon**
 
 `server/config.py`, `_DATA_CONFIG_DIR` määratluse järele:
 
@@ -159,7 +159,7 @@ WORK_SETS_DIR = os.path.join(_DATA_CONFIG_DIR, "work_sets")
 WORK_SET_MAX_MEMBERS = 1000  # Task 1 mõõtmise tulemus; kaitseb ühe filtripäringu suurust
 ```
 
-- [ ] **Step 2: Kirjuta kukkuvad testid**
+- [x] **Step 2: Kirjuta kukkuvad testid**
 
 `tests/test_work_sets_ops.py`:
 
@@ -228,12 +228,12 @@ def test_tundmatu_liikme_eemaldamine_on_noop_mitte_viga(kaust):
     assert r["works"] == ["a"]
 ```
 
-- [ ] **Step 3: Jooksuta, veendu et kukub**
+- [x] **Step 3: Jooksuta, veendu et kukub**
 
 Run: `.venv/bin/pytest tests/test_work_sets_ops.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'server.work_sets_ops'`
 
-- [ ] **Step 4: Kirjuta moodul**
+- [x] **Step 4: Kirjuta moodul**
 
 `server/work_sets_ops.py`:
 
@@ -392,12 +392,12 @@ def mutate_members(set_id: str, add, remove, username: str,
         return _save(ws, username, f"Töökollektsioon: liikmed {set_id}")
 ```
 
-- [ ] **Step 5: Jooksuta testid**
+- [x] **Step 5: Jooksuta testid**
 
 Run: `.venv/bin/pytest tests/test_work_sets_ops.py -v`
 Expected: PASS (5 testi)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/work_sets_ops.py server/config.py tests/test_work_sets_ops.py
@@ -420,7 +420,7 @@ git commit -m "feat(work-sets): salvestuskiht lukustuse ja revisjonikontrolliga 
   - `is_search_visible(work_metadata, user) -> bool`
   - `search_visible_work_ids(ws, user) -> list`
 
-- [ ] **Step 1: Kirjuta kukkuvad testid**
+- [x] **Step 1: Kirjuta kukkuvad testid**
 
 `tests/test_work_sets_access.py`:
 
@@ -479,12 +479,12 @@ def test_avalikku_kogu_naeb_autentimata():
     assert not acc.can_view_set(WS, None)
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `.venv/bin/pytest tests/test_work_sets_access.py -v`
 Expected: FAIL — moodulit ei ole
 
-- [ ] **Step 3: Kirjuta moodul**
+- [x] **Step 3: Kirjuta moodul**
 
 `server/work_sets_access.py`:
 
@@ -562,12 +562,12 @@ def search_visible_work_ids(ws: dict, user: Optional[dict]) -> list:
     return out
 ```
 
-- [ ] **Step 4: Jooksuta testid**
+- [x] **Step 4: Jooksuta testid**
 
 Run: `.venv/bin/pytest tests/test_work_sets_access.py -v`
 Expected: PASS (5 testi)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/work_sets_access.py tests/test_work_sets_access.py
@@ -587,7 +587,7 @@ git commit -m "feat(work-sets): õiguste predikaadid; otsingunimekiri ei kanna s
 - Consumes: Task 2 ja Task 3 funktsioonid, `require_role("admin")`, `get_user`, `optional_user` (`server/deps.py`)
 - Produces: `GET /work-sets`, `POST /work-sets`, `GET /work-sets/{id}`, `PATCH /work-sets/{id}`, `PUT /work-sets/{id}/access`, `DELETE /work-sets/{id}`
 
-- [ ] **Step 1: Kirjuta kukkuv test**
+- [x] **Step 1: Kirjuta kukkuv test**
 
 `tests/test_work_sets_api.py` (kasuta olemasolevat `tests/conftest.py` klienti; kui seal TestClient fixture't ei ole, loo see failis):
 
@@ -613,12 +613,12 @@ def test_tundmatu_kogu_ei_avalda_nime(client, viewer_token):
     assert "nimi" not in r.text.lower()
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `.venv/bin/pytest tests/test_work_sets_api.py -v`
 Expected: FAIL — 404 kõigil teedel (routerit ei ole)
 
-- [ ] **Step 3: Kirjuta router**
+- [x] **Step 3: Kirjuta router**
 
 `server/routers/work_sets.py`:
 
@@ -745,12 +745,12 @@ from .routers import work_sets
 app.include_router(work_sets.router)
 ```
 
-- [ ] **Step 4: Jooksuta testid**
+- [x] **Step 4: Jooksuta testid**
 
 Run: `.venv/bin/pytest tests/test_work_sets_api.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/routers/work_sets.py server/main.py tests/test_work_sets_api.py
@@ -768,7 +768,7 @@ git commit -m "feat(work-sets): kogude CRUD-router (#354)"
 **Interfaces:**
 - Produces: `GET /work-sets/{id}/works`, `POST /work-sets/{id}/works`, `DELETE /work-sets/{id}/works`
 
-- [ ] **Step 1: Kirjuta kukkuvad testid**
+- [x] **Step 1: Kirjuta kukkuvad testid**
 
 ```python
 def test_loend_tagastab_ainult_kutsujale_nahtavad(client, viewer_token, ws_id):
@@ -803,12 +803,12 @@ def test_loetamatu_teose_lisamine_lukatakse_tervikuna_tagasi(client, manager_tok
     assert "avalik-teos-2" not in r2.json()["work_ids"], "osalist lisamist ei tohi olla"
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `.venv/bin/pytest tests/test_work_sets_members.py -v`
 Expected: FAIL — 404 (endpointe ei ole)
 
-- [ ] **Step 3: Lisa endpointid**
+- [x] **Step 3: Lisa endpointid**
 
 `server/routers/work_sets.py` lõppu:
 
@@ -875,12 +875,12 @@ async def delete_work_set_works(set_id: str, request: Request, user=Depends(get_
     return await _mutate(set_id, request, user, adding=False)
 ```
 
-- [ ] **Step 4: Jooksuta testid**
+- [x] **Step 4: Jooksuta testid**
 
 Run: `.venv/bin/pytest tests/test_work_sets_members.py tests/test_work_sets_api.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/routers/work_sets.py tests/test_work_sets_members.py
@@ -900,7 +900,7 @@ git commit -m "feat(work-sets): liikmete haldus ja otsingufiltri ID-loend (#354)
   - `type CollectionSelection = { kind: 'all' } | { kind: 'collection'; id: string } | { kind: 'work_set'; id: string }`
   - `selectionFilterClause(selection: CollectionSelection, workIds: string[] | null): string[]`
 
-- [ ] **Step 1: Kirjuta kukkuv test**
+- [x] **Step 1: Kirjuta kukkuv test**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -932,12 +932,12 @@ describe('selectionFilterClause', () => {
 });
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `npx vitest run src/services/__tests__/selectionFilter.test.ts`
 Expected: FAIL — moodulit ei ole
 
-- [ ] **Step 3: Kirjuta moodul**
+- [x] **Step 3: Kirjuta moodul**
 
 ```ts
 /**
@@ -969,12 +969,12 @@ export function selectionFilterClause(
 }
 ```
 
-- [ ] **Step 4: Jooksuta test**
+- [x] **Step 4: Jooksuta test**
 
 Run: `npx vitest run src/services/__tests__/selectionFilter.test.ts`
 Expected: PASS (5 testi)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/selectionFilter.ts src/services/__tests__/selectionFilter.test.ts
@@ -993,7 +993,7 @@ git commit -m "feat(work-sets): valiku filtri koostaja; tühi loend = null tulem
 - Consumes: `CollectionSelection` (Task 6)
 - Produces: `listWorkSets()`, `getWorkSet(id)`, `createWorkSet(...)`, `patchWorkSet(...)`, `getWorkSetWorkIds(id)`, `addWorks(id, ids, revision)`, `removeWorks(id, ids, revision)`, `invalidateWorkSetIds(id)`
 
-- [ ] **Step 1: Kirjuta kukkuv test**
+- [x] **Step 1: Kirjuta kukkuv test**
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -1030,12 +1030,12 @@ describe('getWorkSetWorkIds', () => {
 });
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `npx vitest run src/services/__tests__/workSetService.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Kirjuta teenus**
+- [x] **Step 3: Kirjuta teenus**
 
 ```ts
 /**
@@ -1104,12 +1104,12 @@ export const removeWorks = (setId: string, workIds: string[], revision: number) 
   mutate(setId, '/works', 'DELETE', { work_ids: workIds, revision });
 ```
 
-- [ ] **Step 4: Jooksuta test**
+- [x] **Step 4: Jooksuta test**
 
 Run: `npx vitest run src/services/__tests__/workSetService.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/workSetService.ts src/services/__tests__/workSetService.test.ts
@@ -1133,7 +1133,7 @@ git commit -m "feat(work-sets): API-klient; ID-loend ei ole TTL-vahemälu (#354)
 
 **Miks token, mitte teine efekt:** ADR 0038 ütleb, et suuna otsustab AINSANA `decideCollectionSync`. Kaks tingimusteta peeglit reageerivad teineteise EELMISELE väärtusele ja tekitavad lõputu URL-i vahetuse (#333). Seega ei lisa me teist sünkroonimist `?set=` jaoks, vaid serialiseerime valiku üheks tokeniks ja anname olemasolevale otsustajale.
 
-- [ ] **Step 1: Kirjuta kukkuvad testid**
+- [x] **Step 1: Kirjuta kukkuvad testid**
 
 ```ts
 import { serializeSelection, parseSelection } from '../collectionUrl';
@@ -1157,12 +1157,12 @@ it('tundmatu töökollektsioon URL-is ei tühjenda vaadet vaikselt', () => {
 });
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `npx vitest run src/contexts/__tests__/collectionSync.test.ts`
 Expected: FAIL — `serializeSelection` puudub
 
-- [ ] **Step 3: Lisa serialiseerimine ja laienda otsustajat**
+- [x] **Step 3: Lisa serialiseerimine ja laienda otsustajat**
 
 `src/contexts/collectionUrl.ts`:
 
@@ -1194,12 +1194,12 @@ function isAdoptable(urlValue: string, collections: Collections, knownSets: Set<
 
 `useCollectionUrlSync` kirjutab tokeni õigesse parameetrisse: `c:` → `?collection=`, `s:` → `?set=`, ja **eemaldab teise parameetri**. Kui välises URL-is on mõlemad, eelistatakse `set`-i.
 
-- [ ] **Step 4: Jooksuta testid**
+- [x] **Step 4: Jooksuta testid**
 
 Run: `npx vitest run src/contexts/__tests__/ && npm run typecheck`
 Expected: PASS; olemasolevad sünkroonimise testid jäävad roheliseks
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/contexts/ src/hooks/useCollectionUrlSync.ts
@@ -1217,13 +1217,13 @@ git commit -m "feat(work-sets): valik URL-is ühe suunaotsustaja kaudu (ADR 0038
 **Interfaces:**
 - Consumes: `listWorkSets()` (Task 7), `selection` (Task 8)
 
-- [ ] **Step 1: Lisa i18n võtmed MÕLEMASSE keelde**
+- [x] **Step 1: Lisa i18n võtmed MÕLEMASSE keelde**
 
 `src/locales/et/common.json`: `"workSets": { "section": "Töökollektsioonid", "permanent": "Püsikogud", "create": "Loo töökollektsioon", "archived": "Arhiveeritud", "notFound": "Töökollektsiooni ei leitud või puudub ligipääs", "allWorks": "Kõik teosed" }`
 
 `src/locales/en/common.json`: `"workSets": { "section": "Work collections", "permanent": "Permanent collections", "create": "Create work collection", "archived": "Archived", "notFound": "Work collection not found or access denied", "allWorks": "All works" }`
 
-- [ ] **Step 2: Kirjuta kukkuv test**
+- [x] **Step 2: Kirjuta kukkuv test**
 
 ```tsx
 it('näitab mõlemat jaotist ja filtreerib otsinguga korraga', async () => {
@@ -1238,21 +1238,21 @@ it('parandab z-indeksi: modaal on päise kohal', () => {
 });
 ```
 
-- [ ] **Step 3: Jooksuta, veendu et kukub**
+- [x] **Step 3: Jooksuta, veendu et kukub**
 
 Run: `npx vitest run src/components/__tests__/CollectionPicker.test.tsx`
 Expected: FAIL
 
-- [ ] **Step 4: Lisa jaotised**
+- [x] **Step 4: Lisa jaotised**
 
 Muuda `CollectionPicker.tsx`: püsikogude puu jääb, alla lisandub `listWorkSets()`-ist laetud lame loend (aktiivsed, nime järgi, võrdse nime korral ID järgi). Ühine otsinguväli filtreerib mõlemat. `z-50` → `z-[1300]` (CLAUDE.md invariant: `Header` on `sticky z-[1200]`, `z-50` EI OLE piisav).
 
-- [ ] **Step 5: Jooksuta testid ja väravad**
+- [x] **Step 5: Jooksuta testid ja väravad**
 
 Run: `npx vitest run src/components/__tests__/CollectionPicker.test.tsx && npm run typecheck && npm test`
 Expected: PASS; `localeParity.test.ts` ja `translationKeysResolve.test.ts` roheline
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/CollectionPicker.tsx src/locales/ src/components/__tests__/
@@ -1270,7 +1270,7 @@ git commit -m "feat(work-sets): päisevalija kaks jaotist; z-[1300] (#354)"
 **Interfaces:**
 - Consumes: `selectionFilterClause` (Task 6), `getWorkSetWorkIds` (Task 7)
 
-- [ ] **Step 1: Kirjuta kukkuv test**
+- [x] **Step 1: Kirjuta kukkuv test**
 
 ```ts
 it('töökollektsiooni otsing kasutab work_id filtrit, mitte kollektsioonifiltrit', async () => {
@@ -1290,12 +1290,12 @@ it('teoste koguarv tuleb totalHits-ist, mitte estimatedTotalHits-ist', async () 
 });
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `npx vitest run src/services/__tests__/searchService.selection.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Asenda kollektsioonifiltri kohad**
+- [x] **Step 3: Asenda kollektsioonifiltri kohad**
 
 Iga koht, kus praegu on
 
@@ -1315,12 +1315,12 @@ if (options.selection && !options.workId) {
 
 `options.selection` tuleb kutsujalt (Dashboard, SearchPage, Statistics), kes on ID-loendi eelnevalt `getWorkSetWorkIds`-iga laadinud. Loendi laadimise ajal ei tehta piiramata päringut.
 
-- [ ] **Step 4: Jooksuta testid**
+- [x] **Step 4: Jooksuta testid**
 
 Run: `npx vitest run src/services/__tests__/ && npm run typecheck`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/searchService.ts src/pages/Dashboard.tsx src/pages/Statistics.tsx src/services/__tests__/
@@ -1340,7 +1340,7 @@ git commit -m "feat(work-sets): sirvimine, otsing ja statistika järgivad valiku
 
 **Uut liikmesusindeksit EI tehta** — kasutatakse sama ID-loendit ja olemasolevaid teose–isiku seoseid (`person_to_works.json`).
 
-- [ ] **Step 1: Kirjuta kukkuv test**
+- [x] **Step 1: Kirjuta kukkuv test**
 
 ```python
 def test_isikute_filter_kasutab_kutsuja_nahtavat_loendit(client, viewer_token, ws_id):
@@ -1357,21 +1357,21 @@ def test_ligipaasuta_tookollektsioon_annab_404_mitte_koik_isikud(client, voorasT
     assert r.status_code == 404
 ```
 
-- [ ] **Step 2: Jooksuta, veendu et kukub**
+- [x] **Step 2: Jooksuta, veendu et kukub**
 
 Run: `.venv/bin/pytest tests/test_persons_work_set_filter.py -v`
 Expected: FAIL — parameetrit ei tunta, vastuses on kõik isikud
 
-- [ ] **Step 3: Lisa parameeter**
+- [x] **Step 3: Lisa parameeter**
 
 `/persons` võtab vastu `work_set`; server laeb kogu, kontrollib `can_view_set`-i (ligipääsu puudumine = 404, mitte filtri eiramine), koostab `search_visible_work_ids`-i ja piirab isikute hulga nende teostega `person_to_works.json` kaudu.
 
-- [ ] **Step 4: Jooksuta testid**
+- [x] **Step 4: Jooksuta testid**
 
 Run: `.venv/bin/pytest tests/test_persons_work_set_filter.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/prosopography/router.py src/prosopography/pages/PersonsPage.tsx tests/test_persons_work_set_filter.py
@@ -1387,11 +1387,11 @@ git commit -m "feat(work-sets): isikute vaade järgib töökollektsiooni (#354)"
 - Modify: `src/pages/admin/Users.tsx` (kolmas õiguste plokk), `src/locales/{et,en}/admin.json`, marsruudid
 - Test: `src/pages/admin/__tests__/WorkSets.test.tsx`
 
-- [ ] **Step 1: Lisa i18n võtmed mõlemasse keelde**
+- [x] **Step 1: Lisa i18n võtmed mõlemasse keelde**
 
 `admin.json` (et): `"workSets": { "title": "Töökollektsioonid", "members": "Liikmeid", "viewer": "Vaataja", "manager": "Haldur", "archive": "Arhiveeri", "restore": "Taasaktiveeri", "publish": "Avalda", "limitReached": "Kogu on täis" }` — ja sama võtmestik `en`-i.
 
-- [ ] **Step 2: Kirjuta kukkuv test**
+- [x] **Step 2: Kirjuta kukkuv test**
 
 ```tsx
 it('vaataja ei näe liikmete muutmise nuppe', () => {
@@ -1407,21 +1407,21 @@ it('kolm õiguste plokki on eraldi ega kirjuta teineteist üle', () => {
 });
 ```
 
-- [ ] **Step 3: Jooksuta, veendu et kukub**
+- [x] **Step 3: Jooksuta, veendu et kukub**
 
 Run: `npx vitest run src/pages/admin/__tests__/WorkSets.test.tsx`
 Expected: FAIL
 
-- [ ] **Step 4: Kirjuta vaated**
+- [x] **Step 4: Kirjuta vaated**
 
 `WorkSets.tsx`: loend (nimi, liikmete arv, nähtavus, olek), valitud kogu paneel (nimi, kirjeldus, liikmed, `access`), arhiveerimine/taasaktiveerimine, avaldamine (admin). Kasutajahalduses kolmas plokk kogu kaupa „vaataja / haldur"; salvestus saadab **ainult muudetud määrangud** ega puutu `allowed_collections` ega `edit_collections` välju.
 
-- [ ] **Step 5: Jooksuta kõik väravad**
+- [x] **Step 5: Jooksuta kõik väravad**
 
 Run: `npm run typecheck && npm test && npm run lint:ci && .venv/bin/pytest tests/`
 Expected: kõik roheline
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/pages/admin/ src/locales/ 
@@ -1436,15 +1436,15 @@ git commit -m "feat(work-sets): haldusvaated ja kasutajahalduse kolmas õiguste 
 - Create: `docs/decisions/0042-tookollektsiooni-liikmesust-ei-indekseerita.md`
 - Modify: `CLAUDE.md` (invariandid), `docs/decisions/README.md`
 
-- [ ] **Step 1: Kirjuta ADR**
+- [x] **Step 1: Kirjuta ADR**
 
 Sisu: otsus (liikmesust ei indekseerita), kontekst (tenant-tokeni filter `meilisearch_ops.py:586` kannab lugemisõigust `collections_hierarchy` kaudu), tagajärjed (ID-loend päringu ajal, lagi, ei mingit sünki), alternatiiv ja miks tagasi lükati (viide asendatud spekile).
 
-- [ ] **Step 2: Lisa CLAUDE.md invariandid**
+- [x] **Step 2: Lisa CLAUDE.md invariandid**
 
 Kolm rida „Invariandid" sektsiooni: liikmesus ei jõua Meilisse; `server/cache.py` ei hoia kasutajapõhiseid vastuseid; tühi ID-loend = null tulemust.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/decisions/ CLAUDE.md
