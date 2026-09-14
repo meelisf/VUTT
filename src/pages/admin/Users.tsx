@@ -364,7 +364,9 @@ const UsersPage: React.FC = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 truncate">{u.name}</span>
+                          <Link to={`/admin/users/${u.username}`} className="font-medium text-gray-900 truncate hover:underline">
+                            {u.name}
+                          </Link>
                           {isCurrentUser && (
                             <span className="flex-shrink-0 text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
                               {t('users.you')}
