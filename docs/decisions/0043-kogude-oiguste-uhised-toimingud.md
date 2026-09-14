@@ -65,11 +65,17 @@ muutmise õigust ega toimetajale kasutajate üldloendit.
 
 ## Tagajärjed
 
-Etapp 1a parandab serveri ja konto elutsükli, eraldi PR 1b lisab paneeli;
-teises etapis asendatakse kollektsioonipoolne vana haru koos kliendiga.
-Kuni need etapid pole tehtud, ei kirjelda see ADR juba töötavat garantiid.
-Teostuse lõpus eemaldatakse see üleminekumärkus ning uuendatakse ADR-i ja
-README registri staatus koos; enne seda jääb märkus alles.
+**Tehtud ja tootmises:** etapp 1a (serveri ja konto elutsükli parandus,
+`POST /admin/users/collection-rights` delta), etapp 1b (töökollektsiooni
+ligipääsupaneel) ning etapp 2 (kollektsiooniõiguste delta kasutuselevõtt,
+kaks telge koos alusega, `allowed_users` kirjutusharu eemaldamine, kogude
+loend ja ligipääs adminile, seaded superadminile).
+
+**Veel lahtised:** etapp 3 (otsitav kasutajanimekiri ja `/admin/users/:username`
+detail, §1) ning etapp 4 (ühine „Kogud” sisenemiskoht ja tüübifilter, §4).
+Kuni need pole tehtud, ei kirjelda see ADR kõiki siinseid garantiisid
+töötavana. Teostuse lõpus eemaldatakse see üleminekumärkus ning uuendatakse
+ADR-i ja README registri staatus koos; enne seda jääb märkus alles.
 
 Kollektsioonipaneel näitab selle kaudu antud õigusi. Teose mitmesse kogusse
 kuulumise, avalikkuse või jagatava lingi tõttu ei ole see täielik ligipääsuaudit.
