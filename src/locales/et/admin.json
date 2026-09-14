@@ -99,6 +99,7 @@
   "collections": {
     "tab": "Kollektsioonid",
     "title": "Kollektsiooni kirjeldused",
+    "superadminOnlyHint": "Kollektsiooni seadeid ja struktuuri saab muuta ainult superadmin. Siin näed valitud kogu ligipääsu.",
     "selectCollection": "Vali kollektsioon...",
     "description": "Lühikirjeldus",
     "descriptionLong": "Pikk kirjeldus",

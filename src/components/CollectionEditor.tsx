@@ -59,7 +59,16 @@ function renderTreeOptions(nodes: CollectionTreeNode[], depth = 0): React.ReactN
 }
 
 
-const CollectionEditor: React.FC = () => {
+interface CollectionEditorProps {
+  /**
+   * Kas kutsuja tohib kogu STRUKTUURI ja SEADEID muuta? Väär adminil:
+   * ligipääs on admin+, seaded superadmin (ADR 0043 p4). Peitmine EI OLE
+   * autoriseerimine — serveri `require_role("superadmin")` jääb alles.
+   */
+  canEditSettings?: boolean;
+}
+
+const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = true }) => {
   const { t } = useTranslation(['admin', 'common']);
   const { user, authToken } = useUser();
   const { collections, refreshCollections } = useCollection();
@@ -291,8 +300,15 @@ const CollectionEditor: React.FC = () => {
         </select>
       </div>
 
+      {!canEditSettings && (
+        <p className="text-sm text-gray-500">{t('collections.superadminOnlyHint')}</p>
+      )}
+
       {selectedId && (
         <div className="space-y-6">
+          {/* Seaded on superadmini piir (ADR 0043 p4). */}
+          {canEditSettings && (
+            <>
           {/* Värv */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('collections.createColor')}</label>
@@ -331,6 +347,8 @@ const CollectionEditor: React.FC = () => {
               {t('collections.visibilityHint')}
             </p>
           </div>
+            </>
+          )}
 
           {/* Ligipääs on nähtavuse valiku KÕRVAL, mitte sees: kirjutamisulatust
               saab määrata ka avalikul kogul ja lugemisõigust piiratud kogul
@@ -350,6 +368,8 @@ const CollectionEditor: React.FC = () => {
             />
           )}
 
+          {canEditSettings && (
+            <>
           {/* Lühikirjeldus */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-3">{t('collections.description')}</p>
@@ -476,10 +496,13 @@ const CollectionEditor: React.FC = () => {
 
           }
           {!deleteConfirming && deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+            </>
+          )}
         </div>
       )}
 
       {/* Lisa uus kollektsioon */}
+      {canEditSettings && (
       <div className="border-t border-gray-200 pt-6">
         <button
           onClick={() => setShowCreate(v => !v)}
@@ -589,6 +612,7 @@ const CollectionEditor: React.FC = () => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
