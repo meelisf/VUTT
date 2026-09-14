@@ -85,13 +85,7 @@
       "account": "Konto",
       "rightsTitle": "Kollektsiooniõigused",
       "rightsHint": "Lugemisõigus avab piiratud kogu teosed. Kirjutamisulatus piirab kaastöölise muutmisõigust ega anna lugemisõigust.",
-      "readRight": "Lugemisõigus",
-      "writeScope": "Kirjutamisulatus",
-      "basisRoleBased": "rollist tulenev",
-      "basisInert": "praegu ei mõju",
       "deletedCollection": "Kustutatud kollektsioon ({{id}})",
-      "publicInert": "Praegu ei mõju: kogu on avalik",
-      "inertScope": "Salvestatud ulatus ei piira: õigus rollist",
       "scopeWithoutRead": "Ulatus üksi ei ava selle piiratud kogu teoseid.",
       "addReadRight": "Lisa lugemisõigus",
       "noRights": "Salvestatud määranguid ei ole",
@@ -105,7 +99,14 @@
       "workSetsTitle": "Töökollektsioonid",
       "workSetsSaved": "Salvestatud: {{names}}",
       "workSetsFailed": "Salvestamata: {{names}}",
-      "workSetsConflictHint": "Keegi muutis sama kogu vahepeal. Allolev olek on serverist uuesti laetud — vaata muudatus üle ja salvesta uuesti."
+      "workSetsConflictHint": "Keegi muutis sama kogu vahepeal. Allolev olek on serverist uuesti laetud — vaata muudatus üle ja salvesta uuesti.",
+      "seesWorks": "Näeb selle kogu teoseid",
+      "mayEdit": "Tohib selle kogu teoseid muuta",
+      "remove": "Eemalda",
+      "remnantRole": "salvestatud määrang ei mõjuta midagi, ligipääs tuleb rollist ({{role}})",
+      "remnantPublic": "salvestatud määrang ei mõjuta midagi, kogu on avalik",
+      "remnantDeleted": "salvestatud määrang ei mõjuta midagi, kollektsioon on kustutatud",
+      "roleCoversAll": "{{role}} ligipääs tuleb rollist: eraldi kollektsioonimääranguid ei ole vaja."
     },
     "list": {
       "searchPlaceholder": "Otsi nime, kasutajanime või e-posti järgi",
@@ -186,10 +187,8 @@
     "descriptionLongPlaceholderEn": "Longer introduction in English...",
     "accessPanel": {
       "title": "Ligipääs",
-      "readRight": "Lugemisõigus",
-      "writeScope": "Kirjutamisulatus",
-      "basisRoleBased": "Rollist tulenev",
-      "basisInert": "Praegu ei mõju: kogu on avalik",
+      "readRight": "Näeb teoseid",
+      "writeScope": "Tohib teoseid muuta",
       "publicNoRead": "Kogu on avalik — lugemisõiguse määrangut ei ole vaja ega saa lisada.",
       "editorNeedsRead": "Toimetaja kirjutamisulatus on üldine, aga piiratud kogu lugemisõigust vajab ta endiselt.",
       "scopeWithoutRead": "See ulatus üksi ei ava piiratud teoseid. Lisa eraldi ka lugemisõigus.",
@@ -207,7 +206,9 @@
       "saving": "Salvestan…",
       "loadFailed": "Ligipääsu laadimine ebaõnnestus",
       "saveFailed": "Salvestamine ebaõnnestus",
-      "retry": "Proovi uuesti"
+      "retry": "Proovi uuesti",
+      "remnantRole": "salvestatud määrang ei mõjuta midagi, õigus tuleb rollist",
+      "remnantPublic": "salvestatud määrang ei mõjuta midagi, kogu on avalik"
     }
   },
   "workSets": {
@@ -264,7 +265,8 @@
       "conflictReload": "Kogu muutus vahepeal. Laadisin uue oleku; vaata oma muudatused üle ja salvesta uuesti.",
       "readOnlyHint": "Õiguste jagamine on admini toiming. Siin on selle kogu praegune ligipääs.",
       "serverState": "Serveri praegune olek:"
-    }
+    },
+    "noAccess": "Ligipääs puudub"
   },
   "cards": {
     "registrations": "Taotlused",

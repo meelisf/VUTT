@@ -85,13 +85,7 @@
       "account": "Account",
       "rightsTitle": "Collection rights",
       "rightsHint": "Read access opens the works of a restricted collection. Write scope limits a contributor's editing right and does not grant read access.",
-      "readRight": "Read access",
-      "writeScope": "Write scope",
-      "basisRoleBased": "from role",
-      "basisInert": "no effect now",
       "deletedCollection": "Deleted collection ({{id}})",
-      "publicInert": "No effect now: the collection is public",
-      "inertScope": "Saved scope does not restrict: right comes from role",
       "scopeWithoutRead": "Scope alone does not open the works of this restricted collection.",
       "addReadRight": "Add read access",
       "noRights": "No saved assignments",
@@ -105,7 +99,14 @@
       "workSetsTitle": "Work collections",
       "workSetsSaved": "Saved: {{names}}",
       "workSetsFailed": "Not saved: {{names}}",
-      "workSetsConflictHint": "Someone changed the same collection in the meantime. The state below has been reloaded from the server — review the change and save again."
+      "workSetsConflictHint": "Someone changed the same collection in the meantime. The state below has been reloaded from the server — review the change and save again.",
+      "seesWorks": "Can see this collection's works",
+      "mayEdit": "Can edit this collection's works",
+      "remove": "Remove",
+      "remnantRole": "this saved assignment has no effect, access comes from the role ({{role}})",
+      "remnantPublic": "this saved assignment has no effect, the collection is public",
+      "remnantDeleted": "this saved assignment has no effect, the collection has been deleted",
+      "roleCoversAll": "A {{role}} has access through their role: separate collection assignments are not needed."
     },
     "list": {
       "searchPlaceholder": "Search by name, username or email",
@@ -186,10 +187,8 @@
     "descriptionLongPlaceholderEn": "Longer introduction in English...",
     "accessPanel": {
       "title": "Access",
-      "readRight": "Read access",
-      "writeScope": "Write scope",
-      "basisRoleBased": "Derives from role",
-      "basisInert": "Currently has no effect: the collection is public",
+      "readRight": "Can see works",
+      "writeScope": "Can edit works",
       "publicNoRead": "This collection is public — a read access entry is neither needed nor allowed.",
       "editorNeedsRead": "An editor's write scope is general, but they still need read access to a restricted collection.",
       "scopeWithoutRead": "This scope alone does not open restricted works. Add read access separately.",
@@ -207,7 +206,9 @@
       "saving": "Saving…",
       "loadFailed": "Loading access failed",
       "saveFailed": "Saving failed",
-      "retry": "Try again"
+      "retry": "Try again",
+      "remnantRole": "this saved assignment has no effect, the right comes from the role",
+      "remnantPublic": "this saved assignment has no effect, the collection is public"
     }
   },
   "workSets": {
@@ -264,7 +265,8 @@
       "conflictReload": "The set changed meanwhile. The current state has been loaded; review your changes and save again.",
       "readOnlyHint": "Sharing rights is an admin action. This is the current access for this set.",
       "serverState": "Current state on the server:"
-    }
+    },
+    "noAccess": "No access"
   },
   "cards": {
     "registrations": "Registrations",

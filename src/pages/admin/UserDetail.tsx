@@ -25,8 +25,9 @@ import { accessChanges, SetRole } from './workSetAccess';
 import { saveAccessChanges } from './userWorkSetSave';
 import {
   addableAllowed, addableEdit, CollectionInfo, userRightsDelta, userRightsRows,
-  UserRightsState,
+  UserRightsRow, UserRightsState,
 } from './userRightsDraft';
+import { RightsControl, rightsControl, rowVisible } from './collectionRightsDraft';
 
 interface AdminUser {
   username: string;
@@ -251,10 +252,19 @@ const UserDetail: React.FC = () => {
   const voibParooliTaastada = onIse || voibHallata;
   const wsMuudatusi = target ? accessChanges(workSets, target.username, wsMustand).length > 0 : false;
 
-  const alusSilt = (b: string): string | null => {
-    if (b === 'role_based') return t('users.detail.basisRoleBased');
-    if (b === 'inert') return t('users.detail.basisInert');
-    return null;
+  // Sildid ütlevad TEGEVUSE, mitte välja nime: „lugemisõigus" ja
+  // „kirjutamisulatus" ei öelnud kasutajale, mida nad teevad.
+  const teljeSilt = (field: 'allowed' | 'edit') =>
+    field === 'allowed' ? t('users.detail.seesWorks') : t('users.detail.mayEdit');
+
+  /** Miks salvestatud määrang ei mõju? Kolm põhjust, kõik nimetatud. */
+  const jaanukiPohjus = (rida: UserRightsRow, field: 'allowed' | 'edit'): string => {
+    if (!rida.exists) return t('users.detail.remnantDeleted');
+    const basis = field === 'allowed' ? rida.allowedBasis : rida.editBasis;
+    if (basis === 'role_based') {
+      return t('users.detail.remnantRole', { role: t(`common:roles.${target?.role}`) });
+    }
+    return t('users.detail.remnantPublic');
   };
 
   return (
@@ -380,6 +390,11 @@ const UserDetail: React.FC = () => {
             <section className="bg-white rounded-lg border border-gray-200 p-4">
               <h2 className="text-lg font-semibold text-gray-800">{t('users.detail.rightsTitle')}</h2>
               <p className="mt-1 text-xs text-gray-500">{t('users.detail.rightsHint')}</p>
+              {isAtLeast(target.role, 'admin') && (
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('users.detail.roleCoversAll', { role: t(`common:roles.${target.role}`) })}
+                </p>
+              )}
 
               {!laetud || !mustand ? (
                 // Laadimisviga ei tohi näha välja nagu „õigusi ei ole": tühi
@@ -396,18 +411,65 @@ const UserDetail: React.FC = () => {
                 )}
                 {read.map(rida => {
                   const kogu = kogud[rida.collectionId];
-                  // Lisada tohib ainult olemasolevale kogule ja ainult siis, kui
-                  // see on lubatud: piiratud kogule lugemisõigus, mittevirtuaalsele
-                  // kirjutamisulatus (editor+ saab ulatuse rollist).
-                  const allowedLubatud = rida.allowed
-                    || (rida.exists && kogu?.visibility === 'restricted');
-                  const editLubatud = rida.edit
-                    || (rida.exists && !kogu?.isVirtual && !isAtLeast(target.role, 'editor'));
+                  // Mida tohib LISADA (peegeldab serveri reegleid): piiratud
+                  // kogule lugemisõiguse, mittevirtuaalsele kirjutamisulatuse
+                  // ja sedagi ainult kaastöölisele (editor+ saab ulatuse rollist).
+                  const allowedCanAdd = rida.exists && kogu?.visibility === 'restricted';
+                  const editCanAdd = rida.exists && !kogu?.isVirtual
+                    && !isAtLeast(target.role, 'editor');
+                  // Lüliti AINULT seal, kus lülitamine muudab tegelikku ligipääsu.
+                  const allowedCtrl = rightsControl({
+                    basis: rida.allowedBasis, checked: rida.allowed,
+                    canManage: voibHallata, canAdd: allowedCanAdd,
+                  });
+                  const editCtrl = rightsControl({
+                    basis: rida.editBasis, checked: rida.edit,
+                    canManage: voibHallata, canAdd: editCanAdd,
+                  });
+                  if (!rowVisible(allowedCtrl, editCtrl)) return null;
                   // Ulatus ilma lugemisõiguseta PIIRATUD kogul ei ava teoseid —
                   // seda ei parandata vaikselt (ADR 0031), vaid pakutakse eraldi.
                   const ulatusIlmaLugemiseta = rida.edit && !rida.allowed
-                    && rida.exists && kogu?.visibility === 'restricted'
-                    && rida.editBasis === 'assigned';
+                    && editCtrl === 'toggle' && allowedCanAdd;
+
+                  const lyliti_ = (field: 'allowed' | 'edit', ctrl: RightsControl) => {
+                    if (ctrl === 'hidden') return null;
+                    if (ctrl === 'fact') {
+                      return (
+                        <span className="text-sm text-gray-600">✓ {teljeSilt(field)}</span>
+                      );
+                    }
+                    if (ctrl === 'remnant') return null;  // renderdatakse rea all
+                    return (
+                      <label className="flex items-center gap-1 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={field === 'allowed' ? rida.allowed : rida.edit}
+                          disabled={salvestan}
+                          onChange={e => lyliti(rida.collectionId, field, e.target.checked)}
+                        />
+                        {teljeSilt(field)}
+                      </label>
+                    );
+                  };
+
+                  const jaanukiRida = (field: 'allowed' | 'edit', ctrl: RightsControl) => {
+                    if (ctrl !== 'remnant') return null;
+                    return (
+                      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                        <span>{teljeSilt(field)} — {jaanukiPohjus(rida, field)}</span>
+                        <button
+                          type="button"
+                          className="text-red-700 underline disabled:opacity-50"
+                          disabled={salvestan}
+                          onClick={() => lyliti(rida.collectionId, field, false)}
+                        >
+                          {t('users.detail.remove')}
+                        </button>
+                      </p>
+                    );
+                  };
+
                   return (
                     <li key={rida.collectionId} className="py-2">
                       <div className="flex flex-wrap items-center gap-3">
@@ -417,56 +479,19 @@ const UserDetail: React.FC = () => {
                             : t('users.detail.deletedCollection', { id: rida.collectionId })}
                         </span>
 
-                        <label className="flex items-center gap-1 text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            checked={rida.allowed}
-                            disabled={salvestan || !voibHallata || !allowedLubatud}
-                            onChange={e => lyliti(rida.collectionId, 'allowed', e.target.checked)}
-                          />
-                          {t('users.detail.readRight')}
-                          {alusSilt(rida.allowedBasis) && (
-                            <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-700">
-                              {alusSilt(rida.allowedBasis)}
-                            </span>
-                          )}
-                        </label>
-
-                        <label className="flex items-center gap-1 text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            checked={rida.edit}
-                            disabled={salvestan || !voibHallata || !editLubatud}
-                            onChange={e => lyliti(rida.collectionId, 'edit', e.target.checked)}
-                          />
-                          {t('users.detail.writeScope')}
-                          {alusSilt(rida.editBasis) && (
-                            <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-700">
-                              {alusSilt(rida.editBasis)}
-                            </span>
-                          )}
-                        </label>
+                        {lyliti_('allowed', allowedCtrl)}
+                        {lyliti_('edit', editCtrl)}
                       </div>
 
-                      {rida.allowedBasis === 'inert' && rida.exists
-                        && kogu?.visibility === 'public' && (
-                        <p className="mt-1 text-xs text-gray-500">{t('users.detail.publicInert')}</p>
-                      )}
-                      {/* „Salvestatud ulatus ei piira" eeldab, et ulatus on
-                          tegelikult salvestatud. Mustandis maha võetud kirje
-                          jääb selgituseks alles (laetud olekus ta veel on),
-                          aga rida, millel ulatust kunagi ei olnud, seda ei väida. */}
-                      {rida.editBasis === 'role_based'
-                        && (rida.edit || laetud?.edit.has(rida.collectionId)) && (
-                        <p className="mt-1 text-xs text-gray-500">{t('users.detail.inertScope')}</p>
-                      )}
+                      {jaanukiRida('allowed', allowedCtrl)}
+                      {jaanukiRida('edit', editCtrl)}
                       {ulatusIlmaLugemiseta && (
                         <p className="mt-1 text-xs text-amber-700">
                           {t('users.detail.scopeWithoutRead')}{' '}
                           <button
                             type="button"
                             className="underline"
-                            disabled={salvestan || !voibHallata}
+                            disabled={salvestan}
                             onClick={() => lyliti(rida.collectionId, 'allowed', true)}
                           >
                             {t('users.detail.addReadRight')}
@@ -478,7 +503,10 @@ const UserDetail: React.FC = () => {
                 })}
               </ul>
 
-              {mustand && (addableAllowed(kogud, mustand).length > 0
+              {/* Admin+ saab kõik rollist: uus määrang toodaks ainult uut
+                  jäänukit, seega lisamist ei pakuta. */}
+              {mustand && voibHallata && !isAtLeast(target.role, 'admin')
+                && (addableAllowed(kogud, mustand).length > 0
                 || addableEdit(kogud, mustand, target.role).length > 0) && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {addableAllowed(kogud, mustand).length > 0 && (
@@ -551,8 +579,14 @@ const UserDetail: React.FC = () => {
                 <p className="mt-2 text-sm text-gray-500">{t('workSets.empty')}</p>
               ) : (
                 <div className="mt-2 flex flex-col gap-1">
+                  {/* Nimi ETTE: rida algab sellega, MILLE kohta valik käib —
+                      valik esimesena luges „Puudub — Vennastekogudus". */}
                   {workSets.map(ws => (
-                    <label key={ws.id} className="flex items-center gap-2 text-sm">
+                    <label key={ws.id} className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="min-w-[12rem] truncate">
+                        {wsNimi(ws)}
+                        {ws.status === 'archived' && ` (${t('workSets.statusArchived')})`}
+                      </span>
                       <select
                         value={wsMustand[ws.id] ?? ''}
                         disabled={!voibHallata || !ws.can_manage || wsSalvestan}
@@ -562,14 +596,10 @@ const UserDetail: React.FC = () => {
                         }))}
                         className="text-xs border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
                       >
-                        <option value="">{t('workSets.none')}</option>
+                        <option value="">{t('workSets.noAccess')}</option>
                         <option value="viewer">{t('workSets.viewer')}</option>
                         <option value="manager">{t('workSets.manager')}</option>
                       </select>
-                      <span className="truncate">
-                        {wsNimi(ws)}
-                        {ws.status === 'archived' && ` (${t('workSets.statusArchived')})`}
-                      </span>
                     </label>
                   ))}
                 </div>

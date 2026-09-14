@@ -123,3 +123,47 @@ export function rightsDelta(
 export function affectedUsernames(changes: RightsChange[]): string[] {
   return [...new Set(changes.map(c => c.username))].sort();
 }
+
+/**
+ * Mida real kuvada (#318).
+ *
+ * `toggle` = päris lüliti, `remnant` = salvestatud määrang, mis ei mõju, aga
+ * mille saab koristada, `fact` = olemasolev õigus lugemisvaates, `hidden` =
+ * ei kuvata midagi.
+ */
+export type RightsControl = 'toggle' | 'remnant' | 'fact' | 'hidden';
+
+/**
+ * Lüliti ainult seal, kus lülitamine muudab tegelikku ligipääsu.
+ *
+ * Hall märkeruut kandis varem nelja eri olukorda korraga — rollist tulenev
+ * õigus, lisamatu määrang, võõra kasutaja rida ja inertne jäänuk nägid kõik
+ * ühesugused välja. Kastike, mille olek ei ütle midagi ja mille lülitamine ei
+ * muuda midagi, on müra: seda ei kuvata.
+ *
+ * Jäänuk jääb nähtavaks, sest ta EI OLE tähendusetu — kirje on `users.json`-is
+ * alles ja hakkab uuesti mõjuma, kui kogu piiratakse või kasutaja roll langeb.
+ * ADR 0043 nõuab, et selle saaks käsitsi eemaldada.
+ */
+export function rightsControl(opts: {
+  basis: RightsBasis;
+  /** Kas määrang on mustandis peal? */
+  checked: boolean;
+  /** Kas kutsuja tohib SEDA kasutajat hallata? */
+  canManage: boolean;
+  /** Kas märkimata määrangut tohib üldse lisada (kogu ja roll lubavad)? */
+  canAdd: boolean;
+}): RightsControl {
+  const { basis, checked, canManage, canAdd } = opts;
+  // Ilma haldusõiguseta ei ole ühtki tegevust: olemasolev õigus on väide,
+  // puuduv ei ole midagi.
+  if (!canManage) return checked ? 'fact' : 'hidden';
+  if (basis === 'assigned') return checked || canAdd ? 'toggle' : 'hidden';
+  // role_based | inert — õigus ei tule sellest määrangust.
+  return checked ? 'remnant' : 'hidden';
+}
+
+/** Rida, millel ei ole ühtki nähtavat telge, ei lisa midagi peale müra. */
+export function rowVisible(allowed: RightsControl, edit: RightsControl): boolean {
+  return allowed !== 'hidden' || edit !== 'hidden';
+}

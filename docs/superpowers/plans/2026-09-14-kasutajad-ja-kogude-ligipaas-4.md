@@ -885,98 +885,25 @@ BODY
 
 # Osa 4c — kaks lahtist pisiasja ja ADR-i lõpetamine
 
-### Task 10: „rollist tulenev" silt ainult siis, kui ta midagi ütleb
+### Task 10: TEHTUD eraldi PR-is
 
-`role_based` märgib praegu kahte eri olukorda (#318 kommentaar):
-märkimata kastike editoril/adminil = puhas müra; märgitud kastike = inertne
-salvestatud jäänuk, mille koristustee ADR 0043 nõuab. Peita tohib ainult
-esimese.
+**See task on juba teostatud** (PR #368, arutelu kasutajaga 2026-09-14) ja
+lahendus on plaanitust TUGEVAM — ära tee seda uuesti.
 
-**Failid:**
-- Muuda: `src/pages/admin/collectionRightsDraft.ts`,
-  `src/components/CollectionAccessPanel.tsx`, `src/pages/admin/UserDetail.tsx`
-- Test: `src/pages/admin/__tests__/collectionRightsDraft.test.ts`
+Plaan pakkus `basisLabelVisible`-i: sildi peitmine seal, kus ta midagi ei ütle.
+Kasutaja tähelepanek oli, et probleem ei ole sildis, vaid LÜLITIS: hall
+märkeruut, mida ei saa lülitada, tekitab segadust ka ilma sildita. Reegel on
+nüüd „lüliti ainult seal, kus lülitamine muudab tegelikku ligipääsu" ja seda
+otsustab `rightsControl` (`collectionRightsDraft.ts`, vitestiga kaetud):
 
-- [ ] **Samm 1: kirjuta kukkuv test**
-
-Lisa olemasolevasse testifaili:
-
-```ts
-import { basisLabelVisible } from '../collectionRightsDraft';
-
-describe('basisLabelVisible', () => {
-  it('rollist tulenev silt on müra, kui määrangut ei ole', () => {
-    // Editor ilma salvestatud ulatuseta: silt ei ütle midagi ega paku tegevust.
-    expect(basisLabelVisible('role_based', false)).toBe(false);
-  });
-
-  it('rollist tulenev silt jääb, kui salvestatud määrang on olemas', () => {
-    // Inertne jäänuk, mille koristustee ADR 0043 nõuab — sildi üldine
-    // peitmine kaotaks selle ära.
-    expect(basisLabelVisible('role_based', true)).toBe(true);
-  });
-
-  it('inertne avaliku kogu määrang on alati nähtav', () => {
-    expect(basisLabelVisible('inert', true)).toBe(true);
-    expect(basisLabelVisible('inert', false)).toBe(true);
-  });
-
-  it('tavaline määrang ei kanna silti', () => {
-    expect(basisLabelVisible('assigned', true)).toBe(false);
-  });
-});
+```
+!canManage            → checked ? 'fact'    : 'hidden'
+basis === 'assigned'  → (checked || canAdd) ? 'toggle' : 'hidden'
+role_based | inert    → checked ? 'remnant' : 'hidden'
 ```
 
-- [ ] **Samm 2: käivita, veendu et kukub**
-
-Käsk: `npx vitest run src/pages/admin/__tests__/collectionRightsDraft.test.ts`
-Oodatud: FAIL — `basisLabelVisible is not a function`.
-
-- [ ] **Samm 3: teostus**
-
-`collectionRightsDraft.ts`-i lõppu:
-
-```ts
-/**
- * Kas alust tasub kuvada? (#318)
- *
- * `role_based` tähendab kahte eri asja: märkimata kastike editoril/adminil on
- * puhas müra („õigus tuleb rollist, salvestatud kirjet ei ole"), märgitud
- * kastike on inertne SALVESTATUD jäänuk, mille käsitsi koristamist ADR 0043
- * nõuab. Peita tohib ainult esimese — sildi üldine peitmine kaotaks
- * koristustee. `inert` (avaliku kogu või kustutatud kogu määrang) on alati
- * informatiivne.
- */
-export function basisLabelVisible(basis: RightsBasis, checked: boolean): boolean {
-  if (basis === 'inert') return true;
-  if (basis === 'role_based') return checked;
-  return false;
-}
-```
-
-Kasuta seda MÕLEMAS vaates:
-
-- `CollectionAccessPanel.tsx`: `alusSilt(rida.allowedBasis)` → kuva ainult kui
-  `basisLabelVisible(rida.allowedBasis, rida.allowed)`; sama `edit` teljel.
-  Ka olemasolev `rida.editBasis === 'role_based' && rida.edit` tingimus
-  (`editorNeedsRead` selgitus) käib nüüd sama funktsiooni kaudu.
-- `UserDetail.tsx`: asenda etapis 3a tehtud ad hoc tingimus
-  (`rida.editBasis === 'role_based' && (rida.edit || laetud?.edit.has(...))`)
-  sama funktsiooniga — kaks kohta ei tohi seda reeglit eri moodi teada.
-  **NB:** UserDetailis on mustandi ja laetud oleku vahe päris: mustandis maha
-  võetud kirje peab selgituse alles hoidma. Kasuta `basisLabelVisible(basis,
-  rida.edit || (laetud?.edit.has(rida.collectionId) ?? false))`.
-
-- [ ] **Samm 4: testid ja commit**
-
-```bash
-npx vitest run src/pages/admin/__tests__/collectionRightsDraft.test.ts
-npm run typecheck && npm test
-git add src/pages/admin/collectionRightsDraft.ts src/pages/admin/__tests__/collectionRightsDraft.test.ts src/components/CollectionAccessPanel.tsx src/pages/admin/UserDetail.tsx
-git commit -m "fix(admin): rollist tulenev silt ainult salvestatud määrangu juures (#318)"
-```
-
----
+Kasutusel mõlemas vaates (`CollectionAccessPanel`, `UserDetail`); lülitite
+sildid ütlevad tegevust („Näeb teoseid" / „Tohib teoseid muuta").
 
 ### Task 11: sessiooni aegumine ei paista andmekaona
 

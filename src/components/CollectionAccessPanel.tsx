@@ -20,8 +20,8 @@ import {
 } from '../services/collectionRightsService';
 import { searchUsers } from '../utils/userSearch';
 import {
-  affectedUsernames, canAddAllowed, canAddEdit, rightsDelta, rightsRows,
-  RightsBasis, RightsState, RightsUser,
+  affectedUsernames, canAddAllowed, canAddEdit, rightsControl, rightsDelta, rightsRows,
+  RightsControl, RightsRow, RightsState, RightsUser, rowVisible,
 } from '../pages/admin/collectionRightsDraft';
 
 interface CollectionAccessPanelProps {
@@ -151,10 +151,19 @@ const CollectionAccessPanel: React.FC<CollectionAccessPanelProps> = ({
     setOtsing('');
   };
 
-  const alusSilt = (b: RightsBasis): string | null => {
-    if (b === 'role_based') return t('collections.accessPanel.basisRoleBased');
-    if (b === 'inert') return t('collections.accessPanel.basisInert');
-    return null;
+  // Sildid ütlevad TEGEVUSE, mitte välja nime: „lugemisõigus" ja
+  // „kirjutamisulatus" ei öelnud, mida nad selle inimese jaoks teevad.
+  const teljeSilt = (field: 'allowed' | 'edit') =>
+    field === 'allowed'
+      ? t('collections.accessPanel.readRight')
+      : t('collections.accessPanel.writeScope');
+
+  /** Miks salvestatud määrang ei mõju? */
+  const jaanukiPohjus = (rida: RightsRow, field: 'allowed' | 'edit'): string => {
+    const basis = field === 'allowed' ? rida.allowedBasis : rida.editBasis;
+    return basis === 'role_based'
+      ? t('collections.accessPanel.remnantRole')
+      : t('collections.accessPanel.remnantPublic');
   };
 
   if (laadin) {
@@ -190,12 +199,60 @@ const CollectionAccessPanel: React.FC<CollectionAccessPanelProps> = ({
         )}
         {read.map(rida => {
           const inimene = users.find(u => u.username === rida.username);
+          // Lüliti AINULT seal, kus lülitamine muudab tegelikku ligipääsu:
+          // rollist tulenev õigus, lisamatu määrang ja hallatamatu rida ei
+          // ole lülitid, vaid väited (#318).
+          const allowedCtrl = rightsControl({
+            basis: rida.allowedBasis, checked: rida.allowed,
+            canManage: rida.canManage, canAdd: canAddAllowed(mustand),
+          });
+          const editCtrl = rightsControl({
+            basis: rida.editBasis, checked: rida.edit,
+            canManage: rida.canManage, canAdd: canAddEdit(mustand, roll(rida.username)),
+          });
+          if (!rowVisible(allowedCtrl, editCtrl)) return null;
           // Kirjutamisulatus ilma lugemisõiguseta PIIRATUD kogul ei ava
           // teoseid — seda ei paranda vaikselt, vaid selgitatakse ja
           // pakutakse eraldi tegevust (spekk §2).
           const ulatusIlmaLugemiseta =
             rida.edit && !rida.allowed && mustand.visibility === 'restricted'
-            && rida.editBasis === 'assigned';
+            && editCtrl === 'toggle';
+
+          const lyliti_ = (field: 'allowed' | 'edit', ctrl: RightsControl) => {
+            if (ctrl === 'hidden' || ctrl === 'remnant') return null;
+            if (ctrl === 'fact') {
+              return <span className="text-sm text-gray-600">✓ {teljeSilt(field)}</span>;
+            }
+            return (
+              <label className="flex items-center gap-1 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={field === 'allowed' ? rida.allowed : rida.edit}
+                  disabled={salvestan}
+                  onChange={e => lyliti(rida.username, field, e.target.checked)}
+                />
+                {teljeSilt(field)}
+              </label>
+            );
+          };
+
+          const jaanukiRida = (field: 'allowed' | 'edit', ctrl: RightsControl) => {
+            if (ctrl !== 'remnant') return null;
+            return (
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span>{teljeSilt(field)} — {jaanukiPohjus(rida, field)}</span>
+                <button
+                  type="button"
+                  className="text-red-700 underline disabled:opacity-50"
+                  disabled={salvestan}
+                  onClick={() => lyliti(rida.username, field, false)}
+                >
+                  {t('collections.accessPanel.remove')}
+                </button>
+              </p>
+            );
+          };
+
           return (
             <li key={rida.username} className="py-2">
               <div className="flex flex-wrap items-center gap-3">
@@ -203,39 +260,12 @@ const CollectionAccessPanel: React.FC<CollectionAccessPanelProps> = ({
                   {inimene ? `${inimene.name} (${rida.username})` : rida.username}
                 </span>
 
-                <label className="flex items-center gap-1 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={rida.allowed}
-                    disabled={salvestan || !rida.canManage
-                      || (!rida.allowed && !canAddAllowed(mustand))}
-                    onChange={e => lyliti(rida.username, 'allowed', e.target.checked)}
-                  />
-                  {t('collections.accessPanel.readRight')}
-                  {alusSilt(rida.allowedBasis) && (
-                    <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-700">
-                      {alusSilt(rida.allowedBasis)}
-                    </span>
-                  )}
-                </label>
+                {lyliti_('allowed', allowedCtrl)}
+                {lyliti_('edit', editCtrl)}
 
-                <label className="flex items-center gap-1 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={rida.edit}
-                    disabled={salvestan || !rida.canManage
-                      || (!rida.edit && !canAddEdit(mustand, roll(rida.username)))}
-                    onChange={e => lyliti(rida.username, 'edit', e.target.checked)}
-                  />
-                  {t('collections.accessPanel.writeScope')}
-                  {alusSilt(rida.editBasis) && (
-                    <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-700">
-                      {alusSilt(rida.editBasis)}
-                    </span>
-                  )}
-                </label>
-
-                {rida.canManage && (
+                {/* Rea-ülene eemaldus ainult siis, kui on päris määranguid
+                    maha võtta — jäänukil on oma nupp oma rea juures. */}
+                {rida.canManage && (allowedCtrl === 'toggle' || editCtrl === 'toggle') && (
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 text-sm text-red-700 hover:underline"
@@ -247,7 +277,13 @@ const CollectionAccessPanel: React.FC<CollectionAccessPanelProps> = ({
                 )}
               </div>
 
-              {rida.editBasis === 'role_based' && rida.edit && (
+              {jaanukiRida('allowed', allowedCtrl)}
+              {jaanukiRida('edit', editCtrl)}
+
+              {/* Toimetaja ulatus tuleb rollist, aga piiratud kogu LUGEMISõigust
+                  ta ikka vajab — seda on vaja öelda just siis, kui see puudub. */}
+              {editCtrl === 'remnant' && rida.editBasis === 'role_based'
+                && allowedCtrl === 'toggle' && !rida.allowed && (
                 <p className="mt-1 text-xs text-gray-500">
                   {t('collections.accessPanel.editorNeedsRead')}
                 </p>
