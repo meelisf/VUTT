@@ -135,10 +135,19 @@ export function apiPost<T>(path: string, body: unknown = {}, options?: ApiReques
   return apiRequest<T>('POST', path, body, options);
 }
 
+export function apiPatch<T>(path: string, body: unknown = {}, options?: ApiRequestOptions): Promise<T> {
+  return apiRequest<T>('PATCH', path, body, options);
+}
+
 export function apiPut<T>(path: string, body: unknown = {}, options?: ApiRequestOptions): Promise<T> {
   return apiRequest<T>('PUT', path, body, options);
 }
 
 export function apiDelete<T>(path: string, options?: ApiRequestOptions): Promise<T> {
   return apiRequest<T>('DELETE', path, undefined, options);
+}
+
+/** DELETE kehaga — vajalik, kui kustutatav on loend, mitte tee osa (#354). */
+export function apiDeleteWithBody<T>(path: string, body: unknown, options?: ApiRequestOptions): Promise<T> {
+  return apiRequest<T>('DELETE', path, body, options);
 }
