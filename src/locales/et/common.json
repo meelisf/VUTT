@@ -190,6 +190,17 @@
     "copyLink": "Kopeeri link",
     "linkCopied": "Link kopeeritud!"
   },
+  "workSets": {
+    "section": "Töökollektsioonid",
+    "permanent": "Püsikogud",
+    "create": "Loo töökollektsioon",
+    "archived": "Arhiveeritud",
+    "notFound": "Töökollektsiooni ei leitud või puudub ligipääs",
+    "allWorks": "Kõik teosed",
+    "empty": "Töökollektsioone ei ole",
+    "search": "Otsi kogu nime järgi",
+    "noMatches": "Ükski kogu ei vasta otsingule"
+  },
   "error": {
     "unknown": "Viga",
     "network": "Võrgu viga"
