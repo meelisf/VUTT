@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Plus, Trash2, ChevronUp } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
@@ -6,6 +6,9 @@ import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiPost } from '../services/apiClient';
+import CollectionAccessPanel from './CollectionAccessPanel';
+import { RightsUser } from '../pages/admin/collectionRightsDraft';
 
 // Tailwind 400-taseme värvid värviplaaatide jaoks (inline style — ei sõltu Tailwind JIT kompileerimisest)
 const COLOR_SWATCHES: Record<string, string> = {
@@ -58,8 +61,13 @@ function renderTreeOptions(nodes: CollectionTreeNode[], depth = 0): React.ReactN
 
 const CollectionEditor: React.FC = () => {
   const { t } = useTranslation(['admin', 'common']);
-  const { authToken } = useUser();
+  const { user, authToken } = useUser();
   const { collections, refreshCollections } = useCollection();
+  // Paneelile stabiilne viide: objektiliteraal iga renderduse peal
+  // käivitaks paneeli memo'd uuesti.
+  const actor = useMemo(
+    () => ({ username: user?.username || '', role: user?.role || '' }),
+    [user]);
 
   // --- Kirjelduse muutmine ---
   const [selectedId, setSelectedId] = useState<string>('');
@@ -72,12 +80,13 @@ const CollectionEditor: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Ligipääsukontroll
+  // Nähtavus on superadmini seade; õigused elavad eraldi paneelis (ADR 0043).
   const [editVisibility, setEditVisibility] = useState<'public' | 'restricted'>('public');
-  const [allowedUsers, setAllowedUsers] = useState<string[]>([]);
-  const [allUsers, setAllUsers] = useState<{ username: string; name: string }[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [usersSaving, setUsersSaving] = useState(false);
+  // Ligipääsupaneeli üldloend. `usersKnown` eristab „loend on tõesti tühi"
+  // ja „loendit ei saanud laadida" (1b õppetund) — tühja loendi tõlgendamine
+  // teadmiseks oleks vale vastus.
+  const [allUsers, setAllUsers] = useState<RightsUser[]>([]);
+  const [usersKnown, setUsersKnown] = useState(false);
 
   // --- Kustutamine ---
   const [deleteConfirming, setDeleteConfirming] = useState(false);
@@ -98,22 +107,14 @@ const CollectionEditor: React.FC = () => {
   const [createSuccess, setCreateSuccess] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Lae kõik kasutajad üks kord
+  // Lae kõik kasutajad üks kord (paneeli otsingu jaoks)
   useEffect(() => {
     if (!authToken) return;
-    fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-      body: JSON.stringify({}),
-      timeout: 10000,
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === 'success') {
-          setAllUsers(data.users.map((u: any) => ({ username: u.username, name: u.name })));
-        }
-      })
-      .catch(() => {});
+    apiPost<{ status: string; users?: RightsUser[] }>('/admin/users', {}, { token: authToken })
+      .then(data => { setAllUsers(data.users || []); setUsersKnown(true); })
+      // Loendi puudumine EI blokeeri paneeli: olemasolevad määrangud jäävad
+      // nähtavaks, ainult lisamine jääb tegemata.
+      .catch(() => { setAllUsers([]); setUsersKnown(false); });
   }, [authToken]);
 
   const tree = buildCollectionTree(collections);
@@ -141,50 +142,7 @@ const CollectionEditor: React.FC = () => {
     setDescLongEn(col.description_long?.en || '');
     setEditColor(col.color || 'indigo');
     setEditVisibility((col.visibility as 'public' | 'restricted') || 'public');
-    setUsersLoading(true);
-    fetchWithTimeout(`${FILE_API_URL}/admin/collections/${selectedId}/users`, {
-      headers: getAuthHeaders(authToken),
-      timeout: 10000,
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === 'success') setAllowedUsers(data.allowed_users || []);
-      })
-      .catch(() => {})
-      .finally(() => setUsersLoading(false));
-  }, [selectedId, collections, authToken]);
-
-  const saveAllowedUsers = async (newUsers: string[]) => {
-    if (!selectedId || !authToken) return;
-    setUsersSaving(true);
-    try {
-      await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${selectedId}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({ visibility: editVisibility, allowed_users: newUsers }),
-          timeout: 10000,
-        }
-      );
-    } catch {
-      // vaikne ebaõnnestumine — Salvesta nupp on alati ka olemas
-    } finally {
-      setUsersSaving(false);
-    }
-  };
-
-  const handleAddUser = (username: string) => {
-    const newUsers = [...new Set([...allowedUsers, username])];
-    setAllowedUsers(newUsers);
-    saveAllowedUsers(newUsers);
-  };
-
-  const handleRemoveUser = (username: string) => {
-    const newUsers = allowedUsers.filter(x => x !== username);
-    setAllowedUsers(newUsers);
-    saveAllowedUsers(newUsers);
-  };
+  }, [selectedId, collections]);
 
   const handleSave = async () => {
     if (!selectedId) return;
@@ -202,7 +160,6 @@ const CollectionEditor: React.FC = () => {
             description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
             color: editColor,
             visibility: editVisibility,
-            allowed_users: editVisibility === 'restricted' ? allowedUsers : undefined,
           }),
           timeout: 10000,
         }
@@ -373,54 +330,25 @@ const CollectionEditor: React.FC = () => {
             <p className="text-xs text-gray-400 mt-1">
               {t('collections.visibilityHint')}
             </p>
-
-            {editVisibility === 'restricted' && (
-              <div className="mt-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
-                <p className="text-sm font-medium text-gray-700 mb-2">{t('collections.allowedUsers')}</p>
-                {usersLoading ? (
-                  <Loader2 size={14} className="animate-spin text-gray-400" />
-                ) : (
-                  <>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {allowedUsers.length === 0 && (
-                        <span className="text-xs text-gray-400">{t('collections.noAllowedUsers')}</span>
-                      )}
-                      {allowedUsers.map(username => {
-                        const u = allUsers.find(x => x.username === username);
-                        return (
-                          <span key={username} className="inline-flex items-center gap-1 bg-white border border-amber-300 px-2 py-0.5 rounded text-xs">
-                            {u?.name || username}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveUser(username)}
-                              className="text-gray-400 hover:text-red-500 ml-0.5"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <select
-                      onChange={e => {
-                        if (e.target.value) {
-                          handleAddUser(e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      disabled={usersSaving}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary-400 disabled:opacity-50"
-                    >
-                      <option value="">{usersSaving ? 'Salvestab...' : '+ Lisa kasutaja'}</option>
-                      {allUsers.filter(u => !allowedUsers.includes(u.username)).map(u => (
-                        <option key={u.username} value={u.username}>{u.name} ({u.username})</option>
-                      ))}
-                    </select>
-                  </>
-                )}
-              </div>
-            )}
           </div>
+
+          {/* Ligipääs on nähtavuse valiku KÕRVAL, mitte sees: kirjutamisulatust
+              saab määrata ka avalikul kogul ja lugemisõigust piiratud kogul
+              (ADR 0031 — kaks eri telge). */}
+          {user && (
+            <CollectionAccessPanel
+              // Nähtavuse salvestus muudab määrangute TÄHENDUST („määratud" vs
+              // „praegu ei mõju"). Paneel laeb oma oleku ise ega näe seda
+              // muutust — võti sunnib ta uuesti laadima. Enne salvestust
+              // radio lülitamine võtit ei muuda, seega mustand jääb alles.
+              key={`${selectedId}:${collections[selectedId]?.visibility || 'public'}`}
+              collectionId={selectedId}
+              users={allUsers}
+              usersKnown={usersKnown}
+              actor={actor}
+              onSaved={() => { void refreshCollections(); }}
+            />
+          )}
 
           {/* Lühikirjeldus */}
           <div>
