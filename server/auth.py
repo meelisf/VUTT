@@ -240,6 +240,18 @@ def reserve_username(username):
         _deleted_usernames_cache = set(uus)
 
 
+def users_role_snapshot():
+    """Kasutajanimi → roll, KOPEERITUD `users_lock` all (ADR 0043 p3).
+
+    Lukk vabaneb enne tagastust — kutsuja võtab seejärel `_work_sets_lock`-i.
+    Kahte lukku ei hoita kunagi korraga ja kasutajalukku ei võeta koguluku sees.
+    Vahepealne kasutaja kustutamine talutakse inertse jäänukina, mitte
+    failideülese tehinguna.
+    """
+    with users_lock:
+        return {u: d.get("role", "contributor") for u, d in load_users().items()}
+
+
 # Lae cache serveri stardil
 load_users()
 

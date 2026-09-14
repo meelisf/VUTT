@@ -12,6 +12,7 @@ from typing import Optional
 
 from .config import WORK_SETS_DIR, WORK_SET_MAX_MEMBERS, get_logger
 from .git_ops import save_config_with_git
+from .work_sets_access import check_access_diff, classify_access_diff
 from .utils import generate_nanoid
 
 logger = get_logger(__name__)
@@ -41,6 +42,10 @@ class WorkSetLimit(Exception):
     def __init__(self, current, adding, limit):
         super().__init__("limit")
         self.current, self.adding, self.limit = current, adding, limit
+
+
+class WorkSetAccessDenied(Exception):
+    """Diffis oli vähemalt üks keelatud muudatus — midagi ei salvestatud."""
 
 
 def _path(set_id: str) -> str:
@@ -164,3 +169,32 @@ def mutate_members(set_id: str, add, remove, username: str,
         ws["works"] = uus
         ws["revision"] = ws.get("revision", 1) + 1
         return _save(ws, username, f"Töökollektsioon: liikmed {set_id}")
+
+
+def set_access(set_id: str, new_access: dict, actor: dict,
+               users_snapshot: dict, expected_revision: Optional[int]) -> dict:
+    """`access`-kaardi TÄISASENDUS koos serveripoolse diffiga (ADR 0043 p7).
+
+    Kaardi lugemine, revision-kontroll, diff, valvurid ja salvestus toimuvad
+    ühe `_work_sets_lock` all. `users_snapshot` on KAASA ANTUD — siin ei kutsuta
+    `load_users`-it, sest kahte lukku ei hoita korraga.
+    """
+    with _work_sets_lock:
+        ws = load_work_set(set_id)
+        if ws is None:
+            raise WorkSetNotFound(set_id)
+        _check_revision(ws, expected_revision)
+
+        vana = ws.get("access") or {}
+        diff = classify_access_diff(vana, new_access)
+        viga = check_access_diff(diff, vana, new_access, users_snapshot, actor)
+        if viga:
+            # Valideerimisviga EI tõsta revisionit: kliendi olek jääb kehtima.
+            raise WorkSetAccessDenied(viga)
+
+        if not (diff["added"] or diff["changed"] or diff["removed"]):
+            return ws  # muutusteta salvestus on no-op (ADR 0012 joon)
+
+        ws["access"] = dict(new_access)
+        ws["revision"] = ws.get("revision", 1) + 1
+        return _save(ws, actor["username"], f"Töökollektsioon: õigused {set_id}")

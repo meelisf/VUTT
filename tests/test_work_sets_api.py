@@ -158,7 +158,9 @@ def test_access_vastu_voetakse_ainult_teadaolevad_rollid(client, work_sets, admi
     r = client.put(f"/work-sets/{ws_id}/access",
                    json={"access": {"contrib": "admin"}, "revision": 2},
                    headers=auth(admin_token))
-    assert r.status_code == 400
+    # Rollikontroll elab nüüd kirjepõhises diffi-valvuris (ADR 0043 p7) → 403
+    assert r.status_code == 403
+    assert "viewer" in str(r.json()["detail"])
 
 
 def test_avalikku_kogu_naeb_autentimata(client, work_sets, admin_token, ws_id):
@@ -187,3 +189,71 @@ def test_my_access_on_null_kui_isiklikku_kirjet_ei_ole(client, work_sets, admin_
     client.patch(f"/work-sets/{ws_id}", json={"visibility": "public", "revision": 2},
                  headers=auth(admin_token))
     assert client.get(f"/work-sets/{ws_id}").json()["work_set"]["my_access"] is None
+
+
+# =========================================================
+# PUT access: serveripoolne diff ja kohustuslik revision (#318, ADR 0043 p7)
+# =========================================================
+
+def test_put_access_nouab_revisionit(client, work_sets, admin_token, ws_id):
+    r = client.put(f"/work-sets/{ws_id}/access",
+                   json={"access": {"contrib": "viewer"}},
+                   headers=auth(admin_token))
+    assert r.status_code == 400
+
+
+def test_put_access_keelab_tundmatu_kasutajanime(client, work_sets, admin_token, ws_id):
+    r = client.put(f"/work-sets/{ws_id}/access",
+                   json={"access": {"puudub": "viewer"}, "revision": 2},
+                   headers=auth(admin_token))
+    assert r.status_code == 403
+    assert "puudub" in str(r.json()["detail"])
+
+
+def test_put_access_keelab_admin_maarangu(client, work_sets, admin_token, ws_id):
+    r = client.put(f"/work-sets/{ws_id}/access",
+                   json={"access": {"superadmin": "manager"}, "revision": 2},
+                   headers=auth(admin_token))
+    assert r.status_code == 403
+
+
+def test_lukustatud_votme_valjajatmine_lukkab_terve_salvestuse_tagasi(
+        client, work_sets, admin_token, ws_id):
+    ops.update_work_set(ws_id, {"access": {"editor": "manager", "superadmin": "manager"}},
+                        "admin", expected_revision=2)
+    # Klient „filtreeris" superadmini rea välja ja saadab ainult nähtavad read.
+    r = client.put(f"/work-sets/{ws_id}/access",
+                   json={"access": {"editor": "viewer"}, "revision": 3},
+                   headers=auth(admin_token))
+    assert r.status_code == 403
+    ws = ops.load_work_set(ws_id)
+    assert ws["access"]["superadmin"] == "manager"
+    assert ws["revision"] == 3, "valideerimisviga ei tohi revisionit tõsta"
+
+
+def test_valideerimisviga_ei_tosta_revisionit(client, work_sets, admin_token, ws_id):
+    enne = ops.load_work_set(ws_id)["revision"]
+    client.put(f"/work-sets/{ws_id}/access",
+               json={"access": {"puudub": "viewer"}, "revision": enne},
+               headers=auth(admin_token))
+    assert ops.load_work_set(ws_id)["revision"] == enne
+
+
+def test_muutusteta_access_on_noop(client, work_sets, admin_token, ws_id):
+    ws = ops.load_work_set(ws_id)
+    r = client.put(f"/work-sets/{ws_id}/access",
+                   json={"access": dict(ws["access"]), "revision": ws["revision"]},
+                   headers=auth(admin_token))
+    assert r.status_code == 200
+    assert ops.load_work_set(ws_id)["revision"] == ws["revision"]
+
+
+def test_lubatud_muudatus_salvestub(client, work_sets, admin_token, ws_id):
+    ws = ops.load_work_set(ws_id)
+    uus = dict(ws["access"])
+    uus["contrib"] = "manager"
+    r = client.put(f"/work-sets/{ws_id}/access",
+                   json={"access": uus, "revision": ws["revision"]},
+                   headers=auth(admin_token))
+    assert r.status_code == 200, r.text
+    assert ops.load_work_set(ws_id)["access"]["contrib"] == "manager"
