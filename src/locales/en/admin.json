@@ -106,6 +106,17 @@
       "workSetsSaved": "Saved: {{names}}",
       "workSetsFailed": "Not saved: {{names}}",
       "workSetsConflictHint": "Someone changed the same collection in the meantime. The state below has been reloaded from the server — review the change and save again."
+    },
+    "list": {
+      "searchPlaceholder": "Search by name, username or email",
+      "allRoles": "All roles",
+      "allCollections": "All collections",
+      "allWorkSets": "All work collections",
+      "lastChange": "Last change",
+      "noMatches": "No user matches the filters",
+      "clearFilters": "Clear filters",
+      "activityFailed": "Failed to load the last change",
+      "count": "{{shown}} / {{total}}"
     }
   },
   "pending": {

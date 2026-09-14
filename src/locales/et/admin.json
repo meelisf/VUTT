@@ -106,6 +106,17 @@
       "workSetsSaved": "Salvestatud: {{names}}",
       "workSetsFailed": "Salvestamata: {{names}}",
       "workSetsConflictHint": "Keegi muutis sama kogu vahepeal. Allolev olek on serverist uuesti laetud — vaata muudatus üle ja salvesta uuesti."
+    },
+    "list": {
+      "searchPlaceholder": "Otsi nime, kasutajanime või e-posti järgi",
+      "allRoles": "Kõik rollid",
+      "allCollections": "Kõik kollektsioonid",
+      "allWorkSets": "Kõik töökollektsioonid",
+      "lastChange": "Viimane muudatus",
+      "noMatches": "Ükski kasutaja ei vasta filtritele",
+      "clearFilters": "Tühjenda filtrid",
+      "activityFailed": "Viimase muudatuse laadimine ebaõnnestus",
+      "count": "{{shown}} / {{total}}"
     }
   },
   "pending": {
