@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from git import Actor
 from starlette.concurrency import run_in_threadpool
 
-from ..auth import delete_user_sessions, load_users, save_users
+from ..auth import delete_user_sessions, load_users, save_users, users_transaction
 from ..cache import get_cached_archives, get_cached_collections
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
 from ..config import ARCHIVES_FILE, BASE_DIR, COLLECTIONS_FILE, get_logger
@@ -158,23 +158,30 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     if visibility and old_visibility != new_visibility:
         background_tasks.add_task(update_collection_is_public_async, collection_id, new_visibility == "public")
 
-    # allowed_collections: kasutajate ligipääsu haldus kollektsiooni tasandil
+    # allowed_collections: kasutajate ligipääsu haldus kollektsiooni tasandil.
+    # ÜLEMINEK: see haru eemaldatakse etapis 2 koos kliendiga (ADR 0043 p2);
+    # siin ainult lukustatakse, et jagatud cache-objekt ei muutuks teise lõime
+    # serialiseerimise ajal.
     allowed_users_param = body.get("allowed_users")
     if allowed_users_param is not None:
-        users_data = load_users()
-        changed_users = []
-        for username, udata in users_data.items():
-            current = set(udata.get("allowed_collections", []))
-            updated = set(current)
-            if username in allowed_users_param:
-                updated.add(collection_id)
-            else:
-                updated.discard(collection_id)
-            if updated != current:
-                changed_users.append(username)
-            users_data[username]["allowed_collections"] = list(updated)
-        await run_in_threadpool(save_users, users_data)
-        # Invalideeri muutunud kasutajate sessioonid, et uus ligipääs jõustuks kohe (Leid I)
+        def _kirjuta_allowed_users():
+            changed = []
+            with users_transaction() as users_data:
+                for username, udata in users_data.items():
+                    current = set(udata.get("allowed_collections", []))
+                    updated = set(current)
+                    if username in allowed_users_param:
+                        updated.add(collection_id)
+                    else:
+                        updated.discard(collection_id)
+                    if updated != current:
+                        changed.append(username)
+                    users_data[username]["allowed_collections"] = list(updated)
+                save_users(users_data)
+            return changed
+
+        changed_users = await run_in_threadpool(_kirjuta_allowed_users)
+        # Invalideeri muutunud kasutajate sessioonid (Leid I) — luku VÄLJAS.
         for username in changed_users:
             delete_user_sessions(username)
 

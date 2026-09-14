@@ -91,3 +91,32 @@ def test_users_transaction_hoiab_lukku_kogu_bloki(backend_env):
         t.join(timeout=5)
         assert sai_luku == [False]
         assert "admin" in users
+
+
+def test_koik_kirjutajad_kasutavad_users_transactionit():
+    """Valvur: uus `save_users` kutse ilma lukuta on vaikne regressioon.
+
+    Grep-tasemel kontroll on siin tahtlik — käitumistestiga ei saa tõestada,
+    et KEEGI EI kirjuta lukuta. Kutsuja peab `save_users`-i juurde võtma ka
+    `users_transaction`-i (või olema auth.py enda lukustatud tee).
+    """
+    import pathlib
+    import re
+
+    juur = pathlib.Path(__file__).resolve().parents[1]
+    lubatud_ilma = {
+        "server/auth.py",           # siin ON lukk (users_transaction / save_users ise)
+        "server/registration.py",   # AJUTINE — eemalda Task 4 sammus 5
+    }
+    for fail in sorted((juur / "server").rglob("*.py")):
+        suhteline = str(fail.relative_to(juur))
+        if suhteline in lubatud_ilma:
+            continue
+        tekst = fail.read_text(encoding="utf-8")
+        if re.search(r"\bsave_users\s*\(", tekst):
+            assert "users_transaction" in tekst, (
+                f"{suhteline} kutsub save_users-i ilma users_transaction-ita"
+            )
+        assert "atomic_write_json(USERS_FILE" not in tekst, (
+            f"{suhteline} kirjutab users.json-i save_users-ist mööda"
+        )
