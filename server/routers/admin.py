@@ -13,8 +13,6 @@ from ..auth import (
     can_manage_user,
     delete_user,
     get_all_users,
-    update_user_allowed_collections,
-    update_user_edit_collections,
     update_user_role,
 )
 from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
@@ -199,32 +197,6 @@ async def admin_update_role(request: Request, user=Depends(require_role("admin")
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success"}
-
-
-@router.post("/admin/users/update-collections")
-async def admin_update_collections(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    # NB: anna allowed_collections muutmatult edasi (tüübikontroll on helperis,
-    # et see kehtiks ka otseses ühiktestis); vastus sisaldab serveris salvestatud nimekirja
-    success, message, allowed = await run_in_threadpool(
-        update_user_allowed_collections,
-        data.get("username"), data.get("allowed_collections", []), user)
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
-    return {"status": "success", "allowed_collections": allowed}
-
-
-@router.post("/admin/users/update-edit-collections")
-async def admin_update_edit_collections(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    # NB: kirjutamisulatus (edit_collections) kehtib KÕIGILE kollektsioonidele,
-    # mitte ainult restricted omadele nagu allowed_collections — vt update_user_edit_collections.
-    success, message, scope = await run_in_threadpool(
-        update_user_edit_collections,
-        data.get("username"), data.get("edit_collections", []), user)
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
-    return {"status": "success", "edit_collections": scope}
 
 
 @router.post("/admin/users/collection-rights")

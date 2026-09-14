@@ -2,6 +2,10 @@
 
 `load_users()` tagastab JAGATUD dicti. Kui muudatus toimub väljaspool lukku,
 võib teine lõim serialiseerida poolikut olekut või kaotada oma muudatuse.
+
+Valvur käib ELAVA kirjutustee peal (ADR 0043 p2). Varem juhtis seda
+`update_user_edit_collections`; see eemaldati etapis 4a ja valvur, mis
+testib kadunud teed, ei kaitse midagi.
 """
 import copy
 import threading
@@ -44,14 +48,18 @@ def test_kaks_kirjutajat_ei_kaota_teineteise_muudatust(backend_env, monkeypatch)
     vead = []
 
     def esimene():
-        ok, _sonum, _ = auth.update_user_edit_collections("contrib", ["sample"], admin)
+        ok, _sonum, _ = auth.apply_collection_rights_delta(
+            [{"username": "contrib", "collection_id": "sample",
+              "field": "edit", "action": "add"}], admin)
         if not ok:
             vead.append("esimene")
 
     def teine():
         alustatud.wait(timeout=5)
         # Peab OOTAMA luku taga, mitte lugema poolikut cache'i.
-        ok, _sonum, _ = auth.update_user_edit_collections("contrib_muu", ["sample"], admin)
+        ok, _sonum, _ = auth.apply_collection_rights_delta(
+            [{"username": "contrib_muu", "collection_id": "sample",
+              "field": "edit", "action": "add"}], admin)
         if not ok:
             vead.append("teine")
 
@@ -67,11 +75,13 @@ def test_kaks_kirjutajat_ei_kaota_teineteise_muudatust(backend_env, monkeypatch)
 
     assert vead == []
     # Kumbki muudatus ei kao: kaks samaaegset kirjutajat seerialiseeruvad,
-    # mitte ei kirjuta teineteist üle.
+    # mitte ei kirjuta teineteist üle. Delta LISAB määrangu olemasolevale
+    # (erinevalt vanast täisasendusest), seega conftesti algväärtused jäävad
+    # alles ja järjekorra määrab konfiguratsiooni järjekord („sample” ette).
     assert kirjutatud[0]["contrib_muu"]["edit_collections"] == ["muu"]
     kasutajad = auth.reload_users_cache()
-    assert kasutajad["contrib"]["edit_collections"] == ["sample"]
-    assert kasutajad["contrib_muu"]["edit_collections"] == ["sample"]
+    assert kasutajad["contrib"]["edit_collections"] == ["sample", "oma"]
+    assert kasutajad["contrib_muu"]["edit_collections"] == ["sample", "muu"]
 
 
 def test_users_transaction_hoiab_lukku_kogu_bloki(backend_env):
