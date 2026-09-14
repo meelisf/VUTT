@@ -19,7 +19,13 @@ from ..auth import (
 )
 from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
 from ..deps import get_json_data, require_role
-from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
+from ..git_ops import (
+    clear_git_failures,
+    delete_work_from_git,
+    get_git_failures,
+    get_user_activity,
+    run_git_fsck,
+)
 from ..history_thumbs import ajaloo_pisipilt
 from ..image_history import muudetud_pildid
 from ..mail_templates import format_mail_date, render_mail
@@ -169,6 +175,19 @@ async def reject_registration(request: Request, user=Depends(require_role("admin
 @router.post("/admin/users")
 async def admin_users(user=Depends(require_role("admin"))):
     return {"status": "success", "users": get_all_users()}
+
+
+@router.get("/admin/users/activity")
+async def admin_users_activity(user=Depends(require_role("admin"))):
+    """Iga kasutaja viimane muudatus (#318, spekk §1).
+
+    Viimane MUUDATUS tähendab git-commit'i, mitte viimast sisselogimist.
+    Blokeeriv git-töö käib threadpool'is (ADR 0002); vastus tuleb TTL-vahemälust,
+    seega üks logiläbimine 300 s kohta, mitte üks päringu kohta.
+    """
+    usernames = [u["username"] for u in get_all_users()]
+    activity = await run_in_threadpool(get_user_activity, usernames)
+    return {"status": "success", "activity": activity}
 
 
 @router.post("/admin/users/update-role")
