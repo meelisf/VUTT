@@ -105,8 +105,7 @@ def test_koik_kirjutajad_kasutavad_users_transactionit():
 
     juur = pathlib.Path(__file__).resolve().parents[1]
     lubatud_ilma = {
-        "server/auth.py",           # siin ON lukk (users_transaction / save_users ise)
-        "server/registration.py",   # AJUTINE — eemalda Task 4 sammus 5
+        "server/auth.py",   # siin ON lukk (users_transaction / save_users ise)
     }
     for fail in sorted((juur / "server").rglob("*.py")):
         suhteline = str(fail.relative_to(juur))

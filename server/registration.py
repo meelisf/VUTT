@@ -9,7 +9,9 @@ import uuid
 import threading
 from datetime import datetime, timedelta
 from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE, get_logger
-from .auth import load_users, users_lock, sanitize_edit_collections
+from .auth import (load_users, users_lock, sanitize_edit_collections,
+                   load_deleted_usernames, users_transaction, save_users,
+                   hash_password, DeletedUsernamesCorrupt)
 from .cache import get_cached_collections
 from .utils import atomic_write_json
 from .user_language import normalize_language
@@ -149,6 +151,9 @@ def _next_available_username(email, tokens_data=None, preferred_username=None):
     username = preferred_username or _base_username_from_email(email)
     users = load_users()
     taken = set(users.keys())
+    # Kustutatud nimi jääb hõivatuks: vanades access-kaartides võib tema kirje
+    # alles olla ja uus konto pärandaks selle õigused (ADR 0043 p8).
+    taken |= load_deleted_usernames()
 
     if tokens_data:
         now = datetime.now()
@@ -177,7 +182,7 @@ def suggest_username_for_email(email):
     tokens_data = load_invite_tokens()
     pending_data = load_pending_registrations()
     users = load_users()
-    taken = set(users.keys())
+    taken = set(users.keys()) | load_deleted_usernames()
 
     for reg in pending_data.get("registrations", []):
         if reg.get("status") == "pending" and reg.get("username"):
@@ -358,18 +363,8 @@ def create_user_from_invite(token, password):
     # Kasuta kutse loomisel arvutatud kasutajanime; vanade tokenite puhul tuleta e-posti põhjal.
     username = token_data.get("username") or _base_username_from_email(email)
 
-    # Kontrolli, kas kasutajanimi on vahepeal kasutusse läinud
-    users = load_users()
-    base_username = username
-    counter = 1
-    while username in users:
-        username = f"{base_username}{counter}"
-        counter += 1
-
-    # Roll ja kirjutamisulatus tulevad tokenist (valitud kinnitamisel) — kasutaja
-    # tekib kohe lõpliku õigusseisundiga. Vanadel tokenitel (enne seda muudatust
-    # loodud) need võtmed puuduvad täielikult, seega `.get()` vaikeväärtusega.
-    from .auth import hash_password
+    # Kallis parooliräsi arvutatakse ENNE lukku (ADR 0043 p8) — lukk kaitseb
+    # nimevalikut ja salvestust, mitte bcrypti.
     password_hash = hash_password(password)
 
     # Teine klamber tarbimisteel (leid 6): token peaks juba sisaldama ainult
@@ -382,7 +377,7 @@ def create_user_from_invite(token, password):
     if role not in ("contributor", "editor"):
         role = "contributor"
 
-    users[username] = {
+    uus_kirje = {
         "password_hash": password_hash,
         "name": name,
         "email": email,
@@ -393,15 +388,29 @@ def create_user_from_invite(token, password):
         "created_at": datetime.now().isoformat()
     }
 
-    # Salvesta users.json (atomic write + lock)
-    # NB: token on juba tarbitud — kui salvestamine ebaõnnestub, taastame tokeni
+    # Nimevalik JA salvestus ühe luku all: kaks samaaegset kutset ei tohi valida
+    # sama nime. Varem valiti nimi lukuta ja kirjutati `atomic_write_json`-iga
+    # `save_users`-ist mööda, jättes mälusisese cache'i vana kujuga.
+    # NB: token on juba tarbitud — salvestusveal taastame tokeni.
     try:
-        with users_lock:
-            atomic_write_json(USERS_FILE, users)
+        with users_transaction() as users:
+            hoivatud = set(users.keys()) | load_deleted_usernames()
+            base_username = username
+            counter = 1
+            while username in hoivatud:
+                username = f"{base_username}{counter}"
+                counter += 1
+            users[username] = uus_kirje
+            save_users(users)
+    except DeletedUsernamesCorrupt as e:
+        _unconsume_token(token)
+        logger.error(f"Kasutaja loomine katkestatud, nimeregister katki: {e}")
+        return None, "Kasutaja loomine ebaõnnestus, palun proovi uuesti"
     except Exception as e:
         _unconsume_token(token)
         logger.error(f"Kasutaja salvestamine ebaõnnestus ({username}): {e}")
         return None, "Kasutaja loomine ebaõnnestus, palun proovi uuesti"
 
     logger.info(f"Loodud uus kasutaja: {username} ({name})")
-    return {"username": username, "name": name, "role": users[username]["role"]}, None
+    # Tagastus tuleb KINNITATUD kirjest, mitte hiljem muutuvast cache'ist.
+    return {"username": username, "name": name, "role": uus_kirje["role"]}, None
