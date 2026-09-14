@@ -1,46 +1,42 @@
-"""Endpoint-tasandi testid: POST /admin/users/update-collections."""
+"""Vanad kollektsiooniõiguste endpointid on EEMALDATUD (#318, etapp 4a).
+
+Kaks kirjutusteed sama välja peale on ADR 0043 p2 keeld: vana täisasendus
+võis avalikuks muutunud kogu ID sanitiseerimisel vaikselt maha võtta. Alates
+etapist 2 kirjutab klient ainult deltaga ja etapist 3b ei kutsu vanu teid enam
+keegi. See test hoiab ära nende vaikse tagasitoomise.
+"""
 
 
-def _patch_restricted(monkeypatch):
-    """Anna cache'ile üks restricted-kogu 'r1' (ja avalik 'pub'), et sanitiseerimist näha."""
+def _auth(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_vana_update_collections_on_kadunud(client, login):
+    token = login("admin", "adminpass")
+    r = client.post("/admin/users/update-collections",
+                    json={"username": "editor", "allowed_collections": []},
+                    headers=_auth(token))
+    assert r.status_code == 404, r.text
+
+
+def test_vana_update_edit_collections_on_kadunud(client, login):
+    token = login("admin", "adminpass")
+    r = client.post("/admin/users/update-edit-collections",
+                    json={"username": "editor", "edit_collections": []},
+                    headers=_auth(token))
+    assert r.status_code == 404, r.text
+
+
+def test_delta_tee_toimib_edasi(client, login, monkeypatch):
+    # Eemaldus ei tohi võtta ära ainsat allesjäänud kirjutusteed.
     from server import auth
     monkeypatch.setattr(auth, "get_cached_collections", lambda: {
         "r1": {"name": {"et": "R1"}, "visibility": "restricted"},
-        "pub": {"name": {"et": "Avalik"}, "visibility": "public"},
     })
-
-
-def test_admin_updates_collections(client, login, backend_env, monkeypatch):
-    _patch_restricted(monkeypatch)
     token = login("admin", "adminpass")
-    r = client.post(
-        "/admin/users/update-collections",
-        json={"username": "editor", "allowed_collections": ["r1", "pub", "ghost"]},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    r = client.post("/admin/users/collection-rights",
+                    json={"changes": [{"username": "editor", "collection_id": "r1",
+                                       "field": "allowed", "action": "add"}]},
+                    headers=_auth(token))
     assert r.status_code == 200, r.text
-    # Server sanitiseerib: ainult restricted 'r1' jääb alles, vastus on tõe allikas
-    assert r.json()["allowed_collections"] == ["r1"]
-
-
-def test_editor_cannot_call_endpoint(client, login, backend_env):
-    # require_role("admin") ebaõnnestumisel tõstab deps.get_user HTTPException(401)
-    token = login("editor", "editorpass")
-    r = client.post(
-        "/admin/users/update-collections",
-        json={"username": "editor", "allowed_collections": []},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert r.status_code == 401
-
-
-def test_admin_cannot_edit_equal_level(client, login, backend_env, monkeypatch):
-    _patch_restricted(monkeypatch)
-    token = login("admin", "adminpass")
-    # admin proovib muuta iseenda (admin-tase) kollektsioone → helper keeldub → 400
-    r = client.post(
-        "/admin/users/update-collections",
-        json={"username": "admin", "allowed_collections": ["r1"]},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert r.status_code == 400
+    assert r.json()["users"]["editor"]["allowed_collections"] == ["r1"]

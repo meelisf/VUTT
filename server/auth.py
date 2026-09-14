@@ -454,60 +454,6 @@ def update_user_role(username, new_role, admin_user):
     return True, "Roll muudetud"
 
 
-def update_user_allowed_collections(username, collection_ids, admin_user):
-    """Muudab kasutaja piiratud kollektsioonide ligipääsu (allowed_collections).
-
-    Args:
-        username: Muudetava kasutaja kasutajanimi
-        collection_ids: Soovitud kollektsiooni-id-de list (kliendilt, valideerimata)
-        admin_user: Admin kasutaja, kes muudatuse teeb
-
-    Returns:
-        (success: bool, message: str, allowed_collections: list[str])
-        allowed_collections on serveris salvestatud (sanitiseeritud, deterministlikus
-        järjekorras) nimekiri — see on tõe allikas, mille frontend state'i kirjutab.
-        Vea korral on see [].
-    """
-    # Sisendi tüübikontroll (väldib nt stringi itereerimist tähtedeks)
-    if not isinstance(username, str) or not username.strip():
-        return False, "Kasutajanimi puudub", []
-    if not isinstance(collection_ids, list):
-        return False, "Vigane kollektsioonide nimekiri", []
-
-    with users_transaction() as users:
-        if username not in users:
-            return False, "Kasutajat ei leitud", []
-
-        # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
-        # Blokeerib võrdse/kõrgema taseme ja iseenda — admini piiramine oleks niikuinii mõttetu.
-        target_role = users[username].get("role", "contributor")
-        if not can_manage_user(admin_user["role"], target_role):
-            return False, "Pole õigust selle kasutaja kollektsioone muuta", []
-
-        # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad restricted-id-d,
-        # järjesta konfiguratsiooni restricted-kollektsioonide järjekorra järgi (stabiilne diff).
-        collections_config = get_cached_collections()
-        submitted = {c for c in collection_ids if isinstance(c, str)}
-        restricted_ordered = [
-            cid for cid, c in collections_config.items()
-            if c.get("visibility") == "restricted"
-        ]
-        sanitized = [cid for cid in restricted_ordered if cid in submitted]
-
-        # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
-        old = users[username].get("allowed_collections", [])
-        if old == sanitized:
-            return True, "Kollektsioonid uuendatud", sanitized
-
-        users[username]["allowed_collections"] = sanitized
-        save_users(users)
-    # Invalideeri sessioonid, et uus ligipääs jõustuks kohe (peegeldab kollektsiooni-poolset
-    # CollectionEditor käitumist). Reset-tokeneid EI tühistata — ligipääs ei muuda rolli.
-    delete_user_sessions(username)
-    print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' kollektsioone: {old} -> {sanitized}")
-    return True, "Kollektsioonid uuendatud", sanitized
-
-
 def sanitize_edit_collections(collection_ids, collections_config):
     """Ühine sanitiseerimine kirjutamisulatuse (edit_collections) jaoks.
 
@@ -515,9 +461,9 @@ def sanitize_edit_collections(collection_ids, collections_config):
     JA EI OLE `virtual_group` — teosele ei saagi virtuaalset gruppi kunagi määrata
     (vt frontend `MetadataModal.tsx`), seega ei saa see olla ka mõistlik
     kirjutamisulatuse liige (ADR 0031). Server on tõe allikas, mitte UI: sama
-    filter kehtib nii kasutaja hilisemal muutmisel (`update_user_edit_collections`)
-    kui konto loomishetkel (`registration.create_invite_token`) — kaks kirjutajat,
-    kes ei tohi lahkneda.
+    reeglit jõustab ka delta-tee (`apply_collection_rights_delta` lükkab
+    virtuaalse rühma tagasi) ja seda helperit kasutab konto loomishetkel
+    `registration.create_invite_token` — kirjutajad ei tohi lahkneda.
 
     Vigane sisend (mitte list) → tühi ulatus (fail-closed), mitte erind.
     Tulemus on konfiguratsiooni järjekorras (deterministlik, stabiilne diff).
@@ -529,60 +475,6 @@ def sanitize_edit_collections(collection_ids, collections_config):
         cid for cid, c in collections_config.items()
         if cid in submitted and c.get("type") != "virtual_group"
     ]
-
-
-def update_user_edit_collections(username, collection_ids, admin_user):
-    """Muudab kasutaja kirjutamisulatust (edit_collections).
-
-    Erinevalt allowed_collections'ist (lugemisõigus piiratud kogudele) on see
-    KIRJUTAMISULATUS ja kehtib kõigile kollektsioonidele — contributor tohib
-    toimetada ka avalikku kollektsiooni, kui see on tema ulatuses (ADR 0031).
-    Sanitiseeritakse seega KÕIGI olemasolevate kollektsioonide, mitte ainult
-    restricted-nähtavusega kollektsioonide vastu.
-
-    Args:
-        username: Muudetava kasutaja kasutajanimi
-        collection_ids: Soovitud kollektsiooni-id-de list (kliendilt, valideerimata)
-        admin_user: Admin kasutaja, kes muudatuse teeb
-
-    Returns:
-        (success: bool, message: str, edit_collections: list[str])
-        edit_collections on serveris salvestatud (sanitiseeritud, deterministlikus
-        järjekorras) nimekiri — see on tõe allikas, mille frontend state'i kirjutab.
-        Vea korral on see [].
-    """
-    if not isinstance(username, str) or not username.strip():
-        return False, "Kasutajanimi puudub", []
-    if not isinstance(collection_ids, list):
-        return False, "Vigane kollektsioonide nimekiri", []
-
-    with users_transaction() as users:
-        if username not in users:
-            return False, "Kasutajat ei leitud", []
-
-        # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
-        target_role = users[username].get("role", "contributor")
-        if not can_manage_user(admin_user["role"], target_role):
-            return False, "Pole õigust selle kasutaja ulatust muuta", []
-
-        # Sanitiseerimine (KÕIGI kollektsioonide vastu, mitte ainult restricted;
-        # virtual_group välja jäetud) — ühine tee registreerimise omaga, vt
-        # sanitize_edit_collections.
-        collections_config = get_cached_collections()
-        sanitized = sanitize_edit_collections(collection_ids, collections_config)
-
-        # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
-        old = users[username].get("edit_collections", [])
-        if old == sanitized:
-            return True, "Ulatus uuendatud", sanitized
-
-        users[username]["edit_collections"] = sanitized
-        save_users(users)
-    # Sessioon kannab kasutajaobjekti hetktõmmist (require_token tagastab
-    # session["user"]) — ilma invalideerimiseta jääks vana ulatus 24h kehtima.
-    delete_user_sessions(username)
-    print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' kirjutamisulatust: {old} -> {sanitized}")
-    return True, "Ulatus uuendatud", sanitized
 
 
 _RIGHTS_FIELDS = {"allowed": "allowed_collections", "edit": "edit_collections"}

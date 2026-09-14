@@ -70,28 +70,42 @@ def _patch_editable_collections(monkeypatch):
     })
 
 
+def _delta(username, collection_id, action="add", field="edit"):
+    return {"changes": [{"username": username, "collection_id": collection_id,
+                         "field": field, "action": action}]}
+
+
 def test_admin_sets_edit_collections(client, login, backend_env, monkeypatch):
+    # Vana `update-edit-collections` endpoint eemaldati etapis 4a; ainus
+    # kirjutustee on delta (ADR 0043 p2). Kontrollitav käitumine on sama.
     _patch_editable_collections(monkeypatch)
     token = login("admin", "adminpass")
     response = client.post(
-        "/admin/users/update-edit-collections",
-        json={"username": "editor", "edit_collections": ["sample"]},
+        "/admin/users/collection-rights",
+        json=_delta("editor", "sample"),
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200, response.text
-    assert response.json()["edit_collections"] == ["sample"]
+    assert response.json()["users"]["editor"]["edit_collections"] == ["sample"]
 
 
-def test_edit_collections_sanitizes_unknown_ids(client, login, backend_env, monkeypatch):
-    """Tundmatu kollektsiooni-id ei tohi salvestuda."""
+def test_edit_collections_unknown_id_rejected(client, login, backend_env, monkeypatch):
+    """Tundmatu kollektsiooni-id ei tohi salvestuda.
+
+    Vana täisasendus VAIKIS ta maha (sanitiseeris); delta ütleb selgelt ei ja
+    ei kirjuta paketist midagi — vaikne mahavaikimine oli osa sellest, miks
+    vana tee eemaldati.
+    """
     _patch_editable_collections(monkeypatch)
     token = login("admin", "adminpass")
     response = client.post(
-        "/admin/users/update-edit-collections",
-        json={"username": "editor", "edit_collections": ["sample", "olematu"]},
+        "/admin/users/collection-rights",
+        json=_delta("editor", "olematu"),
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.json()["edit_collections"] == ["sample"]
+    assert response.status_code == 400
+    from server import auth
+    assert auth.reload_users_cache()["editor"].get("edit_collections", []) == []
 
 
 def test_edit_collections_change_invalidates_sessions(client, login, backend_env, monkeypatch):
@@ -100,8 +114,8 @@ def test_edit_collections_change_invalidates_sessions(client, login, backend_env
     editor_token = login("editor", "editorpass")
     admin_token = login("admin", "adminpass")
     client.post(
-        "/admin/users/update-edit-collections",
-        json={"username": "editor", "edit_collections": ["sample"]},
+        "/admin/users/collection-rights",
+        json=_delta("editor", "sample"),
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     verify = client.post("/verify-token", json={"token": editor_token})
@@ -109,16 +123,14 @@ def test_edit_collections_change_invalidates_sessions(client, login, backend_env
 
 
 def test_admin_cannot_edit_equal_level_edit_collections(client, login, backend_env, monkeypatch):
-    """Õiguste eskaleerumise regressioonivalvur (analoogne test_user_collections.py::
-    test_permission_denied_equal_level'ile, aga update_user_edit_collections'i jaoks).
-
-    admin ei tohi muuta teise admini (siin: iseenda) kirjutamisulatust —
-    can_manage_user peab nõudma RANGELT madalamat sihttaset."""
+    """Õiguste eskaleerumise regressioonivalvur: admin ei tohi muuta teise
+    admini (siin: iseenda) kirjutamisulatust — `can_manage_user` peab nõudma
+    RANGELT madalamat sihttaset."""
     _patch_editable_collections(monkeypatch)
     token = login("admin", "adminpass")
     r = client.post(
-        "/admin/users/update-edit-collections",
-        json={"username": "admin", "edit_collections": ["sample"]},
+        "/admin/users/collection-rights",
+        json=_delta("admin", "sample"),
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r.status_code == 400

@@ -188,3 +188,55 @@ def test_endpoint_annab_valideerimisveal_400(client, login, kollektsioonid):
                          "field": "allowed", "action": "add"}]},
                     headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 400
+
+
+# --- Kontrollid, mis kolisid siia kustutatud `test_user_collections.py`-st (#318, etapp 4a).
+# Need olid vana helperi ühiktestid; delta on nüüd ainus kirjutustee, seega peavad
+# samad valvurid olema kaetud siin.
+
+def test_tundmatu_kasutajanimi_lukatakse_tagasi(backend_env, kollektsioonid):
+    auth = backend_env["auth"]
+    ok, sonum, _ = auth.apply_collection_rights_delta(
+        [{"username": "pole-sellist", "collection_id": "kinnine",
+          "field": "allowed", "action": "add"}], ADMIN)
+    assert not ok
+    assert "ei leitud" in sonum.lower()
+
+
+def test_vordse_rolliga_kasutajat_ei_tohi_muuta(backend_env, kollektsioonid):
+    # Admin ei halda teist admini: `can_manage_user` nõuab RANGELT madalamat taset.
+    auth = backend_env["auth"]
+    users = auth.reload_users_cache()
+    users["contrib_muu"]["role"] = "admin"
+    auth.save_users(users)
+
+    ok, sonum, _ = auth.apply_collection_rights_delta(
+        [{"username": "contrib_muu", "collection_id": "kinnine",
+          "field": "allowed", "action": "add"}], ADMIN)
+    assert not ok
+    assert "õigust" in sonum.lower()
+
+
+def test_vigane_paketi_kuju_lukatakse_tagasi(backend_env, kollektsioonid):
+    # Kliendilt tulnud jama ei tohi jõuda muutmisloogikani: tüübikontroll oli
+    # varem vana helperi sees (`isinstance(collection_ids, list)`).
+    auth = backend_env["auth"]
+    assert auth.apply_collection_rights_delta("mitte-list", ADMIN)[0] is False
+    assert auth.apply_collection_rights_delta([{"username": "contrib"}], ADMIN)[0] is False
+    assert auth.apply_collection_rights_delta(
+        [{"username": "", "collection_id": "kinnine",
+          "field": "allowed", "action": "add"}], ADMIN)[0] is False
+
+
+def test_jarjekord_tuleb_konfiguratsioonist_mitte_lisamise_jarjekorrast(
+        backend_env, kollektsioonid):
+    # Deterministlik järjekord hoiab `users.json` diffi loetavana; vanas helperis
+    # oli see sama omadus (`restricted_ordered`).
+    auth = backend_env["auth"]
+    ok, sonum, olek = auth.apply_collection_rights_delta([
+        {"username": "contrib", "collection_id": "teine", "field": "allowed", "action": "add"},
+        {"username": "contrib", "collection_id": "kinnine", "field": "allowed", "action": "add"},
+    ], ADMIN)
+    assert ok, sonum
+    # Konfiguratsioonis on „kinnine" enne „teist" — lisamise järjekord oli vastupidine.
+    assert olek["contrib"]["allowed_collections"] == ["kinnine", "teine"]
