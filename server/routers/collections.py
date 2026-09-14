@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from git import Actor
 from starlette.concurrency import run_in_threadpool
 
-from ..auth import delete_user_sessions, load_users, save_users, users_transaction
+from ..auth import delete_user_sessions, save_users, users_transaction
 from ..cache import get_cached_archives, get_cached_collections
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
 from ..config import ARCHIVES_FILE, BASE_DIR, COLLECTIONS_FILE, get_logger
@@ -189,22 +189,39 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
 
 @router.get("/admin/collections/{collection_id}/users")
 def admin_collection_users(collection_id: str, user=Depends(require_role("admin"))):
-    """Tagastab kollektsiooni metaandmed koos ligipääsuga kasutajate nimekirjaga."""
+    """Kollektsiooni metaandmed koos MÕLEMA õiguste telje salvestatud määrangutega.
+
+    Vastus kannab SALVESTATUD määranguid, mitte kehtivat õigust: `visibility`
+    ütleb, kas lugemismäärang üldse mõjub, ja `edit_users` sisaldab ka
+    editor/admin kirjeid, kelle ulatus tuleb niikuinii rollist. Paneel märgib
+    need inertseks — peitmine kaotaks salvestatud andmed lugeja filtri taha
+    ja teeks nende eemaldamise võimatuks (ADR 0043 p2).
+    """
     if not os.path.exists(COLLECTIONS_FILE):
         return {"status": "error", "message": "collections.json ei leitud"}
     data = _read_json(COLLECTIONS_FILE)
     if collection_id not in data:
         return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
     col = data[collection_id]
-    users_data = load_users()
-    allowed_usernames = [
-        uname for uname, udata in users_data.items()
-        if collection_id in udata.get("allowed_collections", [])
-    ]
+
+    # Hetktõmmis luku all: vastust ei koostata muutuvast jagatud cache-objektist.
+    with users_transaction() as users_data:
+        allowed_usernames = [
+            uname for uname, udata in users_data.items()
+            if collection_id in (udata.get("allowed_collections") or [])
+        ]
+        edit_usernames = [
+            uname for uname, udata in users_data.items()
+            if collection_id in (udata.get("edit_collections") or [])
+        ]
+
     return {
         "status": "success",
         "collection": col,
         "allowed_users": allowed_usernames,
+        "edit_users": edit_usernames,
+        "visibility": col.get("visibility", "public"),
+        "is_virtual": col.get("type") == "virtual_group",
     }
 
 @router.post("/admin/collections")
