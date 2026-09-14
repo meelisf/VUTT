@@ -37,7 +37,9 @@
   },
   "error": {
     "connectionError": "Connection error",
-    "httpsWarning": "If you're using HTTPS preview but the server is HTTP (172.x.x.x), the browser will block it. Try opening the app locally or via HTTP."
+    "httpsWarning": "If you're using HTTPS preview but the server is HTTP (172.x.x.x), the browser will block it. Try opening the app locally or via HTTP.",
+    "selectionLost": "You no longer have access to the selected work set.",
+    "resetSelection": "Reset selection"
   },
   "footer": {
     "aboutProject": "About the project",
