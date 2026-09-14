@@ -573,6 +573,109 @@ def update_user_edit_collections(username, collection_ids, admin_user):
     return True, "Ulatus uuendatud", sanitized
 
 
+_RIGHTS_FIELDS = {"allowed": "allowed_collections", "edit": "edit_collections"}
+
+
+def apply_collection_rights_delta(changes, admin_user):
+    """Muudab AINULT nimetatud määranguid (ADR 0043 p2).
+
+    Vana täisasendus (`update_user_allowed_collections`) kirjutas terve loendi
+    üle ja võis avalikuks muutunud kogu ID sanitiseerimisel vaikselt maha võtta.
+    Delta puudutab ainult loetletud (kasutaja, kogu, väli) kolmikuid; teised
+    kasutajad ja kogud jäävad puutumata.
+
+    Kogu pakett valideeritakse ENNE ühtki muudatust: vea korral ei rakendu
+    sellest midagi. Tagastab (ok, sõnum, kinnitatud_olek), kus kinnitatud_olek
+    katab ainult puudutatud kasutajaid — klient kirjutab selle oma state'i,
+    mitte oma optimistlikku oletust.
+    """
+    if not isinstance(changes, list):
+        return False, "Vigane muudatuste nimekiri", {}
+
+    collections_config = get_cached_collections()
+
+    # 1) Kuju ja vastuolude kontroll
+    soovid = {}  # (username, field, collection_id) -> "add" | "remove"
+    for muudatus in changes:
+        if not isinstance(muudatus, dict):
+            return False, "Vigane muudatus", {}
+        username = muudatus.get("username")
+        collection_id = muudatus.get("collection_id")
+        field = muudatus.get("field")
+        action = muudatus.get("action")
+        if not isinstance(username, str) or not username.strip():
+            return False, "Kasutajanimi puudub", {}
+        if not isinstance(collection_id, str) or not collection_id.strip():
+            return False, "Kollektsiooni ID puudub", {}
+        if field not in _RIGHTS_FIELDS:
+            return False, "field peab olema 'allowed' või 'edit'", {}
+        if action not in ("add", "remove"):
+            return False, "action peab olema 'add' või 'remove'", {}
+        voti = (username, field, collection_id)
+        if voti in soovid and soovid[voti] != action:
+            return False, f"Vastuoluline kordus: {username}/{collection_id}/{field}", {}
+        soovid[voti] = action
+
+    # 2) Sisuline valideerimine (kogu pakett ENNE muutmist) ja 3) rakendamine
+    #    sama luku all — vahepealne rollimuutus ei tohi valideerimist möödutada.
+    with users_transaction() as users:
+        for (username, field, collection_id), action in soovid.items():
+            if username not in users:
+                return False, f"Kasutajat '{username}' ei leitud", {}
+            target_role = users[username].get("role", "contributor")
+            if not can_manage_user(admin_user["role"], target_role):
+                return False, f"Pole õigust kasutaja '{username}' õigusi muuta", {}
+            if action == "remove":
+                # Eemaldamine on koristustoiming: puuduv või avalikuks muutunud
+                # kogu ID tohib alati maha võtta.
+                continue
+            kogu = collections_config.get(collection_id)
+            if kogu is None:
+                return False, f"Kollektsiooni '{collection_id}' ei leitud", {}
+            if field == "allowed" and kogu.get("visibility") != "restricted":
+                return False, (f"Kollektsioon '{collection_id}' on avalik — "
+                               f"lugemisõiguse määrangut ei lisata"), {}
+            if field == "edit" and kogu.get("type") == "virtual_group":
+                return False, (f"Virtuaalsele rühmale '{collection_id}' "
+                               f"kirjutamisulatust ei määrata"), {}
+
+        jarjekord = list(collections_config.keys())
+        muutunud = set()
+        for (username, field, collection_id), action in soovid.items():
+            vali = _RIGHTS_FIELDS[field]
+            praegu = list(users[username].get(vali, []))
+            if action == "add" and collection_id not in praegu:
+                praegu.append(collection_id)
+            elif action == "remove" and collection_id in praegu:
+                praegu = [c for c in praegu if c != collection_id]
+            else:
+                continue  # juba soovitud olekus
+            # Deterministlik järjekord: konfiguratsiooni oma, tundmatud lõppu.
+            praegu.sort(key=lambda c: (jarjekord.index(c) if c in jarjekord
+                                       else len(jarjekord), c))
+            users[username][vali] = praegu
+            muutunud.add(username)
+
+        if muutunud:
+            save_users(users)
+
+        kinnitatud = {
+            u: {
+                "allowed_collections": list(users[u].get("allowed_collections", [])),
+                "edit_collections": list(users[u].get("edit_collections", [])),
+            }
+            for u in {kasutaja for kasutaja, _, _ in soovid}
+        }
+
+    # Sessioonid luku VÄLJAS, üks kord muutunud inimese kohta: viis muudetud
+    # kasutajat = viie inimese sessioonide lõpp, aga ühe inimese kaks muudatust
+    # ei logi teda kaks korda välja.
+    for username in sorted(muutunud):
+        delete_user_sessions(username)
+
+    return True, "Õigused uuendatud", kinnitatud
+
+
 def delete_user(username, admin_user):
     """
     Kustutab kasutaja.
