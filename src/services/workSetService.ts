@@ -117,8 +117,14 @@ export async function deleteWorkSet(setId: string): Promise<void> {
   invalidateWorkSetIds(setId);
 }
 
+/**
+ * `revision` on VALIKULINE: liikmete muutmine on delta („lisa need" /
+ * „eemalda need"), mitte täisasendus, seega vananenud revisjon ei saa kellegi
+ * muudatust maha kirjutada. UI jätab ta saatmata — nõudmine annaks ainult
+ * valepositiivseid 409-sid, kui kaks haldurit töötavad korraga.
+ */
 export async function addWorks(
-  setId: string, workIds: string[], revision: number,
+  setId: string, workIds: string[], revision?: number,
 ): Promise<WorkIdsResponse> {
   const data = await apiPost<WorkIdsResponse>(
     `/work-sets/${setId}/works`, { work_ids: workIds, revision }, AUTH);
@@ -127,10 +133,50 @@ export async function addWorks(
 }
 
 export async function removeWorks(
-  setId: string, workIds: string[], revision: number,
+  setId: string, workIds: string[], revision?: number,
 ): Promise<WorkIdsResponse> {
   const data = await apiDeleteWithBody<WorkIdsResponse>(
     `/work-sets/${setId}/works`, { work_ids: workIds, revision }, AUTH);
   invalidateWorkSetIds(setId);
   return data;
+}
+
+export interface WorkSetMember {
+  work_id: string;
+  title: string;
+  year_display?: string | null;
+}
+
+/**
+ * Liikmete pealkirjad kuvamiseks. Meilist, sest sealsamas on juba
+ * tenant-tokeni ligipääsufilter — kutsuja ei näe siit midagi, mida ta
+ * otsingus ei näeks. ID-d tulevad serverilt (`getWorkSetWorkIds`), mis on
+ * omakorda juba kutsujale filtreeritud; Meili on siin ainult SILDIALLIKAS.
+ */
+export async function getWorkSetMembers(
+  index: { search: (q: string, opts: Record<string, unknown>) => Promise<{ hits: unknown[] }> },
+  workIds: string[],
+): Promise<WorkSetMember[]> {
+  if (workIds.length === 0) return [];
+  const res = await index.search('', {
+    filter: [
+      'lehekylje_number = 1',
+      `work_id IN [${workIds.map(id => `"${id}"`).join(', ')}]`,
+    ],
+    attributesToRetrieve: ['work_id', 'pealkiri', 'title', 'year_display', 'aasta'],
+    limit: workIds.length,
+  });
+  const kaart = new Map<string, WorkSetMember>();
+  for (const hit of res.hits as Record<string, unknown>[]) {
+    const id = hit.work_id as string;
+    if (!id || kaart.has(id)) continue;
+    kaart.set(id, {
+      work_id: id,
+      title: (hit.pealkiri ?? hit.title ?? id) as string,
+      year_display: (hit.year_display ?? hit.aasta ?? null) as string | null,
+    });
+  }
+  // Järjekord tuleb kogu loendist, mitte Meili vastusest. Puuduv teos jääb
+  // nimekirja id-ga: „ei leitud" on info, vaikne kadumine ei ole.
+  return workIds.map(id => kaart.get(id) ?? { work_id: id, title: id, year_display: null });
 }

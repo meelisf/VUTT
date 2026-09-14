@@ -199,7 +199,17 @@
     "allWorks": "All works",
     "empty": "No work collections",
     "search": "Search collections by name",
-    "noMatches": "No collection matches the search"
+    "noMatches": "No collection matches the search",
+    "addTo": "Add to work collection",
+    "selectTarget": "Select work collection",
+    "noManageable": "You do not manage any active work collection",
+    "addedCount": "Added: {{count}}",
+    "addFailed": "Adding failed",
+    "alreadyMember": "Already in collection",
+    "createName": "Name of the new work collection",
+    "createFailed": "Creating failed",
+    "selectedWorks": "Selected works: {{count}}",
+    "limitReachedShort": "The collection is full"
   },
   "error": {
     "unknown": "Error",

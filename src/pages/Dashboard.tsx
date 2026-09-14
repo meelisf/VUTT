@@ -31,6 +31,8 @@ import { getLangCode } from '../utils/getLangCode';
 import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLinkedEntityMaps';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import DashboardBulkActionBar from '../components/dashboard/DashboardBulkActionBar';
+import WorkSetPicker from '../components/WorkSetPicker';
+import { addWorks } from '../services/workSetService';
 import DashboardResultsHeader from '../components/dashboard/DashboardResultsHeader';
 
 const ITEMS_PER_PAGE = 12;
@@ -43,12 +45,15 @@ const SEARCH_DEBOUNCE_MS = 400;
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user } = useUser();
-  const { selectedCollection, setSelectedCollection, collections, isLoading: collectionsLoading } = useCollection();
+  const { selectedCollection, setSelectedCollection, collections, workSets, refreshWorkSets, isLoading: collectionsLoading } = useCollection();
   // Töökollektsiooni ID-loend tuleb serverilt; kuni ta ei ole kohal, ei tohi
   // päringut teha (piiramata vastus näitaks teoseid väljaspool valikut).
   const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
   // Valiku silt ühest kohast (vt `contexts/selectionDisplay.ts`).
   const { label: selectionLabel, colorClasses: selectionColors } = useSelectionLabel();
+  // Kolm õiguste telge on eraldi (ADR 0031): metaandmete hulgi-muutmine on
+  // admini tegevus, töökollektsiooni lisamine nõuab ainult kogu haldusõigust.
+  const managesAnyWorkSet = workSets.some(ws => ws.can_manage && ws.status === 'active');
   const index = useMeiliIndex();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -108,6 +113,8 @@ const Dashboard: React.FC = () => {
   // Viimati klikitud teose indeks nähtaval lehel — shift-valiku ankur (nagu manage-lehel)
   const lastSelectedIndexRef = useRef<number | null>(null);
   const [showBulkCollectionPicker, setShowBulkCollectionPicker] = useState(false);
+  const [showBulkWorkSetPicker, setShowBulkWorkSetPicker] = useState(false);
+  const [bulkWorkSetMessage, setBulkWorkSetMessage] = useState<string | null>(null);
   const [showMobileCollectionPicker, setShowMobileCollectionPicker] = useState(false);
   const [showBulkTagsPicker, setShowBulkTagsPicker] = useState(false);
   const [showBulkGenrePicker, setShowBulkGenrePicker] = useState(false);
@@ -536,6 +543,38 @@ const Dashboard: React.FC = () => {
     lastSelectedIndexRef.current = null;
   };
 
+  /**
+   * Hulgi-lisamine töökollektsiooni (spekk §1.3).
+   *
+   * `revision` jäetakse SAADAMATA: liikmete muutmine on delta („lisa need"),
+   * mitte täisasendus, seega vananenud revisjon ei saa kellegi muudatust maha
+   * kirjutada. Revisjoni nõudmine annaks ainult valepositiivseid 409-sid, kui
+   * kaks haldurit lisavad korraga.
+   */
+  const handleBulkAddToWorkSet = async (setId: string) => {
+    if (selectedWorkIds.size === 0) return;
+    setBulkAssignLoading(true);
+    setBulkWorkSetMessage(null);
+    try {
+      const enne = selectedWorkIds.size;
+      await addWorks(setId, Array.from(selectedWorkIds));
+      setBulkWorkSetMessage(t('common:workSets.addedCount', { count: enne }));
+      setSelectedWorkIds(new Set());
+      setSelectMode(false);
+      await refreshWorkSets();
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      setBulkWorkSetMessage(
+        status === 409
+          ? t('common:workSets.limitReachedShort', 'Kogu on täis')
+          : t('common:workSets.addFailed', 'Lisamine ebaõnnestus'),
+      );
+    } finally {
+      setBulkAssignLoading(false);
+      setShowBulkWorkSetPicker(false);
+    }
+  };
+
   // Massilise kollektsiooni määramine
   const handleBulkAssignCollection = async (collectionId: string | null) => {
     if (selectedWorkIds.size === 0) return;
@@ -619,6 +658,14 @@ const Dashboard: React.FC = () => {
         <div className={`max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8 ${selectMode && selectedWorkIds.size > 0 ? 'pb-32 sm:pb-36' : ''}`}>
 
           {/* Error Banner */}
+          {bulkWorkSetMessage && (
+            <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded text-sm text-indigo-800 flex items-center justify-between gap-3">
+              <span>{bulkWorkSetMessage}</span>
+              <button onClick={() => setBulkWorkSetMessage(null)} className="text-indigo-500 hover:text-indigo-700">
+                <X size={14} />
+              </button>
+            </div>
+          )}
           {(error || scopeError) && (
             <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm flex items-start gap-3">
               <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
@@ -863,7 +910,7 @@ const Dashboard: React.FC = () => {
               return (
                 <>
                   <DashboardResultsHeader
-                    isAdmin={isAdmin}
+                    canSelect={isAdmin || managesAnyWorkSet}
                     hasWorks={works.length > 0}
                     selectMode={selectMode}
                     selectedCount={selectedWorkIds.size}
@@ -1025,21 +1072,25 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Floating Action Bar - ilmub kui teosed on valitud (ühtlustatud PageActionBar stiiliga manage-lehelt) */}
-      {selectMode && !showBulkCollectionPicker && !showBulkTagsPicker && !showBulkGenrePicker && (
+      {selectMode && !showBulkCollectionPicker && !showBulkTagsPicker && !showBulkGenrePicker && !showBulkWorkSetPicker && (
         <DashboardBulkActionBar
           selectedCount={selectedWorkIds.size}
           loading={bulkAssignLoading}
+          canEditMetadata={isAdmin}
+          canAddToWorkSet={managesAnyWorkSet}
           labels={{
             selectedCount: t('bulkAssign.selectedCount', { count: selectedWorkIds.size }),
             assignCollection: t('bulkAssign.assignCollection'),
             assignTags: t('bulkAssign.assignTags'),
             assignGenre: t('bulkAssign.assignGenre'),
+            assignWorkSet: t('bulkAssign.assignWorkSet'),
             clearSelection: t('bulkAssign.clearSelection'),
             exitSelect: t('bulkAssign.exitSelect'),
           }}
           onOpenCollection={() => setShowBulkCollectionPicker(true)}
           onOpenTags={() => setShowBulkTagsPicker(true)}
           onOpenGenre={() => setShowBulkGenrePicker(true)}
+          onOpenWorkSet={() => setShowBulkWorkSetPicker(true)}
           onExitSelectMode={exitSelectMode}
         />
       )}
@@ -1057,6 +1108,16 @@ const Dashboard: React.FC = () => {
           onClose={() => setShowBulkCollectionPicker(false)}
           showUnassigned={true}
           title={t('bulkAssign.selectCollection')}
+        />
+      )}
+
+      {showBulkWorkSetPicker && (
+        <WorkSetPicker
+          isOpen={showBulkWorkSetPicker}
+          onClose={() => setShowBulkWorkSetPicker(false)}
+          onSelect={handleBulkAddToWorkSet}
+          selectedCount={selectedWorkIds.size}
+          busy={bulkAssignLoading}
         />
       )}
 

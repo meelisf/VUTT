@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPickerEntries, matchesQuery } from '../pickerEntries';
+import { buildPickerEntries, manageableWorkSets, matchesQuery } from '../pickerEntries';
 import { CollectionTreeNode } from '../../services/collectionService';
 import { WorkSetSummary } from '../../services/workSetService';
 
@@ -77,5 +77,34 @@ describe('matchesQuery', () => {
 
   it('langeb teise keele peale tagasi, kui valitud keeles nime ei ole', () => {
     expect(matchesQuery({ et: '', en: 'Fischer' }, 'fisch', 'et')).toBe(true);
+  });
+});
+
+describe('manageableWorkSets', () => {
+  const SEGA: WorkSetSummary[] = [
+    { id: 'ws_hallatav', name: { et: 'Hallatav', en: 'Managed' },
+      visibility: 'members', status: 'active', revision: 1, can_manage: true },
+    { id: 'ws_vaadatav', name: { et: 'Vaadatav', en: 'Viewable' },
+      visibility: 'members', status: 'active', revision: 1, can_manage: false },
+    { id: 'ws_arhiiv', name: { et: 'Arhiivis', en: 'Archived' },
+      visibility: 'members', status: 'archived', revision: 1, can_manage: true },
+  ];
+
+  it('ainult hallatavad ja aktiivsed', () => {
+    expect(manageableWorkSets(SEGA, '', 'et').map(w => w.id)).toEqual(['ws_hallatav']);
+  });
+
+  it('vaataja ei saa lisada — kogu ei ole loendis', () => {
+    expect(manageableWorkSets(SEGA, '', 'et').find(w => w.id === 'ws_vaadatav')).toBeUndefined();
+  });
+
+  it('arhiveeritud kogu ei võta uusi liikmeid', () => {
+    // Arhiveerimine on „töö on tehtud" — lisamine sinna oleks vaikne üllatus.
+    expect(manageableWorkSets(SEGA, '', 'et').find(w => w.id === 'ws_arhiiv')).toBeUndefined();
+  });
+
+  it('otsing filtreerib', () => {
+    expect(manageableWorkSets(SEGA, 'hall', 'et').map(w => w.id)).toEqual(['ws_hallatav']);
+    expect(manageableWorkSets(SEGA, 'xyzzy', 'et')).toEqual([]);
   });
 });
