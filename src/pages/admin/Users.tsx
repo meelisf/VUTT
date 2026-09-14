@@ -184,6 +184,14 @@ const UsersPage: React.FC = () => {
   const selectKlass =
     'text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500';
 
+  // Päis ja read jagavad SAMA veerumalli — flex-reas ei lange sildid andmetega
+  // kokku ja valesti joondatud päis eksitab rohkem, kui päise puudumine.
+  // Mobiilis on kolm veergu: `hidden` element ei hõiva grid-lahtrit, seega
+  // e-post ja viimane muudatus kaovad koos oma veeruga.
+  const ridaKlass = 'grid items-center gap-x-3 px-3 '
+    + 'grid-cols-[minmax(0,1fr)_6rem_7.5rem] '
+    + 'sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,12rem)_7.5rem_8.5rem]';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header showSearchButton={false} pageTitle={t('admin:tabs.users')} />
@@ -294,12 +302,12 @@ const UsersPage: React.FC = () => {
             </div>
           ) : (
             <div className="bg-white rounded-lg border border-gray-200">
-              <div className="flex flex-wrap items-center gap-x-3 px-3 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-200">
-                <span>{t('users.name')}</span>
-                <span>{t('users.username')}</span>
-                <span className="hidden sm:block">{t('users.email')}</span>
-                <span>{t('users.role')}</span>
-                <span className="hidden sm:block ml-auto">{t('users.list.lastChange')}</span>
+              <div className={`${ridaKlass} py-1.5 text-xs font-medium text-gray-500 border-b border-gray-200`}>
+                <span className="truncate">{t('users.name')}</span>
+                <span className="truncate">{t('users.username')}</span>
+                <span className="hidden sm:block truncate">{t('users.email')}</span>
+                <span className="truncate">{t('users.role')}</span>
+                <span className="hidden sm:block truncate text-right">{t('users.list.lastChange')}</span>
               </div>
               <ul className="divide-y divide-gray-100">
               {nahtavad.map((u, i) => {
@@ -312,7 +320,7 @@ const UsersPage: React.FC = () => {
                   >
                     <Link
                       to={`/admin/users/${u.username}`}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 hover:bg-gray-50"
+                      className={`${ridaKlass} py-2 hover:bg-gray-50`}
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="font-medium text-gray-900 truncate">{u.name}</span>
@@ -324,8 +332,8 @@ const UsersPage: React.FC = () => {
                       </span>
                       <span className="font-mono text-xs text-gray-500 truncate">{u.username}</span>
                       <span className="hidden sm:block text-sm text-gray-600 truncate">{u.email || '-'}</span>
-                      <span className="text-xs text-gray-500">{t(`common:roles.${u.role}`)}</span>
-                      <span className="hidden sm:block ml-auto text-xs text-gray-400 whitespace-nowrap">
+                      <span className="truncate text-xs text-gray-500">{t(`common:roles.${u.role}`)}</span>
+                      <span className="hidden sm:block text-right text-xs text-gray-400 whitespace-nowrap">
                         {activity
                           ? (activity[u.username] ? formatDateTime(activity[u.username]) : '—')
                           : ''}
