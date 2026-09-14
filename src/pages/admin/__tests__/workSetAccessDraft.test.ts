@@ -104,3 +104,25 @@ describe('draftChanged', () => {
     expect(draftChanged(laetud, { ...laetud, uus: 'viewer' })).toBe(true);
   });
 });
+
+describe('classifyEntries ilma autoriteetse kasutajaloendita', () => {
+  // Haldur EI SAA üldloendit (spekk §3) ja admini loendi laadimine võib
+  // ebaõnnestuda. Tühja loendi tõlgendamine „kõik on kustutatud" oleks vale
+  // vastus: puuduv teadmine ei ole teadmine puudumisest.
+  it('ei märgi kedagi kustutatuks, kui loend ei ole teada', () => {
+    const read = classifyEntries({ mari: 'viewer', siim: 'manager' }, [], ADMIN,
+                                 { usersKnown: false });
+    expect(read.map(r => r.kind)).toEqual(['normal', 'normal']);
+  });
+
+  it('ei luba midagi muuta ega eemaldada, kui loend ei ole teada', () => {
+    const read = classifyEntries({ mari: 'viewer' }, [], ADMIN, { usersKnown: false });
+    expect(read[0].canChange).toBe(false);
+    expect(read[0].canRemove).toBe(false);
+  });
+
+  it('vaikimisi on loend autoriteetne — olemasolev kutsumisviis ei muutu', () => {
+    expect(classifyEntries({ kadunud: 'viewer' }, USERS, ADMIN)[0].kind)
+      .toBe('deleted_user');
+  });
+});

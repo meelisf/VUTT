@@ -50,12 +50,22 @@ function tohibHallata(actorRole: string, targetRole: string): boolean {
  */
 export function classifyEntries(
   access: Record<string, SetRole>, users: KnownUser[], actor: Actor,
+  opts: { usersKnown?: boolean } = {},
 ): AccessEntry[] {
+  // Haldur EI SAA kasutajate üldloendit (spekk §3) ja admini loendi laadimine
+  // võib ebaõnnestuda. Tühja loendi tõlgendamine „kõik on kustutatud" oleks
+  // vale vastus: puuduv teadmine ei ole teadmine puudumisest. Sellisel juhul
+  // on kõik read lihtsalt lugemisvaade.
+  const usersKnown = opts.usersKnown ?? true;
   const rollid = new Map(users.map(u => [u.username, u.role]));
   return Object.keys(access || {}).sort().map(username => {
     const role = access[username];
     const sihtroll = rollid.get(username);
 
+    if (!usersKnown) {
+      return { username, role, kind: 'normal' as const,
+               canChange: false, canRemove: false };
+    }
     if (sihtroll === undefined) {
       // Kustutatud kasutaja jäänuk: server lubab eemaldada, aga rolli muuta
       // mitte (tundmatu kasutajanimi lükatakse uue määranguna tagasi).

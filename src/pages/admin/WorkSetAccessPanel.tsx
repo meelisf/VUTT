@@ -19,6 +19,12 @@ interface WorkSetAccessPanelProps {
   ws: WorkSetSummary;
   /** Admini üldloend. Halduri režiimis TÜHI — tal ei ole üldloendit. */
   users: KnownUser[];
+  /**
+   * Kas `users` on AUTORITEETNE loend? Väär halduril (tal ei ole üldloendit)
+   * ja siis, kui admini loendi laadimine ebaõnnestus. Tühja loendi
+   * tõlgendamine „kõik kirjed on kustutatud kasutajad" oleks vale vastus.
+   */
+  usersKnown: boolean;
   actor: { username: string; role: string };
   /** Kas kutsuja tohib muuta (admin+)? Väär = lugemisvaade. */
   canEdit: boolean;
@@ -30,7 +36,7 @@ const kaart = (ws: WorkSetSummary): Record<string, SetRole> =>
   ({ ...((ws.access as Record<string, SetRole>) || {}) });
 
 const WorkSetAccessPanel: React.FC<WorkSetAccessPanelProps> = ({
-  ws, users, actor, canEdit, onSaved,
+  ws, users, usersKnown, actor, canEdit, onSaved,
 }) => {
   const { t } = useTranslation(['admin', 'common']);
 
@@ -46,7 +52,8 @@ const WorkSetAccessPanel: React.FC<WorkSetAccessPanelProps> = ({
   const [serveriOlek, setServeriOlek] = useState<Record<string, SetRole> | null>(null);
 
   const read = useMemo(
-    () => classifyEntries(mustand, users, actor), [mustand, users, actor]);
+    () => classifyEntries(mustand, users, actor, { usersKnown }),
+    [mustand, users, actor, usersKnown]);
   const lisatavad = useMemo(
     () => searchUsers(addableUsers(users, mustand, actor), otsing),
     [users, mustand, actor, otsing]);
