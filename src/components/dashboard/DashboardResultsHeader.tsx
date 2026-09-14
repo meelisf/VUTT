@@ -1,7 +1,12 @@
 import { CheckSquare, Square } from 'lucide-react';
 
 interface DashboardResultsHeaderProps {
-  isAdmin: boolean;
+  /**
+   * Kas valikurežiim on üldse lubatud. EI OLE sama mis `isAdmin`: kolm õiguste
+   * telge on eraldi (ADR 0031), ja töökollektsiooni haldur võib olla
+   * contributor. Millised tegevused ribal näha on, otsustab riba ise.
+   */
+  canSelect: boolean;
   hasWorks: boolean;
   selectMode: boolean;
   selectedCount: number;
@@ -24,7 +29,7 @@ interface DashboardResultsHeaderProps {
 }
 
 export default function DashboardResultsHeader({
-  isAdmin,
+  canSelect,
   hasWorks,
   selectMode,
   selectedCount,
@@ -39,7 +44,7 @@ export default function DashboardResultsHeader({
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 border-b border-gray-200 pb-3">
       <div className="flex items-center gap-4">
         <h2 className="text-xl font-bold text-gray-800">{labels.bookshelf}</h2>
-        {isAdmin && hasWorks && (
+        {canSelect && hasWorks && (
           <button
             onClick={onToggleSelectMode}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${

@@ -199,7 +199,17 @@
     "allWorks": "Kõik teosed",
     "empty": "Töökollektsioone ei ole",
     "search": "Otsi kogu nime järgi",
-    "noMatches": "Ükski kogu ei vasta otsingule"
+    "noMatches": "Ükski kogu ei vasta otsingule",
+    "addTo": "Lisa töökollektsiooni",
+    "selectTarget": "Vali töökollektsioon",
+    "noManageable": "Sa ei halda ühtki aktiivset töökollektsiooni",
+    "addedCount": "Lisatud: {{count}}",
+    "addFailed": "Lisamine ebaõnnestus",
+    "alreadyMember": "Juba kogus",
+    "createName": "Uue töökollektsiooni nimi",
+    "createFailed": "Loomine ebaõnnestus",
+    "selectedWorks": "Valitud teoseid: {{count}}",
+    "limitReachedShort": "Kogu on täis"
   },
   "error": {
     "unknown": "Viga",

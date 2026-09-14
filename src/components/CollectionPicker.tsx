@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
-import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen, Search, Users } from 'lucide-react';
+import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen, Search, Users, Plus, Loader2 } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
 import { buildPickerEntries } from './pickerEntries';
+import { createWorkSet } from '../services/workSetService';
 import { CollectionSelection } from '../services/selectionFilter';
 import { getLangCode } from '../utils/getLangCode';
 
@@ -103,11 +104,16 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
   title
 }) => {
   const { t, i18n } = useTranslation(['common']);
-  const { selection, setSelection, collections, workSets } = useCollection();
+  const { selection, setSelection, collections, workSets, refreshWorkSets } = useCollection();
   // Massilise määramise variandis (`onSelect`) valitakse teosele PÜSIKOGU;
   // töökollektsioon ei ole teose omadus, seega seal seda jaotist ei ole.
   const selectedCollection = selection.kind === 'collection' ? selection.id : null;
   const [query, setQuery] = useState('');
+  // Loomine päise valijast (spekk §1.2) — admin ei pea selleks /admin/ alla minema.
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const { user } = useUser();
   const lang = getLangCode(i18n.language);
 
@@ -170,6 +176,24 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
   const handleSelectSet = (next: CollectionSelection) => {
     setSelection(next);
     onClose();
+  };
+
+  const handleCreate = async () => {
+    const nimi = newName.trim();
+    if (!nimi) return;
+    setCreateBusy(true);
+    setCreateError(null);
+    try {
+      const ws = await createWorkSet({ et: nimi, en: nimi });
+      await refreshWorkSets();
+      // Loomise järel valitakse uus kogu kohe aktiivseks: kuraator lõi ta
+      // selleks, et temaga tööle hakata.
+      handleSelectSet({ kind: 'work_set', id: ws.id });
+    } catch {
+      setCreateError(t('workSets.createFailed', 'Loomine ebaõnnestus'));
+    } finally {
+      setCreateBusy(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -278,6 +302,46 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
               <h3 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 {t('workSets.section', 'Töökollektsioonid')}
               </h3>
+              {isAtLeast(user?.role, 'admin') && (
+                creating ? (
+                  <div className="px-3 pb-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+                        placeholder={t('workSets.createName', 'Uue töökollektsiooni nimi')}
+                        className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      <button
+                        onClick={handleCreate}
+                        disabled={!newName.trim() || createBusy}
+                        className="px-2 py-1 bg-primary-600 text-white rounded text-sm disabled:opacity-50"
+                      >
+                        {createBusy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                      </button>
+                      <button
+                        onClick={() => { setCreating(false); setNewName(''); setCreateError(null); }}
+                        className="px-2 py-1 text-gray-500 hover:text-gray-700"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {createError && <p className="text-xs text-red-600 mt-1">{createError}</p>}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setCreating(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-primary-700 hover:bg-primary-50 transition-colors"
+                  >
+                    <span className="w-5" />
+                    <Plus size={16} />
+                    {t('workSets.create', 'Loo töökollektsioon')}
+                  </button>
+                )
+              )}
               {nahtavadKogud.length === 0 ? (
                 <p className="px-3 py-2 text-sm text-gray-500">
                   {otsib

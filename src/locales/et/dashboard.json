@@ -96,7 +96,8 @@
     "tagsSuccess": "Märksõnad määratud {{count}} teosele",
     "tagsError": "Märksõnade määramine ebaõnnestus",
     "genreSuccess": "Žanr määratud {{count}} teosele",
-    "genreError": "Žanri määramine ebaõnnestus"
+    "genreError": "Žanri määramine ebaõnnestus",
+    "assignWorkSet": "Töökollektsioon"
   },
   "collection": {
     "copyLink": "Kopeeri link",

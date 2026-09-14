@@ -172,7 +172,12 @@
     "publishedCannotDelete": "A published collection can only be archived",
     "showArchived": "Show archived",
     "userAccess": "Work collections",
-    "userAccessHint": "Access applies only to that collection's works; it does not change read or edit rights."
+    "userAccessHint": "Access applies only to that collection's works; it does not change read or edit rights.",
+    "memberList": "Members",
+    "noMembers": "The collection is empty",
+    "removeMember": "Remove from collection",
+    "hiddenMembers": "{{count}} members are not visible to you",
+    "loadMembersFailed": "Loading members failed"
   },
   "cards": {
     "registrations": "Registrations",

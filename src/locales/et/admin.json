@@ -172,7 +172,12 @@
     "publishedCannotDelete": "Avaldatud kogu saab ainult arhiveerida",
     "showArchived": "Näita arhiveerituid",
     "userAccess": "Töökollektsioonid",
-    "userAccessHint": "Ligipääs kehtib ainult selle kogu teostele; lugemis- ja toimetamisõigust see ei muuda."
+    "userAccessHint": "Ligipääs kehtib ainult selle kogu teostele; lugemis- ja toimetamisõigust see ei muuda.",
+    "memberList": "Liikmed",
+    "noMembers": "Kogu on tühi",
+    "removeMember": "Eemalda kogust",
+    "hiddenMembers": "{{count}} liiget ei ole sulle nähtav",
+    "loadMembersFailed": "Liikmete laadimine ebaõnnestus"
   },
   "cards": {
     "registrations": "Taotlused",

@@ -1,29 +1,38 @@
-import { BookOpen, FolderInput, Tag, X } from 'lucide-react';
+import { BookOpen, FolderInput, Tag, Users, X } from 'lucide-react';
 
 interface DashboardBulkActionBarProps {
   selectedCount: number;
   loading: boolean;
+  /** Kollektsioon / märksõnad / žanr kirjutavad teose `_metadata.json`-i → admin. */
+  canEditMetadata: boolean;
+  /** Töökollektsiooni lisamine nõuab ainult kogu haldusõigust (ADR 0031: eri telg). */
+  canAddToWorkSet: boolean;
   labels: {
     selectedCount: string;
     assignCollection: string;
     assignTags: string;
     assignGenre: string;
+    assignWorkSet: string;
     clearSelection: string;
     exitSelect: string;
   };
   onOpenCollection: () => void;
   onOpenTags: () => void;
   onOpenGenre: () => void;
+  onOpenWorkSet: () => void;
   onExitSelectMode: () => void;
 }
 
 export default function DashboardBulkActionBar({
   selectedCount,
   loading,
+  canEditMetadata,
+  canAddToWorkSet,
   labels,
   onOpenCollection,
   onOpenTags,
   onOpenGenre,
+  onOpenWorkSet,
   onExitSelectMode,
 }: DashboardBulkActionBarProps) {
   if (selectedCount === 0) return null;
@@ -35,6 +44,7 @@ export default function DashboardBulkActionBar({
           {labels.selectedCount}
         </span>
 
+        {canEditMetadata && (
         <div className="border-l border-gray-200 pl-3">
           <button
             onClick={onOpenCollection}
@@ -45,7 +55,9 @@ export default function DashboardBulkActionBar({
             {labels.assignCollection}
           </button>
         </div>
+        )}
 
+        {canEditMetadata && (
         <div className="border-l border-gray-200 pl-3">
           <button
             onClick={onOpenTags}
@@ -56,7 +68,9 @@ export default function DashboardBulkActionBar({
             {labels.assignTags}
           </button>
         </div>
+        )}
 
+        {canEditMetadata && (
         <div className="border-l border-gray-200 pl-3">
           <button
             onClick={onOpenGenre}
@@ -67,6 +81,20 @@ export default function DashboardBulkActionBar({
             {labels.assignGenre}
           </button>
         </div>
+        )}
+
+        {canAddToWorkSet && (
+          <div className="border-l border-gray-200 pl-3">
+            <button
+              onClick={onOpenWorkSet}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded transition-colors"
+            >
+              <Users size={14} />
+              {labels.assignWorkSet}
+            </button>
+          </div>
+        )}
 
         <button
           onClick={onExitSelectMode}

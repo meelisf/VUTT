@@ -8,21 +8,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Loader2, Plus, Users, Archive, RotateCcw, Globe, Lock, Trash2 } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, Users, Archive, RotateCcw, Globe, Lock, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { isAtLeast } from '../../utils/roleUtils';
 import { getLangCode } from '../../utils/getLangCode';
 import {
-  WorkSetSummary, listWorkSets, createWorkSet, patchWorkSet, deleteWorkSet,
-  getWorkSetWorkIds,
+  WorkSetSummary, WorkSetMember, listWorkSets, createWorkSet, patchWorkSet, deleteWorkSet,
+  getWorkSetWorkIds, getWorkSetMembers, removeWorks, invalidateWorkSetIds,
 } from '../../services/workSetService';
+import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 
 const WorkSets: React.FC = () => {
   const { t, i18n } = useTranslation(['admin', 'common']);
   const { user, isLoading: userLoading } = useUser();
   const { refreshWorkSets } = useCollection();
+  const index = useMeiliIndex();
   const navigate = useNavigate();
   const lang = getLangCode(i18n.language);
 
@@ -33,6 +35,12 @@ const WorkSets: React.FC = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  // Avatud kogu liikmed. Laetakse nõudmisel: enamik haldustoiminguid ei vaja
+  // nimekirja ja 1000 pealkirja laadimine iga kogu kohta oleks raiskamine.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [members, setMembers] = useState<WorkSetMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
 
   const isAdmin = isAtLeast(user?.role, 'admin');
 
@@ -61,6 +69,43 @@ const WorkSets: React.FC = () => {
   }, [showArchived]);
 
   useEffect(() => { load(); }, [load]);
+
+  const avaLiikmed = async (setId: string) => {
+    if (openId === setId) { setOpenId(null); return; }
+    setOpenId(setId);
+    setMembers([]);
+    setMembersError(null);
+    if (!index) return;
+    setMembersLoading(true);
+    try {
+      const ids = await getWorkSetWorkIds(setId);
+      setMembers(await getWorkSetMembers(index, ids));
+    } catch {
+      setMembersError(t('workSets.loadMembersFailed'));
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  /**
+   * Liikme eemaldamine. `revision` jäetakse saatmata: eemaldamine on delta
+   * („eemalda see"), mitte täisasendus, seega vananenud vaade ei saa kellegi
+   * paralleelset lisandust maha kirjutada.
+   */
+  const eemalda = async (setId: string, workId: string) => {
+    setBusyId(setId);
+    try {
+      await removeWorks(setId, [workId]);
+      setMembers(prev => prev.filter(m => m.work_id !== workId));
+      invalidateWorkSetIds(setId);
+      setCounts(prev => ({ ...prev, [setId]: Math.max(0, (prev[setId] ?? 1) - 1) }));
+      setError(null);
+    } catch {
+      setError(t('workSets.saveFailed'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const muuda = async (ws: WorkSetSummary, changes: Record<string, unknown>) => {
     setBusyId(ws.id);
@@ -176,11 +221,17 @@ const WorkSets: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                         {/* −1 = loendi päring ebaõnnestus. Null EI OLE õige vastus:
                             „0 liiget" ja „ei saanud teada" on eri asjad. */}
-                        {t('workSets.members')}: {arv === -1 ? '—' : arv ?? '…'}
-                        {ws.access && ` · ${t('workSets.access')}: ${Object.keys(ws.access).length}`}
+                        <button
+                          onClick={() => avaLiikmed(ws.id)}
+                          className="inline-flex items-center gap-1 hover:text-gray-800"
+                        >
+                          {openId === ws.id ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          {t('workSets.members')}: {arv === -1 ? '—' : arv ?? '…'}
+                        </button>
+                        {ws.access && <span>· {t('workSets.access')}: {Object.keys(ws.access).length}</span>}
                       </div>
                     </div>
 
@@ -216,6 +267,49 @@ const WorkSets: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {openId === ws.id && (
+                    <div className="mt-3 border-t border-gray-100 pt-3">
+                      {membersLoading ? (
+                        <Loader2 size={16} className="animate-spin text-gray-400" />
+                      ) : membersError ? (
+                        <p className="text-sm text-red-600">{membersError}</p>
+                      ) : members.length === 0 ? (
+                        <p className="text-sm text-gray-500">{t('workSets.noMembers')}</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {members.map(m => (
+                            <li key={m.work_id} className="flex items-center gap-2 text-sm">
+                              <Link
+                                to={`/work/${m.work_id}`}
+                                className="flex-1 truncate text-gray-700 hover:text-primary-700 hover:underline"
+                              >
+                                {m.title}
+                                {m.year_display && <span className="text-gray-400"> · {m.year_display}</span>}
+                              </Link>
+                              {ws.can_manage && (
+                                <button
+                                  onClick={() => eemalda(ws.id, m.work_id)}
+                                  disabled={busyId === ws.id}
+                                  title={t('workSets.removeMember')}
+                                  className="text-gray-400 hover:text-rose-600 disabled:opacity-50 shrink-0"
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {/* Kutsuja näeb ainult talle nähtavaid liikmeid — peidetud
+                          liikmete OLEMASOLU on info, nende arv mitte. */}
+                      {arv !== -1 && arv !== undefined && members.length < arv && (
+                        <p className="text-xs text-gray-400 mt-2">
+                          {t('workSets.hiddenMembers', { count: arv - members.length })}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

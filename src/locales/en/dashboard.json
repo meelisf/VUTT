@@ -96,7 +96,8 @@
     "tagsSuccess": "Tags assigned to {{count}} works",
     "tagsError": "Failed to assign tags",
     "genreSuccess": "Genre assigned to {{count}} works",
-    "genreError": "Failed to assign genre"
+    "genreError": "Failed to assign genre",
+    "assignWorkSet": "Work collection"
   },
   "collection": {
     "copyLink": "Copy link",
