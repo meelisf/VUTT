@@ -248,17 +248,28 @@ async def admin_create_collection(request: Request, user=Depends(require_role("s
     _invalidate_all_caches()
     return {"status": "success"}
 
-def _cleanup_allowed_collections_on_delete(collection_id: str):
-    """Eemaldab kustutatud kollektsiooni ID kõigi kasutajate allowed_collections'ist."""
-    users_data = load_users()
-    changed = False
-    for uname, udata in users_data.items():
-        current = udata.get("allowed_collections", [])
-        if collection_id in current:
-            users_data[uname]["allowed_collections"] = [c for c in current if c != collection_id]
-            changed = True
-    if changed:
-        save_users(users_data)
+def _cleanup_collection_from_users(collection_id: str) -> list:
+    """Eemaldab kustutatud kogu ID MÕLEMALT väljalt ühe luku all (ADR 0043).
+
+    Lugemisõigus (`allowed_collections`) ja kirjutamisulatus (`edit_collections`)
+    on eri teljed, aga kustutatud kogu ID ei ole kummalgi kehtiv õigus.
+    Tagastab muutunud kasutajanimed — sessioonid invalideerib KUTSUJA
+    (luku väljas, üks kord kasutaja kohta).
+    """
+    muutunud = []
+    with users_transaction() as users_data:
+        for uname, udata in users_data.items():
+            kasutaja_muutus = False
+            for vali in ("allowed_collections", "edit_collections"):
+                praegu = udata.get(vali, [])
+                if collection_id in praegu:
+                    users_data[uname][vali] = [c for c in praegu if c != collection_id]
+                    kasutaja_muutus = True
+            if kasutaja_muutus:
+                muutunud.append(uname)
+        if muutunud:
+            save_users(users_data)
+    return muutunud
 
 
 def _find_works_with_collection(collection_id: str):
@@ -364,7 +375,10 @@ def admin_delete_collection(collection_id: str, background_tasks: BackgroundTask
 
     # Kustuta kollektsioonist
     del data[collection_id]
-    _cleanup_allowed_collections_on_delete(collection_id)
+    for _uname in _cleanup_collection_from_users(collection_id):
+        # Sessioon kannab kasutajaobjekti hetktõmmist — ilma invalideerimiseta
+        # jääks kustutatud kogu ID 24h ulatusse alles.
+        delete_user_sessions(_uname)
     save_config_with_git(COLLECTIONS_FILE, data, user["username"],
                          message=f"Kollektsioon: kustuta {collection_id}")
 
