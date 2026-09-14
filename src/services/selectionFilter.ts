@@ -25,3 +25,26 @@ export function selectionFilterClause(
   }
   return [`work_id IN [${workIds.map(id => `"${id}"`).join(', ')}]`];
 }
+
+/**
+ * Valiku ulatus filtrikutsetes: kas püsikogu id (vana kuju, endiselt lubatud)
+ * või täisvalik koos serverilt saadud ID-loendiga.
+ *
+ * Elab siin, mitte `searchService`-is, sest ka `types.ts` vajab teda ja
+ * `searchService` impordib `types`-ist — vastupidine import oleks tsükkel.
+ */
+export type SelectionScope =
+  | string
+  | { selection: CollectionSelection; workSetIds: string[] | null };
+
+/**
+ * Ulatus → filtriklauslid. ÜKS tee kõigile kutsujatele (otsing, facetid,
+ * statistika): kaks eraldi teisendust lahkneksid.
+ */
+export function scopeClauses(scope?: SelectionScope): string[] {
+  if (!scope) return [];
+  if (typeof scope === 'string') return [`collections_hierarchy = "${scope}"`];
+  // VISKAB laadimata loendi peal — tahtlikult: piiramata päring näitaks
+  // teoseid väljaspool valikut.
+  return selectionFilterClause(scope.selection, scope.workSetIds);
+}

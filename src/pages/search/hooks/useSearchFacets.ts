@@ -1,6 +1,7 @@
 // src/pages/search/hooks/useSearchFacets.ts
 import { useState, useEffect } from 'react';
 import { getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets, getTagsLabelMap } from '../../../services/searchService';
+import { SelectionScope } from '../../../services/selectionFilter';
 import { getVocabularies, Vocabularies } from '../../../services/collectionService';
 import { ContentSearchResponse } from '../../../types';
 import { SearchUrlParams } from './useSearchUrlParams';
@@ -31,7 +32,9 @@ const isAbortError = (error: unknown) =>
 export function useSearchFacets(
     urlParams: SearchUrlParams,
     lang: string,
-    selectedCollection: string | null,
+    /** Valiku ulatus (#354). Facetid peavad järgima sama piiri kui tulemused. */
+    scope: SelectionScope | undefined,
+    scopeReady: boolean,
     results: ContentSearchResponse | null
 ): FacetsState {
     const index = useMeiliIndex();
@@ -59,14 +62,14 @@ export function useSearchFacets(
 
                 const hasActiveContentFilters = !!urlParams.q || !!urlParams.workId || !!urlParams.author ||
                     urlParams.teoseTags.length > 0 || urlParams.genres.length > 0 || urlParams.types.length > 0;
-                if (hasActiveContentFilters || !index) return;
+                if (hasActiveContentFilters || !index || !scopeReady) return;
 
                 const facetLang = getLangCode(lang);
                 const [tags, genres, types, authors] = await Promise.all([
-                    getTeoseTagsFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
-                    getGenreFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
-                    getTypeFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
-                    getAuthorFacets(index, selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getTeoseTagsFacets(index, scope, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getGenreFacets(index, scope, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getTypeFacets(index, scope, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getAuthorFacets(index, scope, urlParams.yearStart, urlParams.yearEnd, controller.signal),
                 ]);
                 if (cancelled) return;
                 // Labelid lahendatakse facetist saadud Q-koodidele; register on juba
@@ -88,7 +91,7 @@ export function useSearchFacets(
             window.clearTimeout(timer);
             controller.abort();
         };
-    }, [selectedCollection, lang, urlParams.yearStart, urlParams.yearEnd,
+    }, [scope, scopeReady, lang, urlParams.yearStart, urlParams.yearEnd,
         urlParams.q, urlParams.workId, urlParams.author,
         urlParams.teoseTags.length, urlParams.genres.length, urlParams.types.length, index]);
 

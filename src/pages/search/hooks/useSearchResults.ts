@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { searchContent } from '../../../services/searchService';
+import { SelectionScope } from '../../../services/selectionFilter';
 import { ContentSearchResponse } from '../../../types';
 import { SearchUrlParams } from './useSearchUrlParams';
 import { getLangCode } from '../../../utils/getLangCode';
@@ -13,7 +14,14 @@ export interface SearchResultsState {
 
 const SEARCH_DEBOUNCE_MS = 400;
 
-export function useSearchResults(urlParams: SearchUrlParams, lang: string, selectedCollection: string | null): SearchResultsState {
+export function useSearchResults(
+    urlParams: SearchUrlParams,
+    lang: string,
+    /** Valiku ulatus (#354). `undefined` = piiramata. */
+    scope: SelectionScope | undefined,
+    /** Töökollektsiooni ID-loendi ootel EI tohi päringut teha. */
+    scopeReady: boolean,
+): SearchResultsState {
     const index = useMeiliIndex();
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
@@ -30,7 +38,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
             return;
         }
 
-        if (!index) return;
+        if (!index || !scopeReady) return;
 
         const controller = new AbortController();
         let cancelled = false;
@@ -50,7 +58,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
                     languages: urlParams.languages.length > 0 ? urlParams.languages : undefined,
                     author: urlParams.author || undefined,
                     subjectPerson: urlParams.subjectPerson || undefined,
-                    collection: selectedCollection || undefined,
+                    collection: scope,
                     lang: getLangCode(lang),
                     signal: controller.signal,
                 });
@@ -71,7 +79,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
         urlParams.scope, urlParams.workId,
         urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
         urlParams.genres.join(','), urlParams.types.join(','),
-        urlParams.author, urlParams.subjectPerson, selectedCollection, lang, index]);
+        urlParams.author, urlParams.subjectPerson, scope, scopeReady, lang, index]);
 
     return { results, loading, error };
 }

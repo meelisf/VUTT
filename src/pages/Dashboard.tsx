@@ -12,6 +12,7 @@ import LoginModal from '../components/LoginModal';
 import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
+import { useSelectionScope } from '../hooks/useSelectionScope';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, ArrowUpDown, X, User, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
@@ -42,9 +43,21 @@ const SEARCH_DEBOUNCE_MS = 400;
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user } = useUser();
-  const { selectedCollection, setSelectedCollection, getCollectionName, collections, isLoading: collectionsLoading } = useCollection();
+  const { selection, selectedCollection, setSelectedCollection, getCollectionName, collections, workSets, isLoading: collectionsLoading } = useCollection();
+  // Töökollektsiooni ID-loend tuleb serverilt; kuni ta ei ole kohal, ei tohi
+  // päringut teha (piiramata vastus näitaks teoseid väljaspool valikut).
+  const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
   const index = useMeiliIndex();
   const lang = getLangCode(i18n.language);
+  // Valiku SILT: töökollektsioon ei ole `collections`-is, seega nime ei saa
+  // `getCollectionName`-ist. Ligipääsu kaotanud kogu nime me ei tea — siis
+  // öeldakse seda otse, mitte ei vaikita.
+  const selectionLabel = selection.kind === 'work_set'
+    ? (workSets.find(ws => ws.id === selection.id)?.name[lang]
+       ?? t('common:workSets.notFound', 'Töökollektsiooni ei leitud või puudub ligipääs'))
+    : selectedCollection
+      ? getCollectionName(selectedCollection, lang)
+      : t('common:collections.all', 'Kõik tööd');
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -428,7 +441,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     // Oota kollektsioonide alglaadimine ära, et mitte teha esmalt kallist „kõik
     // teosed“ päringut ja kohe selle järel uut vaikimisi kollektsiooni päringut.
-    if (!index || collectionsLoading) return;
+    if (!index || collectionsLoading || !scopeReady) return;
     const controller = new AbortController();
     let cancelled = false;
     const fetchWorks = async () => {
@@ -451,7 +464,7 @@ const Dashboard: React.FC = () => {
           genre: selectedGenre ? [selectedGenre] : undefined,
           type: selectedType ? [selectedType] : undefined,
           languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
-          collection: selectedCollection || undefined,
+          collection: scope,
           onlyFirstPage: sort !== 'recent',
           lang: getLangCode(i18n.language),
           offset: (currentPage - 1) * ITEMS_PER_PAGE,
@@ -487,7 +500,7 @@ const Dashboard: React.FC = () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [index, collectionsLoading, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedLanguages, selectedCollection, currentPage, refreshCounter, i18n.language]);
+  }, [index, collectionsLoading, scopeReady, scope, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedLanguages, currentPage, refreshCounter, i18n.language]);
 
   // Multi-select helper funktsioonid
   // shift+klõps valib vahemiku viimasest ankrust nähtaval leheküljel (nagu manage-lehel)
@@ -613,12 +626,12 @@ const Dashboard: React.FC = () => {
         <div className={`max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8 ${selectMode && selectedWorkIds.size > 0 ? 'pb-32 sm:pb-36' : ''}`}>
 
           {/* Error Banner */}
-          {error && (
+          {(error || scopeError) && (
             <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm flex items-start gap-3">
               <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
               <div>
                 <h3 className="font-bold text-red-800">{t('error.connectionError')}</h3>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
+                <p className="text-sm text-red-700 mt-1">{error || scopeError?.message}</p>
                 <p className="text-xs text-red-600 mt-2">
                   {t('error.httpsWarning')}
                 </p>
@@ -666,7 +679,7 @@ const Dashboard: React.FC = () => {
                   >
                     <Library size={16} className={selectedCollection && colorClasses ? colorClasses.text : 'text-primary-600'} />
                     <span className="flex-1 text-left truncate">
-                      {selectedCollection ? getCollectionName(selectedCollection, lang) : t('common:collections.all', 'Kõik tööd')}
+                      {selectionLabel}
                     </span>
                     <ChevronDown size={14} className="shrink-0 opacity-50" />
                   </button>
