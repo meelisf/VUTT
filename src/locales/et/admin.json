@@ -144,6 +144,36 @@
     "descriptionLongPlaceholderEt": "Pikem tutvustus eesti keeles...",
     "descriptionLongPlaceholderEn": "Longer introduction in English..."
   },
+  "workSets": {
+    "title": "Töökollektsioonid",
+    "members": "Liikmeid",
+    "viewer": "Vaataja",
+    "manager": "Haldur",
+    "none": "Puudub",
+    "archive": "Arhiveeri",
+    "restore": "Taasaktiveeri",
+    "publish": "Avalda",
+    "unpublish": "Tee liikmetele nähtavaks",
+    "delete": "Kustuta",
+    "limitReached": "Kogu on täis",
+    "create": "Loo töökollektsioon",
+    "name": "Nimi",
+    "description": "Kirjeldus",
+    "visibility": "Nähtavus",
+    "visibilityMembers": "Ainult liikmetele",
+    "visibilityPublic": "Avalik",
+    "status": "Olek",
+    "statusActive": "Aktiivne",
+    "statusArchived": "Arhiveeritud",
+    "access": "Ligipääs",
+    "empty": "Töökollektsioone ei ole",
+    "saveFailed": "Salvestamine ebaõnnestus",
+    "conflict": "Kogu muutus vahepeal — laadi leht uuesti",
+    "publishedCannotDelete": "Avaldatud kogu saab ainult arhiveerida",
+    "showArchived": "Näita arhiveerituid",
+    "userAccess": "Töökollektsioonid",
+    "userAccessHint": "Ligipääs kehtib ainult selle kogu teostele; lugemis- ja toimetamisõigust see ei muuda."
+  },
   "cards": {
     "registrations": "Taotlused",
     "users": "Registreerunud kasutajad",
@@ -153,7 +183,8 @@
     "trash": "Prügikast",
     "maintenance": "Hooldus",
     "places": "Kohtade register",
-    "pending": "{{count}} ootel"
+    "pending": "{{count}} ootel",
+    "workSets": "Töökollektsioonid"
   },
   "groups": {
     "users": "Kasutajad",

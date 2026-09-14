@@ -16,6 +16,9 @@ import {
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
+import { WorkSetSummary, listWorkSets, setWorkSetAccess } from '../../services/workSetService';
+import { accessChanges, SetRole } from './workSetAccess';
+import { getLangCode } from '../../utils/getLangCode';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getWritableCollectionOptions } from '../../services/collectionService';
 import { apiPost } from '../../services/apiClient';
@@ -38,7 +41,8 @@ interface UsersResponse {
 }
 
 const UsersPage: React.FC = () => {
-  const { t } = useTranslation(['admin', 'common']);
+  const { t, i18n } = useTranslation(['admin', 'common']);
+  const wsLang = getLangCode(i18n.language);
   const { user, authToken, isLoading: userLoading } = useUser();
   const { collections } = useCollection();
   const navigate = useNavigate();
@@ -71,6 +75,10 @@ const UsersPage: React.FC = () => {
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   // Per-kasutaja salvestamis-indikaator kollektsioonide muutmisel
   const [collectionsUpdating, setCollectionsUpdating] = useState<string | null>(null);
+  // Töökollektsioonid (#354). Ligipääs elab KOGU küljes, mitte kasutaja küljes,
+  // seega salvestus käib kogu kaupa `PUT /work-sets/{id}/access`-iga.
+  const [workSets, setWorkSets] = useState<WorkSetSummary[]>([]);
+  const [workSetUpdating, setWorkSetUpdating] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   // Ankru-ristkülik portaliga renderdatud menüü/kinnituse positsioneerimiseks.
@@ -94,8 +102,33 @@ const UsersPage: React.FC = () => {
   useEffect(() => {
     if (authToken && user && roleLevel(user.role) >= ROLE_LEVELS.admin) {
       loadUsers();
+      // Arhiveeritud kaasa: kasutajal võib olla õigus kogule, mis on arhiivis,
+      // ja selle vaikne peitmine teeks õiguse eemaldamise võimatuks.
+      listWorkSets(true).then(setWorkSets).catch(() => setWorkSets([]));
     }
   }, [authToken, user]);
+
+  /**
+   * Ühe kasutaja roll ühes kogus. Saadab AINULT selle kogu `access`-kaardi ja
+   * ei puuduta `allowed_collections` ega `edit_collections` välju — kolm
+   * õiguste telge on eraldi ja üks ei tohi teist üle kirjutada (ADR 0031).
+   */
+  const handleWorkSetRoleChange = async (username: string, setId: string, role: SetRole | null) => {
+    setWorkSetUpdating(username);
+    setUsersError(null);
+    try {
+      const changes = accessChanges(workSets, username, { [setId]: role });
+      for (const c of changes) {
+        await setWorkSetAccess(c.setId, c.access, c.revision);
+      }
+      if (changes.length > 0) setWorkSets(await listWorkSets(true));
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      setUsersError(status === 409 ? t('workSets.conflict') : t('workSets.saveFailed'));
+    } finally {
+      setWorkSetUpdating(null);
+    }
+  };
 
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -629,6 +662,43 @@ const UsersPage: React.FC = () => {
                               ))}
                             </div>
                             <p className="text-xs text-gray-500 mt-1">{t('users.editCollectionsHint')}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Kolmas õiguste telg: töökollektsioonid (#354). Eraldi
+                          lugemisõigusest ja toimetamisulatusest — kogu ligipääs
+                          EI anna ega võta teoste lugemisõigust. */}
+                      {workSets.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">
+                            {t('workSets.userAccess')}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-col gap-1">
+                              {workSets.map((ws) => (
+                                <label key={ws.id} className="flex items-center gap-2 text-xs">
+                                  <select
+                                    value={(ws.access || {})[u.username] ?? ''}
+                                    disabled={!canManage || !ws.can_manage || workSetUpdating === u.username}
+                                    onChange={(e) => handleWorkSetRoleChange(
+                                      u.username, ws.id,
+                                      (e.target.value || null) as SetRole | null,
+                                    )}
+                                    className="text-xs border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                                  >
+                                    <option value="">{t('workSets.none')}</option>
+                                    <option value="viewer">{t('workSets.viewer')}</option>
+                                    <option value="manager">{t('workSets.manager')}</option>
+                                  </select>
+                                  <span className="truncate">
+                                    {ws.name[wsLang] || ws.name.et || ws.name.en || ws.id}
+                                    {ws.status === 'archived' && ` (${t('workSets.statusArchived')})`}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{t('workSets.userAccessHint')}</p>
                           </div>
                         </div>
                       )}

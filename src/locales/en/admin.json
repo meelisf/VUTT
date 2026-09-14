@@ -144,6 +144,36 @@
     "descriptionLongPlaceholderEt": "Longer introduction in Estonian...",
     "descriptionLongPlaceholderEn": "Longer introduction in English..."
   },
+  "workSets": {
+    "title": "Work collections",
+    "members": "Members",
+    "viewer": "Viewer",
+    "manager": "Manager",
+    "none": "None",
+    "archive": "Archive",
+    "restore": "Reactivate",
+    "publish": "Publish",
+    "unpublish": "Restrict to members",
+    "delete": "Delete",
+    "limitReached": "Collection is full",
+    "create": "Create work collection",
+    "name": "Name",
+    "description": "Description",
+    "visibility": "Visibility",
+    "visibilityMembers": "Members only",
+    "visibilityPublic": "Public",
+    "status": "Status",
+    "statusActive": "Active",
+    "statusArchived": "Archived",
+    "access": "Access",
+    "empty": "No work collections",
+    "saveFailed": "Saving failed",
+    "conflict": "The collection changed meanwhile — reload the page",
+    "publishedCannotDelete": "A published collection can only be archived",
+    "showArchived": "Show archived",
+    "userAccess": "Work collections",
+    "userAccessHint": "Access applies only to that collection's works; it does not change read or edit rights."
+  },
   "cards": {
     "registrations": "Registrations",
     "users": "Registered users",
@@ -153,7 +183,8 @@
     "trash": "Trash",
     "maintenance": "Maintenance",
     "places": "Place Register",
-    "pending": "{{count}} pending"
+    "pending": "{{count}} pending",
+    "workSets": "Work collections"
   },
   "groups": {
     "users": "Users",
