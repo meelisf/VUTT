@@ -1,7 +1,7 @@
 # ADR 0043 — Kogude õigustel on ühised toimingud ja rollipõhised vaated
 
 **Kuupäev:** 2026-09-14
-**Staatus:** teostus pooleli — etapid 1a, 1b ja 2 tootmises (2026-09-14), etapid 3–4 lahtised (#318)
+**Staatus:** teostus pooleli — etapid 1a, 1b, 2 ja 3 tootmises (2026-09-14), etapp 4 lahtine (#318)
 **Seotud:** ADR 0031, 0038, 0042; #318, #354
 **Spekk:** [Kasutajad ja kogude ligipääs](../superpowers/specs/2026-09-14-kasutajad-ja-kogude-ligipaas-design.md)
 
@@ -67,13 +67,13 @@ muutmise õigust ega toimetajale kasutajate üldloendit.
 
 **Tehtud ja tootmises:** etapp 1a (serveri ja konto elutsükli parandus,
 `POST /admin/users/collection-rights` delta), etapp 1b (töökollektsiooni
-ligipääsupaneel) ning etapp 2 (kollektsiooniõiguste delta kasutuselevõtt,
+ligipääsupaneel), etapp 2 (kollektsiooniõiguste delta kasutuselevõtt,
 kaks telge koos alusega, `allowed_users` kirjutusharu eemaldamine, kogude
-loend ja ligipääs adminile, seaded superadminile).
+loend ja ligipääs adminile, seaded superadminile) ning etapp 3 (otsitav
+kasutajanimekiri ja `/admin/users/:username` detail, §1).
 
-**Veel lahtised:** etapp 3 (otsitav kasutajanimekiri ja `/admin/users/:username`
-detail, §1) ning etapp 4 (ühine „Kogud” sisenemiskoht ja tüübifilter, §4).
-Kuni need pole tehtud, ei kirjelda see ADR kõiki siinseid garantiisid
+**Veel lahtised:** etapp 4 (ühine „Kogud” sisenemiskoht ja tüübifilter, §4).
+Kuni etapp 4 pole tehtud, ei kirjelda see ADR kõiki siinseid garantiisid
 töötavana. Teostuse lõpus eemaldatakse see üleminekumärkus ning uuendatakse
 ADR-i ja README registri staatus koos; enne seda jääb märkus alles.
 

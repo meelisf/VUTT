@@ -1,27 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { Link, useNavigate } from 'react-router-dom';
+/**
+ * Kasutajate haldusloend (#318, spekk §1, etapp 3b).
+ *
+ * Kompaktne otsitav nimekiri. Filtrid elavad AINULT URL-is
+ * (`?q=&role=&rights_collection=&rights_work_set=`) — paralleelset
+ * `useState`-koopiat ei hoita, sest kaks tingimusteta peeglit tekitaksid
+ * lõputu tsükli (ADR 0038 / #333). Filtrid on HALDUSLOENDI filtrid, mitte
+ * koguvalik: `useCollectionUrlSync`-i ei kutsuta ja aktiivne kogu ei muutu.
+ *
+ * Konto toimingud ja õiguste toimetamine kolisid detailvaatesse
+ * (`UserDetail.tsx`, etapp 3a) — siin neid enam ei ole.
+ */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Users,
-  Loader2,
-  Trash2,
-  ChevronLeft,
-  MoreVertical,
-  KeyRound,
-  X
-} from 'lucide-react';
+import { Loader2, ChevronLeft, Users } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
-import { WorkSetSummary, listWorkSets, setWorkSetAccess } from '../../services/workSetService';
-import { accessChanges, SetRole } from './workSetAccess';
-import { getLangCode } from '../../utils/getLangCode';
 import { useCollection } from '../../contexts/CollectionContext';
-import { getWritableCollectionOptions } from '../../services/collectionService';
-import { apiPost } from '../../services/apiClient';
-import { ROLE_LEVELS, canManageUser, assignableRoles, roleLevel } from '../../utils/roleUtils';
+import { WorkSetSummary, listWorkSets } from '../../services/workSetService';
+import { getLangCode } from '../../utils/getLangCode';
 import { formatDateTime } from '../../utils/formatDateTime';
-import ResetPasswordResult, { ResetResult } from './ResetPasswordResult';
+import { apiPost } from '../../services/apiClient';
+import { ROLE_LEVELS, roleLevel } from '../../utils/roleUtils';
+import { getUserActivity, UserActivity } from '../../services/userActivityService';
+import {
+  EMPTY_FILTERS, filterUsers, filtersFromParams, paramsFromFilters, UserFilters,
+} from './userListFilter';
 
 interface User {
   username: string;
@@ -41,88 +45,31 @@ interface UsersResponse {
 
 const UsersPage: React.FC = () => {
   const { t, i18n } = useTranslation(['admin', 'common']);
-  const wsLang = getLangCode(i18n.language);
+  const lang = getLangCode(i18n.language);
   const { user, authToken, isLoading: userLoading } = useUser();
   const { collections } = useCollection();
   const navigate = useNavigate();
 
-  // Restricted-kollektsioonid {id, name} kujul, sorditud nime järgi (kuvamiseks).
-  // allowed_collections mõjutab ligipääsu AINULT restricted-kogude puhul.
-  const restrictedCollections = React.useMemo(
-    () =>
-      Object.entries(collections)
-        .filter(([, c]) => c.visibility === 'restricted')
-        .map(([id, c]) => ({ id, name: c.name?.et || id }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'et')),
-    [collections]
-  );
-
-  // KÕIK kollektsioonid, mitte ainult restricted: kirjutamisulatus (edit_collections)
-  // kehtib ka avalikele kogudele — erinevalt allowed_collections'ist. virtual_group on
-  // välja jäetud (vt getWritableCollectionOptions).
-  const allCollections = React.useMemo(
-    () => getWritableCollectionOptions(collections),
-    [collections]
-  );
-
-  // Lahenda kollektsiooni id → kuvanimi (fallback toore id)
-  const collectionName = (id: string): string => collections[id]?.name?.et || id;
-
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
-  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
-  // Per-kasutaja salvestamis-indikaator kollektsioonide muutmisel
-  const [collectionsUpdating, setCollectionsUpdating] = useState<string | null>(null);
-  // Töökollektsioonid (#354). Ligipääs elab KOGU küljes, mitte kasutaja küljes,
-  // seega salvestus käib kogu kaupa `PUT /work-sets/{id}/access`-iga.
+  // Aktiivsus on `null` ka laadimise ajal ja vea korral: kriips tähendab
+  // „vastet ei ole", mitte „viga" (vt allpool).
+  const [activity, setActivity] = useState<UserActivity | null>(null);
+  const [activityFailed, setActivityFailed] = useState(false);
+  const [aktiivneRida, setAktiivneRida] = useState(0);
+  const aktiivneRef = useRef<HTMLLIElement | null>(null);
+
+  // Töökollektsioonid (#354): filter vajab `access`-kaarte, seega arhiveeritud
+  // kaasa — muidu ei saa arhiivis koguga seotud inimesi filtreerida.
   const [workSets, setWorkSets] = useState<WorkSetSummary[]>([]);
-  const [workSetUpdating, setWorkSetUpdating] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  // Ankru-ristkülik portaliga renderdatud menüü/kinnituse positsioneerimiseks.
-  // Vajalik, sest tabeli ümbris on overflow-x-auto, mis lõikaks absolute-menüü "nurga taha".
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-  const [resetResult, setResetResult] = useState<ResetResult | null>(null);
 
-  useEffect(() => {
-    if (!userLoading && (!user || roleLevel(user.role) < ROLE_LEVELS.admin)) {
-      navigate('/');
-    }
-  }, [user, userLoading, navigate]);
+  // Filtrid tulevad AINULT URL-ist. `filters` on tuletis, mitte koopia —
+  // URL-i kirjutab ainult `seaFilter`.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
 
-  useEffect(() => {
-    if (authToken && user && roleLevel(user.role) >= ROLE_LEVELS.admin) {
-      loadUsers();
-      // Arhiveeritud kaasa: kasutajal võib olla õigus kogule, mis on arhiivis,
-      // ja selle vaikne peitmine teeks õiguse eemaldamise võimatuks.
-      listWorkSets(true).then(setWorkSets).catch(() => setWorkSets([]));
-    }
-  }, [authToken, user]);
-
-  /**
-   * Ühe kasutaja roll ühes kogus. Saadab AINULT selle kogu `access`-kaardi ja
-   * ei puuduta `allowed_collections` ega `edit_collections` välju — kolm
-   * õiguste telge on eraldi ja üks ei tohi teist üle kirjutada (ADR 0031).
-   */
-  const handleWorkSetRoleChange = async (username: string, setId: string, role: SetRole | null) => {
-    setWorkSetUpdating(username);
-    setUsersError(null);
-    try {
-      const changes = accessChanges(workSets, username, { [setId]: role });
-      for (const c of changes) {
-        await setWorkSetAccess(c.setId, c.access, c.revision);
-      }
-      if (changes.length > 0) setWorkSets(await listWorkSets(true));
-    } catch (e) {
-      const status = (e as { status?: number }).status;
-      setUsersError(status === 409 ? t('workSets.conflict') : t('workSets.saveFailed'));
-    } finally {
-      setWorkSetUpdating(null);
-    }
-  };
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     setUsersError(null);
 
@@ -140,166 +87,89 @@ const UsersPage: React.FC = () => {
     } finally {
       setUsersLoading(false);
     }
-  };
+  }, [authToken, t]);
 
-  const handleRoleChange = async (username: string, newRole: string) => {
-    setRoleUpdating(username);
-    setUsersError(null);
-
-    try {
-      const data = await apiPost<UsersResponse>('/admin/users/update-role', {
-        username,
-        new_role: newRole
-      }, { token: authToken });
-
-      if (data.status === 'success') {
-        setUsers(users.map(u =>
-          u.username === username
-            ? { ...u, role: newRole as User['role'] }
-            : u
-        ));
-      } else {
-        setUsersError(data.message || t('users.roleChangeError'));
-      }
-    } catch (e) {
-      console.error('Role change error:', e);
-      setUsersError(t('users.connectionError'));
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
-
-  const handleDeleteUser = async (username: string) => {
-    setDeleteConfirm(null);
-    setRoleUpdating(username);
-    setUsersError(null);
-
-    try {
-      const data = await apiPost<UsersResponse>('/admin/users/delete', {
-        username
-      }, { token: authToken });
-
-      if (data.status === 'success') {
-        setUsers(users.filter(u => u.username !== username));
-      } else {
-        setUsersError(data.message || t('users.deleteError'));
-      }
-    } catch (e) {
-      console.error('Delete user error:', e);
-      setUsersError(t('users.connectionError'));
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
-
-  const handleCollectionsChange = async (username: string, nextAllowedCollections: string[]) => {
-    setCollectionsUpdating(username);
-    setUsersError(null);
-    try {
-      const data = await apiPost<{ status: string; allowed_collections?: string[]; message?: string }>(
-        '/admin/users/update-collections',
-        { username, allowed_collections: nextAllowedCollections },
-        { token: authToken }
-      );
-      if (data.status === 'success') {
-        // Serveri vastus on tõe allikas (server sanitiseerib) — ära kasuta optimistlikku nimekirja
-        setUsers(users.map(u =>
-          u.username === username ? { ...u, allowed_collections: data.allowed_collections || [] } : u
-        ));
-      } else {
-        setUsersError(data.message || t('users.collectionsUpdateFailed'));
-      }
-    } catch (e) {
-      console.error('Collections change error:', e);
-      setUsersError(t('users.collectionsUpdateFailed'));
-    } finally {
-      setCollectionsUpdating(null);
-    }
-  };
-
-  // Kirjutamisulatuse (edit_collections) muutmine — sama muster mis allowed_collections'il:
-  // serveri vastus on tõe allikas. NB: server kustutab muudatusel kasutaja sessioonid
-  // (vana ulatus ei tohi jääda 24h kehtima), kasutaja peab uuesti sisse logima.
-  const handleEditCollectionsChange = async (username: string, nextScope: string[]) => {
-    setCollectionsUpdating(username);
-    setUsersError(null);
-    try {
-      const data = await apiPost<{ status: string; edit_collections?: string[]; message?: string }>(
-        '/admin/users/update-edit-collections',
-        { username, edit_collections: nextScope },
-        { token: authToken }
-      );
-      if (data.status === 'success') {
-        setUsers(users.map(u =>
-          u.username === username ? { ...u, edit_collections: data.edit_collections || [] } : u
-        ));
-      } else {
-        setUsersError(data.message || t('users.collectionsUpdateFailed'));
-      }
-    } catch (e) {
-      console.error('Edit collections update error:', e);
-      setUsersError(t('users.collectionsUpdateFailed'));
-    } finally {
-      setCollectionsUpdating(null);
-    }
-  };
-
-  const handleResetPassword = async (username: string) => {
-    setOpenMenu(null);
-    setRoleUpdating(username);
-    setUsersError(null);
-    setResetResult(null);
-    try {
-      const data = await apiPost<{
-        status: string; reset_url?: string; username?: string; name?: string; message?: string;
-        mail_sent?: boolean; mail_error?: string | null;
-      }>('/admin/users/reset-password', { username }, { token: authToken });
-      if (data.status === 'success' && data.reset_url) {
-        setResetResult({
-          username: data.username || username,
-          name: data.name || '',
-          reset_url: data.reset_url,
-          mail_sent: data.mail_sent,
-          mail_error: data.mail_error,
-        });
-      } else {
-        setUsersError(data.message || t('users.resetError'));
-      }
-    } catch (e) {
-      console.error('Reset password error:', e);
-      setUsersError(t('users.resetError'));
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
-
-  // Sulge kebab-menüü klõpsul mujale või kerimisel (fixed-positsioon triiviks muidu ankrust eemale)
   useEffect(() => {
-    if (!openMenu && !deleteConfirm) return;
-    const close = () => { setOpenMenu(null); setDeleteConfirm(null); };
-    document.addEventListener('click', close);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => {
-      document.removeEventListener('click', close);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [openMenu, deleteConfirm]);
-
-  // Arvuta fixed-positsioon ankru järgi: joondu nupu paremasse serva, keera üles kui aken on all otsas
-  const popoverStyle = (width: number, estHeight: number): React.CSSProperties => {
-    const margin = 8;
-    const rect = anchorRect;
-    if (!rect) return { display: 'none' };
-    let left = rect.right - width;
-    if (left < margin) left = margin;
-    let top = rect.bottom + 4;
-    if (top + estHeight > window.innerHeight - margin) {
-      top = Math.max(margin, rect.top - estHeight - 4);
+    if (!userLoading && (!user || roleLevel(user.role) < ROLE_LEVELS.admin)) {
+      navigate('/');
     }
-    return { position: 'fixed', top, left, width };
+  }, [user, userLoading, navigate]);
+
+  useEffect(() => {
+    if (authToken && user && roleLevel(user.role) >= ROLE_LEVELS.admin) {
+      loadUsers();
+      // Arhiveeritud kaasa: kasutajal võib olla õigus kogule, mis on arhiivis,
+      // ja selle vaikne peitmine teeks õiguse eemaldamise võimatuks.
+      listWorkSets(true).then(setWorkSets).catch(() => setWorkSets([]));
+    }
+  }, [authToken, user, loadUsers]);
+
+  useEffect(() => {
+    getUserActivity()
+      .then(a => { setActivity(a); setActivityFailed(false); })
+      // Aktiivsuse viga EI blokeeri kasutajahaldust ega tähenda tegevusetust:
+      // kriips tähendaks „ei ole midagi teinud" ja oleks siin vale vastus.
+      .catch(() => { setActivity(null); setActivityFailed(true); });
+  }, []);
+
+  /**
+   * Ainus koht, mis URL-i kirjutab. Admin-filtrid EI puutu `CollectionContext`-i
+   * ega aktiivset kogu (ADR 0038): need on haldusloendi filtrid, mitte koguvalik.
+   * `replace: true` — iga klahvivajutus ei tohi tekitada ajaloo-kirjet.
+   */
+  const seaFilter = (muutus: Partial<UserFilters>) => {
+    setSearchParams(paramsFromFilters({ ...filters, ...muutus }), { replace: true });
+    setAktiivneRida(0);
   };
+
+  const kustutaFiltrid = () => {
+    setSearchParams(paramsFromFilters(EMPTY_FILTERS), { replace: true });
+    setAktiivneRida(0);
+  };
+
+  const kogudValik = useMemo(
+    () => Object.entries(collections)
+      .map(([id, c]) => ({ id, name: c.name?.[lang] || c.name?.et || id }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'et')),
+    [collections, lang],
+  );
+
+  const workSetNimi = (ws: WorkSetSummary) =>
+    ws.name[lang] || ws.name.et || ws.name.en || ws.id;
+
+  const workSetAccess = useMemo(
+    () => Object.fromEntries(
+      workSets.map(ws => [ws.id, (ws.access || {}) as Record<string, string>])),
+    [workSets],
+  );
+
+  const nahtavad = useMemo(
+    () => filterUsers(users, filters, workSetAccess), [users, filters, workSetAccess]);
+
+  // Indeks ei tohi jääda üle loendi lõpu (nt kasutaja kustutati teises vahekaardis
+  // või filter lühendas loendit) — muidu osutaks Enter olematule reale.
+  const aktiivne = nahtavad.length === 0
+    ? 0
+    : Math.max(0, Math.min(aktiivneRida, nahtavad.length - 1));
+
+  useEffect(() => {
+    aktiivneRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [aktiivne]);
+
+  const klahv = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setAktiivneRida(i => Math.min(i + 1, nahtavad.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setAktiivneRida(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && nahtavad[aktiivne]) {
+      navigate(`/admin/users/${nahtavad[aktiivne].username}`);
+    }
+  };
+
+  const filterSeatud = Boolean(
+    filters.q || filters.role || filters.rightsCollection || filters.rightsWorkSet);
 
   if (userLoading || !user) {
     return (
@@ -310,6 +180,17 @@ const UsersPage: React.FC = () => {
   }
 
   if (roleLevel(user.role) < ROLE_LEVELS.admin) return null;
+
+  const selectKlass =
+    'text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  // Päis ja read jagavad SAMA veerumalli — flex-reas ei lange sildid andmetega
+  // kokku ja valesti joondatud päis eksitab rohkem, kui päise puudumine.
+  // Mobiilis on kolm veergu: `hidden` element ei hõiva grid-lahtrit, seega
+  // e-post ja viimane muudatus kaovad koos oma veeruga.
+  const ridaKlass = 'grid items-center gap-x-3 px-3 '
+    + 'grid-cols-[minmax(0,1fr)_6rem_7.5rem] '
+    + 'sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,12rem)_7.5rem_8.5rem]';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -323,7 +204,7 @@ const UsersPage: React.FC = () => {
         <section>
           <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <Users size={20} className="text-primary-600" />
-            {t('users.title')} ({users.length})
+            {t('users.title')}
           </h2>
 
           {usersError && (
@@ -332,9 +213,73 @@ const UsersPage: React.FC = () => {
             </div>
           )}
 
-          {resetResult && (
-            <ResetPasswordResult result={resetResult} onClose={() => setResetResult(null)} />
+          {activityFailed && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              {t('users.list.activityFailed')}
+            </div>
           )}
+
+          <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              autoFocus
+              value={filters.q}
+              onChange={e => seaFilter({ q: e.target.value })}
+              onKeyDown={klahv}
+              placeholder={t('users.list.searchPlaceholder')}
+              className={`${selectKlass} flex-1 min-w-[12rem]`}
+              aria-label={t('users.list.searchPlaceholder')}
+            />
+            <select
+              value={filters.role}
+              onChange={e => seaFilter({ role: e.target.value })}
+              className={selectKlass}
+              aria-label={t('users.role')}
+            >
+              <option value="">{t('users.list.allRoles')}</option>
+              {Object.keys(ROLE_LEVELS).map(r => (
+                <option key={r} value={r}>{t(`common:roles.${r}`)}</option>
+              ))}
+            </select>
+            <select
+              value={filters.rightsCollection}
+              onChange={e => seaFilter({ rightsCollection: e.target.value })}
+              className={selectKlass}
+              aria-label={t('users.restrictedCollections')}
+            >
+              <option value="">{t('users.list.allCollections')}</option>
+              {kogudValik.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {workSets.length > 0 && (
+              <select
+                value={filters.rightsWorkSet}
+                onChange={e => seaFilter({ rightsWorkSet: e.target.value })}
+                className={selectKlass}
+                aria-label={t('workSets.title')}
+              >
+                <option value="">{t('users.list.allWorkSets')}</option>
+                {workSets.map(ws => (
+                  <option key={ws.id} value={ws.id}>
+                    {workSetNimi(ws)}{ws.status === 'archived' ? ` (${t('workSets.statusArchived')})` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {filterSeatud && (
+              <button
+                type="button"
+                onClick={kustutaFiltrid}
+                className="text-sm text-gray-600 hover:text-gray-900 underline"
+              >
+                {t('users.list.clearFilters')}
+              </button>
+            )}
+            <span className="ml-auto text-xs text-gray-500">
+              {t('users.list.count', { shown: nahtavad.length, total: users.length })}
+            </span>
+          </div>
 
           {usersLoading ? (
             <div className="flex justify-center py-8">
@@ -344,291 +289,60 @@ const UsersPage: React.FC = () => {
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
               {t('users.empty')}
             </div>
+          ) : nahtavad.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+              <p>{t('users.list.noMatches')}</p>
+              <button
+                type="button"
+                onClick={kustutaFiltrid}
+                className="mt-2 text-sm text-primary-600 hover:underline"
+              >
+                {t('users.list.clearFilters')}
+              </button>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {users.map((u) => {
-                const isCurrentUser = u.username === user?.username;
-                const isProcessing = roleUpdating === u.username;
-                const canReset = isCurrentUser || canManageUser(user.role, u.role);
-                const canManage = canManageUser(user.role, u.role);
-                const canDelete = !isCurrentUser && canManage;
-
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className={`${ridaKlass} py-1.5 text-xs font-medium text-gray-500 border-b border-gray-200`}>
+                <span className="truncate">{t('users.name')}</span>
+                <span className="truncate">{t('users.username')}</span>
+                <span className="hidden sm:block truncate">{t('users.email')}</span>
+                <span className="truncate">{t('users.role')}</span>
+                <span className="hidden sm:block truncate text-right">{t('users.list.lastChange')}</span>
+              </div>
+              <ul className="divide-y divide-gray-100">
+              {nahtavad.map((u, i) => {
+                const onIse = u.username === user.username;
                 return (
-                  <div
+                  <li
                     key={u.username}
-                    className={`relative flex flex-col rounded-lg border p-4 transition-colors ${
-                      isCurrentUser ? 'border-primary-300 bg-primary-50' : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
+                    ref={i === aktiivne ? aktiivneRef : undefined}
+                    className={i === aktiivne ? 'ring-2 ring-primary-500 rounded' : undefined}
                   >
-                    {/* Identiteet: nimi + kasutajanimi + e-post; tegevuste kebab paremas ülanurgas */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Link to={`/admin/users/${u.username}`} className="font-medium text-gray-900 truncate hover:underline">
-                            {u.name}
-                          </Link>
-                          {isCurrentUser && (
-                            <span className="flex-shrink-0 text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
-                              {t('users.you')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 font-mono text-xs text-gray-500 truncate">{u.username}</div>
-                        <div className="text-sm text-gray-600 truncate">{u.email || '-'}</div>
-                      </div>
-
-                      {(canReset || canDelete) && (
-                        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => {
-                              setDeleteConfirm(null);
-                              if (openMenu === u.username) {
-                                setOpenMenu(null);
-                              } else {
-                                setAnchorRect(e.currentTarget.getBoundingClientRect());
-                                setOpenMenu(u.username);
-                              }
-                            }}
-                            disabled={isProcessing}
-                            className="p-1 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-50"
-                            aria-haspopup="menu"
-                            aria-expanded={openMenu === u.username}
-                            title={t('users.actionsMenu')}
-                          >
-                            {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <MoreVertical size={16} />}
-                          </button>
-                          {openMenu === u.username && createPortal(
-                            <div
-                              role="menu"
-                              style={popoverStyle(176, 96)}
-                              className="z-50 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-left"
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => { if (e.key === 'Escape') setOpenMenu(null); }}
-                            >
-                              {canReset && (
-                                <button
-                                  role="menuitem"
-                                  onClick={() => handleResetPassword(u.username)}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                >
-                                  <KeyRound size={15} /> {t('users.resetPassword')}
-                                </button>
-                              )}
-                              {canDelete && (
-                                <button
-                                  role="menuitem"
-                                  onClick={() => { setOpenMenu(null); setDeleteConfirm(u.username); }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 size={15} /> {t('users.delete')}
-                                </button>
-                              )}
-                            </div>,
-                            document.body
-                          )}
-                          {deleteConfirm === u.username && createPortal(
-                            <div
-                              style={popoverStyle(224, 96)}
-                              className="z-50 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-left"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <p className="text-xs text-red-600 mb-2">{t('users.confirmDelete')}</p>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleDeleteUser(u.username)}
-                                  disabled={isProcessing}
-                                  className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
-                                >
-                                  {isProcessing ? <Loader2 size={12} className="animate-spin" /> : t('users.yes')}
-                                </button>
-                                <button
-                                  onClick={() => setDeleteConfirm(null)}
-                                  className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
-                                >
-                                  {t('users.no')}
-                                </button>
-                              </div>
-                            </div>,
-                            document.body
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Tähtsad väljad: roll + piiratud kogud */}
-                    <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500">{t('users.role')}</span>
-                        {isCurrentUser || !canManage ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"
-                            title={!isCurrentUser && !canManage ? t('users.noPermissionManage') : undefined}
-                          >
-                            {t(`common:roles.${u.role}`)}
+                    <Link
+                      to={`/admin/users/${u.username}`}
+                      className={`${ridaKlass} py-2 hover:bg-gray-50`}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium text-gray-900 truncate">{u.name}</span>
+                        {onIse && (
+                          <span className="flex-shrink-0 text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
+                            {t('users.you')}
                           </span>
-                        ) : (
-                          <select
-                            value={u.role}
-                            onChange={(e) => handleRoleChange(u.username, e.target.value)}
-                            disabled={isProcessing}
-                            className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-                          >
-                            {assignableRoles(user.role).map((r) => (
-                              <option key={r} value={r}>{t(`common:roles.${r}`)}</option>
-                            ))}
-                          </select>
                         )}
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">
-                          {t('users.restrictedCollections')}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          {(() => {
-                            const assigned = u.allowed_collections || [];
-                            const editable = canManage;
-                            const isUpdating = collectionsUpdating === u.username;
-                            // Kogud, mida kasutajal veel pole (lisamise dropdowni jaoks)
-                            const available = restrictedCollections.filter(rc => !assigned.includes(rc.id));
-
-                            // Read-only vaade (mitte-hallatav kasutaja / iseennast)
-                            if (!editable) {
-                              return assigned.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {assigned.map((c) => (
-                                    <span key={c} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                                      {collectionName(c)}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-sm text-gray-400">—</span>
-                              );
-                            }
-
-                            // Muudetav vaade: chip'id (× eemalda) + lisamise dropdown
-                            return (
-                              <div className="flex flex-wrap items-center gap-1">
-                                {assigned.length > 0 ? (
-                                  assigned.map((c) => (
-                                    <span key={c} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                                      {collectionName(c)}
-                                      <button
-                                        type="button"
-                                        onClick={() => handleCollectionsChange(u.username, assigned.filter(x => x !== c))}
-                                        disabled={isUpdating}
-                                        className="hover:text-blue-900 disabled:opacity-50"
-                                        title={t('users.removeCollection', { name: collectionName(c) })}
-                                        aria-label={t('users.removeCollection', { name: collectionName(c) })}
-                                      >
-                                        <X size={12} />
-                                      </button>
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-sm text-gray-400">—</span>
-                                )}
-                                {isUpdating && <Loader2 size={12} className="animate-spin text-gray-400" />}
-                                {restrictedCollections.length === 0 ? (
-                                  <span className="text-xs text-gray-400">{t('users.noRestrictedCollections')}</span>
-                                ) : available.length > 0 ? (
-                                  <select
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) handleCollectionsChange(u.username, [...assigned, e.target.value]);
-                                    }}
-                                    disabled={isUpdating}
-                                    className="text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-                                  >
-                                    <option value="">+ {t('users.addCollection')}</option>
-                                    {available.map((rc) => (
-                                      <option key={rc.id} value={rc.id}>{rc.name}</option>
-                                    ))}
-                                  </select>
-                                ) : null}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Kirjutamisulatus — ainult contributor'itel; kehtib KÕIGI kollektsioonide,
-                          mitte ainult piiratud kogude kohta */}
-                      {u.role === 'contributor' && (
-                        <div className="flex items-start gap-2">
-                          <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">
-                            {t('users.editCollections')}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap gap-2">
-                              {allCollections.map((c) => (
-                                <label key={c.id} className="flex items-center gap-1 text-xs">
-                                  <input
-                                    type="checkbox"
-                                    disabled={!canManage || collectionsUpdating === u.username}
-                                    checked={(u.edit_collections || []).includes(c.id)}
-                                    onChange={(e) => {
-                                      const cur = u.edit_collections || [];
-                                      handleEditCollectionsChange(
-                                        u.username,
-                                        e.target.checked ? [...cur, c.id] : cur.filter((x) => x !== c.id)
-                                      );
-                                    }}
-                                  />
-                                  {c.name}
-                                </label>
-                              ))}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">{t('users.editCollectionsHint')}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Kolmas õiguste telg: töökollektsioonid (#354). Eraldi
-                          lugemisõigusest ja toimetamisulatusest — kogu ligipääs
-                          EI anna ega võta teoste lugemisõigust. */}
-                      {workSets.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">
-                            {t('workSets.userAccess')}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-col gap-1">
-                              {workSets.map((ws) => (
-                                <label key={ws.id} className="flex items-center gap-2 text-xs">
-                                  <select
-                                    value={(ws.access || {})[u.username] ?? ''}
-                                    disabled={!canManage || !ws.can_manage || workSetUpdating === u.username}
-                                    onChange={(e) => handleWorkSetRoleChange(
-                                      u.username, ws.id,
-                                      (e.target.value || null) as SetRole | null,
-                                    )}
-                                    className="text-xs border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-                                  >
-                                    <option value="">{t('workSets.none')}</option>
-                                    <option value="viewer">{t('workSets.viewer')}</option>
-                                    <option value="manager">{t('workSets.manager')}</option>
-                                  </select>
-                                  <span className="truncate">
-                                    {ws.name[wsLang] || ws.name.et || ws.name.en || ws.id}
-                                    {ws.status === 'archived' && ` (${t('workSets.statusArchived')})`}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">{t('workSets.userAccessHint')}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Vähemoluline: loodud-kuupäev */}
-                    <div className="mt-3 text-xs text-gray-400">
-                      {t('users.created')}: {u.created_at ? formatDateTime(u.created_at) : '-'}
-                    </div>
-                  </div>
+                      </span>
+                      <span className="font-mono text-xs text-gray-500 truncate">{u.username}</span>
+                      <span className="hidden sm:block text-sm text-gray-600 truncate">{u.email || '-'}</span>
+                      <span className="truncate text-xs text-gray-500">{t(`common:roles.${u.role}`)}</span>
+                      <span className="hidden sm:block text-right text-xs text-gray-400 whitespace-nowrap">
+                        {activity
+                          ? (activity[u.username] ? formatDateTime(activity[u.username]) : '—')
+                          : ''}
+                      </span>
+                    </Link>
+                  </li>
                 );
               })}
+              </ul>
             </div>
           )}
         </section>
