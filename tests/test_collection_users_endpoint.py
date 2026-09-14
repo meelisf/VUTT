@@ -77,3 +77,34 @@ def test_editor_ei_paase_ligi(client, login, kogud):
     r = client.get("/admin/collections/kinnine/users", headers=_auth(token))
     # require_role("admin") ebaõnnestumisel tõstab deps.get_user HTTPException(401)
     assert r.status_code == 401
+
+
+def test_put_lukkab_allowed_usersi_tagasi(client, login, backend_env, kogud):
+    """Vana klient ei tohi saada vaikset eduvastust (ADR 0043 p2)."""
+    token = login("superadmin", "superpass")
+    r = client.put("/admin/collections/kinnine",
+                   json={"allowed_users": ["contrib"]},
+                   headers=_auth(token))
+    assert r.status_code == 400
+    assert "allowed_users" in str(r.json().get("detail", r.text))
+
+
+def test_keeldumine_kaib_ENNE_korvalmojusid(client, login, backend_env, kogud):
+    """Seaded ei tohi salvestuda, kui pakett kannab keelatud välja."""
+    token = login("superadmin", "superpass")
+    enne = json.loads(kogud.read_text())["kinnine"].get("color")
+
+    client.put("/admin/collections/kinnine",
+               json={"color": "rose", "allowed_users": ["contrib"]},
+               headers=_auth(token))
+
+    assert json.loads(kogud.read_text())["kinnine"].get("color") == enne
+
+
+def test_put_ilma_allowed_usersita_toimib(client, login, backend_env, kogud):
+    token = login("superadmin", "superpass")
+    r = client.put("/admin/collections/kinnine",
+                   json={"color": "rose"},
+                   headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert json.loads(kogud.read_text())["kinnine"]["color"] == "rose"

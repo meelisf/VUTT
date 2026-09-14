@@ -101,6 +101,16 @@ def delete_archive(archive_id: str, force: bool = False, user=Depends(require_ro
 async def admin_update_collection(collection_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("superadmin"))):
     """Uuendab kollektsiooni description, description_long, color ja visibility välju."""
     body = await request.json()
+
+    # Õigused liikusid eraldi delta-toimingule (ADR 0043 p2):
+    # POST /admin/users/collection-rights. Vana väli lükatakse tagasi ENNE
+    # kõrvalmõjusid, et vana klient ei saaks vaikset eduvastust.
+    if "allowed_users" in body:
+        raise HTTPException(
+            status_code=400,
+            detail="allowed_users ei ole enam selle endpoint'i osa — "
+                   "kasuta POST /admin/users/collection-rights")
+
     description = body.get("description")      # { et, en }
     description_long = body.get("description_long")  # { et, en }
     color = body.get("color")  # string või None
@@ -157,33 +167,6 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     new_visibility = data[collection_id].get("visibility", "public")
     if visibility and old_visibility != new_visibility:
         background_tasks.add_task(update_collection_is_public_async, collection_id, new_visibility == "public")
-
-    # allowed_collections: kasutajate ligipääsu haldus kollektsiooni tasandil.
-    # ÜLEMINEK: see haru eemaldatakse etapis 2 koos kliendiga (ADR 0043 p2);
-    # siin ainult lukustatakse, et jagatud cache-objekt ei muutuks teise lõime
-    # serialiseerimise ajal.
-    allowed_users_param = body.get("allowed_users")
-    if allowed_users_param is not None:
-        def _kirjuta_allowed_users():
-            changed = []
-            with users_transaction() as users_data:
-                for username, udata in users_data.items():
-                    current = set(udata.get("allowed_collections", []))
-                    updated = set(current)
-                    if username in allowed_users_param:
-                        updated.add(collection_id)
-                    else:
-                        updated.discard(collection_id)
-                    if updated != current:
-                        changed.append(username)
-                    users_data[username]["allowed_collections"] = list(updated)
-                save_users(users_data)
-            return changed
-
-        changed_users = await run_in_threadpool(_kirjuta_allowed_users)
-        # Invalideeri muutunud kasutajate sessioonid (Leid I) — luku VÄLJAS.
-        for username in changed_users:
-            delete_user_sessions(username)
 
     return {"status": "success"}
 
