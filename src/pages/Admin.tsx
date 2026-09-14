@@ -95,7 +95,6 @@ const Admin: React.FC = () => {
       icon: <Library size={18} className="text-violet-600" />,
       group: t('admin:groups.settings'),
       href: '/admin/collections',
-      superadminOnly: true,
     },
     {
       key: 'changes',

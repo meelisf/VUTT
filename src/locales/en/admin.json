@@ -99,6 +99,7 @@
   "collections": {
     "tab": "Collections",
     "title": "Collection descriptions",
+    "superadminOnlyHint": "Only a superadmin can change collection settings and structure. Here you can see the access of the selected collection.",
     "selectCollection": "Select collection...",
     "description": "Short description",
     "descriptionLong": "Long description",

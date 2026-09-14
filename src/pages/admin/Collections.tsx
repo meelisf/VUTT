@@ -12,8 +12,10 @@ const Collections: React.FC = () => {
   const { user, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
 
+  // Ligipääs ja loend on admin+; kogu SEADETE muutmine jääb superadminile
+  // (ADR 0043 p4). Peitmine EI OLE autoriseerimine — server kontrollib edasi.
   useEffect(() => {
-    if (!userLoading && (!user || !isAtLeast(user.role, 'superadmin'))) {
+    if (!userLoading && (!user || !isAtLeast(user.role, 'admin'))) {
       navigate('/');
     }
   }, [user, userLoading, navigate]);
@@ -26,7 +28,7 @@ const Collections: React.FC = () => {
     );
   }
 
-  if (!isAtLeast(user.role, 'superadmin')) return null;
+  if (!isAtLeast(user.role, 'admin')) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -38,7 +40,7 @@ const Collections: React.FC = () => {
         </Link>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <CollectionEditor />
+          <CollectionEditor canEditSettings={isAtLeast(user.role, 'superadmin')} />
         </div>
       </div>
     </div>
