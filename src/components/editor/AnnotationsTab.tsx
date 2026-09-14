@@ -8,6 +8,7 @@ import CommentHistoryPanel from './CommentHistoryPanel';
 import PageTagsPanel from './PageTagsPanel';
 import WorkInfoPanel from './WorkInfoPanel';
 import WorkTagsPanel from './WorkTagsPanel';
+import WorkSetsPanel from './WorkSetsPanel';
 import TextAnnotationsPanel from './TextAnnotationsPanel';
 
 interface AnnotationsTabProps {
@@ -80,6 +81,10 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
         lang={lang}
         onOpenMetaModal={onOpenMetaModal}
       />
+
+      {/* Töökollektsioonid on „kõrgema taseme märksõna" — kuraatori, mitte
+          sisu tasandi väide teose kohta. Seepärast teose märksõnade EES. */}
+      <WorkSetsPanel workId={work?.work_id} lang={lang} readOnly={readOnly} />
 
       <WorkTagsPanel work={work} lang={lang} />
 

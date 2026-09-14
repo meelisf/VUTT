@@ -209,7 +209,11 @@
     "createName": "Name of the new work collection",
     "createFailed": "Creating failed",
     "selectedWorks": "Selected works: {{count}}",
-    "limitReachedShort": "The collection is full"
+    "limitReachedShort": "The collection is full",
+    "workPanelTitle": "Work collections",
+    "notInAny": "This work is not in any work collection",
+    "removeFromSet": "Remove from collection",
+    "loadFailed": "Loading work collections failed"
   },
   "error": {
     "unknown": "Error",

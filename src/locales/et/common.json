@@ -209,7 +209,11 @@
     "createName": "Uue töökollektsiooni nimi",
     "createFailed": "Loomine ebaõnnestus",
     "selectedWorks": "Valitud teoseid: {{count}}",
-    "limitReachedShort": "Kogu on täis"
+    "limitReachedShort": "Kogu on täis",
+    "workPanelTitle": "Töökollektsioonid",
+    "notInAny": "Teos ei kuulu ühtegi töökollektsiooni",
+    "removeFromSet": "Eemalda kogust",
+    "loadFailed": "Töökollektsioonide laadimine ebaõnnestus"
   },
   "error": {
     "unknown": "Viga",
