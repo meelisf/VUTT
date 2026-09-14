@@ -177,7 +177,28 @@
     "noMembers": "The collection is empty",
     "removeMember": "Remove from collection",
     "hiddenMembers": "{{count}} members are not visible to you",
-    "loadMembersFailed": "Loading members failed"
+    "loadMembersFailed": "Loading members failed",
+    "accessPanel": {
+      "title": "Access",
+      "explain": "Rights granted here apply to this work set only.",
+      "noRightsGranted": "A work set right does not grant any additional right to read works or edit texts. The user sees the works they are already allowed to see.",
+      "adminsExplain": "Admins and superadmins manage all work sets by role — they do not need to be added here.",
+      "publicExplain": "This set is public: no personal viewer entry is needed for browsing. Existing entries remain and take effect again if the set is later restricted.",
+      "archivedExplain": "This set is archived. Rights remain in effect and can still be changed.",
+      "searchPlaceholder": "Search by name, username or email",
+      "noMatches": "No users found",
+      "addPerson": "Add user",
+      "roleBased": "Right derives from role",
+      "deletedUser": "Deleted user ({{username}})",
+      "remove": "Remove",
+      "noEntries": "No entries",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "conflictReload": "The set changed meanwhile. The current state has been loaded; review your changes and save again.",
+      "readOnlyHint": "Sharing rights is an admin action. This is the current access for this set.",
+      "serverState": "Current state on the server:"
+    }
   },
   "cards": {
     "registrations": "Registrations",
