@@ -89,15 +89,6 @@ async def _get_user(request: Request, min_role: str = "contributor"):
     return user
 
 
-async def _optional_user(request: Request):
-    """Loeb tokeni kui on olemas, aga ei nõua autentimist."""
-    token = request.query_params.get("token")
-    if not token:
-        return None
-    user, error = require_token({"auth_token": token}, min_role="contributor")
-    return None if error else user
-
-
 def _require_role(role: str):
     async def dep(request: Request):
         return await _get_user(request, min_role=role)
@@ -117,10 +108,11 @@ def _resolve_work_set_ids(set_id, request: Request):
     kogu isikuloendi ja oleks vaikne leke. Sama vastus nagu puuduval kogul —
     tundmatu link ei avalda kogu olemasolu.
 
-    Kasutaja loetakse `deps.optional_user`-iga, MITTE selle mooduli
-    `_optional_user`-iga: viimane loeb tokeni ainult query-parameetrist
-    (`?token=`), aga klient saadab `Authorization`-päise. Siin oleks vahe
-    vaikne ligipääsu-eitus.
+    Kasutaja loetakse `deps.optional_user`-iga — see on ainus kutsuja-lugeja,
+    mida selles moodulis autentimata teel kasutada tohib (#356). Varem oli siin
+    oma `_optional_user`, mis luges tokeni ainult query-parameetrist (`?token=`),
+    aga klient saadab `Authorization`-päise: tulemus oli vaikne ligipääsu-eitus.
+    Valvur: `tests/test_token_lugeja_uks_reegel.py`.
     """
     if not set_id:
         return None
@@ -162,7 +154,6 @@ def prosopography_list(
     work_set: str = None,
     limit: int = 48,
     offset: int = 0,
-    user=Depends(_optional_user),
 ):
     """Tagastab isikute nimekirja prosopography_index.json-st, pagineeritult."""
     id_list = [i for i in ids.split(",") if i] if ids else None
@@ -243,7 +234,6 @@ def prosopography_map(
     related_to: str = None,
     collection: str = None,
     work_set: str = None,
-    user=Depends(_optional_user),
 ):
     """Tagastab koordinaadiga isikud päritolukoha järgi grupeeritud markeritena."""
     id_list = [i for i in ids.split(",") if i] if ids else None
@@ -928,7 +918,6 @@ async def places_put(
 @router.get("/{person_id:path}")
 def prosopography_get(
     person_id: str,
-    user=Depends(_optional_user),
 ):
     """Tagastab ühe isiku täisandmed + seotud teosed pöördindeksist."""
     person = get_person_with_works(person_id)
