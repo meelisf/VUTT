@@ -45,6 +45,13 @@ _work_ids_cache = {}
 _work_info_cache = {}
 _repo_init_lock = threading.Lock()
 
+# Kasutajate viimane muudatus (#318). Kaart on kõigile adminidele SAMA, seega
+# globaalne TTL-vahemälu; kasutajapõhist vastust siin ei hoita.
+ACTIVITY_TTL_SECONDS = 300
+_activity_cache = None       # autor -> ISO-aeg
+_activity_cache_at = None
+_activity_lock = threading.Lock()
+
 
 def _decode_git_path(fp: str) -> str:
     """Dekodeerib git-i tsiteeritud tee.
@@ -935,6 +942,72 @@ def _read_commit_meta(repo, max_commits=None, username=None, paths=None):
         args.append("--")
         args.extend(paths if isinstance(paths, (list, tuple)) else [paths])
     return _parse_commit_meta(repo.git.log(*args))
+
+
+def _reset_activity_cache():
+    """Ainult testidele: TTL-vahemälu nullimine."""
+    global _activity_cache, _activity_cache_at
+    with _activity_lock:
+        _activity_cache = None
+        _activity_cache_at = None
+
+
+def _read_author_dates(repo):
+    """(autor, ISO-aeg) paarid ÜHE git-protsessiga, uuemast vanemani.
+
+    Commiti sõnumit siin ei loeta — vaja on ainult „kes, millal". Mõõdetud
+    tootmises: 12 060 commiti läbimine ~0,13 s, seega piisab ühest korrast
+    TTL kohta ja partii-akent (`--max-count`) pole vaja.
+    """
+    out = repo.git.log(f"--format=%an{_COMMIT_FIELD_SEP}%cI")
+    paarid = []
+    for rida in out.split("\n"):
+        if _COMMIT_FIELD_SEP not in rida:
+            continue
+        autor, iso = rida.split(_COMMIT_FIELD_SEP, 1)
+        iso = iso.strip()
+        if autor and iso:
+            paarid.append((autor, iso))
+    return paarid
+
+
+def _latest_by_author(paarid):
+    """Autor → uusim aeg. Git log on uuemast vanemani, seega esimene võidab.
+
+    „Automaatne" on taustatee autor (vt `save_config_with_git`) — see ei ole
+    ühegi inimese muudatus.
+    """
+    out = {}
+    for autor, iso in paarid:
+        if autor == "Automaatne":
+            continue
+        if autor not in out:
+            out[autor] = iso
+    return out
+
+
+def get_user_activity(usernames):
+    """username → viimase commiti ISO-aeg; puuduv vaste jääb kaardist välja.
+
+    Vaste leitakse TÄPSE kasutajanime järgi: VUTT-i commitides on `%an`
+    kasutajanimi (vt `save_page_to_git`). Ligikaudne vaste (git `--author`
+    on substring) annaks vale inimese aktiivsuse.
+
+    Viga EI muutu tühjaks kaardiks — tühi kaart tähendaks „keegi ei ole midagi
+    teinud" ja oleks katkisest git-ist eristamatu. Kutsuja otsustab, kuidas
+    seda kuvada.
+    """
+    global _activity_cache, _activity_cache_at
+    with _activity_lock:
+        vana = (_activity_cache is None or _activity_cache_at is None
+                or (datetime.now() - _activity_cache_at).total_seconds()
+                > ACTIVITY_TTL_SECONDS)
+        if vana:
+            repo = get_or_init_repo()
+            _activity_cache = _latest_by_author(_read_author_dates(repo))
+            _activity_cache_at = datetime.now()
+        kaart = _activity_cache
+    return {u: kaart[u] for u in usernames if u in kaart}
 
 
 def _get_changed_paths_by_commit(repo, max_commits, username=None):

@@ -37,6 +37,7 @@ const PersonDetailPage = lazyRetry(() => import('./prosopography/pages/PersonDet
 const PersonEditPage = lazyRetry(() => import('./prosopography/pages/PersonEditPage'));
 const AdminRegistrations = lazyRetry(() => import('./pages/admin/Registrations'));
 const AdminUsers = lazyRetry(() => import('./pages/admin/Users'));
+const AdminUserDetail = lazyRetry(() => import('./pages/admin/UserDetail'));
 const AdminTrash = lazyRetry(() => import('./pages/admin/Trash'));
 const AdminCollections = lazyRetry(() => import('./pages/admin/Collections'));
 const AdminMaintenance = lazyRetry(() => import('./pages/admin/Maintenance'));
@@ -105,6 +106,11 @@ const router = createBrowserRouter([
   {
     path: "/admin/users",
     element: <Lazy><AdminUsers /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/users/:username",
+    element: <Lazy><AdminUserDetail /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {

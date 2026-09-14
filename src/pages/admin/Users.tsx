@@ -9,9 +9,6 @@ import {
   ChevronLeft,
   MoreVertical,
   KeyRound,
-  Copy,
-  CheckCircle,
-  Mail,
   X
 } from 'lucide-react';
 import Header from '../../components/Header';
@@ -23,6 +20,8 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { getWritableCollectionOptions } from '../../services/collectionService';
 import { apiPost } from '../../services/apiClient';
 import { ROLE_LEVELS, canManageUser, assignableRoles, roleLevel } from '../../utils/roleUtils';
+import { formatDateTime } from '../../utils/formatDateTime';
+import ResetPasswordResult, { ResetResult } from './ResetPasswordResult';
 
 interface User {
   username: string;
@@ -84,14 +83,7 @@ const UsersPage: React.FC = () => {
   // Ankru-ristkülik portaliga renderdatud menüü/kinnituse positsioneerimiseks.
   // Vajalik, sest tabeli ümbris on overflow-x-auto, mis lõikaks absolute-menüü "nurga taha".
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-  const [resetResult, setResetResult] = useState<{
-    username: string; name: string; reset_url: string;
-    // Saatmise tulemus (#298). `undefined` = vana backend, mis ei saatnud üldse.
-    mail_sent?: boolean; mail_error?: string | null;
-  } | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
-  // Saadetud kirja korral on taastelink peidus — see avab ta tagasi.
-  const [showResetLink, setShowResetLink] = useState(false);
+  const [resetResult, setResetResult] = useState<ResetResult | null>(null);
 
   useEffect(() => {
     if (!userLoading && (!user || roleLevel(user.role) < ROLE_LEVELS.admin)) {
@@ -257,8 +249,6 @@ const UsersPage: React.FC = () => {
     setRoleUpdating(username);
     setUsersError(null);
     setResetResult(null);
-    setLinkCopied(false);
-    setShowResetLink(false);
     try {
       const data = await apiPost<{
         status: string; reset_url?: string; username?: string; name?: string; message?: string;
@@ -280,14 +270,6 @@ const UsersPage: React.FC = () => {
       setUsersError(t('users.resetError'));
     } finally {
       setRoleUpdating(null);
-    }
-  };
-
-  const copyResetLink = () => {
-    if (resetResult) {
-      navigator.clipboard.writeText(`${window.location.origin}${resetResult.reset_url}`);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
     }
   };
 
@@ -317,16 +299,6 @@ const UsersPage: React.FC = () => {
       top = Math.max(margin, rect.top - estHeight - 4);
     }
     return { position: 'fixed', top, left, width };
-  };
-
-  const formatDate = (isoString: string) => {
-    return new Date(isoString).toLocaleDateString('et-EE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   if (userLoading || !user) {
@@ -361,63 +333,7 @@ const UsersPage: React.FC = () => {
           )}
 
           {resetResult && (
-            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <h3 className="font-medium text-green-800">{t('users.resetLinkGenerated')}</h3>
-                  <p className="text-sm text-green-700 mt-1">
-                    {resetResult.name} (<span className="font-mono">{resetResult.username}</span>)
-                  </p>
-                  <p className="text-xs text-green-700 mt-1">{t('users.resetLinkHint')}</p>
-                  {/* Saatmise tulemus. Link ülal kehtib kõigil kolmel juhul —
-                      teade puudutab ainult edasitoimetamist. */}
-                  {resetResult.mail_sent === true && (
-                    <p className="text-xs text-green-700 mt-1 flex items-center gap-1">
-                      <Mail size={13} />
-                      {t('mail.sentToUser')}
-                    </p>
-                  )}
-                  {resetResult.mail_sent === false && (
-                    <p className="text-xs text-amber-700 mt-1">
-                      {t('mail.failed', { reason: resetResult.mail_error || '—' })}
-                    </p>
-                  )}
-                  {/* Saadetud kirja korral on link peidus, mitte ära võetud:
-                      kiri võib maanduda rämpsposti (#298). */}
-                  {resetResult.mail_sent === true && !showResetLink && (
-                    <button
-                      onClick={() => setShowResetLink(true)}
-                      className="mt-2 text-xs text-green-800 underline hover:text-green-900"
-                    >
-                      {t('mail.showLink')}
-                    </button>
-                  )}
-                  {(resetResult.mail_sent !== true || showResetLink) && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
-                      {window.location.origin}{resetResult.reset_url}
-                    </code>
-                    <button
-                      onClick={copyResetLink}
-                      className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-1 whitespace-nowrap"
-                    >
-                      {linkCopied ? <CheckCircle size={16} /> : <Copy size={16} />}
-                      {linkCopied ? t('users.linkCopied') : t('users.copyLink')}
-                    </button>
-                  </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => setResetResult(null)}
-                  className="text-green-600 hover:text-green-800 flex-shrink-0"
-                  title={t('common:buttons.close')}
-                  aria-label={t('common:buttons.close')}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
+            <ResetPasswordResult result={resetResult} onClose={() => setResetResult(null)} />
           )}
 
           {usersLoading ? (
@@ -448,7 +364,9 @@ const UsersPage: React.FC = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 truncate">{u.name}</span>
+                          <Link to={`/admin/users/${u.username}`} className="font-medium text-gray-900 truncate hover:underline">
+                            {u.name}
+                          </Link>
                           {isCurrentUser && (
                             <span className="flex-shrink-0 text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
                               {t('users.you')}
@@ -706,7 +624,7 @@ const UsersPage: React.FC = () => {
 
                     {/* Vähemoluline: loodud-kuupäev */}
                     <div className="mt-3 text-xs text-gray-400">
-                      {t('users.created')}: {u.created_at ? formatDate(u.created_at) : '-'}
+                      {t('users.created')}: {u.created_at ? formatDateTime(u.created_at) : '-'}
                     </div>
                   </div>
                 );
