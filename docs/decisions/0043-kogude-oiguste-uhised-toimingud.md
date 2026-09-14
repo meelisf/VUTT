@@ -1,7 +1,7 @@
 # ADR 0043 — Kogude õigustel on ühised toimingud ja rollipõhised vaated
 
 **Kuupäev:** 2026-09-14
-**Staatus:** otsustatud suund; teostus ootel (#318)
+**Staatus:** teostus pooleli — etapid 1a, 1b ja 2 tootmises (2026-09-14), etapid 3–4 lahtised (#318)
 **Seotud:** ADR 0031, 0038, 0042; #318, #354
 **Spekk:** [Kasutajad ja kogude ligipääs](../superpowers/specs/2026-09-14-kasutajad-ja-kogude-ligipaas-design.md)
 
