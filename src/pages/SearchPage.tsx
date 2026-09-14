@@ -16,6 +16,7 @@ import { useSearchUrlParams } from './search/hooks/useSearchUrlParams';
 import { useSearchResults } from './search/hooks/useSearchResults';
 import { useSearchFacets } from './search/hooks/useSearchFacets';
 import { useSelectionScope } from '../hooks/useSelectionScope';
+import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { useQCodeMaps } from './search/hooks/useQCodeMaps';
 import { useFilterDraft } from './search/hooks/useFilterDraft';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
@@ -26,8 +27,10 @@ const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { selection, selectedCollection, setSelectedCollection, getCollectionName, collections, workSets } = useCollection();
+    const { selection, selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
     const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
+    // Valiku silt ühest kohast (vt `contexts/selectionDisplay.ts`).
+    const { label: selectionLabel } = useSelectionLabel();
     // Aktiivne kogu käib URL-iga kaasa (#323) — muidu avaneb jagatud link
     // saaja kogus ja annab null vastet.
     useCollectionUrlSync();
@@ -343,10 +346,7 @@ const SearchPage: React.FC = () => {
                                 {selection.kind === 'work_set' && (
                                     <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-primary-100 text-primary-800 rounded-full text-xs font-medium border border-primary-200">
                                         <Users size={11} />
-                                        <span className="truncate max-w-xs">
-                                            {workSets.find(ws => ws.id === selection.id)?.name[getLangCode(i18n.language)]
-                                                ?? t('common:workSets.notFound', 'Töökollektsiooni ei leitud või puudub ligipääs')}
-                                        </span>
+                                        <span className="truncate max-w-xs">{selectionLabel}</span>
                                         <button
                                             type="button"
                                             onClick={() => setSelectedCollection(null)}

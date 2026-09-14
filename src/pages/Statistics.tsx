@@ -7,6 +7,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
 import { useSelectionScope } from '../hooks/useSelectionScope';
+import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { scopeClauses } from '../services/selectionFilter';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../services/collectionService';
@@ -26,8 +27,11 @@ interface YearCount {
 
 const Statistics: React.FC = () => {
   const { t, i18n } = useTranslation(['statistics', 'common']);
-  const { selection, selectedCollection, getCollectionName, collections, workSets } = useCollection();
+  const { selectedCollection, getCollectionName, collections } = useCollection();
   const { scope, ready: scopeReady } = useSelectionScope();
+  // Valiku silt ühest kohast (vt `contexts/selectionDisplay.ts`).
+  const { label: selectionLabel, isWorkSet } = useSelectionLabel();
+  const workSetName = isWorkSet ? selectionLabel : null;
   // Valiku klauslid ühest kohast — statistika ei tohi kasutada oma
   // teisendust, muidu lahkneb ta otsingust (#354).
   const scopeFilter = useMemo(() => (scopeReady ? scopeClauses(scope) : []), [scope, scopeReady]);
@@ -37,12 +41,6 @@ const Statistics: React.FC = () => {
   // Hoiab kogu URL-i ja konteksti kooskõlas (mõlemas suunas, #333)
   useCollectionUrlSync();
   const lang = getLangCode(i18n.language);
-  // Aktiivse töökollektsiooni nimi: ta ei ole `collections`-is, seega
-  // `getCollectionName` ei tea temast midagi.
-  const workSetName = selection.kind === 'work_set'
-    ? (workSets.find(ws => ws.id === selection.id)?.name[lang]
-       ?? t('common:workSets.notFound', 'Töökollektsiooni ei leitud või puudub ligipääs'))
-    : null;
   const [collectionLinkCopied, setCollectionLinkCopied] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);

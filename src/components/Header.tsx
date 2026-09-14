@@ -17,9 +17,7 @@ import LoginModal from './LoginModal';
 import UserMenu from './UserMenu';
 import CollectionPicker from './CollectionPicker';
 import { useUser } from '../contexts/UserContext';
-import { useCollection } from '../contexts/CollectionContext';
-import { getCollectionColorClasses } from '../services/collectionService';
-import { getLangCode } from '../utils/getLangCode';
+import { useSelectionLabel } from '../hooks/useSelectionLabel';
 
 interface HeaderProps {
   /** Kuva täistekstotsingu nupp (vaikimisi true) */
@@ -38,12 +36,14 @@ const Header: React.FC<HeaderProps> = ({
   pageTitleIcon,
   children
 }) => {
-  const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
+  const { t } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, sessionExpired, clearSessionExpired } = useUser();
-  const { selectedCollection, getCollectionName, collections } = useCollection();
+  // Valiku silt ja värv tulevad ÜHEST kohast: `selectedCollection` üksi ei
+  // suuda töökollektsiooni väljendada (null = „kõik teosed") ja päis
+  // näitas seetõttu `?set=`-valiku ajal „Kõik tööd".
+  const { label: selectionLabel, colorClasses: selectionColors } = useSelectionLabel();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
-  const lang = getLangCode(i18n.language);
   const headerNavigate = useNavigate();
 
   // Navigeeri alati dashboardile (koos salvestatud filtritega)
@@ -86,23 +86,21 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Kollektsiooni valija (laiem, et kollektsiooni nimi mahuks) */}
           {(() => {
-            const colorClasses = selectedCollection ? getCollectionColorClasses(collections[selectedCollection]) : null;
+            const colorClasses = selectionColors;
             return (
               <button
                 onClick={() => setShowCollectionPicker(true)}
                 className={`hidden sm:flex items-center gap-2 text-sm px-3 py-1.5 rounded-md transition-colors border ${
-                  selectedCollection && colorClasses
+                  colorClasses
                     ? `${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} ${colorClasses.hoverBg}`
                     : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                <Library size={16} className={selectedCollection && colorClasses ? colorClasses.text : 'text-primary-600'} />
+                <Library size={16} className={colorClasses ? colorClasses.text : 'text-primary-600'} />
                 <span className="max-w-72 truncate font-medium">
-                  {selectedCollection
-                    ? getCollectionName(selectedCollection, lang)
-                    : t('common:collections.all', 'Kõik tööd')}
+                  {selectionLabel}
                 </span>
-                <ChevronDown size={14} className={selectedCollection && colorClasses ? colorClasses.text : 'text-gray-400'} />
+                <ChevronDown size={14} className={colorClasses ? colorClasses.text : 'text-gray-400'} />
               </button>
             );
           })()}

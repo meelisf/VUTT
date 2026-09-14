@@ -4,7 +4,6 @@ import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { searchWorks, FacetDistribution } from '../services/searchService';
 import { isQCode } from '../utils/qcodeUtils';
-import { getCollectionColorClasses } from '../services/collectionService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import Header from '../components/Header';
@@ -13,6 +12,7 @@ import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { useSelectionScope } from '../hooks/useSelectionScope';
+import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, ArrowUpDown, X, User, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
@@ -43,21 +43,14 @@ const SEARCH_DEBOUNCE_MS = 400;
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user } = useUser();
-  const { selection, selectedCollection, setSelectedCollection, getCollectionName, collections, workSets, isLoading: collectionsLoading } = useCollection();
+  const { selectedCollection, setSelectedCollection, collections, isLoading: collectionsLoading } = useCollection();
   // Töökollektsiooni ID-loend tuleb serverilt; kuni ta ei ole kohal, ei tohi
   // päringut teha (piiramata vastus näitaks teoseid väljaspool valikut).
   const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
+  // Valiku silt ühest kohast (vt `contexts/selectionDisplay.ts`).
+  const { label: selectionLabel, colorClasses: selectionColors } = useSelectionLabel();
   const index = useMeiliIndex();
   const lang = getLangCode(i18n.language);
-  // Valiku SILT: töökollektsioon ei ole `collections`-is, seega nime ei saa
-  // `getCollectionName`-ist. Ligipääsu kaotanud kogu nime me ei tea — siis
-  // öeldakse seda otse, mitte ei vaikita.
-  const selectionLabel = selection.kind === 'work_set'
-    ? (workSets.find(ws => ws.id === selection.id)?.name[lang]
-       ?? t('common:workSets.notFound', 'Töökollektsiooni ei leitud või puudub ligipääs'))
-    : selectedCollection
-      ? getCollectionName(selectedCollection, lang)
-      : t('common:collections.all', 'Kõik tööd');
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -667,17 +660,17 @@ const Dashboard: React.FC = () => {
 
               {/* Mobiili kollektsiooni valija */}
               {(() => {
-                const colorClasses = selectedCollection ? getCollectionColorClasses(collections[selectedCollection]) : null;
+                const colorClasses = selectionColors;
                 return (
                   <button
                     className={`sm:hidden flex items-center gap-2 w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                      selectedCollection && colorClasses
+                      colorClasses
                         ? `${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} ${colorClasses.hoverBg}`
                         : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                     }`}
                     onClick={() => setShowMobileCollectionPicker(true)}
                   >
-                    <Library size={16} className={selectedCollection && colorClasses ? colorClasses.text : 'text-primary-600'} />
+                    <Library size={16} className={colorClasses ? colorClasses.text : 'text-primary-600'} />
                     <span className="flex-1 text-left truncate">
                       {selectionLabel}
                     </span>
