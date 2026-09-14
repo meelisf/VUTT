@@ -297,8 +297,7 @@
     "trash": "Trash",
     "maintenance": "Maintenance",
     "places": "Place Register",
-    "pending": "{{count}} pending",
-    "workSets": "Work collections"
+    "pending": "{{count}} pending"
   },
   "groups": {
     "users": "Users",

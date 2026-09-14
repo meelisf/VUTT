@@ -292,13 +292,12 @@
     "registrations": "Taotlused",
     "users": "Registreerunud kasutajad",
     "upload": "Laadi üles",
-    "collections": "Kollektsioonid",
+    "collections": "Kogud",
     "changes": "Muudatused",
     "trash": "Prügikast",
     "maintenance": "Hooldus",
     "places": "Kohtade register",
-    "pending": "{{count}} ootel",
-    "workSets": "Töökollektsioonid"
+    "pending": "{{count}} ootel"
   },
   "groups": {
     "users": "Kasutajad",

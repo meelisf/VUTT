@@ -39,7 +39,7 @@ const AdminRegistrations = lazyRetry(() => import('./pages/admin/Registrations')
 const AdminUsers = lazyRetry(() => import('./pages/admin/Users'));
 const AdminUserDetail = lazyRetry(() => import('./pages/admin/UserDetail'));
 const AdminTrash = lazyRetry(() => import('./pages/admin/Trash'));
-const AdminCollections = lazyRetry(() => import('./pages/admin/Collections'));
+const AdminCollections = lazyRetry(() => import('./pages/admin/CollectionsHub'));
 const AdminCollectionDetail = lazyRetry(() => import('./pages/admin/CollectionDetail'));
 const AdminMaintenance = lazyRetry(() => import('./pages/admin/Maintenance'));
 const AdminPlaces = lazyRetry(() => import('./pages/admin/Places'));

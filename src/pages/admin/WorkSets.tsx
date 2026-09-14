@@ -6,7 +6,7 @@
  * Meilisearchi (ADR 0042) — liikmete arv tuleb serverilt kutsuja kohta.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Loader2, Plus, Users, Archive, RotateCcw, Globe, Lock, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react';
 import Header from '../../components/Header';
@@ -29,6 +29,7 @@ const WorkSets: React.FC = () => {
   const { refreshWorkSets } = useCollection();
   const index = useMeiliIndex();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const lang = getLangCode(i18n.language);
 
   const [sets, setSets] = useState<WorkSetSummary[]>([]);
@@ -79,6 +80,18 @@ const WorkSets: React.FC = () => {
   }, [showArchived]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ?set=<id> on ÜHESUUNALINE sisenemispunkt hubist: avame selle kogu paneeli,
+  // aga kui kasutaja paneeli käsitsi sulgeb, URL-i tagasi EI kirjutata — see
+  // oleks teine peegel (ADR 0038). Ainult `set` väärtuse muutumisel, muidu ei
+  // saaks paneeli üldse sulgeda.
+  const setParam = searchParams.get('set');
+  useEffect(() => {
+    if (!setParam) return;
+    setAccessOpenId(setParam);
+    // Arhiveeritud kogu ei ole vaikimisi loendis — deep-link toob ta nähtavale.
+    setShowArchived(true);
+  }, [setParam]);
 
   useEffect(() => {
     if (!isAdmin) return;
