@@ -12,7 +12,6 @@ import {
   RotateCcw,
   Upload,
   RefreshCw,
-  Users,
 } from 'lucide-react';
 import Header from '../components/Header';
 import ConfirmModal from '../components/ConfirmModal';
@@ -49,9 +48,6 @@ import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
 import PageActionBar from './manage/PageActionBar';
-import WorkSetPicker from '../components/WorkSetPicker';
-import { useCollection } from '../contexts/CollectionContext';
-import { addWorks } from '../services/workSetService';
 import { mapReocrState, selectableNoTextFiles, applicableReocrPages, ReocrStatusResponse } from '../utils/reocrStatus';
 import { ruhmita } from './manage/trashGrouping';
 import TrashDeletedPages from './manage/TrashDeletedPages';
@@ -69,11 +65,6 @@ type ActiveTab = 'pages' | 'trash' | 'replace';
 const WorkManage: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common']);
   const { workId } = useParams<{ workId: string }>();
-  const { workSets, refreshWorkSets } = useCollection();
-  const managesAnyWorkSet = workSets.some(ws => ws.can_manage && ws.status === 'active');
-  const [showWorkSetPicker, setShowWorkSetPicker] = useState(false);
-  const [workSetBusy, setWorkSetBusy] = useState(false);
-  const [workSetMessage, setWorkSetMessage] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user, authToken } = useUser();
   const [searchParams] = useSearchParams();
@@ -679,29 +670,6 @@ const WorkManage: React.FC = () => {
     }
   };
 
-  /**
-   * Teose lisamine töökollektsiooni. `revision` jäetakse saatmata — lisamine on
-   * delta, mitte täisasendus (vt `workSetService.addWorks`).
-   */
-  const handleAddToWorkSet = async (setId: string) => {
-    if (!workId) return;
-    setWorkSetBusy(true);
-    setWorkSetMessage(null);
-    try {
-      await addWorks(setId, [workId]);
-      setWorkSetMessage(t('common:workSets.addedCount', { count: 1 }));
-      await refreshWorkSets();
-    } catch (e) {
-      const status = (e as { status?: number }).status;
-      setWorkSetMessage(status === 409
-        ? t('common:workSets.limitReachedShort', 'Kogu on täis')
-        : t('common:workSets.addFailed', 'Lisamine ebaõnnestus'));
-    } finally {
-      setWorkSetBusy(false);
-      setShowWorkSetPicker(false);
-    }
-  };
-
   const handleDeleteWork = async () => {
     if (!workId || !authToken) return;
     setDeletingWork(true);
@@ -843,23 +811,6 @@ const WorkManage: React.FC = () => {
               <>
                 {/* Valiku/järjekorra tegevused on hõljuvas alumises ribas (PageActionBar) */}
 
-                {/* Teose lisamine töökollektsiooni (spekk §1.3, „teose juurest").
-                    Teose tasemel tegevus → siin, mitte valikupõhises PageActionBar-is. */}
-                {managesAnyWorkSet && (
-                  <div className="mx-4 mb-2 flex flex-wrap items-center gap-3">
-                    <button
-                      onClick={() => { setWorkSetMessage(null); setShowWorkSetPicker(true); }}
-                      disabled={workSetBusy}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded"
-                    >
-                      <Users size={14} />
-                      {t('common:workSets.addTo', 'Lisa töökollektsiooni')}
-                    </button>
-                    {workSetMessage && (
-                      <span className="text-sm text-indigo-800">{workSetMessage}</span>
-                    )}
-                  </div>
-                )}
 
                 {/* Progress-kokkuvõte */}
                 {reocrStatus?.progress && reocrStatus.progress.total > 0 && (
@@ -1340,15 +1291,6 @@ const WorkManage: React.FC = () => {
           }}
           onReplaceImage={handleReplaceImage}
           cacheBust={thumbCacheBust}
-        />
-      )}
-
-      {showWorkSetPicker && (
-        <WorkSetPicker
-          isOpen={showWorkSetPicker}
-          onClose={() => setShowWorkSetPicker(false)}
-          onSelect={handleAddToWorkSet}
-          busy={workSetBusy}
         />
       )}
 

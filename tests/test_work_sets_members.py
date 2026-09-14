@@ -161,3 +161,46 @@ def test_work_ids_peab_olema_loend(client, work_sets, manager_token, ws_id):
                     json={"work_ids": "avalik-teos-2", "revision": 3},
                     headers=auth(manager_token))
     assert r.status_code == 400
+
+
+def test_teose_kogud_naitab_ainult_kutsujale_nahtavaid(client, work_sets, viewer_token,
+                                                       login, ws_id):
+    """Teose juures kuvatav „kõrgema taseme märksõna" (#354)."""
+    r = client.get("/work-sets/for-work/avalik-teos", headers=auth(viewer_token))
+    assert r.status_code == 200
+    kogud = r.json()["work_sets"]
+    assert [ws["id"] for ws in kogud] == [ws_id]
+    assert kogud[0]["can_manage"] is False
+
+    voeras = login("contrib_muu", "contribpass")
+    r2 = client.get("/work-sets/for-work/avalik-teos", headers=auth(voeras))
+    assert r2.json()["work_sets"] == [], "võõras ei tohi kogu olemasolust teada saada"
+
+
+def test_teose_kogud_ei_lekita_liikmesust_labi_ligipaasmatu_teose(client, work_sets,
+                                                                  viewer_token, ws_id):
+    # `piiratud-teos` on kogu liige, aga vaataja ei näe teost otsingus.
+    # Kuulumise kuvamine siin ei tohi olla laiem kui `search_visible_work_ids`.
+    r = client.get("/work-sets/for-work/piiratud-teos", headers=auth(viewer_token))
+    assert r.status_code == 200
+    assert r.json()["work_sets"] == []
+
+
+def test_haldur_naeb_haldusoigust(client, work_sets, manager_token, ws_id):
+    r = client.get("/work-sets/for-work/avalik-teos", headers=auth(manager_token))
+    assert r.json()["work_sets"][0]["can_manage"] is True
+
+
+def test_mitteliige_annab_tuhja_loendi(client, work_sets, manager_token, ws_id):
+    r = client.get("/work-sets/for-work/avalik-teos-2", headers=auth(manager_token))
+    assert r.status_code == 200
+    assert r.json()["work_sets"] == []
+
+
+def test_arhiveeritud_kogu_kuulumine_on_endiselt_nahtav(client, work_sets, admin_token,
+                                                        manager_token, ws_id):
+    import server.work_sets_ops as ops
+    ops.update_work_set(ws_id, {"status": "archived"}, "admin")
+    r = client.get("/work-sets/for-work/avalik-teos", headers=auth(manager_token))
+    # Arhiveerimine ei kustuta liikmesust — teos ON seal kogus ja seda peab näha olema.
+    assert [ws["id"] for ws in r.json()["work_sets"]] == [ws_id]

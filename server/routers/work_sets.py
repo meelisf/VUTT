@@ -81,6 +81,36 @@ async def post_work_set(request: Request, user=Depends(require_role("admin"))):
     return {"status": "success", "work_set": _public_view(ws, user)}
 
 
+@router.get("/work-sets/for-work/{work_id}")
+def get_work_sets_for_work(work_id: str, user=Depends(optional_user)):
+    """Kogud, kuhu see teos kuulub ja mida kutsuja näeb (#354).
+
+    Deklareeritud ENNE `/work-sets/{set_id}` mustreid: FastAPI võtab esimese
+    sobiva teekonna ja `for-work` peab literaalina võitma.
+
+    Kuulumise kuvamine ei tohi olla LAIEM kui otsingu-nähtavus: kui kutsuja ei
+    näe teost otsingus, ei tohi ta selle liikmesuste kaudu kogudest teada saada.
+    Seepärast kontrollitakse siin sama predikaati, mis läheb otsingufiltrisse.
+
+    Arhiveeritud kogu kuulumine JÄÄB nähtavaks — arhiveerimine ei kustuta
+    liikmesust ja peidetud kuuluvus oleks kasutajale seletamatu.
+    """
+    # Import funktsiooni sees, MITTE mooduli tasandil: moodulitasandi import
+    # seob nime laadimise hetkel ja testide monkeypatch `work_sets_access`-il
+    # ei jõuaks siia. Sama muster nagu `_mutate`-is.
+    from ..work_sets_access import is_search_visible, load_work_metadata_by_id
+
+    meta = load_work_metadata_by_id(work_id)
+    if meta is None or not is_search_visible(meta, user):
+        return {"status": "success", "work_sets": []}
+    out = [
+        _public_view(ws, user)
+        for ws in list_work_sets()
+        if can_view_set(ws, user) and work_id in (ws.get("works") or [])
+    ]
+    return {"status": "success", "work_sets": out}
+
+
 @router.get("/work-sets/{set_id}")
 def get_work_set(set_id: str, user=Depends(optional_user)):
     ws = _load_viewable_or_404(set_id, user)

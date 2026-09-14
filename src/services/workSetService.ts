@@ -80,6 +80,18 @@ export async function listWorkSets(includeArchived = false): Promise<WorkSetSumm
   return data.work_sets;
 }
 
+/**
+ * Kogud, kuhu see teos kuulub ja mida kutsuja näeb (#354).
+ *
+ * EI ole vahemälustatud: kuuluvus muutub iga lisamise/eemaldamisega ja vaade
+ * peab muutust kohe näitama. Vastus on kutsujapõhine.
+ */
+export async function getWorkSetsForWork(workId: string): Promise<WorkSetSummary[]> {
+  const data = await apiGet<{ work_sets: WorkSetSummary[] }>(
+    `/work-sets/for-work/${encodeURIComponent(workId)}`, AUTH);
+  return data.work_sets;
+}
+
 export async function getWorkSet(setId: string): Promise<WorkSetSummary> {
   const data = await apiGet<{ work_set: WorkSetSummary }>(`/work-sets/${setId}`, AUTH);
   return data.work_set;
