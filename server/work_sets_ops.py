@@ -102,6 +102,16 @@ def create_work_set(name: dict, description: Optional[dict], username: str) -> d
         return _save(ws, username, f"Töökollektsioon: loo {set_id}")
 
 
+def delete_work_set(set_id: str) -> None:
+    """Faili kustutamine. Elutsükli otsuse (kas tohib) teeb router — siin on
+    ainult salvestus. Tee tuleb `_path`-ist, et testid saaksid kausta asendada."""
+    with _work_sets_lock:
+        path = _path(set_id)
+        if not os.path.exists(path):
+            raise WorkSetNotFound(set_id)
+        os.remove(path)
+
+
 def _check_revision(ws: dict, expected_revision: Optional[int]):
     if expected_revision is not None and ws.get("revision") != expected_revision:
         raise WorkSetConflict(ws.get("revision"))
