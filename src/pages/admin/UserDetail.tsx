@@ -452,7 +452,12 @@ const UserDetail: React.FC = () => {
                         && kogu?.visibility === 'public' && (
                         <p className="mt-1 text-xs text-gray-500">{t('users.detail.publicInert')}</p>
                       )}
-                      {rida.editBasis === 'role_based' && (
+                      {/* „Salvestatud ulatus ei piira" eeldab, et ulatus on
+                          tegelikult salvestatud. Mustandis maha võetud kirje
+                          jääb selgituseks alles (laetud olekus ta veel on),
+                          aga rida, millel ulatust kunagi ei olnud, seda ei väida. */}
+                      {rida.editBasis === 'role_based'
+                        && (rida.edit || laetud?.edit.has(rida.collectionId)) && (
                         <p className="mt-1 text-xs text-gray-500">{t('users.detail.inertScope')}</p>
                       )}
                       {ulatusIlmaLugemiseta && (

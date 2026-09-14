@@ -97,7 +97,6 @@
       "noRights": "No saved assignments",
       "addRead": "+ add read access",
       "addScope": "+ add write scope",
-      "remove": "Remove",
       "sessionWarning": "Changing rights requires the user to log in again.",
       "save": "Save changes",
       "cancel": "Cancel",
