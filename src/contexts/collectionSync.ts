@@ -1,5 +1,5 @@
 import { Collections } from '../services/collectionService';
-import { ALL_COLLECTIONS } from './collectionUrl';
+import { ALL_COLLECTIONS, WORK_SET_PREFIX } from './collectionUrl';
 
 /**
  * Aktiivse kogu kahesuunaline sünkroniseerimine URL-i ja konteksti vahel (#333).
@@ -29,9 +29,25 @@ export type CollectionSyncAction =
   | { type: 'adopt-url'; value: string | null }
   | { type: 'write-url'; value: string; resetPage: boolean };
 
-/** Kas URL-i väärtuse tohib konteksti võtta? */
-function isAdoptable(urlValue: string, collections: Collections): boolean {
-  return urlValue === ALL_COLLECTIONS || !!collections[urlValue];
+/**
+ * Kas URL-i väärtuse tohib konteksti võtta?
+ *
+ * Töökollektsioon (`s:<id>`) on adopteeritav ainult siis, kui ta on kutsujale
+ * TEADAOLEVATE kogude hulgas. Enne `listWorkSets` vastust on hulk tühi ja
+ * tokenit ei võeta vastu — muidu satuks kontekst kogusse, mida ei pruugi
+ * olemas olla, ja vaade tühjeneks vaikselt.
+ */
+function isAdoptable(
+  urlValue: string,
+  collections: Collections,
+  knownSets: ReadonlySet<string>,
+): boolean {
+  if (urlValue === ALL_COLLECTIONS) return true;
+  if (urlValue.startsWith(WORK_SET_PREFIX)) {
+    return knownSets.has(urlValue.slice(WORK_SET_PREFIX.length));
+  }
+  const id = urlValue.startsWith('c:') ? urlValue.slice(2) : urlValue;
+  return !!collections[id];
 }
 
 /**
@@ -40,6 +56,7 @@ function isAdoptable(urlValue: string, collections: Collections): boolean {
  * @param agreed      viimane väärtus, milles URL ja kontekst kokku leppisid
  * @param mirrored    kas esimene peegeldus on tehtud
  * @param collections teadaolevad kogud (tundmatut id-d ei võeta konteksti)
+ * @param knownSets   teadaolevad töökollektsioonid (ilma prefiksita id-d)
  */
 export function decideCollectionSync(
   urlValue: string | null,
@@ -47,6 +64,7 @@ export function decideCollectionSync(
   agreed: string | null,
   mirrored: boolean,
   collections: Collections,
+  knownSets: ReadonlySet<string> = new Set(),
 ): CollectionSyncAction {
   const want = selected ?? ALL_COLLECTIONS;
   if (urlValue === want) return { type: 'noop' };
@@ -54,7 +72,8 @@ export function decideCollectionSync(
   // Väline muutus võidab: URL-is on midagi, mida meie sinna ei kirjutanud.
   // Tundmatu kogu (kustutatud või ligipääsmatu) EI tühjenda vaadet — siis
   // parandame hoopis URL-i.
-  if (urlValue !== null && urlValue !== agreed && isAdoptable(urlValue, collections)) {
+  if (urlValue !== null && urlValue !== agreed
+      && isAdoptable(urlValue, collections, knownSets)) {
     return { type: 'adopt-url', value: urlValue === ALL_COLLECTIONS ? null : urlValue };
   }
 
