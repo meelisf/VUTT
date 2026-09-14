@@ -19,10 +19,13 @@ import {
   getWorkSetWorkIds, getWorkSetMembers, removeWorks, invalidateWorkSetIds,
 } from '../../services/workSetService';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
+import { apiPost } from '../../services/apiClient';
+import WorkSetAccessPanel from './WorkSetAccessPanel';
+import { KnownUser } from './workSetAccessDraft';
 
 const WorkSets: React.FC = () => {
   const { t, i18n } = useTranslation(['admin', 'common']);
-  const { user, isLoading: userLoading } = useUser();
+  const { user, authToken, isLoading: userLoading } = useUser();
   const { refreshWorkSets } = useCollection();
   const index = useMeiliIndex();
   const navigate = useNavigate();
@@ -41,6 +44,13 @@ const WorkSets: React.FC = () => {
   const [members, setMembers] = useState<WorkSetMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState<string | null>(null);
+  // Kasutajate üldloend on ADMINI oma: haldur ei saa seda (spekk §3).
+  // Laetakse korra, mitte iga paneeli avamisel.
+  const [users, setUsers] = useState<KnownUser[]>([]);
+  // Eraldi lipp: tühi loend „ei laadinud" ja tühi loend „ei ole kasutajaid"
+  // annavad paneelis eri vastuse.
+  const [usersKnown, setUsersKnown] = useState(false);
+  const [accessOpenId, setAccessOpenId] = useState<string | null>(null);
 
   const isAdmin = isAtLeast(user?.role, 'admin');
 
@@ -69,6 +79,15 @@ const WorkSets: React.FC = () => {
   }, [showArchived]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    apiPost<{ status: string; users?: KnownUser[] }>('/admin/users', {}, { token: authToken })
+      .then(d => { setUsers(d.users || []); setUsersKnown(true); })
+      // Kasutajate loendi puudumine EI tohi paneeli blokeerida: olemasolevad
+      // kirjed jäävad nähtavaks, ainult lisamine jääb tegemata.
+      .catch(() => { setUsers([]); setUsersKnown(false); });
+  }, [isAdmin, authToken]);
 
   const avaLiikmed = async (setId: string) => {
     if (openId === setId) { setOpenId(null); return; }
@@ -141,8 +160,10 @@ const WorkSets: React.FC = () => {
     if (!newName.trim()) return;
     setBusyId('new');
     try {
-      await createWorkSet({ et: newName.trim(), en: newName.trim() });
+      const loodud = await createWorkSet({ et: newName.trim(), en: newName.trim() });
       setNewName('');
+      // Spekk §2: „Kogu loomise järel on sama paneel kohe kättesaadav."
+      setAccessOpenId(loodud.id);
       await load();
       await refreshWorkSets();
       setError(null);
@@ -231,7 +252,15 @@ const WorkSets: React.FC = () => {
                           {openId === ws.id ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                           {t('workSets.members')}: {arv === -1 ? '—' : arv ?? '…'}
                         </button>
-                        {ws.access && <span>· {t('workSets.access')}: {Object.keys(ws.access).length}</span>}
+                        {ws.access && (
+                          <button
+                            onClick={() => setAccessOpenId(accessOpenId === ws.id ? null : ws.id)}
+                            className="inline-flex items-center gap-1 hover:text-gray-800"
+                          >
+                            {accessOpenId === ws.id ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                            {t('workSets.access')}: {Object.keys(ws.access).length}
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -267,6 +296,22 @@ const WorkSets: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {accessOpenId === ws.id && (
+                    <WorkSetAccessPanel
+                      key={ws.id}
+                      ws={ws}
+                      users={users}
+                      usersKnown={usersKnown}
+                      actor={{ username: user?.username || '', role: user?.role || 'contributor' }}
+                      canEdit={isAdmin && !!ws.can_manage}
+                      onSaved={(uus) => {
+                        // Uus kaart tuleb serverilt: kirjuta ainult see rida üle.
+                        // `load()` sulgeks paneeli ja kaotaks mustandi.
+                        setSets(prev => prev.map(x => (x.id === uus.id ? uus : x)));
+                      }}
+                    />
+                  )}
 
                   {openId === ws.id && (
                     <div className="mt-3 border-t border-gray-100 pt-3">

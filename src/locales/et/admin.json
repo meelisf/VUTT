@@ -177,7 +177,28 @@
     "noMembers": "Kogu on tühi",
     "removeMember": "Eemalda kogust",
     "hiddenMembers": "{{count}} liiget ei ole sulle nähtav",
-    "loadMembersFailed": "Liikmete laadimine ebaõnnestus"
+    "loadMembersFailed": "Liikmete laadimine ebaõnnestus",
+    "accessPanel": {
+      "title": "Ligipääs",
+      "explain": "Siin antud õigus puudutab ainult seda töökollektsiooni.",
+      "noRightsGranted": "Töökollektsiooni õigus ei anna juurde teoste lugemise ega tekstide muutmise õigust. Kasutaja näeb siin talle lubatud teoseid.",
+      "adminsExplain": "Adminid ja superadminid haldavad kõiki töökollektsioone rollist tulenevalt — neid ei ole vaja siia lisada.",
+      "publicExplain": "Kogu on avalik: sirvimiseks ei ole isiklikku vaatajamäärangut vaja. Olemasolevad määrangud jäävad kehtima, kui kogu hiljem piiratakse.",
+      "archivedExplain": "Kogu on arhiveeritud. Õigused jäävad kehtima ja neid saab muuta.",
+      "searchPlaceholder": "Otsi nime, kasutajanime või e-posti järgi",
+      "noMatches": "Ühtki kasutajat ei leitud",
+      "addPerson": "Lisa kasutaja",
+      "roleBased": "Õigus tuleneb rollist",
+      "deletedUser": "Kustutatud kasutaja ({{username}})",
+      "remove": "Eemalda",
+      "noEntries": "Ühtki määrangut ei ole",
+      "save": "Salvesta muudatused",
+      "cancel": "Loobu",
+      "saving": "Salvestan…",
+      "conflictReload": "Kogu muutus vahepeal. Laadisin uue oleku; vaata oma muudatused üle ja salvesta uuesti.",
+      "readOnlyHint": "Õiguste jagamine on admini toiming. Siin on selle kogu praegune ligipääs.",
+      "serverState": "Serveri praegune olek:"
+    }
   },
   "cards": {
     "registrations": "Taotlused",

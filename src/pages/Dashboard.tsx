@@ -45,7 +45,7 @@ const SEARCH_DEBOUNCE_MS = 400;
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user } = useUser();
-  const { selectedCollection, setSelectedCollection, collections, workSets, refreshWorkSets, isLoading: collectionsLoading } = useCollection();
+  const { selectedCollection, setSelectedCollection, setSelection, collections, workSets, refreshWorkSets, isLoading: collectionsLoading } = useCollection();
   // Töökollektsiooni ID-loend tuleb serverilt; kuni ta ei ole kohal, ei tohi
   // päringut teha (piiramata vastus näitaks teoseid väljaspool valikut).
   const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
@@ -672,9 +672,26 @@ const Dashboard: React.FC = () => {
               <div>
                 <h3 className="font-bold text-red-800">{t('error.connectionError')}</h3>
                 <p className="text-sm text-red-700 mt-1">{error || scopeError?.message}</p>
-                <p className="text-xs text-red-600 mt-2">
-                  {t('error.httpsWarning')}
-                </p>
+                {scopeError ? (
+                  <>
+                    {/* Ligipääsu kadumine EI OLE tühi kogu ega piiramata otsing
+                        (ADR 0042). Üleminek on KASUTAJA tegevus — automaatne
+                        effect siin annaks piiramata päringu ja kaks
+                        tingimusteta peeglit URL-i vastu annaksid tsükli (#333). */}
+                    <p className="text-sm text-red-700 mt-1">{t('error.selectionLost')}</p>
+                    <button
+                      type="button"
+                      onClick={() => setSelection({ kind: 'all' })}
+                      className="mt-2 px-3 py-1.5 text-sm text-white bg-red-600 rounded hover:bg-red-700"
+                    >
+                      {t('error.resetSelection')}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-xs text-red-600 mt-2">
+                    {t('error.httpsWarning')}
+                  </p>
+                )}
               </div>
             </div>
           )}

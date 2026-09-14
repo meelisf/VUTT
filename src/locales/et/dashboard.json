@@ -37,7 +37,9 @@
   },
   "error": {
     "connectionError": "Ühenduse viga",
-    "httpsWarning": "Kui kasutad eelvaadet HTTPS-iga, aga server on HTTP (172.x.x.x), siis brauser blokeerib selle. Proovi avada rakendus lokaalselt või HTTP kaudu."
+    "httpsWarning": "Kui kasutad eelvaadet HTTPS-iga, aga server on HTTP (172.x.x.x), siis brauser blokeerib selle. Proovi avada rakendus lokaalselt või HTTP kaudu.",
+    "selectionLost": "Sul ei ole enam ligipääsu valitud töökollektsioonile.",
+    "resetSelection": "Lähtesta valik"
   },
   "footer": {
     "aboutProject": "Projektist",
