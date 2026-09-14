@@ -23,7 +23,11 @@ const PersonsMap = React.lazy(() => import('../components/PersonsMap'));
 const PersonsPage: React.FC = () => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
-  const { selectedCollection, collections } = useCollection();
+  const { selection, selectedCollection, collections } = useCollection();
+  // Töökollektsioon: ID-loendi koostab ja ligipääsu kontrollib SERVER
+  // (`work_set` parameeter), mitte klient — isikute filter käib teose-isiku
+  // seoste kaudu, mida kliendil ei ole (#354).
+  const workSetParam = selection.kind === 'work_set' ? selection.id : undefined;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -67,7 +71,7 @@ const PersonsPage: React.FC = () => {
   useEffect(() => { setInputValue(query); }, [query]);
   useEffect(() => {
     setSearchParams(p => { const n = new URLSearchParams(p); n.delete('offset'); return n; }, { replace: true });
-  }, [selectedCollection]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedCollection, workSetParam]); // eslint-disable-line react-hooks/exhaustive-deps
   // Debounce: uuenda URL 300ms pärast viimast klahvivajutust
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -184,6 +188,7 @@ const PersonsPage: React.FC = () => {
       tag: tags.length ? tags : undefined,
       sort_by: sortBy !== 'alpha' ? sortBy : undefined,
       collection: effectiveSelectedCollection || undefined,
+      work_set: workSetParam,
       limit: LIMIT,
       offset,
     }, token)
@@ -194,13 +199,14 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, tags, sortBy, effectiveSelectedCollection, offset, token, t]);
+  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, tags, sortBy, effectiveSelectedCollection, workSetParam, offset, token, t]);
 
   const fetchFacets = useCallback(() => {
     getPersonFacets({
       q: query || undefined,
       gender: gender || undefined,
       collection: effectiveSelectedCollection || undefined,
+      work_set: workSetParam,
     }, token)
       .then(data => {
         const lang = i18n.language?.slice(0, 2) ?? 'et';
@@ -217,7 +223,7 @@ const PersonsPage: React.FC = () => {
         })));
       })
       .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); setTagFacets([]); });
-  }, [query, gender, effectiveSelectedCollection, token, i18n.language]);
+  }, [query, gender, effectiveSelectedCollection, workSetParam, token, i18n.language]);
 
   useEffect(() => {
     fetchPersons();
@@ -248,6 +254,7 @@ const PersonsPage: React.FC = () => {
     tag: tags.length ? tags : undefined,
     related_to: relatedTo || undefined,
     collection: effectiveSelectedCollection || undefined,
+    work_set: workSetParam,
   };
 
   // Select-mood helpers

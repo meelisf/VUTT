@@ -6,7 +6,8 @@ import os
 from typing import Optional
 
 from . import state
-from .indices import ACADEMIA_INSTITUTION_NAMES, _load_index, _persons_in_collection, _person_collections
+from .indices import (ACADEMIA_INSTITUTION_NAMES, _load_index, _persons_in_collection,
+                      _persons_in_work_set, _person_collections)
 from .person_crud import _make_snippets, get_person
 from .relations import get_person_relation_network_ids
 from ._compat import sync_from_facade
@@ -315,10 +316,16 @@ def list_persons(
     ids: Optional[list] = None,
     tags: Optional[list] = None,
     collection: Optional[str] = None,
+    work_set_ids: Optional[list] = None,
     limit: int = 48,
     offset: int = 0,
 ) -> dict:
-    """Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult."""
+    """Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult.
+
+    `work_set_ids` on juba kutsujale NÄHTAV teoste loend (#354): õiguskontroll
+    on tehtud routeris, siin ainult lõikamine. `None` = piirangut ei ole,
+    tühi loend = null tulemust (tühi kogu EI OLE sama mis puuduv filter).
+    """
     sync_from_facade()
     if collection:
         collection_ids = _persons_in_collection(collection)
@@ -326,6 +333,16 @@ def list_persons(
             ids = [i for i in ids if i in collection_ids]
         else:
             ids = list(collection_ids)
+    if work_set_ids is not None:
+        set_ids = _persons_in_work_set(work_set_ids)
+        if ids is not None:
+            ids = [i for i in ids if i in set_ids]
+        else:
+            ids = list(set_ids)
+        if not ids:
+            # Tühi ID-loend PEAB andma null tulemust. `ids=[]` alla voolamine
+            # tähendaks paljudes kohtades „filtrit ei ole" → kogu korpus.
+            return {"results": [], "total": 0, "limit": limit, "offset": offset}
 
     results = _filter_index_entries(
         q=q,
@@ -379,6 +396,7 @@ def get_person_map_markers(
     tags: Optional[list] = None,
     related_to: Optional[str] = None,
     collection: Optional[str] = None,
+    work_set_ids: Optional[list] = None,
 ) -> dict:
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
     sync_from_facade()
@@ -392,6 +410,16 @@ def get_person_map_markers(
             ids = [i for i in ids if i in collection_ids]
         else:
             ids = list(collection_ids)
+
+    if work_set_ids is not None:
+        set_ids = _persons_in_work_set(work_set_ids)
+        if ids is not None:
+            ids = [i for i in ids if i in set_ids]
+        else:
+            ids = list(set_ids)
+        if not ids:
+            # Tühi loend = null markerit, mitte „filtrit ei ole".
+            return {"markers": [], "total": 0}
 
     entries = _filter_index_entries(
         q=q,
@@ -475,6 +503,7 @@ def get_person_facets(
     gender: Optional[str] = None,
     ids: Optional[list] = None,
     collection: Optional[str] = None,
+    work_set_ids: Optional[list] = None,
 ) -> dict:
     """Tagastab persons-listingu jaoks facetid."""
     sync_from_facade()
@@ -483,6 +512,7 @@ def get_person_facets(
         gender=gender,
         ids=ids,
         collection=collection,
+        work_set_ids=work_set_ids,
         limit=10**9,
         offset=0,
     )["results"]
