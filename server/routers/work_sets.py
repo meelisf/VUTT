@@ -9,10 +9,11 @@ risti-kasutaja leke.
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
-from ..auth import is_at_least
+from ..auth import is_at_least, users_role_snapshot
 from ..deps import get_json_data, get_user, optional_user, require_role
 from ..work_sets_access import can_manage_set, can_view_set, search_visible_work_ids
 from ..work_sets_ops import (
+    WorkSetAccessDenied,
     WorkSetConflict,
     WorkSetLimit,
     WorkSetNotFound,
@@ -21,6 +22,7 @@ from ..work_sets_ops import (
     list_work_sets,
     load_work_set,
     mutate_members,
+    set_access,
     update_work_set,
 )
 
@@ -153,14 +155,22 @@ async def patch_work_set(set_id: str, request: Request, user=Depends(get_user)):
 async def put_access(set_id: str, request: Request, user=Depends(require_role("admin"))):
     _load_or_404(set_id)
     body = await get_json_data(request)
-    access = body.get("access") or {}
+    access = body.get("access")
     if not isinstance(access, dict):
         raise HTTPException(status_code=400, detail="access peab olema objekt")
-    if any(v not in ("viewer", "manager") for v in access.values()):
-        raise HTTPException(status_code=400, detail="Roll peab olema viewer või manager")
+    revision = body.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        # Täisasendus ilma revisionita kirjutaks teise admini töö vaikselt üle.
+        raise HTTPException(status_code=400, detail="revision on kohustuslik")
+
+    # Hetktõmmis võetakse `users_lock` all ja see lukk on vabastatud ENNE
+    # `_work_sets_lock`-i (ADR 0043 p3).
+    users_snapshot = await run_in_threadpool(users_role_snapshot)
     try:
-        ws = await run_in_threadpool(update_work_set, set_id, {"access": access},
-                                     user["username"], body.get("revision"))
+        ws = await run_in_threadpool(set_access, set_id, access, user,
+                                     users_snapshot, revision)
+    except WorkSetAccessDenied as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except WorkSetConflict as e:
         raise HTTPException(status_code=409, detail={"revision": e.current_revision})
     except WorkSetNotFound:

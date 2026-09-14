@@ -146,6 +146,9 @@ USERS_FILE = os.path.join(_STATE_DIR, "users.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
 RESET_TOKENS_FILE = os.path.join(_STATE_DIR, "reset_tokens.json")
+# Kustutatud kasutajanimede püsiv reserveering (ADR 0043 p8): nime
+# taaskasutus pärandaks uuele kontole vanad access-kirjed.
+DELETED_USERNAMES_FILE = os.path.join(_STATE_DIR, "deleted_usernames.json")
 REOCR_LOG_FILE = os.path.join(_STATE_DIR, "reocr_log.json")
 
 # Konfiguratsioonifailid — data/config/ kaustas (sisemises gitis)
@@ -193,6 +196,9 @@ WORK_SETS_DIR = os.path.join(_DATA_CONFIG_DIR, "work_sets")
 # Mõõdetud tootmises (#354 Task 1): 1000 liiget = ~36 ms ID-loend + ~4 ms Meili
 # filtrit. Lagi ei ole jõudluspiirang, vaid kaitse ühe filtripäringu suuruse vastu.
 WORK_SET_MAX_MEMBERS = 1000
+# Kirjete kaitsepiir `access`-kaardil — EI OLE mõõdetud kasutajate mahutavus.
+# Üle piiri uut kaarti ei salvestata; pärandkaart tohib ainult VÄHENEDA.
+WORK_SET_MAX_ACCESS = 1000
 
 # Album Academicum referentsandmed
 AA_FILE = os.path.join(_PROJECT_ROOT, "reference_data", "album_academicum.json")

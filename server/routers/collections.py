@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from git import Actor
 from starlette.concurrency import run_in_threadpool
 
-from ..auth import delete_user_sessions, load_users, save_users
+from ..auth import delete_user_sessions, load_users, save_users, users_transaction
 from ..cache import get_cached_archives, get_cached_collections
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
 from ..config import ARCHIVES_FILE, BASE_DIR, COLLECTIONS_FILE, get_logger
@@ -158,23 +158,30 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     if visibility and old_visibility != new_visibility:
         background_tasks.add_task(update_collection_is_public_async, collection_id, new_visibility == "public")
 
-    # allowed_collections: kasutajate ligipääsu haldus kollektsiooni tasandil
+    # allowed_collections: kasutajate ligipääsu haldus kollektsiooni tasandil.
+    # ÜLEMINEK: see haru eemaldatakse etapis 2 koos kliendiga (ADR 0043 p2);
+    # siin ainult lukustatakse, et jagatud cache-objekt ei muutuks teise lõime
+    # serialiseerimise ajal.
     allowed_users_param = body.get("allowed_users")
     if allowed_users_param is not None:
-        users_data = load_users()
-        changed_users = []
-        for username, udata in users_data.items():
-            current = set(udata.get("allowed_collections", []))
-            updated = set(current)
-            if username in allowed_users_param:
-                updated.add(collection_id)
-            else:
-                updated.discard(collection_id)
-            if updated != current:
-                changed_users.append(username)
-            users_data[username]["allowed_collections"] = list(updated)
-        await run_in_threadpool(save_users, users_data)
-        # Invalideeri muutunud kasutajate sessioonid, et uus ligipääs jõustuks kohe (Leid I)
+        def _kirjuta_allowed_users():
+            changed = []
+            with users_transaction() as users_data:
+                for username, udata in users_data.items():
+                    current = set(udata.get("allowed_collections", []))
+                    updated = set(current)
+                    if username in allowed_users_param:
+                        updated.add(collection_id)
+                    else:
+                        updated.discard(collection_id)
+                    if updated != current:
+                        changed.append(username)
+                    users_data[username]["allowed_collections"] = list(updated)
+                save_users(users_data)
+            return changed
+
+        changed_users = await run_in_threadpool(_kirjuta_allowed_users)
+        # Invalideeri muutunud kasutajate sessioonid (Leid I) — luku VÄLJAS.
         for username in changed_users:
             delete_user_sessions(username)
 
@@ -241,17 +248,28 @@ async def admin_create_collection(request: Request, user=Depends(require_role("s
     _invalidate_all_caches()
     return {"status": "success"}
 
-def _cleanup_allowed_collections_on_delete(collection_id: str):
-    """Eemaldab kustutatud kollektsiooni ID kõigi kasutajate allowed_collections'ist."""
-    users_data = load_users()
-    changed = False
-    for uname, udata in users_data.items():
-        current = udata.get("allowed_collections", [])
-        if collection_id in current:
-            users_data[uname]["allowed_collections"] = [c for c in current if c != collection_id]
-            changed = True
-    if changed:
-        save_users(users_data)
+def _cleanup_collection_from_users(collection_id: str) -> list:
+    """Eemaldab kustutatud kogu ID MÕLEMALT väljalt ühe luku all (ADR 0043).
+
+    Lugemisõigus (`allowed_collections`) ja kirjutamisulatus (`edit_collections`)
+    on eri teljed, aga kustutatud kogu ID ei ole kummalgi kehtiv õigus.
+    Tagastab muutunud kasutajanimed — sessioonid invalideerib KUTSUJA
+    (luku väljas, üks kord kasutaja kohta).
+    """
+    muutunud = []
+    with users_transaction() as users_data:
+        for uname, udata in users_data.items():
+            kasutaja_muutus = False
+            for vali in ("allowed_collections", "edit_collections"):
+                praegu = udata.get(vali, [])
+                if collection_id in praegu:
+                    users_data[uname][vali] = [c for c in praegu if c != collection_id]
+                    kasutaja_muutus = True
+            if kasutaja_muutus:
+                muutunud.append(uname)
+        if muutunud:
+            save_users(users_data)
+    return muutunud
 
 
 def _find_works_with_collection(collection_id: str):
@@ -357,7 +375,10 @@ def admin_delete_collection(collection_id: str, background_tasks: BackgroundTask
 
     # Kustuta kollektsioonist
     del data[collection_id]
-    _cleanup_allowed_collections_on_delete(collection_id)
+    for _uname in _cleanup_collection_from_users(collection_id):
+        # Sessioon kannab kasutajaobjekti hetktõmmist — ilma invalideerimiseta
+        # jääks kustutatud kogu ID 24h ulatusse alles.
+        delete_user_sessions(_uname)
     save_config_with_git(COLLECTIONS_FILE, data, user["username"],
                          message=f"Kollektsioon: kustuta {collection_id}")
 

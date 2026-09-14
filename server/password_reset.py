@@ -13,7 +13,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
-from .auth import delete_user_sessions, hash_password, load_users, save_users
+from .auth import (delete_user_sessions, hash_password, load_users, save_users,
+                   users_transaction)
 from .config import RESET_TOKENS_FILE, get_logger
 from .registration import validate_password_strength  # taaskasuta paroolipoliitikat
 from .utils import atomic_write_json
@@ -205,19 +206,25 @@ def complete_password_reset(token: str, new_password: str) -> Tuple[Optional[Dic
 
     username = token_data["username"]
 
-    # 3. Sea uus hash (loe vana välja rollbacki jaoks)
-    users = load_users()
-    if username not in users:
-        _unconsume_token(token)
-        return None, "Kasutajat ei leitud"
-    old_hash = users[username].get("password_hash")
-    users[username]["password_hash"] = hash_password(new_password)
-    try:
-        save_users(users)
-    except Exception as e:
-        _unconsume_token(token)
-        logger.error(f"Reset: parooli salvestus ebaõnnestus ({username}): {e}")
-        return None, "Parooli salvestamine ebaõnnestus, palun proovi uuesti"
+    # 3. Sea uus hash (loe vana välja rollbacki jaoks).
+    # Kallis bcrypt-räsi arvutatakse ENNE lukku — lukk kaitseb ainult
+    # loe-muuda-salvesta tsüklit, mitte parooli räsimist (ADR 0043 p3).
+    uus_hash = hash_password(new_password)
+    with users_transaction() as users:
+        if username not in users:
+            _unconsume_token(token)
+            return None, "Kasutajat ei leitud"
+        old_hash = users[username].get("password_hash")
+        users[username]["password_hash"] = uus_hash
+        try:
+            save_users(users)
+        except Exception as e:
+            # Taasta mälusisene olek: kettale ei jõudnud midagi, aga cache on
+            # JAGATUD objekt ja kannaks muidu salvestamata hashi edasi.
+            users[username]["password_hash"] = old_hash
+            _unconsume_token(token)
+            logger.error(f"Reset: parooli salvestus ebaõnnestus ({username}): {e}")
+            return None, "Parooli salvestamine ebaõnnestus, palun proovi uuesti"
 
     # 4. Invalideeri sessioonid — turvainvariant: peavad kaduma
     try:
@@ -225,9 +232,9 @@ def complete_password_reset(token: str, new_password: str) -> Tuple[Optional[Dic
     except Exception as e:
         # Rollback: taasta vana hash, vabasta token
         try:
-            users = load_users()
-            users[username]["password_hash"] = old_hash
-            save_users(users)
+            with users_transaction() as users:
+                users[username]["password_hash"] = old_hash
+                save_users(users)
         except Exception as e2:
             logger.error(f"Reset: hash-rollback ebaõnnestus ({username}): {e2}")
         _unconsume_token(token)

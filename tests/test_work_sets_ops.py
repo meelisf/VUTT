@@ -35,10 +35,13 @@ def kaust(tmp_path, monkeypatch):
     return {"tmp": tmp_path, "kirjutised": kirjutised}
 
 
-def test_loomine_annab_id_ja_teeb_loojast_halduri(kaust):
+def test_loomine_annab_id_ilma_looja_access_kirjeta(kaust):
     ws = ops.create_work_set({"et": "Fischer", "en": ""}, {"et": "", "en": ""}, "mari")
     assert ws["id"].startswith("ws_")
-    assert ws["access"]["mari"] == "manager"
+    # Looja EI saa automaatset access-kirjet: kogusid loovad admin+, kelle
+    # haldusõigus tuleneb rollist (ADR 0043 p5). `created_by` jääb auditiinfoks.
+    assert ws["access"] == {}
+    assert ws["created_by"] == "mari"
     assert ws["revision"] == 1
     assert ws["visibility"] == "members" and ws["status"] == "active"
     assert ws["works"] == []

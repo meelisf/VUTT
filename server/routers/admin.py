@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from ..auth import (
+    apply_collection_rights_delta,
     can_manage_user,
     delete_user,
     get_all_users,
@@ -205,6 +206,22 @@ async def admin_update_edit_collections(request: Request, user=Depends(require_r
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success", "edit_collections": scope}
+
+
+@router.post("/admin/users/collection-rights")
+async def admin_collection_rights(request: Request, user=Depends(require_role("admin"))):
+    """Kollektsiooniõiguste delta (ADR 0043 p2).
+
+    Mõlemad kliendivaated (kasutajadetail ja kogu ligipääsupaneel) kasutavad
+    seda sama toimingut — paralleelset õiguste kirjutusteed ei looda.
+    Vastuses on KINNITATUD lõppolek ainult puudutatud kasutajate kohta.
+    """
+    data = await get_json_data(request)
+    success, message, users_state = await run_in_threadpool(
+        apply_collection_rights_delta, data.get("changes"), user)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success", "users": users_state}
 
 
 @router.post("/admin/users/delete")

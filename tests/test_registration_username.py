@@ -214,3 +214,67 @@ def test_suggest_kombineeritud_kaudne_kollisioon(monkeypatch):
         tokens={"tokens": [{"username": "john2", "used": False, "expires_at": future}]},
     )
     assert suggest_username_for_email("john@example.com") == "john3"
+
+
+# =========================================================
+# Nimevaliku võidujooks ja kustutatud nimede register (#318, ADR 0043 p8)
+# =========================================================
+
+import threading  # noqa: E402
+
+
+def _tee_token(backend_env, token, email, username):
+    import json
+    fail = backend_env["invite_tokens_file"]
+    data = json.loads(fail.read_text())
+    data["tokens"].append({
+        "token": token,
+        "email": email,
+        "name": "Uus Kasutaja",
+        "username": username,
+        "role": "contributor",
+        "used": False,
+        "expires_at": "2099-01-01T00:00:00",
+    })
+    fail.write_text(json.dumps(data, ensure_ascii=False))
+
+
+def test_kaks_samaaegset_kutset_saavad_eri_nimed(backend_env):
+    reg = backend_env["registration"]
+    _tee_token(backend_env, "tok-a", "uus@example.test", "uus")
+    _tee_token(backend_env, "tok-b", "uus@example.test", "uus")
+
+    tulemused = []
+    barjaar = threading.Barrier(2, timeout=10)
+
+    def loo(token):
+        barjaar.wait()
+        tulemused.append(reg.create_user_from_invite(token, "TugevParool123!"))
+
+    lõimed = [threading.Thread(target=loo, args=(t,)) for t in ("tok-a", "tok-b")]
+    for l in lõimed:
+        l.start()
+    for l in lõimed:
+        l.join(timeout=20)
+
+    nimed = [k["username"] for k, viga in tulemused if k]
+    assert len(nimed) == 2, tulemused
+    assert len(set(nimed)) == 2, f"kaks kontot said sama nime: {nimed}"
+
+
+def test_kustutatud_nime_ei_anta_uuesti(backend_env):
+    auth = backend_env["auth"]
+    reg = backend_env["registration"]
+    auth.reserve_username("uus")
+    _tee_token(backend_env, "tok-c", "uus@example.test", "uus")
+
+    kasutaja, viga = reg.create_user_from_invite("tok-c", "TugevParool123!")
+    assert viga is None, viga
+    assert kasutaja["username"] != "uus"
+
+
+def test_suggest_username_arvestab_reserveeritud_nime(backend_env):
+    auth = backend_env["auth"]
+    reg = backend_env["registration"]
+    auth.reserve_username("uus")
+    assert reg.suggest_username_for_email("uus@example.test") != "uus"

@@ -9,9 +9,10 @@ import threading
 import time
 import logging
 import bcrypt
+from contextlib import contextmanager
 from datetime import datetime
 from .cache import get_cached_collections
-from .config import USERS_FILE, SESSION_DURATION
+from .config import USERS_FILE, SESSION_DURATION, DELETED_USERNAMES_FILE
 from .utils import atomic_write_json
 from .heartbeat import mark_error, mark_success, register_job
 
@@ -164,6 +165,91 @@ def reload_users_cache():
         _users_cache = _load_users_from_file()
         print(f"Kasutajate cache uuesti laetud: {len(_users_cache)} kasutajat")
         return _users_cache
+
+
+@contextmanager
+def users_transaction():
+    """Kogu loe-kontrolli-muuda-salvesta tsükkel ühe luku all (ADR 0043 p3).
+
+    `load_users()` tagastab JAGATUD `_users_cache` objekti — mitte koopia.
+    Kui üks lõim muudab seda dicti sel ajal, kui teine seda `atomic_write_json`-is
+    serialiseerib, kirjutatakse ketta peale olek, mida kumbki kutsuja ei palunud.
+    `save_users` sees olev lukk kaitseb ainult kirjutamist, mitte kontrolli ja
+    muutmist enne seda.
+
+    `users_lock` on RLock, seega `save_users(users)` tohib olla bloki SEES.
+    Sisse EI panda aeglast kõrvaltegevust (sessioonid, tokenid, e-kiri,
+    parooliräsi) — see hoiaks lukku ilma põhjuseta.
+    """
+    with users_lock:
+        yield load_users()
+
+
+class DeletedUsernamesCorrupt(Exception):
+    """Register on olemas, aga loetamatu.
+
+    Tühjana käsitlemine annaks kustutatud nime uuesti välja — seepärast
+    katkestab see konto loomise ja kustutamise, mitte ei jää vaikselt vahele.
+    """
+
+
+_deleted_usernames_cache = None
+
+
+def _load_deleted_usernames_from_file():
+    if not os.path.exists(DELETED_USERNAMES_FILE):
+        return set()
+    try:
+        with open(DELETED_USERNAMES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        raise DeletedUsernamesCorrupt(str(e))
+    if not isinstance(data, list) or any(not isinstance(x, str) for x in data):
+        raise DeletedUsernamesCorrupt("oodatud on stringide list")
+    return set(data)
+
+
+def load_deleted_usernames():
+    """Mälus hoitav `set`: konto loomise nimekontroll on O(1) liikmesuskontroll,
+    mitte töökollektsioonide failide skann."""
+    global _deleted_usernames_cache
+    with users_lock:
+        if _deleted_usernames_cache is None:
+            _deleted_usernames_cache = _load_deleted_usernames_from_file()
+        return _deleted_usernames_cache
+
+
+def is_username_reserved(username):
+    return username in load_deleted_usernames()
+
+
+def reserve_username(username):
+    """Lisab nime registrisse. Cache avaldatakse alles EDUKA kirjutuse järel.
+
+    Kutsutakse ENNE konto eemaldamise salvestust: kui see kukub, jääb konto
+    alles ja kustutamist saab uuesti proovida. Vastupidises järjekorras jääks
+    konto kustutatuks ja nimi vabaks — just see, mida register välistab.
+    """
+    global _deleted_usernames_cache
+    with users_lock:
+        praegu = load_deleted_usernames()
+        if username in praegu:
+            return
+        uus = sorted(praegu | {username})
+        atomic_write_json(DELETED_USERNAMES_FILE, uus)
+        _deleted_usernames_cache = set(uus)
+
+
+def users_role_snapshot():
+    """Kasutajanimi → roll, KOPEERITUD `users_lock` all (ADR 0043 p3).
+
+    Lukk vabaneb enne tagastust — kutsuja võtab seejärel `_work_sets_lock`-i.
+    Kahte lukku ei hoita kunagi korraga ja kasutajalukku ei võeta koguluku sees.
+    Vahepealne kasutaja kustutamine talutakse inertse jäänukina, mitte
+    failideülese tehinguna.
+    """
+    with users_lock:
+        return {u: d.get("role", "contributor") for u, d in load_users().items()}
 
 
 # Lae cache serveri stardil
@@ -340,20 +426,21 @@ def update_user_role(username, new_role, admin_user):
     if username == admin_user["username"]:
         return False, "Ei saa muuta enda rolli"
 
-    users = load_users()
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud"
 
-    if username not in users:
-        return False, "Kasutajat ei leitud"
+        target_current = users[username].get("role", "contributor")
+        # Invariant: tohib target-i puutuda JA tohib uut rolli määrata
+        if not can_change_role(admin_user["role"], target_current, new_role):
+            return False, "Pole õigust seda kasutajat sellele rollile määrata"
 
-    target_current = users[username].get("role", "contributor")
-    # Invariant: tohib target-i puutuda JA tohib uut rolli määrata
-    if not can_change_role(admin_user["role"], target_current, new_role):
-        return False, "Pole õigust seda kasutajat sellele rollile määrata"
+        old_role = target_current
+        users[username]["role"] = new_role
+        save_users(users)
 
-    old_role = target_current
-    users[username]["role"] = new_role
-    save_users(users)
-
+    # Sessioonide ja tokenite käsitlus on TEADLIKULT luku VÄLJAS: nad võtavad
+    # oma lukud ja pesastamine tekitaks lukujärjekorra-sõltuvuse.
     # Invalideeri kasutaja sessioonid, et uus roll jõustuks kohe (sessioon hoiab
     # user-hetktõmmist) — sama muster nagu delete_user. Kasutaja peab uuesti sisse logima.
     invalidated = delete_user_sessions(username)
@@ -387,33 +474,33 @@ def update_user_allowed_collections(username, collection_ids, admin_user):
     if not isinstance(collection_ids, list):
         return False, "Vigane kollektsioonide nimekiri", []
 
-    users = load_users()
-    if username not in users:
-        return False, "Kasutajat ei leitud", []
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud", []
 
-    # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
-    # Blokeerib võrdse/kõrgema taseme ja iseenda — admini piiramine oleks niikuinii mõttetu.
-    target_role = users[username].get("role", "contributor")
-    if not can_manage_user(admin_user["role"], target_role):
-        return False, "Pole õigust selle kasutaja kollektsioone muuta", []
+        # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
+        # Blokeerib võrdse/kõrgema taseme ja iseenda — admini piiramine oleks niikuinii mõttetu.
+        target_role = users[username].get("role", "contributor")
+        if not can_manage_user(admin_user["role"], target_role):
+            return False, "Pole õigust selle kasutaja kollektsioone muuta", []
 
-    # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad restricted-id-d,
-    # järjesta konfiguratsiooni restricted-kollektsioonide järjekorra järgi (stabiilne diff).
-    collections_config = get_cached_collections()
-    submitted = {c for c in collection_ids if isinstance(c, str)}
-    restricted_ordered = [
-        cid for cid, c in collections_config.items()
-        if c.get("visibility") == "restricted"
-    ]
-    sanitized = [cid for cid in restricted_ordered if cid in submitted]
+        # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad restricted-id-d,
+        # järjesta konfiguratsiooni restricted-kollektsioonide järjekorra järgi (stabiilne diff).
+        collections_config = get_cached_collections()
+        submitted = {c for c in collection_ids if isinstance(c, str)}
+        restricted_ordered = [
+            cid for cid, c in collections_config.items()
+            if c.get("visibility") == "restricted"
+        ]
+        sanitized = [cid for cid in restricted_ordered if cid in submitted]
 
-    # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
-    old = users[username].get("allowed_collections", [])
-    if old == sanitized:
-        return True, "Kollektsioonid uuendatud", sanitized
+        # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
+        old = users[username].get("allowed_collections", [])
+        if old == sanitized:
+            return True, "Kollektsioonid uuendatud", sanitized
 
-    users[username]["allowed_collections"] = sanitized
-    save_users(users)
+        users[username]["allowed_collections"] = sanitized
+        save_users(users)
     # Invalideeri sessioonid, et uus ligipääs jõustuks kohe (peegeldab kollektsiooni-poolset
     # CollectionEditor käitumist). Reset-tokeneid EI tühistata — ligipääs ei muuda rolli.
     delete_user_sessions(username)
@@ -469,33 +556,136 @@ def update_user_edit_collections(username, collection_ids, admin_user):
     if not isinstance(collection_ids, list):
         return False, "Vigane kollektsioonide nimekiri", []
 
-    users = load_users()
-    if username not in users:
-        return False, "Kasutajat ei leitud", []
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud", []
 
-    # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
-    target_role = users[username].get("role", "contributor")
-    if not can_manage_user(admin_user["role"], target_role):
-        return False, "Pole õigust selle kasutaja ulatust muuta", []
+        # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
+        target_role = users[username].get("role", "contributor")
+        if not can_manage_user(admin_user["role"], target_role):
+            return False, "Pole õigust selle kasutaja ulatust muuta", []
 
-    # Sanitiseerimine (KÕIGI kollektsioonide vastu, mitte ainult restricted;
-    # virtual_group välja jäetud) — ühine tee registreerimise omaga, vt
-    # sanitize_edit_collections.
-    collections_config = get_cached_collections()
-    sanitized = sanitize_edit_collections(collection_ids, collections_config)
+        # Sanitiseerimine (KÕIGI kollektsioonide vastu, mitte ainult restricted;
+        # virtual_group välja jäetud) — ühine tee registreerimise omaga, vt
+        # sanitize_edit_collections.
+        collections_config = get_cached_collections()
+        sanitized = sanitize_edit_collections(collection_ids, collections_config)
 
-    # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
-    old = users[username].get("edit_collections", [])
-    if old == sanitized:
-        return True, "Ulatus uuendatud", sanitized
+        # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
+        old = users[username].get("edit_collections", [])
+        if old == sanitized:
+            return True, "Ulatus uuendatud", sanitized
 
-    users[username]["edit_collections"] = sanitized
-    save_users(users)
+        users[username]["edit_collections"] = sanitized
+        save_users(users)
     # Sessioon kannab kasutajaobjekti hetktõmmist (require_token tagastab
     # session["user"]) — ilma invalideerimiseta jääks vana ulatus 24h kehtima.
     delete_user_sessions(username)
     print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' kirjutamisulatust: {old} -> {sanitized}")
     return True, "Ulatus uuendatud", sanitized
+
+
+_RIGHTS_FIELDS = {"allowed": "allowed_collections", "edit": "edit_collections"}
+
+
+def apply_collection_rights_delta(changes, admin_user):
+    """Muudab AINULT nimetatud määranguid (ADR 0043 p2).
+
+    Vana täisasendus (`update_user_allowed_collections`) kirjutas terve loendi
+    üle ja võis avalikuks muutunud kogu ID sanitiseerimisel vaikselt maha võtta.
+    Delta puudutab ainult loetletud (kasutaja, kogu, väli) kolmikuid; teised
+    kasutajad ja kogud jäävad puutumata.
+
+    Kogu pakett valideeritakse ENNE ühtki muudatust: vea korral ei rakendu
+    sellest midagi. Tagastab (ok, sõnum, kinnitatud_olek), kus kinnitatud_olek
+    katab ainult puudutatud kasutajaid — klient kirjutab selle oma state'i,
+    mitte oma optimistlikku oletust.
+    """
+    if not isinstance(changes, list):
+        return False, "Vigane muudatuste nimekiri", {}
+
+    collections_config = get_cached_collections()
+
+    # 1) Kuju ja vastuolude kontroll
+    soovid = {}  # (username, field, collection_id) -> "add" | "remove"
+    for muudatus in changes:
+        if not isinstance(muudatus, dict):
+            return False, "Vigane muudatus", {}
+        username = muudatus.get("username")
+        collection_id = muudatus.get("collection_id")
+        field = muudatus.get("field")
+        action = muudatus.get("action")
+        if not isinstance(username, str) or not username.strip():
+            return False, "Kasutajanimi puudub", {}
+        if not isinstance(collection_id, str) or not collection_id.strip():
+            return False, "Kollektsiooni ID puudub", {}
+        if field not in _RIGHTS_FIELDS:
+            return False, "field peab olema 'allowed' või 'edit'", {}
+        if action not in ("add", "remove"):
+            return False, "action peab olema 'add' või 'remove'", {}
+        voti = (username, field, collection_id)
+        if voti in soovid and soovid[voti] != action:
+            return False, f"Vastuoluline kordus: {username}/{collection_id}/{field}", {}
+        soovid[voti] = action
+
+    # 2) Sisuline valideerimine (kogu pakett ENNE muutmist) ja 3) rakendamine
+    #    sama luku all — vahepealne rollimuutus ei tohi valideerimist möödutada.
+    with users_transaction() as users:
+        for (username, field, collection_id), action in soovid.items():
+            if username not in users:
+                return False, f"Kasutajat '{username}' ei leitud", {}
+            target_role = users[username].get("role", "contributor")
+            if not can_manage_user(admin_user["role"], target_role):
+                return False, f"Pole õigust kasutaja '{username}' õigusi muuta", {}
+            if action == "remove":
+                # Eemaldamine on koristustoiming: puuduv või avalikuks muutunud
+                # kogu ID tohib alati maha võtta.
+                continue
+            kogu = collections_config.get(collection_id)
+            if kogu is None:
+                return False, f"Kollektsiooni '{collection_id}' ei leitud", {}
+            if field == "allowed" and kogu.get("visibility") != "restricted":
+                return False, (f"Kollektsioon '{collection_id}' on avalik — "
+                               f"lugemisõiguse määrangut ei lisata"), {}
+            if field == "edit" and kogu.get("type") == "virtual_group":
+                return False, (f"Virtuaalsele rühmale '{collection_id}' "
+                               f"kirjutamisulatust ei määrata"), {}
+
+        jarjekord = list(collections_config.keys())
+        muutunud = set()
+        for (username, field, collection_id), action in soovid.items():
+            vali = _RIGHTS_FIELDS[field]
+            praegu = list(users[username].get(vali, []))
+            if action == "add" and collection_id not in praegu:
+                praegu.append(collection_id)
+            elif action == "remove" and collection_id in praegu:
+                praegu = [c for c in praegu if c != collection_id]
+            else:
+                continue  # juba soovitud olekus
+            # Deterministlik järjekord: konfiguratsiooni oma, tundmatud lõppu.
+            praegu.sort(key=lambda c: (jarjekord.index(c) if c in jarjekord
+                                       else len(jarjekord), c))
+            users[username][vali] = praegu
+            muutunud.add(username)
+
+        if muutunud:
+            save_users(users)
+
+        kinnitatud = {
+            u: {
+                "allowed_collections": list(users[u].get("allowed_collections", [])),
+                "edit_collections": list(users[u].get("edit_collections", [])),
+            }
+            for u in {kasutaja for kasutaja, _, _ in soovid}
+        }
+
+    # Sessioonid luku VÄLJAS, üks kord muutunud inimese kohta: viis muudetud
+    # kasutajat = viie inimese sessioonide lõpp, aga ühe inimese kaks muudatust
+    # ei logi teda kaks korda välja.
+    for username in sorted(muutunud):
+        delete_user_sessions(username)
+
+    return True, "Õigused uuendatud", kinnitatud
 
 
 def delete_user(username, admin_user):
@@ -513,18 +703,24 @@ def delete_user(username, admin_user):
     if username == admin_user["username"]:
         return False, "Ei saa kustutada ennast"
 
-    users = load_users()
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud"
 
-    if username not in users:
-        return False, "Kasutajat ei leitud"
+        # Invariant: tohib kustutada ainult rangelt madalamat taset
+        if not can_manage_user(admin_user["role"], users[username].get("role", "contributor")):
+            return False, "Pole õigust seda kasutajat kustutada"
 
-    # Invariant: tohib kustutada ainult rangelt madalamat taset
-    if not can_manage_user(admin_user["role"], users[username].get("role", "contributor")):
-        return False, "Pole õigust seda kasutajat kustutada"
-
-    deleted_name = users[username].get("name", username)
-    del users[username]
-    save_users(users)
+        deleted_name = users[username].get("name", username)
+        try:
+            # Reserveering ENNE konto eemaldamist (ADR 0043 p8): kirjutusviga
+            # jätab konto alles, mitte ei vabasta nime.
+            reserve_username(username)
+        except (DeletedUsernamesCorrupt, OSError) as e:
+            print(f"Kustutamine katkestatud: nimeregistri kirjutus ebaõnnestus ({username}): {e}")
+            return False, "Kasutajanime registreerimine ebaõnnestus, proovi uuesti"
+        del users[username]
+        save_users(users)
 
     # Eemalda kasutaja aktiivsed sessioonid (lukuga, vt delete_user_sessions)
     removed = delete_user_sessions(username)
