@@ -66,9 +66,16 @@ interface CollectionEditorProps {
    * autoriseerimine — serveri `require_role("superadmin")` jääb alles.
    */
   canEditSettings?: boolean;
+  /** Juhitav valik. Kui antud, ei hoia editor oma valikut. */
+  selectedId?: string;
+  onSelectId?: (id: string) => void;
+  /** Kas näidata editori enda kogu-valijat? Hubis valib rida. */
+  showPicker?: boolean;
 }
 
-const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = true }) => {
+const CollectionEditor: React.FC<CollectionEditorProps> = ({
+  canEditSettings = true, selectedId, onSelectId, showPicker = true,
+}) => {
   const { t } = useTranslation(['admin', 'common']);
   const { user, authToken } = useUser();
   const { collections, refreshCollections } = useCollection();
@@ -79,7 +86,16 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = t
     [user]);
 
   // --- Kirjelduse muutmine ---
-  const [selectedId, setSelectedId] = useState<string>('');
+  // Juhitav/juhtimata muster: ilma `selectedId` propita töötab editor edasi
+  // täpselt nagu enne (oma valik, oma valija) — see hoiab olemasoleva
+  // kasutuskoha muutmatuna, kuni hub on valmis.
+  const [omaValik, setOmaValik] = useState<string>('');
+  const juhitud = selectedId !== undefined;
+  const valitud = juhitud ? selectedId : omaValik;
+  const vahetaValik = (id: string) => {
+    if (!juhitud) setOmaValik(id);
+    onSelectId?.(id);
+  };
   const [descEt, setDescEt] = useState('');
   const [descEn, setDescEn] = useState('');
   const [descLongEt, setDescLongEt] = useState('');
@@ -136,31 +152,31 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = t
     setDeleteWorksCount(null);
     setDeleteInput('');
     setDeleteError(null);
-  }, [selectedId]);
+  }, [valitud]);
 
   // Lae valitud kollektsiooni andmed vormi
   useEffect(() => {
-    if (!selectedId || !collections[selectedId]) {
+    if (!valitud || !collections[valitud]) {
       setDescEt(''); setDescEn(''); setDescLongEt(''); setDescLongEn('');
       return;
     }
-    const col = collections[selectedId];
+    const col = collections[valitud];
     setDescEt(col.description?.et || '');
     setDescEn(col.description?.en || '');
     setDescLongEt(col.description_long?.et || '');
     setDescLongEn(col.description_long?.en || '');
     setEditColor(col.color || 'indigo');
     setEditVisibility((col.visibility as 'public' | 'restricted') || 'public');
-  }, [selectedId, collections]);
+  }, [valitud, collections]);
 
   const handleSave = async () => {
-    if (!selectedId) return;
+    if (!valitud) return;
     setSaving(true);
     setSaveError(null);
     setSaved(false);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${selectedId}`,
+        `${FILE_API_URL}/admin/collections/${valitud}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
@@ -189,14 +205,14 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = t
   };
 
   const handleStartDelete = async () => {
-    if (!selectedId) return;
+    if (!valitud) return;
     setDeleteConfirming(true);
     setDeleteWorksCount(null);
     setDeleteInput('');
     setDeleteError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${selectedId}/works-count`,
+        `${FILE_API_URL}/admin/collections/${valitud}/works-count`,
         { headers: getAuthHeaders(authToken), timeout: 10000 }
       );
       const data = await res.json();
@@ -207,18 +223,18 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = t
   };
 
   const handleDelete = async () => {
-    if (!selectedId) return;
+    if (!valitud) return;
     setDeleting(true);
     setDeleteError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${selectedId}`,
+        `${FILE_API_URL}/admin/collections/${valitud}`,
         { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 30000 }
       );
       const data = await res.json();
       if (data.status === 'success') {
         await refreshCollections();
-        setSelectedId('');
+        vahetaValik('');
         setDeleteConfirming(false);
         setDeleteInput('');
       } else {
@@ -277,8 +293,8 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = t
     }
   };
 
-  const selectedName = selectedId && collections[selectedId]
-    ? (collections[selectedId].name.et)
+  const selectedName = valitud && collections[valitud]
+    ? (collections[valitud].name.et)
     : '';
 
   return (
@@ -286,25 +302,27 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = t
       <h2 className="text-lg font-semibold text-gray-800">{t('collections.title')}</h2>
 
       {/* Kollektsiooni valik */}
+      {showPicker && (
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           {t('collections.selectCollection')}
         </label>
         <select
-          value={selectedId}
-          onChange={e => setSelectedId(e.target.value)}
+          value={valitud}
+          onChange={e => vahetaValik(e.target.value)}
           className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
         >
           <option value="">{t('collections.selectCollection')}</option>
           {renderTreeOptions(tree)}
         </select>
       </div>
+      )}
 
       {!canEditSettings && (
         <p className="text-sm text-gray-500">{t('collections.superadminOnlyHint')}</p>
       )}
 
-      {selectedId && (
+      {valitud && (
         <div className="space-y-6">
           {/* Seaded on superadmini piir (ADR 0043 p4). */}
           {canEditSettings && (
@@ -359,8 +377,8 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({ canEditSettings = t
               // „praegu ei mõju"). Paneel laeb oma oleku ise ega näe seda
               // muutust — võti sunnib ta uuesti laadima. Enne salvestust
               // radio lülitamine võtit ei muuda, seega mustand jääb alles.
-              key={`${selectedId}:${collections[selectedId]?.visibility || 'public'}`}
-              collectionId={selectedId}
+              key={`${valitud}:${collections[valitud]?.visibility || 'public'}`}
+              collectionId={valitud}
               users={allUsers}
               usersKnown={usersKnown}
               actor={actor}
