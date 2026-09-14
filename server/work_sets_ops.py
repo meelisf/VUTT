@@ -98,7 +98,11 @@ def create_work_set(name: dict, description: Optional[dict], username: str) -> d
             "visibility": "members",
             "status": "active",
             "ever_published": False,
-            "access": {username: "manager"},
+            # Looja EI saa automaatset access-kirjet: kogusid loovad admin+,
+            # kelle haldusõigus tuleneb rollist. Dekoratiivne kirje eksitas
+            # „Minu õigused" loendit ja nõudis hiljem koristuserandit
+            # (ADR 0043 p5). `created_by` jääb auditiinfoks.
+            "access": {},
             "works": [],
             "revision": 1,
             "created_by": username,
