@@ -173,15 +173,32 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
   const map = useMap();
   const [mapLibre, setMapLibre] = useState<MapLibreMap | null>(null);
   const originalFilters = useRef(new Map<string, FilterSpecification | null>());
+  /** Kas MapLibre'i eksemplar on veel elus.
+   *
+   * `remove()` nullib MapLibre'i `style` välja, mille peale iga hilisem
+   * `setFeatureState` / `setData` viskab „can't access property …,
+   * this.style is undefined" ja React näitab veaekraani.
+   *
+   * Kaks teed satuvad sinna:
+   *  1. Efektide koristus käib DEKLAREERIMISE järjekorras — kihi eemaldus
+   *     (allpool) jõuab hover-efekti koristusele ette.
+   *  2. `loadRegions` puudutab allikat pärast `await`-i; `abort()` ei jõua
+   *     enam vahele, kui päring just lahenes.
+   *
+   * See lipp on ainus asi, mis need teed ühendab: `mapLibre` viide jääb
+   * kehtima ka pärast mahavõtmist, seega objekti olemasolust ei piisa. */
+  const mapLibreAlive = useRef(false);
 
   useEffect(() => {
     const layer = L.maplibreGL({
       style: HISTORICAL_STYLE_URL,
       attributionControl: { customAttribution: OHM_ATTRIBUTION },
     }).addTo(map);
+    mapLibreAlive.current = true;
     setMapLibre(layer.getMaplibreMap());
 
     return () => {
+      mapLibreAlive.current = false;
       map.removeLayer(layer);
     };
   }, [map]);
@@ -264,6 +281,10 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
       controller = new AbortController();
       try {
         const response = await fetchHistoricalRegions({ year, ...requestBounds }, controller.signal);
+        // `abort()` ei jõua enam vahele, kui päring just lahenes: koristus ja
+        // see jätk on sama mikrotaski-ketta kaks otsa. Ilma kontrollita
+        // kirjutaks `setData` juba mahavõetud kaardi allikasse.
+        if (!mapLibreAlive.current) return;
         const received = response.geojson as unknown as FeatureCollection;
         for (const feature of received.features) {
           const id = feature.id ?? (feature.properties?.relation_id as string | number | undefined);
@@ -306,7 +327,12 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
 
     const clearHover = () => {
       if (hoveredId !== null) {
-        mapLibre.setFeatureState({ source: REGION_SOURCE_ID, id: hoveredId }, { hover: false });
+        // Mahavõetud kaardil ei ole olekut, mida lähtestada — ja puudutus
+        // viskaks. Lähtestamine on siis niikuinii mõttetu töö: kogu
+        // feature-state hävib koos kaardiga.
+        if (mapLibreAlive.current) {
+          mapLibre.setFeatureState({ source: REGION_SOURCE_ID, id: hoveredId }, { hover: false });
+        }
         hoveredId = null;
       }
       map.getContainer().style.cursor = '';
