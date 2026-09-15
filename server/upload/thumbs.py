@@ -331,7 +331,17 @@ def poll_and_sync_thumbs(
             if s:
                 s["files"] = new_files
                 s["last_progress_at"] = last_progress_at
-                if new_status != s.get("status"):
+                # CAS: staatust kirjutame AINULT siis, kui ta on tsükli
+                # algusest saadik puutumata. `new_status` on tuletatud
+                # hetktõmmisest, mis võeti enne kümneid sekundeid SFTP-tööd —
+                # vahepeal võib apply-lõim olla `applying → processing`
+                # kirjutanud. Paljas `!=` kirjutas siis vananenud väärtuse
+                # tagasi ja upload jäi IGAVESEKS `applying`-usse: CAS keeldus
+                # („Rakenda" = 409) ja iga järgmine poll kinnitas seisu uuesti,
+                # sest `applying` ei ole PREPRESS_IDLE_STATUSES-es (y5fcky,
+                # 2026-09-15). I1 keelab polli staatuseOTSUSE; see rida keelab
+                # ka vananenud staatuse TAASTAMISE.
+                if s.get("status") == current_status and new_status != current_status:
                     s["status"] = new_status
                 upload_state.write_state(upload_id, s)
 
