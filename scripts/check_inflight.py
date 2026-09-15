@@ -25,7 +25,13 @@ from datetime import datetime
 # `preview_status` jääb igaveseks "rendering"-uks — viisardi umbtee
 # (`start_preview` väljub idempotentsuse tõttu, „Rakenda" on disabled).
 # Käivituse taaste vabastab selle, aga kasutaja kaotab pooleli töö.
-UPLOAD_LENNUS = ("applying", "processing", "collecting_images", "prepping")
+# `ada_fetching`: ~320 MB server-server allalaadimine. Taaste annab
+# selge vea + „Laen uuesti", aga kogu allalaadimine algab otsast.
+# `importing`: taaste annab staatuse tagasi, AGA kui restart tabas
+# kirjutamise hetke, jääb poolik teosekaust alles ja järgmine katse
+# lõpeb „Kaust on juba olemas" — sealt edasi ainult käsitsi serveris.
+UPLOAD_LENNUS = ("applying", "processing", "collecting_images", "prepping",
+                 "ada_fetching", "importing")
 
 # Re-OCR töö staatused, mis tähendavad elavat lõime.
 REOCR_LENNUS = ("uploading", "processing", "cancelling")
