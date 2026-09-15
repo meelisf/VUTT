@@ -16,6 +16,7 @@ struktuuri — ja `auth_token`-i nimelise välja sinna kõrvale (vt #237).
 """
 import json
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -32,6 +33,60 @@ MAX_MESSAGE_LEN = 500
 MAX_STACK_LEN = 4000
 MAX_URL_LEN = 500
 MAX_UA_LEN = 300
+
+# --- Volituste eemaldamine --------------------------------------------------
+#
+# `/set-password?token=<uuid>` loeb tokeni päringustringist, seega puhastamata
+# URL kirjutaks kehtiva kutse- või paroolivahetuse tokeni admini nähtavasse
+# logisse. Klient puhastab juba oma pool (`src/services/scrubSensitive.ts`),
+# aga KLIENT ON ANDMED: vana vahemälust laaditud bundle või käsitsi koostatud
+# päring saadab mida tahes. Server ei tohi salvestada seda, mida ta kuvada ei
+# tohi — sama õppetund kui #237, kus kirjutustee-pop ei puhastanud juba
+# salvestatud kirjeid.
+#
+# Reegel on KAHEOSALINE, sest kumbki pool üksi lekiks:
+#   1. võtmenimi — katab lühikesi väärtusi (`?reset=1`)
+#   2. väärtuse KUJU — katab tulevasi võtmenimesid, mida keegi ei mäletanud
+#      nimekirja lisada. Paljas denylist on nimekiri, mis jääb alati maha.
+#
+# Kaks keelt, üks reegel: TS-pool peab kandma sama nimekirja ja sama kuju.
+REDACTED = "<eemaldatud>"
+
+SENSITIVE_KEYS = {
+    "token", "auth_token", "access_token", "refresh_token",
+    "reset", "invite", "key", "apikey", "api_key",
+    "password", "pwd", "secret", "sig", "signature", "exp", "session",
+}
+
+_TOKENISH = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+_LONG_OPAQUE = re.compile(r"^[A-Za-z0-9_-]{24,}$")
+_PARAM = re.compile(r"([?&])([A-Za-z0-9_-]+)=([^&\s\"')\]]+)")
+
+
+def _on_tundlik(votme_nimi: str, vaartus: str) -> bool:
+    if votme_nimi.lower() in SENSITIVE_KEYS:
+        return True
+    return bool(_TOKENISH.match(vaartus) or _LONG_OPAQUE.match(vaartus))
+
+
+def scrub(tekst: Optional[str]) -> Optional[str]:
+    """Asendab tundlike päringuparameetrite väärtused.
+
+    Töötab nii paljal URL-il kui teate/stacki SEES peituval päringustringil —
+    üks funktsioon, sest leke näeb mõlemas kohas ühtemoodi välja.
+    """
+    if not tekst:
+        return tekst
+
+    def _asenda(m):
+        eraldaja, votme_nimi, vaartus = m.group(1), m.group(2), m.group(3)
+        if _on_tundlik(votme_nimi, vaartus):
+            return "{}{}={}".format(eraldaja, votme_nimi, REDACTED)
+        return m.group(0)
+
+    return _PARAM.sub(_asenda, tekst)
+
 
 _lock = threading.Lock()
 _cache: Optional[List[dict]] = None
@@ -83,9 +138,9 @@ def record_error(payload: dict, *, ip: str = "", username: Optional[str] = None)
 
     kirje = {
         "received_at": datetime.now(timezone.utc).isoformat(),
-        "message": message.strip(),
-        "stack": _lyhenda(payload.get("stack"), MAX_STACK_LEN),
-        "url": _lyhenda(payload.get("url"), MAX_URL_LEN),
+        "message": scrub(message.strip()),
+        "stack": scrub(_lyhenda(payload.get("stack"), MAX_STACK_LEN)),
+        "url": scrub(_lyhenda(payload.get("url"), MAX_URL_LEN)),
         "user_agent": _lyhenda(payload.get("user_agent"), MAX_UA_LEN),
         # Kust viga tuli: "boundary" (React), "window" (onerror),
         # "promise" (unhandledrejection). Kliendi enda silt, ainult vihjeks.

@@ -13,7 +13,10 @@ async function freshReporter() {
 }
 
 function mockFetch() {
-  const fn = vi.fn(() => Promise.resolve({ ok: true } as Response));
+  // Argumendid PEAVAD olema tüübis: ilma nendeta on `mock.calls` tüüp `[]` ja
+  // `calls[0][1]` ei kompileeru (CI püüdis, `build` mitte).
+  const fn = vi.fn((_url: string, _init?: RequestInit) =>
+    Promise.resolve({ ok: true } as Response));
   vi.stubGlobal('fetch', fn);
   return fn;
 }
@@ -29,9 +32,9 @@ describe('clientErrorReporter', () => {
     reportClientError({ message: 'katki', stack: 'fe@x.js:1', source: 'boundary' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain('/client-error');
-    const body = JSON.parse(init.body as string);
+    const body = JSON.parse(init!.body as string);
     expect(body.message).toBe('katki');
     expect(body.source).toBe('boundary');
     // `keepalive`: viga võib tabada vahetult enne lehelt lahkumist.
@@ -108,7 +111,7 @@ describe('clientErrorReporter', () => {
     }));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
     expect(body.source).toBe('window');
   });
 });

@@ -5,6 +5,7 @@ Eesmärk: vead, mida kasutaja kunagi ei raporteeri, jõuavad ise kohale.
 neid — kaardi `setFeatureState` tabas iga klikkijat ja `y5fcky` seisis tunde.
 """
 import json
+import re
 import os
 import sys
 from pathlib import Path
@@ -168,3 +169,74 @@ def test_lugemistee_on_admini_taga():
         allkiri = str(route.endpoint.__defaults__)
         assert "require_role" in allkiri or route.dependencies, (
             f"{meetod} /admin/client-errors ei ole rolli taga")
+
+
+# --- Volitused ei tohi logisse jõuda (#133 ülevaatus) ----------------------
+
+def test_server_puhastab_tokeni_ka_siis_kui_klient_ei_puhastanud(logi):
+    """Klient on ANDMED, mitte filter.
+
+    Kliendipoolne puhastus on esimene kaitse, aga vana vahemälust laaditud
+    bundle või käsitsi koostatud päring saadab mida tahes. Server EI TOHI
+    salvestada seda, mida ta kuvada ei tohi — sama õppetund kui #237, kus
+    kirjutustee-pop ei puhastanud juba salvestatud kirjeid.
+    """
+    client_errors.record_error({
+        "message": "viga",
+        "url": "/set-password?token=3f1a9c22-77bd-4e1a-9b3e-5c1d2e3f4a5b",
+    }, ip="10.0.0.1")
+
+    kirje = client_errors.list_errors()[0]
+    assert "3f1a9c22" not in kirje["url"]
+    assert "/set-password" in kirje["url"], "tee peab alles jääma"
+
+
+def test_server_puhastab_tokeni_teatest_ja_stackist(logi):
+    client_errors.record_error({
+        "message": "Failed at /set-password?token=3f1a9c22-77bd-4e1a-9b3e-5c1d2e3f4a5b",
+        "stack": "at x (/invite?invite=3f1a9c22-77bd-4e1a-9b3e-5c1d2e3f4a5b)",
+    }, ip="10.0.0.1")
+
+    kirje = client_errors.list_errors()[0]
+    assert "3f1a9c22" not in kirje["message"]
+    assert "3f1a9c22" not in kirje["stack"]
+
+
+def test_server_sailitab_diagnostilise_paringu(logi):
+    """Puhastus ei tohi diagnostikat ära süüa: `?view=map` ütles, MIS katki."""
+    client_errors.record_error({
+        "message": "viga",
+        "url": "/persons?view=map&related_to=vutt:Pj1blexq",
+    }, ip="10.0.0.1")
+
+    kirje = client_errors.list_errors()[0]
+    assert "view=map" in kirje["url"]
+    assert "related_to=vutt:Pj1blexq" in kirje["url"]
+
+
+def test_server_puhastab_tundmatu_votmenimega_uuidi(logi):
+    """Denylist on nimekiri, mis jääb alati maha — kuju peab ka katma."""
+    client_errors.record_error({
+        "message": "viga",
+        "url": "/x?k=3f1a9c22-77bd-4e1a-9b3e-5c1d2e3f4a5b",
+    }, ip="10.0.0.1")
+
+    assert "3f1a9c22" not in client_errors.list_errors()[0]["url"]
+
+
+def test_kaks_keelt_uks_reegel():
+    """TS- ja Python-pool peavad kandma SAMA tundlike võtmete nimekirja.
+
+    Ainult ühte poolde lisatud võti tähendab, et klient saadab tokeni ära
+    (kui puudu on TS-pool) või server salvestab ta (kui puudu on Python-pool).
+    Kumbki üksi ei ole kaitse — vt `scrubSensitive.ts` päis.
+    """
+    ts = (Path(__file__).resolve().parents[1]
+          / "src" / "services" / "scrubSensitive.ts").read_text(encoding="utf-8")
+    plokk = ts.split("SENSITIVE_KEYS = new Set([")[1].split("]);")[0]
+    ts_votmed = set(re.findall(r"'([^']+)'", plokk))
+
+    assert ts_votmed == client_errors.SENSITIVE_KEYS, (
+        "nimekirjad lahknesid — ainult TS-is: {} · ainult Pythonis: {}".format(
+            sorted(ts_votmed - client_errors.SENSITIVE_KEYS),
+            sorted(client_errors.SENSITIVE_KEYS - ts_votmed)))

@@ -1,4 +1,5 @@
 import { FILE_API_URL } from '../config';
+import { scrubUrl, scrubText } from './scrubSensitive';
 
 /**
  * Saadab kliendipoolsed vead serverisse (#133).
@@ -49,11 +50,16 @@ export function reportClientError({ message, stack, source }: ClientErrorPayload
     sent += 1;
 
     const body = JSON.stringify({
-      message: text,
-      stack: stack ?? null,
-      // URL-i paneb klient, sest server näeb ainult seda endpointi. Päringustring
-      // tuleb kaasa — just tema ütles y5fcky puhul, MIS lehel viga juhtus.
-      url: window.location.pathname + window.location.search,
+      // Volitused EI TOHI raportisse jõuda: `/set-password?token=<uuid>` loeb
+      // tokeni päringustringist, seega toores `search` kirjutaks kehtiva
+      // paroolivahetuse tokeni admini nähtavasse logisse. Server puhastab sama
+      // reegliga uuesti — klient on ANDMED, mitte filter.
+      message: scrubText(text),
+      stack: scrubText(stack) ?? null,
+      // URL-i paneb klient, sest server näeb ainult seda endpointi. Puhastatud
+      // päringustring tuleb kaasa — just tema ütles kaardivea puhul, MIS lehel
+      // viga juhtus (`?view=map`).
+      url: scrubUrl(window.location.pathname + window.location.search),
       user_agent: navigator.userAgent,
       source,
     });
