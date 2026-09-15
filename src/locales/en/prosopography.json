@@ -330,5 +330,16 @@
     "noChanges": "No changes found",
     "empty": "No history yet"
   },
-  "loadingVocab": "Loading…"
+  "loadingVocab": "Loading…",
+  "scope": {
+    "clearHint": "Remove restriction — search continues across all of VUTT",
+    "workSet": "Work collection"
+  },
+  "similar": {
+    "confirmRequired": "A person with this name already exists. Review the match or confirm this is a different person.",
+    "distinct": "This is a different person — continue with a new record",
+    "title": "Similar people across all of VUTT",
+    "view": "View person",
+    "workCount": "{{count}} works"
+  }
 }

@@ -23,6 +23,7 @@ import { usePersonTagSuggestions } from '../hooks/usePersonTagSuggestions';
 import { CollapsibleSection, DynamicList } from '../components/personForm/CollapsibleSection';
 import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
 import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
+import SimilarPersonsWarning from '../components/personForm/SimilarPersonsWarning';
 import PlacePicker from '../components/personForm/PlacePicker';
 import { formatRelationOwnerName, formatRelationTypeLabel } from '../utils/estonianName';
 import { getVocabularies } from '../../services/collectionService';
@@ -72,6 +73,10 @@ const PersonEditPage: React.FC = () => {
   const lang = i18n.language?.slice(0, 2) ?? 'et';
 
   // Profiilipilt
+  // Dublikaadihoiatus (#240). `similarCount` on salvestusvärava sisend,
+  // `similarDismissed` kasutaja kinnitus „see on teine inimene".
+  const [similarCount, setSimilarCount] = useState(0);
+  const [similarDismissed, setSimilarDismissed] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -199,6 +204,16 @@ const PersonEditPage: React.FC = () => {
    */
   const savePerson = async (): Promise<boolean> => {
     if (!draft.name_label.trim()) { setError(t('form.nameRequired')); return false; }
+    // Võimaliku dublikaadi korral peab kasutaja enne salvestamist kas
+    // olemasoleva kaardi üle vaatama või kinnitama, et tegu on teise inimesega
+    // (#240). Eraldi kohustuslikku otsingusammu EI ole — värav käib ainult
+    // siis, kui vasteid päriselt on. Nime sarnasus ei ole loomiskeeld:
+    // kinnitus on vasteploki sees ühe klikiga.
+    if (isNew && similarCount > 0 && !similarDismissed) {
+      setError(t('similar.confirmRequired',
+        'Sama nimega isik on juba olemas. Vaata vaste üle või kinnita, et tegu on teise inimesega.'));
+      return false;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -317,6 +332,38 @@ const PersonEditPage: React.FC = () => {
           </div>
         )}
 
+        {/* ── Nimi ja olemasolu kontroll (ainult uus isik) ──
+            Nimi tuleb ENNE välisallikast otsimist ja profiilipilti: kasutaja
+            peab nägema võimalikku olemasolevat kaarti enne, kui ta hakkab uut
+            täitma (#240). */}
+        {isNew && (
+          <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+              {t('form.nameLabel')} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={draft.name_label}
+              onChange={e => {
+                // Kinnitus „see on teine inimene" kehtib ÜHE nime kohta. Ilma
+                // lähtestamiseta lülitaks üks kinnitus hoiatuse välja kogu
+                // ülejäänud täitmise ajaks, ka päris uue nime peal.
+                setSimilarDismissed(false);
+                set({ name_label: e.target.value });
+              }}
+              placeholder="Anna Margaretha von Fersen"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            />
+            <SimilarPersonsWarning
+              name={draft.name_label}
+              token={token}
+              dismissed={similarDismissed}
+              onDismiss={() => setSimilarDismissed(true)}
+              onMatchesChange={setSimilarCount}
+            />
+          </div>
+        )}
+
         {/* ── Rikastamine välisallikatest (ainult uus isik) ── */}
         {isNew && !enrichedWith && (
           <EnrichmentSearch
@@ -424,18 +471,21 @@ const PersonEditPage: React.FC = () => {
         {/* ── Identiteedi kaart ── */}
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5 space-y-5">
 
-          <div>
-            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-              {t('form.nameLabel')} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={draft.name_label}
-              onChange={e => set({ name_label: e.target.value })}
-              placeholder="Anna Margaretha von Fersen"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-            />
-          </div>
+          {/* Uue isiku puhul on nimeväli juba vormi alguses — siin teda ei korrata. */}
+          {!isNew && (
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+                {t('form.nameLabel')} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={draft.name_label}
+                onChange={e => set({ name_label: e.target.value })}
+                placeholder="Anna Margaretha von Fersen"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">{t('form.nameFirst')}</label>

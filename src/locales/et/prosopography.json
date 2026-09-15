@@ -330,5 +330,16 @@
     "noChanges": "Muudatusi ei leitud",
     "empty": "Ajalugu puudub"
   },
-  "loadingVocab": "Laadin…"
+  "loadingVocab": "Laadin…",
+  "scope": {
+    "clearHint": "Eemalda piirang — otsib edasi kogu VUTT-ist",
+    "workSet": "Töökollektsioon"
+  },
+  "similar": {
+    "confirmRequired": "Sama nimega isik on juba olemas. Vaata vaste üle või kinnita, et tegu on teise inimesega.",
+    "distinct": "See on teine inimene — jätkan uue isikuga",
+    "title": "Sarnased isikud kogu VUTT-ist",
+    "view": "Vaata isikut",
+    "workCount": "{{count}} teost"
+  }
 }
