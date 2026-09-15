@@ -93,7 +93,7 @@ const Admin: React.FC = () => {
     {
       key: 'collections',
       icon: <Library size={18} className="text-violet-600" />,
-      group: t('admin:groups.settings'),
+      group: t('admin:groups.content'),
       href: '/admin/collections',
     },
     {
@@ -119,12 +119,6 @@ const Admin: React.FC = () => {
       icon: <MapPin size={18} className="text-teal-600" />,
       group: t('admin:groups.settings'),
       href: '/admin/places',
-    },
-    {
-      key: 'workSets',
-      icon: <Users size={18} className="text-primary-600" />,
-      group: t('admin:groups.content'),
-      href: '/admin/work-sets',
     },
   ];
 

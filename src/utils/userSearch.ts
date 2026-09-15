@@ -6,24 +6,20 @@
  * kollektsioonipaneel ei leidnud „jogi"-ga nime „Jõgi", töökollektsiooni oma
  * leidis. Eestikeelsete nimede juures on see päris viga, mitte kosmeetika.
  */
+import { normalizeForSearch } from './diacritics';
+
 export interface SearchableUser {
   username: string;
   name: string;
   email: string;
 }
 
-function normaliseeri(s: string): string {
-  // NFD + kombineerivate märkide eemaldus: „Jõgi" ja „Jogi" peavad leidma
-  // teineteist MÕLEMAS suunas.
-  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-}
-
 /** Otsib nime, kasutajanime ja e-posti järgi. Tühi päring annab kõik. */
 export function searchUsers<T extends SearchableUser>(users: T[], query: string): T[] {
-  const q = normaliseeri(query);
+  const q = normalizeForSearch(query);
   if (!q) return users;
   return users.filter(u =>
-    normaliseeri(u.name).includes(q)
-    || normaliseeri(u.username).includes(q)
-    || normaliseeri(u.email).includes(q));
+    normalizeForSearch(u.name).includes(q)
+    || normalizeForSearch(u.username).includes(q)
+    || normalizeForSearch(u.email).includes(q));
 }

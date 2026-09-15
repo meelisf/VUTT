@@ -209,6 +209,27 @@
       "retry": "Try again",
       "remnantRole": "this saved assignment has no effect, the right comes from the role",
       "remnantPublic": "this saved assignment has no effect, the collection is public"
+    },
+    "hub": {
+      "title": "Collections",
+      "typeAll": "All",
+      "typeCollections": "Collections",
+      "typeWorkSets": "Work collections",
+      "searchPlaceholder": "Search by collection name",
+      "noMatches": "No collection matches the search",
+      "badgeCollection": "Collection",
+      "badgeWorkSet": "Work collection",
+      "badgeVirtual": "Group",
+      "badgeRestricted": "Restricted",
+      "badgeArchived": "Archived",
+      "empty": "No collections",
+      "notFound": "Collection not found",
+      "tabWorks": "Works",
+      "tabAccess": "Access",
+      "tabSettings": "Settings",
+      "worksLink": "Open this collection's works in search",
+      "settingsSuperadminOnly": "Only a superadmin can change collection settings.",
+      "newWorkSet": "New work collection"
     }
   },
   "workSets": {
@@ -277,8 +298,7 @@
     "trash": "Trash",
     "maintenance": "Maintenance",
     "places": "Place Register",
-    "pending": "{{count}} pending",
-    "workSets": "Work collections"
+    "pending": "{{count}} pending"
   },
   "groups": {
     "users": "Users",

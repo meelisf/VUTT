@@ -209,6 +209,27 @@
       "retry": "Proovi uuesti",
       "remnantRole": "salvestatud määrang ei mõjuta midagi, õigus tuleb rollist",
       "remnantPublic": "salvestatud määrang ei mõjuta midagi, kogu on avalik"
+    },
+    "hub": {
+      "title": "Kogud",
+      "typeAll": "Kõik",
+      "typeCollections": "Kollektsioonid",
+      "typeWorkSets": "Töökollektsioonid",
+      "searchPlaceholder": "Otsi kogu nime järgi",
+      "noMatches": "Ükski kogu ei vasta otsingule",
+      "badgeCollection": "Kollektsioon",
+      "badgeWorkSet": "Töökollektsioon",
+      "badgeVirtual": "Rühm",
+      "badgeRestricted": "Piiratud",
+      "badgeArchived": "Arhiveeritud",
+      "empty": "Kogusid ei ole",
+      "notFound": "Kollektsiooni ei leitud",
+      "tabWorks": "Teosed",
+      "tabAccess": "Ligipääs",
+      "tabSettings": "Seaded",
+      "worksLink": "Ava selle kogu teosed otsingus",
+      "settingsSuperadminOnly": "Kogu seadeid muudab superadmin.",
+      "newWorkSet": "Uus töökollektsioon"
     }
   },
   "workSets": {
@@ -272,13 +293,12 @@
     "registrations": "Taotlused",
     "users": "Registreerunud kasutajad",
     "upload": "Laadi üles",
-    "collections": "Kollektsioonid",
+    "collections": "Kogud",
     "changes": "Muudatused",
     "trash": "Prügikast",
     "maintenance": "Hooldus",
     "places": "Kohtade register",
-    "pending": "{{count}} ootel",
-    "workSets": "Töökollektsioonid"
+    "pending": "{{count}} ootel"
   },
   "groups": {
     "users": "Kasutajad",
