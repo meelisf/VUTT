@@ -679,6 +679,31 @@ const PersonEditPage: React.FC = () => {
           canEdit={!!canEdit}
         />
 
+        {/* ── Album Academicumi kirje ──
+            Näidatakse ainult siis, kui isikul on AA-kood või kirje juba
+            täidetud: AA-d on niikuinii ainult AA-koodiga isikutel ja tühi väli
+            igal teisel vormil oleks pelk müra.
+
+            Kirje EI OLE elulugu ega Markdown — masinkopeeritud struktureeritud
+            allikakirje saksakeelsete lühenditega, mille reavahetused on
+            sisulised (ADR 0039). Seepärast `font-mono` ja eraldi plokk, mitte
+            eluloo tab. */}
+        {(draft.aa_id.trim() || draft.aa_raw.trim()) && (
+          <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+              {t('form.aaRecordLabel')}
+            </label>
+            <p className="text-xs text-gray-500 mb-2">{t('form.aaRecordHint')}</p>
+            <textarea
+              value={draft.aa_raw}
+              onChange={e => set({ aa_raw: e.target.value })}
+              rows={6}
+              disabled={!canEdit}
+              className="w-full px-3 py-2 text-xs font-mono border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 disabled:text-gray-500"
+            />
+          </div>
+        )}
+
         {/* ── Nimevariandid ja identifikaatorid (klapitav) ── */}
         <CollapsibleSection
           title={t('form.namesAndIdentifiers')}

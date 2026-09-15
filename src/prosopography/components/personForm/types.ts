@@ -55,7 +55,7 @@ export interface FormDraft {
   sources: SourceDraft[];
   biography_et: string;
   biography_en: string;
-  /** AA-toorik. Vormis kirjutamiseks EI avata, aga käib ümarreisi kaasa. */
+  /** AA-toorik. Toimetatav oma väljas (nähtav ainult AA-koodiga isikul). */
   aa_raw: string;
   /** Kinnitusruudud — ajutine vormiolek, kaardile ei salvestu. */
   confirm_et: boolean;
