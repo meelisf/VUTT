@@ -62,4 +62,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0040](0040-jalgitav-fail-on-autoriteetne-fail.md) | Jälgitav fail on autoriteetne fail: iga kirjutustee commitib, tuletatav ei ole gitis | kehtib |
 | [0041](0041-ankur-ja-kirje-on-uks-fakt.md) | Annotatsiooni ankur ja kirje on üks fakt kahes failis; toimetaja märkus renderdatakse teksti sees ankru juures | kehtib |
 | [0042](0042-tookollektsiooni-liikmesust-ei-indekseerita.md) | Töökollektsiooni liikmesust ei indekseerita Meilisse; otsing filtreerib serverilt saadud `work_id` loendiga | kehtib |
-| [0043](0043-kogude-oiguste-uhised-toimingud.md) | Kogu- ja kasutajavaade kasutavad ühiseid õigustoiminguid; kogude loend adminile, seaded superadminile | teostus pooleli: 1a/1b/2/3 tootmises, 4 lahtine (#318) |
+| [0043](0043-kogude-oiguste-uhised-toimingud.md) | Kogu- ja kasutajavaade kasutavad ühiseid õigustoiminguid; kogude loend adminile, seaded superadminile | kehtib |

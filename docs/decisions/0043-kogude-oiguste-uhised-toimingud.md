@@ -1,7 +1,7 @@
 # ADR 0043 — Kogude õigustel on ühised toimingud ja rollipõhised vaated
 
 **Kuupäev:** 2026-09-14
-**Staatus:** teostus pooleli — etapid 1a, 1b, 2 ja 3 tootmises (2026-09-14), etapp 4 lahtine (#318)
+**Staatus:** kehtib (teostatud 2026-09-14/15, #318)
 **Seotud:** ADR 0031, 0038, 0042; #318, #354
 **Spekk:** [Kasutajad ja kogude ligipääs](../superpowers/specs/2026-09-14-kasutajad-ja-kogude-ligipaas-design.md)
 
@@ -65,17 +65,22 @@ muutmise õigust ega toimetajale kasutajate üldloendit.
 
 ## Tagajärjed
 
-**Tehtud ja tootmises:** etapp 1a (serveri ja konto elutsükli parandus,
+Teostatud tervikuna: etapp 1a (serveri ja konto elutsükli parandus,
 `POST /admin/users/collection-rights` delta), etapp 1b (töökollektsiooni
 ligipääsupaneel), etapp 2 (kollektsiooniõiguste delta kasutuselevõtt,
 kaks telge koos alusega, `allowed_users` kirjutusharu eemaldamine, kogude
-loend ja ligipääs adminile, seaded superadminile) ning etapp 3 (otsitav
-kasutajanimekiri ja `/admin/users/:username` detail, §1).
+loend ja ligipääs adminile, seaded superadminile), etapp 3 (otsitav
+kasutajanimekiri ja `/admin/users/:username` detail, §1) ning etapp 4
+(ühine „Kogud” sisenemiskoht `CollectionsHub` tüübifiltriga, kollektsiooni
+detailvaade kolme plokiga, §4).
 
-**Veel lahtised:** etapp 4 (ühine „Kogud” sisenemiskoht ja tüübifilter, §4).
-Kuni etapp 4 pole tehtud, ei kirjelda see ADR kõiki siinseid garantiisid
-töötavana. Teostuse lõpus eemaldatakse see üleminekumärkus ning uuendatakse
-ADR-i ja README registri staatus koos; enne seda jääb märkus alles.
+Kaks kohta lahendati plaanitust teisiti. Hall märkeruut, mida ei saa
+lülitada, segab ka ilma seletava sildita: reegel on „lüliti ainult seal,
+kus lülitamine muudab tegelikku ligipääsu" ja seda otsustab `rightsControl`
+(`collectionRightsDraft.ts`), mitte sildi peitmine. Aegunud sessioon on
+vaates oma veateade (`isSessionExpired`, `utils/apiErrorText.ts`) — ilma
+selleta luges väljalogimine kasutajale andmekaona, sest sessioonid elavad
+mälus ja iga juurutus logib kõik välja.
 
 Kollektsioonipaneel näitab selle kaudu antud õigusi. Teose mitmesse kogusse
 kuulumise, avalikkuse või jagatava lingi tõttu ei ole see täielik ligipääsuaudit.

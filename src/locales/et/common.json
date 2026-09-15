@@ -74,7 +74,8 @@
     "notLoggedIn": "Logi sisse",
     "ocr": {
       "content_blocked": "Gemini sisufilter keeldus sellest leheküljest. Proovi LOSS-mudelit."
-    }
+    },
+    "sessionExpired": "Sessioon on aegunud — logi uuesti sisse. Andmed on alles."
   },
   "language": {
     "switchTo": "Vaheta keeleks {{lang}}",
