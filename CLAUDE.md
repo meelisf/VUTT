@@ -408,8 +408,11 @@ const { bg, text, border, hoverBg } = getCollectionColorClasses(collection);
 ```
 
 **Album Academicumi toorik** — `aa_raw` on KIRJE, mitte tekst: masinkopeeritud
-struktureeritud allikakirje saksakeelsete lühenditega. Seda **ei tõlgita**,
-ta ei ole eluloo varuvariant ja vormis kirjutamiseks teda ei avata.
+struktureeritud allikakirje saksakeelsete lühenditega. Seda **ei tõlgita** ja
+ta ei ole eluloo varuvariant. **Toimetatav** (2026-09-15): vormis oma väli,
+`font-mono`, nähtav ainult AA-koodiga või juba täidetud kirjega isikul — AA on
+niikuinii ainult AA-koodiga isikutel. Isikulehel on plokk kokkupandav; see
+olek on VAATE mugavus ja seda ei salvestata.
 
 **Isikute nimevariandid** — *Lorenz Luden* vs *Laurentius Ludenius*: admin salvestab Wikidata/GND
 ID, `people_ops.py` tõmbab taustal aliased (`et, en, de, la`) → `person_aliases.json` →
