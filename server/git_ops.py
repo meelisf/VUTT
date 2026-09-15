@@ -338,6 +338,42 @@ def start_git_commit_graph_loop():
     ).start()
 
 
+def warm_git_index():
+    """Soojendab git-indeksi ja töökataloogi cache'i käivitusel.
+
+    Esimene commit pärast serveri taaskäivitust maksis tootmises 14,7 s:
+    `git add`/`git commit --only` värskendavad 60 000+ kirjega indeksit ja
+    pärast buuti tuleb iga kirje kettalt stat'ida. Klient katkestas 10 s pealt
+    ja teatas ebaõnnestumisest, kuigi töökollektsioon loodi ära (#318).
+
+    `run_git_fsck` seda ei kata: fsck loeb objektibaasi, mitte töökataloogi.
+
+    `GIT_OPTIONAL_LOCKS=0` on siin oluline: soojendus EI TOHI võtta
+    `index.lock`-i, sest `save_with_git` kordab luku konflikti ainult 3×
+    (0,15 s sammuga) ja samal ajal saabuv päris salvestus kukuks. Ilma lukuta
+    jääb indeksi värskendus kettale kirjutamata, aga soojendus töötab ikka —
+    kasu tuleb OS-i dentry/inode cache'ist, mitte git-i indeksifailist.
+    """
+    env = os.environ.copy()
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    algus = time.time()
+    try:
+        subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=BASE_DIR,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=300,
+        )
+        logger.info("Git-indeks soojendatud: %.2fs", time.time() - algus)
+    except Exception as e:
+        # Jõudlusabi, mitte kirjutustee: tõrge ei tohi käivitust ega ühtki
+        # salvestust mõjutada.
+        logger.warning("Git-indeksi soojendus ebaõnnestus (%.2fs): %s",
+                       time.time() - algus, e)
+
+
 def run_git_fsck():
     """
     Käivitab 'git fsck' repo terviklikkuse kontrolliks.

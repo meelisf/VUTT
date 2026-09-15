@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes, get_meilisearch_sync_status
 from .upload_ops import start_upload_sync_loop
 from .reocr_ops import start_reocr_background
-from .git_ops import run_git_fsck, start_git_commit_graph_loop
+from .git_ops import run_git_fsck, start_git_commit_graph_loop, warm_git_index
 from .heartbeat import snapshot as heartbeat_snapshot
 # NB: upload/re-OCR endpointid + nende ops-importid elavad nüüd routerites
 # (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
@@ -54,6 +54,9 @@ async def lifespan(app: FastAPI):
     build_work_id_cache()
     # Tervikluse kontroll ja ajalooindeksi hooldus ei pea API käivitumist blokeerima.
     threading.Thread(target=run_git_fsck, daemon=True, name="git-fsck").start()
+    # Esimene commit pärast buuti maksis 14,7 s (külm dentry-cache, 60k faili
+    # indeksis) ja klient katkestas 10 s pealt — vt warm_git_index.
+    threading.Thread(target=warm_git_index, daemon=True, name="git-warm").start()
     start_git_commit_graph_loop()
     from .auth import warn_if_no_superadmin
     warn_if_no_superadmin()

@@ -1,5 +1,6 @@
 import { SelectionScope, scopeClauses } from './selectionFilter';
 import { dateBound } from '../utils/workDating';
+import { isAbortError } from '../utils/isAbortError';
 /**
  * Otsing, sirvimis- ja facet-päringud Meilisearchist
  */
@@ -51,10 +52,6 @@ export const pushYearFilter = (filter: string[], yearStart?: number | string, ye
 function pushSelectionFilter(filter: string[], scope?: SelectionScope): void {
   filter.push(...scopeClauses(scope));
 }
-
-const isAbortError = (error: unknown): boolean =>
-  (error instanceof DOMException && error.name === 'AbortError') ||
-  (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError');
 
 // Interface for dashboard search options
 export interface DashboardSearchOptions {

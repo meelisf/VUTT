@@ -287,7 +287,8 @@
       "readOnlyHint": "Sharing rights is an admin action. This is the current access for this set.",
       "serverState": "Current state on the server:"
     },
-    "noAccess": "No access"
+    "noAccess": "No access",
+    "createUnconfirmed": "No response in time. The list has been refreshed — check whether the collection already exists before trying again."
   },
   "cards": {
     "registrations": "Registrations",
