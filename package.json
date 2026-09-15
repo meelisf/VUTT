@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "@maplibre/maplibre-gl-style-spec": "^24.10.0",
-    "@tailwindcss/postcss": "^4.2.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.14.0",
