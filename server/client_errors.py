@@ -20,6 +20,7 @@ import re
 import threading
 from datetime import datetime, timezone
 from typing import List, Optional
+from urllib.parse import unquote
 
 from .config import STATE_DIR, get_logger
 from .utils import atomic_write_json
@@ -61,31 +62,63 @@ SENSITIVE_KEYS = {
 _TOKENISH = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 _LONG_OPAQUE = re.compile(r"^[A-Za-z0-9_-]{24,}$")
-_PARAM = re.compile(r"([?&])([A-Za-z0-9_-]+)=([^&\s\"')\]]+)")
+_PARAM = re.compile(r"([?&#;])([^=\s?&#;]+)=(\"[^\"]*\"|'[^']*'|[^?&#;\s)\]]*)")
 
 
 def _on_tundlik(votme_nimi: str, vaartus: str) -> bool:
     if votme_nimi.lower() in SENSITIVE_KEYS:
         return True
-    return bool(_TOKENISH.match(vaartus) or _LONG_OPAQUE.match(vaartus))
+    return bool(_TOKENISH.fullmatch(vaartus) or _LONG_OPAQUE.fullmatch(vaartus))
+
+
+def _decode_for_inspection(value: str) -> str:
+    for _ in range(4):
+        if "%" not in value:
+            return value
+        if re.search(r"%(?![0-9a-fA-F]{2})", value):
+            raise ValueError("Vigane kodeering")
+        value = unquote(value, errors="strict")
+    if "%" in value:
+        raise ValueError("Liiga sügav kodeering")
+    return value
+
+
+def _scrub_params(tekst: str) -> str:
+    def _asenda(m):
+        eraldaja, votme_nimi, vaartus = m.group(1), m.group(2), m.group(3)
+        try:
+            key = _decode_for_inspection(votme_nimi)
+            value = _decode_for_inspection(vaartus).strip("\"'")
+            if _on_tundlik(key, value):
+                return "{}{}={}".format(eraldaja, key, REDACTED)
+        except (UnicodeError, ValueError):
+            return eraldaja + REDACTED
+        return m.group(0)
+    return _PARAM.sub(_asenda, tekst)
 
 
 def scrub(tekst: Optional[str]) -> Optional[str]:
-    """Asendab tundlike päringuparameetrite väärtused.
+    """Puhastab päringu/fragmendi ka veateate sees ja kodeeritud kujul.
 
-    Töötab nii paljal URL-il kui teate/stacki SEES peituval päringustringil —
-    üks funktsioon, sest leke näeb mõlemas kohas ühtemoodi välja.
+    Kodeeritud ohtlik lõik eemaldatakse tervikuna: dekodeeritud eraldaja või
+    tühik ei tohi jätta saladuse lõppu alles. Sama nelja sammu piir on TS-is.
     """
     if not tekst:
         return tekst
 
-    def _asenda(m):
-        eraldaja, votme_nimi, vaartus = m.group(1), m.group(2), m.group(3)
-        if _on_tundlik(votme_nimi, vaartus):
-            return "{}{}={}".format(eraldaja, votme_nimi, REDACTED)
-        return m.group(0)
+    def _kodeeritud(m):
+        algne = m.group(0)
+        if "%" not in algne:
+            return algne
+        try:
+            decoded = _decode_for_inspection(algne)
+            if _scrub_params(decoded) != decoded:
+                return REDACTED
+            return algne
+        except (UnicodeError, ValueError):
+            return REDACTED
 
-    return _PARAM.sub(_asenda, tekst)
+    return _scrub_params(re.sub(r"\S+", _kodeeritud, _scrub_params(tekst)))
 
 
 _lock = threading.Lock()
@@ -110,17 +143,39 @@ def _load() -> List[dict]:
     try:
         with open(CLIENT_ERRORS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, list) else []
+        if not isinstance(data, list):
+            return []
+        cleaned = [_clean_record(row) for row in data if isinstance(row, dict)][:MAX_ERRORS]
+        if cleaned != data:
+            try:
+                atomic_write_json(CLIENT_ERRORS_FILE, cleaned)
+            except OSError:
+                # Ka kirjutustõrke korral tagastame ainult puhastatud koopia.
+                logger.warning("Vana vealogi puhastatud koopia salvestamine ebaõnnestus")
+        return cleaned
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("client_errors.json loetamatu, alustan tühjalt: %s", e)
         return []
 
 
-def _lyhenda(vaartus, piir: int) -> Optional[str]:
+def _puhasta_ja_lyhenda(vaartus, piir: int) -> Optional[str]:
     if vaartus is None:
         return None
-    tekst = str(vaartus)
+    tekst = scrub(str(vaartus))
     return tekst[:piir] if len(tekst) > piir else tekst
+
+
+# Vana logi peab läbima sama väljade ja pikkuste lepingu kui uus kirje.
+_RECORD_LIMITS = {
+    "received_at": 80, "message": MAX_MESSAGE_LEN, "stack": MAX_STACK_LEN,
+    "url": MAX_URL_LEN, "user_agent": MAX_UA_LEN, "source": 40,
+    "username": 200, "ip": 80,
+}
+
+
+def _clean_record(row: dict) -> dict:
+    return {key: _puhasta_ja_lyhenda(value, _RECORD_LIMITS[key])
+            for key, value in row.items() if key in _RECORD_LIMITS}
 
 
 def record_error(payload: dict, *, ip: str = "", username: Optional[str] = None) -> bool:
@@ -131,20 +186,20 @@ def record_error(payload: dict, *, ip: str = "", username: Optional[str] = None)
     """
     if not isinstance(payload, dict):
         return False
-    message = _lyhenda(payload.get("message"), MAX_MESSAGE_LEN)
+    message = _puhasta_ja_lyhenda(payload.get("message"), MAX_MESSAGE_LEN)
     if not message or not message.strip():
         # Teateta kirje ei ütle midagi ja ainult ujutab logi üle.
         return False
 
     kirje = {
         "received_at": datetime.now(timezone.utc).isoformat(),
-        "message": scrub(message.strip()),
-        "stack": scrub(_lyhenda(payload.get("stack"), MAX_STACK_LEN)),
-        "url": scrub(_lyhenda(payload.get("url"), MAX_URL_LEN)),
-        "user_agent": _lyhenda(payload.get("user_agent"), MAX_UA_LEN),
+        "message": message.strip(),
+        "stack": _puhasta_ja_lyhenda(payload.get("stack"), MAX_STACK_LEN),
+        "url": _puhasta_ja_lyhenda(payload.get("url"), MAX_URL_LEN),
+        "user_agent": _puhasta_ja_lyhenda(payload.get("user_agent"), MAX_UA_LEN),
         # Kust viga tuli: "boundary" (React), "window" (onerror),
         # "promise" (unhandledrejection). Kliendi enda silt, ainult vihjeks.
-        "source": _lyhenda(payload.get("source"), 40),
+        "source": _puhasta_ja_lyhenda(payload.get("source"), 40),
         "username": username,
         "ip": ip or None,
     }

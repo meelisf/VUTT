@@ -240,3 +240,80 @@ def test_kaks_keelt_uks_reegel():
         "nimekirjad lahknesid — ainult TS-is: {} · ainult Pythonis: {}".format(
             sorted(ts_votmed - client_errors.SENSITIVE_KEYS),
             sorted(client_errors.SENSITIVE_KEYS - ts_votmed)))
+
+
+SCRUB_CASES = json.loads((Path(__file__).parent / "fixtures" / "client_error_scrub.json").read_text())
+
+
+@pytest.mark.parametrize("case", SCRUB_CASES, ids=lambda case: case["input"])
+def test_uhine_puhastusleping(case):
+    assert client_errors.scrub(case["input"]) == case["expected"]
+    assert client_errors.scrub(case["expected"]) == case["expected"]
+
+
+@pytest.mark.parametrize("case", [c for c in SCRUB_CASES if c["input"]])
+def test_puhastus_jouab_kettale(logi, case):
+    assert client_errors.record_error({"message": case["input"], "stack": case["input"],
+                                       "url": case["input"], "user_agent": case["input"],
+                                       "source": case["input"]})
+    row = json.loads(logi.read_text())[0]
+    for field in ("message", "stack", "url", "user_agent"):
+        assert row[field] == case["expected"]
+    assert row["source"] == case["expected"][:40]
+
+
+def test_vana_logi_puhastub_ka_kettal_ja_tundmatud_valjad_kaovad(logi):
+    logi.write_text(json.dumps([{"message": "/x?%74oken=synthetic-short",
+                                "stack": "/x#token=synthetic-short",
+                                "auth_token": "synthetic-short", "received_at": "2026-09-15"},
+                               "vigane kirje"]))
+    rows = client_errors.list_errors()
+    assert len(rows) == 1
+    assert rows[0]["message"] == "/x?token=<eemaldatud>"
+    assert rows[0]["stack"] == "/x#token=<eemaldatud>"
+    assert rows[0]["received_at"] == "2026-09-15"
+    assert "synthetic-short" not in logi.read_text()
+    assert "auth_token" not in rows[0]
+    client_errors.invalidate_cache()
+    assert client_errors.list_errors() == rows
+
+
+def test_vana_logi_kirjutustorge_ei_tagasta_toorest_saladust(logi, monkeypatch):
+    logi.write_text(json.dumps([{"message": "/x?%74oken=synthetic-short"}]))
+    def fail(*args):
+        raise OSError("synthetic write failure")
+    monkeypatch.setattr(client_errors, "atomic_write_json", fail)
+    assert client_errors.list_errors()[0]["message"] == "/x?token=<eemaldatud>"
+
+
+def test_puhastus_toimub_enne_pikkusepiiri(logi):
+    # Kui enne lõigata, säiliks tundmatu võtmega tokeni lühike algus.
+    text = "x" * (client_errors.MAX_MESSAGE_LEN - 8) + " /x?k=" + "a" * 64
+    client_errors.record_error({"message": text})
+    assert "aaa" not in json.loads(logi.read_text())[0]["message"]
+
+
+def test_kaivitus_puhastab_logi_enne_ulejaanud_lifespan_i(logi, monkeypatch):
+    import asyncio
+    import threading
+    from server import main
+
+    logi.write_text(json.dumps([{"message": "/x?%74oken=synthetic-short"}]))
+    main_thread = threading.get_ident()
+    threads = []
+    def load():
+        threads.append(threading.get_ident())
+        return client_errors.list_errors()
+    class StopStartup(Exception):
+        pass
+    def stop():
+        raise StopStartup()
+    monkeypatch.setattr(main, "load_client_errors", load)
+    monkeypatch.setattr(main, "check_render_concurrency", stop)
+    async def start():
+        with pytest.raises(StopStartup):
+            async with main.lifespan(main.app):
+                pytest.fail("Taastele järgnev peatamispunkt peab enne yield-i rakenduma")
+    asyncio.run(start())
+    assert threads and threads[0] != main_thread
+    assert "synthetic-short" not in logi.read_text()

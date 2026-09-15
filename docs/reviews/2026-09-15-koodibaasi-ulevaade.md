@@ -9,7 +9,8 @@
 **Sõltumatu järelkontroll:** 2026-09-15, lähtekoodi commit `48109fd7`.
 Allpool on parandatud algse ülevaate järeldusi; algsete mõõtmiste kordamata
 arvud on taustainfo, mitte järelkontrolli tulemused. Järelkontroll muutis esmalt seda dokumenti. Järgnevalt parandati kasutaja
-palvel P0-2 ehituskonfiguratsioonis; teised koodiparandused on tegevusettepanekud.
+palvel P0-2 ehituskonfiguratsioonis ning P0-1/P0-3 rakenduskoodis (vt §8).
+Allpool olevad vastunäited kirjeldavad paranduseelset seisu.
 
 **Vastus lühidalt:** esmajärjekorras tuleb eemaldada `state/` Docker image'ist
 ja sulgeda vearaporti serveripoolse puhastuse kodeeritud sisendite augud.
@@ -56,7 +57,7 @@ infra-info (IP, kasutajanimi, tee) avalikus repos → vt P2-5.
 
 ## 2. P0 — parandatud või kohe vaja
 
-### P0-1. Vearaport kandis volitusi — **OSALISELT LAHENDATUD** (`72cc43be`)
+### P0-1. Vearaport kandis volitusi — parandatud, vt §8
 
 `src/services/clientErrorReporter.ts` saatis `window.location.pathname + window.location.search`
 serverisse. `src/pages/SetPassword.tsx:20` loeb tokeni just päringustringist
@@ -137,7 +138,7 @@ registry-koopiaid; tokenite tühistamise vajadus sõltub tegelikust kokkupuutest
 `~/VUTT/state/` on dokumenteeritud tootmise runtime-kaust. Lokaalne `state/`
 ei tõenda tootmise sisu (CLAUDE.md); tootmise image'i kihte pole kontrollitud.
 
-### P0-3. `maplibre-gl <=6.4.0` — kriitiline XSS
+### P0-3. `maplibre-gl <=6.4.0` — sõltuvus uuendatud, vt §8
 
 Lukufaili MapLibre **5.24.0** kuulub haavatavasse vahemikku. Turvateate järgi on esimene
 parandatud versioon **6.4.1**. Rünne puudutab ohtlikku HTML-i stiili allikate
@@ -472,3 +473,56 @@ image'i, tegelikke runtime-andmeid või GitHubi branch protection'i. Ei lugenud
 Algse ülevaate väide „CI on PR-idel kohustuslik” ei ole pelga workflow põhjal
 tõendatud: käivitustingimused ja merge'i blokeerivad nõuded on eri asjad.
 Testide arv ega testikoodi maht ei ole koodikatvuse mõõtmine.
+
+
+## 8. Rakendatud turvaparandused (2026-09-15)
+
+### Vearaportite puhastus
+
+- TS ja Python kontrollivad nii päringut kui ka fragmenti, kodeeritud
+  võtmenimesid/väärtusi ning pesastatud URL-e. Dekodeerimise piir on neli sammu;
+  vigane või sügavam kodeering eemaldatakse. Pesastatud ohtlik kodeeritud lõik
+  eemaldatakse tervikuna, mitte ei saadeta uuesti kodeeritud saladust edasi.
+- Tavalised diagnostilised parameetrid (`view=map`, `related_to`) ja ohutud
+  UTF-8 otsingusõnad säilivad. Puhastus toimub enne pikkusepiiri rakendamist.
+- Mõlemad keeled kasutavad 23 juhuga ühist testikorpust
+  `tests/fixtures/client_error_scrub.json`; testid kontrollivad ka idempotentsust.
+- Server puhastab vana logi lugemisel, eemaldab tundmatud väljad ja vigased
+  kirjed ning kirjutab puhastatud logi atomaarse asendusega tagasi.
+  Kirjutustõrke korral näeb admin siiski ainult puhastatud koopiat ja server
+  logib hoiatuse. Käivitamisel tehakse see enne päringute vastuvõtmist eraldi
+  I/O-lõimes; tühistatud või vigaseid tokeneid logis eraldi ei säilitata.
+- See ei kustuta varukoopiaid ega tühista varem logitud kehtivaid tokeneid.
+  Nende käsitlus sõltub tegelikust varasemast kokkupuutest.
+
+### MapLibre
+
+- `maplibre-gl` 5.24.0 → **6.9.1** ja Leafleti adapter 0.1.3 → **0.1.4**
+  (adapter deklareerib 6.x toe). Uuendatud on ka lukufail.
+- `HistoricalMapLayer` paint-abifunktsiooni võtmetüüp tuleb nüüd otse
+  `MapLibreMap.setPaintProperty` allkirjast; 6.x rangem tüübikontroll läbib.
+- Regressioonitest kasutab paigaldatud teegi päris `AttributionControl`-i:
+  järjestikused `onload`/`ontoggle` atribuudid eemaldatakse, ohutu allikaviide säilib.
+- Chrome'is kontrollitud päris `HistoricalMapLayer` koos välise OHM-stiiliga:
+  renderdus, aastavahetus 1650 → 1750, suumimine, kihi eemaldamine/taastamine ja
+  attributsioon. Brauseri vigu/hoiatusi ei tekkinud. Piirkondade API oli lokaalses
+  testvaates asendatud tühja testvastusega; tootmisandmeid ega kasutajaseanssi ei muudetud.
+- `npm audit --omit=dev`: **0 critical**, MapLibre'i leidu pole. Alles on
+  3 high ja 1 moderate muudes pakettides; kogu sõltuvuspuu ei ole leiuvaba.
+
+### Lõppkontroll
+
+- Backendi ja MCP ühiskäivitus: **2543 testi läbis**, 8 konfiguratsiooniga välja
+  jäetud (102 s). Lõpliku vealogikoodi eraldi kontroll: **66 testi läbis**, sh
+  käivitusaegse puhastuse ning I/O-lõime test. Varasem TestClienti hangumine
+  piiratud keskkonnas ei kordunud väljaspool seda.
+- Frontend: **1208 testi / 118 faili läbis**; typecheck, lint (43 hoiatust,
+  0 viga) ja build koos eelkompressiooniga läbisid.
+- MapLibre'i brauserikontroll ja turvaaudit on kirjeldatud ülal.
+
+### Rakendamine
+
+Muudatused vajavad nii backendi uuendamist (`server_update.sh --no-cache`)
+kui ka uue frontendi `dist/` avaldamist koos `.br`/`.gz` failidega.
+Ainult backendi uuendamine ei vii MapLibre'i uut versiooni kasutajate brauserisse.
+Tootmisse juurutamine jääb kasutaja valitud hooldusajale.

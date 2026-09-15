@@ -34,36 +34,46 @@ function isSensitive(key: string, value: string): boolean {
   return TOKENISH.test(value) || LONG_OPAQUE.test(value);
 }
 
-/**
- * Puhastab URL-i päringustringi. Tee jääb alati alles — just tema ütleb,
- * MIS lehel viga juhtus.
- */
-export function scrubUrl(url: string): string {
-  try {
-    const [path, query] = url.split('?');
-    if (!query) return url;
-    const params = new URLSearchParams(query);
-    const out = new URLSearchParams();
-    params.forEach((value, key) => {
-      out.append(key, isSensitive(key, value) ? REDACTED : value);
-    });
-    const rendered = decodeURIComponent(out.toString());
-    return rendered ? `${path}?${rendered}` : path;
-  } catch {
-    // Katkine URL: parem kaotada diagnostika kui lekitada.
-    return url.split('?')[0] ?? '';
-  }
+/** Päring ja fragment; jutumärkides väärtus võib sisaldada tühikuid. */
+const PARAM = /([?&#;])([^=\s?&#;]+)=("[^"]*"|'[^']*'|[^?&#;\s)\]]*)/g;
+
+function decodeForInspection(value: string): string {
+  for (let i = 0; i < 4 && value.includes('%'); i++) value = decodeURIComponent(value);
+  if (value.includes('%')) throw new Error('Liiga sügav kodeering');
+  return value;
 }
 
-/** Sama päringustringide jaoks, mis peituvad veateate või stacki SEES. */
+function scrubParams(text: string): string {
+  return text.replace(PARAM, (match, sep, key, value) => {
+    try {
+      const normalizedKey = decodeForInspection(key);
+      const bare = decodeForInspection(value).replace(/^["']|["']$/g, '');
+      return isSensitive(normalizedKey, bare) ? `${sep}${normalizedKey}=${REDACTED}` : match;
+    } catch {
+      return `${sep}${REDACTED}`;
+    }
+  });
+}
+
+/** Sama puhastus URL-i, veateate ja stacki jaoks. */
 export function scrubText<T extends string | undefined | null>(text: T): T {
   if (!text) return text;
-  try {
-    return (text as string).replace(
-      /([?&])([A-Za-z0-9_-]+)=([^&\s"')\]]+)/g,
-      (match, sep, key, value) => (isSensitive(key, value) ? `${sep}${key}=${REDACTED}` : match),
-    ) as T;
-  } catch {
-    return text;
-  }
+  // Kodeeritud lõiku ei dekodeerita väljundisse: nii ei teki uusi eraldajaid
+  // ega jää osa tühikut sisaldavast saladusest alles. Sügavuse piir on ühine
+  // Pythoniga. Vigane või liiga sügav kodeering jäetakse tervenisti välja.
+  const checked = scrubParams(text).replace(/\S+/g, chunk => {
+    if (!chunk.includes('%')) return chunk;
+    try {
+      const decoded = decodeForInspection(chunk);
+      if (scrubParams(decoded) !== decoded) return REDACTED;
+      return chunk;
+    } catch {
+      return REDACTED;
+    }
+  });
+  return scrubParams(checked) as T;
+}
+
+export function scrubUrl(url: string): string {
+  return scrubText(url);
 }

@@ -2,6 +2,9 @@ import threading
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
+
+from .client_errors import list_errors as load_client_errors
 
 from .config import (
     PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR,
@@ -38,6 +41,8 @@ from .prosopography.indices import rebuild_indices
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"VUTT FastAPI käivitus.")
+    # Puhasta varasemad vealogid enne päringute vastuvõtmist, I/O eraldi lõimes.
+    await run_in_threadpool(load_client_errors)
     # Ei blokeeri käivitust — RENDER_SEMAPHORE on protsessi-lokaalne ja seda
     # ei saa siit parandada; hoiatus on selleks, et põhjus oleks logis olemas,
     # kui keegi workerite arvu tõstab (ADR 0028).

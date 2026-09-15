@@ -71,3 +71,16 @@ describe('scrubText', () => {
     expect(scrubText(undefined)).toBeUndefined();
   });
 });
+
+// Sama sisend/väljund-leping jookseb ka tests/test_client_errors.py-s.
+import { readFileSync } from 'node:fs';
+const cases: Array<{ input: string; expected: string }> = JSON.parse(
+  readFileSync(new URL('../../../tests/fixtures/client_error_scrub.json', import.meta.url), 'utf8'),
+);
+describe('kahe keele ühine puhastusleping', () => {
+  it.each(cases)('$input', ({ input, expected }) => {
+    expect(scrubText(input)).toBe(expected);
+    expect(scrubUrl(input)).toBe(expected);
+    expect(scrubText(expected)).toBe(expected);
+  });
+});
