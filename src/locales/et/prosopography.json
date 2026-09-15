@@ -330,5 +330,9 @@
     "noChanges": "Muudatusi ei leitud",
     "empty": "Ajalugu puudub"
   },
-  "loadingVocab": "Laadin…"
+  "loadingVocab": "Laadin…",
+  "scope": {
+    "clearHint": "Eemalda piirang — otsib edasi kogu VUTT-ist",
+    "workSet": "Töökollektsioon"
+  }
 }

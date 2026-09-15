@@ -330,5 +330,9 @@
     "noChanges": "No changes found",
     "empty": "No history yet"
   },
-  "loadingVocab": "Loading…"
+  "loadingVocab": "Loading…",
+  "scope": {
+    "clearHint": "Remove restriction — search continues across all of VUTT",
+    "workSet": "Work collection"
+  }
 }

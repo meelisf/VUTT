@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, Map, List, Waypoints } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, Map, List, Waypoints, Library } from 'lucide-react';
 import Header from '../../components/Header';
 import Pagination from '../../components/Pagination';
 import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
 import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAdvancedFilters';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
-import { getVocabularies } from '../../services/collectionService';
+import { getVocabularies, getCollectionColorClasses } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import type { ProsopoIndexEntry, ProsopoMapResponse } from '../types';
@@ -23,7 +23,7 @@ const PersonsMap = React.lazy(() => import('../components/PersonsMap'));
 const PersonsPage: React.FC = () => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
-  const { selection, selectedCollection, collections } = useCollection();
+  const { selection, setSelection, selectedCollection, collections, workSets, getCollectionName } = useCollection();
   // Töökollektsioon: ID-loendi koostab ja ligipääsu kontrollib SERVER
   // (`work_set` parameeter), mitte klient — isikute filter käib teose-isiku
   // seoste kaudu, mida kliendil ei ole (#354).
@@ -163,6 +163,46 @@ const PersonsPage: React.FC = () => {
     if (isAtLeast(user?.role, 'admin')) return selectedCollection;
     return user?.allowed_collections?.includes(selectedCollection) ? selectedCollection : null;
   }, [collections, selectedCollection, user]);
+
+  /** Aktiivne otsinguulatus pillina. `null` = otsime kogu VUTT-ist.
+   *
+   * Lähtub EFEKTIIVSEST ulatusest, mitte päise valikust: kui kasutajal
+   * kinnisele kogule ligipääsu ei ole, siis otsing teda ei piira ja pilli ka
+   * ei näidata — pill peab ütlema, mis päriselt kehtib.
+   *
+   * Töökollektsioon käib sama pilli kaudu: `selection` on üks token
+   * (ADR 0038) ja nähtamatu piirang tekitab sama vea mõlemal kujul —
+   * kasutaja ei leia isikut ja loob ta uuesti (#240). */
+  const scopePill = useMemo(() => {
+    if (effectiveSelectedCollection) {
+      const collection = collections[effectiveSelectedCollection];
+      return {
+        label: getCollectionName(effectiveSelectedCollection, i18n.language === 'en' ? 'en' : 'et'),
+        colors: getCollectionColorClasses(collection ?? null),
+      };
+    }
+    if (workSetParam) {
+      const set = workSets.find(w => w.id === workSetParam);
+      const lang = i18n.language === 'en' ? 'en' : 'et';
+      return {
+        // Sama lahendusahel nagu WorkSetPicker'is: keel → et → en → id.
+        label: set ? (set.name[lang] || set.name.et || set.name.en || set.id)
+                   : t('scope.workSet', 'Töökollektsioon'),
+        colors: getCollectionColorClasses(null),
+      };
+    }
+    return null;
+  }, [effectiveSelectedCollection, collections, getCollectionName, i18n.language, workSetParam, workSets, t]);
+
+  /** Piirangu eemaldamine tühistab valiku KOGU rakenduses, mitte ainult siin.
+   *
+   * Kokkulepe #240: üks kollektsioonivalik kogu rakenduses. Isikuotsingule ei
+   * teki eraldi varjatud ulatust, seega kirjutame `CollectionContext`-i ja
+   * laseme URL-i sünkil käia oma tavalist teed (`useCollectionUrlSync`,
+   * ADR 0038) — oma vastassuunalist effecti siia EI lisata. */
+  const clearScope = useCallback(() => {
+    setSelection({ kind: 'all' });
+  }, [setSelection]);
 
   const selectedIds = new Set(selectedPersons.map(p => p.id));
 
@@ -391,9 +431,26 @@ const PersonsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Aktiivne seoste-filter otsinguriba all */}
-          {relatedTo && (
+          {/* Aktiivsed piirangud otsinguriba all. Järjekord laiast kitsaks:
+              kollektsioon piirab korpust, seoste-filter selle sees. */}
+          {(scopePill || relatedTo) && (
             <div className="flex flex-wrap items-center gap-1.5">
+              {scopePill && (
+                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${scopePill.colors.bg} ${scopePill.colors.text} ${scopePill.colors.border}`}>
+                  <Library size={11} />
+                  <span className="truncate max-w-xs">{scopePill.label}</span>
+                  <button
+                    type="button"
+                    onClick={clearScope}
+                    className={`ml-0.5 rounded-full p-0.5 ${scopePill.colors.hoverBg}`}
+                    title={t('scope.clearHint', 'Eemalda piirang — otsib edasi kogu VUTT-ist')}
+                    aria-label={t('scope.clearHint', 'Eemalda piirang — otsib edasi kogu VUTT-ist')}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              )}
+              {relatedTo && (
               <div className="flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-200">
                 <Waypoints size={11} />
                 <span className="truncate max-w-xs">
@@ -411,6 +468,7 @@ const PersonsPage: React.FC = () => {
                   <X size={11} />
                 </button>
               </div>
+              )}
             </div>
           )}
 
