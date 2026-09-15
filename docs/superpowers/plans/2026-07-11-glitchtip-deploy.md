@@ -1,6 +1,14 @@
 # GlitchTip self-hosted deploy — vea-aggregatsioon (issue #133)
 
-**Seis (kontrollitud 2026-08-04):** integratsioonikiht EI OLE main'is — PR #170 on endiselt
+> **AEGUNUD — ÄRA TEOSTA (2026-09-15).** GlitchTipist loobuti: #133 lahendati
+> majasiseselt (PR #380 — `POST /client-error` + kaetud ring
+> `state/client_errors.json`-is + admin-vaade), PR #170 on suletud ja haru
+> `feature/issue-133-error-reporting` kustutatud. Põhjus oli **hoolduskohustus**,
+> mitte tehniline puudus: GlitchTip on Docker-stack pluss andmebaas hooldada.
+> Väline agregaator saab sama endpointi taha hiljem tulla, aga siis on see uus
+> otsus ja uus plaan. Fail jääb alles kui ajalugu.
+
+**Seis (kontrollitud 2026-08-04, vt ülalolevat märkust):** integratsioonikiht EI OLE main'is — PR #170 on endiselt
 avatud, harul `feature/issue-133-error-reporting` (sealt ka `docs/error-reporting.md`,
 `server/error_reporting.py`, `src/services/errorReporting.ts`). Enne infrastruktuuri
 püstitamist tuleb PR #170 üle vaadata ja mergida.
