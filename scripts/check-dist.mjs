@@ -6,7 +6,7 @@
  * typecheck, lint ega testid — ainult brauser.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { basename, join } from 'node:path';
 
 const ROOT = process.cwd();
 const DIST = join(ROOT, 'dist');
@@ -34,7 +34,10 @@ function assertMaplibreWorkerEmitted(paths, pkg) {
   // kadumine ei ole (vt allpool).
   if (!pkg.dependencies?.['maplibre-gl']) return;
 
-  const jsFiles = paths.filter(path => extname(path) === '.js');
+  // NB: ka `.mjs`. `?url` (vale kuju, vt allpool) emiteerib töölise just
+  // `.mjs`-ina — `.js`-ile piirdunud valvur ei näeks teda üldse ja kurdaks
+  // puuduva impordi üle, kuigi tegelik põhjus on kadunud `worker`-lipp.
+  const jsFiles = paths.filter(path => /\.m?js$/.test(path));
   const sources = new Map(jsFiles.map(path => [path, readFileSync(path, 'utf8')]));
   const allCode = [...sources.values()].join('\n');
 
