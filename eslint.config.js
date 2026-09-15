@@ -14,7 +14,8 @@ import reactHooks from 'eslint-plugin-react-hooks';
  * sadu leide, mis mataksid signaali müra alla. Laiendada saab igal ajal.
  *
  * **Baseline-lävi.** `exhaustive-deps` on `warn`, mitte `error`, ja CI jookseb
- * `npm run lint:ci` = `--max-warnings 57` (seis 2026-07-25). Mõte: olemasolev
+ * `npm run lint:ci`, mille `--max-warnings` arv elab `package.json`-is — ÜHES
+ * kohas, sest siia kirjutatud koopia jäi vahepeal hoiatuste arvust maha. Mõte: olemasolev
  * võlg on lubatud, uus mitte. Puuduva sõltuvuse "parandamine" ei ole mehaaniline
  * töö — lisamine võib tekitada lõputu tsükli või liigse päringu, ja mõni väljajätt
  * on täiesti õige (vt `PersonsMap.tsx` `filterKey`). Iga juhtum vajab otsust.
