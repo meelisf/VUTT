@@ -8,7 +8,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 
-const DIST = join(process.cwd(), 'dist');
+const ROOT = process.cwd();
+const DIST = join(ROOT, 'dist');
 
 function* walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -27,15 +28,29 @@ function* walk(dir) {
  * valvur, mitte ainult kommentaar: eeldus sõltub teegi major-versioonist ja
  * bundleri käitumisest, mitte meie koodist.
  */
-function assertMaplibreWorkerEmitted(paths) {
-  const jsFiles = paths.filter(path => extname(path) === '.js' && !path.endsWith('.map'));
+function assertMaplibreWorkerEmitted(paths, pkg) {
+  // Kas valvatavat teeki üldse on, otsustab MEIE `package.json`, mitte teegi
+  // sisemine string. Sõltuvuse eemaldamine on teadlik otsus; sentineli
+  // kadumine ei ole (vt allpool).
+  if (!pkg.dependencies?.['maplibre-gl']) return;
+
+  const jsFiles = paths.filter(path => extname(path) === '.js');
   const sources = new Map(jsFiles.map(path => [path, readFileSync(path, 'utf8')]));
   const allCode = [...sources.values()].join('\n');
 
-  // MapLibre on buildis siis, kui tema töölise-URL-i otsingukood on kohal.
-  // (Kaardita lehed ei pea MapLibre'i üldse laadima — siis pole midagi valvata.)
+  // MapLibre'i töölise-URL-i tuletamise kood (`…-dev.mjs` haru) on tõend, et
+  // teek on buildis ja et ta lahendab URL-i endiselt ise. See string on teegi
+  // SISEASI: kui uus major ta ümber nimetab, ei tohi valvur vaikselt läbi
+  // lasta — just versioonivahetus on see hetk, mille jaoks valvur olemas on.
   const DEV_WORKER_NAME = 'maplibre-gl-worker-dev.mjs';
-  if (!allCode.includes(DEV_WORKER_NAME)) return;
+  if (!allCode.includes(DEV_WORKER_NAME)) {
+    throw new Error(
+      `Valvur ei tunne MapLibre'i buildis ära: stringi ${DEV_WORKER_NAME} ei ole üheski chunk'is, `
+      + 'kuigi `maplibre-gl` on sõltuvus. Kas teek nimetas oma töölise-failid ümber (uus major) '
+      + 'või ei jõua kaardikood enam buildi? Kontrolli üle ja uuenda seda valvurit — vaikne '
+      + 'läbilaskmine tähendaks tühja kaarti ilma veata (#378).',
+    );
+  }
 
   const worker = jsFiles.find(path => basename(path).startsWith('maplibre-gl-worker'));
   if (!worker) {
@@ -45,8 +60,12 @@ function assertMaplibreWorkerEmitted(paths) {
     );
   }
 
+  // Viidet otsime KÕIGIST TEISTEST chunk'idest: worker-fail ise võib oma nime
+  // sisaldada (nt `sourceMappingURL`, kui sourcemap'id sisse lülitatakse) ja
+  // teeks kontrollist tautoloogia.
   const workerName = basename(worker);
-  if (!allCode.includes(workerName)) {
+  const otherCode = jsFiles.filter(path => path !== worker).map(path => sources.get(path)).join('\n');
+  if (!otherCode.includes(workerName)) {
     throw new Error(
       `Töölise-chunk ${workerName} on emititud, aga ükski bundle ei viita sellele — `
       + 'kas `setWorkerUrl(maplibreWorkerUrl)` jäi tegemata?',
@@ -66,4 +85,5 @@ function assertMaplibreWorkerEmitted(paths) {
 }
 
 const paths = [...walk(DIST)];
-assertMaplibreWorkerEmitted(paths);
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+assertMaplibreWorkerEmitted(paths, pkg);
