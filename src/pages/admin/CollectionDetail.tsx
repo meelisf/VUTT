@@ -4,7 +4,8 @@
  * Kolm plokki rollide järgi: „Teosed" (LINK otsingusse — teoste kuuluvus elab
  * `_metadata.json`-is ja otsingus, ADR 0007, siia uut lugemisteed ei tehta),
  * „Ligipääs" (admin+, olemasolev `CollectionAccessPanel`) ja „Seaded"
- * (superadmin, olemasolev `CollectionEditor` ilma oma valijata).
+ * (superadmin, olemasolev `CollectionEditor` ilma oma valija ja ilma sisemise
+ * ligipääsupaneelita).
  *
  * Peitmine ei ole autoriseerimine: server hoiab seadete endpointidel
  * `require_role("superadmin")`-i.
@@ -201,6 +202,9 @@ const CollectionDetail: React.FC = () => {
                   canEditSettings
                   selectedId={id}
                   showPicker={false}
+                  // Ligipääs on siin OMAETTE tab — editori sisemine paneel
+                  // oleks sama asja teine koopia.
+                  showAccessPanel={false}
                   // Kustutamise järel suunab editor valiku tühjaks — hubi
                   // marsruut on siis õige sihtkoht, mitte kustutatud kogu.
                   onSelectId={(uusId) => navigate(

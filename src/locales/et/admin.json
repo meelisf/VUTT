@@ -228,7 +228,8 @@
       "tabAccess": "Ligipääs",
       "tabSettings": "Seaded",
       "worksLink": "Ava selle kogu teosed otsingus",
-      "settingsSuperadminOnly": "Kogu seadeid muudab superadmin."
+      "settingsSuperadminOnly": "Kogu seadeid muudab superadmin.",
+      "newWorkSet": "Uus töökollektsioon"
     }
   },
   "workSets": {

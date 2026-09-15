@@ -11,13 +11,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { isAtLeast } from '../../utils/roleUtils';
 import { getLangCode } from '../../utils/getLangCode';
 import { listWorkSets, WorkSetSummary } from '../../services/workSetService';
+import CollectionCreateForm from '../../components/CollectionCreateForm';
 import { buildKoguRows, paramFromTyyp, tyypFromParam, KoguTyyp } from './kogudeLoend';
 
 const CollectionsHub: React.FC = () => {
@@ -32,6 +33,9 @@ const CollectionsHub: React.FC = () => {
   // haldur (editor/contributor) jõuab siia ilma üldise kasutajahalduseta —
   // talle jäävad ainult töökollektsioonid.
   const isAdmin = isAtLeast(user?.role, 'admin');
+  // Kollektsiooni loomine on superadmin (ADR 0043 p4), töökollektsiooni oma
+  // admin — sama piir nagu vastavatel endpointidel.
+  const isSuperadmin = isAtLeast(user?.role, 'superadmin');
 
   const [workSets, setWorkSets] = useState<WorkSetSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +107,30 @@ const CollectionsHub: React.FC = () => {
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
         </div>
+
+        {/* Loomine kuulub LOENDISSE, mitte ühe kogu lehele: enne seda sai uue
+            kollektsiooni teha ainult mõne olemasoleva kogu seadete alt ja
+            töökollektsiooni ainult juba olemasoleva rea kaudu (#318). */}
+        {isAdmin && (
+          <div className="mb-6 flex flex-wrap items-start gap-x-6 gap-y-2">
+            {isSuperadmin && (
+              <CollectionCreateForm
+                onCreated={(uusId) => navigate(`/admin/collections/${encodeURIComponent(uusId)}`)}
+              />
+            )}
+            {isAdmin && (
+              // Töökollektsiooni loomine elab `WorkSets`-is — kaks kirjutusteed
+              // sama API juurde oleks duplikaat, mitte mugavus.
+              <Link
+                to="/admin/work-sets"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700"
+              >
+                <Plus size={16} />
+                {t('collections.hub.newWorkSet')}
+              </Link>
+            )}
+          </div>
+        )}
 
         {error ? (
           <p className="text-sm text-red-600">{t('common:workSets.loadFailed')}</p>
