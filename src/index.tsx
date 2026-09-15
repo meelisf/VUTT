@@ -6,11 +6,16 @@ import 'leaflet/dist/leaflet.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './index.css';
 import { i18nReady, preloadOtherLanguage } from './i18n';
+import { installGlobalErrorReporting } from './services/clientErrorReporter';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
+
+// Globaalsed veakuulajad ENNE esimest renderdust: käivitusaegne viga on
+// just see, mida kasutaja kõige tõenäolisemalt ei raporteeri (#133).
+installGlobalErrorReporting();
 
 const root = ReactDOM.createRoot(rootElement);
 

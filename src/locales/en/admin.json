@@ -446,5 +446,11 @@
     "sentToUser": "Email sent to the user's address",
     "failed": "Could not send the email ({{reason}}) — pass the link on manually",
     "showLink": "Show the link"
+  },
+  "clientErrors": {
+    "clear": "Clear",
+    "empty": "No client-side errors recorded.",
+    "loadError": "Failed to load errors.",
+    "title": "Client-side errors"
   }
 }

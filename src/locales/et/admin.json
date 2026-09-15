@@ -446,5 +446,11 @@
     "sentToUser": "Kiri saadetud kasutaja e-posti aadressile",
     "failed": "Kirja ei õnnestunud saata ({{reason}}) — anna link käsitsi edasi",
     "showLink": "Näita linki"
+  },
+  "clientErrors": {
+    "clear": "Tühjenda",
+    "empty": "Kliendipoolseid vigu ei ole registreeritud.",
+    "loadError": "Vigade laadimine ebaõnnestus.",
+    "title": "Kliendipoolsed vead"
   }
 }

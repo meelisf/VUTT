@@ -8,6 +8,12 @@ from starlette.concurrency import run_in_threadpool
 from ..access_ops import can_read_work, can_write_work, is_work_public
 from ..admin_page_ops import get_sorted_images
 from ..cache import get_cached_collections
+from ..client_errors import (
+    MAX_ERRORS as CLIENT_ERRORS_MAX,
+    clear_errors as clear_client_errors,
+    list_errors as list_client_errors,
+    record_error as record_client_error,
+)
 from ..cache_invalidation import _sitemap_cache, _home_cache
 from ..config import BASE_DIR
 from ..deps import optional_user as _get_optional_user, require_role
@@ -300,3 +306,51 @@ def sitemap_xml():
     return Response(content=_sitemap_cache["xml"], media_type="application/xml")
 
 
+
+
+@router.post("/client-error")
+async def report_client_error(request: Request):
+    """Võtab vastu kliendipoolse vea (#133).
+
+    **Avalik TAHTLIKULT.** Kaardiviga, mis selle endpointi tingis, tabas
+    `/persons` lehel ka välja logimata kasutajaid — autentimise taha pandud
+    raportöör oleks pime just seal, kus enamik liiklust on.
+
+    Lugemine EI OLE siin: `/admin/client-errors` + `require_role("admin")`.
+    nginx proksib `/api/files/` kõik teed avalikult, seega see ei ole valikuline.
+
+    Vastus on ALATI 200 „vastu võetud" kujuga, ka siis, kui kirje kõrvale
+    visati: raportöör ei tohi ise vigu tekitada ega kliendile põhjust anda
+    uuesti proovida.
+    """
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, "/client-error")
+    if not allowed:
+        # 429 on siin aus: klient tohib teada, et ta trummeldab.
+        raise HTTPException(status_code=429, detail=f"Liiga palju päringuid ({retry_after}s)")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"status": "ok"}
+
+    user = _get_optional_user(request)
+    await run_in_threadpool(
+        record_client_error, payload,
+        ip=client_ip,
+        username=(user or {}).get("username"),
+    )
+    return {"status": "ok"}
+
+
+@router.get("/admin/client-errors")
+def admin_client_errors(user=Depends(require_role("admin"))):
+    """Kogutud kliendivead, uusim ees. Ainult admin (vt `report_client_error`)."""
+    return {"errors": list_client_errors(), "max": CLIENT_ERRORS_MAX}
+
+
+@router.delete("/admin/client-errors")
+def admin_clear_client_errors(user=Depends(require_role("admin"))):
+    """Tühjendab logi. Parandatud vead ei tohi uusi varjata."""
+    clear_client_errors()
+    return {"status": "success"}

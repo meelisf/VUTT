@@ -7,6 +7,7 @@ import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import ClientErrorsPanel from './ClientErrorsPanel';
 
 type ActionState = 'idle' | 'running' | 'done' | 'error';
 
@@ -225,6 +226,10 @@ const Maintenance: React.FC = () => {
           <Wrench size={20} className="text-gray-500" />
           <h2 className="text-lg font-semibold text-gray-800">{t('admin:maintenance.title')}</h2>
         </div>
+
+        {/* Kliendipoolsed vead (#133) — kõige ees, sest see on ainus koht, kus
+            kasutaja juurde jõudmata vead nähtavaks saavad. */}
+        <ClientErrorsPanel token={authToken ?? undefined} />
 
         {/* Arhiivide register */}
         <div className="mb-6">
