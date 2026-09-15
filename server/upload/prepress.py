@@ -137,10 +137,20 @@ def _reset_status_if_prepping(upload_id: str) -> None:
 
     Pärast preview_cancel-i on staatus "applying" ja selle ülekirjutamine
     awaiting_split'iks lubaks teise apply CAS-i sisse (topelt-SFTP).
+
+    Kontroll ja kirjutus peavad olema SAMA luku sees. Lukuta loetud staatus on
+    hetktõmmis: apply CAS (`prepping → applying`) mahub kontrolli ja kirjutuse
+    vahele ning `set_upload_state` kirjutaks siis tingimusteta juba aegunud
+    otsuse pealt. Kirjutame otse dikti, mitte `set_upload_state` kaudu —
+    `get_upload_lock` on tavaline `threading.Lock`, seega pesastatud kutse
+    annaks ummikseisu (sama põhjus nagu `try_begin_applying`-us).
     """
-    s = upload_state.read_state(upload_id)
-    if s and s.get("status") == "prepping":
-        upload_state.set_upload_state(upload_id, status="awaiting_split")
+    lock = upload_state.get_upload_lock(upload_id)
+    with lock:
+        s = upload_state.read_state(upload_id)
+        if s and s.get("status") == "prepping":
+            s["status"] = "awaiting_split"
+            upload_state.write_state(upload_id, s)
 
 
 def start_preview(upload_id: str) -> None:
