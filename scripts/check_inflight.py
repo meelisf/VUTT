@@ -21,7 +21,11 @@ from datetime import datetime
 # `applying` — 300 DPI renderdus + SFTP käib; restart jätab upload'i rippu (#256).
 # `processing` — partii on OCR-serveris, pisipiltide sünk käib.
 # `collecting_images` — pildikausta kogumine käib VUTT-i poolel.
-UPLOAD_LENNUS = ("applying", "processing", "collecting_images")
+# `prepping` = eelvaate renderduslõim jookseb. Restart tapab ta ja
+# `preview_status` jääb igaveseks "rendering"-uks — viisardi umbtee
+# (`start_preview` väljub idempotentsuse tõttu, „Rakenda" on disabled).
+# Käivituse taaste vabastab selle, aga kasutaja kaotab pooleli töö.
+UPLOAD_LENNUS = ("applying", "processing", "collecting_images", "prepping")
 
 # Re-OCR töö staatused, mis tähendavad elavat lõime.
 REOCR_LENNUS = ("uploading", "processing", "cancelling")

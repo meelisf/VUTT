@@ -191,3 +191,50 @@ def cleanup_prepress_artifacts(upload_id: str) -> None:
         os.unlink(os.path.join(base, "source.pdf"))
     except OSError:
         pass
+
+
+def taasta_rippuvad_eelvaated() -> None:
+    """Käivitusel: vabasta eelvaated, mille renderduslõime restart tappis.
+
+    `start_preview` on idempotentne — `preview_status == "rendering"` tähendab
+    „töö juba käib" ja ta väljub kohe. Pärast konteineri restarti on see väide
+    vale: lõime enam ei ole, aga lipp jäi kettale. Viisardis on tulemus LÕPLIK
+    umbtee — eelvaadet ei saa uuesti käivitada ja „Rakenda" on samal ajal
+    `disabled={applying || rendering}` taga. Kasutaja näeb külmunud
+    edenemisnumbrit, ilma vea ja väljapääsuta.
+
+    `cancelled`, mitte `error`: kasutaja ei teinud midagi valesti ja renderdus
+    jätkab pooleli kohast (`if not os.path.isfile(dst)`), seega järgmine avamine
+    lihtsalt lõpetab töö ära.
+
+    Elutsükli-staatuse liigutab ainult `_reset_status_if_prepping` ehk ainult
+    siis, kui omanik oleme meie. `applying` kuulub apply-lõimele ja
+    `apply_recovery`-le (ADR 0028 I1); selle ülekirjutamine laseks teise apply
+    CAS-ist läbi.
+
+    Sama muster nagu `apply_recovery.taasta_rippuvad_applyd` ja
+    `ada.fetch.taasta_rippuvad_fetchid`. Tohib joosta AINULT käivitusel, enne
+    kui uusi eelvaateid saab alustada — muidu tapaks ta päris töö.
+    """
+    if not os.path.isdir(upload_state.UPLOADS_DIR):
+        return
+    for uid in sorted(os.listdir(upload_state.UPLOADS_DIR)):
+        # Erand ÜHE upload'i pealt ei tohi ülejäänuid taastamata jätta: see
+        # jookseb daemon-lõimes, kus lekkinud erand kaob logisse.
+        try:
+            s = upload_state.read_state(uid)
+            if not s:
+                continue
+            plaan = s.get("prepress") or {}
+            if plaan.get("preview_status") != "rendering":
+                continue
+            upload_state.mutate_prepress(
+                uid, lambda p: p.update(preview_status="cancelled")
+            )
+            _reset_status_if_prepping(uid)
+            logger.info(
+                "Rippuv eelvaade vabastatud: {} ({}/{} lehte renderdatud)".format(
+                    uid, plaan.get("preview_done"), len(plaan.get("pages") or []))
+            )
+        except Exception:
+            logger.warning("Eelvaate taaste ebaõnnestus: %s", uid, exc_info=True)

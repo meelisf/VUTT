@@ -168,3 +168,63 @@ def test_reset_ei_kirjuta_apply_staatust_ule(tmp_path, monkeypatch):
     assert upload_state.read_state("u9")["status"] == "applying", (
         "renderdaja kirjutas apply staatuse üle — teine apply pääseks CAS-ist läbi"
     )
+
+
+# --- Rippuva eelvaate taaste käivitusel ---------------------------------
+
+def _tee_upload(tmp_path, uid, status, preview_status):
+    (tmp_path / "uploads" / uid).mkdir(parents=True, exist_ok=True)
+    upload_state.write_state(uid, {
+        "id": uid, "status": status, "meta": {"slug": "x"},
+        "prepress": {"preview_status": preview_status, "preview_done": 3,
+                     "pages": [], "default_split_x": 0.5},
+    })
+
+
+def test_taaste_vabastab_rippuva_eelvaate(tmp_path, monkeypatch):
+    """Konteineri restart tapab renderduslõime — `rendering` jääb igaveseks.
+
+    Tagajärg on viisardis LÕPLIK umbtee: `start_preview` on idempotentne ja
+    väljub kohe (`preview_status == "rendering"`), nii et eelvaadet ei saa
+    uuesti käivitada; „Rakenda" on samal ajal `disabled={applying || rendering}`
+    taga. Kasutaja näeb külmunud edenemisnumbrit, ilma vea ja väljapääsuta.
+
+    `cancelled`, mitte `error`: kasutaja ei teinud midagi valesti ja renderdus
+    JÄTKAB pooleli kohast (`if not os.path.isfile(dst)`), seega järgmine avamine
+    lihtsalt lõpetab töö ära.
+    """
+    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(tmp_path / "uploads"))
+    _tee_upload(tmp_path, "u1", "prepping", "rendering")
+
+    prepress.taasta_rippuvad_eelvaated()
+
+    s = upload_state.read_state("u1")
+    assert s["prepress"]["preview_status"] == "cancelled"
+    assert s["status"] == "awaiting_split", "peab olema jälle jätkatav"
+
+
+def test_taaste_ei_puutu_valmis_eelvaadet(tmp_path, monkeypatch):
+    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(tmp_path / "uploads"))
+    _tee_upload(tmp_path, "u2", "awaiting_split", "ready")
+
+    prepress.taasta_rippuvad_eelvaated()
+
+    s = upload_state.read_state("u2")
+    assert s["prepress"]["preview_status"] == "ready"
+    assert s["status"] == "awaiting_split"
+
+
+def test_taaste_ei_varasta_staatust_apply_kaest(tmp_path, monkeypatch):
+    """`applying` kuulub apply-lõimele ja apply_recovery-le (ADR 0028 I1).
+
+    Eelvaate lipu tohib vabastada, elutsükli-staatust MITTE — vastasel juhul
+    pääseks teine apply CAS-ist läbi.
+    """
+    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(tmp_path / "uploads"))
+    _tee_upload(tmp_path, "u3", "applying", "rendering")
+
+    prepress.taasta_rippuvad_eelvaated()
+
+    s = upload_state.read_state("u3")
+    assert s["prepress"]["preview_status"] == "cancelled"
+    assert s["status"] == "applying", "apply staatust ei tohi puutuda"

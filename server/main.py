@@ -86,6 +86,13 @@ async def lifespan(app: FastAPI):
     from .upload.import_work import taasta_rippuvad_impordid
     threading.Thread(target=taasta_rippuvad_impordid, daemon=True,
                      name="import-recovery").start()
+    # Rippuv `preview_status="rendering"` → `cancelled`. Ilma selleta on
+    # viisard umbteel: `start_preview` väljub idempotentsuse tõttu kohe ja
+    # „Rakenda" on `rendering` ajal disabled — kasutaja näeb külmunud
+    # edenemisnumbrit, ilma vea ja väljapääsuta.
+    from .upload.prepress import taasta_rippuvad_eelvaated
+    threading.Thread(target=taasta_rippuvad_eelvaated, daemon=True,
+                     name="preview-recovery").start()
     yield
     print("VUTT FastAPI sulgemine.")
 
