@@ -1,12 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import type { Feature, FeatureCollection } from 'geojson';
+import { setWorkerUrl } from 'maplibre-gl';
 import type { FilterSpecification, GeoJSONSource, LayerSpecification, Map as MapLibreMap } from 'maplibre-gl';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { useMap } from 'react-leaflet';
 import { fetchHistoricalRegions } from '../services/prosopographyService';
 import type { HistoricalRegionProperties } from '../types';
 import { REGION_SOURCE_ID, pickRegionFeature, regionLayerSpecs } from '../utils/regionLayers';
 import '@maplibre/maplibre-gl-leaflet';
+
+// MapLibre 6 on ESM-only: tööline ei ole enam bundle'i sees, vaid eraldi fail,
+// mille URL tuletatakse vaikimisi `import.meta.url`-ist. Vite ei näe dünaamilist
+// `new Worker(muutuja)` kutsungit, seega jääks URL osutama olematusse
+// `assets/maplibre-gl-worker.mjs`-i → 404 → ükski vektorplaat ei laadi ja
+// kaardile ei teki ühtki kihti (kaob ka meie GeoJSON-piirkonnakiht).
+// `?worker&url` laseb faili Vite'i worker-pipeline'ist läbi iseseisva chunkina
+// — `?url` üksi ei kõlba, sest dist-worker impordib naabri
+// `maplibre-gl-shared.mjs`, mida `?url` kaasa ei võta.
+// Valvur: `scripts/check-dist.mjs` (worker-chunk peab buildis olemas olema).
+setWorkerUrl(maplibreWorkerUrl);
 
 const HISTORICAL_STYLE_URL = 'https://www.openhistoricalmap.org/map-styles/historical/historical.json';
 const OHM_ATTRIBUTION = '<a href="https://www.openhistoricalmap.org/">OpenHistoricalMap</a>';
