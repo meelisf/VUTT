@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen, Search, Users, Plus, Loader2 } from 'lucide-react';
@@ -129,17 +129,25 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
     );
   }, [collections, user]);
 
-  // Laiendatud sõlmed
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    // Vaikimisi laienda kõik tippkollektsioonid
-    const initial = new Set<string>();
-    Object.entries(visibleCollections).forEach(([id, col]) => {
-      if (!col.parent) {
-        initial.add(id);
-      }
-    });
-    return initial;
-  });
+  // Laiendatud sõlmed. Vaikimisi on kõik tippkollektsioonid lahti.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  // `Header` monteerib valija TINGIMUSTETA (`isOpen` juhib ainult
+  // `return null`-i), seega mount toimub enne, kui kogud on üle võrgu kohal.
+  // `useState`-i initsialiseerija jookseb täpselt siis — tühja objekti peal —
+  // ja jättis laiendatud hulga tühjaks (#319). Seemenda esimesel korral, kui
+  // kogud päriselt saabuvad.
+  const seemendatud = useRef(false);
+  useEffect(() => {
+    if (seemendatud.current) return;
+    const juured = Object.entries(visibleCollections)
+      .filter(([, col]) => !col.parent)
+      .map(([id]) => id);
+    if (juured.length === 0) return;
+    // Seemendus on ÜHEKORDNE: hiljem saabuv kogu ei tohi kasutaja
+    // kokkuklapitud haru uuesti lahti kangutada.
+    seemendatud.current = true;
+    setExpandedIds(new Set(juured));
+  }, [visibleCollections]);
 
   // Ehita puu
   const tree = useMemo(() => buildCollectionTree(visibleCollections), [visibleCollections]);
