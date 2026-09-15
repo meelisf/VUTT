@@ -420,6 +420,18 @@ Et soovitused oleksid tasakaalus — need ei ole viisakusfraasid, vaid asjad, mi
 
 ## 6. Soovitatud järjekord
 
+> **Seis 2026-09-15 (pärast rakendamist):** P0-1, P0-2, P0-3, P1-9, P1-11 ja P2-6 on
+> **tehtud** (vt §8 ja PR #382). Ülejäänud suuremad leiud said issue'd:
+> **#386** (P0-de järelmõjud: vanad image'id ja logitud tokenid — järjekorra punktid 1–2),
+> **#387** (P1-2 + P1-3 Python-versioon ja sõltuvuste lock — punkt 5),
+> **#388** (P1-10 konteineri protsessihaldus — punkt 6),
+> **#389** (P1-5 käivitustaaste võistlus — punkt 4),
+> **#390** (P1-1 `strictNullChecks` — punkt 10).
+> **P1-4, P1-6, P1-7, P1-8 ja P2-jäägid on teadlikult ilma issue'ta** ja elavad
+> registris [`docs/tegemata_tood.md`](../tegemata_tood.md) — nad on hajusad ja
+> liiguvad siis, kui sama faili niikuinii puutud.
+
+
 | # | Tegevus | Valmimise kontroll |
 |---|---|---|
 | 1 | `state/` ehituskonfiguratsioonist eemaldatud; teha uus build ja varasemate image'ite leviku kontroll | värske image ei sisalda runtime-faile; vana materjali käsitlus otsustatud |
