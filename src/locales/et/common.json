@@ -308,5 +308,6 @@
       "12": "detsember"
     },
     "unparsed": "Dateering säilib tekstina, kuid otsinguks ei saa sellest aastat tuletada."
-  }
+  },
+  "refresh": "Värskenda"
 }

@@ -280,6 +280,11 @@ RATE_LIMITS = {
     '/reset/validate': (10, 300),       # 10 valideerimist 5 min jooksul IP kohta
     '/reset/set-password': (5, 300),    # 5 katset 5 min jooksul (nagu invite)
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
+    # Kliendivigade raport (#133): endpoint on avalik, sest vead tabavad ka
+    # välja logimata kasutajaid. Lagi on lai, sest üks katkine leht võib
+    # anda mitu viga järjest (boundary + window + promise), aga mitte
+    # piiramatu — muidu saab logi täis kirjutada.
+    '/client-error': (20, 300),     # 20 raportit 5 min jooksul IP kohta
     # Avalikke /meta/* SEO endpointe ei piirata IP järgi: Google'i sitemap'i
     # valideerimine küsib tuhandeid URL-e lühikese aja jooksul ning serverini
     # jõuavad ülikooli pöördproksi tõttu eri kliendid sama IP-ga.

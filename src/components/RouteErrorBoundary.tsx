@@ -1,7 +1,8 @@
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, RefreshCw, Home, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { reportClientError } from '../services/clientErrorReporter';
 
 // React Routeri errorElement — näitab kasutajasõbralikku veateadet marsruudi vigade korral
 export default function RouteErrorBoundary() {
@@ -22,6 +23,15 @@ export default function RouteErrorBoundary() {
 
   // Stack trace (ainult dev-režiimis kasulik)
   const errorStack = error instanceof Error ? error.stack : undefined;
+
+  // Raporteeri serverisse (#133). Enne seda oli ainus signaal „kasutaja
+  // kirjutab" — ja nii jäi kaardiviga kuudeks märkamata, kuigi ta tabas iga
+  // kasutajat, kes seoste kaardil isikule klikkis.
+  // Effectis, mitte renderduses: renderdus peab jääma kõrvalmõjuta, ja see
+  // ekraan võib React StrictMode'is kaks korda renderduda.
+  useEffect(() => {
+    reportClientError({ message: errorMessage, stack: errorStack, source: 'boundary' });
+  }, [errorMessage, errorStack]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

@@ -89,7 +89,7 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `user_settings/`, `notifications/` | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/` | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
 `labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`work_sets/{id}.json`**, **`prosopography/{nanoid}.json`**
@@ -137,6 +137,7 @@ Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json
 | `meili_doc.py` | Puhas `_metadata.json` → Meili-dokument kaardistus (side-effect-vaba) |
 | `meilisearch_ops.py` | Meili sünk, ThreadPoolExecutor, keep-warm |
 | `git_ops.py`, `auth.py`, `cache.py`, `rate_limit.py` | Versioonihaldus, autentimine, cache (TTL 5 min), rate-limit |
+| `client_errors.py` | Kliendipoolsed vead (#133): kaetud ring `state/client_errors.json`-is, valge nimekiri + pikkusepiirid |
 | `upload/`, `upload_ops.py` | Upload-viisard + OCR-serveri integratsioon; poolitamine enne OCR-i elab `upload/prepress*.py` + `page_source.py` + `store_source.py` moodulites |
 | `ada/` | ADA (dspace.ut.ee) import: `mapping` (puhas DC-kaardistus), `client` (REST), `fetch` (allalaadimine), `provenance` (ankrud) |
 | `marginalia_normalize.py` | `normalize_marginalia_tags()` — kutsutakse KÕIGIS kirjutusteedes |
@@ -369,6 +370,15 @@ käsitlema nagu `.txt`-d: leht on **lahendatud**, mitte ootel — see puudutab k
 seisaku-tuvastust (`last_progress_at`, `is_stalled`) ja upload'i `done`-üleminekut.
 Tühi väljund EI ole viga. Lugemiskohad: `reocr_ops` (üksik + batch poll),
 `reocr_recovery`, `upload/thumbs.py`, `upload/import_work.py`.
+
+**Kliendipoolsed vead (#133)** — `POST /client-error` on **tahtlikult avalik**
+(vead tabavad ka välja logimata kasutajaid), lugemine `GET|DELETE
+/admin/client-errors` + `require_role("admin")`. Kliendi saadetu on ANDMED:
+kirje ehitatakse valge nimekirja järgi ja väljad lõigatakse — ajatempli, IP ja
+kasutajanime paneb SERVER. **Raportöör ei tohi ise vigu tekitada**: iga tõrge
+neelatakse vaikselt, dedupe + lehesessiooni lagi hoiavad tsükli kinni.
+Valvurid: `tests/test_client_errors.py` (sh endpointide kaitse),
+`src/services/__tests__/clientErrorReporter.test.ts`.
 
 **z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
 (nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob
