@@ -162,3 +162,38 @@ def test_planned_pages_applying_ajal_ei_topeltloe(upload):
         uid, ocr_server_path="/srv", sftp_open_func=lambda i: sftp)
 
     assert res["planned_pages"] == 5
+
+
+def test_apply_lopetamine_tsukli_keskel_ei_kirjutata_ule(upload):
+    """Poll ei tohi tsükli alguses loetud staatust lõpus tagasi kirjutada.
+
+    Tootmises (2026-09-15, upload y5fcky): poll luges `applying`, tegi
+    kümneid sekundeid SFTP-tööd, vahepeal jõudis apply-lõim lõpuni ja kirjutas
+    `processing` — ja polli lõppkirjutus taastas `applying`. Sealt edasi ei
+    pääsenud enam ükski „Rakenda" läbi (`applying` ei ole APPLY_START_STATUSES-es,
+    CAS andis 409) ja iga järgmine poll kinnitas seisu uuesti, sest `applying`
+    ei ole ka PREPRESS_IDLE_STATUSES-es. Kasutaja nägi 64/64 valmis lehte ja
+    mitte ühtki toimivat nuppu.
+
+    I1 ütleb „poll ei MUUDA staatust" — poll ei muutnudki, ta TAASTAS vananenu.
+    """
+    uid = upload(status="applying", expected_pages=2)
+
+    class _ApplyLopetabKeskel(_SFTP):
+        def listdir(self, path):
+            # Apply-lõim jõuab lõpuni siis, kui poll on juba oma hetktõmmise
+            # võtnud, aga lõppkirjutuseni pole jõudnud.
+            upload_state.set_upload_state(uid, status="processing")
+            return super().listdir(path)
+
+    sftp = _ApplyLopetabKeskel(KOIK_VALMIS)
+
+    upload_thumbs.poll_and_sync_thumbs(
+        uid, ocr_server_path="/srv", sftp_open_func=lambda i: sftp)
+
+    s = upload_state.read_state(uid)
+    assert s["status"] == "processing", (
+        "poll kirjutas vananenud hetktõmmise värske väärtuse peale"
+    )
+    # Polli õiguspärane töö peab siiski kohale jõudma.
+    assert len(s["files"]) == 2

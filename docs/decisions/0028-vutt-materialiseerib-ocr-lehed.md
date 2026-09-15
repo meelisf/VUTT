@@ -74,6 +74,33 @@ keset apply't väljundi arvult lähtearvule.
 
 Kontseptuaalselt: `applying` tähendab, et sisendvoog ei ole veel suletud.
 
+**Täpsustus 2026-09-15 (upload `y5fcky`).** „Ei tohi muuta" ei ole piisav
+sõnastus: poll ei tohi staatust ka **taastada**. Poll luges tsükli alguses
+`applying`, tegi kümneid sekundeid SFTP-tööd, vahepeal jõudis apply-lõim
+lõpuni ja kirjutas `processing` — ja polli lõppkirjutus tegi
+
+```python
+if new_status != s.get("status"):   # "applying" != "processing" → True
+    s["status"] = new_status        # kirjutab "applying" TAGASI
+```
+
+Tingimus oli mõeldud tähendama „kirjuta ainult siis, kui muutus", aga ta
+kirjutab täpselt siis, kui **keegi teine** on vahepeal väärtust muutnud.
+Lõppkirjutus luges küll värskelt ja luku all, aga `new_status` oli tuletatud
+tsükli alguse hetktõmmisest.
+
+Seis oli lõplik: `applying` ei ole `APPLY_START_STATUSES`-es, seega iga
+„Rakenda" sai CAS-ist 409; `applying` ei ole ka `PREPRESS_IDLE_STATUSES`-es,
+seega poll jooksis edasi ja kinnitas seisu igal tsüklil uuesti. Kasutaja nägi
+64/64 valmis lehte ja mitte ühtki toimivat nuppu.
+
+> Poll kirjutab staatuse ainult siis, kui ketta väärtus on **tsükli algusest
+> saadik muutumatu** (`s.get("status") == current_status`). Üldisemalt: aeglase
+> tsükli lõpus tehtud kirjutus peab olema CAS, mitte paljas võrdlus — lugemise
+> ja kirjutamise vahele mahub teine kirjutaja.
+
+Valvur: `tests/test_upload_apply_poll.py::test_apply_lopetamine_tsukli_keskel_ei_kirjutata_ule`.
+
 Topelt-apply ohtu see race ei loonud — `APPLY_START_STATUSES` on
 `("awaiting_split", "prepping", "error")` ja `reviewing` ei kuulu sinna.
 

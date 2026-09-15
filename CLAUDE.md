@@ -306,7 +306,11 @@ PIL viskaks EXIF-i ära ja pöördega pilt näeks kahel teel erinev välja).
 Kolm invarianti, iga rikkumine on nähtav viga:
 - **I1** — kuni staatus on `applying`, ei muuda `poll_and_sync_thumbs` upload'i
   põhistaatust. Ilma selleta kirjutab juba esimene JPG-d näinud poll staatuse
-  `reviewing`-uks keset apply't (`elif all_page_nums`).
+  `reviewing`-uks keset apply't (`elif all_page_nums`). Poll ei tohi staatust ka
+  **taastada**: lõppkirjutus on CAS (`s.get("status") == current_status`), mitte
+  paljas `!=`. Aeglase tsükli algusest pärit hetktõmmis on vananenud — apply
+  jõuab vahepeal `processing` kirjutada ja paljas võrdlus pani `applying`
+  tagasi, kust CAS ei lasknud enam läbi ühtki „Rakenda" (y5fcky, 2026-09-15).
 - **I2** — `applying` ajal ei laadi poll ühtki kaug-JPG-d alla; pisipildid
   kirjutab `prepress_apply` kohapeal (mitte-fataalselt: kaugpilt on juba
   avaldatud). Aken `publish_atomic` ja `write_thumbnail` vahel on reaalne.
