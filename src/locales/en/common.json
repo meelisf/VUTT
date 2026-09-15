@@ -74,7 +74,8 @@
     "notLoggedIn": "Sign in",
     "ocr": {
       "content_blocked": "Gemini's content filter refused this page. Try the LOSS model."
-    }
+    },
+    "sessionExpired": "Your session has expired — please log in again. Your data is intact."
   },
   "language": {
     "switchTo": "Switch language to {{lang}}",

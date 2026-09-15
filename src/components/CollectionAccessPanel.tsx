@@ -14,6 +14,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isSessionExpired } from '../utils/apiErrorText';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import {
   applyCollectionRights, getCollectionRights,
@@ -61,12 +62,15 @@ const CollectionAccessPanel: React.FC<CollectionAccessPanelProps> = ({
       };
       setLaetud(olek);
       setMustand(klooni(olek));
-    } catch {
+    } catch (e) {
       // Laadimisviga EI tohi muutuda tühjaks õiguste kaardiks: tühi kaart
       // näeks välja nagu „õigusi ei ole" ja selle salvestamine kustutaks kõik.
       setLaetud(null);
       setMustand(null);
-      setViga(t('collections.accessPanel.loadFailed'));
+      // Aegunud sessioon ei ole andmekadu — tekst muutub, olek mitte.
+      setViga(isSessionExpired(e)
+        ? t('common:errors.sessionExpired')
+        : t('collections.accessPanel.loadFailed'));
     } finally {
       setLaadin(false);
     }
@@ -138,8 +142,10 @@ const CollectionAccessPanel: React.FC<CollectionAccessPanelProps> = ({
       setOtsing('');
       onSaved?.();
     } catch (e) {
-      setViga((e as { message?: string }).message
-        || t('collections.accessPanel.saveFailed'));
+      setViga(isSessionExpired(e)
+        ? t('common:errors.sessionExpired')
+        : ((e as { message?: string }).message
+          || t('collections.accessPanel.saveFailed')));
     } finally {
       setSalvestan(false);
     }

@@ -9,6 +9,7 @@ import { buildPickerEntries } from './pickerEntries';
 import { createWorkSet } from '../services/workSetService';
 import { CollectionSelection } from '../services/selectionFilter';
 import { getLangCode } from '../utils/getLangCode';
+import { isSessionExpired } from '../utils/apiErrorText';
 
 interface CollectionPickerProps {
   // Variant 1: Headeris kasutatav (globaalne kontekst)
@@ -104,7 +105,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
   title
 }) => {
   const { t, i18n } = useTranslation(['common']);
-  const { selection, setSelection, collections, workSets, refreshWorkSets } = useCollection();
+  const { selection, setSelection, collections, workSets, workSetsError, refreshWorkSets } = useCollection();
   // Massilise määramise variandis (`onSelect`) valitakse teosele PÜSIKOGU;
   // töökollektsioon ei ole teose omadus, seega seal seda jaotist ei ole.
   const selectedCollection = selection.kind === 'collection' ? selection.id : null;
@@ -344,9 +345,15 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
               )}
               {nahtavadKogud.length === 0 ? (
                 <p className="px-3 py-2 text-sm text-gray-500">
-                  {otsib
-                    ? t('workSets.noMatches', 'Ükski kogu ei vasta otsingule')
-                    : t('workSets.empty', 'Töökollektsioone ei ole')}
+                  {/* Laadimata loend ei ole tühi loend: „ei ole" ütleks
+                      aegunud sessiooni korral, et kogud on kadunud. */}
+                  {workSetsError
+                    ? (isSessionExpired(workSetsError)
+                      ? t('common:errors.sessionExpired')
+                      : t('workSets.loadFailed', 'Töökollektsioonide laadimine ebaõnnestus'))
+                    : otsib
+                      ? t('workSets.noMatches', 'Ükski kogu ei vasta otsingule')
+                      : t('workSets.empty', 'Töökollektsioone ei ole')}
                 </p>
               ) : (
                 nahtavadKogud.map((ws) => {

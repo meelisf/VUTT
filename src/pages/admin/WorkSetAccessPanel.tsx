@@ -8,6 +8,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isSessionExpired } from '../../utils/apiErrorText';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import { WorkSetSummary, getWorkSet, setWorkSetAccess } from '../../services/workSetService';
 import { applyUserRole, SetRole } from './workSetAccess';
@@ -98,6 +99,10 @@ const WorkSetAccessPanel: React.FC<WorkSetAccessPanelProps> = ({
           // Värske oleku laadimine ebaõnnestus — konflikti teade jääb,
           // salvestamine annab uue 409 ja seda saab korrata.
         }
+      } else if (isSessionExpired(e)) {
+        // Aegunud sessioon ei ole salvestamise ebaõnnestumine andmete mõttes:
+        // mustand jääb alles, uuesti sisse logides saab sama salvestuse saata.
+        setViga(t('common:errors.sessionExpired'));
       } else {
         setViga((status === 403 && (e as { message?: string }).message)
           || t('workSets.saveFailed'));
