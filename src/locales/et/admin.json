@@ -287,7 +287,8 @@
       "readOnlyHint": "Õiguste jagamine on admini toiming. Siin on selle kogu praegune ligipääs.",
       "serverState": "Serveri praegune olek:"
     },
-    "noAccess": "Ligipääs puudub"
+    "noAccess": "Ligipääs puudub",
+    "createUnconfirmed": "Vastust ei saadud õigeks ajaks. Loend on värskendatud — kontrolli, kas kogu on juba loodud, enne kui uuesti proovid."
   },
   "cards": {
     "registrations": "Taotlused",

@@ -13,6 +13,7 @@ import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { isAtLeast } from '../../utils/roleUtils';
+import { loomiseTulem } from './workSetCreateOutcome';
 import { getLangCode } from '../../utils/getLangCode';
 import {
   WorkSetSummary, WorkSetMember, listWorkSets, createWorkSet, patchWorkSet, deleteWorkSet,
@@ -180,8 +181,19 @@ const WorkSets: React.FC = () => {
       await load();
       await refreshWorkSets();
       setError(null);
-    } catch {
-      setError(t('workSets.saveFailed'));
+    } catch (e) {
+      // Katkenud vastus EI OLE ebaõnnestunud töö: server viib kirjutuse lõpuni
+      // ka siis, kui klient on juba läinud (`run_in_threadpool` lõime ei
+      // tühistata) — täpselt nii tekkis „ebaõnnestus", kuigi kogu oli loodud.
+      // Laeme loendi ja ütleme ainult seda, mida tegelikult teame.
+      const tulem = loomiseTulem(e);
+      if (tulem === 'kinnitamata') setNewName('');  // kordusklikk = duplikaat
+      await load();
+      await refreshWorkSets();
+      // `load()` nullib vea õnnestumisel — teade käib seega PEALE, mitte enne.
+      setError(tulem === 'kinnitamata'
+        ? t('workSets.createUnconfirmed')
+        : t('workSets.saveFailed'));
     } finally {
       setBusyId(null);
     }

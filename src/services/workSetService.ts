@@ -40,6 +40,14 @@ interface WorkIdsResponse {
 
 const AUTH = { useLocalStorageToken: true } as const;
 
+/**
+ * Kirjutusteed committivad `data/` gitis (ADR 0040). Vaikimisi 10 s on liiga
+ * napp: esimene commit pärast serveri taaskäivitust mõõdeti tootmises 14,7 s
+ * (60 000+ kirjega indeks, külm dentry-cache). Katkestus ei peata serveri
+ * tööd — ta ainult varjab tulemuse, seega lühike lävi teeb kahju, mitte kasu.
+ */
+const WRITE = { ...AUTH, timeout: 30000 } as const;
+
 const idCache = new Map<string, { workIds: string[]; revision: number }>();
 // Samaaegsed kutsed (nt Dashboard + päise loendur) ei tohi teha kahte päringut.
 // Lennusolev lubadus EI ole vahemälu: ta kustutatakse ka vea korral.
@@ -125,7 +133,7 @@ export async function createWorkSet(
   name: Record<string, string>,
   description: Record<string, string> = { et: '', en: '' },
 ): Promise<WorkSetSummary> {
-  const data = await apiPost<{ work_set: WorkSetSummary }>('/work-sets', { name, description }, AUTH);
+  const data = await apiPost<{ work_set: WorkSetSummary }>('/work-sets', { name, description }, WRITE);
   return data.work_set;
 }
 
@@ -133,7 +141,7 @@ export async function patchWorkSet(
   setId: string, changes: Record<string, unknown>, revision: number,
 ): Promise<WorkSetSummary> {
   const data = await apiPatch<{ work_set: WorkSetSummary }>(
-    `/work-sets/${setId}`, { ...changes, revision }, AUTH);
+    `/work-sets/${setId}`, { ...changes, revision }, WRITE);
   invalidateWorkSetIds(setId);
   return data.work_set;
 }
@@ -142,14 +150,14 @@ export async function setWorkSetAccess(
   setId: string, access: Record<string, 'viewer' | 'manager'>, revision: number,
 ): Promise<WorkSetSummary> {
   const data = await apiPut<{ work_set: WorkSetSummary }>(
-    `/work-sets/${setId}/access`, { access, revision }, AUTH);
+    `/work-sets/${setId}/access`, { access, revision }, WRITE);
   // Ligipääsu muutus muudab seda, mida SEE kutsuja loendis näeb.
   invalidateWorkSetIds(setId);
   return data.work_set;
 }
 
 export async function deleteWorkSet(setId: string): Promise<void> {
-  await apiDelete(`/work-sets/${setId}`, AUTH);
+  await apiDelete(`/work-sets/${setId}`, WRITE);
   invalidateWorkSetIds(setId);
 }
 
@@ -163,7 +171,7 @@ export async function addWorks(
   setId: string, workIds: string[], revision?: number,
 ): Promise<WorkIdsResponse> {
   const data = await apiPost<WorkIdsResponse>(
-    `/work-sets/${setId}/works`, { work_ids: workIds, revision }, AUTH);
+    `/work-sets/${setId}/works`, { work_ids: workIds, revision }, WRITE);
   invalidateWorkSetIds(setId);
   return data;
 }
@@ -172,7 +180,7 @@ export async function removeWorks(
   setId: string, workIds: string[], revision?: number,
 ): Promise<WorkIdsResponse> {
   const data = await apiDeleteWithBody<WorkIdsResponse>(
-    `/work-sets/${setId}/works`, { work_ids: workIds, revision }, AUTH);
+    `/work-sets/${setId}/works`, { work_ids: workIds, revision }, WRITE);
   invalidateWorkSetIds(setId);
   return data;
 }
