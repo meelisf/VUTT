@@ -5,6 +5,8 @@ data
 __pycache__
 *.pyc
 .env
+# Kasutajad, sessioonid ja tokenid ei tohi jõuda ka ehituskonteksti.
+state/
 .DS_Store
 *.log
 meilisearch

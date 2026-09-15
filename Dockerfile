@@ -15,7 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY server/ ./server/
 COPY scripts/ ./scripts/
-COPY state/ ./state/
 COPY reference_data/ ./reference_data/
 
 # Make sure scripts are executable
@@ -25,8 +24,8 @@ RUN chmod +x server/*.py
 ENV PYTHONUNBUFFERED=1
 ENV VUTT_DATA_DIR=/data
 
-# Create directory for data mount
-RUN mkdir -p /data
+# Loo tühjad haakepunktid; runtime-olek tuleb hosti köitest, mitte image'ist.
+RUN mkdir -p /data /app/state
 
 # Expose ports
 EXPOSE 8001
