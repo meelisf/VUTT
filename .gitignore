@@ -41,6 +41,9 @@ loss/state/prosopography/
 # Claude Code lokaalsed sätted + ajutised worktree'd (masina-spetsiifilised)
 .claude/
 
+# Pi agendi lokaalne konf (masina-spetsiifiline, nagu .claude/)
+.pi/
+
 # Suured skännid reference_data-s ei kuulu reposse (txt/csv kuuluvad)
 reference_data/*.jpg
 
