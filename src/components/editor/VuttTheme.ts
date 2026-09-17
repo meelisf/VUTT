@@ -59,8 +59,19 @@ export const vuttTheme = EditorView.theme({
   // Paaristägid peidetakse CSS-iga, mitte replace-widgetina.
   // See käib kokku VuttMarkupExtensioni mark+atomic mudeliga, mis oli viimane stabiilselt töötanud
   // lahendus plain caret nooleliikumise jaoks tagide ümber.
+  // Peidetud tägi PEAB jääma mõõdetavaks — `display: none` EI KÕLBA.
+  // `posAtCoords` skaneerimissilmus (ainult vertikaalne kursoriliikumine) küsib
+  // iga rea kohta `coordsAt(block.to, -1)` (alla) või `coordsAt(block.from, 1)`
+  // (üles). `display: none` sisul ei ole DOM-kasti → `coordsAt` tagastab `null`
+  // → silmus ei peatu sellel real, vaid läheb järgmisele. Üleni italic lehel ei
+  // peata teda ükski rida: nool alla viib kursori `doc.length`-i (kasutaja
+  // vaates kaob ära), nool üles nulli. Null-laiusega, aga OLEMASOLEV kast
+  // annab ristküliku ja silmus peatub õigel real.
   '.vutt-hidden-tag': {
-    display: 'none',
+    display: 'inline-block',
+    width: '0',
+    overflow: 'hidden',
+    verticalAlign: 'top',
   },
   '.vutt-ann': {
     backgroundColor: '#fef9c3',
