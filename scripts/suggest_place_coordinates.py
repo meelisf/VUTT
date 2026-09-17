@@ -18,6 +18,7 @@ import json
 import time
 import urllib.parse
 import urllib.request
+from typing import Optional, Union
 
 
 CSV_FIELDS = [
@@ -49,13 +50,13 @@ def build_query(row: dict) -> str:
     return label
 
 
-def fetch_json(url: str) -> dict | list:
+def fetch_json(url: str) -> Union[dict, list]:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=20) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def suggest_nominatim(row: dict) -> dict | None:
+def suggest_nominatim(row: dict) -> Optional[dict]:
     query = build_query(row)
     if not query:
         return None
@@ -82,7 +83,7 @@ def suggest_nominatim(row: dict) -> dict | None:
     }
 
 
-def suggest_geonames(row: dict, username: str) -> dict | None:
+def suggest_geonames(row: dict, username: str) -> Optional[dict]:
     query = build_query(row)
     if not query:
         return None
@@ -116,7 +117,7 @@ def suggest_geonames(row: dict, username: str) -> dict | None:
     }
 
 
-def should_process(row: dict, types: set[str] | None) -> bool:
+def should_process(row: dict, types: Optional[set[str]]) -> bool:
     if row.get("lat") and row.get("lon"):
         return False
     if types is None:

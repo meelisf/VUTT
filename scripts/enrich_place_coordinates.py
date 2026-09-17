@@ -17,6 +17,7 @@ import re
 import time
 import urllib.parse
 import urllib.request
+from typing import Optional
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,7 +29,7 @@ WD_HEADERS = {
 }
 
 
-def parse_wikidata_point(value: str) -> dict | None:
+def parse_wikidata_point(value: str) -> Optional[dict]:
     match = re.match(r"^Point\(([-0-9.]+)\s+([-0-9.]+)\)$", (value or "").strip())
     if not match:
         return None

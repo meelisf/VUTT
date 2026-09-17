@@ -3,6 +3,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -14,7 +15,7 @@ _DEFAULT_PROSOPO_DIR = os.path.join(
 )
 
 
-def migrate(prosopo_dir: str | None = None) -> int:
+def migrate(prosopo_dir: Optional[str] = None) -> int:
     """Konverteerib failid; tagastab muudetud failide arvu."""
     target = Path(prosopo_dir or _DEFAULT_PROSOPO_DIR)
     if not target.exists():

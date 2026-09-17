@@ -1,7 +1,7 @@
 # Ehituskonteksti läheb kõik peale siinsete välistuste. Dockerfile kopeerib
-# ainult `requirements.txt`, `server/`, `scripts/` ja `reference_data/` —
-# ülejäänu on puhas ülekantav maht. Uue ülemise taseme kausta lisamisel
-# kontrolli, kas ta peab siia tulema.
+# ainult `requirements.txt`, `docker-entrypoint.sh`, `server/`, `scripts/` ja
+# `reference_data/` — ülejäänu on puhas ülekantav maht. Uue ülemise taseme
+# kausta lisamisel kontrolli, kas ta peab siia tulema.
 dist
 node_modules
 data

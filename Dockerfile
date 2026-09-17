@@ -31,5 +31,15 @@ RUN mkdir -p /data /app/state
 EXPOSE 8001
 EXPOSE 8002
 
-# Run both Python servers (FastAPI + Image Server)
-CMD ["/bin/bash", "-c", "python3 -m uvicorn server.main:app --host 0.0.0.0 --port 8002 & python3 -m server.image_server & wait"]
+# Käivitus: kaks serverit ühes konteineris. Skript lõpetab konteineri, kui
+# KUMB TAHES neist sureb, et `restart: always` saaks taastada (#388).
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Healthcheck katab MÕLEMAD pordid. Ta ei taaskäivita midagi (Docker ei
+# taaskäivita `unhealthy` konteinerit) — taastuse teeb entrypoint'i `wait -n`;
+# healthcheck teeb rippuva protsessi `docker ps`-is nähtavaks.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python3 -c "import socket, urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=4).read(); socket.create_connection(('127.0.0.1', 8001), timeout=4).close()"
+
+CMD ["/app/docker-entrypoint.sh"]
