@@ -166,7 +166,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     const timer = setTimeout(async () => {
       const currentId = ++prosopoSearchIdRef.current;
       try {
-        const res = await listPersons({ q: inputValue }, token);
+        // Relevantsus, mitte tähestik: server lõikab 48 peale ja valija veel
+        // 6 peale — tähestikuline lõige oleks otsituga risti.
+        const res = await listPersons(
+          { q: inputValue, sort_by: 'relevance' }, token);
         if (prosopoSearchIdRef.current !== currentId) return;
         setProsopoResults(res.results.slice(0, 6));
       } catch {
@@ -613,6 +616,12 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                         {entry.death_year && <span>†{entry.death_year}</span>}
                         {entry.has_wikidata && <span className="text-blue-400">WD</span>}
                         {entry.has_gnd && <span className="text-orange-400">GND</span>}
+                        {/* Teeb järjestuse loetavaks; 0 jäetakse välja (enamik kirjeid). */}
+                        {entry.work_count > 0 && (
+                          <span className="text-gray-500 not-italic">
+                            {entry.work_count} {t('prosopography.works', { count: entry.work_count })}
+                          </span>
+                        )}
                       </span>
                     </span>
                   </div>
