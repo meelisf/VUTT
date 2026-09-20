@@ -195,6 +195,55 @@ def _entry_matches_year_range(entry: dict, year_from: Optional[int], year_to: Op
     return False
 
 
+def _relevance_key(entry: dict, q_lower: str, aliases_data: Optional[dict] = None) -> tuple:
+    """Valija järjestusvõti: vaste kvaliteet → teosearv → nimi → id.
+
+    Miks astmestik, mitte paljas kaal: täpselt kirjutatud harv nimi ei tohi
+    kaduda produktiivse nimekaimu taha. `work_count` otsustab AINULT võrdse
+    vastekvaliteedi sees — täpselt selle juhu, kus sarnaseid nimesid on mitu.
+
+`sort_name` EI OSALE astme määramisel, kuigi valijas otsitakse tavaliselt
+    perekonnanime järgi. Ta on heuristika — `family_name` puudumisel nime
+    viimane sõna — ja eksib kahtpidi (mõlemad mõõdetud tootmises 2026-09-20):
+    patronüüm („Ericus Johannis") ja ümberpööratud kuju („Horn, Petrus")
+    annavad `sort_name`-iks eesnime. Perekonnanime-aste tõstis nii 1-teoselised
+    isikud 507-teoselise „Johann Vogeli" ette. Perekonnanimeotsing ei kaota
+    midagi: perekonnanimi ON nimesõna ja satub niikuinii esimesele astmele.
+
+    Tähestikuline järjestus siin ei aitaks: perekonnanime otsingul on KÕIGIL
+    vastetel identne `sort_name` ja järjekorra otsustaks indeksifaili järjekord.
+
+    Võti peab olema TÄIELIK (lõpus `id`) — muidu vahetavad võrdsed kirjed
+    laadimiste vahel kohta ja loend võbeleb klahvivajutuste vahel.
+    """
+    label = entry.get("label") or ""
+    sort_name = entry.get("sort_name") or ""
+    label_cf = label.casefold()
+    sort_cf = sort_name.casefold()
+
+    def _aliases() -> list:
+        result = [a for a in (entry.get("aliases") or []) if isinstance(a, str)]
+        extern = ((aliases_data or {}).get(entry.get("id")) or {}).get("aliases") or []
+        result.extend(a for a in extern if isinstance(a, str))
+        return result
+
+    if not q_lower:
+        tier = 2
+    elif any(word.casefold().startswith(q_lower) for word in label.split()):
+        tier = 0
+    elif (q_lower in label_cf or q_lower in sort_cf
+          or any(q_lower in a.casefold() for a in _aliases())):
+        tier = 1
+    else:
+        # Vaste tuli sildist või mujalt — nimes päringut ei ole.
+        tier = 2
+
+    work_count = entry.get("work_count")
+    if not isinstance(work_count, int):
+        work_count = 0
+    return (tier, -work_count, sort_cf, entry.get("id") or "")
+
+
 def _filter_index_entries(
     q: Optional[str] = None,
     gender: Optional[str] = None,
@@ -211,6 +260,7 @@ def _filter_index_entries(
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
     tags: Optional[list] = None,
+    aliases_data: Optional[dict] = None,
 ) -> list[dict]:
     sync_from_facade()
     index = _load_index()
@@ -224,7 +274,8 @@ def _filter_index_entries(
         results = [e for e in results if e.get("id") in id_set]
     if q:
         q_lower = q.casefold()
-        aliases_data = _load_person_aliases()
+        if aliases_data is None:
+            aliases_data = _load_person_aliases()
 
         def _matches_tags(entry: dict) -> bool:
             for tag in _entry_tags(entry):
@@ -344,6 +395,10 @@ def list_persons(
             # tähendaks paljudes kohtades „filtrit ei ole" → kogu korpus.
             return {"results": [], "total": 0, "limit": limit, "offset": offset}
 
+    # Relevantsus vajab aliaseid nii filtris kui järjestuses — 350 KB faili
+    # teistkordne parsimine iga klahvivajutuse peale oleks puhas raiskamine.
+    aliases_data = _load_person_aliases() if (q and sort_by == "relevance") else None
+
     results = _filter_index_entries(
         q=q,
         gender=gender,
@@ -360,9 +415,14 @@ def list_persons(
         imm_year_to=imm_year_to,
         ids=ids,
         tags=tags,
+        aliases_data=aliases_data,
     )
 
-    if sort_by == "birth_year":
+    if sort_by == "relevance" and q:
+        # Relevantsus ilma päringuta ei ole olek — siis jääb tähestik.
+        q_lower = q.casefold()
+        results.sort(key=lambda e: _relevance_key(e, q_lower, aliases_data))
+    elif sort_by == "birth_year":
         results.sort(key=lambda e: (e.get("birth_date") is None, e.get("birth_date") or ""))
     elif sort_by == "death_year":
         results.sort(key=lambda e: (e.get("death_date") is None, e.get("death_date") or ""))
@@ -732,4 +792,4 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     }
 
 
-__all__ = ['list_persons', '_filter_index_entries', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations', '_entry_tags', '_normalize_tag_query', '_tag_match_keys']
+__all__ = ['list_persons', '_filter_index_entries', '_relevance_key', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations', '_entry_tags', '_normalize_tag_query', '_tag_match_keys']
