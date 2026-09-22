@@ -31,17 +31,52 @@ INVITE_EXPIRY_HOURS = 48
 # (`src/pages/registerInterest.ts` — kaks keelt, üks reegel).
 MAX_INTEREST_COLLECTIONS = 3
 
+# Läbivaadatud taotluse säilitusaeg (#300). Kirje kannab isikuandmeid ja vaba
+# tekstina motivatsiooni; kinnitatud taotluse info elab edasi kasutajakontos,
+# tagasi lükatul ei ole VUTT-iga enam seost. `pending` ei aegu kunagi.
+REGISTRATION_RETENTION_DAYS = 30
+
 # =========================================================
 # REGISTREERIMISE FUNKTSIOONID
 # =========================================================
 
+def _prune_reviewed(registrations, now):
+    """Eemaldab läbivaadatud kirjed, mille `reviewed_at` on säilitusajast vanem."""
+    cutoff = now - timedelta(days=REGISTRATION_RETENTION_DAYS)
+    kept = []
+    for reg in registrations:
+        if reg.get("status") == "pending":
+            kept.append(reg)
+            continue
+        try:
+            if datetime.fromisoformat(reg["reviewed_at"]) >= cutoff:
+                kept.append(reg)
+        except (ValueError, KeyError, TypeError):
+            kept.append(reg)  # parssimata kirje — hoia alles (ära kaota vaikselt)
+    return kept
+
+
 def load_pending_registrations():
-    """Laeb ootel registreerimistaotlused."""
+    """Laeb registreerimistaotlused; aegunud läbivaadatud kirjed kustutatakse.
+
+    Puhastus kirjutatakse kohe kettale, mitte alles järgmise salvestusega:
+    kustutamise mõte on, et andmeid serveris enam ei ole, ja taotluste vahel
+    võib mööduda kuid. Iga kirjutustee laeb enne, seega ei jõua aegunud kirje
+    ka salvestades tagasi.
+    """
     with registrations_lock:
         if not os.path.exists(PENDING_REGISTRATIONS_FILE):
             return {"registrations": []}
         with open(PENDING_REGISTRATIONS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+        koik = data.get("registrations", [])
+        alles = _prune_reviewed(koik, datetime.now())
+        if len(alles) != len(koik):
+            data["registrations"] = alles
+            atomic_write_json(PENDING_REGISTRATIONS_FILE, data)
+            logger.info("Registreerimistaotlused: %d aegunud läbivaadatud kirjet kustutatud",
+                        len(koik) - len(alles))
+        return data
 
 
 def save_pending_registrations(data):
