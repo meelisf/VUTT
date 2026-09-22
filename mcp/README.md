@@ -243,8 +243,8 @@ CI jooksutab `pytest tests/ mcp/tests/` — selgesõnaline tee, sest `testpaths`
   Testid tohivad (`mcp/tests/conftest.py` lisab repo juure sys.path'i).
 - `mcp/tests/` EI TOHI sisaldada `__init__.py`-d — pakett `mcp.tests` varjutaks
   repo enda `tests` paketi ja lõhuks 5 olemasolevat testi.
-- `mcp` sõltuvus on AINULT `requirements-dev.txt`-is — `requirements.txt`
-  paigaldatakse Docker-buildis Python 3.9 peale, kuhu SDK v2 ei mahu.
+- `mcp` sõltuvus on AINULT `requirements-dev.txt`-is — backend-konteiner ei vaja
+  teda ja tootmise lukk (`requirements.lock`) ei tohi MCP SDK tõttu liikuda.
 - Iga tööriist on `@mcp.tool(structured_output=False)`. Vaikimisi lisaks SDK
   `-> str` tagastusele ka `structured_content`-i, mille tugi on klientide vahel
   ebaühtlane.
