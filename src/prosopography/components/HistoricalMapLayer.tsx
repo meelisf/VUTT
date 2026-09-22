@@ -78,7 +78,7 @@ function dateFilter(year: number): FilterSpecification {
 
 /** Muudab ajalooliste halduspiiride ja piirkonnanimede hierarhia paremini loetavaks. */
 function enhanceAdministrativeReadability(map: MapLibreMap): void {
-  const paint = (layerId: string, property: Parameters<MapLibreMap['setPaintProperty']>[1], value: unknown) => {
+  const paint = (layerId: string, property: Parameters<MapLibreMap['setPaintProperty']>[1], value: Parameters<MapLibreMap['setPaintProperty']>[2]) => {
     if (map.getLayer(layerId)) map.setPaintProperty(layerId, property, value);
   };
 

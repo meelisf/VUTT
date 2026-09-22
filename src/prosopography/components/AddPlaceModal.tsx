@@ -36,8 +36,8 @@ interface WdPreview {
 const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: initialPlaces, onAdd, onClose, token }) => {
   const { t, i18n } = useTranslation('prosopography');
   const lang = i18n.language?.slice(0, 2) ?? 'et';
-  const wdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const parentWdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const parentWdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Lokaalne places — kasvab kui lisatakse ülempiirkond
   const [places, setPlaces] = useState(initialPlaces);

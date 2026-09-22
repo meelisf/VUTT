@@ -38,7 +38,7 @@ describe('clientErrorReporter', () => {
     expect(body.message).toBe('katki');
     expect(body.source).toBe('boundary');
     // `keepalive`: viga võib tabada vahetult enne lehelt lahkumist.
-    expect(init.keepalive).toBe(true);
+    expect(init!.keepalive).toBe(true);
   });
 
   it('ei saada sama viga korduvalt aknas', async () => {

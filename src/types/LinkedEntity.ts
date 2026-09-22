@@ -7,11 +7,5 @@ export interface LinkedEntity {
   label: string;           // Primary label for display (e.g., "Tartu")
   source: 'wikidata' | 'viaf' | 'album_academicum' | 'gnd' | 'manual' | 'local';
   entity_type?: 'person' | 'topic' | 'place' | 'organization';
-  labels?: {               // Multilingual support
-    et?: string;
-    en?: string;
-    la?: string;
-    de?: string;
-    [key: string]: string | undefined;
-  };
+  labels?: Record<string, string> | null;  // Mitmekeelsed sildid (et, en, la, de, …)
 }

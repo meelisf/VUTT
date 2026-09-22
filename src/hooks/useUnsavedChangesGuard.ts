@@ -97,7 +97,7 @@ export function useUnsavedChangesGuard(
   const proceedBlocked = useCallback(() => {
     const { state: next } = consumeAllowance(stateRef.current);
     apply(next);
-    blockerRef.current.proceed();
+    blockerRef.current.proceed?.();
   }, [apply]);
 
   // Router blokeeris navigatsiooni → pane see ootele samasse dialoogi.
