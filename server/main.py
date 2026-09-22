@@ -38,6 +38,34 @@ from .routers.collections import router as collections_router
 from .routers.ocr_jobs import router as ocr_jobs_router
 from .prosopography.indices import rebuild_indices
 
+def _kaivitustaasted() -> None:
+    """Rippuvate olekute taaste pärast restarti; üks samm ei peata teisi."""
+    # Rippuv ada_fetching → ada_error. Ilma selleta blokeeriks CAS „Laen uuesti"
+    # nupu igaveseks, sest upload_progress kadus restardiga.
+    from .ada.fetch import taasta_rippuvad_fetchid
+    # Rippuv `applying` → awaiting_split või error (#256). Restart tapab
+    # apply-lõime enne, kui ta staatust muuta jõuab; ilma taasteta jääb upload
+    # igaveseks „OCR server töötleb…" alla.
+    from .upload.apply_recovery import taasta_rippuvad_applyd
+    # Rippuv `importing` → eelmine staatus. Sama põhjus: restart tapab
+    # impordi-lõime enne except-haru ja CAS keelaks iga uue katse.
+    from .upload.import_work import taasta_rippuvad_impordid
+    # Rippuv `preview_status="rendering"` → `cancelled`. Ilma selleta on
+    # viisard umbteel: `start_preview` väljub idempotentsuse tõttu kohe ja
+    # „Rakenda" on `rendering` ajal disabled — kasutaja näeb külmunud
+    # edenemisnumbrit, ilma vea ja väljapääsuta.
+    from .upload.prepress import taasta_rippuvad_eelvaated
+    for taaste in (taasta_rippuvad_fetchid, taasta_rippuvad_applyd,
+                   taasta_rippuvad_impordid, taasta_rippuvad_eelvaated):
+        # Erand EI TOHI käivitust peatada: taasteta server on parem kui
+        # server, mis ei tõuse. Iga taaste püüab ka ise upload'i kaupa.
+        try:
+            taaste()
+        except Exception:
+            logger.error("Käivitustaaste ebaõnnestus: %s", taaste.__name__,
+                         exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"VUTT FastAPI käivitus.")
@@ -74,30 +102,14 @@ async def lifespan(app: FastAPI):
     start_reocr_background()  # re-OCR restardi-jätkamine (AINULT API-protsessis); orbude
                               # taaste + reaper käivad taustalõimes, et maas OCR-server ei
                               # blokeeriks API käivitumist (#181)
-    # Rippuv ada_fetching → ada_error. Ilma selleta blokeeriks CAS „Laen uuesti"
-    # nupu igaveseks, sest upload_progress kadus restardiga.
-    from .ada.fetch import taasta_rippuvad_fetchid
-    threading.Thread(target=taasta_rippuvad_fetchid, daemon=True,
-                     name="ada-fetch-recovery").start()
-    # Rippuv `applying` → awaiting_split või error (#256). Restart tapab
-    # apply-lõime enne, kui ta staatust muuta jõuab; ilma taasteta jääb upload
-    # igaveseks „OCR server töötleb…" alla. Otsus tuleb lokaalsest state'ist,
-    # SSH-d siin EI OLE (ADR 0002).
-    from .upload.apply_recovery import taasta_rippuvad_applyd
-    threading.Thread(target=taasta_rippuvad_applyd, daemon=True,
-                     name="apply-recovery").start()
-    # Rippuv `importing` → eelmine staatus. Sama põhjus: restart tapab
-    # impordi-lõime enne except-haru ja CAS keelaks iga uue katse.
-    from .upload.import_work import taasta_rippuvad_impordid
-    threading.Thread(target=taasta_rippuvad_impordid, daemon=True,
-                     name="import-recovery").start()
-    # Rippuv `preview_status="rendering"` → `cancelled`. Ilma selleta on
-    # viisard umbteel: `start_preview` väljub idempotentsuse tõttu kohe ja
-    # „Rakenda" on `rendering` ajal disabled — kasutaja näeb külmunud
-    # edenemisnumbrit, ilma vea ja väljapääsuta.
-    from .upload.prepress import taasta_rippuvad_eelvaated
-    threading.Thread(target=taasta_rippuvad_eelvaated, daemon=True,
-                     name="preview-recovery").start()
+    # Käivitustaasted lõpevad ENNE `yield`-i ehk enne, kui server päringuid
+    # vastu võtab (#389). Iga taaste otsustab lokaalse state'i hetktõmmise
+    # põhjal; daemon-lõimes jooksis ta paralleelselt uute päringutega ja
+    # „Rakenda" CAS võis jõuda taaste lugemise ja kirjutuse vahele — taaste
+    # lähtestanuks siis päriselt käimasoleva töö. Kõik neli on ainult lokaalne
+    # failisüsteem, SSH-d EI OLE (ADR 0002); tootmises 68 upload'i peal kokku
+    # ~66 ms (mõõdetud 2026-09-22). Threadpoolis, et I/O ei blokeeriks silmust.
+    await run_in_threadpool(_kaivitustaasted)
     yield
     print("VUTT FastAPI sulgemine.")
 
