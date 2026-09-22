@@ -142,7 +142,9 @@ Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json
 | `ada/` | ADA (dspace.ut.ee) import: `mapping` (puhas DC-kaardistus), `client` (REST), `fetch` (allalaadimine), `provenance` (ankrud) |
 | `marginalia_normalize.py` | `normalize_marginalia_tags()` — kutsutakse KÕIGIS kirjutusteedes |
 
-**Python 3.9 ühilduvus:** `Optional[dict]`, mitte `dict | None`.
+**Python 3.12 kõikjal** (Docker, CI, hosti `.venv`; #387). Tootmissõltuvused on
+lukustatud `requirements.lock`-is — Dockerfile ja CI paigaldavad SEDA, `requirements.txt`
+on ainult vahemike allikas. Uuendus = uus freeze (juhis faili päises), mitte käsitsi pin.
 Blokeeriv I/O `async def` sees on keelatud (ADR 0002) — kas sync `def` route või `run_in_threadpool`.
 Funktsiooni eemaldamisel kontrolli ka `server/__init__.py` re-eksporte.
 
@@ -166,7 +168,8 @@ ja spekk `docs/_archive/superpowers/specs/done/2026-08-15-vutt-mcp-server-design
 Neli asja, mis on juba korra katki läinud:
 - **Ei tohi importida `server`-it runtime'is** — pipx-venv on isoleeritud. Testid tohivad.
 - **`mcp/tests/` ilma `__init__.py`-ta** — pakett `mcp.tests` varjutab repo `tests` paketi.
-- **`mcp` sõltuvus AINULT `requirements-dev.txt`-is** — Docker on Python 3.9, SDK v2 ei mahu.
+- **`mcp` sõltuvus AINULT `requirements-dev.txt`-is** — backend-konteiner ei vaja teda ja
+  tootmise lukk (`requirements.lock`) ei tohi MCP SDK tõttu liikuda.
 - **Iga tööriist `@mcp.tool(structured_output=False)`** — vaikimisi tuleks kaasa
   `structured_content`, mille klienditugi on ebaühtlane.
 - **`VuttError` PEAB olema SDK `ToolError` alamtüüp** — alates `mcp` 2.1.0-st
