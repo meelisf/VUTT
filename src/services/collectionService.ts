@@ -182,7 +182,7 @@ export function getCollectionHierarchy(collections: Collections, id: string): st
 
   while (currentId) {
     hierarchy.unshift(currentId);
-    const collection = collections[currentId];
+    const collection: Collection | undefined = collections[currentId];
     currentId = collection?.parent;
   }
 
