@@ -68,7 +68,7 @@ const SearchPage: React.FC = () => {
             getWorkMetadata(index, urlParams.workId).then(work => {
                 if (work) {
                     let author = (work as any).author || '';
-                    if (work.creators?.length > 0) {
+                    if (work.creators && work.creators.length > 0) {
                         const praeses = work.creators.find((c: any) => c.role === 'praeses');
                         if (praeses) author = praeses.name;
                     }

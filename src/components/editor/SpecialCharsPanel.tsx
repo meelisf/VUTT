@@ -60,7 +60,7 @@ export default function SpecialCharsPanel({
               {isCustomChars && (
                 <span className="text-[10px] text-primary-500 font-normal">✦</span>
               )}
-              {user && (
+              {Boolean(user) && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setShowCharEditor(true); }}

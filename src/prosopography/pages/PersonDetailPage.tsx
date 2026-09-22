@@ -338,7 +338,7 @@ const PersonDetailPage: React.FC = () => {
           // Teoste pealkirjad: päri partiidena (max 50 korraga), et vältida Meilisearch IN-filtri piiranguid
           const BATCH = 50;
           const allHits: any[] = [];
-          const batches = [];
+          const batches: string[][] = [];
           for (let i = 0; i < uniqueWorkIds.length; i += BATCH) batches.push(uniqueWorkIds.slice(i, i + BATCH));
           Promise.all(batches.map(batch => {
             const ids = batch.map((wid: string) => `"${wid}"`).join(', ');
