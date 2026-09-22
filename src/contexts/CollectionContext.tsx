@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
-import { getCollections, Collections } from '../services/collectionService';
+import { getCollections, Collection, Collections } from '../services/collectionService';
 import { listWorkSetsSafe, invalidateWorkSetIds, WorkSetSummary } from '../services/workSetService';
 import { useUser } from './UserContext';
 import { CollectionSelection } from '../services/selectionFilter';
@@ -177,7 +177,7 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
     let currentId: string | undefined = id;
 
     while (currentId) {
-      const collection = collections[currentId];
+      const collection: Collection | undefined = collections[currentId];
       if (collection) {
         path.unshift(collection.name[lang] || collection.name.et);
         currentId = collection.parent;
