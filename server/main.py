@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from .client_errors import list_errors as load_client_errors
+from .server_errors import install_http_handler, install_thread_excepthook
 
 from .config import (
     PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR,
@@ -69,6 +70,8 @@ def _kaivitustaasted() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"VUTT FastAPI käivitus.")
+    # Enne ühegi taustalõime starti: surnud lõim jõuab admini vealogisse (#133).
+    install_thread_excepthook()
     # Puhasta varasemad vealogid enne päringute vastuvõtmist, I/O eraldi lõimes.
     await run_in_threadpool(load_client_errors)
     # Ei blokeeri käivitust — RENDER_SEMAPHORE on protsessi-lokaalne ja seda
@@ -114,6 +117,8 @@ async def lifespan(app: FastAPI):
     print("VUTT FastAPI sulgemine.")
 
 app = FastAPI(title="VUTT API", version="1.0.0", lifespan=lifespan)
+# Käsitlemata erind (500) → admini vealogi (#133); vastus jääb samaks.
+install_http_handler(app)
 app.include_router(prosopography_router, prefix="/prosopography")
 app.include_router(notifications_router)
 app.include_router(upload_router)
