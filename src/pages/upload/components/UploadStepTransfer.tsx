@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertTriangle, FileUp, Info, Loader2 } from 'lucide-react';
+import { AlertTriangle, FileUp, Info, Loader2, RotateCcw } from 'lucide-react';
+import type { PartialUpload } from '../types';
 
 interface UploadProgress {
   bytes_sent: number;
@@ -28,6 +29,8 @@ interface UploadStepTransferProps {
   /** Mõõdetud jäänud aeg saatmisele (nt "43 min"); null kui veel mõõtmata. */
   sendEta: string | null;
   uploadError: string;
+  /** Serveris pooleli olev fail (#235): sama faili valik jätkab sealt. */
+  resumePartial?: PartialUpload | null;
   dragging: boolean;
   setDragging: (value: boolean) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -58,6 +61,7 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
   sending,
   sendEta,
   uploadError,
+  resumePartial,
   dragging,
   setDragging,
   fileInputRef,
@@ -254,6 +258,18 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
           <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
             <AlertTriangle size={16} className="shrink-0 mt-0.5" />
             <span>{t('step2.collectingImages')}</span>
+          </div>
+        )}
+        {resumePartial && resumePartial.total > 0 && (
+          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
+            <RotateCcw size={16} className="shrink-0 mt-0.5" />
+            <span>
+              {t('step2.resumePartial', {
+                name: resumePartial.name ?? '',
+                mbDone: Math.floor(resumePartial.received / 1024 / 1024),
+                mbTotal: Math.ceil(resumePartial.total / 1024 / 1024),
+              })}
+            </span>
           </div>
         )}
         <div

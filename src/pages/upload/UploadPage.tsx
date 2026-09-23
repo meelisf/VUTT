@@ -117,6 +117,13 @@ const UploadPage: React.FC = () => {
                           >
                             {t(`status.${u.status}`, u.status)}
                           </span>
+                          {u.partial_upload && u.partial_upload.total > 0 && (
+                            <span className="ml-2 text-[11px] text-gray-500">
+                              {t('pending.partial', {
+                                pct: Math.floor((u.partial_upload.received / u.partial_upload.total) * 100),
+                              })}
+                            </span>
+                          )}
                           {u.stalled && (
                             <span
                               className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 align-middle"
@@ -222,6 +229,7 @@ const UploadPage: React.FC = () => {
             sending={wizard.sending}
             sendEta={wizard.sendEta}
             uploadError={wizard.uploadError}
+            resumePartial={wizard.resumePartial}
             dragging={wizard.dragging}
             setDragging={wizard.setDragging}
             fileInputRef={wizard.fileInputRef}

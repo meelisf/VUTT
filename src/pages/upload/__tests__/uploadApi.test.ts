@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, UploadStalledError, uploadImagePage, uploadSingleFile } from '../uploadApi';
+import { ApiError, UploadStalledError, uploadImagePage } from '../uploadApi';
 
 // XHR-i test-topelt. Päris XMLHttpRequest'i node-keskkonnas ei ole, ja meil on
 // vaja kontrollida ka aja kulgu (progressi seiskumine), mida fetch ei võimalda.
@@ -82,7 +82,7 @@ afterEach(() => {
 
 describe('uploadApi failide üleslaadimine', () => {
   it('saadab faili POST-iga õigele URL-ile ja lahendub 200 korral', async () => {
-    const promise = uploadSingleFile('upl1', new File(['x'], 'a.pdf'), 'tok');
+    const promise = uploadImagePage('upl1', new File(['x'], 'a.pdf'), 1, 1, 'tok');
     await flush();
 
     const xhr = lastXHR();
@@ -98,7 +98,7 @@ describe('uploadApi failide üleslaadimine', () => {
   });
 
   it('viskab ApiErrori detailse message-ga serveri vea korral (Leid 1)', async () => {
-    const promise = uploadSingleFile('upl1', new File(['x'], 'a.pdf'), 'tok');
+    const promise = uploadImagePage('upl1', new File(['x'], 'a.pdf'), 1, 1, 'tok');
     await flush();
     lastXHR().respond(500, JSON.stringify({ status: 'error', detail: 'SFTP ühendus aegus' }));
 
@@ -110,7 +110,7 @@ describe('uploadApi failide üleslaadimine', () => {
   });
 
   it('märgistab 413 (fail liiga suur) eraldi staatusena', async () => {
-    const promise = uploadSingleFile('upl1', new File(['x'], 'a.pdf'), 'tok');
+    const promise = uploadImagePage('upl1', new File(['x'], 'a.pdf'), 1, 1, 'tok');
     await flush();
     lastXHR().respond(413, '');
 
@@ -138,7 +138,7 @@ describe('uploadApi failide üleslaadimine', () => {
 
   it('raporteerib edenemist onProgress kaudu', async () => {
     const seen: Array<{ loaded: number; total: number }> = [];
-    const promise = uploadSingleFile('upl1', new File(['x'], 'a.pdf'), 'tok', {
+    const promise = uploadImagePage('upl1', new File(['x'], 'a.pdf'), 1, 1, 'tok', {
       onProgress: (p) => seen.push(p),
     });
     await flush();
@@ -161,7 +161,7 @@ describe('uploadApi failide üleslaadimine', () => {
   // katkestas 160 MB faili 43 kB/s ühenduses alati 8 % pealt (nginx logis 499).
   it('EI katkesta üleslaadimist, mis kestab üle 20 minuti, kui edenemine liigub', async () => {
     vi.useFakeTimers();
-    const promise = uploadSingleFile('upl1', new File(['x'], 'suur.pdf'), 'tok');
+    const promise = uploadImagePage('upl1', new File(['x'], 'suur.pdf'), 1, 1, 'tok');
     await flush();
     const xhr = lastXHR();
 
@@ -180,7 +180,7 @@ describe('uploadApi failide üleslaadimine', () => {
   it('katkestab, kui edenemine seiskub kauemaks kui stallTimeout', async () => {
     vi.useFakeTimers();
     // Haagi käsitleja kohe: tagasilükkamine juhtub taimerite kerimise ajal
-    const settled = uploadSingleFile('upl1', new File(['x'], 'suur.pdf'), 'tok', {
+    const settled = uploadImagePage('upl1', new File(['x'], 'suur.pdf'), 1, 1, 'tok', {
       stallTimeout: 120_000,
     }).catch((e) => e);
     await flush();
@@ -197,7 +197,7 @@ describe('uploadApi failide üleslaadimine', () => {
 
   it('katkestab, kui keha on saadetud, aga server ei vasta responseTimeout jooksul', async () => {
     vi.useFakeTimers();
-    const settled = uploadSingleFile('upl1', new File(['x'], 'a.pdf'), 'tok', {
+    const settled = uploadImagePage('upl1', new File(['x'], 'a.pdf'), 1, 1, 'tok', {
       stallTimeout: 120_000,
       responseTimeout: 300_000,
     }).catch((e) => e);
@@ -216,7 +216,7 @@ describe('uploadApi failide üleslaadimine', () => {
   });
 
   it('viskab võrguvea korral ApiErrori, mitte ei jää rippuma', async () => {
-    const promise = uploadSingleFile('upl1', new File(['x'], 'a.pdf'), 'tok');
+    const promise = uploadImagePage('upl1', new File(['x'], 'a.pdf'), 1, 1, 'tok');
     await flush();
     lastXHR().onerror?.();
 

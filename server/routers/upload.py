@@ -3,6 +3,7 @@ import asyncio
 import os
 import time
 from typing import Optional
+from urllib.parse import unquote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -14,6 +15,7 @@ from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
 from ..ocr_providers import gemini
 from ..upload import prepress, prepress_apply, prepress_plan
+from ..upload import chunked
 from ..upload import state as upload_state
 from ..upload_ops import (
     add_image_page,
@@ -339,6 +341,55 @@ async def admin_set_ocr_model(upload_id: str, request: Request,
             content={"detail": "Mudelit saab muuta ainult enne OCR-i saatmist"},
         )
     return {"status": "saved", "ocr_model": model}
+
+
+@router.get("/admin/upload/{upload_id}/chunk")
+def admin_upload_chunk_status(upload_id: str, user=Depends(require_role("admin"))):
+    """Jätkamispunkt (#235): mitu baiti serveril on ja millisest failist.
+
+    Sync def — loeb state.json-i ja faili suurust (ADR 0002).
+    """
+    if not _valid_upload_id(upload_id):
+        raise HTTPException(status_code=400, detail="Vigane upload_id")
+    try:
+        return chunked.get_partial(upload_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Upload ei leitud")
+
+
+@router.post("/admin/upload/{upload_id}/chunk")
+async def admin_upload_chunk(upload_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Üks faili tükk (#235, ADR 0047). Päised: X-Upload-Offset, X-Upload-Total,
+    X-Upload-Fingerprint, X-Filename. Vale nihe → 409 + serveri tegelik seis."""
+    if not _valid_upload_id(upload_id):
+        raise HTTPException(status_code=400, detail="Vigane upload_id")
+    try:
+        offset = int(request.headers.get("X-Upload-Offset", ""))
+        total = int(request.headers.get("X-Upload-Total", ""))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Vigane nihe või suurus")
+    pikkus = request.headers.get("Content-Length")
+    if pikkus and pikkus.isdigit() and int(pikkus) > chunked.CHUNK_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Tükk on liiga suur")
+    data = await request.body()
+    try:
+        tulemus = await run_in_threadpool(
+            chunked.append_chunk, upload_id,
+            offset=offset, total=total,
+            fingerprint=request.headers.get("X-Upload-Fingerprint", ""),
+            name=unquote(request.headers.get("X-Filename", "")),
+            data=data,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Upload ei leitud")
+    except chunked.ChunkConflict as e:
+        return JSONResponse(status_code=409, content=chunked.as_conflict_body(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Tüki vastuvõtt ebaõnnestus ({upload_id}): {e}")
+        raise HTTPException(status_code=500, detail="Serveri viga faili töötlemisel")
+    return {"status": "accepted", **tulemus}
 
 
 @router.post("/admin/upload/{upload_id}/files")

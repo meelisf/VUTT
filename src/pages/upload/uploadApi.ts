@@ -41,7 +41,7 @@ const RESPONSE_TIMEOUT_MS = 300_000;
  *  saatmise ajal edenemissündmuste vahet, pärast saatmist vastuse ootamist. */
 function sendFileWithProgress(
   url: string,
-  file: File,
+  file: Blob,
   headers: Record<string, string>,
   options: UploadTransferOptions = {},
 ): Promise<Response> {
@@ -131,21 +131,6 @@ export function getUploadStatus(uploadId: string, token: string | null): Promise
   return apiGet<PollResult>(`/admin/upload/${uploadId}/status`, { token });
 }
 
-export async function uploadSingleFile(
-  uploadId: string,
-  file: File,
-  token: string | null,
-  options?: UploadTransferOptions,
-): Promise<void> {
-  const response = await sendFileWithProgress(
-    `${FILE_API_URL}/admin/upload/${uploadId}/files`,
-    file,
-    { 'X-Filename': encodeURIComponent(file.name), ...getAuthHeaders(token) },
-    options,
-  );
-  await parseUploadResponse(response);
-}
-
 export async function uploadImagePage(
   uploadId: string,
   file: File,
@@ -166,6 +151,175 @@ export async function uploadImagePage(
     options,
   );
   await parseUploadResponse(response);
+}
+
+// ---------------------------------------------------------------------------
+// Jätkatav üleslaadimine (#235, ADR 0047)
+// ---------------------------------------------------------------------------
+
+/** Tüki suurus. 4 MiB mõõdetud 27–47 kB/s liinil ≈ 1,5–2,5 min tüki kohta:
+ *  katkemine maksab ühe tüki, mitte tunni. Serveri lagi on 16 MiB. */
+export const CHUNK_SIZE = 4 * 1024 * 1024;
+/** Järjestikuseid ebaõnnestunud katseid enne loobumist (ühe tüki kohta). */
+export const CHUNK_MAX_RETRIES = 6;
+const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000, 30_000];
+const FINGERPRINT_SAMPLE = 1024 * 1024;
+
+export interface ChunkStatus {
+  received: number;
+  total: number | null;
+  fingerprint: string | null;
+  name: string | null;
+  status: string;
+}
+
+export interface ChunkResult {
+  received: number;
+  total: number;
+  complete: boolean;
+  expected_pages?: number;
+}
+
+/** Faili sõrmejälg jätkamiseks: suurus + SHA-256 esimesest ja viimasest MiB-st.
+ *  Brauser ei säilita File-objekti üle lehe värskendamise — kasutaja valib faili
+ *  uuesti, ja sõrmejälg ütleb, kas see on sama fail. Tervet 160 MB faili ei
+ *  räsita: see nõuaks kogu faili mällu lugemist. */
+export async function fileFingerprint(file: Blob & { name?: string; lastModified?: number }): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    // Ebaturvaline kontekst (http, mitte localhost) — nõrgem, aga deterministlik.
+    return `v0:${file.size}:${file.lastModified ?? 0}:${encodeURIComponent(file.name ?? '')}`.slice(0, 128);
+  }
+  const algus = await file.slice(0, FINGERPRINT_SAMPLE).arrayBuffer();
+  const lopp = await file.slice(Math.max(0, file.size - FINGERPRINT_SAMPLE)).arrayBuffer();
+  const suurus = new TextEncoder().encode(`${file.size}:`);
+  const koos = new Uint8Array(suurus.length + algus.byteLength + lopp.byteLength);
+  koos.set(suurus, 0);
+  koos.set(new Uint8Array(algus), suurus.length);
+  koos.set(new Uint8Array(lopp), suurus.length + algus.byteLength);
+  const digest = await subtle.digest('SHA-256', koos);
+  return 'v1:' + Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function getChunkStatus(uploadId: string, token: string | null): Promise<ChunkStatus> {
+  return apiGet<ChunkStatus>(`/admin/upload/${uploadId}/chunk`, { token });
+}
+
+interface SendChunkArgs {
+  uploadId: string;
+  blob: Blob;
+  offset: number;
+  total: number;
+  fingerprint: string;
+  name: string;
+  token: string | null;
+  onProgress?: (loaded: number) => void;
+}
+
+/** Üks tükk. 409 EI OLE viga: server ütleb oma tegeliku seisu. */
+async function sendChunk(a: SendChunkArgs): Promise<
+  { kind: 'ok'; result: ChunkResult } | { kind: 'conflict'; reason: string; received: number }
+> {
+  const response = await sendFileWithProgress(
+    `${FILE_API_URL}/admin/upload/${a.uploadId}/chunk`,
+    a.blob,
+    {
+      'X-Upload-Offset': String(a.offset),
+      'X-Upload-Total': String(a.total),
+      'X-Upload-Fingerprint': a.fingerprint,
+      'X-Filename': encodeURIComponent(a.name),
+      ...getAuthHeaders(a.token),
+    },
+    { onProgress: ({ loaded }) => a.onProgress?.(loaded) },
+  );
+  if (response.status === 409) {
+    const body = await response.json().catch(() => ({}));
+    return { kind: 'conflict', reason: String(body.reason ?? ''), received: Number(body.received ?? 0) };
+  }
+  return { kind: 'ok', result: await parseUploadResponse<ChunkResult>(response) };
+}
+
+/** Kliendipoolsed vead, mida kordamine ei paranda. */
+function isFatal(e: unknown): boolean {
+  return e instanceof ApiError && e.status >= 400 && e.status < 500;
+}
+
+export interface ChunkedUploadDeps {
+  fingerprint?: typeof fileFingerprint;
+  getStatus?: typeof getChunkStatus;
+  send?: typeof sendChunk;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+export interface ChunkedUploadOptions {
+  onProgress?: (p: { loaded: number; total: number }) => void;
+  /** Kutsutakse, kui jätkatakse serveris juba olevast baidist (> 0). */
+  onResume?: (received: number) => void;
+}
+
+/** Laeb faili tükkidena. Jätkab serveri teadaolevast baidist, kui sama fail
+ *  (sõrmejälg + suurus) on seal pooleli; võrgu- ja serveriviga tüki peal →
+ *  ootus + serverilt tegeliku seisu küsimine + jätk (kuni `CHUNK_MAX_RETRIES`).
+ *
+ *  Tagastab `null`, kui server ütles, et fail on juba vastu võetud (nt kadunud
+ *  viimase vastuse järel) — edasist edenemist näitab polling. */
+export async function uploadFileChunked(
+  uploadId: string,
+  file: File,
+  token: string | null,
+  options: ChunkedUploadOptions = {},
+  deps: ChunkedUploadDeps = {},
+): Promise<ChunkResult | null> {
+  const fingerprint = await (deps.fingerprint ?? fileFingerprint)(file);
+  const getStatus = deps.getStatus ?? getChunkStatus;
+  const send = deps.send ?? sendChunk;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>(r => setTimeout(r, ms)));
+  const total = file.size;
+
+  /** Serveri seis sama faili kohta; teine fail või puuduv poolik → 0. */
+  const serverOffset = async (): Promise<number> => {
+    const st = await getStatus(uploadId, token);
+    return st.fingerprint === fingerprint && st.total === total ? st.received : 0;
+  };
+
+  let offset = await serverOffset();
+  if (offset > 0) options.onResume?.(offset);
+  let failures = 0;
+  let conflicts = 0;
+
+  for (;;) {
+    const end = Math.min(offset + CHUNK_SIZE, total);
+    try {
+      const res = await send({
+        uploadId, blob: file.slice(offset, end), offset, total, fingerprint,
+        name: file.name, token,
+        onProgress: (loaded) => options.onProgress?.({ loaded: offset + loaded, total }),
+      });
+      if (res.kind === 'conflict') {
+        // Fail on juba vastu võetud / töötlemisel — polling näitab edasist.
+        if (res.reason === 'status') return null;
+        // Nihke parandus peab järgmisel katsel klappima; korduv konflikt
+        // tähendab, et keegi teine kirjutab samasse upload'i.
+        conflicts += 1;
+        if (conflicts > 3) throw new ApiError('Üleslaadimine on teises aknas pooleli', 409);
+        // Nihe ei klapi (nt kadunud vastus): jätka serveri tegelikust seisust.
+        // Teine fail serveris → alustame otsast (nihe 0 kirjutab ta üle).
+        offset = res.reason === 'mismatch' ? 0 : res.received;
+        continue;
+      }
+      failures = 0;
+      conflicts = 0;
+      offset = res.result.received;
+      options.onProgress?.({ loaded: offset, total });
+      if (res.result.complete) return res.result;
+    } catch (e) {
+      if (isFatal(e) || failures >= CHUNK_MAX_RETRIES) throw e;
+      await sleep(RETRY_DELAYS_MS[Math.min(failures, RETRY_DELAYS_MS.length - 1)]);
+      failures += 1;
+      // Tükk võis kohale jõuda ka siis, kui vastus kadus.
+      try { offset = await serverOffset(); } catch { /* järgmine katse küsib uuesti */ }
+    }
+  }
 }
 
 /** Impordi lagi. Import kestab O(lehtede arv): 524 lk ≈ 75 s (SFTP alla, git
