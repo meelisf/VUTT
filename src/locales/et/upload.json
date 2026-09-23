@@ -12,7 +12,8 @@
     "resume": "Jätka",
     "empty": "Pooleliolevaid üleslaadimisi pole",
     "stalled": "OCR seisab",
-    "stalledHint": "OCR pole üle 30 minuti uusi lehti tootnud — töö võib olla pooleli jäänud. Kontrolli vajadusel OCR-serverit."
+    "stalledHint": "OCR pole üle 30 minuti uusi lehti tootnud — töö võib olla pooleli jäänud. Kontrolli vajadusel OCR-serverit.",
+    "partial": "pooleli {{pct}}%"
   },
   "step1": {
     "title": "Teose metaandmed",
@@ -54,7 +55,8 @@
     "multipleImagesNote": "Mitu pilti laetakse üles järjestikuselt — ärge sulgege lehte.",
     "collectingImages": "Pildid üles laadimata — vali kõik failid uuesti.",
     "multiFilesSelected": "{{n}} pilti valitud (sorditud nime järgi):",
-    "uploadAllBtn": "Laadi kõik üles"
+    "uploadAllBtn": "Laadi kõik üles",
+    "resumePartial": "Pooleli jäänud üleslaadimine: {{name}} ({{mbDone}} / {{mbTotal}} MB serveris). Vali sama fail uuesti — üleslaadimine jätkub sealt, kus katkes."
   },
   "step3": {
     "title": "Ülevaatus",

@@ -57,6 +57,13 @@ export interface UploadType {
   labels?: Record<string, string>;
 }
 
+/** Serveris pooleli olev fail (#235): `partial_upload` state.json-is. */
+export interface PartialUpload {
+  name: string | null;
+  received: number;
+  total: number;
+}
+
 export interface SavedUpload {
   id: string;
   status: string;
@@ -65,6 +72,7 @@ export interface SavedUpload {
   expected_pages: number | null;
   files: FileEntry[];
   stalled?: boolean;
+  partial_upload?: PartialUpload;
 }
 
 export interface WorkMetadataForReplace {

@@ -458,7 +458,9 @@ Uus tundlik väli lisa `SECRET_FIELDS`-i, mitte ainult kirjutusteele.
 Workspace'i „Ajalugu" tabist. **Kommentaaride taaste = ÜKS git-commit** (`onCommentsRestored`).
 
 **Upload (admin, `/upload`)** — neljaastmeline viisard: metaandmed → fail → **poolitamine**
-→ ülevaatus. Failitüüp tuvastatakse magic byte'idest (mitte laiendist). Fail salvestatakse
+→ ülevaatus. Failitüüp tuvastatakse magic byte'idest (mitte laiendist). Üksikfail tuleb
+**tükkidena** (`/chunk`, ADR 0047): jätkamise tõde on `source.part` suurus, poolik elab
+`pending` all väljal `partial_upload` — uut staatust EI OLE. Fail salvestatakse
 esmalt VUTT-i poolele (`uploads/{id}/source.pdf` või `source/`) ja läheb OCR-serverisse alles
 sammu 3 otsuse järel — ALATI lehthaaval materialiseerituna work-kausta (ADR 0028). Import: SFTP alla →
 `_metadata.json` + lehe-JSON-id →

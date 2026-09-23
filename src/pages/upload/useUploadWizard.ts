@@ -36,9 +36,10 @@ import {
   listUploads,
   replaceWorkUpload,
   uploadImagePage,
-  uploadSingleFile,
+  uploadFileChunked,
+  getChunkStatus,
 } from './uploadApi';
-import type { AdaLookupResult, PollResult, SavedUpload } from './types';
+import type { AdaLookupResult, PartialUpload, PollResult, SavedUpload } from './types';
 
 /** Staatused, mille korral OCR-i pool on käigus → viisardi 4. samm. */
 // `importing` kuulub siia: import kestab suurel teosel minuteid ja
@@ -85,6 +86,10 @@ export function useUploadWizard() {
   // Brauser → VUTT saatmise edenemine; null = seda faasi ei käi (edasi räägib polling)
   const [sendProgress, setSendProgress] = useState<{ bytes_sent: number; bytes_total: number } | null>(null);
   const sendStartedAtRef = useRef<number | null>(null);
+  // Jätkamisel serveris juba olnud baidid: ETA mõõdab ainult selle seansi kiirust.
+  const sendBaseRef = useRef(0);
+  // Serveris pooleli olev fail (#235) — sammul 2 öeldakse, et sama faili valik jätkab.
+  const [resumePartial, setResumePartial] = useState<PartialUpload | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Multi-image üleslaadimine ---
@@ -184,6 +189,7 @@ export function useUploadWizard() {
 
   function resetWizardState() {
     setUploadId(null);
+    setResumePartial(null);
     setStep(1);
     setPollResult(null);
     setFileUploading(false);
@@ -390,16 +396,28 @@ export function useUploadWizard() {
     startPolling(uploadId, POLL_FAST_MS);
 
     sendStartedAtRef.current = Date.now();
+    sendBaseRef.current = 0;
     try {
-      await uploadSingleFile(uploadId, file, authToken, {
+      // Tükkidena (#235, ADR 0047): katkemine maksab ühe tüki; sama faili
+      // uuesti valimine jätkab serveri teadaolevast baidist.
+      await uploadFileChunked(uploadId, file, authToken, {
         onProgress: ({ loaded, total }) =>
           setSendProgress({ bytes_sent: loaded, bytes_total: total }),
+        onResume: (received) => { sendBaseRef.current = received; },
       });
-      // 202 — SFTP transfer algas taustal, polling jätkab
+      setResumePartial(null);
+      // Fail on serveris; edasist (poolitamine, OCR) näitab polling.
     } catch (e) {
       setUploadError(uploadErrorMessage(e));
       setFileUploading(false);
       stopPolling();
+      // Mis serverisse jõudis, jääb alles — ütle kasutajale, et jätkamine on võimalik.
+      try {
+        const st = await getChunkStatus(uploadId, authToken);
+        setResumePartial(st.received > 0 && st.total
+          ? { name: st.name ?? file.name, received: st.received, total: st.total }
+          : null);
+      } catch { /* teade ilma jätkamise vihjeta */ }
     } finally {
       // Edasi raporteerib edenemist polling (VUTT → OCR-server)
       setSendProgress(null);
@@ -562,6 +580,7 @@ export function useUploadWizard() {
   // ---------------------------------------------------------------------------
   function handleResume(saved: SavedUpload) {
     setUploadId(saved.id);
+    setResumePartial(saved.partial_upload ?? null);
     setTitle(saved.meta.title);
     // saved.meta.year võib backendist tulla numbrina, kuigi tüüp ütleb string
     // — year-olek on alati string, muidu YearInputPreview .trim() crashib
@@ -637,14 +656,15 @@ export function useUploadWizard() {
 
   // Saatmise faas (brauser → VUTT): kestus tuleb kasutaja ühendusest, mitte
   // lehekülgede arvust, seega mõõdame selle ise. `sending` juhib ka seda, et
-  // "võid lahkuda" / "Sulge" ei tohi selles faasis paista — lahkumine tapaks
-  // XHR-i ja juba saadetud baidid läheksid kaotsi.
+  // "võid lahkuda" / "Sulge" ei tohi selles faasis paista — lahkumine peatab
+  // saatmise (serveris olevad tükid jäävad alles, aga jätkamiseks tuleb sama
+  // fail uuesti valida, #235).
   const sending = sendProgress !== null;
   const sendEtaSeconds =
     sendProgress && sendStartedAtRef.current
       ? estimateRemainingSeconds(
-          sendProgress.bytes_sent,
-          sendProgress.bytes_total,
+          sendProgress.bytes_sent - sendBaseRef.current,
+          sendProgress.bytes_total - sendBaseRef.current,
           Date.now() - sendStartedAtRef.current,
         )
       : null;
@@ -667,6 +687,7 @@ export function useUploadWizard() {
     autoCreateLoading, autoCreateError,
     dragging, setDragging,
     uploadError,
+    resumePartial,
     fileUploading,
     pendingMultiFiles, setPendingMultiFiles,
     multiCurrentNum, multiTotalNum,

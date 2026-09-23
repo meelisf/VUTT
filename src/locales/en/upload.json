@@ -12,7 +12,8 @@
     "resume": "Resume",
     "empty": "No pending uploads",
     "stalled": "OCR stalled",
-    "stalledHint": "No new pages from OCR for over 30 minutes — the job may have stalled. Check the OCR server if needed."
+    "stalledHint": "No new pages from OCR for over 30 minutes — the job may have stalled. Check the OCR server if needed.",
+    "partial": "{{pct}}% uploaded"
   },
   "step1": {
     "title": "Work metadata",
@@ -54,7 +55,8 @@
     "multipleImagesNote": "Multiple images are uploaded sequentially — do not close this page.",
     "collectingImages": "Images not fully uploaded — please select all files again.",
     "multiFilesSelected": "{{n}} images selected (sorted by name):",
-    "uploadAllBtn": "Upload all"
+    "uploadAllBtn": "Upload all",
+    "resumePartial": "Interrupted upload: {{name}} ({{mbDone}} / {{mbTotal}} MB on the server). Select the same file again to continue where it stopped."
   },
   "step3": {
     "title": "Review",

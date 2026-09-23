@@ -66,3 +66,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0044](0044-peidetud-tagi-peab-jaama-mootdetavaks.md) | Peidetud tägi peab jääma mõõdetavaks | kehtib |
 | [0045](0045-kaivitustaaste-enne-valmisolekut.md) | Käivitustaaste lõpeb enne, kui server päringuid vastu võtab; ainult lokaalne, võrgutöö jääb taustalõime | kehtib |
 | [0046](0046-sessioon-on-oiguste-ainus-tode.md) | Sessioon on kutsuja õiguste ainus tõde (iga õigusvälja kirjutus katkestab sessiooni); tokenit loeb ainult `deps.py` | kehtib |
+| [0047](0047-jatkatav-uleslaadimine.md) | Üksikfail laetakse üles tükkidena; jätkamise tõde on kettal olev baitide arv, uut upload'i staatust ei ole | kehtib |
