@@ -8,12 +8,28 @@ x-logging: &default-logging
     max-file: "5"
 
 services:
-  # Backend: Python serverid (File Server + Image Server)
+  # Backend: FastAPI file server (8002). Pildiserver on eraldi teenus `images`
+  # (#388): kumbki protsess on oma konteineri PID 1 laps, seega ühe surm
+  # lõpetab AINULT tema konteineri ja `restart: always` taastab ta, ilma et
+  # teine pool katkestust saaks.
   backend:
     build: .
+    # Nimeline image, et `images` saaks sama ehitust kasutada ilma teise
+    # buildita. Nimi on sama, mille compose varem ise tuletas.
+    image: vutt-backend:latest
     container_name: vutt-backend
     restart: always
+    # tini PID 1-ks: edastab SIGTERM-i ja korjab orvud (`docker stop` on puhas).
+    init: true
     logging: *default-logging
+    # Healthcheck EI taaskäivita (Docker ei taaskäivita `unhealthy`
+    # konteinerit) — ta teeb rippuva, mitte surnud protsessi nähtavaks.
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=4).read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     environment:
       # VUTT_ENV=production aktiveerib startup-kontrolli vaikimisi saladuste vastu (Leid 1).
       # Sea .env failis VUTT_ENV=production tootmises; arenduses jäta määramata (dev).
@@ -77,8 +93,37 @@ services:
     # Pordid suletud välismaailmale (ainult sisevõrk või nginx kasutab)
     # Avame localhostile host Nginxi jaoks
     ports:
-      - "127.0.0.1:8001:8001"
       - "127.0.0.1:8002:8002"
+
+  # Pildiserver (8001): skaneeringud ja pisipildid. Sama image, teine käsk.
+  images:
+    image: vutt-backend:latest
+    container_name: vutt-images
+    command: ["python3", "-m", "server.image_server"]
+    restart: always
+    init: true
+    logging: *default-logging
+    # AINULT see, mida pildiserver vajab. `server.config` käivituskontroll
+    # nõuab tootmises MEILI_MASTER_KEY-d ja IMAGE_TOKEN_SECRET-i; ülejäänud
+    # saladused (Gemini, SMTP, OCR-serveri SSH) siia ei kuulu.
+    environment:
+      - VUTT_ENV=${VUTT_ENV:-dev}
+      - VUTT_DATA_DIR=/data
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
+      - IMAGE_TOKEN_SECRET=${IMAGE_TOKEN_SECRET:-dev-image-secret-change-in-production}
+    # `data/` kirjutatav: pisipildid tekivad teose kausta. `state/` (users.json,
+    # paroolide räsid) on teadlikult mountimata — pildiserver ei autendi kedagi;
+    # `auth` import logib puuduva faili kohta hoiatuse ja jätkab tühjalt.
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 8001), timeout=4).close()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    ports:
+      - "127.0.0.1:8001:8001"
 
   # Otsingumootor
   meilisearch:

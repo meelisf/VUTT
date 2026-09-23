@@ -100,8 +100,10 @@ Muuda `docker-compose.yml` vajadusel, et pordid oleks avatud:
 ```yaml
   backend:
     ports:
-      - "127.0.0.1:8001:8001"
       - "127.0.0.1:8002:8002"
+  images:        # pildiserver, sama image eraldi teenusena (#388)
+    ports:
+      - "127.0.0.1:8001:8001"
   meilisearch:
     ports:
       - "127.0.0.1:7700:7700"
@@ -110,13 +112,13 @@ Muuda `docker-compose.yml` vajadusel, et pordid oleks avatud:
 ### 4.3 Käivita teenused
 ```bash
 cd /opt/vutt
-docker compose up -d backend meilisearch
+docker compose up -d backend images meilisearch
 ```
 
 Kontrolli:
 ```bash
 docker compose ps
-# Peaksid nägema 'vutt-backend' ja 'vutt-meili' olekus 'Up'.
+# Peaksid nägema 'vutt-backend', 'vutt-images' ja 'vutt-meili' olekus 'Up (healthy)'.
 ```
 
 ### 4.4 Taasindekseerimine
