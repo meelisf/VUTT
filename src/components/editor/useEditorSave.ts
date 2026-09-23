@@ -1,9 +1,11 @@
-import { useCallback, useRef, type MutableRefObject } from 'react';
+import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditorView } from '@codemirror/view';
 import type { Annotation, Page, PageStatus, TextAnnotation } from '../../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 import { replyToComment } from '../../services/pageService';
+import { pageSwapAnnotation } from './editorAnnotations';
+import { savedStateAfterRestore, type RestoreResult } from './pageRestore';
 
 export interface EditorSavedState {
   status: PageStatus;
@@ -21,13 +23,15 @@ interface UseEditorSaveParams {
   textAnnotations: TextAnnotation[];
   setTextAnnotations: (annotations: TextAnnotation[]) => void;
   onSave: (updatedPage: Page) => Promise<void>;
-  setSavedState: (state: EditorSavedState) => void;
+  setSavedState: Dispatch<SetStateAction<EditorSavedState>>;
   setIsDirty: (dirty: boolean) => void;
   setIsSaving: (saving: boolean) => void;
   setSaveError: (error: string | null) => void;
   viewRef: MutableRefObject<EditorView | null>;
   commentFlushRef: MutableRefObject<(() => Annotation[] | null) | null>;
   authToken?: string | null;
+  /** Taastatud lehe väljad vanemale (Workspace `page`), vt `handlePageRestored`. */
+  onPageRestored?: (patch: Partial<Page>) => void;
 }
 
 // Tekstiredaktori salvestusloogika ja korduvate savedState uuenduste keskne koht.
@@ -47,6 +51,7 @@ export function useEditorSave({
   viewRef,
   commentFlushRef,
   authToken,
+  onPageRestored,
 }: UseEditorSaveParams) {
   const { t } = useTranslation(['workspace', 'common']);
   const isSavingRef = useRef(false);
@@ -140,6 +145,34 @@ export function useEditorSave({
     setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
   }, [page_tags, setComments, setSavedState, status, textAnnotations]);
 
+  /**
+   * Git-taaste (#375). Server on versiooni JUBA salvestanud ja commitinud,
+   * seega on see salvestatud seis, mitte salvestamata muudatus:
+   * - tekst asendatakse `pageSwapAnnotation`-iga (programmaatiline, ei märgi dirty-ks);
+   * - kirjed ja lepitusel tekkinud kommentaarid võetakse serveri vastusest;
+   * - vanema `page` saab sama teksti — muidu paneks järgmine `page`-objekti
+   *   asendus samal lehel (nt metaandmete salvestus) vana teksti redaktorisse
+   *   tagasi (`useEditorState` sünkroniseerib `page.text_content`-i järgi).
+   */
+  const handlePageRestored = useCallback((r: RestoreResult) => {
+    const view = viewRef.current;
+    if (view && view.state.doc.toString() !== r.content) {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: r.content },
+        annotations: pageSwapAnnotation.of(true),
+      });
+    }
+    if (r.textAnnotations) setTextAnnotations(r.textAnnotations);
+    if (r.comments) setComments(r.comments);
+    setSavedState(prev => savedStateAfterRestore(prev, r));
+    setIsDirty(false);
+    onPageRestored?.({
+      text_content: r.content,
+      ...(r.textAnnotations ? { text_annotations: r.textAnnotations } : {}),
+      ...(r.comments ? { comments: r.comments } : {}),
+    });
+  }, [onPageRestored, setComments, setIsDirty, setSavedState, setTextAnnotations, viewRef]);
+
   const handleReplyToComment = useCallback(async (commentId: string, replyText: string) => {
     if (!authToken) throw new Error(t('saveError.tokenMissing'));
     const updatedComments = await replyToComment(page, commentId, replyText, authToken);
@@ -155,6 +188,7 @@ export function useEditorSave({
     handleSaveTextAnnotations,
     handleDeleteAndSaveTextAnnotation,
     handleCommentsRestored,
+    handlePageRestored,
     handleReplyToComment,
   };
 }

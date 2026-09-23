@@ -6,6 +6,7 @@ import AnnotationsTab from './AnnotationsTab';
 import HistoryTab from './HistoryTab';
 import type { EditorTab } from './types';
 import type { ReocrStatus } from './useReOcr';
+import type { RestoreResult } from './pageRestore';
 
 interface EditorInfoHistoryTabsProps {
   activeTab: EditorTab;
@@ -19,7 +20,6 @@ interface EditorInfoHistoryTabsProps {
   onWorkUpdate?: (updatedWork: Partial<Work>) => void;
   lang: string;
   viewRef: MutableRefObject<EditorView | null>;
-  setIsDirty: (dirty: boolean) => void;
   setActiveTab: (tab: EditorTab) => void;
 
   page_tags: Page['page_tags'];
@@ -30,10 +30,10 @@ interface EditorInfoHistoryTabsProps {
   commentFlushRef: MutableRefObject<(() => Annotation[] | null) | null>;
   handleSaveAnnotations: (comments: Annotation[]) => Promise<void>;
   handleCommentsRestored: (comments: Annotation[]) => void;
+  handlePageRestored: (result: RestoreResult) => void;
   handleReplyToComment: (commentId: string, replyText: string) => Promise<void>;
 
   textAnnotations: TextAnnotation[];
-  setTextAnnotations: (annotations: TextAnnotation[]) => void;
   handleSaveTextAnnotations: (annotations: TextAnnotation[]) => Promise<void>;
   handleDeleteAndSaveTextAnnotation: (annId: number) => Promise<void>;
 
@@ -57,7 +57,6 @@ export default function EditorInfoHistoryTabs({
   onWorkUpdate,
   lang,
   viewRef,
-  setIsDirty,
   setActiveTab,
   page_tags,
   setPageTags,
@@ -67,9 +66,9 @@ export default function EditorInfoHistoryTabs({
   commentFlushRef,
   handleSaveAnnotations,
   handleCommentsRestored,
+  handlePageRestored,
   handleReplyToComment,
   textAnnotations,
-  setTextAnnotations,
   handleSaveTextAnnotations,
   handleDeleteAndSaveTextAnnotation,
   handleReOcr,
@@ -118,17 +117,10 @@ export default function EditorInfoHistoryTabs({
           geminiEnabled={geminiEnabled}
           onShareableChange={(shareable) => onWorkUpdate?.({ shareable })}
           collections={collections}
-          onRestore={(content, restoredTextAnnotations) => {
-            const view = viewRef.current;
-            if (view) {
-              view.dispatch({
-                changes: { from: 0, to: view.state.doc.length, insert: content },
-              });
-              setIsDirty(true);
-            }
-            if (Array.isArray(restoredTextAnnotations)) {
-              setTextAnnotations(restoredTextAnnotations);
-            }
+          onRestore={(result) => {
+            // Server on taastatud versiooni juba salvestanud — see on
+            // salvestatud seis, mitte salvestamata muudatus (#375).
+            handlePageRestored(result);
             setActiveTab('edit');
           }}
           readOnly={readOnly || false}

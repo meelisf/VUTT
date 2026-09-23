@@ -25,10 +25,9 @@
     "restore": "Taasta",
     "restoreConfirm": "Kas soovid taastada selle versiooni?",
     "restoreOriginalConfirm": "Kas soovid taastada ORIGINAAL OCR versiooni?",
-    "restoreNote": "Tekst laaditakse redaktorisse. Muudatuste salvestamiseks pead vajutama \"Salvesta\".",
-    "restoreSuccess": "Versioon {{date}} ({{author}}) laaditud redaktorisse.",
+    "restoreNote": "Taastatakse selle versiooni tekst koos tekstisiseste märkustega ja see salvestatakse kohe. Hilisemad tekstiparandused pöörduvad tagasi. Lehe märkmed ja märksõnad jäävad alles.",
+    "restoreSuccess": "Versioon {{date}} ({{author}}) taastatud ja salvestatud.",
     "restoreError": "Taastamine ebaõnnestus",
-    "saveReminder": "Salvestamiseks vajuta \"Salvesta\" nuppu.",
     "noBackups": "Varasemaid versioone pole",
     "loadError": "Ajaloo laadimine ebaõnnestus",
     "loginRequired": "Ajaloo laadimiseks pead olema sisse logitud.",
@@ -50,7 +49,8 @@
       "saved_changes": "Salvestas muudatused"
     },
     "adminOnly": "Varukoopiate taastamine on saadaval ainult administraatoritele.",
-    "restoreHint": "Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta \"Salvesta\"."
+    "restoreHint": "Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta \"Salvesta\".",
+    "restoreGitWarning": "Hoiatus: tekst salvestati, aga versiooniajaloo commit ebaõnnestus ({{error}}). Teata sellest administraatorile."
   },
   "saveError": {
     "notLoggedIn": "Salvestamiseks pead olema sisse logitud.",
