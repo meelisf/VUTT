@@ -117,6 +117,7 @@ export default function EditorInfoHistoryTabs({
           geminiEnabled={geminiEnabled}
           onShareableChange={(shareable) => onWorkUpdate?.({ shareable })}
           collections={collections}
+          onCommentsRestored={handleCommentsRestored}
           onRestore={(result) => {
             // Server on taastatud versiooni juba salvestanud — see on
             // salvestatud seis, mitte salvestamata muudatus (#375).

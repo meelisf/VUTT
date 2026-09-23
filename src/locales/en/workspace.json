@@ -61,7 +61,11 @@
       "otherFields": "Also changed: {{fields}}",
       "added": "Added",
       "modified": "Changed",
-      "removed": "Removed"
+      "removed": "Removed",
+      "restoreAsComment": "Restore as note",
+      "restoreAsCommentHint": "Adds the annotation text as a page note. The page text is not changed; the note can be linked to the text manually later.",
+      "restoredAsComment": "restored as note",
+      "restoreAsCommentGitWarning": "The note was saved, but the version history commit failed. Please tell an administrator."
     },
     "moreVersions": "Showing the latest {{count}} versions; older ones are kept but not listed here."
   },

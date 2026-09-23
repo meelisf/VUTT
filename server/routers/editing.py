@@ -9,7 +9,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import require_catalog_access
-from ..annotation_ops import apply_restored_annotations, split_page_json
+from ..annotation_ops import (
+    apply_restored_annotations, restore_annotation_as_comment, split_page_json,
+)
 from ..auth import is_at_least
 from ..cache import get_cached_suggestions
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
@@ -390,6 +392,58 @@ async def page_comments_restore(
     )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     return {"status": "success", "comments": new_comments}
+
+
+@router.post("/page-annotations/restore-as-comment")
+async def page_annotation_restore_as_comment(
+    request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("contributor"))
+):
+    """Eemaldatud tekst-annotatsioon lehe märkmena tagasi (#375 punkt 4).
+
+    `commit_hash` = commit, mis märkuse EEMALDAS (ajaloo kirje); märkus loetakse
+    tema vanemast. Teksti ei puututa ega eemaldata midagi — ankru uuesti
+    valimist ei ole, toimetaja seob märkme vajadusel käsitsi.
+    """
+    data = await get_json_data(request)
+    commit_hash = data.get('commit_hash')
+    annotation_id = data.get('annotation_id')
+    if not isinstance(commit_hash, str) or not commit_hash or not isinstance(annotation_id, int):
+        raise HTTPException(status_code=400, detail="Vigased parameetrid")
+
+    catalog, _filename, json_relpath, json_path, _txt = _validate_page_paths(data)
+    await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
+
+    # commit_hash peab kuuluma SELLE lehe JSON-i ajalukku (mitte suvaline git-objekt).
+    history = await run_in_threadpool(get_file_git_history, json_relpath, max_count=500)
+    if commit_hash not in {h['full_hash'] for h in history}:
+        raise HTTPException(status_code=400, detail="Commit ei kuulu selle lehe ajalukku")
+    if not os.path.exists(json_path):
+        raise HTTPException(status_code=404, detail="Lehe metaandmeid ei leitud")
+
+    vanem = await run_in_threadpool(get_file_at_commit, json_relpath, f"{commit_hash}^")
+    praegu = await run_in_threadpool(_read_json_file, json_path)
+    try:
+        uus, _kommentaar = restore_annotation_as_comment(praegu, vanem, annotation_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except FileExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    uus['updated_at'] = datetime.now().isoformat()
+    git_result = await run_in_threadpool(
+        save_with_git, json_path, json.dumps(uus, indent=2, ensure_ascii=False),
+        user['username'], message=f"Restore annotation {annotation_id} as comment: {commit_hash[:8]}",
+    )
+    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+    meta, _ = split_page_json(uus)
+    response = {"status": "success", "comments": meta.get('comments', []), "git_committed": True}
+    # Sama leping mis `/save`-il ja `/git-restore`-il: fail on kettal, commit puudub.
+    if git_result.get("success") is False:
+        response["git_committed"] = False
+        response["warning"] = "Märge salvestati, aga Git versioonihalduse commit ebaõnnestus."
+    return response
 
 
 @router.post("/git-restore")

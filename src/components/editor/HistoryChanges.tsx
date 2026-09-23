@@ -29,7 +29,17 @@ export const HistoryChangeBadges: React.FC<{ changes?: PageChanges }> = ({ chang
   );
 };
 
-const Grupp: React.FC<{ title: string; g?: ItemGroupChange }> = ({ title, g }) => {
+interface AnnotationRestore {
+  /** Eemaldatud märkus lehe märkmena tagasi (#375 p4). Ainult tekst-annotatsioonidel. */
+  onRestore: (id: string | number) => void;
+  /** Kas mõni taastamine käib (nupud lukus) ja milline (`String(id)`) selles kirjes. */
+  busy: boolean;
+  restoringId: string | null;
+  /** Selles kirjes juba taastatud märkused (`String(id)`). */
+  restoredIds: ReadonlySet<string>;
+}
+
+const Grupp: React.FC<{ title: string; g?: ItemGroupChange; restore?: AnnotationRestore }> = ({ title, g, restore }) => {
   const { t } = useTranslation(['workspace']);
   if (!g) return null;
   return (
@@ -51,6 +61,21 @@ const Grupp: React.FC<{ title: string; g?: ItemGroupChange }> = ({ title, g }) =
         {g.removed?.map(r => (
           <li key={`r-${r.id}`} className="bg-red-50 text-red-900 border-l-4 border-red-300 pl-2 py-0.5 whitespace-pre-wrap break-words">
             <span className="font-semibold">{t('history.changes.removed')}:</span> {r.text}
+            {restore && (
+              restore.restoredIds.has(String(r.id)) ? (
+                <span className="ml-2 text-[10px] text-green-700">{t('history.changes.restoredAsComment')}</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => restore.onRestore(r.id)}
+                  disabled={restore.busy}
+                  className="ml-2 text-[10px] px-1.5 py-0.5 rounded border border-red-200 bg-white text-red-800 hover:bg-red-100 disabled:opacity-50"
+                  title={t('history.changes.restoreAsCommentHint')}
+                >
+                  {restore.restoringId === String(r.id) ? '…' : t('history.changes.restoreAsComment')}
+                </button>
+              )
+            )}
           </li>
         ))}
       </ul>
@@ -59,14 +84,14 @@ const Grupp: React.FC<{ title: string; g?: ItemGroupChange }> = ({ title, g }) =
 };
 
 /** Lahtivõetud rea toimetajakihi muutused loetaval kujul (#375). */
-export const HistoryChangeDetails: React.FC<{ changes?: PageChanges }> = ({ changes }) => {
+export const HistoryChangeDetails: React.FC<{ changes?: PageChanges; annotationRestore?: AnnotationRestore }> = ({ changes, annotationRestore }) => {
   const { t } = useTranslation(['workspace', 'common']);
   if (!changes) return null;
   const { text_annotations, comments, page_tags, status, other_fields } = changes;
   if (!text_annotations && !comments && !page_tags && !status && !other_fields?.length) return null;
   return (
     <div className="bg-white rounded border border-gray-200 p-3 mb-3">
-      <Grupp title={t('history.changes.annotations')} g={text_annotations} />
+      <Grupp title={t('history.changes.annotations')} g={text_annotations} restore={annotationRestore} />
       <Grupp title={t('history.changes.comments')} g={comments} />
       {page_tags && (
         <div className="mb-3 last:mb-0 text-xs">
