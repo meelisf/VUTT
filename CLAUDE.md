@@ -42,6 +42,7 @@ ssh vutt && cd ~/VUTT
 ./scripts/server_update.sh --no-cache   # git pull + docker build + restart; --no-cache on Python-muudatusel kohustuslik
 ./scripts/server_seed_data.sh           # Meilisearch reindeks (kui andmed/skeem muutusid)
 docker logs vutt-backend                # backend jookseb Dockeris (vutt-backend)
+docker logs vutt-images                 # pildiserver (8001): SAMA image, eraldi teenus (#388)
 
 # Frontend — lokaalses masinas
 npm run build && rsync -avz --delete dist/ vutt:~/VUTT/dist/
@@ -71,7 +72,7 @@ Eeldused hostis (ei ole `nginx.host.conf`-is): rate-limit tsoonid `nginx.conf` h
 ```
 Frontend (Vite/React 19)
 ├── Meilisearch (7700) — otsing + metaandmed (indeks: teosed)
-├── Image Server (8001) — skaneeringud .jpg
+├── Image Server (8001) — skaneeringud .jpg (konteiner `vutt-images`, ainult `data/` mount)
 └── File Server (8002) — FastAPI: toimetamine, auth, git, prosopograafia
     ↓
 Failisüsteem: data/{kaust}/{lehekülg}.txt + .jpg + .json + _metadata.json
