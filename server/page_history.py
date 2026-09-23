@@ -154,33 +154,70 @@ def _read_blobs(repo_dir: str, specs: list) -> dict:
     return tulemus
 
 
+def _log_single_path(repo_dir: str, rel: str, limit: int) -> list:
+    """Ühe faili commitid uuemast vanemani.
+
+    ÜKS pathspec päringu kohta: commit-graph'i Bloom-filter kiirendab ainult
+    seda. Kaks teed ühes `git log`-is käis tootmises (~13 000 commiti) läbi
+    kogu ajaloo — 3,6 s vs 74 ms (mõõdetud 2026-09-23, git 2.47).
+    """
+    out = _git(
+        repo_dir, "log", f"--max-count={limit}",
+        f"--format=%H{_FIELD_SEP}%an{_FIELD_SEP}%cI{_FIELD_SEP}%ct{_FIELD_SEP}%s%x00",
+        "--", rel,
+    ).decode("utf-8", "replace")
+    kirjed = []
+    for plokk in out.split("\x00"):
+        osad = plokk.strip("\n").split(_FIELD_SEP)
+        if len(osad) < 5:
+            continue
+        kirjed.append({"hash": osad[0], "author": osad[1], "date": osad[2],
+                       "ts": int(osad[3]), "message": osad[4]})
+    return kirjed
+
+
+def _on_uuem(repo_dir: str, a: dict, b: dict) -> bool:
+    """Kas commit `a` on `b`-st uuem? Aeg otsustab; sama sekund → ajalugu.
+
+    Salvestused käivad `_git_write_lock`-i all järjest, seega sama sekundi
+    viik on haruldane — aga oletus annaks siis vale järjekorra.
+    """
+    if a["ts"] != b["ts"]:
+        return a["ts"] > b["ts"]
+    return subprocess.run(
+        ["git", "merge-base", "--is-ancestor", b["hash"], a["hash"]],
+        cwd=repo_dir, capture_output=True,
+    ).returncode == 0
+
+
+def _liida(repo_dir: str, txt_log: list, json_log: list, txt_rel: str, json_rel: str) -> list:
+    """Kaks sama (lineaarse) ajaloo alamjada üheks, uuem ees, sama commit korra."""
+    tulemus, i, j = [], 0, 0
+    while i < len(txt_log) or j < len(json_log):
+        a = txt_log[i] if i < len(txt_log) else None
+        b = json_log[j] if j < len(json_log) else None
+        if a and b and a["hash"] == b["hash"]:
+            tulemus.append({**a, "files": {txt_rel, json_rel}}); i += 1; j += 1
+        elif a and (b is None or _on_uuem(repo_dir, a, b)):
+            tulemus.append({**a, "files": {txt_rel}}); i += 1
+        else:
+            tulemus.append({**b, "files": {json_rel}}); j += 1
+    return tulemus
+
+
 def build_page_history(repo_dir: str, txt_rel: str, json_rel: str, max_count: int = 50) -> dict:
     """Lehe ajalugu uuemast vanemani, iga kirje juures `changes`.
+
+    Kaks ühe-teega päringut liidetakse. Liidu `max_count` uusimat on alati
+    kummagi loendi enda `max_count` uusima hulgas, seega piisab mõlemast
+    `max_count + 1`-st.
 
     `has_more`: aknast jäi vanemaid versioone välja. Siis ei ole aknas ka
     originaali ja ükski kirje ei nimeta end originaaliks.
     """
-    # `core.quotePath=false`: muidu tuleb `--name-only` täpitähtedega tee
-    # jutumärkides ja oktaalkoodis (`"1696-R\303\266rling…"`) ega võrdu
-    # `json_rel`-iga — „mis muutus" läheks vaikselt valeks.
-    out = _git(
-        repo_dir, "-c", "core.quotePath=false", "log", f"--max-count={max_count + 1}",
-        f"--format=%x00%H{_FIELD_SEP}%an{_FIELD_SEP}%cI{_FIELD_SEP}%s",
-        "--name-only", "--", txt_rel, json_rel,
-    ).decode("utf-8", "replace")
-
-    kirjed = []
-    for plokk in out.split("\x00"):
-        if not plokk.strip():
-            continue
-        paise, _, failid = plokk.partition("\n")
-        osad = paise.split(_FIELD_SEP)
-        if len(osad) < 4:
-            continue
-        kirjed.append({
-            "hash": osad[0], "author": osad[1], "date": osad[2], "message": osad[3],
-            "files": {f.strip() for f in failid.splitlines() if f.strip()},
-        })
+    txt_log = _log_single_path(repo_dir, txt_rel, max_count + 1)
+    json_log = _log_single_path(repo_dir, json_rel, max_count + 1)
+    kirjed = _liida(repo_dir, txt_log, json_log, txt_rel, json_rel)
 
     has_more = len(kirjed) > max_count
     kirjed = kirjed[:max_count]
