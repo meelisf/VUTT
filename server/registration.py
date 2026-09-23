@@ -36,6 +36,11 @@ MAX_INTEREST_COLLECTIONS = 3
 # tagasi lükatul ei ole VUTT-iga enam seost. `pending` ei aegu kunagi.
 REGISTRATION_RETENTION_DAYS = 30
 
+# Kasutatud ja aegunud kutse säilitusaeg (#399). Kirje kannab kutsutu nime ja
+# e-posti; kasutatud kutse info elab edasi kasutajakontos, kasutamata ja
+# aegunud kutse puhul on kirje ainus jälg.
+INVITE_RETENTION_DAYS = 30
+
 # =========================================================
 # REGISTREERIMISE FUNKTSIOONID
 # =========================================================
@@ -162,13 +167,48 @@ def update_registration_status(reg_id, status, reviewed_by):
 # INVITE TOKENITE FUNKTSIOONID
 # =========================================================
 
+def _prune_invite_tokens(tokens, now):
+    """Eemaldab kutsed, mis on säilitusajast kauem kasutatud või aegunud.
+
+    Kasutatud kutse ankur on `used_at`; selle puudumisel (vanad kirjed)
+    `expires_at`, mis on kasutamisest alati hilisem. Kehtiv kutse ei kustu
+    kunagi, sest tema `expires_at` on tulevikus. Kehtivad kasutamata kutsed
+    on ka ainsad, mida nimevalik (`_next_available_username`) arvestab —
+    puhastus ei muuda seega ühtki nimeotsust.
+    """
+    cutoff = now - timedelta(days=INVITE_RETENTION_DAYS)
+    kept = []
+    for t in tokens:
+        ankur = t.get("used_at") if t.get("used") and t.get("used_at") else t.get("expires_at")
+        try:
+            if datetime.fromisoformat(ankur) >= cutoff:
+                kept.append(t)
+        except (ValueError, TypeError):
+            kept.append(t)  # parssimata kirje — hoia alles (ära kaota vaikselt)
+    return kept
+
+
 def load_invite_tokens():
-    """Laeb invite tokenid."""
+    """Laeb invite tokenid; aegunud ja ammu kasutatud kutsed kustutatakse.
+
+    Puhastus kirjutatakse kohe kettale (sama põhjus mis
+    `load_pending_registrations`-is). `_validate_and_consume_token` ja
+    `_unconsume_token` loevad faili otse, aga värskelt tarbitud kutse `used_at`
+    on praegu, seega vahepeal jooksnud puhastus rollback'i alt kirjet ei vii.
+    """
     with tokens_lock:
         if not os.path.exists(INVITE_TOKENS_FILE):
             return {"tokens": []}
         with open(INVITE_TOKENS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+        koik = data.get("tokens", [])
+        alles = _prune_invite_tokens(koik, datetime.now())
+        if len(alles) != len(koik):
+            data["tokens"] = alles
+            atomic_write_json(INVITE_TOKENS_FILE, data)
+            logger.info("Kutsed: %d aegunud või kasutatud kirjet kustutatud",
+                        len(koik) - len(alles))
+        return data
 
 
 def save_invite_tokens(data):
