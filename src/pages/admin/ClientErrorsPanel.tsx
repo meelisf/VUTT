@@ -15,7 +15,8 @@ interface ClientError {
   ip: string | null;
 }
 
-/** Kliendipoolsete vigade vaade (#133).
+/** Kliendi- ja serveripoolsete vigade vaade (#133). Serveri kirjetel on
+ * `source` kujul `server:thread` / `server:http`.
  *
  * Enne seda oli ainus signaal „kasutaja kirjutab meili". Logi on kaetud ring
  * (server hoiab viimased N), seega siin ei pagineerita. */
@@ -64,7 +65,7 @@ const ClientErrorsPanel: React.FC<{ token?: string }> = ({ token }) => {
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
           <AlertTriangle size={15} className="text-gray-500" />
-          {t('admin:clientErrors.title', 'Kliendipoolsed vead')}
+          {t('admin:clientErrors.title', 'Vealogi (klient ja server)')}
           {errors.length > 0 && (
             <span className="text-xs font-normal text-gray-500">
               ({errors.length}{max ? ` / ${max}` : ''})
@@ -101,7 +102,7 @@ const ClientErrorsPanel: React.FC<{ token?: string }> = ({ token }) => {
 
       {!loading && !loadError && errors.length === 0 && (
         <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
-          {t('admin:clientErrors.empty', 'Kliendipoolseid vigu ei ole registreeritud.')}
+          {t('admin:clientErrors.empty', 'Vigu ei ole registreeritud.')}
         </p>
       )}
 

@@ -449,8 +449,8 @@
   },
   "clientErrors": {
     "clear": "Tühjenda",
-    "empty": "Kliendipoolseid vigu ei ole registreeritud.",
+    "empty": "Vigu ei ole registreeritud.",
     "loadError": "Vigade laadimine ebaõnnestus.",
-    "title": "Kliendipoolsed vead"
+    "title": "Vealogi (klient ja server)"
   }
 }

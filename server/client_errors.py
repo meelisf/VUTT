@@ -1,4 +1,7 @@
-"""Kliendipoolsete vigade kogumine (#133).
+"""Kliendi- ja serveripoolsete vigade kogumine (#133).
+
+Serveripool (`record_server_error`) kirjutab samasse ringi sisemise teega;
+konksud elavad `server_errors.py`-s.
 
 **Miks kohalik, mitte Sentry/GlitchTip.** Issue pakkus välist agregaatorit;
 GlitchTip on Docker-stack pluss andmebaas hooldada ja Sentry nõuab otsust, kas
@@ -18,6 +21,8 @@ import json
 import os
 import re
 import threading
+import time
+import traceback
 from datetime import datetime, timezone
 from typing import List, Optional
 from urllib.parse import unquote
@@ -204,6 +209,11 @@ def record_error(payload: dict, *, ip: str = "", username: Optional[str] = None)
         "ip": ip or None,
     }
 
+    return _lisa(kirje)
+
+
+def _lisa(kirje: dict) -> bool:
+    """Lisab valmis kirje ringi algusesse ja kirjutab kettale."""
     global _cache
     with _lock:
         if _cache is None:
@@ -218,6 +228,72 @@ def record_error(payload: dict, *, ip: str = "", username: Optional[str] = None)
             logger.warning("client_errors.json kirjutamine ebaõnnestus: %s", e)
             return False
     return True
+
+
+# --- Serveripoolsed vead ------------------------------------------------------
+#
+# Sama ring, sisemine kirjutustee (mitte avalik POST). Kliendivigadel hoiab
+# dedupe + lehesessiooni lagi tsükli kinni; serveril tuleb see siin teha:
+# iga päringuga korduv viga täidaks muidu 500-kirjelise ringi minutitega ja
+# tõrjuks kliendivead välja. Võti on erindi TÜÜP + VISKEKOHT, mitte teade —
+# teade kannab sageli muutuvat id-d.
+SERVER_DEDUPE_SECONDS = 300
+_server_viimati: dict = {}
+_server_lock = threading.Lock()
+
+
+def _viskekoht(exc: BaseException) -> str:
+    tb = exc.__traceback__
+    viimane = None
+    while tb is not None:
+        viimane, tb = tb, tb.tb_next
+    if viimane is None:
+        return ""
+    return "{}:{}".format(viimane.tb_frame.f_code.co_filename, viimane.tb_lineno)
+
+
+def record_server_error(source: str, exc, *, thread: Optional[str] = None,
+                        url: Optional[str] = None) -> bool:
+    """Salvestab serveri erindi ringi. Ei viska KUNAGI; tagastab, kas salvestus.
+
+    `source`: "server:thread" (taustalõime surm) või "server:http" (käsitlemata
+    erind päringus). Traceback'ist hoitakse LÕPP — Pythoni stack'is on
+    viskekoht viimasel real, mitte esimesel.
+    """
+    try:
+        if not isinstance(exc, BaseException):
+            return False
+        nimi = type(exc).__name__
+        votme = (source, nimi, _viskekoht(exc))
+        nuud = time.monotonic()
+        with _server_lock:
+            eelmine = _server_viimati.get(votme)
+            if eelmine is not None and nuud - eelmine < SERVER_DEDUPE_SECONDS:
+                return False
+            _server_viimati[votme] = nuud
+
+        teade = "{}: {}".format(nimi, exc) if str(exc) else nimi
+        if thread:
+            teade += " (lõim {})".format(thread)
+        # Puhastus ENNE lõikamist: lõige saladuse keskelt jätaks poole alles,
+        # mida kujureegel enam ära ei tunne.
+        stack = scrub("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+        kirje = {
+            "received_at": datetime.now(timezone.utc).isoformat(),
+            "message": _puhasta_ja_lyhenda(teade, MAX_MESSAGE_LEN),
+            "stack": stack[-MAX_STACK_LEN:],
+            "url": _puhasta_ja_lyhenda(url, MAX_URL_LEN),
+            "user_agent": None,
+            "source": source[:40],
+            "username": None,
+            "ip": None,
+        }
+        return _lisa(kirje)
+    except Exception:
+        # Raportöör ei tohi ise vigu tekitada — lõime konksus peidaks visatud
+        # erind algse vea.
+        logger.warning("Serveri vea salvestamine ebaõnnestus", exc_info=True)
+        return False
 
 
 def list_errors(limit: Optional[int] = None) -> List[dict]:

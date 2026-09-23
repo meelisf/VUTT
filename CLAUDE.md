@@ -381,7 +381,11 @@ kirje ehitatakse valge nimekirja järgi ja väljad lõigatakse — ajatempli, IP
 kasutajanime paneb SERVER. **Raportöör ei tohi ise vigu tekitada**: iga tõrge
 neelatakse vaikselt, dedupe + lehesessiooni lagi hoiavad tsükli kinni.
 Valvurid: `tests/test_client_errors.py` (sh endpointide kaitse),
-`src/services/__tests__/clientErrorReporter.test.ts`.
+`src/services/__tests__/clientErrorReporter.test.ts`. **Serveripool** kirjutab
+samasse ringi sisemise teega (`record_server_error`, `server/server_errors.py`):
+lõime surm (`threading.excepthook`) ja 500 (`source` = `server:thread` / `server:http`).
+Kordus sama viskekoha pealt 5 min jooksul jäetakse vahele — muidu tõrjuks iga
+päringuga korduv viga kliendivead ringist välja. Executor-tööde erindid siia EI jõua.
 
 **z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
 (nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob
