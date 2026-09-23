@@ -688,6 +688,7 @@ const Workspace: React.FC = () => {
             triggerSave={editorSaveRef}
             onWorkUpdate={(updatedWork) => setWork(prev => prev ? { ...prev, ...updatedWork } : prev)}
             collections={collections}
+            onPageRestored={(patch) => setPage(prev => prev ? { ...prev, ...patch } : prev)}
           />
           </div>
         </div>

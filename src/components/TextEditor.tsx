@@ -38,9 +38,11 @@ interface TextEditorProps {
   triggerSave?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   onWorkUpdate?: (updatedWork: Partial<Work>) => void;
   collections?: Collections;
+  /** Git-taaste salvestas lehe serveris — vanem uuendab oma `page`-objekti (#375). */
+  onPageRestored?: (patch: Partial<Page>) => void;
 }
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections, onPageRestored }) => {
   const { user, authToken, userSettings } = useUser();
   const {
     specialCharacters,
@@ -191,6 +193,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     handleSaveTextAnnotations: saveTextAnnotations,
     handleDeleteAndSaveTextAnnotation: deleteAndSaveTextAnnotation,
     handleCommentsRestored,
+    handlePageRestored,
     handleReplyToComment,
   } = useEditorSave({
     page,
@@ -208,6 +211,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     viewRef,
     commentFlushRef,
     authToken,
+    onPageRestored,
   });
 
   const {
@@ -306,7 +310,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           onWorkUpdate={onWorkUpdate}
           lang={lang}
           viewRef={viewRef}
-          setIsDirty={setIsDirty}
           setActiveTab={setActiveTab}
           page_tags={page_tags}
           setPageTags={setPageTags}
@@ -316,9 +319,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           commentFlushRef={commentFlushRef}
           handleSaveAnnotations={handleSaveAnnotations}
           handleCommentsRestored={handleCommentsRestored}
+          handlePageRestored={handlePageRestored}
           handleReplyToComment={handleReplyToComment}
           textAnnotations={textAnnotations}
-          setTextAnnotations={setTextAnnotations}
           handleSaveTextAnnotations={handleSaveTextAnnotations}
           handleDeleteAndSaveTextAnnotation={handleDeleteAndSaveTextAnnotation}
           handleReOcr={handleReOcr}

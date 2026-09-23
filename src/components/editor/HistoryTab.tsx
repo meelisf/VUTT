@@ -22,9 +22,9 @@ import {
 } from 'lucide-react';
 import { Page, Work } from '../../types';
 import type { Collections } from '../../services/collectionService';
-import type { TextAnnotation } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { parseRestoreResponse, type RestoreResult } from './pageRestore';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
@@ -51,7 +51,8 @@ interface HistoryTabProps {
   work?: Work;
   user: any;
   authToken: string | null;
-  onRestore: (content: string, textAnnotations?: TextAnnotation[] | null) => void;
+  /** Server on versiooni juba salvestanud ja commitinud (#375). */
+  onRestore: (result: RestoreResult) => void;
   readOnly: boolean;
   handleReOcr?: () => void;
   reocrStatus?: string;
@@ -316,7 +317,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
 
     const confirmMsg = entry.is_original
-      ? `${t('history.restoreOriginalConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${entry.formatted_date}`
+      ? `${t('history.restoreOriginalConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${entry.formatted_date}\n\n${t('history.restoreNote')}`
       : `${t('history.restoreConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${entry.formatted_date}\n\n${t('history.restoreNote')}`;
 
     if (!confirm(confirmMsg)) {
@@ -340,9 +341,14 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       });
 
       const data = await response.json();
-      if (data.status === 'success' && data.restored_content !== undefined) {
-        onRestore(data.restored_content, data.restored_text_annotations);
-        alert(`${t('history.restoreSuccess', { date: entry.formatted_date, author: entry.author })}\n\n${t('history.saveReminder')}`);
+      const result = parseRestoreResponse(data);
+      if (result) {
+        onRestore(result);
+        const done = t('history.restoreSuccess', { date: entry.formatted_date, author: entry.author });
+        // Failid on kettal, aga ajaloo commit puudub — seda ei tohi edu alla peita.
+        alert(result.gitWarning
+          ? `${done}\n\n${t('history.restoreGitWarning', { error: result.gitWarning })}`
+          : done);
         loadGitHistory();
       } else {
         alert(`${t('history.restoreError')}: ${data.message || t('common:error.unknown')}`);

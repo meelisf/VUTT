@@ -25,10 +25,9 @@
     "restore": "Restore",
     "restoreConfirm": "Do you want to restore this version?",
     "restoreOriginalConfirm": "Do you want to restore the ORIGINAL OCR version?",
-    "restoreNote": "Text will be loaded into the editor. Press \"Save\" to apply changes.",
-    "restoreSuccess": "Version {{date}} ({{author}}) loaded into editor.",
+    "restoreNote": "This version's text is restored together with its in-text notes and saved immediately. Later text corrections will be reverted. Page notes and tags are kept.",
+    "restoreSuccess": "Version {{date}} ({{author}}) restored and saved.",
     "restoreError": "Restore failed",
-    "saveReminder": "Press \"Save\" to apply changes.",
     "noBackups": "No previous versions",
     "loadError": "Failed to load history",
     "loginRequired": "Please log in to view history.",
@@ -50,7 +49,8 @@
       "saved_changes": "Saved changes"
     },
     "adminOnly": "Version restoration is only available to administrators.",
-    "restoreHint": "Restoring will load the selected version into the editor. Press \"Save\" to apply changes."
+    "restoreHint": "Restoring will load the selected version into the editor. Press \"Save\" to apply changes.",
+    "restoreGitWarning": "Warning: the text was saved, but the version history commit failed ({{error}}). Please tell an administrator."
   },
   "saveError": {
     "notLoggedIn": "You must be logged in to save.",

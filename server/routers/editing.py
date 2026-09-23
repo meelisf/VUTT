@@ -393,6 +393,7 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
 
     additional = None
     restored_text_annotations = None
+    restored_comments = None
     json_filename = os.path.splitext(filename)[0] + ".json"
     json_path = os.path.join(BASE_DIR, catalog, json_filename)
     restored_json = await run_in_threadpool(
@@ -408,11 +409,15 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
         )
         restored_meta, _ = split_page_json(uus_page_json)
         restored_text_annotations = restored_meta.get('text_annotations', [])
+        # Lepitus võib ankru kaotanud kirje muuta LEHE KOMMENTAARIKS. Klient
+        # peab selle saama, muidu kirjutab järgmine Ctrl+S ta vana
+        # kliendiseisuga üle (#375).
+        restored_comments = restored_meta.get('comments', [])
         if changed:
             uus_page_json['updated_at'] = datetime.now().isoformat()
             additional = [(json_path, json.dumps(uus_page_json, indent=2, ensure_ascii=False))]
 
-    await run_in_threadpool(
+    git_result = await run_in_threadpool(
         save_with_git,
         path,
         content,
@@ -421,11 +426,22 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
         additional_files=additional,
     )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
-    return {
+    # Taaste on SALVESTATUD: klient joondab nende väljadega oma salvestatud
+    # võrdlusseisu ega vaja uut Ctrl+S-i (#375).
+    response = {
         "status": "success",
         "restored_content": content,
         "restored_text_annotations": restored_text_annotations,
+        "restored_comments": restored_comments,
+        "git_committed": True,
     }
+    # Sama leping mis `/save`-il: failid on kettal, aga ajaloo commit puudub.
+    if git_result.get("success") is False:
+        response["git_committed"] = False
+        response["warning"] = "Versioon taastati kettale, aga Git versioonihalduse commit ebaõnnestus."
+        if git_result.get("error"):
+            response["git_error"] = git_result.get("error")
+    return response
 
 @router.post("/works/bulk-collection")
 async def bulk_collection(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
