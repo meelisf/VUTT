@@ -63,4 +63,6 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0041](0041-ankur-ja-kirje-on-uks-fakt.md) | Annotatsiooni ankur ja kirje on üks fakt kahes failis; toimetaja märkus renderdatakse teksti sees ankru juures | kehtib |
 | [0042](0042-tookollektsiooni-liikmesust-ei-indekseerita.md) | Töökollektsiooni liikmesust ei indekseerita Meilisse; otsing filtreerib serverilt saadud `work_id` loendiga | kehtib |
 | [0043](0043-kogude-oiguste-uhised-toimingud.md) | Kogu- ja kasutajavaade kasutavad ühiseid õigustoiminguid; kogude loend adminile, seaded superadminile | kehtib |
+| [0044](0044-peidetud-tagi-peab-jaama-mootdetavaks.md) | Peidetud tägi peab jääma mõõdetavaks | kehtib |
 | [0045](0045-kaivitustaaste-enne-valmisolekut.md) | Käivitustaaste lõpeb enne, kui server päringuid vastu võtab; ainult lokaalne, võrgutöö jääb taustalõime | kehtib |
+| [0046](0046-sessioon-on-oiguste-ainus-tode.md) | Sessioon on kutsuja õiguste ainus tõde (iga õigusvälja kirjutus katkestab sessiooni); tokenit loeb ainult `deps.py` | kehtib |

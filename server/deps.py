@@ -9,18 +9,15 @@ Semantika (main.py päritolu):
 - ``get_user``: loeb tokeni ``Authorization: Bearer`` headerist; kui puudub,
   ``query``-parameetrist ``token`` (ainult ``<img src>`` tüüpi GET-id, nt upload thumb).
 - ``optional_user``: loeb tokeni ``Authorization`` headerist; tagastab ``None``
-  anonüümsele. Ei nõua autentimist.
+  anonüümsele. Ei nõua autentimist. Kasutaja on sama mis ``get_user``-il.
 
-NB: ``server/prosopography/router.py``-s on veel eraldi ``_get_user``, mis toetab
-lisaks JSON body-st tokeni lugemist (legacy kanal). Selle ühendamine on #356 lahtine
-osa. Sealne ``_optional_user`` on KUSTUTATUD: ta luges tokeni ainult ``?token=``-ist,
-klient saadab päise, seega tagastas ta päris kasutaja päringul alati ``None``.
-Autentimata kutsuja loetakse prosopograafias nüüd siinse ``optional_user``-iga.
-Valvur: ``tests/test_token_lugeja_uks_reegel.py``.
+Need on AINSAD kutsuja-lugejad (#356). Prosopograafia routeri oma ``_get_user``
+(luges tokeni ka JSON-kehast) ja ``_optional_user`` (ainult ``?token=``) on
+kustutatud. Valvur: ``tests/test_token_lugeja_uks_reegel.py``.
 """
 from fastapi import HTTPException, Request
 
-from .auth import require_token, get_session, load_users
+from .auth import require_token
 
 
 async def get_user(request: Request, min_role: str = "contributor"):
@@ -61,23 +58,23 @@ async def get_json_data(request: Request):
 
 def optional_user(request: Request):
     """
-    Tagastab autentitud kasutaja (koos allowed_collections) või ``None``
-    anonüümsele päringule. Erinevalt ``get_user``-st ei tõsta 401.
+    Tagastab autentitud kasutaja või ``None`` anonüümsele päringule. Erinevalt
+    ``get_user``-st ei tõsta 401.
 
-    NB: on teadlikult SYNC (mitte async). ``get_session`` ja ``load_users`` on
-    sünkroonsed (in-memory dict + faililugemine) ja osa callereid main.py-s
-    (viewer-token, download, SEO meta) kutsub seda ilma ``await``-ta. Põhjus,
-    miks ``get_user`` on async: FastAPI dependency injekteerib selle ja starlette
-    ootab awaitable'it — aga ``optional_user``-i kutsutakse otse endpointides
-    (``user = _get_optional_user(request)``), mitte ``Depends`` kaudu.
+    Kasutaja on SAMA mis ``get_user``-il (``require_token``: sessiooni
+    hetktõmmis + 24 h aegumine) — ainult puudumise käitumine erineb. Varem
+    kirjutas see ``allowed_collections``-i üle värskest ``users.json``-ist ega
+    kontrollinud aegumist: kaks lugejat andsid sama tokeni peale eri vastuse.
+    Sessioon on õiguste ainus tõde, sest iga õigusvälja kirjutus katkestab
+    sessiooni (ADR 0046, valvur ``test_oigusvalja_kirjutus_katkestab_sessiooni``).
+
+    NB: on teadlikult SYNC (mitte async) — osa callereid (viewer-token,
+    download, SEO meta) kutsub seda otse, ilma ``await``-ta.
     """
     token_str = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
     if not token_str:
         return None
-    session = get_session(token_str)
-    if not session:
+    user, error = require_token({"auth_token": token_str})
+    if error:
         return None
-    username = session["user"]["username"]
-    users = load_users()
-    user_data = users.get(username, {})
-    return {**session["user"], "allowed_collections": user_data.get("allowed_collections", [])}
+    return dict(user)

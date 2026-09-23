@@ -220,6 +220,10 @@ ainult `contributor`) ei anna KUNAGI lugemisõigust; lugemisõigus on
 `allowed_collections`. Uus kirjutustee kutsub `can_write_work`-i, ei kirjuta oma
 kontrolli. Õigusotsust EI tehta `work_collections_index.json` põhjal — see on
 read-model (ADR 0007); autoriteet on `_metadata.json`.
+Kutsuja õigused tulevad **sessioonist** (ADR 0046): `get_user` ja `optional_user`
+annavad sama kasutaja, tokenit loeb AINULT `deps.py`. Seepärast PEAB iga
+`allowed_collections`/`edit_collections` kirjutus kutsuma `delete_user_sessions`-it
+(valvur `test_oigusvalja_kirjutus_katkestab_sessiooni.py`).
 
 **Marginaalia (ADR 0003, 0009)** — iga sisuline füüsiline marginaaliarida on eraldi `<m>…</m>`
 plokk; `<m>` on VÄLIMINE täg ega sisalda reavahetust. Järjestikused plokid koondatakse üheks

@@ -103,7 +103,6 @@ export function bulkAssignCollection(
   collectionId: string | null,
 ): Promise<ApiStatusResponse> {
   return apiPost<ApiStatusResponse>('/works/bulk-collection', {
-    auth_token: token,
     work_ids: workIds,
     // null = "Määramata" → set puhastab kõik; päris kollektsioon → add lisab olemasolevate kõrvale
     mode: collectionId === null ? 'set' : 'add',
@@ -118,7 +117,6 @@ export function bulkAssignTags(
   mode: 'add' | 'replace' | 'remove',
 ): Promise<ApiStatusResponse> {
   return apiPost<ApiStatusResponse>('/works/bulk-tags', {
-    auth_token: token,
     work_ids: workIds,
     tags,
     mode,
@@ -131,7 +129,6 @@ export function bulkAssignGenre(
   genre: LinkedEntity | null,
 ): Promise<ApiStatusResponse> {
   return apiPost<ApiStatusResponse>('/works/bulk-genre', {
-    auth_token: token,
     work_ids: workIds,
     genre,
     mode: genre ? 'add' : 'set',

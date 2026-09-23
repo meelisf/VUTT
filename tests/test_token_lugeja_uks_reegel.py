@@ -76,3 +76,19 @@ def test_prosopograafial_ei_ole_oma_optional_user_lugejat():
         "`_optional_user` on `deps.optional_user`-i dubleering, mis lahknes (#356). "
         "Kutsuja loetakse `server.deps.optional_user`-iga."
     )
+
+
+def test_prosopograafial_ei_ole_oma_kutsuja_lugejat():
+    """#356 osa 2: `_get_user` / `_require_role` asendati `deps`-iga.
+
+    Routeri lugeja luges tokeni lisaks JSON-kehast (`auth_token`) — kanal,
+    millel mõõdetult ei olnud ühtki elavat kutsujat ja mis tegi #237 võimalikuks
+    (saladus domeeni-payloadis). Routeris ei loeta tokenit üldse.
+    """
+    import server.prosopography.router as router
+
+    for nimi in ("_get_user", "_require_role"):
+        assert not hasattr(router, nimi), f"{nimi}: kasuta server.deps-i (#356)"
+    lugejad = [fn.name for fn in _funktsioonid()
+               if _loeb_authorization_paist(fn) or _loeb_query_tokenit(fn)]
+    assert lugejad == [], f"Router loeb ise tokenit: {lugejad}"
