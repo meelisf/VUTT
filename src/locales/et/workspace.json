@@ -50,7 +50,20 @@
     },
     "adminOnly": "Varukoopiate taastamine on saadaval ainult administraatoritele.",
     "restoreHint": "Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta \"Salvesta\".",
-    "restoreGitWarning": "Hoiatus: tekst salvestati, aga versiooniajaloo commit ebaõnnestus ({{error}}). Teata sellest administraatorile."
+    "restoreGitWarning": "Hoiatus: tekst salvestati, aga versiooniajaloo commit ebaõnnestus ({{error}}). Teata sellest administraatorile.",
+    "changes": {
+      "text": "Tekst",
+      "annotations": "Märkused",
+      "comments": "Märkmed",
+      "tags": "Märksõnad",
+      "status": "Staatus",
+      "other": "Muud andmed",
+      "otherFields": "Muutusid ka: {{fields}}",
+      "added": "Lisatud",
+      "modified": "Muudetud",
+      "removed": "Eemaldatud"
+    },
+    "moreVersions": "Näidatakse {{count}} viimast versiooni; vanemad on alles, aga siin ei ole nähtavad."
   },
   "saveError": {
     "notLoggedIn": "Salvestamiseks pead olema sisse logitud.",
