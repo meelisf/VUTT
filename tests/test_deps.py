@@ -188,3 +188,59 @@ def test_optional_user_is_synchronous(backend_env):
         "optional_user peab olema sync def, mitte async — muidu viewer-token jms "
         "endpointid saavad koruutini mitte kasutaja."
     )
+
+
+# ---------------------------------------------------------------------------
+# Üks kutsuja-reegel (#356 punkt 4): sessioon on ainus tõde
+# ---------------------------------------------------------------------------
+
+def _paisega(token):
+    from starlette.requests import Request
+    return Request({"type": "http", "headers": [(b"authorization", f"Bearer {token}".encode())]})
+
+
+def test_optional_user_ja_get_user_annavad_sama_kasutaja(login):
+    """Õigusväljad tulevad sessioonist mõlemal. Varem kirjutas `optional_user`
+    `allowed_collections`-i üle värskest `users.json`-ist ja kaks lugejat
+    andsid sama tokeni peale eri vastuse. Õigusmuudatus katkestab sessiooni
+    (ADR 0031/0043), seega värske lugemine oli teine tõeallikas, mitte kate."""
+    from server import auth
+    from server.deps import get_user, optional_user
+
+    token = login("editor", "editorpass")
+    # Otse muudetud users.json ILMA sessiooni katkestamiseta — seda ükski
+    # kirjutustee ei tee (valvur: test_oigusvalja_kirjutus_katkestab_sessiooni).
+    with auth.users_transaction() as users:
+        users["editor"]["allowed_collections"] = ["uus-kogu"]
+        auth.save_users(users)
+
+    via_get = asyncio.run(get_user(_paisega(token)))
+    via_optional = optional_user(_paisega(token))
+
+    assert via_optional == via_get
+    assert "uus-kogu" not in via_optional["allowed_collections"]
+
+
+def test_optional_user_ei_anna_aegunud_sessiooni(login):
+    """`get_user` lükkab üle 24 h sessiooni tagasi; `optional_user` ei tohi seda
+    enne taustapuhastust (5 min tsükkel) kasutajana tagastada."""
+    from datetime import datetime, timedelta
+    from server import auth
+    from server.deps import optional_user
+
+    token = login("editor", "editorpass")
+    with auth._sessions_lock:
+        auth.sessions[token]["created_at"] = (datetime.now() - timedelta(hours=25)).isoformat()
+
+    assert optional_user(_paisega(token)) is None
+
+
+def test_optional_user_tagastab_koopia(login):
+    """Kutsuja muudatus ei tohi jõuda jagatud sessiooniobjekti."""
+    from server import auth
+    from server.deps import optional_user
+
+    token = login("editor", "editorpass")
+    optional_user(_paisega(token))["role"] = "superadmin"
+
+    assert auth.get_session(token)["user"]["role"] == "editor"
