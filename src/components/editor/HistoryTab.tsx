@@ -20,7 +20,7 @@ import {
   Link,
   Sparkles
 } from 'lucide-react';
-import { Page, Work } from '../../types';
+import { Annotation, Page, Work } from '../../types';
 import type { Collections } from '../../services/collectionService';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
@@ -57,6 +57,8 @@ interface HistoryTabProps {
   authToken: string | null;
   /** Server on versiooni juba salvestanud ja commitinud (#375). */
   onRestore: (result: RestoreResult) => void;
+  /** Server lisas lehe märkme (eemaldatud märkus märkmena, #375 p4) — salvestatud seis. */
+  onCommentsRestored?: (comments: Annotation[]) => void;
   readOnly: boolean;
   handleReOcr?: () => void;
   reocrStatus?: string;
@@ -73,6 +75,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   user,
   authToken,
   onRestore,
+  onCommentsRestored,
   readOnly,
   handleReOcr,
   reocrStatus,
@@ -87,6 +90,54 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
   // Git ajaloo state
   const [gitHistory, setGitHistory] = useState<GitHistoryEntry[]>([]);
+  // Eemaldatud märkuse taastamine märkmena (#375 p4): võti = commit + märkuse id.
+  const [restoringAnn, setRestoringAnn] = useState<string | null>(null);
+  const [restoredAnns, setRestoredAnns] = useState<Set<string>>(new Set());
+
+  const handleRestoreAnnotation = async (entry: GitHistoryEntry, annId: string | number) => {
+    if (!authToken || !page.original_path || !page.image_url) return;
+    const key = `${entry.full_hash}:${annId}`;
+    setRestoringAnn(key);
+    try {
+      const imagePath = page.image_url.split('/').pop() || '';
+      const response = await fetchWithTimeout(`${FILE_API_URL}/page-annotations/restore-as-comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({
+          original_path: page.original_path,
+          file_name: imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt'),
+          commit_hash: entry.full_hash,
+          annotation_id: annId,
+        }),
+        timeout: 30000,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && Array.isArray(data.comments)) {
+        onCommentsRestored?.(data.comments);
+        setRestoredAnns(prev => new Set(prev).add(key));
+        if (data.git_committed === false) alert(t('history.changes.restoreAsCommentGitWarning'));
+      } else {
+        alert(`${t('history.restoreError')}: ${data.detail || data.message || response.status}`);
+      }
+    } catch (e: any) {
+      alert(`${t('history.restoreError')}: ${e.message || t('common:error.network')}`);
+    } finally {
+      setRestoringAnn(null);
+    }
+  };
+
+  /** Ühe ajaloo kirje vaade taastamise olekust (võtmed kujul `commit:id`). */
+  const annotationRestoreFor = (entry: GitHistoryEntry) => {
+    const prefix = `${entry.full_hash}:`;
+    const oma = (k: string) => k.startsWith(prefix);
+    return {
+      onRestore: (id: string | number) => handleRestoreAnnotation(entry, id),
+      busy: restoringAnn !== null,
+      restoringId: restoringAnn && oma(restoringAnn) ? restoringAnn.slice(prefix.length) : null,
+      restoredIds: new Set([...restoredAnns].filter(oma).map(k => k.slice(prefix.length))),
+    };
+  };
+
   // Server näitab piiratud akna; vanemad versioonid on olemas, aga loendis mitte.
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -556,7 +607,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                     {/* Avatav diff paneel */}
                     {isExpanded && (
                       <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-                        <HistoryChangeDetails changes={entry.changes} />
+                        <HistoryChangeDetails
+                          changes={entry.changes}
+                          annotationRestore={!readOnly && onCommentsRestored
+                            ? annotationRestoreFor(entry) : undefined}
+                        />
                         {!hasTextChange(entry.changes) ? null : isLoadingThis ? (
                           <div className="flex items-center gap-2 text-gray-500 py-2">
                             <Loader2 size={14} className="animate-spin" />

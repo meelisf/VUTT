@@ -61,7 +61,11 @@
       "otherFields": "Muutusid ka: {{fields}}",
       "added": "Lisatud",
       "modified": "Muudetud",
-      "removed": "Eemaldatud"
+      "removed": "Eemaldatud",
+      "restoreAsComment": "Taasta märkmena",
+      "restoreAsCommentHint": "Lisab märkuse teksti lehe märkmeks. Leheteksti ei muudeta; märkme saab hiljem käsitsi tekstiga siduda.",
+      "restoredAsComment": "taastatud märkmena",
+      "restoreAsCommentGitWarning": "Märge salvestati, aga versiooniajaloo commit ebaõnnestus. Teata sellest administraatorile."
     },
     "moreVersions": "Näidatakse {{count}} viimast versiooni; vanemad on alles, aga siin ei ole nähtavad."
   },

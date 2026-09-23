@@ -184,3 +184,42 @@ def apply_restored_annotations(
     text, meta, reconciled = reconcile_page_annotations(restored_text, meta)
     changed = swapped or reconciled
     return text, merge_page_json(page_json, meta, wrapped), changed
+
+
+def restore_annotation_as_comment(page_json: dict, parent_json_raw: Optional[str],
+                                  annotation_id: int):
+    """Eemaldatud tekst-annotatsioon lehe märkmeks (#375 punkt 4).
+
+    `parent_json_raw` = lehe JSON commitis, KUS märkus veel oli (eemaldava
+    commiti vanem). Tagastab `(uus_page_json, kommentaar)`; teksti ega teisi
+    välju ei puututa, midagi ei eemaldata. Kuju on sama, mille lepitus annab
+    ankru kaotanud kirjele (`_orphan_comment`), seega on taastatud märge
+    lepitusel tekkinuga eristamatu — ja ühte ei tehta kaks korda.
+
+    Vead: `LookupError` — kirjet vanemas ei ole; `ValueError` — kirjel pole
+    sisu; `FileExistsError` — märkus on lehel alles või juba märkmena taastatud.
+    """
+    try:
+        vanem = json.loads(parent_json_raw) if parent_json_raw is not None else None
+    except (json.JSONDecodeError, TypeError):
+        vanem = None
+    if not isinstance(vanem, dict):
+        raise LookupError("Märkust ei leitud")
+    vanem_meta, _ = split_page_json(vanem)
+    kirje = next((a for a in _annotation_records(vanem_meta) if a["id"] == annotation_id), None)
+    if kirje is None:
+        raise LookupError("Märkust ei leitud")
+
+    meta, wrapped = split_page_json(page_json)
+    if any(a["id"] == annotation_id and a.get("comment") == kirje.get("comment")
+           for a in _annotation_records(meta)):
+        raise FileExistsError("Märkus on lehel alles")
+    kommentaar = _orphan_comment(kirje, 0)
+    if kommentaar is None:
+        raise ValueError("Märkusel ei ole teksti")
+    olemas = list(meta.get("comments") or [])
+    if any(isinstance(c, dict) and c.get("text") == kommentaar["text"] for c in olemas):
+        raise FileExistsError("Märkus on juba lehe märkmena olemas")
+
+    uus_meta = {**meta, "comments": olemas + [kommentaar]}
+    return merge_page_json(page_json, uus_meta, wrapped), kommentaar
