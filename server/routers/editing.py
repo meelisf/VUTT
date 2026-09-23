@@ -1,6 +1,7 @@
 from ..work_dating import dating_updates
 import json
 import os
+import subprocess
 import unicodedata
 from datetime import datetime
 
@@ -17,7 +18,7 @@ from ..comment_history_ops import (
     build_comment_history,
     find_comment_in_content,
 )
-from ..config import BASE_DIR
+from ..config import BASE_DIR, get_logger
 from ..deps import get_json_data, get_user, require_role
 from ..entity_labels_ops import enrich_entity_labels_async, enrich_entity_labels_async_qcodes
 from ..git_ops import (
@@ -30,10 +31,12 @@ from ..git_ops import (
 from ..marginalia_normalize import normalize_marginalia_tags
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_works, save_work_metadata
+from ..page_history import build_page_history
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
 from ..save_diff import page_content_unchanged
 from ..utils import find_directory_by_id
+logger = get_logger(__name__)
 router = APIRouter()
 
 # Võtmed, mille SERVER kirjutab ja mida klient ei saada tagasi. Ilma nendeta
@@ -251,9 +254,20 @@ async def git_history(request: Request, user=Depends(require_role("contributor")
     if not catalog or not filename:
         raise HTTPException(status_code=400, detail="Vigane failitee")
     await run_in_threadpool(_require_catalog_access, catalog, user)
-    path = os.path.join(catalog, filename)
-    history = await run_in_threadpool(get_file_git_history, path)
-    return {"status": "success", "history": history}
+    # Lehe `.txt` JA `.json` ühes loendis (#375): toimetajakiht (märkused,
+    # märkmed, märksõnad) elab JSON-is ja ainult seda muutnud commit jäi
+    # varem nimekirjast välja. Iga kirje kannab `changes`-i.
+    json_filename = os.path.splitext(filename)[0] + ".json"
+    try:
+        res = await run_in_threadpool(
+            build_page_history, BASE_DIR,
+            os.path.join(catalog, filename), os.path.join(catalog, json_filename),
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error("Lehe ajaloo lugemine ebaõnnestus (%s/%s): %s", catalog, filename,
+                     (e.stderr or b"").decode("utf-8", "replace").strip())
+        return {"status": "success", "history": [], "has_more": False}
+    return {"status": "success", **res}
 
 @router.post("/commit-diff")
 async def commit_diff(request: Request, user=Depends(require_role("contributor"))):

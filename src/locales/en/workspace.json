@@ -50,7 +50,20 @@
     },
     "adminOnly": "Version restoration is only available to administrators.",
     "restoreHint": "Restoring will load the selected version into the editor. Press \"Save\" to apply changes.",
-    "restoreGitWarning": "Warning: the text was saved, but the version history commit failed ({{error}}). Please tell an administrator."
+    "restoreGitWarning": "Warning: the text was saved, but the version history commit failed ({{error}}). Please tell an administrator.",
+    "changes": {
+      "text": "Text",
+      "annotations": "Annotations",
+      "comments": "Notes",
+      "tags": "Tags",
+      "status": "Status",
+      "other": "Other data",
+      "otherFields": "Also changed: {{fields}}",
+      "added": "Added",
+      "modified": "Changed",
+      "removed": "Removed"
+    },
+    "moreVersions": "Showing the latest {{count}} versions; older ones are kept but not listed here."
   },
   "saveError": {
     "notLoggedIn": "You must be logged in to save.",

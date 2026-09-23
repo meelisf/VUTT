@@ -101,3 +101,18 @@ def test_puuduv_commit_hash_on_400(client, login, repo):
         headers={"Authorization": f"Bearer {login('editor', 'editorpass')}"},
     )
     assert r.status_code == 400
+
+
+def test_git_history_naitab_ka_json_muutust(client, login, repo):
+    """#375 punkt 1: ajalugu küsib `.txt` JA `.json`, iga kirje kannab `changes`-i."""
+    r = client.post(
+        "/git-history",
+        json={"original_path": "1690-w1", "file_name": "pg1.txt"},
+        headers={"Authorization": f"Bearer {login('editor', 'editorpass')}"},
+    )
+    body = r.json()
+    assert body["has_more"] is False
+    [v2, v1] = body["history"]
+    assert v1["full_hash"] == repo["v1"] and v1["is_original"] is True
+    assert v2["changes"]["text"] is True
+    assert v2["changes"]["text_annotations"]["added"] == [{"id": 1, "text": "toimetaja märkus"}]

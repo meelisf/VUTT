@@ -25,6 +25,8 @@ import type { Collections } from '../../services/collectionService';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { parseRestoreResponse, type RestoreResult } from './pageRestore';
+import { canRestoreVersion, hasTextChange, type PageChanges } from './historyChanges';
+import { HistoryChangeBadges, HistoryChangeDetails } from './HistoryChanges';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
@@ -36,6 +38,8 @@ interface GitHistoryEntry {
   formatted_date: string;
   message: string;
   is_original: boolean;
+  /** Mis selles versioonis muutus (#375). Puudub vana serveri vastuses. */
+  changes?: PageChanges;
 }
 
 // Diff andmed
@@ -83,6 +87,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
   // Git ajaloo state
   const [gitHistory, setGitHistory] = useState<GitHistoryEntry[]>([]);
+  // Server näitab piiratud akna; vanemad versioonid on olemas, aga loendis mitte.
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
@@ -131,6 +137,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       const data = await response.json();
       if (data.status === 'success') {
         setGitHistory(data.history || []);
+        setHasMoreHistory(!!data.has_more);
       } else {
         console.error("Git ajaloo laadimine ebaõnnestus:", data.message);
         if (data.message?.includes('Autentimine') || data.message?.includes('parool')) {
@@ -200,7 +207,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       setExpandedCommit(null);
     } else {
       setExpandedCommit(key);
-      loadDiff(entry);
+      // Ainult toimetajakihti muutnud versioonil tekstidiffi ei ole (#375).
+      if (hasTextChange(entry.changes)) loadDiff(entry);
     }
   };
 
@@ -520,8 +528,10 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                         </span>
                       )}
 
-                      {/* Restore nupp (ainult admin) */}
-                      {isAdmin && (
+                      {/* Restore nupp (ainult admin). Taaste taastab teksti koos
+                          märkustega — märkmete/märksõnade versiooni juures ei ole
+                          tal midagi taastada (#375). */}
+                      {isAdmin && canRestoreVersion(entry.changes) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleGitRestore(entry); }}
                           disabled={isRestoring || readOnly}
@@ -541,10 +551,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                       )}
                     </div>
 
+                    <HistoryChangeBadges changes={entry.changes} />
+
                     {/* Avatav diff paneel */}
                     {isExpanded && (
                       <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-                        {isLoadingThis ? (
+                        <HistoryChangeDetails changes={entry.changes} />
+                        {!hasTextChange(entry.changes) ? null : isLoadingThis ? (
                           <div className="flex items-center gap-2 text-gray-500 py-2">
                             <Loader2 size={14} className="animate-spin" />
                             <span className="text-sm">{t('history.loadingDiff')}</span>
@@ -585,6 +598,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                 );
               })}
             </div>
+          )}
+          {hasMoreHistory && (
+            <p className="text-xs text-gray-400 px-5 py-3 border-t border-gray-100">
+              {t('history.moreVersions', { count: gitHistory.length })}
+            </p>
           )}
         </div>
       ) : (
