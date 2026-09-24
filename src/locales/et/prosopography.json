@@ -102,6 +102,7 @@
     "from": "alates",
     "gender": "Sugu",
     "genderUnknown": "Teadmata",
+    "identifierConflict": "Mõni välistest ID-dest on juba teisel kaardil: {{ids}}",
     "identifiers": "Identifikaatorid",
     "institution": "Asutus / töökoht",
     "institutionPlaceholder": "Academia Gustaviana…",

@@ -8,7 +8,7 @@ import { searchGnd, GndSearchResult } from '../services/gndService';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
-import { listPersons, createPerson } from '../prosopography/services/prosopographyService';
+import { listPersons, createPersonChecked, PersonConflictError, getPerson } from '../prosopography/services/prosopographyService';
 import type { ProsopoIndexEntry } from '../prosopography/types';
 import { normalizeExtId } from '../prosopography/utils/externalIds';
 
@@ -361,6 +361,22 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     setShowSuggestions(false);
   };
 
+  /** Loob kaardi ühe ID-ga või võtab olemasoleva (409 exists). split / muu viga → null. */
+  const looVoiLeia = async (label: string, scheme: string, id: string) => {
+    try {
+      const record = await createPersonChecked({
+        name: label, identifiers: [{ scheme, id }], created_via: 'picker',
+      }, token!);
+      return { id: record.id, label: record.name.label };
+    } catch (e) {
+      if (e instanceof PersonConflictError && e.conflict === 'exists') {
+        const olemas = await getPerson(e.existingPersonIds[0]).catch(() => null);
+        return { id: e.existingPersonIds[0], label: olemas?.name?.label ?? label };
+      }
+      return null;
+    }
+  };
+
   const handleSelect = async (result: Suggestion) => {
     justSelectedRef.current = true;
     setIsLoading(true);
@@ -373,26 +389,22 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       const label = normalizePersonName(result.label);
       if (isPersonSearch && token) {
         // Person-režiimis: loo prosopograafia kirje GND identifikaatoriga
-        try {
-          const gndId = result.id.replace(/^GND:/i, '');
-          const record = await createPerson({ name: label, identifiers: [{ scheme: 'gnd', id: normalizeExtId('gnd', gndId) }] } as any, token);
-          entity = { id: record.id, label: record.name.label, source: 'local', entity_type: 'person', labels: { et: record.name.label } };
-        } catch {
-          entity = { id: result.id, label, source: 'gnd', labels: { et: label } };
-        }
+        const gndId = result.id.replace(/^GND:/i, '');
+        const r = await looVoiLeia(label, 'gnd', normalizeExtId('gnd', gndId));
+        entity = r
+          ? { id: r.id, label: r.label, source: 'local', entity_type: 'person', labels: { et: r.label } }
+          : { id: result.id, label, source: 'gnd', labels: { et: label } };
       } else {
         entity = { id: result.id, label, source: 'gnd', labels: { et: label } };
       }
     } else if (result.isViaf || result.id.startsWith('VIAF:')) {
       const label = normalizePersonName(result.label);
       if (isPersonSearch && token) {
-        try {
-          const viafId = result.id.replace(/^VIAF:/i, '');
-          const record = await createPerson({ name: label, identifiers: [{ scheme: 'viaf', id: normalizeExtId('viaf', viafId) }] } as any, token);
-          entity = { id: record.id, label: record.name.label, source: 'local', entity_type: 'person', labels: { et: record.name.label } };
-        } catch {
-          entity = { id: result.id, label, source: 'viaf', labels: { et: label } };
-        }
+        const viafId = result.id.replace(/^VIAF:/i, '');
+        const r = await looVoiLeia(label, 'viaf', normalizeExtId('viaf', viafId));
+        entity = r
+          ? { id: r.id, label: r.label, source: 'local', entity_type: 'person', labels: { et: r.label } }
+          : { id: result.id, label, source: 'viaf', labels: { et: label } };
       } else {
         entity = { id: result.id, label, source: 'viaf', labels: { et: label } };
       }
@@ -414,12 +426,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
       if (isPersonSearch && token) {
         // Person-režiimis: loo prosopograafia kirje Wikidata identifikaatoriga
-        try {
-          const record = await createPerson({ name: bestLabel, identifiers: [{ scheme: 'wikidata', id: normalizeExtId('wikidata', result.id) }] } as any, token);
-          entity = { id: record.id, label: record.name.label, source: 'local', entity_type: 'person', labels: multilingualLabels };
-        } catch {
-          entity = { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };
-        }
+        const r = await looVoiLeia(bestLabel, 'wikidata', normalizeExtId('wikidata', result.id));
+        entity = r
+          ? { id: r.id, label: r.label, source: 'local', entity_type: 'person', labels: multilingualLabels }
+          : { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };
       } else {
         entity = { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };
       }
