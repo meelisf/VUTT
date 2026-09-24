@@ -97,6 +97,9 @@ async def lifespan(app: FastAPI):
     from .auth import warn_if_no_superadmin
     warn_if_no_superadmin()
     threading.Thread(target=rebuild_indices, daemon=True).start()
+    # Isikukaartide automaatrikastus (ADR 0048): planeerija + pooleliolevate taaste.
+    from .prosopography import auto_enrich_runner
+    auto_enrich_runner.start()
     threading.Thread(target=metadata_watcher_loop, daemon=True).start()
     threading.Thread(target=_keepwarm_loop, daemon=True).start()
     threading.Thread(target=_ensure_filterable_attributes, daemon=True).start()
