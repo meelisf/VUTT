@@ -341,7 +341,9 @@
     "splitConflict": "The sources point to two different VUTT cards — tell an admin; the cards need to be merged.",
     "searching": "Searching…",
     "noResults": "Nothing found in authority files",
+    "candidatesFailed": "Loading candidate details failed. Try again or create the person without a source.",
     "openButton": "Add person…",
-    "manualForm": "Fill in the form manually"
+    "manualForm": "Fill in the form manually",
+    "createWithoutSource": "Create without a source…"
   }
 }

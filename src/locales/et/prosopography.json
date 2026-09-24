@@ -341,7 +341,9 @@
     "splitConflict": "Allikad viitavad kahele eri VUTT-i kaardile — teata adminile, kaardid tuleb liita.",
     "searching": "Otsin…",
     "noResults": "Allikatest ei leitud kedagi",
+    "candidatesFailed": "Kandidaatide andmete laadimine ebaõnnestus. Proovi uuesti või loo isik ilma allikata.",
     "openButton": "Lisa isik…",
-    "manualForm": "Täida vorm käsitsi"
+    "manualForm": "Täida vorm käsitsi",
+    "createWithoutSource": "Loo ilma allikata…"
   }
 }

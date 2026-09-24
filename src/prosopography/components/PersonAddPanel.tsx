@@ -12,7 +12,7 @@ import { groupCandidates } from '../panel/candidateGroups';
 import { chooseCardName } from '../panel/candidateNames';
 import type { CandidateGroup, CandidateResult, SourceScheme } from '../panel/types';
 import {
-  createPersonChecked, fetchCandidates, PersonConflictError,
+  createPersonChecked, fetchCandidates, getPerson, PersonConflictError,
   type CreatePersonBody, type SimilarPerson,
 } from '../services/prosopographyService';
 
@@ -107,11 +107,13 @@ const CandidateRow: React.FC<{
   query: string;
   state: { open: boolean; selectedName: string } | undefined;
   creating: boolean;
+  /** Tõene, kui MÕNI rida parasjagu loob (mitte tingimata see) — M4: kõik loomisnupud keelatakse korraga. */
+  createDisabled: boolean;
   onToggle: () => void;
   onSelectName: (name: string) => void;
   onCreate: () => void;
   onSelectExisting: () => void;
-}> = ({ group, query, state, creating, onToggle, onSelectName, onCreate, onSelectExisting }) => {
+}> = ({ group, query, state, creating, createDisabled, onToggle, onSelectName, onCreate, onSelectExisting }) => {
   const { t } = useTranslation(['prosopography']);
   const { chosen, matched, optionsOrdered, firstOk, fallback } = useMemo(
     () => computeGroupName(group, query), [group, query],
@@ -140,7 +142,13 @@ const CandidateRow: React.FC<{
 
   return (
     <div data-testid="candidate-row" role="button" tabIndex={0} onClick={onToggle}
-      onKeyDown={e => e.key === 'Enter' && onToggle()}
+      onKeyDown={e => {
+        // M2: klahv peab tulema realt endalt, mitte sisemiselt selectilt/nupult
+        // (need bubble'ivad muidu üles ja avaks/sulgeks rea tahtmatult).
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter') { onToggle(); }
+        else if (e.key === ' ') { e.preventDefault(); onToggle(); }
+      }}
       className="rounded border border-gray-200 cursor-pointer">
       <div className="w-full flex flex-col items-start gap-1 px-2.5 py-1.5 hover:bg-gray-50">
         <div className="w-full flex items-center gap-1.5">
@@ -191,7 +199,7 @@ const CandidateRow: React.FC<{
             </select>
           </div>
 
-          <button type="button" onClick={onCreate} disabled={creating}
+          <button type="button" onClick={onCreate} disabled={createDisabled}
             className="w-full rounded bg-primary-600 text-white text-sm font-medium py-1.5 hover:bg-primary-700 disabled:opacity-50">
             {creating ? <Loader2 className="inline w-3.5 h-3.5 animate-spin" /> : t('panel.createAndSelect')}
           </button>
@@ -203,8 +211,9 @@ const CandidateRow: React.FC<{
 
 const NoSourceBlock: React.FC<{
   name: string; note: string; context?: { work_id: string; role?: string }; creating: boolean;
+  createDisabled: boolean;
   onNameChange: (v: string) => void; onNoteChange: (v: string) => void; onCreate: () => void;
-}> = ({ name, note, context, creating, onNameChange, onNoteChange, onCreate }) => {
+}> = ({ name, note, context, creating, createDisabled, onNameChange, onNoteChange, onCreate }) => {
   const { t } = useTranslation(['prosopography']);
   // Vorm on vaikimisi kokku pandud — muidu oleks korraga kaks „Loo ja vali" nuppu
   // ekraanil (see + avatud kandidaadirida), mis segaks ka klaviatuuri/lugejaga navigeerimist.
@@ -215,7 +224,7 @@ const NoSourceBlock: React.FC<{
       <p className="text-xs text-gray-400 mb-2">{t('panel.noSourceHint')}</p>
       {!formOpen ? (
         <button type="button" onClick={() => setFormOpen(true)} className="text-xs font-medium text-primary-700 hover:text-primary-900 hover:underline">
-          {t('panel.manualForm')}
+          {t('panel.createWithoutSource')}
         </button>
       ) : (
         <>
@@ -225,7 +234,7 @@ const NoSourceBlock: React.FC<{
           <textarea value={note} onChange={e => onNoteChange(e.target.value)} rows={2}
             className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm mb-2" />
           {context && <p className="text-xs text-gray-400 mb-2">{t('panel.linkedToWork')}</p>}
-          <button type="button" onClick={onCreate} disabled={creating || !name.trim()}
+          <button type="button" onClick={onCreate} disabled={createDisabled || !name.trim()}
             className="w-full rounded bg-primary-600 text-white text-sm font-medium py-1.5 hover:bg-primary-700 disabled:opacity-50">
             {creating ? <Loader2 className="inline w-3.5 h-3.5 animate-spin" /> : t('panel.createAndSelect')}
           </button>
@@ -254,19 +263,28 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
   const [createError, setCreateError] = useState<string | null>(null);
   const [manualName, setManualName] = useState(initialQuery);
   const [manualNote, setManualNote] = useState('');
+  const [candidatesError, setCandidatesError] = useState(false);
 
-  const groups = useMemo(() => groupCandidates(results), [results]);
+  // I4: Wikidata täistekstiotsing toob ka mitte-isikuid (asutused, kohad jms).
+  // Grupp, mille ainus liige on selline mitte-inimene WD-kirje (ilma GND/VIAF
+  // vasteta, mis oleks selle üle kinnitanud), ei kuulu isikupaneeli.
+  const groups = useMemo(() => groupCandidates(results).filter(g => {
+    const wd = g.members.find(m => m.scheme === 'wikidata');
+    if (!wd?.ok || wd.summary?.is_human !== false) return true;
+    return g.members.some(m => m.scheme !== 'wikidata');
+  }), [results]);
 
   const runSearch = useCallback(async (q: string) => {
     const id = ++searchIdRef.current;
     if (!q.trim()) {
-      setResults([]); setSimilarPersons([]); setFailedSources([]);
+      setResults([]); setSimilarPersons([]); setFailedSources([]); setCandidatesError(false);
       return;
     }
     setLoading(true);
     setConflictIds(null);
+    setCandidatesError(false);
     try {
-      const { refs, failed } = await searchPersonSources(q, lang);
+      const { refs, failed } = await searchPersonSources(q, lang, focusRef);
       if (id !== searchIdRef.current) return;
       setFailedSources(failed);
       const { results: res, similar_persons } = await fetchCandidates(
@@ -276,11 +294,13 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
       setResults(res);
       setSimilarPersons(similar_persons);
     } catch {
-      if (id === searchIdRef.current) { setResults([]); setSimilarPersons([]); }
+      if (id === searchIdRef.current) {
+        setResults([]); setSimilarPersons([]); setCandidatesError(true);
+      }
     } finally {
       if (id === searchIdRef.current) setLoading(false);
     }
-  }, [lang, token]);
+  }, [lang, token, focusRef]);
 
   // Esmane otsing käivitub kohe (viide 0 ms), edasised otsinguvälja muudatused 400 ms debounce'iga.
   useEffect(() => {
@@ -296,10 +316,11 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
     // Tekstisisel paneelil (`/persons/new`) ei ole Esc-il sulgemist kuhugi tagasi
     // minna — `onClose` võib seal olla no-op, seega kuularit ei registreerita üldse.
     if (inline) return;
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // M4: loomine käib — Esc ei tohi paneeli kinni lüüa (päring on veel lennus).
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !creatingKey) onClose(); };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [inline, onClose]);
+  }, [inline, onClose, creatingKey]);
 
   // focusRef: väljastpoolt viidatud kandidaat avatakse kohe, aga ainult ÜKS kord —
   // muidu avab efekt grupi uuesti iga `groups`-muutuse peale ka siis, kui kasutaja
@@ -347,7 +368,17 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
     } catch (err) {
       if (err instanceof PersonConflictError) {
         if (err.conflict === 'exists') {
-          onDone({ id: err.existingPersonIds[0], label: fallbackLabel, created: false });
+          // I5: fallbackLabel on paneeli enda valik/otsingusõna, mitte tingimata
+          // olemasoleva kaardi kanooniline nimi — proovime seda enne onDone-i.
+          const existingId = err.existingPersonIds[0];
+          let label = fallbackLabel;
+          try {
+            const person = await getPerson(existingId);
+            label = person.name?.label ?? fallbackLabel;
+          } catch {
+            // Kanoonilise nime laadimine ebaõnnestus — jääme fallback-nimega, id ise on ikka õige.
+          }
+          onDone({ id: existingId, label, created: false });
         } else {
           setConflictIds(err.existingPersonIds);
         }
@@ -392,16 +423,19 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
     }, manualName);
   };
 
+  // M4: loomine on lennus — sulgemine (tausta klõps, X, Esc) ei tohi paneeli kaotada.
+  const handleClose = () => { if (!creatingKey) onClose(); };
+
   return (
     <>
-      {!inline && <div className="fixed inset-0 bg-black/30 z-[1300]" onClick={onClose} />}
+      {!inline && <div className="fixed inset-0 bg-black/30 z-[1300]" onClick={handleClose} />}
       <div className={inline
         ? 'bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col'
         : 'fixed inset-y-0 right-0 w-full sm:w-[28rem] z-[1300] bg-white shadow-2xl flex flex-col'}>
         <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3">
           <h2 className="text-base font-semibold text-gray-900">{t('panel.title')}</h2>
           {!inline && (
-            <button type="button" onClick={onClose} aria-label={t('common:buttons.close')} className="text-gray-400 hover:text-gray-600">
+            <button type="button" onClick={handleClose} aria-label={t('common:buttons.close')} className="text-gray-400 hover:text-gray-600">
               <X size={18} />
             </button>
           )}
@@ -422,8 +456,12 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
 
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">{t('panel.sourcesTitle')}</h3>
+            {/* I2: laadimistõrge ja "kedagi ei leitud" on kaks eri olekut — tõrke korral
+                EI näidata noResults-teadet, mis jätaks mulje, et otsing lihtsalt käis läbi. */}
             {!loading && groups.length === 0 && (
-              <p className="text-xs text-gray-400">{t('panel.noResults')}</p>
+              candidatesError
+                ? <p role="alert" className="text-xs text-red-600">{t('panel.candidatesFailed')}</p>
+                : <p className="text-xs text-gray-400">{t('panel.noResults')}</p>
             )}
             <ul className="space-y-1.5">
               {groups.map(g => (
@@ -433,6 +471,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
                     query={query}
                     state={openState[g.key]}
                     creating={creatingKey === g.key}
+                    createDisabled={creatingKey !== null}
                     onToggle={() => toggleGroup(g)}
                     onSelectName={name => setOpenState(prev => ({ ...prev, [g.key]: { open: true, selectedName: name } }))}
                     onCreate={() => handleCreateFromGroup(g)}
@@ -462,6 +501,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
             note={manualNote}
             context={context}
             creating={creatingKey === 'manual'}
+            createDisabled={creatingKey !== null}
             onNameChange={setManualName}
             onNoteChange={setManualNote}
             onCreate={handleCreateManual}
