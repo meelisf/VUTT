@@ -190,165 +190,163 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
 # WIKIDATA
 # =========================================================
 
-def _sparql_query(sparql: str) -> Optional[list]:
-    """Käivitab SPARQL päringu Wikidata vastu, tagastab bindings-lista või None vea korral."""
-    url = "https://query.wikidata.org/sparql?" + urllib.parse.urlencode({
-        "query": sparql,
-        "format": "json"
-    })
+_WD_API = "https://www.wikidata.org/w/api.php"
+_WD_ALIAS_LANGS = ("et", "en", "de", "la", "mul")
+# Sildi keelejärjestus. Vana SPARQL-tee: "et,en", muidu Q-kood — `mul` on
+# Wikidata mitmekeelne silt ja parem kui paljas kood.
+_WD_LABEL_LANGS = ("et", "en", "mul")
+
+
+def _wd_get_json(url: str) -> Optional[dict]:
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        return data.get("results", {}).get("bindings", [])
-    except Exception:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        logger.warning(f"Wikidata päring ebaõnnestus ({url[:120]}): {e}")
         return None
+
+
+def _wd_entity(qid: str) -> Optional[dict]:
+    """Üks entiteet `Special:EntityData` kaudu (CDN-vahemälus, ~1 s)."""
+    data = _wd_get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json")
+    if not data:
+        return None
+    entities = data.get("entities") or {}
+    # Ümbersuunatud (liidetud) Q-kood tuleb teise võtme all.
+    return entities.get(qid) or next(iter(entities.values()), None)
+
+
+def _wd_labels(ids) -> Optional[dict]:
+    """Sildid `{qid: {lang: tekst}}` ühe `wbgetentities` päringuga (≤ 50 id-d partii kohta).
+
+    Tõrge → None, MITTE osaline tulemus: sildita viide kirjutaks kaardile Q-koodi
+    kohanimeks.
+    """
+    ids = sorted(set(ids))
+    out = {}
+    for i in range(0, len(ids), 50):
+        params = urllib.parse.urlencode({
+            "action": "wbgetentities",
+            "ids": "|".join(ids[i:i + 50]),
+            "props": "labels",
+            "languages": "|".join(_WD_LABEL_LANGS),
+            "format": "json",
+        })
+        data = _wd_get_json(f"{_WD_API}?{params}")
+        if data is None or "entities" not in data:
+            return None
+        for qid, ent in data["entities"].items():
+            out[qid] = {lang: v["value"] for lang, v in (ent.get("labels") or {}).items()}
+    return out
+
+
+def _wd_best_values(entity: dict, prop: str) -> list:
+    """Väärtused nagu `wdt:` neid annab: parim auaste (preferred, muidu normal),
+    deprecated mitte kunagi. Järjekord nagu entiteedis."""
+    claims = [c for c in (entity.get("claims") or {}).get(prop, [])
+              if c.get("rank") != "deprecated"
+              and (c.get("mainsnak") or {}).get("snaktype") == "value"]
+    preferred = [c for c in claims if c.get("rank") == "preferred"]
+    return [c["mainsnak"]["datavalue"]["value"] for c in (preferred or claims)]
+
+
+def _wd_item_ids(entity: dict, prop: str) -> list:
+    return [v["id"] for v in _wd_best_values(entity, prop)
+            if isinstance(v, dict) and isinstance(v.get("id"), str)]
+
+
+def _wd_time(entity: dict, prop: str):
+    """(kuupäev, täpsus) esimesest parima auastmega väärtusest.
+
+    Entity API: `+1621-00-00T00:00:00Z` aasta täpsusel; SPARQL andis
+    `1621-01-01` — nullkuu/-päev asendatakse 01-ga, et väljund ei muutuks.
+    """
+    for v in _wd_best_values(entity, prop):
+        if not isinstance(v, dict) or not v.get("time"):
+            continue
+        aeg = v["time"].lstrip("+")
+        kuupaev = aeg.split("T")[0]
+        osad = kuupaev.rsplit("-", 2)
+        if len(osad) == 3:
+            aasta, kuu, paev = osad
+            kuupaev = f"{aasta}-{kuu if kuu != '00' else '01'}-{paev if paev != '00' else '01'}"
+        prec = int(v.get("precision", 11))
+        return kuupaev, ("year" if prec <= 9 else ("month" if prec == 10 else "day"))
+    return None, None
 
 
 def _fetch_wikidata(qid: str) -> Optional[dict]:
-    """Küsib Wikidata andmed kahes SPARQL päringus.
+    """Isiku andmed Wikidata entity API-st: üks entiteedipäring + üks sildipäring.
 
-    Päring 1: ühe väärtusega väljad (sugu, sünd/surm kuupäev+koht).
-    Päring 2: mitme väärtusega väljad (ametid, konfessioon, seisus) — LIMIT 1 puudub.
+    Varem kaks järjestikust SPARQL-päringut (WDQS): külmalt 10–15 s kumbki ja
+    klient loobus 15 s järel (nginx 499, 2026-09-24). Väljundi kuju on sama.
     """
-    # Range Q-ID kontroll: vältib SPARQL-injektsiooni — qid interpoleeritakse
-    # otse SPARQL-päringusse (wd:{qid} ...), seega lubame ainult "Q" + ASCII numbrid.
+    # Range Q-ID kontroll — id läheb URL-i.
     if not re.fullmatch(r"Q\d+", qid):
         return None
 
-    # ── Päring 1: ühe väärtusega omadused (sh kuupäeva täpsus) ───────────────
-    sparql1 = f"""
-SELECT ?gender ?birthDate ?birthPrec ?deathDate ?deathPrec
-       ?birthPlaceLabel ?birthPlaceQ ?deathPlaceLabel ?deathPlaceQ
-       (GROUP_CONCAT(DISTINCT ?altLabel; SEPARATOR="||") AS ?altLabels)
-WHERE {{
-  OPTIONAL {{ wd:{qid} wdt:P21 ?gender. }}
-  OPTIONAL {{ wd:{qid} p:P569/psv:P569 ?birthNode.
-              ?birthNode wikibase:timeValue ?birthDate.
-              ?birthNode wikibase:timePrecision ?birthPrec. }}
-  OPTIONAL {{ wd:{qid} p:P570/psv:P570 ?deathNode.
-              ?deathNode wikibase:timeValue ?deathDate.
-              ?deathNode wikibase:timePrecision ?deathPrec. }}
-  OPTIONAL {{ wd:{qid} wdt:P19 ?birthPlace. BIND(?birthPlace AS ?birthPlaceQ) }}
-  OPTIONAL {{ wd:{qid} wdt:P20 ?deathPlace. BIND(?deathPlace AS ?deathPlaceQ) }}
-  OPTIONAL {{ wd:{qid} skos:altLabel ?altLabel. FILTER(LANG(?altLabel) IN ("et","en","de","la","mul")) }}
-  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "et,en". }}
-}}
-GROUP BY ?gender ?birthDate ?birthPrec ?deathDate ?deathPrec
-         ?birthPlaceLabel ?birthPlaceQ ?deathPlaceLabel ?deathPlaceQ
-"""
-
-    # ── Päring 2: mitme väärtusega omadused ──────────────────────────────────
-    sparql2 = f"""
-SELECT ?occupationLabel ?occupationQ ?confessionLabel ?confessionQ ?statusLabel ?statusQ
-WHERE {{
-  OPTIONAL {{ wd:{qid} wdt:P106 ?occupation. BIND(?occupation AS ?occupationQ) }}
-  OPTIONAL {{ wd:{qid} wdt:P140 ?confession. BIND(?confession AS ?confessionQ) }}
-  OPTIONAL {{ wd:{qid} wdt:P3716 ?status. BIND(?status AS ?statusQ) }}
-  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "et,en". }}
-}}
-LIMIT 10
-"""
-
-    b1_list = _sparql_query(sparql1)
-    b2_list = _sparql_query(sparql2)
-
-    if b1_list is None and b2_list is None:
+    entity = _wd_entity(qid)
+    if entity is None:
         return None
-    if b1_list is not None and len(b1_list) == 0 and (b2_list is None or len(b2_list) == 0):
-        return {}
+
+    gender_ids = _wd_item_ids(entity, "P21")
+    birth_places = _wd_item_ids(entity, "P19")
+    death_places = _wd_item_ids(entity, "P20")
+    occupation_ids = list(dict.fromkeys(_wd_item_ids(entity, "P106")))
+    confession_ids = _wd_item_ids(entity, "P140")
+    status_ids = _wd_item_ids(entity, "P3716")
+
+    viited = set(birth_places[:1] + death_places[:1] + occupation_ids
+                 + confession_ids[:1] + status_ids[:1])
+    sildid = _wd_labels(viited) if viited else {}
+    if sildid is None:
+        return None
+
+    def silt(q: str) -> str:
+        labels = sildid.get(q) or {}
+        return next((labels[l] for l in _WD_LABEL_LANGS if labels.get(l)), q)
+
+    def viide(q: str) -> dict:
+        return {"id": q, "label": silt(q)}
 
     result = {}
-    b1 = b1_list[0] if b1_list else {}
+    if gender_ids:
+        result["gender"] = _WD_GENDER.get(gender_ids[0])
 
-    try:
-        gender_q = (b1.get("gender") or {}).get("value", "").split("/")[-1]
-        if gender_q:
-            result["gender"] = _WD_GENDER.get(gender_q)
-    except Exception:
-        pass
+    for väli, prop in (("birth", "P569"), ("death", "P570")):
+        kuupaev, tapsus = _wd_time(entity, prop)
+        if kuupaev:
+            result[f"{väli}.date"] = kuupaev
+            result[f"{väli}.precision"] = tapsus
 
-    try:
-        birth_date = (b1.get("birthDate") or {}).get("value")
-        if birth_date:
-            prec_num = int((b1.get("birthPrec") or {}).get("value", "11"))
-            result["birth.date"] = birth_date[:10]
-            result["birth.precision"] = "year" if prec_num <= 9 else ("month" if prec_num == 10 else "day")
-    except Exception:
-        pass
+    if birth_places:
+        result["birth.place"] = viide(birth_places[0])
+    if death_places:
+        result["death.place"] = viide(death_places[0])
 
-    try:
-        death_date = (b1.get("deathDate") or {}).get("value")
-        if death_date:
-            prec_num = int((b1.get("deathPrec") or {}).get("value", "11"))
-            result["death.date"] = death_date[:10]
-            result["death.precision"] = "year" if prec_num <= 9 else ("month" if prec_num == 10 else "day")
-    except Exception:
-        pass
+    aliases = list(dict.fromkeys(
+        a["value"].strip()
+        for lang in _WD_ALIAS_LANGS
+        for a in (entity.get("aliases") or {}).get(lang, [])
+        if a.get("value", "").strip()
+    ))
+    if aliases:
+        result["name.aliases"] = aliases
 
-    try:
-        bp_label = (b1.get("birthPlaceLabel") or {}).get("value")
-        bp_q = (b1.get("birthPlaceQ") or {}).get("value", "").split("/")[-1]
-        if bp_label:
-            result["birth.place"] = {"id": bp_q if bp_q.startswith("Q") else None, "label": bp_label}
-    except Exception:
-        pass
-
-    try:
-        dp_label = (b1.get("deathPlaceLabel") or {}).get("value")
-        dp_q = (b1.get("deathPlaceQ") or {}).get("value", "").split("/")[-1]
-        if dp_label:
-            result["death.place"] = {"id": dp_q if dp_q.startswith("Q") else None, "label": dp_label}
-    except Exception:
-        pass
-
-    try:
-        alt_raw = (b1.get("altLabels") or {}).get("value", "")
-        aliases = [a.strip() for a in alt_raw.split("||") if a.strip()]
-        if aliases:
-            result["name.aliases"] = aliases
-    except Exception:
-        pass
-
-    # ── Mitme väärtusega väljad ───────────────────────────────────────────────
-    if b2_list:
-        seen_occ = set()
-        occupations = []
-        confession = None
-        status = None
-
-        for b in b2_list:
-            try:
-                occ_label = (b.get("occupationLabel") or {}).get("value")
-                occ_q = (b.get("occupationQ") or {}).get("value", "").split("/")[-1]
-                if occ_label and occ_label not in seen_occ:
-                    seen_occ.add(occ_label)
-                    occupations.append({"id": occ_q if occ_q.startswith("Q") else None, "label": occ_label})
-            except Exception:
-                pass
-
-            try:
-                conf_label = (b.get("confessionLabel") or {}).get("value")
-                conf_q = (b.get("confessionQ") or {}).get("value", "").split("/")[-1]
-                if conf_label and confession is None:
-                    confession = {"id": conf_q if conf_q.startswith("Q") else None, "label": conf_label}
-            except Exception:
-                pass
-
-            try:
-                st_label = (b.get("statusLabel") or {}).get("value")
-                st_q = (b.get("statusQ") or {}).get("value", "").split("/")[-1]
-                if st_label and status is None:
-                    status = {"id": st_q if st_q.startswith("Q") else None, "label": st_label}
-            except Exception:
-                pass
-
-        if occupations:
-            result["_occupations"] = occupations
-        if confession:
-            result["confession"] = confession
-        if status:
-            result["status"] = status
+    # Ametite silt on dedup-võti nagu vanas teel (sama sildiga eri Q-koodid üheks).
+    occupations, nähtud = [], set()
+    for q in occupation_ids:
+        label = silt(q)
+        if label not in nähtud:
+            nähtud.add(label)
+            occupations.append({"id": q, "label": label})
+    if occupations:
+        result["_occupations"] = occupations
+    if confession_ids:
+        result["confession"] = viide(confession_ids[0])
+    if status_ids:
+        result["status"] = viide(status_ids[0])
 
     return result
 
