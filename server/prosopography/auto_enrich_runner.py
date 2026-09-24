@@ -82,6 +82,21 @@ def run_auto_enrichment(person_id: str) -> Optional[dict]:
         else:
             answered.append({"scheme": scheme, "id": ext_id, "remote": remote})
 
+    # 1b. Seotud ID-d (nt GND `sameAs` → Wikidata), mida kaardil veel pole:
+    # küsime ka nende andmed kohe, samuti lukust väljas. Kas ID kaardile
+    # tohib minna, otsustatakse alles luku all (ID võib olla teisel kaardil).
+    have_schemes = {s for s, _ in targets}
+    linked_results: dict = {}
+    for scheme, ext_id in aggregate(answered)["linked"].items():
+        key = (scheme, normalize_ext_id(scheme, ext_id))
+        if scheme in have_schemes or scheme not in ENRICH_SCHEMES or key in linked_results:
+            continue
+        try:
+            linked_results[key] = fetch_remote(*key)
+        except Exception:
+            logger.warning("Automaatrikastus: %s seotud %s:%s ebaõnnestus", person_id, *key, exc_info=True)
+            linked_results[key] = None
+
     # 2–3. Lukkude all: värske kaart, kehtivus, rakendamine, üks salvestus.
     with ext_id_claim_lock, person_lock(person_id):
         card = crud.get_person(person_id)
@@ -92,21 +107,36 @@ def run_auto_enrichment(person_id: str) -> Optional[dict]:
         failed = [f for f in failed if f in alles]
         ids_left = any(p in alles for p in targets)
 
-        agg = aggregate(answered)
-        applied = apply_to_card(card, agg)
+        # Seotud ID lisatakse ainult siis, kui ta ei ole teisel kaardil; ja AINULT
+        # lisatud ID allika andmed lähevad koondamisse — teise isiku kaardile
+        # kuuluva ID andmed ei tohi sellele kaardile jõuda.
         dup = False
+        added_ids = False
+        linked_sources = []
         have = {s for s, _ in alles}
-        for scheme, ext_id in agg["linked"].items():
+        for scheme, ext_id in aggregate(answered)["linked"].items():
             if scheme in have:
                 continue
-            found = crud._find_by_external_id(scheme, ext_id)
+            key = (scheme, normalize_ext_id(scheme, ext_id))
+            found = crud._find_by_external_id(*key)
             owner = crud._resolve_owner(found["id"]) if found else None
             if owner and owner != person_id:
                 dup = True
                 continue
-            card.setdefault("identifiers", []).append({"scheme": scheme, "id": normalize_ext_id(scheme, ext_id), "checked_at": None})
-            if "identifiers" not in applied:
-                applied.append("identifiers")
+            card.setdefault("identifiers", []).append(
+                {"scheme": key[0], "id": key[1], "checked_at": None})
+            added_ids = True
+            remote = linked_results.get(key)
+            if remote is not None:
+                linked_sources.append({"scheme": key[0], "id": key[1], "remote": remote})
+            elif scheme in ENRICH_SCHEMES:
+                failed.append(key)
+
+        answered = answered + linked_sources
+        agg = aggregate(answered)
+        applied = apply_to_card(card, agg)
+        if added_ids:
+            applied.append("identifiers")
 
         review = card.get("review") or {}
         card["review"] = finish_review(

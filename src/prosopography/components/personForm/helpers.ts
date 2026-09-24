@@ -134,6 +134,11 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
     }
   }
 
+  // Seotud välised ID-d (VIAF-kirjest või GND `sameAs`-ist) — ainult tühjadesse väljadesse.
+  if (autoFilled['_linked_wikidata'] && !draft.wikidata_id) patch.wikidata_id = autoFilled['_linked_wikidata'];
+  if (autoFilled['_linked_gnd'] && !draft.gnd_id) patch.gnd_id = autoFilled['_linked_gnd'];
+  if (autoFilled['_linked_viaf'] && !draft.viaf_id) patch.viaf_id = autoFilled['_linked_viaf'];
+
   return { ...draft, ...patch };
 }
 

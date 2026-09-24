@@ -52,6 +52,7 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
     if (af['name.aliases']?.length) fields.push(t('enrich.fieldsBrief.nameAliases'));
     if (af['_linked_wikidata']) fields.push('Wikidata link');
     if (af['_linked_gnd']) fields.push('GND link');
+    if (af['_linked_viaf']) fields.push('VIAF link');
     if (af['_aa_education']?.length) fields.push(t('enrich.fieldsBrief.education'));
     if (af['_aa_origin']) fields.push(t('enrich.fieldsBrief.origin'));
     return fields;
@@ -107,14 +108,8 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
       // Täienda identifikaatorid
       if (result.scheme === 'wikidata') newDraft.wikidata_id = result.id;
       if (result.scheme === 'gnd') newDraft.gnd_id = result.id;
-      if (result.scheme === 'viaf') {
-        newDraft.viaf_id = result.id;
-        // VIAF võib pakkuda seotud WD/GND ID-d
-        if (preview.auto_filled['_linked_wikidata'] && !newDraft.wikidata_id)
-          newDraft.wikidata_id = preview.auto_filled['_linked_wikidata'];
-        if (preview.auto_filled['_linked_gnd'] && !newDraft.gnd_id)
-          newDraft.gnd_id = preview.auto_filled['_linked_gnd'];
-      }
+      // Seotud WD/GND/VIAF ID-d täidab applyEnrichmentToDraft ise.
+      if (result.scheme === 'viaf') newDraft.viaf_id = result.id;
       const fields = describeAutoFilled(preview.auto_filled);
       onEnrich(newDraft, { scheme: result.scheme, id: result.id, label: result.label, fields });
     } catch {

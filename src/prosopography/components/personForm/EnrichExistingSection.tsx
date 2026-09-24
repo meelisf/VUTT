@@ -33,6 +33,7 @@ const FIELD_I18N: Record<string, string> = {
   aa_raw: 'biography',
   _linked_wikidata: 'linkedWikidata',
   _linked_gnd: 'linkedGnd',
+  _linked_viaf: 'linkedViaf',
   _aa_education: 'education',
   _aa_origin: 'origin',
 };
@@ -105,14 +106,8 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
 
   const handleApply = () => {
     if (!diff) return;
+    // Seotud ID-d (VIAF, GND `sameAs`) täidab applyEnrichmentToDraft ise.
     const newDraft = applyEnrichmentToDraft(diff.auto_filled, draft);
-    // VIAF seotud ID-d
-    if (activeScheme === 'viaf') {
-      if (diff.auto_filled['_linked_wikidata'] && !newDraft.wikidata_id)
-        newDraft.wikidata_id = diff.auto_filled['_linked_wikidata'];
-      if (diff.auto_filled['_linked_gnd'] && !newDraft.gnd_id)
-        newDraft.gnd_id = diff.auto_filled['_linked_gnd'];
-    }
     onChange(newDraft);
     const fields = autoKeys.map(fieldLabel);
     setAppliedFields(fields);
