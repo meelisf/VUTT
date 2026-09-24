@@ -17,9 +17,17 @@ const WIKIDATA_API_URL = 'https://www.wikidata.org/w/api.php';
  * Searches Wikidata for entities matching the query.
  * @param query The search string
  * @param lang Preferred language (e.g., 'et', 'en')
+ * @param opts `throwOnError: true` korral viskab võrgu-/parsimistõrke edasi
+ *   selle asemel, et vaikimisi tühja loendiga vastata — vaikimisi (opts
+ *   puudub) käitub TÄPSELT nagu enne, sest kutsujaid (nt `EntityPicker`) ei
+ *   tohi mõjutada.
  * @returns Array of search results
  */
-export async function searchWikidata(query: string, lang: string = 'et'): Promise<WikidataSearchResult[]> {
+export async function searchWikidata(
+  query: string,
+  lang: string = 'et',
+  opts?: { throwOnError?: boolean },
+): Promise<WikidataSearchResult[]> {
   if (!query || query.length < 2) return [];
 
   const params = new URLSearchParams({
@@ -34,7 +42,7 @@ export async function searchWikidata(query: string, lang: string = 'et'): Promis
   try {
     const response = await fetchWithTimeout(`${WIKIDATA_API_URL}?${params.toString()}`, { timeout: 15000 });
     if (!response.ok) throw new Error('Wikidata search failed');
-    
+
     const data = await response.json();
     if (!data.search) return [];
 
@@ -46,6 +54,7 @@ export async function searchWikidata(query: string, lang: string = 'et'): Promis
     }));
   } catch (error) {
     console.error('Wikidata search error:', error);
+    if (opts?.throwOnError) throw error;
     return [];
   }
 }

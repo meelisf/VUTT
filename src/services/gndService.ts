@@ -37,16 +37,34 @@ function normalizeName(preferredName: string): string {
 /**
  * Searches GND for persons matching the query.
  * Esmalt lobid.org, tõrke või tühja tulemuse korral DNB enda SRU-liides.
+ *
+ * `opts.throwOnError`: viskab tõrke edasi ainult siis, kui MÕLEMAD backendid
+ * nurjusid — ühe backendi ÕNNESTUNUD tühi vastus on ehtne tühi tulemus, mitte
+ * tõrge. Vaikimisi (opts puudub) käitub TÄPSELT nagu enne.
  */
-export async function searchGnd(query: string): Promise<GndSearchResult[]> {
+export async function searchGnd(query: string, opts?: { throwOnError?: boolean }): Promise<GndSearchResult[]> {
   if (!query || query.length < 2) return [];
 
-  const viaLobid = await searchGndLobid(query);
+  let lobidOk = true;
+  let viaLobid: GndSearchResult[] = [];
+  try {
+    viaLobid = await searchGndLobid(query, opts);
+  } catch (error) {
+    if (!opts?.throwOnError) throw error; // sisemine funktsioon ei tohiks siia jõuda ilma throwOnError'ita
+    lobidOk = false;
+  }
   if (viaLobid.length > 0) return viaLobid;
-  return searchGndSru(query);
+
+  try {
+    return await searchGndSru(query, opts);
+  } catch (error) {
+    if (!opts?.throwOnError) throw error;
+    if (lobidOk) return []; // lobid vastas (tühjalt) — ehtne tühi tulemus, SRU tõrge ei loe
+    throw error; // mõlemad backendid nurjusid
+  }
 }
 
-async function searchGndLobid(query: string): Promise<GndSearchResult[]> {
+async function searchGndLobid(query: string, opts?: { throwOnError?: boolean }): Promise<GndSearchResult[]> {
   try {
     // Filtreeri ainult isikud (Person)
     const params = new URLSearchParams({
@@ -107,6 +125,7 @@ async function searchGndLobid(query: string): Promise<GndSearchResult[]> {
     return results;
   } catch (error) {
     console.error('GND search error (lobid):', error);
+    if (opts?.throwOnError) throw error;
     return [];
   }
 }
@@ -119,7 +138,7 @@ const GNDO_NS = 'https://d-nb.info/standards/elementset/gnd#';
  * CORS on lubatud (`access-control-allow-origin: *`), seega käib otse brauserist.
  * NB: CSP `connect-src` peab lubama services.dnb.de (nginx.host.conf, KAKS rida).
  */
-async function searchGndSru(query: string): Promise<GndSearchResult[]> {
+async function searchGndSru(query: string, opts?: { throwOnError?: boolean }): Promise<GndSearchResult[]> {
   try {
     // SRU ei otsi mitmesõnalist fraasi — iga sõna eraldi tingimusena.
     // BBG=Tp* piirab isikukirjetega (Tp = Person).
@@ -180,6 +199,7 @@ async function searchGndSru(query: string): Promise<GndSearchResult[]> {
     return results;
   } catch (error) {
     console.error('GND search error (DNB SRU):', error);
+    if (opts?.throwOnError) throw error;
     return [];
   }
 }
