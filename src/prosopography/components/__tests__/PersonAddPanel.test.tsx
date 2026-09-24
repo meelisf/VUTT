@@ -85,6 +85,15 @@ describe('PersonAddPanel', () => {
     expect(await screen.findByText(/panel.sourceSearchFailed/)).toBeTruthy();
   });
 
+  it('inline korral taustakatet ei renderdata', async () => {
+    const { container } = render(
+      <PersonAddPanel initialQuery="Ludenius" token="t" lang="et" onDone={vi.fn()} onClose={vi.fn()} inline />,
+    );
+    await screen.findAllByText('panel.selectExisting');
+    expect(container.querySelector('.bg-black\\/30')).toBeNull();
+    expect(container.querySelector('.fixed')).toBeNull();
+  });
+
   it('loomise tõrge (mitte-konflikt) on nähtav ja onDone ei käivitu', async () => {
     // Vt kommentaari mock-mooduli juures: vi.fn-i tagasilükatud promise loetakse
     // vitest 4.1-s testi veaks ka siis, kui komponent selle kinni püüab — seega

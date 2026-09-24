@@ -26,6 +26,8 @@ export interface PersonAddPanelProps {
   onClose: () => void;
   /** Kui antud, avatakse selle viitega kandidaat kohe lahti (valija välise tulemuse klikk). */
   focusRef?: { scheme: 'wikidata' | 'gnd' | 'viaf'; id: string };
+  /** Renderda tavalise lehe-plokina (nt `/persons/new`), mitte külgpaneelina — ilma taustakatte ja `fixed`-klassideta. */
+  inline?: boolean;
 }
 
 const SOURCE_LABEL: Record<SourceScheme, string> = { wikidata: 'WD', gnd: 'GND', viaf: 'VIAF' };
@@ -233,7 +235,7 @@ const NoSourceBlock: React.FC<{
   );
 };
 
-const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, lang, context, onDone, onClose, focusRef }) => {
+const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, lang, context, onDone, onClose, focusRef, inline }) => {
   const { t } = useTranslation(['prosopography', 'common']);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchIdRef = useRef(0);
@@ -389,8 +391,10 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-[1300]" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[28rem] z-[1300] bg-white shadow-2xl flex flex-col">
+      {!inline && <div className="fixed inset-0 bg-black/30 z-[1300]" onClick={onClose} />}
+      <div className={inline
+        ? 'bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col'
+        : 'fixed inset-y-0 right-0 w-full sm:w-[28rem] z-[1300] bg-white shadow-2xl flex flex-col'}>
         <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3">
           <h2 className="text-base font-semibold text-gray-900">{t('panel.title')}</h2>
           <button type="button" onClick={onClose} aria-label={t('common:buttons.close')} className="text-gray-400 hover:text-gray-600">

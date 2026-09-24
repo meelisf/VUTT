@@ -21,7 +21,7 @@ import ProsopoPersonPicker from '../components/personForm/ProsopoPersonPicker';
 import TagsList from '../components/personForm/TagsList';
 import { usePersonTagSuggestions } from '../hooks/usePersonTagSuggestions';
 import { CollapsibleSection, DynamicList } from '../components/personForm/CollapsibleSection';
-import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
+import NewPersonStart from './NewPersonStart';
 import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
 import SimilarPersonsWarning from '../components/personForm/SimilarPersonsWarning';
 import PlacePicker from '../components/personForm/PlacePicker';
@@ -54,7 +54,8 @@ const PersonEditPage: React.FC = () => {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [enrichedWith, setEnrichedWith] = useState<{ scheme: string; id: string; label: string; fields: string[] } | null>(null);
+  // Uue isiku voog algab isikupaneeliga (NewPersonStart); see lipp avab käsitsi tühja vormi.
+  const [manualMode, setManualMode] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
   const [occupOpen, setOccupOpen] = useState(false);
   const [relOpen, setRelOpen] = useState(false);
@@ -296,6 +297,35 @@ const PersonEditPage: React.FC = () => {
 
   const inputCls = "px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none";
 
+  // Uue isiku voog algab isikupaneeliga (spekk §5-§6): otsing/valik/loomine käib
+  // paneeli enda kaudu, tühi vorm tuleb nähtavale alles „Täida vorm käsitsi" peale.
+  // Sisselogimata (token puudub) ei ole see mõistlik — jääb kohe tühja vormi juurde.
+  const showStart = isNew && !!token && !manualMode;
+
+  if (showStart) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+          <button
+            onClick={() => navigate('/persons')}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors mb-4"
+          >
+            <ArrowLeft size={15} />
+            {t('backToList')}
+          </button>
+          <h1 className="text-lg font-bold text-gray-900 mb-6">{pageTitle}</h1>
+          <NewPersonStart
+            initialQuery={prefillName}
+            token={token}
+            lang={lang === 'en' ? 'en' : 'et'}
+            onManual={() => setManualMode(true)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
     <div className="min-h-screen bg-gray-50">
@@ -360,44 +390,6 @@ const PersonEditPage: React.FC = () => {
               onDismiss={() => setSimilarDismissed(true)}
               onMatchesChange={setSimilarCount}
             />
-          </div>
-        )}
-
-        {/* ── Rikastamine välisallikatest (ainult uus isik) ── */}
-        {isNew && !enrichedWith && (
-          <EnrichmentSearch
-            draft={draft}
-            token={token}
-            onEnrich={(newDraft, info) => {
-              setDraft(newDraft);
-              setEnrichedWith(info);
-              setNamesOpen(true); // ava identifikaatorid
-            }}
-          />
-        )}
-
-        {enrichedWith && (
-          <div className="mb-5 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800 flex items-start gap-2">
-            <span className="shrink-0 mt-0.5">✓</span>
-            <span className="flex-1">
-              <strong>{t('enrich.enrichedWith', { source:
-                enrichedWith.scheme === 'wikidata' ? t('enrich.sourceWikidata') :
-                enrichedWith.scheme === 'gnd' ? t('enrich.sourceGnd') :
-                enrichedWith.scheme === 'album_academicum' ? t('enrich.sourceAa') :
-                t('enrich.sourceViaf')
-              })}</strong>
-              {' '}({enrichedWith.id})
-              {enrichedWith.fields.length > 0 && (
-                <span className="text-green-700"> — {t('enrich.enrichedFields')} {enrichedWith.fields.join(', ')}</span>
-              )}
-            </span>
-            <button
-              type="button"
-              onClick={() => setEnrichedWith(null)}
-              className="text-green-400 hover:text-green-700 shrink-0"
-            >
-              <X size={14} />
-            </button>
           </div>
         )}
 
