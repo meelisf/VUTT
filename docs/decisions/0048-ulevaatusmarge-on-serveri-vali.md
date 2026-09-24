@@ -12,7 +12,7 @@ serveri stubi tee (`ensure_prosopo_for_entity`, kui teosele lingitakse Wikidata/
 isik, kellel veel kaarti ei ole) —, aga ükski neist ei rikastanud kaarti loomisel.
 2026. aasta juunist loodud 155 kaardist 19 olid täiesti tühjad (ainult nimi), 15-l
 neist oli olemas väline ID, mille pealt oleks saanud eluaastad ja ameti
-automaatselt tõmmata. Olemasolev `verification_level` oli kõigil ~2200 kaardil
+automaatselt tõmmata. Olemasolev `verification_level` oli kõigil ~2100 aktiivsel kaardil
 väärtuses `draft` — see ei eristanud „äsja loodud tühi kaart" ja „toimetaja poolt
 läbi vaadatud kaart".
 
@@ -26,8 +26,8 @@ Samast tööst tuli välja teine probleem: `ext_id_index` (väline ID → `vutt:
 pöördindeks, kasutab `_find_by_external_id`) uuendati salvestusest eraldi
 sammuna, luku vabastamise järel aegunud koopiast. Kaks samal ajal käivat
 ID-lisamist (nt admin lisab GND-ID käsitsi, samal ajal loob upload'i taustatöö
-stubi samale isikule) said seega lukustada kaks eri kaarti sama välise ID
-peale, ja indeksi hilisem uuendus võis kustutada teise tee vahepeal lisatud ID.
+stubi samale isikule) võisid seega panna sama välise ID kahele eri kaardile,
+ja indeksi hilisem uuendus võis kustutada teise tee vahepeal lisatud ID.
 
 ## Otsus
 
@@ -40,13 +40,15 @@ peale, ja indeksi hilisem uuendus võis kustutada teise tee vahepeal lisatud ID.
   reegel, et ta ei tohi kinnitatud olekut uuesti avada.
 - **Automaatrikastus täidab ainult tühja välja.** Erandid lisamise suunas:
   `name.aliases` ühendatakse olemasolevaga, seotud välised ID-d
-  (Wikidata/GND-lingid AA-kirjest) lisatakse identifikaatorite loendisse, kui ID
-  ei ole juba mõnel teisel kaardil. Kaardiga vastuolus olevat väärtust ega
-  allikate omavahel vastuolus olevat väärtust ei rakendata — mõlemad lähevad
-  `review.source_conflicts`-i, kaart jääb muutmata. Kuupäevad normaliseeritakse
-  enne võrdlust `YYYY-MM-DD`-vormingusse (puuduv kuu/päev täidetakse „01"-ga),
-  et sama teadmise kaks kirjakuju (`"1592"` vs `"1592-01-01"`) ei loeks
-  vastuoluks.
+  (VIAF-kirjes viidatud Wikidata/GND-ID-d) lisatakse identifikaatorite
+  loendisse, kui ID ei ole juba mõnel teisel kaardil. Väärtust, mis läheb
+  vastuollu juba kaardil oleva täidetud väljaga, ei rakendata — see väli
+  jääb täitmata ja jääb muutmisvaates nähtavaks, ilma et see kuhugi eraldi
+  kirja läheks. Kahe allika OMAVAHEL vastuolus olevad väärtused (ja
+  kokkusobivad, aga erineva täpsusega kuupäevad, `compatible: true`) lähevad
+  `review.source_conflicts`-i. Kuupäevad normaliseeritakse enne võrdlust
+  `YYYY-MM-DD`-vormingusse (puuduv kuu/päev täidetakse „01"-ga), et sama
+  teadmise kaks kirjakuju (`"1592"` vs `"1592-01-01"`) ei loeks vastuoluks.
 - **Välisallika päringut ei tehta ühegi luku all.** `run_auto_enrichment` teeb
   võrgukõned enne lukkude võtmist, loeb kaardi lukkude all UUESTI ja rakendab
   ettepanekud alles siis. `enrich_pending` on töö püsiv jälg `review.reasons`-is:
@@ -84,12 +86,15 @@ peale, ja indeksi hilisem uuendus võis kustutada teise tee vahepeal lisatud ID.
   See on ainus koht, kus kuju kontrollitakse (kehatüüp, `name` kuju,
   `identifiers`/`aliases` kuju → 400 enne ühtegi kirjutust), ID-lukk
   võetakse üle kontrolli JA salvestuse, ning `review` luuakse
-  (`new_review`) enne esimest kirjutust. Server seab `created_at`/`updated_at`/
-  `updated_by` ise — kliendi saadetud väärtused nende väljade jaoks ei jõua
-  kaardile (vt `_apply_card_update`, mis viskab need koos `id`-ga ära).
+  (`new_review`) enne esimest kirjutust. `_apply_card_update` viskab kliendi
+  saadetud `id`/`created_at`/`created_by`/`schema_version`/`import_batch_ids`/
+  `merged_into` alati ära; `updated_at`/`updated_by` seab
+  `create_person_checked` ise ÜLE, alles pärast `_apply_card_update`-i
+  kutset — kliendi saadetud väärtus neis väljades ei jõua seega kaardile
+  kummalgi teel.
 
-Tuletatud floruit (isiku tegevusperioodi arvutus eluaastatest/ametitest/
-teostest) ei ole selles PR-is implementeeritud — see on PR 2 teema ja jääb
+Tuletatud floruit (seotud teoste aastatest, ainult tegevusrollid; käsitsi
+sisestatu võidab) ei ole selles PR-is teostatud — see on PR 2 teema ja jääb
 kokkulepitud reegliks, mitte olemasolevaks koodiks.
 
 ## Tagajärjed
