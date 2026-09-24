@@ -295,6 +295,11 @@ def _fetch_wikidata(qid: str) -> Optional[dict]:
     if entity is None:
         return None
 
+    return _wikidata_result(entity)
+
+
+def _wikidata_result(entity: dict) -> Optional[dict]:
+    """Isikuentiteedist rikastuse väljad (sildipäring sees). None = siltide tõrge."""
     gender_ids = _wd_item_ids(entity, "P21")
     birth_places = _wd_item_ids(entity, "P19")
     death_places = _wd_item_ids(entity, "P20")
@@ -547,22 +552,28 @@ def _parse_lobid(data: dict) -> dict:
     return result
 
 
+def _fetch_lobid_raw(gnd_id: str) -> Optional[dict]:
+    """lobid.org toorvastus või None (tõrge/aegumine)."""
+    url = f"https://lobid.org/gnd/{gnd_id}.json"
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=_LOBID_TIMEOUT) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        logger.warning("GND lobid.org päring ebaõnnestus (%s): %s", url, e)
+        return None
+
+
 def _fetch_gnd(gnd_id: str) -> Optional[dict]:
     """Küsib GND andmed lobid.org REST API kaudu, tõrke korral d-nb.info-st.
 
     lobid annab rohkem (kohad ja ametid siltidega), aga on üksik veapunkt —
     2026-08-07 oli päev otsa täiesti kättesaamatu.
     """
-    url = f"https://lobid.org/gnd/{gnd_id}.json"
-    try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=_LOBID_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
-        logger.warning("GND rikastus lobid.org kaudu ebaõnnestus (%s): %s — proovin d-nb.info", url, e)
+    raw = _fetch_lobid_raw(gnd_id)
+    if raw is None:
         return _fetch_gnd_dnb(gnd_id)
-
-    return _parse_lobid(data)
+    return _parse_lobid(raw)
 
 
 # =========================================================
