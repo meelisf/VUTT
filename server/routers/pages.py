@@ -16,7 +16,7 @@ from ..admin_page_ops import (
     reorder_pages,
     restore_original_page_image,
     split_page,
-    apply_page_ops,
+    precheck_page_ops,
     transform_page_image,
     work_lock,
     write_new_page,
@@ -26,6 +26,7 @@ from ..admin_page_ops import (
 from ..config import BASE_DIR, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import delete_page_from_git, save_with_git
+from .. import page_ops_jobs
 from ..image_server import generate_thumbnail, invalidate_cover
 from ..meilisearch_ops import sync_work_to_meilisearch
 from ..trash_reason import DELETE_COMMIT_PREFIX
@@ -341,24 +342,29 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
 
 @router.post("/admin/work/{work_id}/page-ops")
 async def admin_apply_page_ops(work_id: str, request: Request, user=Depends(require_role("admin"))):
-    """Rakendab ootel pöörded ja poolitused korraga (#431, ADR 0050).
+    """Käivitab ootel pöörded ja poolitused TAUSTATÖÖNA (#431, ADR 0050).
 
     Body: {"ops": [{"filename", "rotate": 0|90|180|270, "split_x": float|null}]}.
-    Vigane sisend või vahepeal muutunud leht → 400 enne ühegi faili puudutamist;
-    viga keset pakki → 500, sõnum ütleb, mitu lehte jõuti teha.
+    Vigane sisend või puuduv leht → 400 kohe; sama teose töö juba käib → 409.
+    Edenemine: GET …/page-ops/status.
     """
     data = await get_json_data(request)
+    ops = data.get("ops")
     try:
-        result = await run_in_threadpool(
-            apply_page_ops, work_id, data.get("ops"), user["username"]
-        )
+        pre = await run_in_threadpool(precheck_page_ops, work_id, ops)
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    if not result.get("found", True):
+    if not pre.get("found", True):
         raise HTTPException(status_code=404, detail="Teost ei leitud")
-    return {"status": "success", **result}
+    if not page_ops_jobs.start(work_id, ops, user["username"], pre["total"]):
+        raise HTTPException(status_code=409, detail="Selle teose lehetoimingud juba käivad")
+    return {"status": "started", "total": pre["total"]}
+
+
+@router.get("/admin/work/{work_id}/page-ops/status")
+def admin_page_ops_status(work_id: str, user=Depends(require_role("admin"))):
+    """Taustatöö olek: {state: idle|running|done|error, done, total, result?, error?}."""
+    return page_ops_jobs.get_status(work_id)
 
 
 @router.post("/admin/work/{work_id}/page-image/{filename}/transform")

@@ -780,6 +780,68 @@ def delete_work_from_git(folder_name, work_title, work_id, username="VUTT Server
         return False
 
 
+def commit_add_and_remove(add_files, remove_paths, message, username="VUTT Server"):
+    """Kirjutab + lisab failid JA eemaldab teised ÜHE native git-commitiga (#431).
+
+    Lehe poolitus tegi varem kaks commitit, millest teine käis GitPythoni
+    ``repo.index.remove`` + ``repo.index.commit`` kaudu (~2 s /data repos, sama
+    põhjus nagu ``save_with_git``-i docstringis) ja ILMA ``_git_write_lock``-ita.
+    65-leheline pakk võttis nii ~5 min. Siin on kogu tsükkel üks path-skoobitud
+    ``git commit --only`` luku all.
+
+    Args:
+        add_files: [(absoluutne_tee, sisu), ...] — kirjutatakse atomaarselt.
+        remove_paths: [absoluutne_tee, ...] — jälgitud failid; kustutatakse
+            tööpuust ja commit salvestab kustutuse.
+        message: commiti sõnum (prügikasti liigitus loeb selle ALGUST,
+            vt ``trash_reason``).
+
+    Viga: skoobitud rollback (ainult need teed) ja erind edasi.
+    """
+    get_or_init_repo()
+    adds = [os.path.relpath(p, BASE_DIR) for p, _ in add_files]
+    removes = [os.path.relpath(p, BASE_DIR) for p in remove_paths if os.path.exists(p)]
+    paths = adds + removes
+    if not paths:
+        return {"success": True, "is_noop": True}
+    _invalidate_work_info(paths)
+    git_env = os.environ.copy()
+    git_env.update({
+        "GIT_AUTHOR_NAME": username,
+        "GIT_AUTHOR_EMAIL": f"{username}@vutt.local",
+        "GIT_COMMITTER_NAME": username,
+        "GIT_COMMITTER_EMAIL": f"{username}@vutt.local",
+    })
+
+    def _git(*args, check=True):
+        return subprocess.run(["git", *args], cwd=BASE_DIR, env=git_env,
+                              check=check, capture_output=True, text=True)
+
+    with _git_write_lock:
+        for path, content in add_files:
+            atomic_write_text(path, content)
+        try:
+            if adds:
+                _git("add", "--", *adds)
+            if removes:
+                # --cached: fail kaob indeksist; tööpuust eemaldame ise, et
+                # rollback saaks ta HEAD-ist tagasi tuua.
+                _git("rm", "--cached", "--quiet", "--", *removes)
+                for rel in removes:
+                    os.remove(os.path.join(BASE_DIR, rel))
+            _git("commit", "--only", "--no-verify", "--no-gpg-sign", "-m", message, "--", *paths)
+            commit_hash = _git("rev-parse", "HEAD").stdout.strip()
+        except (subprocess.CalledProcessError, OSError) as e:
+            stderr = getattr(e, "stderr", "") or ""
+            logger.error(f"GIT: commit_add_and_remove ebaõnnestus: {e} {stderr.strip()}")
+            _git("reset", "-q", "--", *paths, check=False)
+            if removes:
+                _git("checkout", "HEAD", "--", *removes, check=False)
+            raise
+    logger.info(f"Git commit: {commit_hash[:8]} - {message} (autor: {username})")
+    return {"success": True, "commit_hash": commit_hash}
+
+
 def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str, username: str = "VUTT Server") -> bool:
     """
     Stage'ib lehe .txt ja .json kustutamise gitist ja teeb commit.

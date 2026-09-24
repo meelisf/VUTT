@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, FileUp, Info, Loader2, RotateCcw } from 'lucide-react';
+import ProgressBar from '../../../components/ProgressBar';
 import type { PartialUpload } from '../types';
 
 interface UploadProgress {
@@ -97,25 +98,16 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
               <p className="text-sm font-medium text-gray-800">{t('ada.downloading')}</p>
             </div>
             {progress && progress.bytes_total > 0 && (
-              <div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                  <span>{t('step2.progressLabel').replace('{{pct}}', String(progressPct))}</span>
-                  <span>
-                    {t('ada.downloadProgress', {
-                      done: progress.files_done ?? 0,
-                      total: progress.files_total ?? 0,
-                      mbDone: Math.round(progress.bytes_sent / 1024 / 1024),
-                      mbTotal: Math.round(progress.bytes_total / 1024 / 1024),
-                    })}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progressPct}%` }}
-                  />
-                </div>
-              </div>
+              <ProgressBar
+                percent={progressPct}
+                label={t('step2.progressLabel').replace('{{pct}}', String(progressPct))}
+                detail={t('ada.downloadProgress', {
+                  done: progress.files_done ?? 0,
+                  total: progress.files_total ?? 0,
+                  mbDone: Math.round(progress.bytes_sent / 1024 / 1024),
+                  mbTotal: Math.round(progress.bytes_total / 1024 / 1024),
+                })}
+              />
             )}
           </>
         ) : (
@@ -179,33 +171,19 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
 
         {/* Progress bar (ainult üksiku faili upload ajaks) */}
         {multiTotalNum <= 1 && status === 'uploading' && progress && progress.bytes_total > 0 && (
-          <div>
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>{t('step2.progressLabel').replace('{{pct}}', String(progressPct))}</span>
-              <span>
-                {Math.round(progress.bytes_sent / 1024 / 1024)} /{' '}
-                {Math.round(progress.bytes_total / 1024 / 1024)} MB
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          </div>
+          <ProgressBar
+            percent={progressPct}
+            label={t('step2.progressLabel').replace('{{pct}}', String(progressPct))}
+            detail={<>
+              {Math.round(progress.bytes_sent / 1024 / 1024)} /{' '}
+              {Math.round(progress.bytes_total / 1024 / 1024)} MB
+            </>}
+          />
         )}
 
         {/* Multi-image progress bar */}
         {multiTotalNum > 1 && (
-          <div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${Math.round(((multiCurrentNum - 1) / multiTotalNum) * 100)}%` }}
-              />
-            </div>
-          </div>
+          <ProgressBar percent={Math.round(((multiCurrentNum - 1) / multiTotalNum) * 100)} />
         )}
 
         {/* Veateade progressis */}

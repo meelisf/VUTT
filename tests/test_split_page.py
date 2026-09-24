@@ -75,6 +75,16 @@ def work_dir(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(aps, "save_with_git", lambda *a, **kw: {"success": True})
     monkeypatch.setattr(aps, "delete_page_from_git", lambda *a, **kw: True)
+    # Poolitus teeb ühe commiti (#431); fail-ops tehakse siin käsitsi nagu git teeks.
+    def _commit(adds, removes, *a, **kw):
+        import os as _os
+        for p, c in adds:
+            open(p, "w", encoding="utf-8").write(c)
+        for p in removes:
+            if _os.path.exists(p):
+                _os.remove(p)
+        return {"success": True}
+    monkeypatch.setattr(aps, "commit_add_and_remove", _commit)
     monkeypatch.setattr(aps, "sync_work_to_meilisearch", lambda *a: None)
 
     return {"folder": folder, "work_id": wid, "img_path": img_path}

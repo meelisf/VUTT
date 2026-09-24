@@ -297,7 +297,9 @@
       "error": "Applying failed",
       "done": "Applied: {{rotated}} rotations, {{split}} splits",
       "blocked": "Save or discard the pending changes first.",
-      "badgeSplit": "will be split"
+      "badgeSplit": "will be split",
+      "progress": "{{done}} / {{total}} pages",
+      "interrupted": "The job stopped before finishing (server restart?). The page list was refreshed — check what reached the disk."
     }
   },
   "metadata": {

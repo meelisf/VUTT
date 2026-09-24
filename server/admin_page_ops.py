@@ -19,7 +19,7 @@ from git import Actor
 from git.exc import GitCommandError
 from PIL import Image
 from .config import BASE_DIR, get_logger
-from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git
+from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import update_page_person_mentions
@@ -411,17 +411,6 @@ def _split_page_locked(path: str, work_id: str, page_num: int, split_x: float,
             f.write(content)
         os.chmod(fpath, 0o644)
 
-    # Git commit 1: lisa mõlemad uued lehed ühes commitinas
-    save_with_git(
-        left_txt_path, left_txt, username,
-        message=f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): vasakpoolne [{work_id}]",
-        additional_files=[
-            (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
-            (right_txt_path, right_txt),
-            (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
-        ]
-    )
-
     # Populeeri MÕLEMA poole ._originals poolituseelse topeltlehega, et
     # "Taasta originaal" tooks kummalt poolelt terve topeltlehe tagasi.
     # Eelista originaali enda ._originals-it (pristine enne kõike) kui olemas.
@@ -440,11 +429,19 @@ def _split_page_locked(path: str, work_id: str, page_num: int, split_x: float,
     if os.path.exists(orig_img_path):
         shutil.move(orig_img_path, os.path.join(trash_dir, orig_filename))
 
-    # Git commit 2: eemalda originaali .txt ja .json
-    delete_page_from_git(
-        folder_name, orig_base,
-        f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): eemalda originaal [{work_id}]",
-        username
+    # ÜKS native commit: lisa pooled + eemalda originaali .txt/.json (#431).
+    # Varem kaks commitit, teine GitPythoni kaudu (~2 s) ja ilma git-lukuta.
+    # Sõnum algab SPLIT_COMMIT_PREFIX-iga — prügikasti liigitus loeb seda.
+    commit_add_and_remove(
+        [
+            (left_txt_path, left_txt),
+            (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
+            (right_txt_path, right_txt),
+            (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
+        ],
+        [orig_txt_path, orig_json_path],
+        f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): pooled lisatud, originaal eemaldatud [{work_id}]",
+        username,
     )
 
     return left_filename, right_filename
@@ -635,7 +632,24 @@ def _normalize_page_ops(ops) -> list:
     return clean
 
 
-def apply_page_ops(work_id: str, ops, username: str) -> dict:
+def precheck_page_ops(work_id: str, ops) -> dict:
+    """Kiire kontroll ENNE taustatöö käivitamist: vigane sisend või puuduv leht
+    → ValueError (endpoint annab 400 kohe). Lõplik kontroll kordub
+    `apply_page_ops`-is luku all — vahepeal võib leht kaduda.
+    Tagastab {"found": False} või {"total": n}.
+    """
+    clean = _normalize_page_ops(ops)
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"found": False}
+    images = set(get_sorted_images(path))
+    missing = [op["filename"] for op in clean if op["filename"] not in images]
+    if missing:
+        raise ValueError("Lehti ei leitud (leht muutus vahepeal): " + ", ".join(missing))
+    return {"total": len(clean)}
+
+
+def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
     """Rakendab teose halduse ootel pöörded ja poolitused ÜHE luku all (#431, ADR 0050).
 
     Järjekord lehe sees on sama mis upload'is: pööre → poolitus (joon on
@@ -647,6 +661,8 @@ def apply_page_ops(work_id: str, ops, username: str) -> dict:
     Puuduv leht (vahepeal kustutatud/poolitatud) → ValueError ENNE muutmist.
     Viga keset pakki → RuntimeError, mille sõnum ütleb, mitu lehte jõuti teha;
     Meili sünkitakse ka siis, et indeks vastaks kettale.
+
+    `progress(tehtud, kokku)` kutsutakse iga lehe järel (taustatöö olek, #431).
     """
     clean = _normalize_page_ops(ops)
     if not clean:
@@ -666,6 +682,8 @@ def apply_page_ops(work_id: str, ops, username: str) -> dict:
         order = {fn: i for i, fn in enumerate(images)}
         clean.sort(key=lambda op: order[op["filename"]])
 
+        if progress:
+            progress(0, len(clean))
         try:
             for op in clean:
                 fn = op["filename"]
@@ -678,6 +696,8 @@ def apply_page_ops(work_id: str, ops, username: str) -> dict:
                     _split_page_locked(path, work_id, images.index(fn) + 1,
                                        op["split_x"], username, images)
                     split += 1
+                if progress:
+                    progress(clean.index(op) + 1, len(clean))
         except Exception as e:
             logger.error(f"PAGE-OPS {folder_name}: katkes pärast {rotated} pööret / {split} poolitust: {e}")
             raise RuntimeError(

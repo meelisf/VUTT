@@ -231,20 +231,32 @@ export function reorderWorkPages(workId: string, token: string, order: string[])
   return apiPost<ApiStatusResponse>(`/admin/work/${workId}/reorder-pages`, { order }, authJson(token, { timeout: 30000 }));
 }
 
-export interface PageOpsResult extends ApiStatusResponse {
+export interface PageOpsResult {
   rotated?: number;
   split?: number;
   new_page_count?: number;
 }
 
-/** Ootel pöörded ja poolitused ühe päringuga (#431). Pikk timeout: poolitus
- *  teeb iga lehe kohta pildilõike + git-commitid; nginx lubab 600 s. */
-export function applyWorkPageOps(
+/** Taustatöö olek (#431). `idle` = tööd ei ole (või server taaskäivitus). */
+export interface PageOpsStatus {
+  state: 'idle' | 'running' | 'done' | 'error';
+  done?: number;
+  total?: number;
+  result?: PageOpsResult;
+  error?: string;
+}
+
+/** Käivitab ootel pöörded ja poolitused taustatööna; edenemine `getWorkPageOpsStatus`-ist. */
+export function startWorkPageOps(
   workId: string,
   token: string,
   ops: { filename: string; rotate: number; split_x: number | null }[],
-): Promise<PageOpsResult> {
-  return apiPost<PageOpsResult>(`/admin/work/${workId}/page-ops`, { ops }, authJson(token, { timeout: 590000 }));
+): Promise<{ status: string; total: number }> {
+  return apiPost(`/admin/work/${workId}/page-ops`, { ops }, authJson(token, { timeout: 30000 }));
+}
+
+export function getWorkPageOpsStatus(workId: string, token: string): Promise<PageOpsStatus> {
+  return apiGet<PageOpsStatus>(`/admin/work/${workId}/page-ops/status`, auth(token, { timeout: 15000 }));
 }
 
 export function deleteWorkPages(workId: string, token: string, baseNames: string[]): Promise<ApiStatusResponse> {
