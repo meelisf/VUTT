@@ -89,7 +89,46 @@ def test_seotud_id_teisel_kaardil_ei_lisata(prosopo_env, monkeypatch):
     assert "identifiers" in k["review"]["auto_filled"]
 
 
-def test_voork_ei_ole_luku_all(prosopo_env, monkeypatch):
+def test_teine_kaivitus_ei_kirjuta_uuesti(prosopo_env, monkeypatch):
+    from server.prosopography import ops
+    prosopo_env.write("aaa", identifiers=[{"scheme": "wikidata", "id": "Q1"}],
+                      gender=None, review=PENDING)
+    remote(monkeypatch, {("wikidata", "Q1"): {"gender": "M"}})
+
+    calls = []
+    algne = ops.save_with_git
+
+    def loendav(*a, **k):
+        calls.append(1)
+        return algne(*a, **k)
+
+    monkeypatch.setattr(ops, "save_with_git", loendav)
+
+    runner.run_auto_enrichment("vutt:Paaa")
+    esimene = prosopo_env.read("aaa")
+    runner.run_auto_enrichment("vutt:Paaa")
+    teine = prosopo_env.read("aaa")
+
+    assert teine == esimene
+    assert len(calls) == 1
+
+
+def test_lopetatud_kaarti_ei_puudutata(prosopo_env, monkeypatch):
+    prosopo_env.write("aaa", identifiers=[{"scheme": "wikidata", "id": "Q1"}],
+                      review={**PENDING, "reasons": ["auto_enriched"]})
+    kutsutud = []
+    monkeypatch.setattr(runner, "fetch_remote",
+                        lambda s, i: kutsutud.append((s, i)) or {"gender": "M"})
+    enne = prosopo_env.read("aaa")
+
+    tulemus = runner.run_auto_enrichment("vutt:Paaa")
+
+    assert tulemus is None
+    assert prosopo_env.read("aaa") == enne
+    assert kutsutud == []
+
+
+def test_vork_ei_ole_luku_all(prosopo_env, monkeypatch):
     from server.prosopography.locks import person_lock
     prosopo_env.write("aaa", identifiers=[{"scheme": "wikidata", "id": "Q1"}], review=PENDING)
     vaba = {}

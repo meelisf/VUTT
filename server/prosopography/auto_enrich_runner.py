@@ -2,7 +2,8 @@
 
 Järjekord: allikad VÄLJASPOOL lukke → ID-lukk + person_lock → kaart uuesti,
 ID-de kehtivus, rakendamine, review, üks salvestus. `enrich_pending` märge on
-töö püsiv jälg: iga lõppenud katse eemaldab selle, käivitusel korratakse jäänuid.
+töö püsiv jälg: iga lõppenud katse eemaldab selle, käivitusel korratakse
+pooleli jäänud katseid.
 """
 from __future__ import annotations
 
@@ -37,16 +38,34 @@ def _is_dead(card: Optional[dict]) -> bool:
     return card is None or bool(card.get("merged_into")) or card.get("record_status") == "tombstone"
 
 
-def _pairs(card: dict) -> set:
-    return {(i.get("scheme"), normalize_ext_id(i.get("scheme"), i.get("id")))
-            for i in card.get("identifiers") or [] if isinstance(i, dict)}
+def _is_pending(card: Optional[dict]) -> bool:
+    """Kas kaart ootab veel automaatrikastust (`enrich_pending` reasons-loendis).
+
+    Teine käivitus samal kaardil (nt käivitustaaste, mis jookseb paralleelselt
+    värske loomise ajastatud katsega) EI TOHI review-välja uuesti kirjutada —
+    esimene katse on juba lõppolekusse viinud (ja admin võib olla selle
+    vahepeal kinnitanud, spekk §3.1: kinnitust ei avata uuesti)."""
+    reasons = ((card or {}).get("review") or {}).get("reasons") or []
+    return "enrich_pending" in reasons
+
+
+def _pairs(card: dict) -> list:
+    """Kaardi väliste ID-de (skeem, id) paarid kaardi järjekorras, dubleeringuteta.
+
+    Loend, mitte hulk — sihtide ja ebaõnnestunud allikate järjekord (ja seega
+    `review.failed_sources` sisu) ei tohi sõltuda Pythoni hulga sisemisest
+    (hash-põhisest) järjestusest."""
+    return list(dict.fromkeys(
+        (i.get("scheme"), normalize_ext_id(i.get("scheme"), i.get("id")))
+        for i in card.get("identifiers") or [] if isinstance(i, dict)
+    ))
 
 
 def run_auto_enrichment(person_id: str) -> Optional[dict]:
     crud = _crud()
     sync_from_facade()
     card = crud.get_person(person_id)
-    if _is_dead(card):
+    if _is_dead(card) or not _is_pending(card):
         return None
     targets = [(s, i) for s, i in _pairs(card) if s in ENRICH_SCHEMES and i]
 
@@ -66,9 +85,9 @@ def run_auto_enrichment(person_id: str) -> Optional[dict]:
     # 2–3. Lukkude all: värske kaart, kehtivus, rakendamine, üks salvestus.
     with ext_id_claim_lock, person_lock(person_id):
         card = crud.get_person(person_id)
-        if _is_dead(card):
+        if _is_dead(card) or not _is_pending(card):
             return None
-        alles = _pairs(card)
+        alles = set(_pairs(card))
         answered = [a for a in answered if (a["scheme"], a["id"]) in alles]
         failed = [f for f in failed if f in alles]
         ids_left = any(p in alles for p in targets)
@@ -117,7 +136,7 @@ def schedule_auto_enrichment(person_id: str) -> None:
 
 
 def recover_pending() -> int:
-    """Ajastab kaardid, kus `enrich_pending` jäi (katse ei jõudnud lõpule)."""
+    """Ajastab kaardid, kuhu `enrich_pending` jäi alles (katse ei jõudnud lõpule)."""
     sync_from_facade()
     n = 0
     for path in glob.glob(os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")):
@@ -126,7 +145,7 @@ def recover_pending() -> int:
                 card = json.load(f)
         except Exception:
             continue
-        if _is_dead(card) or "enrich_pending" not in ((card.get("review") or {}).get("reasons") or []):
+        if _is_dead(card) or not _is_pending(card):
             continue
         schedule_auto_enrichment(card["id"])
         n += 1
