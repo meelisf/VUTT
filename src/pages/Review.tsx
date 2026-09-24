@@ -107,9 +107,15 @@ const Review: React.FC = () => {
   const { user, authToken: token, isLoading: userLoading } = useUser();
   // Kollektsioonivalik tuleb päisest (sama valik nagu Dashboardil) — Review
   // ei kasva oma teist rippmenüüd, aga näitab filtrit nähtavalt (vt allpool).
-  const { selectedCollection, setSelectedCollection, getCollectionName, collections,
+  const { selection, setSelection, selectedCollection, getCollectionName, collections, workSets,
     isLoading: collectionsLoading } = useCollection();
   const navigate = useNavigate();
+  const selectedWorkSet = selection.kind === 'work_set'
+    ? workSets.find(ws => ws.id === selection.id) : undefined;
+  const hasCollectionFilter = selection.kind !== 'all';
+  const filterName = selection.kind === 'work_set'
+    ? (selectedWorkSet?.name[i18n.language] || selectedWorkSet?.name.et || selection.id)
+    : selectedCollection ? getCollectionName(selectedCollection, i18n.language === 'en' ? 'en' : 'et') : '';
 
   const [commits, setCommits] = useState<RecentCommit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,7 +166,7 @@ const Review: React.FC = () => {
     setOffset(0);
     setHasMore(false);
     loadRecentEdits(0, false);
-  }, [user, token, selectedUser, selectedCollection, collectionsLoading]);
+  }, [user, token, selectedUser, selection, collectionsLoading]);
 
   // Lae kõigi kasutajate nimekiri admin jaoks
   useEffect(() => {
@@ -286,8 +292,10 @@ const Review: React.FC = () => {
       }
 
       // Päises valitud kollektsioon (alamkollektsioonid tulevad kaasa)
-      if (selectedCollection) {
-        url += `&collection=${encodeURIComponent(selectedCollection)}`;
+      if (selection.kind === 'collection') {
+        url += `&collection=${encodeURIComponent(selection.id)}`;
+      } else if (selection.kind === 'work_set') {
+        url += `&set=${encodeURIComponent(selection.id)}`;
       }
 
       // Git-ajaloo koostamine võib külma failisüsteemi või hõivatud threadpool'i korral
@@ -614,17 +622,19 @@ const Review: React.FC = () => {
           <div className="p-6">
             {/* Nähtav kollektsioonifilter: päises tehtud valik ei tohi siin
                 vaikselt mõjuda — üks klõps viib tagasi kõigi tööde peale. */}
-            {activeTab === 'history' && selectedCollection && collections[selectedCollection] && (() => {
-              const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
+            {activeTab === 'history' && hasCollectionFilter && (() => {
+              const colorClasses = selectedCollection && collections[selectedCollection]
+                ? getCollectionColorClasses(collections[selectedCollection])
+                : { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700' };
               return (
                 <div className={`mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-4 py-2.5 text-sm ${colorClasses.bg} ${colorClasses.border}`}>
                   <Library size={16} className={colorClasses.text} />
                   <span className={`font-medium ${colorClasses.text}`}>
-                    {getCollectionName(selectedCollection, i18n.language === 'en' ? 'en' : 'et')}
+                    {filterName}
                   </span>
                   <span className="text-gray-500">{t('collectionFilter.personsHidden')}</span>
                   <button
-                    onClick={() => setSelectedCollection(null)}
+                    onClick={() => setSelection({ kind: 'all' })}
                     className="ml-auto text-primary-700 hover:text-primary-800 underline underline-offset-2"
                   >
                     {t('common:collections.all')}
@@ -876,8 +886,8 @@ const Review: React.FC = () => {
                 <History className="mx-auto text-gray-300" size={48} />
                 <p className="mt-4 text-gray-500">
                   {selectedUser
-                    ? (selectedCollection ? t('emptyForUserCollection', { user: selectedUser }) : t('emptyForUser', { user: selectedUser }))
-                    : selectedCollection
+                    ? (hasCollectionFilter ? t('emptyForUserCollection', { user: selectedUser }) : t('emptyForUser', { user: selectedUser }))
+                    : hasCollectionFilter
                       ? (isAdmin ? t('emptyCollection') : t('emptyUserCollection'))
                       : (isAdmin ? t('empty') : t('emptyUser'))}
                 </p>

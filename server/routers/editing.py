@@ -38,6 +38,8 @@ from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
 from ..save_diff import page_content_unchanged
 from ..utils import find_directory_by_id
+from ..work_sets_ops import load_work_set
+from ..work_sets_access import can_view_set, search_visible_work_ids
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -239,12 +241,20 @@ async def recent_edits(request: Request, user=Depends(get_user)):
     f_user = request.query_params.get('user') if is_at_least(user['role'], 'admin') else user['username']
     # Kollektsioonifilter ainult kitsendab; isikukaardid jäävad filtriga välja.
     f_collection = request.query_params.get('collection') or None
+    work_ids = None
+    set_id = request.query_params.get("set")
+    if set_id:
+        ws = await run_in_threadpool(load_work_set, set_id)
+        if ws is None or not can_view_set(ws, user):
+            raise HTTPException(status_code=404, detail="Töökollektsiooni ei leitud")
+        work_ids = await run_in_threadpool(search_visible_work_ids, ws, user)
     res = await run_in_threadpool(
         get_recent_commits,
         username=f_user,
         limit=int(request.query_params.get('limit', 30)),
         skip=int(request.query_params.get('offset', 0)),
         collection=f_collection,
+        work_ids=work_ids,
     )
     return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": is_at_least(user['role'], 'admin')}
 
