@@ -345,5 +345,28 @@
     "title": "Sarnased isikud kogu VUTT-ist",
     "view": "Vaata isikut",
     "workCount": "{{count}} teost"
+  },
+  "panel": {
+    "title": "Lisa isik",
+    "searchPlaceholder": "Otsi nime järgi (ka nimeosa)",
+    "existingTitle": "VUTT-is juba olemas",
+    "selectExisting": "Vali see",
+    "sourcesTitle": "Allikatest",
+    "matchedVariant": "sobis: {{name}} (nimevariant)",
+    "alreadyInVutt": "juba VUTT-is",
+    "nameOnCard": "Nimi kaardil",
+    "createAndSelect": "Loo ja vali",
+    "sourceNoResponse": "{{source}} ei vastanud",
+    "sourceSearchFailed": "{{source}} otsing ebaõnnestus",
+    "noSourceTitle": "Ei leia allikatest",
+    "noSourceHint": "Loo isik ilma välise ID-ta; kaart läheb ülevaatusele.",
+    "note": "Märkus",
+    "linkedToWork": "Seotakse selle teosega",
+    "createdNotice": "Isik loodud. Andmed täituvad allikast taustal; kaart ootab ülevaatust.",
+    "splitConflict": "Allikad viitavad kahele eri VUTT-i kaardile — teata adminile, kaardid tuleb liita.",
+    "searching": "Otsin…",
+    "noResults": "Allikatest ei leitud kedagi",
+    "openButton": "Lisa isik…",
+    "manualForm": "Täida vorm käsitsi"
   }
 }

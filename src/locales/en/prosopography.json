@@ -345,5 +345,28 @@
     "title": "Similar people across all of VUTT",
     "view": "View person",
     "workCount": "{{count}} works"
+  },
+  "panel": {
+    "title": "Add a person",
+    "searchPlaceholder": "Search by name (partial names work)",
+    "existingTitle": "Already in VUTT",
+    "selectExisting": "Select",
+    "sourcesTitle": "From authority files",
+    "matchedVariant": "matched: {{name}} (name variant)",
+    "alreadyInVutt": "already in VUTT",
+    "nameOnCard": "Name on the card",
+    "createAndSelect": "Create and select",
+    "sourceNoResponse": "{{source}} did not respond",
+    "sourceSearchFailed": "{{source}} search failed",
+    "noSourceTitle": "Not found in authority files",
+    "noSourceHint": "Create the person without an external ID; the card will be reviewed.",
+    "note": "Note",
+    "linkedToWork": "Will be linked to this work",
+    "createdNotice": "Person created. Data is filled in from the source in the background; the card awaits review.",
+    "splitConflict": "The sources point to two different VUTT cards — tell an admin; the cards need to be merged.",
+    "searching": "Searching…",
+    "noResults": "Nothing found in authority files",
+    "openButton": "Add person…",
+    "manualForm": "Fill in the form manually"
   }
 }
