@@ -16,6 +16,7 @@ from ..admin_page_ops import (
     reorder_pages,
     restore_original_page_image,
     split_page,
+    apply_page_ops,
     transform_page_image,
     work_lock,
     write_new_page,
@@ -336,6 +337,28 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
     if not result.get("found", True):
         raise HTTPException(status_code=404, detail="Teost või lehekülge ei leitud")
     return {"status": "success", "new_page_count": result["new_page_count"]}
+
+
+@router.post("/admin/work/{work_id}/page-ops")
+async def admin_apply_page_ops(work_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Rakendab ootel pöörded ja poolitused korraga (#431, ADR 0050).
+
+    Body: {"ops": [{"filename", "rotate": 0|90|180|270, "split_x": float|null}]}.
+    Vigane sisend või vahepeal muutunud leht → 400 enne ühegi faili puudutamist;
+    viga keset pakki → 500, sõnum ütleb, mitu lehte jõuti teha.
+    """
+    data = await get_json_data(request)
+    try:
+        result = await run_in_threadpool(
+            apply_page_ops, work_id, data.get("ops"), user["username"]
+        )
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if not result.get("found", True):
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    return {"status": "success", **result}
 
 
 @router.post("/admin/work/{work_id}/page-image/{filename}/transform")

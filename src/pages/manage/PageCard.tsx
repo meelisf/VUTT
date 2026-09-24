@@ -1,9 +1,11 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Scissors, Check, Loader2, FileCheck2, AlertCircle } from 'lucide-react';
+import { Scissors, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
 import PageThumb from './PageThumb';
 import { IMAGE_BASE_URL } from '../../config';
 import { ReocrState } from '../../utils/reocrStatus';
+import { cardLineLeftPercent } from '../../components/pagePrep/geometry';
+import { PendingPageOp, showsCardLine } from './pageOpsPlan';
 
 interface PageCardProps {
   workId: string;
@@ -20,7 +22,19 @@ interface PageCardProps {
   onToggle: (filename: string, shiftKey: boolean) => void;
   onEdit: (visiblePageNum: number) => void;
   isFocused?: boolean;
+  /** Ootel pööre/poolitus (#431) — kaart näitab eelvaadet, fail ei ole veel muutunud. */
+  pendingOp?: PendingPageOp;
+  /** Üldjoon (0..1) ootel poolitusele. */
+  splitX: number;
 }
+
+/** Ootel pöörde eelvaade CSS-iga. 90°/270° juures skaleeritakse 3:4 kasti
+ *  sisse (pööratud kast oleks 4:3 ja lõikuks servadest). */
+const rotateStyle = (deg: number): React.CSSProperties | undefined => {
+  if (!deg) return undefined;
+  const scale = deg === 90 || deg === 270 ? ' scale(0.75)' : '';
+  return { transform: `rotate(${deg}deg)${scale}` };
+};
 
 const statusColor = (status: string) => {
   switch (status) {
@@ -33,13 +47,17 @@ const statusColor = (status: string) => {
 const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const { t } = useTranslation(['workspace', 'common']);
   const imageTokenQuery = p.imageToken ? `&exp=${p.imageToken.exp}&sig=${p.imageToken.sig}` : '';
+  const [aspect, setAspect] = React.useState<number | undefined>(undefined);
+  const op = p.pendingOp;
+  // 180° ei muuda kuvatud pildi mõõte → joon käib sama valemi järgi.
+  const lineLeft = showsCardLine(op) ? cardLineLeftPercent(aspect, p.splitX) : null;
   return (
     <div
       ref={ref}
       className={`relative flex flex-col rounded-lg border overflow-hidden bg-white ${
         p.isFocused ? 'ring-2 ring-blue-500 motion-safe:animate-pulse'
           : p.isSelected ? 'border-primary-500 ring-2 ring-primary-400'
-          : p.isChanged ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
+          : p.isChanged || op ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
       }`}
     >
       {/* Kogu pisipildi-ala on valiku-sihtmärk: klõps valib, Shift+klõps vahemiku.
@@ -97,7 +115,27 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
              lapiti välja nägema. `cover` lõikas küljed 3/4 portreeks ja peitis
              just selle — lehe tegelikku formaati polnud kaardilt näha. */
           className="w-full h-full object-contain"
+          onAspect={setAspect}
+          imgStyle={rotateStyle(op?.rotate ?? 0)}
         />
+        {/* Ootel poolituse joon — sama värv ja kuju nagu upload'i kontaktlehel. */}
+        {lineLeft !== null && (
+          <div
+            data-testid="pending-split-line"
+            className="absolute top-0 bottom-0 w-px bg-rose-600 pointer-events-none"
+            style={{ left: `${lineLeft}%` }}
+          />
+        )}
+        {/* Ootel toimingute märk — all keskel, et nurgad jääksid vabaks. */}
+        {op && (
+          <span
+            data-testid="pending-op-badge"
+            className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-1 py-0.5 rounded text-[10px] leading-none bg-amber-100 text-amber-800 border border-amber-300 shadow-sm"
+          >
+            {op.rotate !== 0 && (<><RotateCw size={11} />{op.rotate}°</>)}
+            {op.split && (<><Columns2 size={11} />{t('manage.pageOps.badgeSplit')}</>)}
+          </span>
+        )}
         {/* Nähtav number — all vasakul */}
         <span className={`absolute bottom-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(p.status)}`}>
           {p.visiblePageNum}

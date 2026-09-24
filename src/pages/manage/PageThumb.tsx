@@ -8,7 +8,15 @@ import { thumbRetryDelay, buildThumbUrl } from '../../utils/thumbRetry';
 
 type ThumbStatus = 'loading' | 'ok' | 'error';
 
-const PageThumb: React.FC<{ workId: string; src: string; className: string }> = ({ workId, src, className }) => {
+const PageThumb: React.FC<{
+  workId: string;
+  src: string;
+  className: string;
+  /** Pildi kuvasuhe (laius/kõrgus) laadimisel — poolitusjoone paigutuseks kaardil. */
+  onAspect?: (ratio: number) => void;
+  /** Eelvaate teisendus (nt ootel pööre, #431). */
+  imgStyle?: React.CSSProperties;
+}> = ({ workId, src, className, onAspect, imgStyle }) => {
   const { authToken } = useUser();
   const { t } = useTranslation(['workspace']);
   const [tokenQuery, setTokenQuery] = useState('');  // "&exp=..&sig=.." kui piiratud teos
@@ -83,7 +91,10 @@ const PageThumb: React.FC<{ workId: string; src: string; className: string }> = 
         src={imgSrc}
         alt=""
         loading="lazy"
-        onLoad={() => {
+        style={imgStyle}
+        onLoad={(e) => {
+          const im = e.currentTarget;
+          if (onAspect && im.naturalHeight) onAspect(im.naturalWidth / im.naturalHeight);
           if (timerRef.current) clearTimeout(timerRef.current);
           retryRef.current = 0;
           setStatus('ok');

@@ -280,7 +280,22 @@
     "replaceHint": "Upload a new scan. Metadata is preserved automatically.",
     "replaceWarning": "Replacing deletes all current pages and replaces them with newly OCR-processed pages.",
     "openUploadWizard": "Open the upload wizard",
-    "directory": "Directory"
+    "directory": "Directory",
+    "pageOps": {
+      "split": "Split",
+      "noSplit": "Don't split",
+      "summary": "{{count}} pages have a pending rotation or split",
+      "line": "Split line",
+      "apply": "Apply",
+      "discard": "Discard changes",
+      "applying": "Applying…",
+      "confirmTitle": "Apply rotations and splits",
+      "confirm": "Apply changes to {{count}} pages? Splitting cuts the image and the text (at <pb/>) into two pages; the original moves to the trash and can be restored.",
+      "error": "Applying failed",
+      "done": "Applied: {{rotated}} rotations, {{split}} splits",
+      "blocked": "Save or discard the pending changes first.",
+      "badgeSplit": "will be split"
+    }
   },
   "metadata": {
     "title": "Metadata",
