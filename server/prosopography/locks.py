@@ -26,3 +26,12 @@ def person_lock(person_id: str) -> threading.Lock:
             lock = threading.Lock()
             _person_locks[person_id] = lock
         return lock
+
+
+# Väliste ID-de „broneerimise" lukk (spekk §4.6, ADR 0048). Iga tee, mis lisab
+# kaardile välise ID, hoiab seda üle kontrolli, salvestuse ja ext_id_index-i
+# uuenduse — ühe isiku lukk ei kaitse TEIST kaarti. Järjekord: see lukk enne
+# person_lock-i, mitte kunagi vastupidi. RLock: loomine võib seest kutsuda
+# stub-teed, mis sama lukku uuesti küsib. Protsessilokaalne — mitme workeri
+# korral vaja protsessideülest lukku.
+ext_id_claim_lock = threading.RLock()

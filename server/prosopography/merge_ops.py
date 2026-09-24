@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from . import state
 from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, rebuild_indices
 from .person_crud import _id_to_path, get_person
-from .locks import merge_operation_lock, person_lock
+from .locks import ext_id_claim_lock, merge_operation_lock, person_lock
 from ._compat import sync_from_facade
 from ..prosopo_biography_fields import (
     ANCHOR_FIELDS, BIOGRAPHY_EN, BIOGRAPHY_ET, TEXT_FIELDS,
@@ -250,7 +250,9 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
         raise ValueError("Source ja target ei tohi olla samad.")
     # Globaalne lukk serialiseerib ka relation-loop'is ja kohaliitmisel võetavad
     # lisalukud; järjestus väldib source/target paaris ebavajalikku ristootamist.
-    with merge_operation_lock:
+    # ID-lukk kõige välimisena (ADR 0048) — liitmine loeb/kirjutab source'i ID-sid
+    # target'ile, mis on samuti ID-lisav tee.
+    with ext_id_claim_lock, merge_operation_lock:
         with ExitStack() as stack:
             for person_id in sorted((source_id, target_id)):
                 stack.enter_context(person_lock(person_id))

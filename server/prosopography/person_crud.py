@@ -11,7 +11,7 @@ from . import state
 from . import ext_id_index
 from ._compat import sync_from_facade
 from .ext_ids import normalize_ext_id
-from .locks import person_lock
+from .locks import ext_id_claim_lock, person_lock
 from ..entity_labels_ops import fill_person_labels_from_registry
 from ..prosopo_biography_fields import (
     AA_RAW, ANCHOR_FIELDS, ANCHOR_OF, ANCHOR_SOURCE, BIOGRAPHY_EN, BIOGRAPHY_ET,
@@ -324,7 +324,9 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
 def update_person(person_id: str, data: dict, username: str) -> dict:
     """Uuendab isiku kirjet optimistliku konkurentsikontrolliga."""
     sync_from_facade()
-    with person_lock(person_id):
+    from contextlib import nullcontext
+    claim = ext_id_claim_lock if "identifiers" in data else nullcontext()
+    with claim, person_lock(person_id):
         person = get_person(person_id)
         if person is None:
             raise KeyError(person_id)
@@ -365,6 +367,10 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
 
         if "identifiers" in data:
             data["identifiers"] = _normalize_identifiers(data["identifiers"])
+            # Ainult LISANDUNUD ID-d: pärandduplikaat (sama AA kahel kaardil)
+            # ei tohi kaardi tavasalvestust blokeerida.
+            _check_identifiers_free(
+                person_id, _added_identifiers(person.get("identifiers"), data["identifiers"]))
         person.update(data)
         person["updated_at"] = now
         person["updated_by"] = username
@@ -406,34 +412,27 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
 
 
 def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> tuple:
-    """Lisab identifikaatori ja käivitab rikastuse."""
+    """Lisab identifikaatori; rikastuse eelvaade (võrk) PÄRAST lukke (spekk §4.6)."""
     from .enrichment import fetch_and_diff
 
     sync_from_facade()
     ext_id = normalize_ext_id(scheme, ext_id)
-    with person_lock(person_id):
+    with ext_id_claim_lock, person_lock(person_id):
         person = get_person(person_id)
         if person is None:
             raise KeyError(person_id)
-
         existing = _normalize_identifiers(person.get("identifiers") or [])
-        person["identifiers"] = existing
-        for ident in existing:
-            if ident.get("scheme") == scheme and ident.get("id") == ext_id:
-                break
-        else:
+        if not any(i.get("scheme") == scheme and i.get("id") == ext_id for i in existing):
+            _check_identifiers_free(person_id, [{"scheme": scheme, "id": ext_id}])
             existing.append({"scheme": scheme, "id": ext_id, "checked_at": None})
-            person["identifiers"] = existing
-
-        diff = fetch_and_diff(scheme, ext_id, person)
-
-        now = datetime.now(timezone.utc).isoformat()
-        person["updated_at"] = now
+        person["identifiers"] = existing
+        person["updated_at"] = datetime.now(timezone.utc).isoformat()
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
         _save_person_locked(person, username, f"Prosopo identifikaator: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     _indices()._update_aliases_entry(person)
+    diff = fetch_and_diff(scheme, ext_id, person)
     return person, diff
 
 
@@ -580,6 +579,25 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
     return person
 
 
+def restore_person(person_id: str, restored: dict, username: str) -> dict:
+    """Taastab kaardi varasemale seisule (git). ID-lisav tee: võib tuua tagasi ID,
+    mis on vahepeal teisele kaardile läinud — seega ID-lukk + kontroll."""
+    sync_from_facade()
+    with ext_id_claim_lock, person_lock(person_id):
+        current = get_person(person_id) or {}
+        restored = {**restored, "id": person_id}
+        restored["identifiers"] = _normalize_identifiers(restored.get("identifiers") or [])
+        _check_identifiers_free(
+            person_id, _added_identifiers(current.get("identifiers"), restored["identifiers"]))
+        restored["updated_at"] = datetime.now(timezone.utc).isoformat()
+        restored["updated_by"] = username
+        name = (restored.get("name") or {}).get("label") or person_id
+        _save_person_locked(restored, username, f"Prosopo taastamine: {name} [{person_id}]")
+    _indices()._update_index_entry(restored)
+    _indices()._update_aliases_entry(restored)
+    return restored
+
+
 def _find_by_external_id(scheme: str, ext_id: str) -> Optional[dict]:
     """Otsib prosopo kaarti välise identifikaatori (scheme + id) järgi.
 
@@ -594,6 +612,53 @@ def _find_by_external_id(scheme: str, ext_id: str) -> Optional[dict]:
         ext_id_index.remove_person(person_id)
         return None
     return person
+
+
+class IdentifierConflict(Exception):
+    """Väline ID on juba teisel kaardil. `split` = ID-d on ERI kaartidel."""
+
+    def __init__(self, kind: str, person_ids: list):
+        super().__init__(f"{kind}: {', '.join(person_ids)}")
+        self.kind = kind
+        self.person_ids = person_ids
+
+
+def _resolve_owner(person_id: str) -> Optional[str]:
+    """Liidetud kaardi omanik on liitmise siht (ahel, max 5 sammu)."""
+    for _ in range(5):
+        person = get_person(person_id)
+        if person is None:
+            return None
+        target = person.get("merged_into")
+        if not target:
+            return person_id
+        person_id = target
+    return person_id
+
+
+def _check_identifiers_free(person_id: Optional[str], identifiers: list) -> None:
+    """Kutsuja hoiab `ext_id_claim_lock`-i. Viskab IdentifierConflict, kui mõni
+    antud ID on teisel (aktiivsel) kaardil. `person_id=None` = uus kaart."""
+    owners: list = []
+    for ident in _normalize_identifiers(identifiers or []):
+        if not isinstance(ident, dict):
+            continue
+        found = _find_by_external_id(ident.get("scheme"), ident.get("id"))
+        if not found:
+            continue
+        owner = _resolve_owner(found["id"])
+        if owner and owner != person_id and owner not in owners:
+            owners.append(owner)
+    if owners:
+        raise IdentifierConflict("exists" if len(owners) == 1 else "split", owners)
+
+
+def _added_identifiers(old: list, new: list) -> list:
+    """Uues loendis olevad ID-d, mida vanas ei olnud (normaliseeritud võrdlus)."""
+    vana = {(i.get("scheme"), i.get("id")) for i in _normalize_identifiers(old or [])
+            if isinstance(i, dict)}
+    return [i for i in _normalize_identifiers(new or [])
+            if isinstance(i, dict) and (i.get("scheme"), i.get("id")) not in vana]
 
 
 def ensure_prosopo_for_entity(entity: dict, username: str) -> dict:
@@ -703,4 +768,4 @@ def bulk_update_occupation(
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 
 
-__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation']
+__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation']
