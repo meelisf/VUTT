@@ -58,3 +58,33 @@ def test_route_kuju_ja_oigus(client, login, prosopo_env, kokkuvotted):
                     json={"name": "A", "refs": [{"scheme": "wikidata", "id": "Q1"}]}, headers=h)
     assert r.status_code == 200 and r.json()["results"][0]["ok"] is True
     assert client.post("/prosopography/candidates", json={"name": "A", "refs": []}).status_code in (401, 403)
+
+
+def test_contributor_ei_saa_ligi(client, login, prosopo_env, kokkuvotted):
+    """I1: contributor'il on token (PageTagsPanel jaoks), aga /candidates on editor+.
+    NB: `deps.get_user` (ADR/#356 — AINUS tokeni-lugeja) tagastab kõigi
+    autentimistõrgete (ka ebapiisava rolli) korral 401, mitte 403 — vt
+    `server/deps.py` `get_user`. Brief kirjeldas seda 403-na; test kontrollib
+    tegelikku, mõõdetud käitumist."""
+    token = login("contrib", "contribpass")
+    h = {"Authorization": f"Bearer {token}"}
+    r = client.post("/prosopography/candidates",
+                    json={"name": "A", "refs": [{"scheme": "wikidata", "id": "Q1"}]}, headers=h)
+    assert r.status_code == 401
+
+
+def test_olemasolev_kaart_lingi_jargi(prosopo_env, monkeypatch):
+    """I5: viite enda ID ei ole veel VUTT-is, aga tema Wikidata-link on juba
+    salvestatud teise identifikaatori all — esimene tabamus võidab."""
+    prosopo_env.write("aaa", identifiers=[{"scheme": "wikidata", "id": "Q1"}])
+    vastused = {("gnd", "2"): {"label": "A", "names": [], "links": {"wikidata": "Q1"}}}
+    monkeypatch.setattr(candidates, "candidate_summary", lambda s, i: vastused.get((s, i)))
+    monkeypatch.setattr(candidates, "_similar", lambda name: [])
+    r = candidates.candidates("A", [{"scheme": "gnd", "id": "2"}])
+    assert r["results"][0]["existing_person_id"] == "vutt:Paaa"
+
+
+def test_vigane_ref_ei_kuku_500ga(prosopo_env, kokkuvotted):
+    """M6: vale tüübiga skeem ja kehtetu GND-id jäetakse vaikimisi kõrvale."""
+    r = candidates.candidates("x", [{"scheme": 1, "id": "x"}, {"scheme": "gnd", "id": "abc-def"}])
+    assert r["results"] == []

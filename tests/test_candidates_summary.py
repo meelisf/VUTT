@@ -77,3 +77,36 @@ def test_tundmatu_skeem_ja_tork_on_none(monkeypatch):
     assert candidates.candidate_summary("aa", "1") is None
     monkeypatch.setattr(enrichment, "_wd_entity", lambda q: None)
     assert candidates.candidate_summary("wikidata", "Q1") is None
+
+
+def test_wikidata_inimene_on_human(monkeypatch):
+    """I4: P31=Q5 (inimene) → is_human True."""
+    entity = {**WD, "claims": {**WD["claims"],
+              "P31": [{"rank": "normal", "mainsnak": {"snaktype": "value",
+                       "datavalue": {"value": {"id": "Q5"}}}}]}}
+    monkeypatch.setattr(enrichment, "_wd_entity", lambda q: entity)
+    monkeypatch.setattr(enrichment, "_wd_labels", lambda ids: {i: {"et": f"silt {i}"} for i in ids})
+    s = candidates.candidate_summary("wikidata", "Q1698324")
+    assert s["is_human"] is True
+
+
+def test_wikidata_mitteinimene_ei_ole_human(monkeypatch):
+    """I4: P31 ilma Q5-ta (nt asutus) → is_human False. Wikidata täistekstiotsing
+    toob ka mitte-isikuid, mida paneelis ei tohi inimesena näidata."""
+    entity = {**WD, "claims": {**WD["claims"],
+              "P31": [{"rank": "normal", "mainsnak": {"snaktype": "value",
+                       "datavalue": {"value": {"id": "Q43229"}}}}]}}  # organisatsioon
+    monkeypatch.setattr(enrichment, "_wd_entity", lambda q: entity)
+    monkeypatch.setattr(enrichment, "_wd_labels", lambda ids: {i: {"et": f"silt {i}"} for i in ids})
+    s = candidates.candidate_summary("wikidata", "Q1698324")
+    assert s["is_human"] is False
+
+
+def test_gnd_ja_viaf_on_alati_human(monkeypatch):
+    """I4: GND/VIAF otsingud on isik-ainult, seega alati is_human True."""
+    monkeypatch.setattr(enrichment, "_fetch_lobid_raw", lambda g: None)
+    monkeypatch.setattr(enrichment, "_fetch_gnd_dnb", lambda g: {
+        "name.label": "Test Person", "name.aliases": []})
+    assert candidates.candidate_summary("gnd", "1")["is_human"] is True
+    monkeypatch.setattr(enrichment, "_fetch_viaf", lambda v: {"name.label": "Test Person"})
+    assert candidates.candidate_summary("viaf", "1")["is_human"] is True

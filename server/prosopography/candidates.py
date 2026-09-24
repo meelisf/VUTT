@@ -17,6 +17,11 @@ from .ext_ids import normalize_ext_id
 _WD_NAME_LANGS = ("et", "en", "de", "la", "sv", "mul")
 _MAX_REFS = 15
 _BUDGET_S = 8.0
+# GND-ID kanoonilisel kujul (prefiks eemaldatud, kontrollnumber suur X): numbrid,
+# vahel X/- (nt "104367439X", "1029967695"). Valideerimata id läheks välja
+# tarbetu võrgupäringuna ja normaliseerimise-eelne praht (nt vale skeemi tüüp
+# refis) kukutaks `_existing`-i tüübiveaga (#M6).
+_GND_ID_RE = re.compile(r"^[0-9]+[0-9X-]*$")
 
 
 def _date_unit(r: dict, prefix: str) -> dict:
@@ -67,9 +72,14 @@ def _wikidata(qid: str) -> Optional[dict]:
         vals = enrichment._wd_best_values(entity, prop)
         if vals and isinstance(vals[0], str):
             links[key] = normalize_ext_id(key, vals[0])
+    # Isikuotsing (GND/VIAF) on isik-ainult, aga Wikidata täistekstiotsing
+    # toob ka asutusi, kohti jms — P31 (instance of) = Q5 (inimene) on ainus
+    # otsene signaal (I4).
+    is_human = "Q5" in enrichment._wd_item_ids(entity, "P31")
     return {"label": names[0]["text"] if names else qid, "names": names,
             "description": description, **_fields(r),
-            "url": f"https://www.wikidata.org/wiki/{qid}", "links": links}
+            "url": f"https://www.wikidata.org/wiki/{qid}", "links": links,
+            "is_human": is_human}
 
 
 def _gnd(gnd_id: str) -> Optional[dict]:
@@ -82,13 +92,14 @@ def _gnd(gnd_id: str) -> Optional[dict]:
         info = raw.get("biographicalOrHistoricalInformation") or []
         return {"label": label or gnd_id, "names": names,
                 "description": info[0] if info else None, **_fields(r),
-                "url": url, "links": _links(r)}
+                "url": url, "links": _links(r), "is_human": True}
     r = enrichment._fetch_gnd_dnb(gnd_id)
     if r is None:
         return None
     return {"label": r.get("name.label") or gnd_id,
             "names": _names_plain(r.get("name.label"), r.get("name.aliases")),
-            "description": None, **_fields(r), "url": url, "links": _links(r)}
+            "description": None, **_fields(r), "url": url, "links": _links(r),
+            "is_human": True}
 
 
 def _viaf(viaf_id: str) -> Optional[dict]:
@@ -98,7 +109,7 @@ def _viaf(viaf_id: str) -> Optional[dict]:
     return {"label": r.get("name.label") or viaf_id,
             "names": _names_plain(r.get("name.label"), r.get("name.aliases")),
             "description": None, **_fields(r),
-            "url": f"https://viaf.org/viaf/{viaf_id}", "links": _links(r)}
+            "url": f"https://viaf.org/viaf/{viaf_id}", "links": _links(r), "is_human": True}
 
 
 _BUILDERS = {"wikidata": _wikidata, "gnd": _gnd, "viaf": _viaf}
@@ -139,21 +150,49 @@ def _existing(scheme: str, ext_id: str) -> Optional[str]:
     return _resolve_owner(found["id"]) if found else None
 
 
+def _valid_ref(r) -> bool:
+    """Vigane sisend EI TOHI 500-ga kukkuda (M6): tundmatu/vale tüübiga skeem
+    (nt int) lõhuks `normalize_ext_id`-i `.strip()`-i, ja vigane GND-id (mitte
+    numbriline pärast normaliseerimist) läheks tarbetu võrgupäringuna välja."""
+    if not isinstance(r, dict):
+        return False
+    scheme, ext_id = r.get("scheme"), r.get("id")
+    if not isinstance(scheme, str) or scheme not in _BUILDERS:
+        return False
+    if not isinstance(ext_id, str) or not ext_id:
+        return False
+    if scheme == "gnd" and not _GND_ID_RE.match(normalize_ext_id("gnd", ext_id)):
+        return False
+    return True
+
+
 def candidates(name: str, refs: list) -> dict:
     """Kuni 15 viite kokkuvõtted paralleelselt, koguaja eelarvega; iga viite
     tõrge märgitakse sellele viitele, teised tulevad."""
-    refs = [r for r in refs if isinstance(r, dict) and r.get("scheme") and r.get("id")][:_MAX_REFS]
-    futures = [_executor.submit(candidate_summary, r["scheme"], str(r["id"])) for r in refs]
+    refs = [r for r in refs if _valid_ref(r)][:_MAX_REFS]
+    futures = [_executor.submit(candidate_summary, r["scheme"], r["id"]) for r in refs]
     wait(futures, timeout=_BUDGET_S)
+    # Eelarve möödas — alustamata futuurid ei jookse ilmaasjata edasi (M7).
+    for fut in futures:
+        fut.cancel()
     results = []
     for ref, fut in zip(refs, futures):
-        scheme, ext_id = ref["scheme"], normalize_ext_id(ref["scheme"], str(ref["id"]))
+        scheme, ext_id = ref["scheme"], normalize_ext_id(ref["scheme"], ref["id"])
         if not fut.done():
             summary, error = None, "timeout"
         else:
             summary = fut.result() if fut.exception() is None else None
             error = None if summary is not None else "source_unavailable"
+        existing_person_id = _existing(scheme, ext_id)
+        # Enda viide ei ole veel VUTT-is, aga tema link (GND/VIAF/Wikidata) võib
+        # juba olla salvestatud teise viite all — esimene tabamus võidab (I5).
+        if existing_person_id is None and summary and summary.get("links"):
+            for link_scheme, link_id in summary["links"].items():
+                found = _existing(link_scheme, link_id)
+                if found:
+                    existing_person_id = found
+                    break
         results.append({"scheme": scheme, "id": ext_id, "ok": summary is not None,
                         "summary": summary, "error": error,
-                        "existing_person_id": _existing(scheme, ext_id)})
+                        "existing_person_id": existing_person_id})
     return {"results": results, "similar_persons": _similar(name)}
