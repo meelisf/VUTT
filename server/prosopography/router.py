@@ -6,7 +6,7 @@ import json
 import os
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Request, Depends, Query
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -383,6 +383,17 @@ async def prosopography_translate(
         raise HTTPException(status_code=400 if klient_eksis else 502, detail=sonum)
 
     return {"status": "ok", "text": tolge, "usage": usage}
+
+
+@router.post("/candidates")
+def prosopography_candidates(data: dict = Body(...), user=Depends(require_role("editor"))):
+    """Isikupaneeli kandidaatide kokkuvõtted (spekk §4.1). Sync def — võrk
+    käib threadpoolis (ADR 0002); lukke ei võeta."""
+    from .candidates import candidates
+    name, refs = data.get("name") or "", data.get("refs")
+    if not isinstance(name, str) or not isinstance(refs, list):
+        raise HTTPException(status_code=400, detail="invalid_candidates_request")
+    return candidates(name, refs)
 
 
 _ALLOWED_CREATED_VIA = ("picker", "form")
