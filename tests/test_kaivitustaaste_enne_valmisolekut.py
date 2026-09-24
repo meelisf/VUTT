@@ -37,8 +37,12 @@ def _vaigista_kaivitus(monkeypatch):
     monkeypatch.setattr(main, "check_render_concurrency", lambda: None)
     import server.auth
     import server.prosopography.places_ops as places_ops
+    import server.prosopography.auto_enrich_runner as auto_enrich_runner
     monkeypatch.setattr(server.auth, "warn_if_no_superadmin", noop)
     monkeypatch.setattr(places_ops, "validate_places_config", noop)
+    # Muidu registreerub päris planeerija ja käivitub taastelõim, mis skannib
+    # päris `data/config/prosopography`-t (võimalik võrk + git-commit testi ajal).
+    monkeypatch.setattr(auto_enrich_runner, "start", noop)
 
 
 def test_taasted_on_lopetatud_enne_yield_i(monkeypatch):

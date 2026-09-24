@@ -168,19 +168,22 @@ def test_metadata_save_jookseb_threadpoolis(monkeypatch):
 def test_prosopography_create_jookseb_threadpoolis(monkeypatch):
     seen = {}
 
-    def fake_create(data, username):
-        seen["args"] = (data, username)
+    def fake_create(**kwargs):
+        seen["kwargs"] = kwargs
         seen["thread"] = _worker_thread_name()
         return {"id": "vutt:P1"}
 
-    monkeypatch.setattr(prosopography, "create_person", fake_create)
+    monkeypatch.setattr(prosopography, "create_person_checked", fake_create)
     monkeypatch.setattr(prosopography, "enrich_entity_labels_from_person_async", lambda *_a: None)
     result = asyncio.run(prosopography.prosopography_create(
         _json_request(b'{"name":"Test"}'), user={"username": "editor"}
     ))
 
     assert result == {"id": "vutt:P1"}
-    assert seen["args"] == ({"name": "Test"}, "editor")
+    assert seen["kwargs"] == {
+        "username": "editor", "created_via": "form",
+        "name": "Test", "identifiers": None, "note": None,
+    }
     assert seen["thread"] != MAIN_THREAD
 
 

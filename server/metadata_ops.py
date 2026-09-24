@@ -167,6 +167,15 @@ def bulk_update_works(
     return {"updated": len(changed), "skipped": skipped, "failed": failed}
 
 
+def _read_work_id(meta_path: str):
+    """Teose id stub-kaardi konteksti jaoks; puuduv/katkine fail → None (kontekst on valikuline)."""
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            return (json.load(f) or {}).get("id")
+    except Exception:
+        return None
+
+
 def save_work_metadata(
     meta_path: str,
     updates: dict,
@@ -205,7 +214,7 @@ def save_work_metadata(
 
     # Loo prosopo stub kaardid Wikidata Q-koodiga creators/tags/publisher jaoks
     if any(k in updates for k in ("creators", "tags", "publisher")):
-        updates = ensure_prosopo_stubs(updates, username)
+        updates = ensure_prosopo_stubs(updates, username, work_id=_read_work_id(meta_path))
     stubs_done = time.monotonic()
 
     with metadata_lock:

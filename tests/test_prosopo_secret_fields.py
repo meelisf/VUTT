@@ -25,7 +25,7 @@ SECRET_FIELDS = ("auth_token", "token")
 
 
 def _write_card(tmp_path, monkeypatch, extra: dict):
-    from server.prosopography import person_crud
+    from server.prosopography import ops, person_crud
 
     prosopo_dir = tmp_path / "prosopography"
     prosopo_dir.mkdir()
@@ -38,7 +38,11 @@ def _write_card(tmp_path, monkeypatch, extra: dict):
     (prosopo_dir / "abc123.json").write_text(
         json.dumps(card, ensure_ascii=False), encoding="utf-8"
     )
-    monkeypatch.setattr(person_crud.state, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
+    # Patch käib fassaadil `ops`, mitte otse `state`-il: `state.PROSOPOGRAPHY_DIR`
+    # on lehter, mida `sync_from_facade` laisalt uuendab, ja otse peale kirjutatud
+    # monkeypatch salvestaks taastuspunktiks juhusliku vahepealse väärtuse, kui
+    # mõni eelnev test on fassaadi mustaks jätnud (vt ADR 0048 test-fixture).
+    monkeypatch.setattr(ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
     return person_crud, prosopo_dir
 
 

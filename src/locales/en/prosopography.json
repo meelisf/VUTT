@@ -102,6 +102,7 @@
     "from": "from",
     "gender": "Gender",
     "genderUnknown": "Unknown",
+    "identifierConflict": "One of the external IDs is already on another card: {{ids}}",
     "identifiers": "Identifiers",
     "institution": "Institution / workplace",
     "institutionPlaceholder": "Academia Gustaviana…",

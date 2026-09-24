@@ -9,7 +9,7 @@ import BiographySection from '../components/personForm/BiographySection';
 import EntityPicker from '../../components/EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
-import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage, deletePerson } from '../services/prosopographyService';
+import { getPerson, createPersonChecked, PersonConflictError, updatePerson, uploadPersonImage, deletePersonImage, deletePerson } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
 
@@ -220,17 +220,10 @@ const PersonEditPage: React.FC = () => {
     setError(null);
     try {
       if (isNew) {
-        const created = await createPerson(
-          {
-            name: draft.name_label.trim(),
-            birth_year: draft.birth.year ? parseInt(draft.birth.year) : undefined,
-            death_year: draft.death.year ? parseInt(draft.death.year) : undefined,
-            notes: draft.notes.trim() || undefined,
-          },
-          token,
-        );
-        const payload = draftToPayload(draft, created, seisused, konfessioonid);
-        await updatePerson(created.id, { ...payload, updated_at: created.updated_at }, token);
+        // Üks samm (spekk §4.2): kogu vormisisu salvestub ENNE taustarikastust —
+        // create + update vahele sattunud rikastus andis varem versioonikonflikti.
+        const payload = draftToPayload(draft, undefined, seisused, konfessioonid);
+        const created = await createPersonChecked({ card: payload, created_via: 'form' }, token);
         createdIdRef.current = created.id;
       } else {
         const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid);
@@ -239,7 +232,11 @@ const PersonEditPage: React.FC = () => {
       setIsDirty(false);
       return true;
     } catch (e: any) {
-      if (e?.conflict) {
+      if (e instanceof PersonConflictError) {
+        setError(t('form.identifierConflict',
+          'Mõni välistest ID-dest on juba teisel kaardil: {{ids}}',
+          { ids: e.existingPersonIds.join(', ') }));
+      } else if (e?.conflict) {
         setError(t('form.conflictError'));
       } else {
         setError(t('form.saveError'));

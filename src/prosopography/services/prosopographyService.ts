@@ -203,20 +203,39 @@ export async function getWorkTitles(
   }
 }
 
-export async function createPerson(data: {
-  name: string;
-  birth_year?: number | null;
-  death_year?: number | null;
-  notes?: string;
+export interface CreatePersonBody {
+  created_via: 'picker' | 'form';
+  name?: string;
   identifiers?: { scheme: string; id: string }[];
-}, token: string): Promise<ProsopoRecord> {
-  const resp = await fetchWithTimeout(BASE, {
+  aliases?: string[];
+  note?: string;
+  card?: Partial<ProsopoRecord>;
+  context?: { work_id: string; role?: string };
+}
+
+/** Välise ID konflikt loomisel (spekk §4.2): `exists` = üks kaart, `split` = ID-d eri kaartidel. */
+export class PersonConflictError extends Error {
+  constructor(public conflict: 'exists' | 'split', public existingPersonIds: string[]) {
+    super(`person_conflict:${conflict}`);
+  }
+}
+
+/** Isiku loomine ühe sammuga — ainus loomistee (server paneb ülevaatusmärke). */
+export async function createPersonChecked(body: CreatePersonBody, token: string): Promise<ProsopoRecord> {
+  const resp = await fetchWithTimeout(`${BASE}/persons/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify(data),
-    timeout: 10000,
+    body: JSON.stringify(body),
+    timeout: 15000,
   });
-  if (!resp.ok) throw new Error(`createPerson: ${resp.status}`);
+  if (resp.status === 409) {
+    const err = await resp.json().catch(() => ({}));
+    const d = err?.detail ?? {};
+    if (d.error === 'identifier_conflict') {
+      throw new PersonConflictError(d.conflict, d.existing_person_ids ?? []);
+    }
+  }
+  if (!resp.ok) throw new Error(`createPersonChecked: ${resp.status}`);
   return resp.json();
 }
 
@@ -229,8 +248,12 @@ export async function updatePerson(personId: string, data: Partial<ProsopoRecord
     timeout: 10000,
   });
   if (resp.status === 409) {
-    const err = await resp.json();
-    throw Object.assign(new Error('conflict'), { conflict: true, current_updated_at: err.detail?.current_updated_at });
+    const err = await resp.json().catch(() => ({}));
+    const d = err?.detail ?? {};
+    if (d.error === 'identifier_conflict') {
+      throw new PersonConflictError(d.conflict, d.existing_person_ids ?? []);
+    }
+    throw Object.assign(new Error('conflict'), { conflict: true, current_updated_at: d.current_updated_at });
   }
   if (!resp.ok) throw new Error(`updatePerson: ${resp.status}`);
   return resp.json();

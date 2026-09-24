@@ -15,7 +15,7 @@ from ..config import get_logger
 from ..entity_labels_ops import enrich_entity_labels_from_person_async
 from .person_crud import (
     get_person,
-    create_person,
+    create_person_checked,
     update_person,
     add_identifier,
     apply_enrichment,
@@ -24,6 +24,8 @@ from .person_crud import (
     delete_person_image,
     bulk_update_occupation,
     _safe_nanoid,
+    IdentifierConflict,
+    restore_person,
 )
 from .person_search import list_persons, get_person_map_markers, get_person_facets, _normalize_tag_query
 from .historical_regions import HistoricalRegionsError, get_historical_regions
@@ -33,7 +35,7 @@ from .indices import rebuild_indices
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
-from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo, save_with_git
+from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo
 from ..rate_limit import get_client_ip, check_rate_limit
 from ..utils import find_directory_by_id
 from ..access_ops import is_work_public
@@ -44,6 +46,15 @@ from urllib.parse import quote
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def _identifier_conflict_http(e) -> HTTPException:
+    """IdentifierConflict → 409 (spekk §4.2: exists | split)."""
+    detail = {"error": "identifier_conflict", "conflict": e.kind,
+              "existing_person_ids": e.person_ids}
+    if e.kind == "exists":
+        detail["existing_person_id"] = e.person_ids[0]
+    return HTTPException(status_code=409, detail=detail)
 
 
 def _check_wikidata_rate_limit(request: Request):
@@ -374,14 +385,46 @@ async def prosopography_translate(
     return {"status": "ok", "text": tolge, "usage": usage}
 
 
+_ALLOWED_CREATED_VIA = ("picker", "form")
+
+
+@router.post("/persons/create")
+async def prosopography_create_checked(request: Request, user=Depends(require_role("editor"))):
+    """Isiku loomine ühe sammuga (spekk §4.2): paneel saadab tipuväljad, vorm `card`-i."""
+    data = await request.json()
+    created_via = data.get("created_via") if data.get("created_via") in _ALLOWED_CREATED_VIA else "form"
+    try:
+        person = await run_in_threadpool(
+            lambda: create_person_checked(
+                username=user["username"], created_via=created_via,
+                name=data.get("name"), identifiers=data.get("identifiers"),
+                aliases=data.get("aliases"), note=data.get("note"),
+                card=data.get("card"), context=data.get("context")))
+    except IdentifierConflict as e:
+        raise _identifier_conflict_http(e)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    enrich_entity_labels_from_person_async(person)
+    return person
+
+
 @router.post("")
 async def prosopography_create(
     request: Request,
     user=Depends(require_role("editor")),
 ):
-    """Loob uue vutt:P kirje."""
+    """Loob uue vutt:P kirje (vana tee — delegeerib create_person_checked-ile)."""
     data = await request.json()
-    person = await run_in_threadpool(create_person, data, username=user["username"])
+    try:
+        person = await run_in_threadpool(
+            lambda: create_person_checked(
+                username=user["username"], created_via="form",
+                name=data.get("name"), identifiers=data.get("identifiers"),
+                note=data.get("notes")))
+    except IdentifierConflict as e:
+        raise _identifier_conflict_http(e)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     enrich_entity_labels_from_person_async(person)
     return person
 
@@ -453,6 +496,8 @@ async def prosopography_add_identifier(
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    except IdentifierConflict as e:
+        raise _identifier_conflict_http(e)
     return {"person": person, "diff": diff}
 
 
@@ -475,6 +520,8 @@ async def prosopography_enrich(
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return person
 
 
@@ -655,10 +702,6 @@ def person_source_diff(person_id: str, field: str, user=Depends(require_role("ed
 @router.post("/{person_id:path}/restore")
 async def person_restore(person_id: str, request: Request, user=Depends(require_role("admin"))):
     """Taastab isikukaardi antud commit-i seisule. Teeb uue git commit-i."""
-    from ..config import PROSOPOGRAPHY_DIR
-    from .indices import _update_index_entry, _update_aliases_entry
-    from datetime import datetime, timezone
-
     data = await request.json()
     commit_hash = data.get("commit_hash")
     if not commit_hash:
@@ -679,22 +722,10 @@ async def person_restore(person_id: str, request: Request, user=Depends(require_
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="JSON parse viga")
 
-    now = datetime.now(timezone.utc).isoformat()
-    person["updated_at"] = now
-    person["updated_by"] = user["username"]
-
-    path = os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
-    name = (person.get("name") or {}).get("label") or person_id
-    await run_in_threadpool(
-        save_with_git,
-        path,
-        json.dumps(person, ensure_ascii=False, indent=2),
-        user["username"],
-        message=f"Prosopo taastamine: {name} [{person_id}]",
-    )
-
-    await run_in_threadpool(_update_index_entry, person)
-    await run_in_threadpool(_update_aliases_entry, person)
+    try:
+        person = await run_in_threadpool(restore_person, person_id, person, user["username"])
+    except IdentifierConflict as e:
+        raise _identifier_conflict_http(e)
     return {"status": "ok", "person": person}
 
 
@@ -915,6 +946,8 @@ async def prosopography_update(
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    except IdentifierConflict as e:
+        raise _identifier_conflict_http(e)
     except ValueError as e:
         msg = str(e)
         if msg == "updated_at_required":

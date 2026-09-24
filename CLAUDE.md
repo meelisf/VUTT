@@ -294,6 +294,13 @@ sisendist on kohustuslik. Indeks kannab NELJA katget
 VAADE (`biographyChain.ts`), mitte indeks. AA-kirje ei ole KUNAGI eluloo
 varuvariant, aga on katke ahela lõpp.
 
+**Isikukaardi ülevaatus ja ID-d (ADR 0048)** — `review` on serveri väli: kõik kliendi
+kirjutusteed läbivad `strip_server_fields`-i (ka `review.*` rajad). Kaardi salvestus
+käib `_save_person_locked` kaudu — see uuendab `ext_id_index`-i samas kriitilises
+sektsioonis. ID-lisav tee võtab `ext_id_claim_lock`-i ENNE `person_lock`-i.
+Automaatrikastus täidab ainult tühja; välisallika päringut ei tehta luku all.
+Uus isik ainult `create_person_checked` kaudu (`POST /prosopography/persons/create`).
+
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
 allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `urlTransform`
