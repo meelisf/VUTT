@@ -297,7 +297,9 @@
       "error": "Rakendamine ebaõnnestus",
       "done": "Rakendatud: {{rotated}} pööret, {{split}} poolitust",
       "blocked": "Enne salvesta või tühista ootel muudatused.",
-      "badgeSplit": "poolitatakse"
+      "badgeSplit": "poolitatakse",
+      "progress": "{{done}} / {{total}} lehte",
+      "interrupted": "Töö katkes enne lõppu (server taaskäivitus?). Lehtede nimekiri värskendati — vaata üle, mis jõudis kettale."
     }
   },
   "metadata": {

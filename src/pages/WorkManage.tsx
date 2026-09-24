@@ -23,7 +23,9 @@ import { ApiError } from '../services/apiClient';
 import {
   addWorkPages,
   applyReocrResults,
-  applyWorkPageOps,
+  startWorkPageOps,
+  getWorkPageOpsStatus,
+  PageOpsStatus,
   deleteWork,
   deleteWorkPages,
   DeletedWorkPage,
@@ -124,6 +126,10 @@ const WorkManage: React.FC = () => {
   const [pageOpsError, setPageOpsError] = useState<string | null>(null);
   const [pageOpsConfirmOpen, setPageOpsConfirmOpen] = useState(false);
   const [pageOpsResult, setPageOpsResult] = useState<string | null>(null);
+  // Taustatöö edenemine (#431): null = tööd ei jälgita.
+  const [pageOpsProgress, setPageOpsProgress] = useState<{ done: number; total: number } | null>(null);
+  const pageOpsPollAlive = useRef(true);
+  useEffect(() => { pageOpsPollAlive.current = true; return () => { pageOpsPollAlive.current = false; }; }, []);
 
   // Hulgivalik + liigutamine
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -379,7 +385,7 @@ const WorkManage: React.FC = () => {
   // Hõljuv alumine tegevusriba nähtav ainult lehekülgede tabis, kui on valik
   // VÕI salvestamata järjekorra-muudatus. Kasutatakse nii sisu alaserva padding'uks
   // (et viimane pisipiltide rida ei jää riba taha) kui riba renderdamiseks.
-  const showActionBar = activeTab === 'pages' && (selectedFiles.size > 0 || hasReorderChanges || pageOpsCount > 0);
+  const showActionBar = activeTab === 'pages' && (selectedFiles.size > 0 || hasReorderChanges || pageOpsCount > 0 || pageOpsSaving);
 
   // Vali/tühista; shift = vahemik viimasest ankrust nähtaval järjekorral
   const handleToggle = (filename: string, shiftKey: boolean) => {
@@ -548,35 +554,85 @@ const WorkManage: React.FC = () => {
 
   const handleReorderSave = () => { setReorderConfirmOpen(true); };
 
-  /** Rakendab ootel pöörded ja poolitused ühe päringuga (kinnituse järel). */
+  /**
+   * Jälgib taustatööd kuni lõpuni (#431). Pakk-poolitus võib kesta minuteid —
+   * riba näitab „12 / 65 lehte". Lõpus laetakse nimekiri alati uuesti: ketas
+   * võis muutuda ka vea korral (osaline tulemus).
+   */
+  const followPageOps = async (total: number): Promise<boolean> => {
+    if (!workId || !authToken) return false;
+    setPageOpsSaving(true);
+    setPageOpsProgress({ done: 0, total });
+    let ok = false;
+    try {
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1000));
+        if (!pageOpsPollAlive.current) return false;
+        let st: PageOpsStatus;
+        try {
+          st = await getWorkPageOpsStatus(workId, authToken);
+        } catch {
+          continue;   // ajutine võrgutõrge — töö käib serveris edasi
+        }
+        if (st.state === 'running') {
+          setPageOpsProgress({ done: st.done ?? 0, total: st.total ?? total });
+          continue;
+        }
+        if (st.state === 'done') {
+          const r = st.result ?? {};
+          setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, split: r.split ?? 0 }));
+          ok = true;
+        } else if (st.state === 'error') {
+          setPageOpsError(st.error || t('manage.pageOps.error'));
+        } else {
+          setPageOpsError(t('manage.pageOps.interrupted'));
+        }
+        break;
+      }
+    } finally {
+      if (pageOpsPollAlive.current) {
+        // Ootel plaan tühjaks ka vea korral: osaliselt tehtud pööre oleks
+        // uuel „Rakenda"-l teist korda pööratud. Kasutaja märgib uuesti.
+        setPendingOps({});
+        handleClearSelection();
+        await loadPages();
+        setThumbCacheBust(Date.now());
+        setPageOpsProgress(null);
+        setPageOpsSaving(false);
+      }
+    }
+    return ok;
+  };
+
+  /** Käivitab ootel pöörded ja poolitused taustatööna (kinnituse järel). */
   const savePageOps = async (): Promise<boolean> => {
     if (!workId || !authToken || pageOpsCount === 0) return false;
     setPageOpsConfirmOpen(false);
-    setPageOpsSaving(true);
     setPageOpsError(null);
     setPageOpsResult(null);
     try {
-      const r = await applyWorkPageOps(workId, authToken, toRequest(pendingOps, splitX));
-      setPendingOps({});
-      handleClearSelection();
-      setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, split: r.split ?? 0 }));
-      return true;
+      const r = await startWorkPageOps(workId, authToken, toRequest(pendingOps, splitX));
+      return await followPageOps(r.total);
     } catch (e: any) {
-      // Osaline tulemus on võimalik (server ütleb, mitu tehti) — ootel plaan jääb
-      // alles ja prune viskab ära lehed, mida enam ei ole.
+      if (e instanceof ApiError && e.status === 409) {
+        // Sama teose töö juba käib (teine sakk, topeltklikk) — jälgi seda.
+        return await followPageOps(pageOpsCount);
+      }
       setPageOpsError(e?.message || t('manage.pageOps.error'));
       return false;
-    } finally {
-      // Nii edu kui vea korral: ketas võis muutuda → värske nimekiri + pisipildid.
-      await loadPages();
-      setThumbCacheBust(Date.now());
-      setPageOpsSaving(false);
     }
   };
 
-  // Salvestamata järjekorra mustand on samasugune salvestamata muudatus nagu tekst.
-  // NB: `saveReorder` (mitte `handleReorderSave`) — dialoog ei tohi küsida teist
-  // kinnitust "Salvesta ja jätka" peale.
+  // Lehe avamisel: kui selle teose töö juba käib (lehe värskendus keset tööd),
+  // jätka jälgimist, muidu tunduks, et midagi ei toimu.
+  useEffect(() => {
+    if (!workId || !authToken || !isAdmin) return;
+    getWorkPageOpsStatus(workId, authToken)
+      .then((st) => { if (st.state === 'running') void followPageOps(st.total ?? 0); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workId, authToken, isAdmin]);
+
   // Järjekorra mustand ja ootel pöörded/poolitused ei saa korraga olla (nupud
   // blokeerivad teineteist), seega salvestab dialoog selle, mis ootel on.
   const { dialogProps } = useUnsavedChangesGuard({
@@ -1411,6 +1467,7 @@ const WorkManage: React.FC = () => {
           splitPercent={splitPercent}
           setSplitPercent={setSplitPercent}
           pageOpsSaving={pageOpsSaving}
+          pageOpsProgress={pageOpsProgress}
           pageOpsError={pageOpsError}
           onApplyPageOps={() => setPageOpsConfirmOpen(true)}
           onDiscardPageOps={() => { setPendingOps({}); setPageOpsError(null); }}
