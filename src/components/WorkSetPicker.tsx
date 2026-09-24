@@ -8,7 +8,9 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Users, X, Loader2, Search } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
-import { manageableWorkSets } from './pickerEntries';
+import { favoriteEntries, manageableWorkSets, Nimi } from './pickerEntries';
+import { useFavoriteCollections } from '../hooks/useFavoriteCollections';
+import FavoriteStar from './FavoriteStar';
 import { getLangCode } from '../utils/getLangCode';
 
 interface WorkSetPickerProps {
@@ -32,6 +34,35 @@ const WorkSetPicker: React.FC<WorkSetPickerProps> = ({
   const kogud = useMemo(
     () => manageableWorkSets(workSets, query, lang),
     [workSets, query, lang],
+  );
+  const fav = useFavoriteCollections();
+  // `kogud` on juba otsinguga filtreeritud — lemmikute plokk võtab sealt.
+  const lemmikud = useMemo(
+    () => favoriteEntries(fav.favorites, [], kogud, '', lang),
+    [fav.favorites, kogud, lang],
+  );
+
+  const rida = (ws: { id: string; name: Nimi }, key: string) => (
+    <div key={key} className="flex items-center gap-1">
+      <button
+        onClick={() => onSelect(ws.id)}
+        disabled={busy}
+        className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors hover:bg-gray-100 disabled:opacity-50"
+      >
+        <Users size={18} className="text-gray-400" />
+        <span className="flex-1 truncate">
+          {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
+        </span>
+        {busy && <Loader2 size={16} className="animate-spin text-gray-400" />}
+      </button>
+      {fav.enabled && (
+        <FavoriteStar
+          active={fav.isFavorite('work_set', ws.id)}
+          onToggle={() => fav.toggle('work_set', ws.id)}
+          disabled={fav.busy}
+        />
+      )}
+    </div>
   );
 
   if (!isOpen) return null;
@@ -77,20 +108,21 @@ const WorkSetPicker: React.FC<WorkSetPickerProps> = ({
                 : t('workSets.noManageable', 'Sa ei halda ühtki aktiivset töökollektsiooni')}
             </p>
           ) : (
-            kogud.map(ws => (
-              <button
-                key={ws.id}
-                onClick={() => onSelect(ws.id)}
-                disabled={busy}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors hover:bg-gray-100 disabled:opacity-50"
-              >
-                <Users size={18} className="text-gray-400" />
-                <span className="flex-1 truncate">
-                  {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
-                </span>
-                {busy && <Loader2 size={16} className="animate-spin text-gray-400" />}
-              </button>
-            ))
+            <>
+              {lemmikud.length > 0 && (
+                <>
+                  <h3 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {t('workSets.favorites', 'Lemmikud')}
+                  </h3>
+                  {lemmikud.map(e => rida(e, `fav:${e.id}`))}
+                  <div className="border-t border-gray-200 my-2" />
+                </>
+              )}
+              {fav.error && (
+                <p className="px-3 pb-1 text-xs text-red-600">{t('workSets.favoriteFailed', 'Lemmiku salvestamine ebaõnnestus')}</p>
+              )}
+              {kogud.map(ws => rida(ws, ws.id))}
+            </>
           )}
         </div>
       </div>

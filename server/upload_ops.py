@@ -175,6 +175,13 @@ def remote_paths(ocr_model: str, upload_id: str, slug: str) -> tuple:
     return staging, f"{staging}/{slug}"
 
 
+def _clean_work_sets(value) -> list:
+    """Töökollektsioonide ID-d: ainult mittetühjad stringid, kordusteta."""
+    if not isinstance(value, list):
+        return []
+    return list(dict.fromkeys(v for v in value if isinstance(v, str) and v))
+
+
 def create_upload(meta: dict, username: Optional[str] = None) -> dict:
     """
     Loob uue upload staging'u ja tagastab state.json sisu.
@@ -229,6 +236,10 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
             "ester_id": meta.get('ester_id'),
             "archive_refs": meta.get('archive_refs', []),
             "external_url": meta.get('external_url'),
+            # Töökollektsioonide valik (ADR 0042): rakendub impordil kogu
+            # failidesse, `_metadata.json`-i EI jõua (import ehitab selle
+            # nimekirja järgi).
+            "work_sets": _clean_work_sets(meta.get('work_sets')),
         },
         "expected_pages": None,
         # Töötlusotsus, mitte bibliograafiline väide — vaikeväärtus tuletatakse
@@ -265,9 +276,11 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
         'creators', 'location',
         'publisher', 'tags',
         'ester_id', 'external_url',
-        'archive_refs',
+        'archive_refs', 'work_sets',
     }
     updates = dating_updates(updates)
+    if 'work_sets' in updates:
+        updates = {**updates, 'work_sets': _clean_work_sets(updates['work_sets'])}
     lock = _get_upload_lock(upload_id)
     with lock:
         state = _read_state(upload_id)
@@ -806,7 +819,16 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
     except Exception as e:
         logger.warning(f"replace {upload_id}: OCR koristamine ebaõnnestus: {e}")
 
-    # 12. Märgi upload 'imported'-ks
+    # 12. Töökollektsioonid — sama leping nagu uue teose impordil: ei kukuta.
+    work_sets_skipped = None
+    valitud_kogud = (state.get('meta') or {}).get('work_sets')
+    if valitud_kogud:
+        from .work_sets_ops import add_work_to_sets
+        work_sets_skipped = add_work_to_sets(target_work_id, valitud_kogud, username or "Automaatne")
+        if work_sets_skipped:
+            logger.warning(f"replace {upload_id}: töökollektsioonid vahele jäetud: {work_sets_skipped}")
+
+    # 13. Märgi upload 'imported'-ks
     with state_lock:
         s = _read_state(upload_id)
         if s:
@@ -815,7 +837,10 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
             _write_state(upload_id, s)
 
     logger.info(f"replace {upload_id}: valmis → work_id={target_work_id}, slug={slug}, lehed={downloaded}")
-    return {"work_id": target_work_id, "slug": slug}
+    result = {"work_id": target_work_id, "slug": slug}
+    if work_sets_skipped is not None:
+        result["work_sets_skipped"] = work_sets_skipped
+    return result
 
 
 def cancel_upload(upload_id: str) -> bool:

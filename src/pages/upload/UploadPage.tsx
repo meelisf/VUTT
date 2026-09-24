@@ -51,13 +51,6 @@ const UploadPage: React.FC = () => {
     if (!user || !isAtLeast(user.role, 'admin')) navigate('/');
   }, [user, navigate, authLoading]);
 
-  // Kollektsioonide loend (sortimine nime järgi)
-  const collectionList = Object.entries(collections).sort(([, a], [, b]) => {
-    const nameA = typeof a.name === 'object' ? (a.name[lang] ?? a.name['et'] ?? '') : String(a.name);
-    const nameB = typeof b.name === 'object' ? (b.name[lang] ?? b.name['et'] ?? '') : String(b.name);
-    return nameA.localeCompare(nameB, lang);
-  });
-
   const stepLabels: [string, string, string, string] = [
     t('steps.metadata'),
     t('steps.upload'),
@@ -195,7 +188,9 @@ const UploadPage: React.FC = () => {
             slug={wizard.slug}
             selectedCollection={wizard.selectedCollection}
             setSelectedCollection={wizard.setSelectedCollection}
-            collectionList={collectionList}
+            selectedWorkSets={wizard.selectedWorkSets}
+            setSelectedWorkSets={wizard.setSelectedWorkSets}
+            collections={collections}
             lang={lang}
             step1Loading={wizard.step1Loading}
             step1Error={wizard.step1Error}

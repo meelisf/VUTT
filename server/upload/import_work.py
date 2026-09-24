@@ -500,6 +500,16 @@ def _teosta_import(
     except Exception as e:
         logger.warning(f"import {upload_id}: meilisearch sync viga: {e}")
 
+    # Töökollektsioonid (ADR 0042): valik elab upload'i olekus, liikmesus tekib
+    # alles nüüd, kui teos on olemas. Kogu, kuhu lisada ei saa, ei kukuta
+    # importi — vahelejäetu läheb vastusesse.
+    work_sets_skipped = None
+    if meta.get('work_sets'):
+        from ..work_sets_ops import add_work_to_sets
+        work_sets_skipped = add_work_to_sets(work_id, meta['work_sets'], username or "Automaatne")
+        if work_sets_skipped:
+            logger.warning(f"import {upload_id}: töökollektsioonid vahele jäetud: {work_sets_skipped}")
+
     # Uuenda upload state → 'imported'
     _lopeta_import(upload_id, 'imported', get_upload_lock_func, read_state_func,
                    write_state_func, work_id=work_id)
@@ -527,4 +537,6 @@ def _teosta_import(
     result = {"work_id": work_id, "slug": slug, "git_committed": git_committed}
     if git_warning:
         result["warning"] = git_warning
+    if work_sets_skipped is not None:
+        result["work_sets_skipped"] = work_sets_skipped
     return result

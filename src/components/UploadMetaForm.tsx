@@ -13,7 +13,7 @@ import { Creator, CreatorRole, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Collections, getVocabularies, Vocabularies } from '../services/collectionService';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
-import { CollectionDropdown } from './MetadataModal';
+import CollectionTargetSelect from './CollectionTargetSelect';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
@@ -49,6 +49,8 @@ interface MetaForm {
   creators: Creator[];
   languages: string[];
   collections: string[];
+  /** Töökollektsioonid — upload'i olekus, liikmesus tekib impordil (ADR 0042). */
+  work_sets: string[];
   ester_id: string;
   external_url: string;
   archive_refs: ArchiveRef[];
@@ -70,6 +72,7 @@ const EMPTY_FORM: MetaForm = {
   creators: [],
   languages: [],
   collections: [],
+  work_sets: [],
   ester_id: '',
   external_url: '',
   archive_refs: [],
@@ -151,6 +154,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             creators: m.creators ?? [],
             languages: m.languages ?? [],
             collections: Array.isArray(m.collections) ? m.collections : initialCollections,
+            work_sets: Array.isArray(m.work_sets) ? m.work_sets : [],
             ester_id: m.ester_id ?? '',
             external_url: m.external_url ?? '',
             archive_refs: m.archive_refs ?? [],
@@ -228,6 +232,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
       creators: cleanCreators(form.creators),
       languages: form.languages,
       collections: form.collections,
+      work_sets: form.work_sets,
       ester_id: cleanEsterId(form.ester_id),
       external_url: form.external_url.trim() || null,
       archive_refs: cleanArchiveRefs(form.archive_refs),
@@ -423,12 +428,15 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">
             {t('workspace:metadata.classification', 'Klassifikatsioon')}
           </h4>
-          <CollectionDropdown
+          <CollectionTargetSelect
             collections={collections}
-            selected={form.collections}
+            selectedCollections={form.collections}
+            onCollectionsChange={(next) => setForm((f) => ({ ...f, collections: next }))}
+            multipleCollections
+            selectedWorkSets={form.work_sets}
+            onWorkSetsChange={(next) => setForm((f) => ({ ...f, work_sets: next }))}
+            label={t('upload:step1.collectionLabel')}
             lang={lang}
-            onChange={(next) => setForm({ ...form, collections: next })}
-            label={t('workspace:metadata.collection')}
           />
           {/* Žanrid */}
           <div>

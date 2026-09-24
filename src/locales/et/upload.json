@@ -25,8 +25,7 @@
     "slugLabel": "Kaustanimi (slug)",
     "slugHint": "Kaust luuakse: data/{{slug}}/",
     "slugConflict": "Kaust data/{{slug}}/ on juba olemas — muuda slug-i",
-    "collectionLabel": "Kollektsioon (valikuline)",
-    "collectionNone": "— vali kollektsioon —",
+    "collectionLabel": "Kollektsioon ja töökollektsioonid (valikuline)",
     "languagesLabel": "Keeled (valikuline)",
     "continue": "Jätka üleslaadimisele",
     "required": "Kohustuslik väli",
@@ -91,7 +90,8 @@
     "importError": "Importimine ebaõnnestus",
     "gitCommitWarning": "Teos imporditi, aga Git versioonihalduse commit ebaõnnestus.",
     "transferFailed": "Failide saatmine OCR-serverisse ebaõnnestus",
-    "backToSplit": "Tagasi poolitamise juurde"
+    "backToSplit": "Tagasi poolitamise juurde",
+    "workSetsSkipped": "Teost ei lisatud töökollektsiooni(desse): {{names}}"
   },
   "step3split": {
     "title": "Lehtede ülevaatus",

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
-import type { Collection } from '../../../services/collectionService';
+import type { Collections } from '../../../services/collectionService';
+import CollectionTargetSelect from '../../../components/CollectionTargetSelect';
 import type { AdaLookupResult, AdaVormiVali, UploadType } from '../types';
 import { ApiError } from '../../../services/apiClient';
 import { adaLookup, mergeAdaIntoForm } from '../adaApi';
@@ -18,8 +19,10 @@ interface UploadStepMetaProps {
   slug: string;
   selectedCollection: string;
   setSelectedCollection: (value: string) => void;
-  collectionList: Array<[string, Collection]>;
-  lang: string;
+  selectedWorkSets: string[];
+  setSelectedWorkSets: (value: string[]) => void;
+  collections: Collections;
+  lang: 'et' | 'en';
   step1Loading: boolean;
   step1Error: string;
   autoCreateLoading: boolean;
@@ -47,7 +50,9 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
   slug,
   selectedCollection,
   setSelectedCollection,
-  collectionList,
+  selectedWorkSets,
+  setSelectedWorkSets,
+  collections,
   lang,
   step1Loading,
   step1Error,
@@ -245,25 +250,17 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
           </p>
         ) : null}
 
-        {/* Kollektsioon */}
+        {/* Kollektsioon + töökollektsioonid */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t('step1.collectionLabel')}
-          </label>
-          <select
-            value={selectedCollection}
-            onChange={(e) => setSelectedCollection(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-          >
-            <option value="">{t('step1.collectionNone')}</option>
-            {collectionList.map(([id, col]) => (
-              <option key={id} value={id}>
-                {typeof col.name === 'object'
-                  ? (col.name[lang as keyof typeof col.name] ?? col.name.et ?? id)
-                  : String(col.name)}
-              </option>
-            ))}
-          </select>
+          <CollectionTargetSelect
+            collections={collections}
+            selectedCollections={selectedCollection ? [selectedCollection] : []}
+            onCollectionsChange={(next) => setSelectedCollection(next[0] ?? '')}
+            selectedWorkSets={selectedWorkSets}
+            onWorkSetsChange={setSelectedWorkSets}
+            label={t('step1.collectionLabel')}
+            lang={lang}
+          />
         </div>
 
         {/* ADA-import on HARV tee: vorm on esimene ja kohe kasutatav, import tuleb
