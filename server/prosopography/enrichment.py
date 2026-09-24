@@ -124,6 +124,22 @@ def _ühenda_variandid(local_val, remote_val) -> Optional[list]:
     return olemas + lisandub
 
 
+def fetch_remote(scheme: str, ext_id: str) -> Optional[dict]:
+    """Ühe allika toorvastus (normaliseeritud ID-ga). None = tõrge või tundmatu skeem."""
+    # Vorming kanooniliseks ENNE päringut: `lobid.org/gnd/GND:123` andis 404 ja
+    # rikastus ebaõnnestus vaikselt (#240).
+    ext_id = normalize_ext_id(scheme, ext_id)
+    if scheme == "wikidata":
+        return _fetch_wikidata(ext_id)
+    if scheme == "gnd":
+        return _fetch_gnd(ext_id)
+    if scheme in ("aa", "album_academicum"):
+        return _fetch_aa(ext_id)
+    if scheme == "viaf":
+        return _fetch_viaf(ext_id)
+    return None
+
+
 def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E501
     """
     Küsib allika andmed ja võrdleb kohaliku kirjega.
@@ -131,20 +147,9 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
       auto_filled: {field_path: value}  — kohalik null, allikas täidab
       conflicts:   [{field, local, remote}]  — mõlemal väärtus, aga erinevad
     """
-    # Vorming kanooniliseks ENNE päringut: `lobid.org/gnd/GND:123` andis 404 ja
-    # rikastus ebaõnnestus vaikselt (#240).
-    ext_id = normalize_ext_id(scheme, ext_id)
-
-    if scheme == "wikidata":
-        remote = _fetch_wikidata(ext_id)
-    elif scheme == "gnd":
-        remote = _fetch_gnd(ext_id)
-    elif scheme in ("aa", "album_academicum"):
-        remote = _fetch_aa(ext_id)
-    elif scheme == "viaf":
-        remote = _fetch_viaf(ext_id)
-    else:
+    if scheme not in ("wikidata", "gnd", "aa", "album_academicum", "viaf"):
         return {"auto_filled": {}, "conflicts": [], "error": f"Tundmatu skeem: {scheme}"}
+    remote = fetch_remote(scheme, ext_id)
 
     if remote is None:
         return {"auto_filled": {}, "conflicts": [], "error": "Andmete laadimine ebaõnnestus"}
