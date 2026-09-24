@@ -1,7 +1,7 @@
 # Isiku lisamise voog: isikupaneel, automaatrikastus, ülevaatusjärjekord
 
 Kuupäev: 2026-09-24
-Staatus: kokku lepitud disain (brainstorm 2026-09-24; rev 2 pärast ülevaatust — §10);
+Staatus: kokku lepitud disain (brainstorm 2026-09-24; rev 3 pärast kahte ülevaatust — §10);
 teostus neljas PR-is (§8)
 Seotud: #240 (prosopograafia kvaliteedi kogumiskoht); PR #415 (Wikidata entity API);
 ADR 0007 (read-modelid), 0022 (välise ID kanooniline kuju), 0039 (eluloo väljad)
@@ -69,8 +69,8 @@ Serveripoolne väli kaardil:
 ```
 
 - `state`: `pending` | `done`.
-- `reasons` (mitu korraga): `enrich_pending` | `auto_enriched` | `enrich_failed` |
-  `no_source` | `possible_duplicate`.
+- `reasons` (mitu korraga): `enrich_pending` | `auto_enriched` | `nothing_to_fill` |
+  `enrich_failed` | `no_source` | `possible_duplicate` (lõppolekud §4.3).
 - `created_via`: `picker` | `form` | `server_stub` | `backfill`.
 - `auto_filled` loetleb **tegelikke kaardivälju** (`occupations`, `identifiers`), mitte
   rikastaja tehnilisi võtmeid (`_occupations`, `_linked_gnd`) — vt §4.3 teisendus.
@@ -162,22 +162,32 @@ Lisaks vastuses `similar_persons`: nimepõhine VUTT-i vaste (sama loogika mis
 Keha: `{name, identifiers: [{scheme, id}, …], aliases?: [str], context?: {work_id, role},
 note?: str, created_via: "picker"|"form", card?: {…}}`.
 
-`card` on vormi **kogu algne sisu** (sama kuju mis `draftToPayload`): loomine on ÜKS
-samm. Praegu teeb `PersonEditPage` `createPerson` + `updatePerson`; kui taustarikastus
+**Kaardi sisul on täpselt üks allikas** — kas `card` VÕI tipuväljad, mitte mõlemad:
+
+- **Vorm** saadab `card`-i (sama kuju mis `draftToPayload`, sisaldab ka `identifiers`,
+  `name.label`, `name.aliases`, `notes`). Tipuväljad `name`, `identifiers`, `aliases`,
+  `note` on siis **keelatud → 400**.
+- **Paneel** saadab tipuväljad, `card`-i ei ole.
+
+Prioriteedireeglit (kumb võidab) ei ole, sest kahte allikat ei lubata. Server
+**moodustab esmalt lõpliku salvestatava kaardi**, siis `strip_server_fields`, siis
+normaliseerib selle kaardi `identifiers`-i — ja duplikaadikontroll (samm 2) käib
+**just nende salvestatavate ID-de** peal. Muud teed ei ole: kontroll ja salvestus ei
+saa lahkneda.
+
+`card` on vormi **kogu algne sisu**: loomine on ÜKS samm. Praegu teeb `PersonEditPage` `createPerson` + `updatePerson`; kui taustarikastus
 satub nende vahele, saab teine samm versioonikonflikti ja kasutaja voog katkeb.
 Kogu vormisisu salvestub enne, kui taustatöö üldse järjekorda läheb; rikastus täidab
 seejärel ainult seda, mis vormis tühjaks jäi. `card`-ist visatakse serveriväljad ära
 (`strip_server_fields`, §3.1).
 
 1. Normaliseeri ID-d (ADR 0022).
-2. **Loomise luku all** kontrolli iga ID `ext_id_index`-ist:
+2. **ID-lukk** (§4.6) all kontrolli iga lõpliku kaardi ID-d `ext_id_index`-ist:
    - kõik leitud ID-d on ÜHEL kaardil → **409** `{conflict: "exists", existing_person_id}`;
    - ID-d on **eri kaartidel** → **409** `{conflict: "split", existing_person_ids: [...]}` —
      allikad väidavad, et kaks VUTT-i kaarti on üks isik. Paneel ei loo midagi, näitab
      mõlemat kaarti ja soovitab liitmist (admin). Kaks kasutajat samal ajal → üks kaart.
-   Lukk on uus
-   moodulitasandi `_create_lock`, mis katab kontrolli JA kirjutuse; protsessilokaalne —
-   sama hoiatus mis `_work_sets_lock`-il (mitme workeri korral vaja protsessideülest).
+   Lukk katab kontrolli, kirjutuse JA `ext_id_index`-i uuenduse (§4.6).
 3. Loo kaart (`create_person`), `review = {state: pending, reasons: [...], context,
    created_via}`: ID-dega → `enrich_pending`; ID-ta → `no_source`. Server teeb ise
    nimepõhise sarnasusotsingu (sama mis `similar_persons` §4.1) — vaste korral lisandub
@@ -196,8 +206,15 @@ Protsessisisene piiratud executor (2 lõime). Üks töö = üks kaart, kõik tem
 1. **Väljaspool lukku:** küsi iga ID skeemi kohta allika andmed (`_fetch_*`). Aeglane
    välisallikas ei hoia kaardi muutmist kinni.
 2. **Koonda kõigi allikate ettepanekud väljade kaupa** enne ühtegi kirjutust (vt reeglid).
-3. **Luku all:** loe kaart uuesti (vahepeal võis keegi muuta), arvuta rakendatav hulk
-   värske kaardi pealt, rakenda, uuenda `review`, salvesta **ühe** kirjutuse + commitiga.
+3. **Lukkude all** (ID-lukk, siis `person_lock` — §4.6): loe kaart uuesti (vahepeal
+   võis keegi muuta) ja **kontrolli, et ettepanekud kehtivad veel**:
+   - kaart puudub või on tombstone (`merged_into`, `record_status = tombstone`) →
+     **ei kirjutata midagi**, töö lõpeb;
+   - iga ettepanek kannab oma allikat `(scheme, id)`; rakendatakse ainult nende allikate
+     ettepanekud, mille **normaliseeritud ID on kaardil endiselt olemas**. Kui kasutaja
+     päringu ajal eksliku Wikidata ID eemaldas või muutis, selle andmed kaardile ei jõua;
+   - arvuta rakendatav hulk värske kaardi pealt, rakenda, uuenda `review`, salvesta
+     **ühe** kirjutuse + commitiga, uuenda `ext_id_index`.
 
 `person_lock` on tavaline `threading.Lock` ja `apply_enrichment` võtab selle ise —
 taustatöö EI kutsu `apply_enrichment`-i luku seest (ummikseis). Mõlemad kasutavad ühist
@@ -221,9 +238,10 @@ viimine serverisse ka seal on hilisem koristus (märgitud #240 alla), mitte sell
 **Reeglid:**
 
 - **Täidab ainult tühja.** Välja, millel on kaardil väärtus, ei muudeta.
-- **Erand: hulgaväljad** (`name.aliases`, `_HULGA_VÄLJAD`) — ühendatakse (NFC-võrdlusega
-  dedup), olemasolevat ei eemaldata kunagi. See on ainus juhtum, kus täidetud välja
-  sisu muutub, ja ainult lisamise suunas.
+- **Erandid — ainult lisamise suunas, olemasolevat ei eemaldata kunagi:**
+  - hulgaväljad (`name.aliases`, `_HULGA_VÄLJAD`) — ühendatakse (NFC-võrdlusega dedup);
+  - `identifiers` — seotud ID-d (`_linked_*`) lisatakse, kui seda skeemi kaardil veel
+    ei ole ja ID ei ole teisel kaardil (§4.6).
 - **Allikatevaheline vastuolu:** kui tühja välja jaoks pakuvad kaks allikat erinevat
   väärtust, jääb väli **täitmata** ja mõlemad väärtused koos allikatega lähevad
   `review.source_conflicts`-i. Nii ei otsusta järjekord (kumb allikas enne vastas).
@@ -232,16 +250,47 @@ viimine serverisse ka seal on hilisem koristus (märgitud #240 alla), mitte sell
   väärtused jäävad `source_conflicts`-i alla märkega `compatible: true` (admin näeb).
 - **Konflikti kaardiga (kaardil on väärtus, allikas pakub muud) ei rakendata kunagi**;
   need on käsitsi rikastuse vaates nagu praegu.
-- **Osaline õnnestumine:** kui mõni allikas vastas ja mõni mitte, rakendatakse vastanute
-  ettepanekud, `review.reasons` saab nii `auto_enriched` kui `enrich_failed`,
-  `review.failed_sources` loetleb ebaõnnestunud skeemid. Automaatset kordust ebaõnnestunud
-  allikale ei ole — admin saab käsitsi rikastuse vaatest uuesti proovida.
-- Kui ükski allikas ei vastanud: ainult `enrich_failed`.
+**Lõppolek.** Iga lõppenud katse **eemaldab `enrich_pending`-i** ja säilitab muud
+põhjused (`no_source`, `possible_duplicate`). Muidu jääks kaart kinnitamatuks (§4.5) ja
+läheks igal käivitusel uuesti rikastusse. Tulemus lisab täpselt ühe kombinatsiooni:
 
-**Taaste:** käivitusel otsib taustalõim üles kaardid `review.reasons ∋ enrich_pending`
+| Olukord | Lisatavad põhjused |
+|---|---|
+| vähemalt üks allikas vastas, rakendati ≥ 1 väli | `auto_enriched` |
+| … ja mõni allikas ei vastanud | `auto_enriched` + `enrich_failed` (`failed_sources`) |
+| allikad vastasid, rakendatavaid välju ei olnud | `nothing_to_fill` |
+| … ja mõni allikas ei vastanud | `nothing_to_fill` + `enrich_failed` |
+| ükski allikas ei vastanud | `enrich_failed` |
+| ükski ID ei ole kaardil enam alles | — (ainult `enrich_pending` eemaldub) |
+| kaart puudub / tombstone | midagi ei kirjutata |
+
+`source_conflicts` lisandub igal juhul, kui vastuolusid oli. Automaatset kordust
+ebaõnnestunud allikale ei ole — admin saab käsitsi rikastuse vaatest uuesti proovida.
+
+**Taaste:** kuna iga lõppenud katse eemaldab `enrich_pending`-i, tähendab see märge
+ainult „katse ei jõudnud lõpule". Käivitusel otsib taustalõim üles kaardid `review.reasons ∋ enrich_pending`
 ja kordab. Märge on töö püsiv jälg; mälusisest järjekorda ei usaldata.
 
 Git-commit nagu tavalisel rikastusel (autor = looja, sõnum „Automaatne rikastus").
+
+### 4.6 ID-lukk ja lukkude järjekord
+
+Ühe isiku lukk ei kaitse **teist** kaarti: kaks taustatööd võivad korraga leida sama
+GND ID vabana ja lisada selle eri kaartidele — sama võidujooks nagu kahe loomise vahel.
+
+- Uus moodulitasandi **`_ext_id_claim_lock`**. Iga tee, mis **lisab kaardile välise ID**,
+  võtab selle ja hoiab üle **kontrolli, salvestuse ja `ext_id_index`-i uuenduse**:
+  `persons/create`, taustarikastuse `_linked_*` lisandus, `add_identifier`
+  (`POST /{id}/identifiers`) ja `update_person`, kui `identifiers` muutub.
+- **Järjekord on alati: `_ext_id_claim_lock` → `person_lock`**, mitte kunagi vastupidi.
+  Teed, mis ID-sid ei lisa, võtavad ainult `person_lock`-i (ja ei tohi seejärel
+  `_ext_id_claim_lock`-i küsida).
+- `ext_id_index` uuendatakse praegu `_update_index_entry`-s pärast salvestust ja väljaspool
+  isiku lukku (`apply_enrichment`). ID-lisavates teedes peab see jääma
+  `_ext_id_claim_lock`-i sisse — muidu näeb järgmine kontroll vana indeksit.
+- Välisallika päringut ei tehta kunagi ühegi luku all.
+- Protsessilokaalne — sama hoiatus mis `_work_sets_lock`-il ja `RENDER_SEMAPHORE`-il
+  (mitme workeri korral vaja protsessideülest lukku).
 
 ### 4.4 Serveri stub'id
 
@@ -340,7 +389,10 @@ teose vorm jääb nähtavaks.
   koos allikaga** — sellest tehakse identiteedi otsus.
 - **„Loo ja vali"** → `POST persons/create` → valija `onChange` → paneel sulgub → teade
   „Isik loodud. Andmed täituvad allikast taustal; kaart ootab ülevaatust."
-- **409** → „See isik on juba VUTT-is" + „Vali see".
+- **409 `exists`** → „See isik on juba VUTT-is" + „Vali see".
+- **409 `split`** → „Allikad viitavad kahele eri VUTT-i kaardile" + mõlemad kaardid
+  „Ava" lingina; midagi ei looda ega valita. Toimetajale tekst „teata adminile",
+  adminile „Liida…".
 - **Allikata loomine**: nimi (eeltäidetud), märkus (`notes`). Paneel näitab infona
   „fl. 1645 (sellest teosest)". Kaardile floruit'i ei kirjutata: seos teosega tekib, kui
   kasutaja teose metaandmed salvestab (`person_to_works`), ja tuletatud floruit (§3.2)
@@ -394,6 +446,15 @@ pytest:
 - `enrichment_to_card_fields`: `_linked_gnd` teisel kaardil → ei lisata + `possible_duplicate`;
 - taustatöö ei võta lukku välisallika päringu ajaks; kaart loetakse luku all uuesti
   (vahepealne käsitsi muudatus jääb alles);
+- **päringu ajal eemaldatud/muudetud ID** → selle allika ettepanekuid ei rakendata;
+  **kaart kustutati/liideti** päringu ajal → midagi ei kirjutata;
+- **lõppolekud** (§4.3 tabel): iga rida; `enrich_pending` eemaldub alati,
+  `possible_duplicate` / `no_source` säilivad;
+- **ID-lukk:** kaks samaaegset taustatööd sama `_linked_gnd`-iga eri kaartidel → ID ühel
+  kaardil, teine saab `possible_duplicate`; `update_person` identifiers-muudatus ja
+  `create` sama ID-ga korraga → üks kaart;
+- `persons/create`: `card` + tipuväli korraga → 400; duplikaadikontroll käib `card.identifiers`
+  peal (ID ainult `card`-is → ikkagi 409);
 - kinnitus: vale `updated_at` → 409; `enrich_pending` ajal → 409;
 - käivitusel `enrich_pending` kordus;
 - tuletatud floruit: ainult tegevusrollid; käsitsi võidab;
@@ -416,8 +477,8 @@ Iga PR on tootmises eraldi testitav (kasutaja töövoog: merge → deploy → te
 
 1. **Serveri alus** — `review` märge + `strip_server_fields` kõigis kirjutusteedes +
    ADR 0048; `persons/create` (ühesammuline, `card`); `_apply_fields` lukuta
-   sisefunktsioon; `enrichment_to_card_fields`; taustarikastus (koondamine, vastuolud,
-   osaline õnnestumine) + taaste; stub-teed; `EntityPicker` ja `PersonEditPage` kutsuvad
+   sisefunktsioon; `_ext_id_claim_lock` + lukkude järjekord; `enrichment_to_card_fields`;
+   taustarikastus (koondamine, vastuolud, ID kehtivuse kontroll, lõppolekud) + taaste; stub-teed; `EntityPicker` ja `PersonEditPage` kutsuvad
    uut otspunkti (vorm ühe sammuga). *Kasu kohe:* ID-ga loodud kaartidele proovitakse
    automaatrikastust ja kõik uued kaardid saavad ülevaatusmärke. (Allikata loomine ja
    allikate tõrked võivad endiselt anda tühja kaardi — aga see on järjekorras nähtav.)
@@ -455,3 +516,14 @@ välisallika päringu ajal. Tuletatud floruit on read-model ega kasuta
 6. Vormi loomine ühe sammuga (`card`), enne taustatööd (§4.2).
 7. Väiksemad: sõna-eesliite sobivusreegel (§5.2); 409 `split` mitme kaardi korral (§4.2);
    PR 1 lubadus täpsustatud (§8).
+
+**Rev 3 (2026-09-24, teise ülevaatuse järel):**
+
+1. Kaardi sisul üks allikas: `card` VÕI tipuväljad (mõlemad → 400); duplikaadikontroll
+   käib lõpliku salvestatava kaardi normaliseeritud ID-de peal (§4.2).
+2. Taustatöö rakendab ainult nende allikate ettepanekud, mille ID on kaardil alles;
+   kustutatud/tombstone-kaardile ei kirjutata (§4.3).
+3. `_ext_id_claim_lock` kõigile ID-lisavatele teedele, katab kontrolli + salvestuse +
+   `ext_id_index`-i; järjekord ID-lukk → `person_lock` (§4.6).
+4. Iga lõppenud katse eemaldab `enrich_pending`-i; lõppolekute tabel, sh `nothing_to_fill` (§4.3).
+5. `identifiers` lisandus on nimetatud „ainult tühja" erandina; §6 eristab 409 `exists`/`split`.
