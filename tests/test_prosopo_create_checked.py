@@ -74,6 +74,12 @@ def test_aliases_vigane_kuju_on_viga(prosopo_env):
                                           aliases=[["a"]])
 
 
+def test_card_identifiers_vigane_kuju_on_viga(prosopo_env):
+    with pytest.raises(ValueError, match="invalid_identifiers"):
+        person_crud.create_person_checked(username="u", created_via="form", card={
+            "name": {"label": "X"}, "identifiers": "Q1"})
+
+
 def test_route_400_vigane_card(client, login, prosopo_env):
     token = login("editor", "editorpass")
     r = client.post("/prosopography/persons/create",

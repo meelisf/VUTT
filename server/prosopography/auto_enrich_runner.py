@@ -43,7 +43,7 @@ def _is_pending(card: Optional[dict]) -> bool:
 
     Teine käivitus samal kaardil (nt käivitustaaste, mis jookseb paralleelselt
     värske loomise ajastatud katsega) EI TOHI review-välja uuesti kirjutada —
-    esimene katse on juba lõppolekusse viinud (ja admin võib olla selle
+    esimene katse on kaardi juba lõppolekusse viinud (ja admin võib olla selle
     vahepeal kinnitanud, spekk §3.1: kinnitust ei avata uuesti)."""
     reasons = ((card or {}).get("review") or {}).get("reasons") or []
     return "enrich_pending" in reasons

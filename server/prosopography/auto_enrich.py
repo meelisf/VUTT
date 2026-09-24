@@ -171,8 +171,8 @@ def apply_to_card(card: dict, agg: dict) -> list:
         if prefix in f and not obj.get("date"):
             obj = {**obj, "date": f[prefix]["date"], "precision": f[prefix]["precision"]}
             applied.append(f"{prefix}.date")
-        # Vana kaart võib kanda kohta lihtstringina — see loetakse täidetuks,
-        # mitte üle ei kirjutata (paljal stringil pole `.get`-meetodit).
+        # Vana kaart võib kanda kohta lihtstringina — seda loetakse täidetuks
+        # ega kirjutata üle (paljal stringil pole `.get`-meetodit).
         existing_place = obj.get("place")
         place_filled = (isinstance(existing_place, str) and existing_place.strip()) or \
             (isinstance(existing_place, dict) and existing_place.get("label"))
@@ -211,8 +211,8 @@ def finish_review(review: dict, *, ids_left: bool, answered: list, failed: list,
                   applied: list, conflicts: list, possible_duplicate: bool) -> dict:
     """Lõppolek (spekk §4.3 tabel). `enrich_pending` eemaldub ALATI.
 
-    Kui kaardil ei ole enam ühtegi rikastatavat ID-d (`ids_left=False`), ei
-    loe ükski teine parameeter — ainus muutus on `enrich_pending` kadumine
+    Kui kaardil ei ole enam ühtegi rikastatavat ID-d (`ids_left=False`),
+    ükski teine parameeter ei ole oluline — ainus muutus on `enrich_pending` kadumine
     (spekk §4.3 tabeli viimane rida). See juhtub nt kui kasutaja kustutas
     kõik ID-d enne, kui runner jõudis lõpetada.
     """

@@ -250,7 +250,7 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
         raise ValueError("Source ja target ei tohi olla samad.")
     # Globaalne lukk serialiseerib ka relation-loop'is ja kohaliitmisel võetavad
     # lisalukud; järjestus väldib source/target paaris ebavajalikku ristootamist.
-    # ID-lukk kõige välimisena (ADR 0048) — liitmine loeb/kirjutab source'i ID-sid
+    # ID-lukk kõige välimisena (ADR 0048) — liitmine kannab source'i ID-d
     # target'ile, mis on samuti ID-lisav tee.
     with ext_id_claim_lock, merge_operation_lock:
         with ExitStack() as stack:

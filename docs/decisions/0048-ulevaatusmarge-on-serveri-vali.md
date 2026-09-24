@@ -43,8 +43,8 @@ ja indeksi hilisem uuendus võis kustutada teise tee vahepeal lisatud ID.
   (VIAF-kirjes viidatud Wikidata/GND-ID-d) lisatakse identifikaatorite
   loendisse, kui ID ei ole juba mõnel teisel kaardil. Väärtust, mis läheb
   vastuollu juba kaardil oleva täidetud väljaga, ei rakendata — see väli
-  jääb täitmata ja jääb muutmisvaates nähtavaks, ilma et see kuhugi eraldi
-  kirja läheks. Kahe allika OMAVAHEL vastuolus olevad väärtused (ja
+  jääb muutmata; erinevus on näha käsitsi rikastuse vaates. Kahe allika
+  OMAVAHEL vastuolus olevad väärtused (ja
   kokkusobivad, aga erineva täpsusega kuupäevad, `compatible: true`) lähevad
   `review.source_conflicts`-i. Kuupäevad normaliseeritakse enne võrdlust
   `YYYY-MM-DD`-vormingusse (puuduv kuu/päev täidetakse „01"-ga), et sama
@@ -68,10 +68,16 @@ ja indeksi hilisem uuendus võis kustutada teise tee vahepeal lisatud ID.
   ID lisamist. `add_identifier` teeb rikastuse võrgueelvaate alles pärast
   lukkude vabastamist.
 - **Salvestus ja indeksi uuendus käivad samas kriitilises sektsioonis**
-  (`_save_person_locked`) — kõik kaardikirjutused (loomine, muutmine,
-  identifikaatori lisamine, pildi lisamine/kustutamine, taastamine, liitmine,
-  massmuudatus, taustarikastus) kutsuvad seda otse `git_ops.save_with_git`
-  asemel.
+  (`_save_person_locked`) — iga ID-d muutev kaardikirjutus (loomine, muutmine,
+  identifikaatori lisamine, pildi lisamine/kustutamine, taastamine,
+  massmuudatus, taustarikastus) kutsub seda otse `git_ops.save_with_git`
+  asemel. Erand on liitmine (`merge_ops.py`): see kirjutab mitu faili korraga
+  ja käivitab hiljem `rebuild_indices`-i, mis nüüd `ext_id_claim_lock`-i all
+  ainult indeksi kehtetuks tunnistab (laisk taasehitus järgmisel päringul) —
+  mitte enam kirjutuse ajal loetud hetktõmmisest tervikuna. `reciprocal_ops`,
+  `places_ops` ja `entity_labels_ops` kirjutavad kaardile samuti otse
+  `save_with_git` kaudu, aga ei muuda kunagi `identifiers`-it, seega
+  `_save_person_locked`-i ja ID-lukku ei vaja.
 - **`/enrich` ei muuda `identifiers`-it.** `apply_enrichment` viskab 400
   (`ValueError("identifiers_via_enrich")`), kui kinnitatud väljade seas on
   `identifiers` või `identifiers.*` — ID-de lisamine käib ainult
@@ -82,7 +88,7 @@ ja indeksi hilisem uuendus võis kustutada teise tee vahepeal lisatud ID.
   `enrich_pending`-i olemasolu enne iga tööd.
 - **Uus isik tekib ainult `create_person_checked` kaudu**
   (`POST /prosopography/persons/create`; vana `POST /prosopography` ja
-  server stubi tee `ensure_prosopo_for_entity` delegeerivad mõlemad sinna).
+  serveri stubitee `ensure_prosopo_for_entity` delegeerivad mõlemad sinna).
   See on ainus koht, kus kuju kontrollitakse (kehatüüp, `name` kuju,
   `identifiers`/`aliases` kuju → 400 enne ühtegi kirjutust), ID-lukk
   võetakse üle kontrolli JA salvestuse, ning `review` luuakse

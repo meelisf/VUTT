@@ -248,8 +248,12 @@ export async function updatePerson(personId: string, data: Partial<ProsopoRecord
     timeout: 10000,
   });
   if (resp.status === 409) {
-    const err = await resp.json();
-    throw Object.assign(new Error('conflict'), { conflict: true, current_updated_at: err.detail?.current_updated_at });
+    const err = await resp.json().catch(() => ({}));
+    const d = err?.detail ?? {};
+    if (d.error === 'identifier_conflict') {
+      throw new PersonConflictError(d.conflict, d.existing_person_ids ?? []);
+    }
+    throw Object.assign(new Error('conflict'), { conflict: true, current_updated_at: d.current_updated_at });
   }
   if (!resp.ok) throw new Error(`updatePerson: ${resp.status}`);
   return resp.json();

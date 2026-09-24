@@ -99,9 +99,9 @@ def _save_person_locked(person: dict, username: str, message: str) -> None:
     """Kaardi salvestus + väliste ID-de indeks SAMAS kriitilises sektsioonis (ADR 0048).
 
     Kutsuja PEAB hoidma `person_lock(person["id"])`-i (ID-lisavas teel ka
-    `ext_id_claim_lock`-i). Indeks uuendatakse just salvestatud koopiast — luku
-    järel tehtud uuendus võiks kirjutada aegunud ID-loendi tagasi ja kustutada
-    vahepeal teise tee lisatud ID (spekk §4.6).
+    `ext_id_claim_lock`-i). Indeks uuendatakse just salvestatud koopiast — pärast
+    luku vabastamist tehtud uuendus võiks kirjutada aegunud ID-loendi tagasi ja
+    kustutada vahepeal teise tee lisatud ID (spekk §4.6).
     """
     state.save_with_git(
         _id_to_path(person["id"]),
@@ -622,10 +622,18 @@ def restore_person(person_id: str, restored: dict, username: str) -> dict:
     sync_from_facade()
     with ext_id_claim_lock, person_lock(person_id):
         current = get_person(person_id) or {}
+        # Hauakivi (tombstone) või liidetud kaart kannab endiselt lähtekaardi ID-sid,
+        # aga need ID-d KUULUVAD liitmise sihile (vt _resolve_owner) — nende
+        # arvestamine "juba olemasolevaks" laseks taastamisel dublikaadi läbi,
+        # sest miski ei loeks neid "lisatuks". Loeme vana seisu ID-loendi tühjaks.
+        current_identifiers = (
+            [] if current.get("record_status") == "tombstone" or current.get("merged_into")
+            else current.get("identifiers")
+        )
         restored = {**restored, "id": person_id}
         restored["identifiers"] = _normalize_identifiers(restored.get("identifiers") or [])
         _check_identifiers_free(
-            person_id, _added_identifiers(current.get("identifiers"), restored["identifiers"]))
+            person_id, _added_identifiers(current_identifiers, restored["identifiers"]))
         restored["updated_at"] = datetime.now(timezone.utc).isoformat()
         restored["updated_by"] = username
         name = (restored.get("name") or {}).get("label") or person_id
@@ -674,6 +682,10 @@ def create_person_checked(*, username: str, created_via: str, name: Optional[str
         raise ValueError("invalid_card")
     if card is not None and card.get("name") is not None and not isinstance(card["name"], dict):
         raise ValueError("invalid_card")
+    if card is not None and card.get("identifiers") is not None and (
+            not isinstance(card["identifiers"], list)
+            or not all(isinstance(i, dict) for i in card["identifiers"])):
+        raise ValueError("invalid_identifiers")
     if identifiers is not None and (
             not isinstance(identifiers, list) or not all(isinstance(i, dict) for i in identifiers)):
         raise ValueError("invalid_identifiers")

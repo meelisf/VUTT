@@ -207,8 +207,8 @@ def _update_index_entry(person: dict):
 
     Väliste ID-de indeksit (`ext_id_index`) SIIN EI uuendata: see käib
     `person_crud._save_person_locked`-is salvestusega samas kriitilises
-    sektsioonis (ADR 0048). See funktsioon jookseb luku järel ja võib saada
-    aegunud koopia — otsinguindeksile on see talutav, duplikaadikontrollile mitte.
+    sektsioonis (ADR 0048). See funktsioon jookseb pärast luku vabastamist ja
+    võib saada aegunud koopia — otsinguindeksile on see talutav, duplikaadikontrollile mitte.
     """
     sync_from_facade()
     from .person_search import _index_entry_from_person
@@ -430,9 +430,15 @@ def rebuild_indices():
                 aliases_data.setdefault(key, value)
         state.atomic_write_json(state.PERSON_ALIASES_FILE, aliases_data)
 
-    # Väliste ID-de pöördindeks juba mällu laetud kaartidest — lisaskannita (#180).
+    # Väliste ID-de pöördindeks: EI asendata rebuild alguses loetud hetktõmmisest
+    # ehitatud kaardiga — vahepeal (rebuild kestab, salvestused jätkuvad) lisatud
+    # ID-d kaoksid siis indeksist. `invalidate()` sunnib järgmise päringu laisale
+    # taasehitusele värske kaustaskanni pealt; claim-lukk on RLock, seega ohutu
+    # ka liitmise seest kutsutuna.
     from . import ext_id_index
-    ext_id_index.rebuild_from(all_persons, state.PROSOPOGRAPHY_DIR)
+    from .locks import ext_id_claim_lock
+    with ext_id_claim_lock:
+        ext_id_index.invalidate()
 
 
 def _remove_aliases_entry(person_id: str):

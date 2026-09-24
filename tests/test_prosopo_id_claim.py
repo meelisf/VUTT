@@ -48,12 +48,37 @@ def test_liidetud_kaardi_id_omanik_on_sihtkaart(prosopo_env):
     assert e.value.person_ids == ["vutt:Pccc"]
 
 
-def test_restore_ei_too_tagasi_teisele_kaardile_laeinud_id(prosopo_env):
+def test_restore_ei_too_tagasi_teisele_kaardile_lainud_id(prosopo_env):
     prosopo_env.write("aaa", identifiers=[{"scheme": "gnd", "id": "5"}])
     b = prosopo_env.write("bbb")
     vana = {**b, "identifiers": [{"scheme": "gnd", "id": "5"}]}
     with pytest.raises(IdentifierConflict):
         person_crud.restore_person("vutt:Pbbb", vana, "admin")
+
+
+def test_restore_hauakivi_ei_too_tagasi_liitmisega_lainud_id(prosopo_env):
+    """Tombstone aaa kannab endiselt gnd:9 — see ID kuulub liitmise sihile ccc.
+    Taastamine ei tohi seda "juba omal kaardil olevaks" pidada."""
+    prosopo_env.write("aaa", identifiers=[{"scheme": "gnd", "id": "9"}],
+                      record_status="tombstone", merged_into="vutt:Pccc")
+    prosopo_env.write("ccc", identifiers=[{"scheme": "gnd", "id": "9"}])
+    vana = {"id": "vutt:Paaa", "name": {"label": "Isik aaa", "aliases": []},
+            "identifiers": [{"scheme": "gnd", "id": "9"}],
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "record_status": "draft", "merged_into": None}
+    with pytest.raises(IdentifierConflict) as e:
+        person_crud.restore_person("vutt:Paaa", vana, "admin")
+    assert e.value.person_ids == ["vutt:Pccc"]
+
+
+def test_restore_lisandunud_vaba_id_uuendab_ext_id_indeksit(prosopo_env):
+    """Taastatud versioon lisab vaba ID — indeks peab kohe kajastama uut omanikku."""
+    from server.prosopography import ext_id_index
+
+    b = prosopo_env.write("bbb")
+    vana = {**b, "identifiers": [{"scheme": "gnd", "id": "42"}]}
+    person_crud.restore_person("vutt:Pbbb", vana, "admin")
+    assert ext_id_index.find_person_id("gnd", "42") == "vutt:Pbbb"
 
 
 def test_add_identifier_ei_tee_vorgupaeringut_luku_all(prosopo_env, monkeypatch):
