@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  pendingCount, pruneMissing, rotatePending, setPendingSplit, showsCardLine, toRequest,
+  pendingCount, pruneMissing, rotatePending, setPendingSplit, setPendingSplitX, showsCardLine, toRequest,
 } from '../pageOpsPlan';
 
 describe('pageOpsPlan (#431 etapp 3)', () => {
@@ -18,13 +18,24 @@ describe('pageOpsPlan (#431 etapp 3)', () => {
     ops = setPendingSplit(ops, ['a.jpg', 'b.jpg'], true);
     expect(pendingCount(ops)).toBe(2);
     ops = setPendingSplit(ops, ['a.jpg', 'b.jpg'], false);
-    expect(ops).toEqual({ 'a.jpg': { rotate: 90, split: false } });
+    expect(ops).toEqual({ 'a.jpg': { rotate: 90, split: false, split_x: null } });
   });
 
   it('pruneMissing viskab kadunud lehed ja hoiab identiteedi, kui midagi ei kadunud', () => {
     const ops = setPendingSplit({}, ['a.jpg', 'b.jpg'], true);
     expect(pruneMissing(ops, ['a.jpg', 'b.jpg', 'c.jpg'])).toBe(ops);
     expect(Object.keys(pruneMissing(ops, ['b.jpg']))).toEqual(['b.jpg']);
+  });
+
+  it('lehekohane joon: redaktor seab, „Poolita" hoiab, „Ära poolita" kustutab', () => {
+    let ops = setPendingSplitX({}, 'a.jpg', 0.42);
+    expect(toRequest(ops, 0.5)).toEqual([{ filename: 'a.jpg', rotate: 0, split_x: 0.42 }]);
+    ops = setPendingSplit(ops, ['a.jpg'], true);
+    expect(ops['a.jpg'].split_x).toBe(0.42);
+    ops = setPendingSplitX(ops, 'a.jpg', null);
+    expect(toRequest(ops, 0.5)[0].split_x).toBe(0.5);
+    ops = setPendingSplit(setPendingSplitX(ops, 'a.jpg', 0.3), ['a.jpg'], false);
+    expect(ops).toEqual({});
   });
 
   it('toRequest: üldjoon ainult poolitatavatele', () => {

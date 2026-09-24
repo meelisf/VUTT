@@ -23,8 +23,13 @@ lõikab teksti `<pb/>` kohalt ja teeb kaks git-commitit (prügikasti rühmitus l
   kinnitusdialoog, `useUnsavedChangesGuard`.
 - **Järjekorra mustand ja ootel lehetoimingud välistavad teineteist** (nupud
   blokeeritud) — mõlemad sõltuvad failinimede loendist.
-- **Üks üldjoon** (protsent) kõigile ootel poolitustele. Lehekohane joon jääb
-  pildiredaktorisse (kohe kehtiv, nagu ka kärbe/kalle).
+- **Üldjoon** (protsent) kõigile ootel poolitustele; **lehekohane joon**
+  (`split_x` ootel kirjel) tuleb pildiredaktori „Poolita" vahekaardilt, mis
+  kirjutab SAMASSE ootel plaani (nagu upload'i detailvaade `custom`-joont).
+  Redaktor ei hoia joont oma olekus — varem kadus see modaali sulgemisel ja
+  järgmine avamine algas 50 % pealt. „Poolita" (hulgi) jätab lehekohase joone
+  alles, „Ära poolita" kustutab selle. Kärbe/kalle/pööre redaktoris jäävad
+  kohe kehtivaks. Ootel pöörde korral näitab poolitusvahekaart pilti pööratuna.
 - **Rakendus: `POST /admin/work/{id}/page-ops`** → `apply_page_ops`. Kogu sisend
   valideeritakse ENNE ühegi faili puudutamist (puuduv leht → 400). Üks
   `work_lock`; lehed lehejärjekorras; lehe sees **pööre → poolitus** (nagu
@@ -39,8 +44,9 @@ lõikab teksti `<pb/>` kohalt ja teeb kaks git-commitit (prügikasti rühmitus l
 
 ## Tagajärjed
 
-- Pildiredaktori toimingud jäävad kohe kehtivaks; kui redaktoris poolitatakse
-  leht, millel oli ootel toiming, kukub see plaanist välja.
+- Pildiredaktori kärbe/kalle/pööre jäävad kohe kehtivaks; kui leht kaob
+  (kustutus, asendus), kukub tema ootel toiming plaanist välja (`pruneMissing`).
+  Endpoint `POST /admin/work/{id}/page/{n}/split` jääb alles, aga UI seda enam ei kasuta.
 - Kaart näitab ootel pööret CSS-iga (90°/270° skaleeritud 3:4 kasti) ja joont
   ainult 0°/180° juures — pööratud kastis oleks joone asukoht oletus.
 - Valvurid: `tests/test_page_ops_batch.py`, `src/pages/manage/__tests__/pageOpsPlan.test.ts`,

@@ -12,6 +12,9 @@ export interface PendingPageOp {
   /** Pööre päripäeva: 0 | 90 | 180 | 270. Rakendub ENNE poolitust. */
   rotate: number;
   split: boolean;
+  /** Lehekohane joon (0..1) pildiredaktorist; puudub/null = üldjoon.
+   *  Sama tähendus nagu upload'i `mode: "custom"` + `split_x`. */
+  split_x?: number | null;
 }
 
 export type PendingPageOps = Record<string, PendingPageOp>;
@@ -43,11 +46,29 @@ export function rotatePending(ops: PendingPageOps, filenames: Iterable<string>, 
   return next;
 }
 
-/** „Poolita" / „Ära poolita" valikule. Idempotentne, mõlemasuunaline. */
+/**
+ * „Poolita" / „Ära poolita" valikule. Idempotentne, mõlemasuunaline.
+ * „Poolita" jätab lehekohase joone PUUTUMATA (käsitsi seatud joon on
+ * väärtuslikum kui hulgikäsk, nagu upload'i `applyDefaultSplitTo`);
+ * „Ära poolita" kustutab ka selle (nagu upload'i `setNoSplit`).
+ */
 export function setPendingSplit(ops: PendingPageOps, filenames: Iterable<string>, split: boolean): PendingPageOps {
   let next = ops;
-  for (const fn of filenames) next = put(next, fn, { ...current(next, fn), split });
+  for (const fn of filenames) {
+    const op = current(next, fn);
+    next = put(next, fn, split ? { ...op, split: true } : { ...op, split: false, split_x: null });
+  }
   return next;
+}
+
+/** Pildiredaktori joon: märgib lehe poolitatavaks oma joonega; null = tagasi üldjoonele. */
+export function setPendingSplitX(ops: PendingPageOps, filename: string, x: number | null): PendingPageOps {
+  return put(ops, filename, { ...current(ops, filename), split: true, split_x: x });
+}
+
+/** Lehe tegelik joon: lehekohane või üldjoon. */
+export function effectiveSplitX(op: PendingPageOp | undefined, splitX: number): number {
+  return op?.split_x ?? splitX;
 }
 
 /** Viskab välja kirjed, mille leht on vahepeal kadunud (kustutatud, redaktoris poolitatud). */
@@ -66,12 +87,12 @@ export function pendingCount(ops: PendingPageOps): number {
   return Object.keys(ops).length;
 }
 
-/** Päringu keha. `splitX` on üldjoon — üks väärtus kõigile poolitatavatele lehtedele. */
+/** Päringu keha. `splitX` on üldjoon — kehtib lehtedele, millel oma joont ei ole. */
 export function toRequest(ops: PendingPageOps, splitX: number): PageOpRequest[] {
   return Object.entries(ops).map(([filename, op]) => ({
     filename,
     rotate: op.rotate,
-    split_x: op.split ? splitX : null,
+    split_x: op.split ? effectiveSplitX(op, splitX) : null,
   }));
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -50,7 +50,7 @@ import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
 import PageActionBar from './manage/PageActionBar';
 import {
-  PendingPageOps, pendingCount, pruneMissing, rotatePending, setPendingSplit, toRequest,
+  PendingPageOps, pendingCount, pruneMissing, rotatePending, setPendingSplit, setPendingSplitX, toRequest,
 } from './manage/pageOpsPlan';
 import { clampSplitX } from '../components/pagePrep/geometry';
 import { mapReocrState, selectableNoTextFiles, applicableReocrPages, ReocrStatusResponse } from '../utils/reocrStatus';
@@ -299,6 +299,18 @@ const WorkManage: React.FC = () => {
   }, [pages]);
 
   const pageOpsCount = pendingCount(pendingOps);
+
+  // Pildiredaktori poolitusvahekaart kirjutab samasse ootel plaani (joon püsib
+  // üle modaali sulgemise, kaardil on sama joon). Stabiilne identiteet —
+  // redaktori lohistuse kuulaja sõltub sellest.
+  const handleEditorSplitChange = useCallback(
+    (filename: string, change: { split: boolean; split_x: number | null }) => {
+      setPendingOps((o) => (change.split
+        ? setPendingSplitX(o, filename, change.split_x)
+        : setPendingSplit(o, [filename], false)));
+    },
+    [],
+  );
   // Üldjoon protsendina tekstiväljas (type="text", vt CLAUDE.md); kehtetu → 50 %.
   const splitX = (() => {
     const v = Number(splitPercent.replace(',', '.'));
@@ -1353,6 +1365,9 @@ const WorkManage: React.FC = () => {
           }}
           onReplaceImage={handleReplaceImage}
           cacheBust={thumbCacheBust}
+          pendingOps={pendingOps}
+          globalSplitX={splitX}
+          onSplitChange={handleEditorSplitChange}
         />
       )}
 

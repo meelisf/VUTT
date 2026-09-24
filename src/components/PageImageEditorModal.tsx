@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Scissors, Crop, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
+import { X, Crop, Columns2, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
+import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { transformPageImage, restoreOriginalPageImage } from '../services/pageService';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
 import { computeNextAnchor, resolveIndexAfter } from '../utils/pageNavAnchor';
@@ -13,6 +12,7 @@ import SplitLine from './pagePrep/SplitLine';
 import RotateButtons from './pagePrep/RotateButtons';
 import { useCropBox } from './pagePrep/useCropBox';
 import CropOverlay from './pagePrep/CropOverlay';
+import type { PendingPageOp } from '../pages/manage/pageOpsPlan';
 
 interface PageInfo {
   filename: string;
@@ -29,6 +29,16 @@ interface Props {
   onPagesChanged: () => Promise<string[]>;  // laeb pages uuesti, tagastab uue failinimede massiivi
   onReplaceImage: (file: File, pageNum: number) => Promise<void>;  // asendab lehe pildi; viskab vea ebaõnnestumisel
   cacheBust: number;  // muutub iga pildi-mutatsiooni järel (kärbe/pööre/poolitus/asendus) → eelvaade värske
+  /**
+   * Poolitus on OOTEL plaan (#431, ADR 0050), nagu upload'i detailvaates: joon
+   * kirjutatakse teose halduse plaani ja rakendub riba „Rakenda" nupust koos
+   * teiste ootel muudatustega. Modaal ei hoia joont oma olekus — muidu kadus
+   * see sulgemisel ja järgmine avamine algas jälle 50 % pealt.
+   */
+  pendingOps: Record<string, PendingPageOp>;
+  globalSplitX: number;
+  /** split=false → ära poolita; split_x=null → üldjoon. */
+  onSplitChange: (filename: string, change: { split: boolean; split_x: number | null }) => void;
 }
 
 // Eelvaate vaikimisi mõõdud (px) — kasutatakse ainult esimese paindeni, enne kui
@@ -38,6 +48,7 @@ const DEFAULT_STAGE_H = 540;
 
 const PageImageEditorModal: React.FC<Props> = ({
   workId, pages, initialIndex, initialTab, imageToken, onClose, onPagesChanged, onReplaceImage, cacheBust,
+  pendingOps, globalSplitX, onSplitChange,
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
@@ -45,7 +56,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [tab, setTab] = useState<'edit' | 'split'>(initialTab);
   const [grossAngle, setGrossAngle] = useState(0);   // jäme orientatsioon (90/180 nupud)
-  const [splitX, setSplitX] = useState(0.5);
 
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -72,6 +82,14 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   const safeIndex = Math.max(0, Math.min(currentIndex, pages.length - 1));
   const current = pages[safeIndex];
+
+  // Poolituse olek tuleb ootel plaanist (vt Props.pendingOps).
+  const pendingOp = current ? pendingOps[current.filename] : undefined;
+  const willSplit = Boolean(pendingOp?.split);
+  const splitX = pendingOp?.split_x ?? globalSplitX;
+  // Ootel pööre rakendub ENNE poolitust → joon kehtib pööratud lehele, seega
+  // näitab poolitusvahekaart pilti juba pööratuna.
+  const pendingRotate = pendingOp?.rotate ?? 0;
 
   // Mõõda lava tegelik suurus (uueneb akna/modaali muutudes ja tabi vahetusel).
   // Korraga on mountitud ainult ühe tabi lava → re-attach [tab] muutudes.
@@ -110,9 +128,13 @@ const PageImageEditorModal: React.FC<Props> = ({
   const imgDispH = natural.h * fit;
   // Ühtne pildi kuva-suurus mõlemal tabil (sõltumatu jämedast pöördest) — split kasutab seda,
   // et edit-tabiga kokku langeda. grossAngle=0 korral identne imgDispW/H-ga.
-  const baseFit = Math.min(stage.w / natural.w, stage.h / natural.h, 1);
-  const baseDispW = natural.w * baseFit;
-  const baseDispH = natural.h * baseFit;
+  // Poolitusvahekaart: kast on OOTEL pöörde järgi pööratud lehe mõõtu (90°/270°
+  // vahetavad laiuse ja kõrguse), pilt pööratakse CSS-iga selle sisse.
+  const splitRot90 = pendingRotate === 90 || pendingRotate === 270;
+  const splitNat = splitRot90 ? { w: natural.h, h: natural.w } : natural;
+  const splitFit = Math.min(stage.w / splitNat.w, stage.h / splitNat.h, 1);
+  const splitBoxW = splitNat.w * splitFit;
+  const splitBoxH = splitNat.h * splitFit;
 
   // --- Kärpe/kalle/perspektiiv (edit-tab) --- ühine upload'i ülevaatusega (#431)
   const crop = useCropBox(displayW, displayH, !!imgNatural);
@@ -124,7 +146,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   // varem oli) — samas efektis, et kasti kalle jääks garanteeritult 0.
   useEffect(() => {
     setGrossAngle(0);
-    setSplitX(0.5);
     setImgNatural(null);
     setError(null);
     resetCrop();
@@ -170,9 +191,12 @@ const PageImageEditorModal: React.FC<Props> = ({
   }, [toolbarDragging, onToolbarMove]);
 
   // --- Split-lohistus (split-tab) --- ühine upload'i ülevaatusega (#431)
-  const { startDrag: startSplitDrag } = useSplitDrag(
+  const currentFilename = current?.filename;
+  const { startDrag: startSplitDrag, updateFromClientX: splitAtClientX } = useSplitDrag(
     splitContainerRef,
-    useCallback((x: number) => setSplitX(clampSplitX(x)), []),
+    useCallback((x: number) => {
+      if (currentFilename) onSplitChange(currentFilename, { split: true, split_x: clampSplitX(Number(x.toFixed(4))) });
+    }, [currentFilename, onSplitChange]),
   );
 
   // --- Navigeerimine ---
@@ -209,43 +233,18 @@ const PageImageEditorModal: React.FC<Props> = ({
 
     try {
       let thumbWarn = false;
-      if (tab === 'edit') {
-        // Jäme pööre + kasti-kalle/perspektiiv → serveri (angle, crop | quad).
-        const p = crop.toServerParams(grossAngle);
-        const r = await transformPageImage(workId, currentFilename, p.angle, p.crop, authToken, p.quad ?? undefined);
-        thumbWarn = !!r.thumbnail_warning;
-      } else {
-        const res = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/work/${workId}/page/${current.page_num}/split`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-            body: JSON.stringify({ split_x: splitX }),
-            timeout: 30000,
-          },
-        );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || `HTTP ${res.status}`);
-        }
-      }
+      // Jäme pööre + kasti-kalle/perspektiiv → serveri (angle, crop | quad).
+      // Poolitus EI käi siit — see on ootel plaan (vt Props.pendingOps).
+      const p = crop.toServerParams(grossAngle);
+      const r = await transformPageImage(workId, currentFilename, p.angle, p.crop, authToken, p.quad ?? undefined);
+      thumbWarn = !!r.thumbnail_warning;
 
       const after = await onPagesChanged();
       const { index, done } = resolveIndexAfter(after, anchor, currentFilename);
       setCurrentIndex(index);
       setSaving(false);
 
-      if (tab === 'split') {
-        // Uued pooled = failid, mida enne polnud
-        const newHalves = after.filter((f) => !before.includes(f));
-        const firstHalfIdx = newHalves.length > 0 ? after.indexOf(newHalves[0]) : -1;
-        setToast({
-          text: t('manage.editor.splitDone'),
-          action: firstHalfIdx >= 0
-            ? { label: t('manage.editor.viewNewHalves'), run: () => goTo(firstHalfIdx) }
-            : undefined,
-        });
-      } else if (done) {
+      if (done) {
         setToast({ text: t('manage.editor.allDone') });
       } else if (thumbWarn) {
         setToast({ text: t('manage.editor.thumbWarning') });
@@ -476,29 +475,49 @@ const PageImageEditorModal: React.FC<Props> = ({
             </div>
           ) : (
             <div className="flex flex-col items-center h-full min-h-0 w-full">
-              <p className="text-sm text-gray-500 mb-3 self-start flex-shrink-0">
-                {t('manage.editor.tabSplit')} — <span className="font-medium text-gray-700">{Math.round(splitX * 100)}%</span>
+              <p className="text-sm text-gray-500 mb-3 self-start flex-shrink-0" data-testid="editor-split-state">
+                {willSplit
+                  ? t('manage.editor.splitAt', { percent: Math.round(splitX * 1000) / 10 })
+                  : t('manage.editor.notSplit')}
+                {pendingRotate !== 0 && (
+                  <span className="ml-2 text-amber-700">· {t('manage.editor.splitAfterRotate', { deg: pendingRotate })}</span>
+                )}
               </p>
               {/* Lava: sama mõõdetav ala ka poolitamise tabil */}
               <div ref={stageRef} className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
               {!imgNatural ? loadingBox : (
               <div
                 ref={splitContainerRef}
-                className="relative select-none cursor-col-resize overflow-hidden rounded border border-gray-200"
-                style={{ width: baseDispW, height: baseDispH }}
+                className={`relative select-none overflow-hidden rounded border border-gray-200 ${willSplit ? 'cursor-col-resize' : ''}`}
+                style={{ width: splitBoxW, height: splitBoxH }}
+                onPointerDown={(e) => { if (willSplit) splitAtClientX(e.clientX); }}
               >
                 <img
                   src={imageUrl}
                   alt={current.filename}
-                  className="block pointer-events-none"
+                  className="absolute pointer-events-none max-w-none"
                   draggable={false}
-                  style={{ width: baseDispW, height: baseDispH }}
+                  style={{
+                    width: natural.w * splitFit,
+                    height: natural.h * splitFit,
+                    left: '50%', top: '50%',
+                    transform: `translate(-50%, -50%) rotate(${pendingRotate}deg)`,
+                  }}
                 />
-                <SplitLine
-                  x={splitX}
-                  box={{ left: 0, top: 0, width: baseDispW, height: baseDispH }}
-                  onHandleDown={startSplitDrag}
-                />
+                {willSplit ? (
+                  <SplitLine
+                    x={splitX}
+                    box={{ left: 0, top: 0, width: splitBoxW, height: splitBoxH }}
+                    onHandleDown={startSplitDrag}
+                  />
+                ) : (
+                  // Sama märk nagu upload'i detailvaates: vaade ei näita joont, mida ei lõigata.
+                  <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-6">
+                    <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
+                      <Columns2 size={15} />{t('manage.editor.notSplit')}
+                    </span>
+                  </div>
+                )}
               </div>
               )}
               </div>
@@ -575,16 +594,44 @@ const PageImageEditorModal: React.FC<Props> = ({
               </button>
             </div>
 
-            {/* Rakenda */}
+            {tab === 'split' ? (
+              // Poolitus on ootel plaan: siin ainult märgitakse, rakendus käib
+              // teose halduse riba „Rakenda" nupust (nagu upload'is „Rakenda").
+              <div className="flex items-center gap-2">
+                {willSplit && pendingOp?.split_x != null && (
+                  <button
+                    onClick={() => onSplitChange(current.filename, { split: true, split_x: null })}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-100"
+                  >
+                    {t('manage.editor.resetToGlobal')}
+                  </button>
+                )}
+                <button
+                  data-testid="editor-split-toggle"
+                  aria-pressed={!willSplit}
+                  onClick={() => onSplitChange(current.filename, { split: !willSplit, split_x: pendingOp?.split_x ?? null })}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm rounded border ${
+                    willSplit ? 'border-gray-300 hover:bg-gray-100' : 'border-gray-900 bg-gray-900 text-white'
+                  }`}
+                >
+                  <Columns2 size={14} />
+                  {willSplit ? t('manage.pageOps.noSplit') : t('manage.pageOps.split')}
+                </button>
+              </div>
+            ) : (
             <button
               onClick={showConfirm ? doApply : onApplyClick}
-              disabled={saving || (tab === 'edit' && noEditChange)}
+              disabled={saving || noEditChange}
               className="flex items-center gap-2 px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded transition-colors"
             >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : (tab === 'split' ? <Scissors size={14} /> : <Check size={14} />)}
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               {t('manage.editor.apply')}
             </button>
+            )}
           </div>
+          {tab === 'split' && (
+            <p className="text-xs text-gray-500">{t('manage.editor.splitPendingHint')}</p>
+          )}
         </div>
       </div>
     </div>
