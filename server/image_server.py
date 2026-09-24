@@ -4,9 +4,11 @@ Optimeeritud jõudluseks (threading, cache) ja turvalisuseks (CORS).
 Toetab NanoID püsiviiteid ja thumbnail genereerimist.
 """
 import glob
+import email.utils
 import http.server
 import json
 import os
+import shutil
 import socketserver
 import sys
 import urllib.parse
@@ -41,15 +43,21 @@ def _validate_image_token(work_id: str, exp: str, sig: str) -> bool:
         return False
 
 
-def _load_work_meta_for_path(resolved_path: str):
-    """Laeb _metadata.json lahendatud pilditee vanemkataloogist."""
-    work_dir = os.path.dirname(resolved_path)
+def _load_work_meta_for_path(work_dir: str):
+    """Laeb metaandmed ainult teose põhikataloogist."""
     meta_path = os.path.join(work_dir, '_metadata.json')
-    if not os.path.exists(meta_path):
+    if os.path.islink(meta_path):
         return None
     try:
         with open(meta_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            meta = json.load(f)
+        if (not isinstance(meta, dict) or
+                not isinstance(meta.get('id'), str) or not meta['id'] or
+                not isinstance(meta.get('collections', []), list) or
+                any(not isinstance(col, str) or not col for col in meta.get('collections', [])) or
+                not isinstance(meta.get('shareable', False), bool)):
+            return None
+        return meta
     except Exception:
         return None
 
@@ -57,13 +65,14 @@ def _load_work_meta_for_path(resolved_path: str):
 def _check_image_access(work_id: str, meta, query_string: str) -> bool:
     """Kontrollib kas pildipäring on lubatud.
     Avalikud teosed läbivad alati. Piiratud teoste puhul valideeritakse HMAC token."""
-    if meta is None or is_work_public(meta) or meta.get('shareable', False):
+    if meta is None:
+        return False
+    if is_work_public(meta) or meta.get('shareable', False):
         return True
-    token_work_id = work_id
     parsed_qs = urllib.parse.parse_qs(query_string)
     exp = parsed_qs.get('exp', [''])[0]
     sig = parsed_qs.get('sig', [''])[0]
-    return _validate_image_token(token_work_id, exp, sig)
+    return _validate_image_token(work_id, exp, sig)
 
 
 def _is_safe_image_path(resolved_path: str, base_dir: str) -> bool:
@@ -73,7 +82,7 @@ def _is_safe_image_path(resolved_path: str, base_dir: str) -> bool:
     try:
         real_path = os.path.realpath(resolved_path)
         real_base = os.path.realpath(base_dir)
-        if not real_path.startswith(real_base + os.sep):
+        if os.path.commonpath((real_path, real_base)) != real_base or real_path == real_base:
             return False
         _, ext = os.path.splitext(real_path)
         return ext.lower() in _ALLOWED_IMAGE_EXTENSIONS
@@ -381,10 +390,7 @@ def get_or_create_page_thumbnail(work_path, thumb_filename):
 
 class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
     def send_error(self, code, message=None, explain=None):
-        # Ära cache'i 403/404 vastuseid. Muidu võib brauser jätta piiratud teose
-        # signeerimata _thumb päringu 403 vastuse 24h vahemällu ja WorkCard ei pruugi
-        # pildi-tokeniga retry järel ennast usaldusväärselt taastada.
-        self._no_cache_response = True
+        self._cache_policy = 'no-store'
         return super().send_error(code, message, explain)
 
     def end_headers(self):
@@ -394,198 +400,115 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Origin', origin)
             self.send_header('Access-Control-Allow-Credentials', 'true')
 
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        if getattr(self, '_no_cache_response', False):
-            self.send_header('Cache-Control', 'no-store')
-        else:
-            # Cache 24h
-            self.send_header('Cache-Control', 'public, max-age=86400')
+        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+        self.send_header('Cache-Control', getattr(self, '_cache_policy', 'no-store'))
         return super().end_headers()
 
     def do_GET(self):
-        """Käsitleb GET päringuid, sh thumbnail päringuid."""
-        # Parsi URL
+        self._handle_image_request(head_only=False)
+
+    def do_HEAD(self):
+        self._handle_image_request(head_only=True)
+
+    def _handle_image_request(self, head_only):
+        """Kõik pilditeed läbivad sama teose, õiguste ja faili kontrolli."""
+        self._cache_policy = 'no-store'
         parsed = urllib.parse.urlparse(self.path)
         path = urllib.parse.unquote(parsed.path)
         parts = [p for p in path.split('/') if p]
-
-        # Teose esilehe thumbnail: /{work_id}/_thumb
-        if len(parts) == 2 and parts[1] == '_thumb':
-            work_id = parts[0]
-            self.serve_thumbnail(work_id)
-            return
-
-        # Dashboard'i stiilis sotsiaalmeedia jagamispilt: /{work_id}/_og
-        if len(parts) == 2 and parts[1] == '_og':
-            work_id = parts[0]
-            self.serve_og_image(work_id)
-            return
-
-        # Lehekülje thumbnail: /{work_id}/_thumbs/_thumb_*.jpg
-        if len(parts) == 3 and parts[1] == '_thumbs' and parts[2].startswith('_thumb_'):
-            work_id = parts[0]
-            thumb_filename = parts[2]
-            self.serve_page_thumbnail(work_id, thumb_filename)
-            return
-
-        # Muu puhul: luba ainult pildifailid BASE_DIR sees
-        resolved = self.translate_path(self.path)
-        if not _is_safe_image_path(resolved, DIRECTORY):
-            self.send_error(403, "Keelatud")
-            return
-        meta = _load_work_meta_for_path(resolved)
-        work_id = (meta or {}).get('id', '')
-        parsed = urllib.parse.urlparse(self.path)
-        if not _check_image_access(work_id, meta, parsed.query):
-            self.send_error(403, "Keelatud")
-            return
-        return super().do_GET()
-
-    def serve_thumbnail(self, work_id):
-        """Serveerib teose thumbnaili, genereerides selle vajadusel."""
-        work_path = find_directory_by_id(work_id)
-        if not work_path:
-            self.send_error(404, f"Teost ei leitud: {work_id}")
-            return
-
-        meta_path = os.path.join(work_path, '_metadata.json')
-        meta = None
-        try:
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                meta = json.load(f)
-        except Exception:
-            pass
-        parsed = urllib.parse.urlparse(self.path)
-        if not _check_image_access(work_id, meta, parsed.query):
+        if (not path.startswith('/') or not parts or
+                parts[0].startswith(('.', '_')) or
+                parts[0] in ('config', 'state') or
+                any(p in ('.', '..') or '\\' in p or '\x00' in p for p in parts) or
+                len(parts) > 3):
             self.send_error(403, "Keelatud")
             return
 
-        # Saa või genereeri thumbnail
-        thumb_path = get_or_create_thumbnail(work_path)
-        if not thumb_path or not os.path.exists(thumb_path):
-            self.send_error(404, "Thumbnaili ei õnnestunud luua")
+        work_dir = find_directory_by_id(parts[0])
+        if not work_dir:
+            self.send_error(404, "Teost ei leitud")
             return
-
-        # Serveeri fail
-        try:
-            with open(thumb_path, 'rb') as f:
-                content = f.read()
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'image/jpeg')
-            self.send_header('Content-Length', len(content))
-            self.end_headers()
-            self.wfile.write(content)
-        except Exception as e:
-            print(f"[THUMB] Viga serveerimisel {thumb_path}: {e}")
-            self.send_error(500, f"Viga faili lugemisel: {e}")
-
-    def serve_og_image(self, work_id):
-        """Serveerib dashboard'i stiilis 1200×630 teose jagamispildi."""
-        work_path = find_directory_by_id(work_id)
-        if not work_path:
-            self.send_error(404, f"Teost ei leitud: {work_id}")
-            return
-
-        meta_path = os.path.join(work_path, '_metadata.json')
-        meta = None
-        try:
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                meta = json.load(f)
-        except Exception:
-            pass
-        parsed = urllib.parse.urlparse(self.path)
-        if not _check_image_access(work_id, meta, parsed.query):
+        # ID-cache või slug ei tohi osutada andmejuurest välja ega alamkausta.
+        work_name = os.path.basename(os.path.normpath(work_dir))
+        if (work_name.startswith(('.', '_')) or work_name in ('config', 'state') or
+                os.path.islink(work_dir) or
+                os.path.dirname(os.path.realpath(work_dir)) != os.path.realpath(DIRECTORY)):
             self.send_error(403, "Keelatud")
             return
-
-        image_path = get_or_create_og_image(work_path)
-        if not image_path or not os.path.exists(image_path):
-            self.send_error(404, "Jagamispilti ei õnnestunud luua")
-            return
-
-        try:
-            with open(image_path, 'rb') as f:
-                content = f.read()
-            self.send_response(200)
-            self.send_header('Content-Type', 'image/jpeg')
-            self.send_header('Content-Length', len(content))
-            self.end_headers()
-            self.wfile.write(content)
-        except Exception as e:
-            print(f"[OG] Viga serveerimisel {image_path}: {e}")
-            self.send_error(500, f"Viga faili lugemisel: {e}")
-
-    def serve_page_thumbnail(self, work_id, thumb_filename):
-        """Serveerib ühe lehekülje thumbnaili, genereerides selle vajadusel."""
-        work_path = find_directory_by_id(work_id)
-        if not work_path:
-            self.send_error(404, f"Teost ei leitud: {work_id}")
-            return
-
-        meta_path = os.path.join(work_path, '_metadata.json')
-        meta = None
-        try:
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                meta = json.load(f)
-        except Exception:
-            pass
-        parsed = urllib.parse.urlparse(self.path)
-        if not _check_image_access(work_id, meta, parsed.query):
+        meta = _load_work_meta_for_path(work_dir)
+        if not meta or not _check_image_access(meta['id'], meta, parsed.query):
             self.send_error(403, "Keelatud")
             return
+        self._cache_policy = ('public, max-age=0, must-revalidate'
+                              if is_work_public(meta) else 'no-store')
 
-        thumb_path = get_or_create_page_thumbnail(work_path, thumb_filename)
-        if not thumb_path or not os.path.exists(thumb_path):
-            self.send_error(404, f"Lehekülge ei leitud: {thumb_filename}")
+        image_path = None
+        if len(parts) == 2 and parts[1] in ('_thumb', '_og'):
+            first_image = get_first_image(work_dir)
+            thumbs_dir = os.path.join(work_dir, '_thumbs')
+            if not first_image:
+                self.send_error(404, "Pilti ei leitud")
+                return
+            if (not _is_safe_image_path(first_image, work_dir) or
+                    not _is_safe_image_path(os.path.join(thumbs_dir, 'check.jpg'), work_dir)):
+                self.send_error(403, "Keelatud")
+                return
+            image_path = (get_or_create_thumbnail(work_dir) if parts[1] == '_thumb'
+                          else get_or_create_og_image(work_dir))
+        elif (len(parts) == 3 and parts[1] == '_thumbs' and
+              parts[2].startswith('_thumb_') and
+              not parts[2][len('_thumb_'):].startswith(('.', '_')) and
+              os.path.splitext(parts[2])[1].lower() in _ALLOWED_IMAGE_EXTENSIONS):
+            source = os.path.join(work_dir, parts[2][len('_thumb_'):])
+            output = os.path.join(work_dir, '_thumbs', parts[2])
+            if (not _is_safe_image_path(source, work_dir) or
+                    not _is_safe_image_path(output, work_dir)):
+                self.send_error(403, "Keelatud")
+                return
+            image_path = get_or_create_page_thumbnail(work_dir, parts[2])
+        elif len(parts) == 2 and not parts[1].startswith(('_', '.')):
+            image_path = os.path.join(work_dir, parts[1])
+        else:
+            self.send_error(403, "Keelatud")
             return
+        if not image_path:
+            self.send_error(404, "Pilti ei leitud")
+            return
+        self._send_image_file(image_path, work_dir, head_only)
 
+    def _send_image_file(self, image_path, work_dir, head_only):
+        if not _is_safe_image_path(image_path, work_dir):
+            self.send_error(403, "Keelatud")
+            return
         try:
-            with open(thumb_path, 'rb') as f:
-                content = f.read()
-            self.send_response(200)
-            self.send_header('Content-Type', 'image/jpeg')
-            self.send_header('Content-Length', len(content))
-            self.end_headers()
-            self.wfile.write(content)
-        except Exception as e:
-            print(f"[THUMB] Viga serveerimisel {thumb_path}: {e}")
-            self.send_error(500, f"Viga faili lugemisel: {e}")
-
-    def translate_path(self, path):
-        """
-        Teisendab URL-i failisüsteemi teeks.
-        Toetab NanoID lahendamist: /occgcn/pilt.jpg -> /1632-1/pilt.jpg
-        """
-        # Eemalda query string
-        path = path.split('?', 1)[0]
-        path = path.split('#', 1)[0]
-        
-        # Dekodeeri URL
-        path = urllib.parse.unquote(path)
-        
-        # Normaliseeri path (eemalda algusest /)
-        path = os.path.normpath(path)
-        parts = path.split(os.sep)
-        
-        # Eemalda tühjad osad (nt alguses olev / tekitab tühja stringi)
-        parts = [p for p in parts if p]
-        
-        if not parts:
-            return os.path.join(DIRECTORY)
-
-        # Esimene osa on potentsiaalne ID (work_id või slug)
-        work_id_or_slug = parts[0]
-        remaining_path = parts[1:] if len(parts) > 1 else []
-        
-        # Proovi leida kausta
-        # 1. Kasuta utility funktsiooni (toetab cache'i ja nanoid-d)
-        found_dir = find_directory_by_id(work_id_or_slug)
-        
-        if found_dir:
-            return os.path.join(found_dir, *remaining_path)
-
-        return os.path.join(DIRECTORY, *parts)
+            with open(image_path, 'rb') as image_file:
+                stat = os.fstat(image_file.fileno())
+                modified_since = self.headers.get('If-Modified-Since')
+                if modified_since and not self.headers.get('If-None-Match'):
+                    try:
+                        modified_at = email.utils.parsedate_to_datetime(modified_since)
+                        if (modified_at.tzinfo is not None and
+                                int(stat.st_mtime) <= int(modified_at.timestamp())):
+                            self.send_response(304)
+                            self.send_header('Last-Modified', self.date_time_string(stat.st_mtime))
+                            self.end_headers()
+                            return
+                    except (ValueError, TypeError, OverflowError):
+                        pass
+                self.send_response(200)
+                content_type = ('image/jpeg' if os.path.basename(os.path.dirname(image_path)) == '_thumbs'
+                                else self.guess_type(image_path))
+                self.send_header('Content-Type', content_type)
+                self.send_header('Content-Length', str(stat.st_size))
+                self.send_header('Last-Modified', self.date_time_string(stat.st_mtime))
+                self.end_headers()
+                if not head_only:
+                    shutil.copyfileobj(image_file, self.wfile)
+        except FileNotFoundError:
+            self.send_error(404, "Pilti ei leitud")
+        except OSError as e:
+            print(f"[IMAGE] Viga serveerimisel {image_path}: {e}")
+            self.send_error(500, "Pilti ei õnnestunud lugeda")
 
 class SafeThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """ThreadingHTTPServer parema exception handlinguga."""
