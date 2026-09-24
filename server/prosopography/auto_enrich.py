@@ -99,7 +99,8 @@ def aggregate(sources: list) -> dict:
             if isinstance(v, dict) and v.get("label"):
                 lists[target].append({k: v[k] for k in ("id", "label", "labels") if v.get(k)})
         aliases.extend(r.get("name.aliases") or [])
-        for lk, ls in (("_linked_wikidata", "wikidata"), ("_linked_gnd", "gnd")):
+        for lk, ls in (("_linked_wikidata", "wikidata"), ("_linked_gnd", "gnd"),
+                       ("_linked_viaf", "viaf")):
             if r.get(lk):
                 linked.setdefault(ls, []).append((scheme, str(r[lk])))
 

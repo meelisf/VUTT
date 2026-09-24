@@ -372,6 +372,28 @@ def _date_precision(date_str: str) -> str:
     return "year" if len(date_str) <= 4 else ("month" if len(date_str) <= 7 else "day")
 
 
+_WIKIDATA_ENTITY_RE = re.compile(r"wikidata\.org/entity/(Q\d+)$")
+_VIAF_RE = re.compile(r"viaf\.org/viaf/(\d+)$")
+
+
+def _linked_from_same_as(uris) -> dict:
+    """GND `sameAs` URI-d → isiku enda seotud Wikidata/VIAF ID.
+
+    `sameAs` all on sama isiku kirjed teistes normandmebaasides — mitte kohad
+    ega ametid —, seega esimene Wikidata/VIAF vaste on selle isiku oma.
+    """
+    linked: dict = {}
+    for uri in uris:
+        uri = str(uri or "").rstrip("/")
+        m = _WIKIDATA_ENTITY_RE.search(uri)
+        if m and "_linked_wikidata" not in linked:
+            linked["_linked_wikidata"] = m.group(1)
+        m = _VIAF_RE.search(uri)
+        if m and "_linked_viaf" not in linked:
+            linked["_linked_viaf"] = m.group(1)
+    return linked
+
+
 def _parse_dnb_jsonld(nodes: list, gnd_id: str) -> dict:
     """Sõelub DNB laiendatud JSON-LD vastuse. Eraldi funktsioon, et olla testitav.
 
@@ -413,6 +435,10 @@ def _parse_dnb_jsonld(nodes: list, gnd_id: str) -> dict:
             result["gender"] = "F"
         elif g_id == "male":
             result["gender"] = "M"
+
+    result.update(_linked_from_same_as(
+        v.get("@id") for v in main.get("http://www.w3.org/2002/07/owl#sameAs", [])
+        if isinstance(v, dict)))
 
     return result
 
@@ -514,6 +540,9 @@ def _parse_lobid(data: dict) -> dict:
             result["_occupations"] = occs[:5]
     except Exception:
         pass
+
+    result.update(_linked_from_same_as(
+        s.get("id") for s in (data.get("sameAs") or []) if isinstance(s, dict)))
 
     return result
 
