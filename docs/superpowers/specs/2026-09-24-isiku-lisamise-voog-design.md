@@ -273,6 +273,23 @@ ja kordab. Märge on töö püsiv jälg; mälusisest järjekorda ei usaldata.
 
 Git-commit nagu tavalisel rikastusel (autor = looja, sõnum „Automaatne rikastus").
 
+### 4.4 Serveri stub'id
+
+`ensure_prosopo_for_entity` (metaandmete salvestamine, import) kutsub sama loomisfunktsiooni
+`created_via: "server_stub"` — saab märke ja taustarikastuse.
+
+### 4.5 Admin
+
+- `GET /prosopography/admin/review?reason=…` — `review.state == pending` kaardid,
+  uuemad ees, teose konteksti pealkirjaga.
+- `POST /prosopography/{id}/review/done` — `require_role("admin")`; keha
+  `{updated_at}` — **admin kinnitab kindla kaardiversiooni**:
+  - `updated_at` ei vasta → **409** (kaarti on vahepeal muudetud, nt taustarikastus lisas
+    andmeid, mida admin ei näinud); UI laeb kaardi uuesti;
+  - `review.reasons ∋ enrich_pending` → **409** `enrich_pending` (rikastus pooleli —
+    kinnitus pärast seda);
+  - muidu `state = done`, `done_by`, `done_at`; git-commit. Kinnitust uuesti ei avata (§3.1).
+
 ### 4.6 ID-lukk ja lukkude järjekord
 
 Ühe isiku lukk ei kaitse **teist** kaarti: kaks taustatööd võivad korraga leida sama
@@ -291,23 +308,6 @@ GND ID vabana ja lisada selle eri kaartidele — sama võidujooks nagu kahe loom
 - Välisallika päringut ei tehta kunagi ühegi luku all.
 - Protsessilokaalne — sama hoiatus mis `_work_sets_lock`-il ja `RENDER_SEMAPHORE`-il
   (mitme workeri korral vaja protsessideülest lukku).
-
-### 4.4 Serveri stub'id
-
-`ensure_prosopo_for_entity` (metaandmete salvestamine, import) kutsub sama loomisfunktsiooni
-`created_via: "server_stub"` — saab märke ja taustarikastuse.
-
-### 4.5 Admin
-
-- `GET /prosopography/admin/review?reason=…` — `review.state == pending` kaardid,
-  uuemad ees, teose konteksti pealkirjaga.
-- `POST /prosopography/{id}/review/done` — `require_role("admin")`; keha
-  `{updated_at}` — **admin kinnitab kindla kaardiversiooni**:
-  - `updated_at` ei vasta → **409** (kaarti on vahepeal muudetud, nt taustarikastus lisas
-    andmeid, mida admin ei näinud); UI laeb kaardi uuesti;
-  - `review.reasons ∋ enrich_pending` → **409** `enrich_pending` (rikastus pooleli —
-    kinnitus pärast seda);
-  - muidu `state = done`, `done_by`, `done_at`; git-commit. Kinnitust uuesti ei avata (§3.1).
 
 ## 5. Otsing ja nimevalik
 
