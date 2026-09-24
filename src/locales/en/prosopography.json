@@ -363,6 +363,7 @@
     "note": "Note",
     "linkedToWork": "Will be linked to this work",
     "createdNotice": "Person created. Data is filled in from the source in the background; the card awaits review.",
+    "createFailed": "Creating the person failed. Please try again.",
     "splitConflict": "The sources point to two different VUTT cards — tell an admin; the cards need to be merged.",
     "searching": "Searching…",
     "noResults": "Nothing found in authority files",

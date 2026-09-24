@@ -84,4 +84,17 @@ describe('PersonAddPanel', () => {
     render(<PersonAddPanel initialQuery="Ludenius" token="t" lang="et" onDone={vi.fn()} onClose={vi.fn()} />);
     expect(await screen.findByText(/panel.sourceSearchFailed/)).toBeTruthy();
   });
+
+  it('loomise tõrge (mitte-konflikt) on nähtav ja onDone ei käivitu', async () => {
+    // Vt kommentaari mock-mooduli juures: vi.fn-i tagasilükatud promise loetakse
+    // vitest 4.1-s testi veaks ka siis, kui komponent selle kinni püüab — seega
+    // resolve'ime Error-objektiga, mille wrapper `throw`-ib.
+    create.mockResolvedValue(new Error('network down'));
+    const onDone = vi.fn();
+    render(<PersonAddPanel initialQuery="Ludenius" token="t" lang="et" onDone={onDone} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByTestId('candidate-row'));
+    fireEvent.click(await screen.findByText('panel.createAndSelect'));
+    await screen.findByText('panel.createFailed');
+    expect(onDone).not.toHaveBeenCalled();
+  });
 });

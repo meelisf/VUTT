@@ -238,6 +238,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
   const inputRef = useRef<HTMLInputElement>(null);
   const searchIdRef = useRef(0);
   const isFirstRun = useRef(true);
+  const focusRefApplied = useRef(false);
 
   const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
@@ -248,6 +249,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
   const [creatingKey, setCreatingKey] = useState<string | null>(null);
   const [conflictIds, setConflictIds] = useState<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [manualName, setManualName] = useState(initialQuery);
   const [manualNote, setManualNote] = useState('');
 
@@ -294,11 +296,14 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
-  // focusRef: väljastpoolt viidatud kandidaat avatakse kohe.
+  // focusRef: väljastpoolt viidatud kandidaat avatakse kohe, aga ainult ÜKS kord —
+  // muidu avab efekt grupi uuesti iga `groups`-muutuse peale ka siis, kui kasutaja
+  // on selle vahepeal ise sulgenud.
   useEffect(() => {
-    if (!focusRef) return;
+    if (!focusRef || focusRefApplied.current) return;
     const match = groups.find(g => g.ids[focusRef.scheme] === focusRef.id);
     if (!match) return;
+    focusRefApplied.current = true;
     setOpenState(prev => {
       if (prev[match.key]?.open) return prev;
       const { chosen } = computeGroupName(match, query);
@@ -329,6 +334,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
   const submitCreate = useCallback(async (key: string, body: CreatePersonBody, fallbackLabel: string) => {
     setCreatingKey(key);
     setConflictIds(null);
+    setCreateError(null);
     try {
       const person = await createPersonChecked(body, token);
       setNotice(t('panel.createdNotice'));
@@ -340,8 +346,11 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
         } else {
           setConflictIds(err.existingPersonIds);
         }
+      } else {
+        // Muu viga (võrk, 500, timeout, vigane vastus): jääme vormi juurde,
+        // kasutaja saab uuesti proovida — andmeid ei kaotata, aga tõrge peab olema nähtav.
+        setCreateError(t('panel.createFailed'));
       }
-      // Muu viga: jääme vormi juurde, kasutaja saab uuesti proovida — andmeid ei kaotata.
     } finally {
       setCreatingKey(null);
     }
@@ -437,6 +446,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
           )}
 
           {notice && <p role="status" className="mt-3 text-xs text-green-700">{notice}</p>}
+          {createError && <p role="alert" className="mt-3 text-xs text-red-600">{createError}</p>}
 
           <NoSourceBlock
             name={manualName}

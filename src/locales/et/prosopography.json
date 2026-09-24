@@ -363,6 +363,7 @@
     "note": "Märkus",
     "linkedToWork": "Seotakse selle teosega",
     "createdNotice": "Isik loodud. Andmed täituvad allikast taustal; kaart ootab ülevaatust.",
+    "createFailed": "Isiku loomine ebaõnnestus. Proovi uuesti.",
     "splitConflict": "Allikad viitavad kahele eri VUTT-i kaardile — teata adminile, kaardid tuleb liita.",
     "searching": "Otsin…",
     "noResults": "Allikatest ei leitud kedagi",
