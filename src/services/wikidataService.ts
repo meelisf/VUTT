@@ -51,6 +51,37 @@ export async function searchWikidata(query: string, lang: string = 'et'): Promis
 }
 
 /**
+ * Täistekstiotsing ainult inimeste hulgast (`haswbstatement:P31=Q5`).
+ * Leiab ka nimeosa järgi keskelt aliasest („Ludenius" → Laurentius Ludenius),
+ * mida `wbsearchentities` (prefiksotsing) ei leia — vt spekk §5.1.
+ */
+export async function searchWikidataPersonsFulltext(query: string, lang: string = 'et'): Promise<WikidataSearchResult[]> {
+  if (!query || query.trim().length < 2) return [];
+  const sp = new URLSearchParams({
+    action: 'query', list: 'search', srsearch: `${query.trim()} haswbstatement:P31=Q5`,
+    srlimit: '7', format: 'json', origin: '*',
+  });
+  const r = await fetchWithTimeout(`${WIKIDATA_API_URL}?${sp.toString()}`, { timeout: 15000 });
+  if (!r.ok) throw new Error('Wikidata fulltext search failed');
+  const ids: string[] = ((await r.json())?.query?.search ?? []).map((s: any) => s.title).filter((t: string) => /^Q\d+$/.test(t));
+  if (ids.length === 0) return [];
+  const langs = [...new Set([lang, 'en', 'de'])].join('|');
+  const lp = new URLSearchParams({
+    action: 'wbgetentities', ids: ids.join('|'), props: 'labels|descriptions',
+    languages: langs, format: 'json', origin: '*',
+  });
+  const lr = await fetchWithTimeout(`${WIKIDATA_API_URL}?${lp.toString()}`, { timeout: 15000 });
+  const ent = lr.ok ? (await lr.json())?.entities ?? {} : {};
+  const pick = (o: any) => o?.[lang]?.value ?? o?.en?.value ?? o?.de?.value;
+  return ids.map(id => ({
+    id,
+    label: pick(ent[id]?.labels) ?? id,
+    description: pick(ent[id]?.descriptions),
+    url: `https://www.wikidata.org/wiki/${id}`,
+  }));
+}
+
+/**
  * Fetches detailed information for a Wikidata entity, including labels in multiple languages.
  * @param id Wikidata ID (e.g., "Q13972")
  * @returns Object with labels in et, en, la, de
