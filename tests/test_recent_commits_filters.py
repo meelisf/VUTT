@@ -208,3 +208,26 @@ def test_metadata_save_invalidates_work_info_cache(repo_env):
 
     assert git_ops.get_recent_commits(collection="yla", limit=10)["commits"] == []
     assert {c["work_id"] for c in git_ops.get_recent_commits(collection="muu-col", limit=10)["commits"]} == {"wMove"}
+
+
+def test_work_set_filters_before_pagination_and_combines_user(repo_env):
+    repo, base, git_ops = repo_env
+    _add_work(repo, base, "wanted", "wA", ["alam"], author="anne")
+    _add_work(repo, base, "other", "wB", ["alam"], author="anne")
+    _add_person(repo, base, author="anne")
+    _pad(repo, 100)
+    first = git_ops.get_recent_commits(work_ids={"wA"}, username="anne", limit=1)
+    second = git_ops.get_recent_commits(work_ids={"wA"}, username="anne", limit=1, skip=1)
+    assert first["has_more"]
+    assert len(first["commits"]) == len(second["commits"]) == 1
+    assert {c["work_id"] for c in first["commits"] + second["commits"]} == {"wA"}
+    assert first["commits"][0]["filepath"] != second["commits"][0]["filepath"]
+    assert git_ops.get_recent_commits(work_ids={"wA"}, username="peeter")["commits"] == []
+    assert git_ops.get_recent_commits(work_ids={"wB"})["commits"][0]["work_id"] == "wB"
+
+
+def test_empty_work_set_never_returns_unfiltered_history(repo_env):
+    repo, base, git_ops = repo_env
+    _add_work(repo, base, "wanted", "wA", ["alam"])
+    _add_person(repo, base)
+    assert git_ops.get_recent_commits(work_ids=[]) == {"commits": [], "has_more": False}

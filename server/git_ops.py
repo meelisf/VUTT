@@ -1117,7 +1117,7 @@ def _collection_scope_ids(collection_id):
     return scope
 
 
-def _scan_commits(repo, window, username, collection_ids, limit, skip):
+def _scan_commits(repo, window, username, collection_ids, limit, skip, work_ids=None):
     """Skannib `window` commiti (None = kogu ajalugu) ja koostab tulemused.
 
     Tagastab (results, has_more, scanned), kus `scanned` on läbi vaadatud
@@ -1191,7 +1191,7 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
                 if is_prosopo:
                     # Isikukaart ei kuulu ühtegi kollektsiooni — kollektsiooni
                     # valides jääb ta välja, „Kõik tööd" toob tagasi.
-                    if collection_ids:
+                    if collection_ids or work_ids is not None:
                         continue
                     nanoid = filename.removesuffix(".json")
                     person_id = f"vutt:P{nanoid}"
@@ -1232,6 +1232,9 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
 
                 # Kollektsioonifilter: teose praegune kuuluvus _metadata.json-is
                 if collection_ids and not (set(work_info.get('collections') or ()) & collection_ids):
+                    continue
+
+                if work_ids is not None and work_info['work_id'] not in work_ids:
                     continue
 
                 if is_import_commit:
@@ -1293,7 +1296,7 @@ def _scan_commits(repo, window, username, collection_ids, limit, skip):
     return results, has_more, len(all_commits)
 
 
-def get_recent_commits(username=None, limit=50, skip=0, collection=None):
+def get_recent_commits(username=None, limit=50, skip=0, collection=None, work_ids=None):
     """
     Tagastab viimased commitid, valikuliselt filtreerituna kasutaja ja
     kollektsiooni järgi.
@@ -1302,6 +1305,7 @@ def get_recent_commits(username=None, limit=50, skip=0, collection=None):
         username: Kui määratud, tagastab ainult selle kasutaja commitid
         limit: Maksimaalne tulemuste arv
         skip: Mitu tulemust algusest vahele jätta (pagineerimine)
+        work_ids: Teoste ID-d; None = filtrita, tühi hulk = tühi tulemus
         collection: Kui määratud, ainult selle kollektsiooni (ja ta
             alamkollektsioonide) teoste muudatused; isikukaardid jäävad välja
 
@@ -1313,6 +1317,11 @@ def get_recent_commits(username=None, limit=50, skip=0, collection=None):
     kasutaja tühja nimekirja lihtsalt sellepärast, et ta muudatused jäid
     akna taha — täpselt see viga, mida see funktsioon parandab.
     """
+    # None = filtrita; tühi hulk = tühi töökollektsioon.
+    if work_ids is not None:
+        work_ids = set(work_ids)
+        if not work_ids:
+            return {"commits": [], "has_more": False}
     repo = get_or_init_repo()
     collection_ids = _collection_scope_ids(collection) if collection else None
 
@@ -1322,7 +1331,7 @@ def get_recent_commits(username=None, limit=50, skip=0, collection=None):
     results, has_more = [], False
     for window in windows:
         results, has_more, scanned = _scan_commits(
-            repo, window, username, collection_ids, limit, skip
+            repo, window, username, collection_ids, limit, skip, work_ids
         )
         if len(results) >= limit or has_more:
             break
