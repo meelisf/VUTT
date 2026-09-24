@@ -8,6 +8,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
+import { useCollection } from '../../contexts/CollectionContext';
+import { getLangCode } from '../../utils/getLangCode';
 import { buildReplaceUploadPayload } from '../../utils/buildReplaceUploadPayload';
 import {
   TYPE_HAND,
@@ -48,8 +50,10 @@ import type { AdaLookupResult, PartialUpload, PollResult, SavedUpload } from './
 const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done', 'importing'];
 
 export function useUploadWizard() {
-  const { t } = useTranslation(['upload', 'common']);
+  const { t, i18n } = useTranslation(['upload', 'common']);
+  const lang = getLangCode(i18n.language);
   const { authToken } = useUser();
+  const { workSets } = useCollection();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -70,6 +74,9 @@ export function useUploadWizard() {
   const [slugManual, setSlugManual] = useState(false);
 
   const [selectedCollection, setSelectedCollection] = useState('');
+  // Töökollektsioonid: valik läheb upload'i olekusse, liikmesuse kirjutab
+  // server impordil (ADR 0042) — teost enne seda ei ole.
+  const [selectedWorkSets, setSelectedWorkSets] = useState<string[]>([]);
   const [step1Loading, setStep1Loading] = useState(false);
   const [step1Error, setStep1Error] = useState('');
 
@@ -325,6 +332,7 @@ export function useUploadWizard() {
             year: year.trim(),
             slug: candidateSlug,
             collections: selectedCollection ? [selectedCollection] : [],
+            work_sets: selectedWorkSets,
             replace_work_id: replaceWorkId || null,
             type: workType,
             ...buildAdaCreateExtras(adaResult ?? null),
@@ -503,6 +511,17 @@ export function useUploadWizard() {
   // ---------------------------------------------------------------------------
   // Import
   // ---------------------------------------------------------------------------
+  /** Server jättis mõne valitud töökollektsiooni vahele (arhiveeritud, kustutatud,
+   *  täis) — teos on imporditud, aga kasutaja peab seda teadma. */
+  function workSetsSkippedWarning(skipped?: Array<{ id: string }>): string | undefined {
+    if (!skipped || skipped.length === 0) return undefined;
+    const names = skipped.map(({ id }) => {
+      const ws = workSets.find((w) => w.id === id);
+      return ws ? (ws.name[lang] || ws.name.et || ws.name.en || id) : id;
+    });
+    return t('step3.workSetsSkipped', { names: names.join(', ') });
+  }
+
   async function handleImport() {
     if (!uploadId || !authToken) return;
     setImportLoading(true);
@@ -515,7 +534,10 @@ export function useUploadWizard() {
       const d = await importUploadWithRecovery(uploadId, authToken);
       stopPolling();
       setFileUploading(false);
-      const uploadWarning = d.warning || (d.git_committed === false ? t('step3.gitCommitWarning') : undefined);
+      const uploadWarning = [
+        d.warning || (d.git_committed === false ? t('step3.gitCommitWarning') : undefined),
+        workSetsSkippedWarning(d.work_sets_skipped),
+      ].filter(Boolean).join(' ') || undefined;
       // Suuna tööle; Git-hoiatus kantakse kaasa, et admin seda sihtlehel näeks.
       navigate(`/work/${d.work_id}`, uploadWarning ? { state: { uploadWarning } } : undefined);
     } catch (e) {
@@ -538,7 +560,8 @@ export function useUploadWizard() {
       const d = await replaceWorkUpload(uploadId, replaceWorkId, authToken);
       stopPolling();
       setFileUploading(false);
-      navigate(`/work/${d.work_id}/1`);
+      const uploadWarning = workSetsSkippedWarning(d.work_sets_skipped);
+      navigate(`/work/${d.work_id}/1`, uploadWarning ? { state: { uploadWarning } } : undefined);
     } catch (e) {
       setImportError(e instanceof Error ? e.message : t('step3.importError'));
     } finally {
@@ -682,6 +705,7 @@ export function useUploadWizard() {
     workType, setWorkType,
     slug,
     selectedCollection, setSelectedCollection,
+    selectedWorkSets, setSelectedWorkSets,
     step1Loading, step1Error,
     replaceWorkId, replaceWorkTitle,
     autoCreateLoading, autoCreateError,

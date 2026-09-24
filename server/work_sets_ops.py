@@ -175,6 +175,38 @@ def mutate_members(set_id: str, add, remove, username: str,
         return _save(ws, username, f"Töökollektsioon: liikmed {set_id}")
 
 
+def add_work_to_sets(work_id: str, set_ids, username: str) -> list:
+    """Lisab ÄSJA LOODUD teose upload'is valitud kogudesse. Tagastab vahelejäetud.
+
+    Kutsuja on import: teos on selleks hetkeks juba loodud ja commititud, nii et
+    kogu, kuhu lisada ei saa, EI TOHI importi kukutada. Vahelejäetu tagastatakse
+    põhjusega (`not_found` | `archived` | `limit` | `error`), et UI saaks seda
+    näidata. Haldusõigust siin ei kontrollita: upload on admin-tee
+    (`require_role("admin")`) ja admin haldab kõiki kogusid (`can_manage_set`).
+    Arhiveeritud kogu ei võta uusi liikmeid — sama reegel, mis valijas
+    (`manageableWorkSets`).
+    """
+    skipped = []
+    for set_id in dict.fromkeys(set_ids or []):
+        try:
+            ws = load_work_set(set_id)
+            if ws is None:
+                skipped.append({"id": set_id, "reason": "not_found"})
+                continue
+            if ws.get("status") != "active":
+                skipped.append({"id": set_id, "reason": "archived"})
+                continue
+            mutate_members(set_id, [work_id], [], username)
+        except WorkSetNotFound:
+            skipped.append({"id": set_id, "reason": "not_found"})
+        except WorkSetLimit:
+            skipped.append({"id": set_id, "reason": "limit"})
+        except Exception as e:
+            logger.error(f"Teose {work_id} lisamine kogusse {set_id} ebaõnnestus: {e}")
+            skipped.append({"id": set_id, "reason": "error"})
+    return skipped
+
+
 def set_access(set_id: str, new_access: dict, actor: dict,
                users_snapshot: dict, expected_revision: Optional[int]) -> dict:
     """`access`-kaardi TÄISASENDUS koos serveripoolse diffiga (ADR 0043 p7).

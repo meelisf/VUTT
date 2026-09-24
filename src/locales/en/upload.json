@@ -25,8 +25,7 @@
     "slugLabel": "Folder name (slug)",
     "slugHint": "Folder will be created: data/{{slug}}/",
     "slugConflict": "Folder data/{{slug}}/ already exists — change the slug",
-    "collectionLabel": "Collection (optional)",
-    "collectionNone": "— select collection —",
+    "collectionLabel": "Collection and work sets (optional)",
     "languagesLabel": "Languages (optional)",
     "continue": "Continue to upload",
     "required": "Required field",
@@ -91,7 +90,8 @@
     "importError": "Import failed",
     "gitCommitWarning": "Work was imported, but the Git version-control commit failed.",
     "transferFailed": "Sending the files to the OCR server failed",
-    "backToSplit": "Back to splitting"
+    "backToSplit": "Back to splitting",
+    "workSetsSkipped": "The work was not added to work set(s): {{names}}"
   },
   "step3split": {
     "title": "Review pages",

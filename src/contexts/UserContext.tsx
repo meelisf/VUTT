@@ -9,6 +9,8 @@ export interface UserSettings {
   language?: 'et' | 'en';
   default_tab?: 'edit' | 'annotate';
   characters?: Array<{ char: string; name: string }>;
+  /** Lemmikkogud valijates: püsikogu = paljas id, töökollektsioon = `s:<id>` (ADR 0038 kuju). */
+  favorite_collections?: string[];
 }
 
 interface User {

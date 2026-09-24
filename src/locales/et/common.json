@@ -215,7 +215,13 @@
     "notInAny": "Teos ei kuulu ühtegi töökollektsiooni",
     "removeFromSet": "Eemalda kogust",
     "loadFailed": "Töökollektsioonide laadimine ebaõnnestus",
-    "retry": "Proovi uuesti"
+    "retry": "Proovi uuesti",
+    "favorites": "Lemmikud",
+    "addFavorite": "Lisa lemmikuks",
+    "removeFavorite": "Eemalda lemmikutest",
+    "favoriteFailed": "Lemmiku salvestamine ebaõnnestus",
+    "noCollection": "Kollektsioonita",
+    "targetPlaceholder": "— vali kollektsioon —"
   },
   "error": {
     "unknown": "Viga",

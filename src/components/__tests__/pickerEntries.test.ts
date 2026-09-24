@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildPickerEntries, manageableWorkSets, matchesQuery } from '../pickerEntries';
+import {
+  buildPickerEntries, favoriteEntries, favoriteToken, manageableWorkSets, matchesQuery, toggleFavorite,
+} from '../pickerEntries';
 import { CollectionTreeNode } from '../../services/collectionService';
 import { WorkSetSummary } from '../../services/workSetService';
 
@@ -106,5 +108,45 @@ describe('manageableWorkSets', () => {
   it('otsing filtreerib', () => {
     expect(manageableWorkSets(SEGA, 'hall', 'et').map(w => w.id)).toEqual(['ws_hallatav']);
     expect(manageableWorkSets(SEGA, 'xyzzy', 'et')).toEqual([]);
+  });
+});
+
+describe('favoriteEntries', () => {
+  // Tokenid nagu URL-is (ADR 0038): püsikogu paljas id, töökollektsioon `s:<id>`.
+  const FAV = ['klingeriana', 's:ws_2', 'vennastekogudus', 's:ws_1'];
+
+  it('püsikogud ees, siis töökollektsioonid; mõlemad nime järgi', () => {
+    expect(favoriteEntries(FAV, TREE, SETS, '', 'et').map(e => `${e.kind}:${e.id}`)).toEqual([
+      'collection:klingeriana', 'collection:vennastekogudus',
+      'work_set:ws_1', 'work_set:ws_2',
+    ]);
+  });
+
+  it('leiab lemmiku ka puu seest (alamkogu)', () => {
+    expect(favoriteEntries(['academia-gustaviana'], TREE, [], '', 'et').map(e => e.id))
+      .toEqual(['academia-gustaviana']);
+  });
+
+  it('kustutatud või nähtamatu kogu token jääb välja', () => {
+    // `ws_vana` ei ole kutsuja antud loendis (arhiiv filtreeritud) → ei ilmu.
+    const kogud = SETS.filter(ws => ws.status === 'active');
+    expect(favoriteEntries(['kadunud', 's:ws_vana', 's:ws_1'], TREE, kogud, '', 'et').map(e => e.id))
+      .toEqual(['ws_1']);
+  });
+
+  it('töökollektsiooni id ei sobi püsikogu tokeniga ega vastupidi', () => {
+    expect(favoriteEntries(['ws_1', 's:klingeriana'], TREE, SETS, '', 'et')).toEqual([]);
+  });
+
+  it('otsing filtreerib ka lemmikuid', () => {
+    expect(favoriteEntries(FAV, TREE, SETS, 'kling', 'et').map(e => e.id))
+      .toEqual(['klingeriana', 'ws_2']);
+  });
+});
+
+describe('toggleFavorite', () => {
+  it('lisab lõppu ja eemaldab', () => {
+    expect(toggleFavorite(['a'], favoriteToken('work_set', 'ws_1'))).toEqual(['a', 's:ws_1']);
+    expect(toggleFavorite(['a', 's:ws_1'], 's:ws_1')).toEqual(['a']);
   });
 });

@@ -5,7 +5,9 @@ import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen, Search, Users
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
-import { buildPickerEntries } from './pickerEntries';
+import { buildPickerEntries, favoriteEntries } from './pickerEntries';
+import { useFavoriteCollections } from '../hooks/useFavoriteCollections';
+import FavoriteStar from './FavoriteStar';
 import { createWorkSet } from '../services/workSetService';
 import { CollectionSelection } from '../services/selectionFilter';
 import { getLangCode } from '../utils/getLangCode';
@@ -32,7 +34,9 @@ const TreeNode: React.FC<{
   toggleExpanded: (id: string) => void;
   /** Otsingu ajal: vaste ei tohi kokkuklapitud vanema taha peitu jääda. */
   forceExpanded?: boolean;
-}> = ({ node, level, selectedId, onSelect, lang, expandedIds, toggleExpanded, forceExpanded }) => {
+  /** Lemmiku tärn rea lõpus (puudub, kui kasutaja pole sisse logitud). */
+  star?: (id: string) => React.ReactNode;
+}> = ({ node, level, selectedId, onSelect, lang, expandedIds, toggleExpanded, forceExpanded, star }) => {
   const isExpanded = forceExpanded || expandedIds.has(node.id);
   const hasChildren = node.children.length > 0;
   const isSelected = selectedId === node.id;
@@ -73,6 +77,7 @@ const TreeNode: React.FC<{
           </span>
           {isSelected && <Check size={18} className={colorClasses.text} />}
         </button>
+        {star?.(node.id)}
       </div>
 
       {/* Alamad */}
@@ -89,6 +94,7 @@ const TreeNode: React.FC<{
               expandedIds={expandedIds}
               toggleExpanded={toggleExpanded}
               forceExpanded={forceExpanded}
+              star={star}
             />
           ))}
         </div>
@@ -155,6 +161,23 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
     () => buildPickerEntries(tree, onSelect ? [] : workSets, query, lang),
     [tree, workSets, query, lang, onSelect],
   );
+  const fav = useFavoriteCollections();
+  // Lemmikud tulevad samast nähtavast hulgast: täht ei tohi avada kogu, mida
+  // valija muidu ei näitaks. Massilise määramise variandis ainult püsikogud.
+  const lemmikud = useMemo(
+    () => favoriteEntries(fav.favorites, tree, nahtavadKogud, query, lang),
+    [fav.favorites, tree, nahtavadKogud, query, lang],
+  );
+  const star = fav.enabled
+    ? (kind: 'collection' | 'work_set', id: string) => (
+      <FavoriteStar
+        active={fav.isFavorite(kind, id)}
+        onToggle={() => fav.toggle(kind, id)}
+        disabled={fav.busy}
+      />
+    )
+    : null;
+  const collectionStar = star ? (id: string) => star('collection', id) : undefined;
   // Otsingu ajal peavad vasted olema NÄHTAVAD: kokkuklapitud vanem peidaks
   // just selle lapse, mille kasutaja otsis.
   const otsib = query.trim().length > 0;
@@ -276,6 +299,45 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
             </>
           )}
 
+          {/* Lemmikud — mõlemad liigid koos, täispuu jääb allapoole muutmata */}
+          {lemmikud.length > 0 && (
+            <>
+              <h3 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                {t('workSets.favorites', 'Lemmikud')}
+              </h3>
+              {lemmikud.map((e) => {
+                const isSelected = e.kind === 'collection'
+                  ? selectedCollection === e.id
+                  : selection.kind === 'work_set' && selection.id === e.id;
+                const Icon = e.kind === 'collection' ? FolderOpen : Users;
+                return (
+                  <div
+                    key={`${e.kind}:${e.id}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors
+                      ${isSelected ? 'bg-primary-100 text-primary-800' : 'hover:bg-gray-100'}`}
+                  >
+                    <span className="w-5" />
+                    <button
+                      onClick={() => (e.kind === 'collection'
+                        ? handleSelect(e.id)
+                        : handleSelectSet({ kind: 'work_set', id: e.id }))}
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    >
+                      <Icon size={18} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
+                      <span className="flex-1 truncate">{e.name[lang] || e.name.et || e.name.en || e.id}</span>
+                      {isSelected && <Check size={18} className="text-primary-600" />}
+                    </button>
+                    {star?.(e.kind, e.id)}
+                  </div>
+                );
+              })}
+              {fav.error && (
+                <p className="px-3 text-xs text-red-600">{t('workSets.favoriteFailed', 'Lemmiku salvestamine ebaõnnestus')}</p>
+              )}
+              <div className="border-t border-gray-200 my-2" />
+            </>
+          )}
+
           {/* Püsikogud */}
           {!onSelect && (
             <h3 className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -300,6 +362,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                 expandedIds={expandedIds}
                 toggleExpanded={toggleExpanded}
                 forceExpanded={otsib}
+                star={collectionStar}
               />
             ))
           )}
@@ -367,21 +430,26 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                 nahtavadKogud.map((ws) => {
                   const isSelected = selection.kind === 'work_set' && selection.id === ws.id;
                   return (
-                    <button
+                    <div
                       key={ws.id}
-                      onClick={() => handleSelectSet({ kind: 'work_set', id: ws.id })}
                       className={`
-                        w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors
+                        flex items-center gap-2 px-3 py-2 rounded-lg transition-colors
                         ${isSelected ? 'bg-primary-100 text-primary-800' : 'hover:bg-gray-100'}
                       `}
                     >
                       <span className="w-5" />
-                      <Users size={18} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
-                      <span className="flex-1 truncate">
-                        {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
-                      </span>
-                      {isSelected && <Check size={18} className="text-primary-600" />}
-                    </button>
+                      <button
+                        onClick={() => handleSelectSet({ kind: 'work_set', id: ws.id })}
+                        className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                      >
+                        <Users size={18} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
+                        <span className="flex-1 truncate">
+                          {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
+                        </span>
+                        {isSelected && <Check size={18} className="text-primary-600" />}
+                      </button>
+                      {star?.('work_set', ws.id)}
+                    </div>
                   );
                 })
               )}

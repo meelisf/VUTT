@@ -215,7 +215,13 @@
     "notInAny": "This work is not in any work collection",
     "removeFromSet": "Remove from collection",
     "loadFailed": "Loading work collections failed",
-    "retry": "Try again"
+    "retry": "Try again",
+    "favorites": "Favourites",
+    "addFavorite": "Add to favourites",
+    "removeFavorite": "Remove from favourites",
+    "favoriteFailed": "Saving the favourite failed",
+    "noCollection": "No collection",
+    "targetPlaceholder": "— choose a collection —"
   },
   "error": {
     "unknown": "Error",

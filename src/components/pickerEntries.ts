@@ -86,3 +86,71 @@ export function buildPickerEntries(
     ),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Lemmikkogud (kasutaja seade `favorite_collections`)
+// ---------------------------------------------------------------------------
+
+/**
+ * Lemmiku token — SAMA kuju nagu aktiivne kogu URL-is (ADR 0038): püsikogu on
+ * paljas id, töökollektsioon `s:<id>`. Üks loend kannab mõlemat liiki.
+ */
+export function favoriteToken(kind: 'collection' | 'work_set', id: string): string {
+  return kind === 'work_set' ? `s:${id}` : id;
+}
+
+/** Lisab tokeni lõppu või eemaldab ta. Järjekord säilib. */
+export function toggleFavorite(favorites: string[], token: string): string[] {
+  return favorites.includes(token)
+    ? favorites.filter(f => f !== token)
+    : [...favorites, token];
+}
+
+export interface FavoriteEntry {
+  kind: 'collection' | 'work_set';
+  id: string;
+  name: Nimi;
+}
+
+function flattenTree(nodes: CollectionTreeNode[], out: CollectionTreeNode[] = []): CollectionTreeNode[] {
+  for (const node of nodes) {
+    out.push(node);
+    flattenTree(node.children, out);
+  }
+  return out;
+}
+
+const nimeJargi = (lang: 'et' | 'en') => (a: FavoriteEntry, b: FavoriteEntry) => {
+  const an = a.name[lang] || a.name.et || a.name.en || a.id;
+  const bn = b.name[lang] || b.name.et || b.name.en || b.id;
+  return an.localeCompare(bn, 'et') || a.id.localeCompare(b.id);
+};
+
+/**
+ * Valija „Lemmikud" plokk: lemmikud, mis on SELLES valijas nähtavad.
+ *
+ * Kutsuja annab juba filtreeritud hulgad (nähtavad püsikogud puuna, valitavad
+ * töökollektsioonid) — lemmik ei tohi avada kogu, mida valija muidu ei näitaks.
+ * Kustutatud kogu token jääb seadetesse, aga siin langeb ta lihtsalt välja.
+ * Järjestus: püsikogud, siis töökollektsioonid; kumbki nime järgi.
+ */
+export function favoriteEntries(
+  favorites: string[],
+  tree: CollectionTreeNode[],
+  workSets: WorkSetSummary[],
+  query: string,
+  lang: 'et' | 'en',
+): FavoriteEntry[] {
+  const fav = new Set(favorites);
+  const kogud: FavoriteEntry[] = flattenTree(tree)
+    .filter(n => fav.has(favoriteToken('collection', n.id)))
+    .map(n => ({ kind: 'collection' as const, id: n.id, name: n.collection.name }));
+  const tooKogud: FavoriteEntry[] = workSets
+    .filter(ws => fav.has(favoriteToken('work_set', ws.id)))
+    .map(ws => ({ kind: 'work_set' as const, id: ws.id, name: ws.name }));
+  const sobib = (e: FavoriteEntry) => matchesQuery(e.name, query, lang);
+  return [
+    ...kogud.filter(sobib).sort(nimeJargi(lang)),
+    ...tooKogud.filter(sobib).sort(nimeJargi(lang)),
+  ];
+}

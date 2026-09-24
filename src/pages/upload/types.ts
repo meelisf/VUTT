@@ -88,6 +88,7 @@ export interface UploadCreatePayload {
   year: string;
   slug: string;
   collections: string[];
+  work_sets?: string[];
   replace_work_id: string | null;
   type: UploadType;
 }
@@ -107,6 +108,8 @@ export interface UploadImportResponse {
   message?: string;
   warning?: string;
   git_committed?: boolean;
+  /** Töökollektsioonid, kuhu teost ei saanud lisada (import ise õnnestus). */
+  work_sets_skipped?: Array<{ id: string; reason: 'not_found' | 'archived' | 'limit' | 'error' }>;
 }
 
 export type PrepressMode = 'default' | 'custom' | 'nosplit';
