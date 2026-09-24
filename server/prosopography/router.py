@@ -488,6 +488,8 @@ async def prosopography_enrich(
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return person
 
 

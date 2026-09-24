@@ -57,6 +57,20 @@ def _indices():
 SECRET_FIELDS = ("auth_token", "token")
 
 
+# Serveri väljad (ADR 0048): kliendi saadetud väärtus visatakse ALATI ära —
+# nii võti ise kui iga väljarada `võti.…` (apply_enrichment kirjutab radu).
+# Muudavad ainult loomine, taustarikastus ja admini kinnitus.
+SERVER_FIELDS = ("review",)
+
+
+def strip_server_fields(data: dict) -> dict:
+    """Koopia ilma serveriväljadeta. Kõik kliendi kirjutusteed kutsuvad seda."""
+    return {
+        k: v for k, v in (data or {}).items()
+        if not any(k == f or k.startswith(f + ".") for f in SERVER_FIELDS)
+    }
+
+
 # Lubatud nanoid-märgid: generate_nanoid annab [a-z0-9], lubame ka legacy variandid
 # (A-Z, _, -). EI sisalda path-ohtlikke märke (., /, \) → kaitseb path traversal'i eest.
 _NANOID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -331,6 +345,8 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
         if person is None:
             raise KeyError(person_id)
 
+        data = strip_server_fields(data)
+
         client_updated_at = data.get("updated_at")
         if not isinstance(client_updated_at, str) or not client_updated_at.strip():
             raise ValueError("updated_at_required")
@@ -547,7 +563,10 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
 
         # Tehniline võti juhib checked_at uuendust, kuid ei kuulu isikukaardile.
         # Koopia väldib kutsuja request-dict'i muteerimist.
-        approved_fields = dict(approved)
+        approved_fields = strip_server_fields(approved)
+        # ID-d ainult add_identifier kaudu (ID-lukk + duplikaadikontroll, §4.6).
+        if any(k == "identifiers" or k.startswith("identifiers.") for k in approved_fields):
+            raise ValueError("identifiers_via_enrich")
         scheme = approved_fields.pop("_enrichment_scheme", None)
 
         # Pärandväli ei tohi ühegi tee kaudu tagasi tekkida (ADR 0039). Siin
@@ -768,4 +787,4 @@ def bulk_update_occupation(
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 
 
-__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation']
+__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation', 'SERVER_FIELDS', 'strip_server_fields']
