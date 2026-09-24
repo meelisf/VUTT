@@ -61,7 +61,7 @@ def _seadista(tmp_path, monkeypatch, sftp, *, staatus="reviewing"):
     monkeypatch.setattr(upload_ops, "BASE_DIR", str(data_dir))
     monkeypatch.setattr(git_ops, "commit_new_work_to_git", lambda *a, **kw: True)
     monkeypatch.setattr(meili_ops, "sync_work_to_meilisearch", lambda slug: True)
-    monkeypatch.setattr(person_crud, "ensure_prosopo_stubs", lambda metadata, username=None: {})
+    monkeypatch.setattr(person_crud, "ensure_prosopo_stubs", lambda metadata, username=None, work_id=None: {})
     monkeypatch.setattr(prosopo_indices, "update_person_to_works", lambda *a, **kw: None)
     monkeypatch.setattr(prosopo_indices, "update_work_collections", lambda *a, **kw: None)
     monkeypatch.setattr(upload_ops, "_ssh_rm_rf", lambda *a, **kw: None)

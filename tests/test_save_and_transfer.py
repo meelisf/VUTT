@@ -201,7 +201,7 @@ def test_import_as_work_reports_git_commit_failure(make_state, tmp_path, monkeyp
     monkeypatch.setattr(upload_ops, "_ssh_rm_rf", lambda *a, **kw: None)
     monkeypatch.setattr(upload_ops, "close_ssh", lambda *a, **kw: None)
     monkeypatch.setattr(meili_ops, "sync_work_to_meilisearch", lambda slug: True)
-    monkeypatch.setattr(person_crud, "ensure_prosopo_stubs", lambda metadata, username=None: {})
+    monkeypatch.setattr(person_crud, "ensure_prosopo_stubs", lambda metadata, username=None, work_id=None: {})
     monkeypatch.setattr(prosopo_indices, "update_person_to_works", lambda *a, **kw: None)
     monkeypatch.setattr(prosopo_indices, "update_work_collections", lambda *a, **kw: None)
 
