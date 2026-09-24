@@ -5,7 +5,7 @@ import PageThumb from './PageThumb';
 import { IMAGE_BASE_URL } from '../../config';
 import { ReocrState } from '../../utils/reocrStatus';
 import { cardLineLeftPercent } from '../../components/pagePrep/geometry';
-import { PendingPageOp, showsCardLine } from './pageOpsPlan';
+import { PendingPageOp, effectiveSplitX, showsCardLine } from './pageOpsPlan';
 
 interface PageCardProps {
   workId: string;
@@ -50,7 +50,7 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const [aspect, setAspect] = React.useState<number | undefined>(undefined);
   const op = p.pendingOp;
   // 180° ei muuda kuvatud pildi mõõte → joon käib sama valemi järgi.
-  const lineLeft = showsCardLine(op) ? cardLineLeftPercent(aspect, p.splitX) : null;
+  const lineLeft = showsCardLine(op) ? cardLineLeftPercent(aspect, effectiveSplitX(op, p.splitX)) : null;
   return (
     <div
       ref={ref}

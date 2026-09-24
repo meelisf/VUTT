@@ -270,12 +270,15 @@
       "confirmBody": "Vana pilt säilib prügikastis. Tekst ja metaandmed jäävad muutmata.",
       "dontAskAgain": "Ära küsi selles aknas uuesti",
       "allDone": "Kõik lehed läbi töödeldud",
-      "splitDone": "Leht poolitatud",
-      "viewNewHalves": "Vaata uusi pooli",
       "thumbWarning": "Pilt muudeti, aga pisipildi uuendamine ebaõnnestus.",
       "dragPanel": "Lohista nupud teise kohta",
       "applyError": "Toiming ebaõnnestus",
-      "close": "Sulge"
+      "close": "Sulge",
+      "splitAt": "Poolitatakse joonelt {{percent}}%",
+      "notSplit": "Ei poolitata",
+      "splitAfterRotate": "leht pööratakse enne poolitamist {{deg}}°",
+      "resetToGlobal": "Lähtesta üldjoonele",
+      "splitPendingHint": "Poolitus jääb ootele ja rakendub koos teiste muudatustega lehtede riba nupust „Rakenda”."
     },
     "replaceHint": "Lae üles uus skänn. Metaandmed säilitatakse automaatselt.",
     "replaceWarning": "Asendamine kustutab kõik praegused leheküljed ja asendab need uute OCR-itud lehekülgedega.",

@@ -270,12 +270,15 @@
       "confirmBody": "The old image is kept in the trash. Text and metadata are unchanged.",
       "dontAskAgain": "Don't ask again in this window",
       "allDone": "All pages processed",
-      "splitDone": "Page split",
-      "viewNewHalves": "View new halves",
       "thumbWarning": "Image was changed, but thumbnail update failed.",
       "dragPanel": "Drag buttons elsewhere",
       "applyError": "Operation failed",
-      "close": "Close"
+      "close": "Close",
+      "splitAt": "Split at {{percent}}%",
+      "notSplit": "Not split",
+      "splitAfterRotate": "the page is rotated {{deg}}° before splitting",
+      "resetToGlobal": "Reset to global line",
+      "splitPendingHint": "The split stays pending and is applied with the other changes from the “Apply” button in the page bar."
     },
     "replaceHint": "Upload a new scan. Metadata is preserved automatically.",
     "replaceWarning": "Replacing deletes all current pages and replaces them with newly OCR-processed pages.",

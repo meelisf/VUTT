@@ -177,9 +177,12 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
           </div>
         )}
 
-        {/* Valiku-rida — ilmub kui ≥1 leht valitud */}
+        {/* Valiku-rida — ilmub kui ≥1 leht valitud. Kaks rida teemade kaupa:
+            ülemine muudab lehti/järjekorda (liiguta, poolita, pööra), alumine
+            on teksti teema (transkribeeri) keskel ja kustutamine nurgas. */}
         {hasSelection && (
-          <div className="px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="px-4 py-2.5 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-sm font-medium text-primary-800 shrink-0">
               {t('manage.select.count', { count: props.selectedCount })}
             </span>
@@ -225,9 +228,20 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
               {t('manage.select.clear')}
             </button>
 
+            {/* Liiguta vea-vihje (täislaiuses, ainult kui kehtetu) */}
+            {props.moveHintText && (
+              <span className="w-full text-sm text-amber-700">{props.moveHintText}</span>
+            )}
+          </div>
+
+          {/* Transkribeeri keskel (eraldi teema), kustuta paremas nurgas.
+              Kolmeveeruline võre hoiab keskmise tõeliselt keskel ka siis,
+              kui paremal on ainult ikoon. */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center border-t border-gray-100 pt-2">
+            <span />
             {/* Transkribeeri — sekundaarne (outline), vähem prominentne kui Liiguta.
                 Mudel tuletatakse teose tüübist (WorkManage), eraldi valikut pole. */}
-            <div className="border-l border-gray-200 pl-3 flex items-center">
+            <div className="flex items-center justify-center">
               <button onClick={props.onReocrClick} disabled={props.actionsDisabled}
                 title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-sm border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-40 rounded">
@@ -248,14 +262,11 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
             <button onClick={props.onDeleteClick} disabled={props.actionsDisabled}
               title={props.actionsDisabled ? props.actionsDisabledTitle : t('manage.bulkDelete.button')}
               aria-label={t('manage.bulkDelete.button')}
-              className="ml-auto p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40">
+              className="justify-self-end p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40">
               <Trash2 size={16} />
             </button>
 
-            {/* Liiguta vea-vihje (täislaiuses, ainult kui kehtetu) */}
-            {props.moveHintText && (
-              <span className="w-full text-sm text-amber-700">{props.moveHintText}</span>
-            )}
+          </div>
           </div>
         )}
     </FloatingActionBar>
