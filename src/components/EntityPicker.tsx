@@ -8,9 +8,9 @@ import { searchGnd, GndSearchResult } from '../services/gndService';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
-import { listPersons, createPersonChecked, PersonConflictError, getPerson } from '../prosopography/services/prosopographyService';
+import { listPersons } from '../prosopography/services/prosopographyService';
 import type { ProsopoIndexEntry } from '../prosopography/types';
-import { normalizeExtId } from '../prosopography/utils/externalIds';
+import PersonAddPanel from '../prosopography/components/PersonAddPanel';
 
 interface SuggestionItem {
   label: string;
@@ -47,8 +47,10 @@ interface EntityPickerProps {
   // Prosopograafia toggle — nähtav creators/publisher/tags kontekstis
   showPersonToggle?: boolean;
   defaultPersonSearch?: boolean;
-  // Token uue isiku automaatseks loomiseks (Wikidata valikul person-režiimis)
+  // Token isikupaneeli jaoks (uue isiku loomine / otsing person-režiimis)
   token?: string;
+  // Teose kontekst isikupaneelile (nt loomisel salvestatav seos) — ainult person-režiimis
+  personContext?: { work_id: string; role?: string };
 }
 
 type Suggestion = WikidataSearchResult & {
@@ -84,8 +86,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   showPersonToggle = false,
   defaultPersonSearch = false,
   token,
+  personContext,
 }) => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
+  const panelLang: 'et' | 'en' = i18n.language.startsWith('en') ? 'en' : 'et';
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -98,6 +102,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   const [showExternalSearch, setShowExternalSearch] = useState(false);
   const [externalResults, setExternalResults] = useState<Suggestion[]>([]);
   const [isExternalLoading, setIsExternalLoading] = useState(false);
+  // Isikupaneel (Task 6) — avaneb samal lehel, loomine/valik käib onDone kaudu
+  const [personPanel, setPersonPanel] = useState<{ focusRef?: { scheme: 'wikidata' | 'gnd' | 'viaf'; id: string } } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -361,23 +367,36 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     setShowSuggestions(false);
   };
 
-  /** Loob kaardi ühe ID-ga või võtab olemasoleva (409 exists). split / muu viga → null. */
-  const looVoiLeia = async (label: string, scheme: string, id: string) => {
-    try {
-      const record = await createPersonChecked({
-        name: label, identifiers: [{ scheme, id }], created_via: 'picker',
-      }, token!);
-      return { id: record.id, label: record.name.label };
-    } catch (e) {
-      if (e instanceof PersonConflictError && e.conflict === 'exists') {
-        const olemas = await getPerson(e.existingPersonIds[0]).catch(() => null);
-        return { id: e.existingPersonIds[0], label: olemas?.name?.label ?? label };
-      }
-      return null;
-    }
+  // Isikupaneeli onDone: olemasolev või äsja loodud kirje → LinkedEntity onChange-i
+  const handlePersonPanelDone = (p: { id: string; label: string; created: boolean }) => {
+    justSelectedRef.current = true;
+    onChange({ id: p.id, label: p.label, source: 'local', entity_type: 'person', labels: { et: p.label } });
+    setInputValue(p.label);
+    setPersonPanel(null);
   };
 
   const handleSelect = async (result: Suggestion) => {
+    // Person-režiimis avab välise tulemuse klikk isikupaneeli fokuseeritud viitega —
+    // paneel on nüüd ainus isiku loomise/valimise tee valijast (PR 3).
+    if (isPersonSearch && token && !result.id.startsWith('local-') && !(result.isLocal && !/^Q\d+$/.test(result.id))) {
+      justSelectedRef.current = true;
+      let scheme: 'wikidata' | 'gnd' | 'viaf';
+      let id: string;
+      if (result.isGnd || result.id.startsWith('GND:')) {
+        scheme = 'gnd';
+        id = result.id.replace(/^GND:/i, '');
+      } else if (result.isViaf || result.id.startsWith('VIAF:')) {
+        scheme = 'viaf';
+        id = result.id.replace(/^VIAF:/i, '');
+      } else {
+        scheme = 'wikidata';
+        id = result.id;
+      }
+      setPersonPanel({ focusRef: { scheme, id } });
+      setShowSuggestions(false);
+      return;
+    }
+
     justSelectedRef.current = true;
     setIsLoading(true);
 
@@ -387,27 +406,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       entity = { id: null, label: result.label, source: 'manual', labels: { et: result.label } };
     } else if (result.isGnd || result.id.startsWith('GND:')) {
       const label = normalizePersonName(result.label);
-      if (isPersonSearch && token) {
-        // Person-režiimis: loo prosopograafia kirje GND identifikaatoriga
-        const gndId = result.id.replace(/^GND:/i, '');
-        const r = await looVoiLeia(label, 'gnd', normalizeExtId('gnd', gndId));
-        entity = r
-          ? { id: r.id, label: r.label, source: 'local', entity_type: 'person', labels: { et: r.label } }
-          : { id: result.id, label, source: 'gnd', labels: { et: label } };
-      } else {
-        entity = { id: result.id, label, source: 'gnd', labels: { et: label } };
-      }
+      entity = { id: result.id, label, source: 'gnd', labels: { et: label } };
     } else if (result.isViaf || result.id.startsWith('VIAF:')) {
       const label = normalizePersonName(result.label);
-      if (isPersonSearch && token) {
-        const viafId = result.id.replace(/^VIAF:/i, '');
-        const r = await looVoiLeia(label, 'viaf', normalizeExtId('viaf', viafId));
-        entity = r
-          ? { id: r.id, label: r.label, source: 'local', entity_type: 'person', labels: { et: r.label } }
-          : { id: result.id, label, source: 'viaf', labels: { et: label } };
-      } else {
-        entity = { id: result.id, label, source: 'viaf', labels: { et: label } };
-      }
+      entity = { id: result.id, label, source: 'viaf', labels: { et: label } };
     } else if (result.isLocal && !/^Q\d+$/.test(result.id)) {
       entity = { id: result.id.startsWith('local-') ? null : result.id, label: result.label, source: 'manual', labels: { et: result.label } };
     } else {
@@ -423,16 +425,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       }
       const baseLang = lang.split('-')[0];
       const bestLabel = multilingualLabels[baseLang] || multilingualLabels.en || result.label;
-
-      if (isPersonSearch && token) {
-        // Person-režiimis: loo prosopograafia kirje Wikidata identifikaatoriga
-        const r = await looVoiLeia(bestLabel, 'wikidata', normalizeExtId('wikidata', result.id));
-        entity = r
-          ? { id: r.id, label: r.label, source: 'local', entity_type: 'person', labels: multilingualLabels }
-          : { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };
-      } else {
-        entity = { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };
-      }
+      entity = { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };
     }
 
     onChange(entity);
@@ -511,6 +504,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     : suggestions.length > 0;
 
   return (
+    <>
     <div className={`relative ${className}`} ref={containerRef}>
       {label && (
         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 px-1">
@@ -696,17 +690,18 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                   </>
                 )}
 
-                {/* Loo uus isik */}
-                <Link
-                  to={inputValue.trim() ? `/persons/new?name=${encodeURIComponent(inputValue.trim())}` : '/persons/new'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onMouseDown={() => { justSelectedRef.current = true; }}
-                  className="w-full px-4 py-2.5 flex items-center gap-2 text-gray-500 hover:bg-green-50 hover:text-green-700 text-xs transition-colors border-b border-gray-100"
-                >
-                  <UserPlus size={12} className="text-green-500 shrink-0" />
-                  <span>{lang === 'en' ? 'Create new person ↗' : 'Loo uus isik ↗'}</span>
-                </Link>
+                {/* Lisa isik — avab isikupaneeli samal lehel (PR 3, task 6) */}
+                {token && (
+                  <button
+                    type="button"
+                    onMouseDown={() => { justSelectedRef.current = true; }}
+                    onClick={() => setPersonPanel({})}
+                    className="w-full px-4 py-2.5 flex items-center gap-2 text-gray-500 hover:bg-green-50 hover:text-green-700 text-xs transition-colors border-b border-gray-100"
+                  >
+                    <UserPlus size={12} className="text-green-500 shrink-0" />
+                    <span>{t('prosopography.panel.openButton')}</span>
+                  </button>
+                )}
 
                 {/* Käsitsi sisestus */}
                 <button
@@ -832,6 +827,18 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         </div>
       )}
     </div>
+    {personPanel && token && (
+      <PersonAddPanel
+        initialQuery={inputValue}
+        token={token}
+        lang={panelLang}
+        context={personContext}
+        focusRef={personPanel.focusRef}
+        onDone={handlePersonPanelDone}
+        onClose={() => setPersonPanel(null)}
+      />
+    )}
+    </>
   );
 };
 

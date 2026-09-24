@@ -178,6 +178,9 @@
       "swap": "Vaheta kohad",
       "confirm": "Liida",
       "warning": "Kustutatava isiku kirje asendatakse viitega säilitatavale."
+    },
+    "panel": {
+      "openButton": "Lisa isik…"
     }
   },
   "collections": {

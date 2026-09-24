@@ -178,6 +178,9 @@
       "swap": "Swap",
       "confirm": "Merge",
       "warning": "The deleted person's record will be replaced with a reference to the kept one."
+    },
+    "panel": {
+      "openButton": "Add person…"
     }
   },
   "collections": {

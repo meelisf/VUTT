@@ -116,6 +116,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
   }>({ authors: [], tags: [], places: [], printers: [], types: [], genres: [] });
 
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
+  // Olemas ainult siis, kui upload'i meta juba kannab work_id (nt asendusteose puhul) —
+  // muidu isikupaneelile konteksti ei anta, sest teost pole veel (ADR 0028: import loob teose).
+  const [metaWorkId, setMetaWorkId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -139,6 +142,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         const yearInput = metaYearDisplay || (metaYear ? String(metaYear) : '') || initialYear;
         existingYearRef.current = { year: metaYear, year_display: metaYearDisplay };
         if (!cancelled) {
+          setMetaWorkId(typeof m.work_id === 'string' && m.work_id ? m.work_id : null);
           setForm({
             title: m.title || initialTitle,
             yearInput,
@@ -350,6 +354,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
                       showPersonToggle
                       defaultPersonSearch
                       token={authToken}
+                      personContext={metaWorkId ? { work_id: metaWorkId, role: creator.role } : undefined}
                     />
                   </div>
                   <select
@@ -419,6 +424,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               showPersonToggle
               defaultPersonSearch
               token={authToken}
+              personContext={metaWorkId ? { work_id: metaWorkId, role: 'publisher' } : undefined}
             />
           </div>
         </div>
