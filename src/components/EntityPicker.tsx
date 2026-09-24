@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked, UserPlus, Users, IdCard } from 'lucide-react';
@@ -11,6 +12,7 @@ import { getEntityUrl } from '../utils/entityUrl';
 import { listPersons } from '../prosopography/services/prosopographyService';
 import type { ProsopoIndexEntry } from '../prosopography/types';
 import PersonAddPanel from '../prosopography/components/PersonAddPanel';
+import { normalizeExtId } from '../prosopography/utils/externalIds';
 
 interface SuggestionItem {
   label: string;
@@ -373,6 +375,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     onChange({ id: p.id, label: p.label, source: 'local', entity_type: 'person', labels: { et: p.label } });
     setInputValue(p.label);
     setPersonPanel(null);
+    setShowSuggestions(false);
   };
 
   const handleSelect = async (result: Suggestion) => {
@@ -381,18 +384,21 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     if (isPersonSearch && token && !result.id.startsWith('local-') && !(result.isLocal && !/^Q\d+$/.test(result.id))) {
       justSelectedRef.current = true;
       let scheme: 'wikidata' | 'gnd' | 'viaf';
-      let id: string;
+      let rawId: string;
       if (result.isGnd || result.id.startsWith('GND:')) {
         scheme = 'gnd';
-        id = result.id.replace(/^GND:/i, '');
+        rawId = result.id.replace(/^GND:/i, '');
       } else if (result.isViaf || result.id.startsWith('VIAF:')) {
         scheme = 'viaf';
-        id = result.id.replace(/^VIAF:/i, '');
+        rawId = result.id.replace(/^VIAF:/i, '');
       } else {
         scheme = 'wikidata';
-        id = result.id;
+        rawId = result.id;
       }
-      setPersonPanel({ focusRef: { scheme, id } });
+      // Kanooniline kuju (ADR 0022) — server normaliseerib iga viite id `candidates()`-is,
+      // seega `candidateGroups.ts` grupi `ids[scheme]` on samuti normaliseeritud; toores id
+      // ei matchiks focusRef'i kaudu õiget gruppi.
+      setPersonPanel({ focusRef: { scheme, id: normalizeExtId(scheme, rawId) } });
       setShowSuggestions(false);
       return;
     }
@@ -504,7 +510,6 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     : suggestions.length > 0;
 
   return (
-    <>
     <div className={`relative ${className}`} ref={containerRef}>
       {label && (
         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 px-1">
@@ -826,19 +831,19 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           </div>
         </div>
       )}
+      {personPanel && token && createPortal(
+        <PersonAddPanel
+          initialQuery={inputValue}
+          token={token}
+          lang={panelLang}
+          context={personContext}
+          focusRef={personPanel.focusRef}
+          onDone={handlePersonPanelDone}
+          onClose={() => { setPersonPanel(null); setShowSuggestions(false); }}
+        />,
+        document.body
+      )}
     </div>
-    {personPanel && token && (
-      <PersonAddPanel
-        initialQuery={inputValue}
-        token={token}
-        lang={panelLang}
-        context={personContext}
-        focusRef={personPanel.focusRef}
-        onDone={handlePersonPanelDone}
-        onClose={() => setPersonPanel(null)}
-      />
-    )}
-    </>
   );
 };
 
