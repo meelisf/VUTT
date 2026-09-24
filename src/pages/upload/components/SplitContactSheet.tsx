@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Columns2, Eye, EyeOff, Loader2, Maximize2 } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
 import { isPreviewReady, willSplit } from '../prepressPlan';
+import { cardLineLeftPercent } from '../../../components/pagePrep/geometry';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 interface Props {
@@ -27,22 +28,6 @@ const cornerBtn = (active: boolean) =>
       ? 'bg-gray-900 border-gray-900 text-white'
       : 'bg-white/90 border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-800'
   }`;
-
-/** Pisipildi kasti kuvasuhe (laius/kõrgus). PEAB vastama `aspect-[3/4]`
- *  klassile allpool — joone asukoht arvutatakse sellest. */
-const BOX_RATIO = 3 / 4;
-
-/**
- * Kui suure osa kasti laiusest pilt `object-contain`-iga tegelikult katab.
- *
- * Lapiti skann (kaheleheline avaus — just see, mida poolitatakse) on kastist
- * laiem ja letterboxitakse: pilt katab kogu laiuse (1) või, portree korral,
- * ainult osa. Joon `left: x%` kasti servast oleks siis VALES kohas — x käib
- * PILDI laiuse kohta. Enne `object-cover`-i ajal oli sama viga vastupidi:
- * lapiti pildi küljed lõigati ära ja joon näitas lõigatud kasti keskkohta.
- */
-const imageWidthRatio = (aspect: number | undefined): number =>
-  (aspect === undefined ? 1 : Math.min(1, aspect / BOX_RATIO));
 
 /**
  * Lehtede ülevaatuse ruudustik. Karkass on `manage/PageCard`-ist (sama kest,
@@ -69,9 +54,8 @@ const SplitContactSheet: React.FC<Props> = ({
         const x = page.mode === 'custom' && page.split_x != null
           ? page.split_x
           : plan.default_split_x;
-        // Joon pildi, mitte kasti järgi (vt imageWidthRatio).
-        const wRatio = imageWidthRatio(aspects[page.n]);
-        const lineLeft = ((1 - wRatio) / 2 + x * wRatio) * 100;
+        // Joon pildi, mitte kasti järgi (vt cardLineLeftPercent).
+        const lineLeft = cardLineLeftPercent(aspects[page.n], x);
         return (
           <div
             key={page.n}

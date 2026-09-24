@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpDown, RefreshCw, Trash2, X, Loader2, Sparkles } from 'lucide-react';
+import { ArrowUpDown, Check, Columns2, RefreshCw, Trash2, X, Loader2, Sparkles } from 'lucide-react';
 import FloatingActionBar from '../../components/pagePrep/FloatingActionBar';
+import RotateButtons from '../../components/pagePrep/RotateButtons';
 
 /**
  * Hõljuv alumine kontekstiriba manage-lehe lehekülgede tabis.
@@ -51,6 +52,18 @@ export interface PageActionBarProps {
   reorderSaving: boolean;
   onReorderSave: () => void;
   onDiscardReorder: () => void;
+  // Ootel pöörded/poolitused (#431) — sama mudel nagu upload'i ülevaatuses
+  pageOpsCount: number;
+  pageOpsDisabled: boolean;           // järjekorra mustand ootel → pööre/poolitus blokeeritud
+  onSplitSelected: () => void;
+  onNoSplitSelected: () => void;
+  onRotateSelected: (delta: number) => void;
+  splitPercent: string;
+  setSplitPercent: (v: string) => void;
+  pageOpsSaving: boolean;
+  pageOpsError: string | null;
+  onApplyPageOps: () => void;
+  onDiscardPageOps: () => void;
 }
 
 const PageActionBar: React.FC<PageActionBarProps> = (props) => {
@@ -58,7 +71,8 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
   const hasSelection = props.selectedCount > 0;
 
   // Riba puudub täielikult kui pole valikut ega järjekorra-muudatusi → pisipildid täies mahus
-  if (!hasSelection && !props.hasReorderChanges) return null;
+  if (!hasSelection && !props.hasReorderChanges && props.pageOpsCount === 0) return null;
+  const opBtn = 'flex items-center gap-1.5 px-2.5 py-1 text-sm border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded';
 
   return (
     <FloatingActionBar className="overflow-hidden">
@@ -128,6 +142,41 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
           </div>
         )}
 
+        {/* Ootel pöörete/poolituste rida — sama kuju nagu järjekorra-rida */}
+        {props.pageOpsCount > 0 && (
+          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="flex items-center gap-1.5 text-sm font-medium text-amber-800">
+              <Columns2 size={15} />
+              {t('manage.pageOps.summary', { count: props.pageOpsCount })}
+            </span>
+            <label className="flex items-center gap-1 text-sm text-gray-700">
+              {t('manage.pageOps.line')}
+              <input
+                type="text" inputMode="numeric" value={props.splitPercent}
+                onChange={(e) => props.setSplitPercent(e.target.value)}
+                data-testid="page-ops-line"
+                className="w-14 text-sm text-center border border-gray-300 rounded px-1 py-0.5"
+              />
+              %
+            </label>
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={props.onDiscardPageOps} disabled={props.pageOpsSaving}
+                className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 disabled:opacity-50">
+                {t('manage.pageOps.discard')}
+              </button>
+              <button onClick={props.onApplyPageOps} disabled={props.pageOpsSaving}
+                data-testid="page-ops-apply"
+                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded">
+                {props.pageOpsSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                {props.pageOpsSaving ? t('manage.pageOps.applying') : t('manage.pageOps.apply')}
+              </button>
+            </div>
+            {props.pageOpsError && (
+              <span className="w-full text-sm text-red-700">{props.pageOpsError}</span>
+            )}
+          </div>
+        )}
+
         {/* Valiku-rida — ilmub kui ≥1 leht valitud */}
         {hasSelection && (
           <div className="px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -149,6 +198,24 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
                 className="w-14 text-sm text-center border border-gray-300 rounded px-1 py-0.5"
               />
               <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
+            </div>
+
+            {/* Poolitus + pööre ootel plaanina (#431). Samad nupud ja järjekord
+                nagu upload'i ülevaatuse SplitActionBar-il. */}
+            <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3"
+              title={props.pageOpsDisabled ? t('manage.pageOps.blocked') : undefined}>
+              <button onClick={props.onSplitSelected} disabled={props.pageOpsDisabled}
+                data-testid="page-ops-split" className={opBtn}>
+                <Columns2 size={14} />{t('manage.pageOps.split')}
+              </button>
+              <button onClick={props.onNoSplitSelected} disabled={props.pageOpsDisabled}
+                className={opBtn}>
+                {t('manage.pageOps.noSplit')}
+              </button>
+              {props.pageOpsDisabled ? null : (
+                <RotateButtons onRotate={props.onRotateSelected} buttonClassName={opBtn} iconSize={14}
+                  testIdPrefix="page-ops-rotate" />
+              )}
             </div>
 
             {/* Tühista valik — punane kiri (nagu Dashboardil), pisut prominentsem */}

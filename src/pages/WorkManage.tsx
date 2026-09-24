@@ -23,6 +23,7 @@ import { ApiError } from '../services/apiClient';
 import {
   addWorkPages,
   applyReocrResults,
+  applyWorkPageOps,
   deleteWork,
   deleteWorkPages,
   DeletedWorkPage,
@@ -48,6 +49,10 @@ import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
 import PageActionBar from './manage/PageActionBar';
+import {
+  PendingPageOps, pendingCount, pruneMissing, rotatePending, setPendingSplit, toRequest,
+} from './manage/pageOpsPlan';
+import { clampSplitX } from '../components/pagePrep/geometry';
 import { mapReocrState, selectableNoTextFiles, applicableReocrPages, ReocrStatusResponse } from '../utils/reocrStatus';
 import { ruhmita } from './manage/trashGrouping';
 import TrashDeletedPages from './manage/TrashDeletedPages';
@@ -111,6 +116,14 @@ const WorkManage: React.FC = () => {
   const [reorderError, setReorderError] = useState<string | null>(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [reorderConfirmOpen, setReorderConfirmOpen] = useState(false);
+
+  // Ootel pöörded/poolitused (#431, ADR 0050) — võti on failinimi
+  const [pendingOps, setPendingOps] = useState<PendingPageOps>({});
+  const [splitPercent, setSplitPercent] = useState('50');
+  const [pageOpsSaving, setPageOpsSaving] = useState(false);
+  const [pageOpsError, setPageOpsError] = useState<string | null>(null);
+  const [pageOpsConfirmOpen, setPageOpsConfirmOpen] = useState(false);
+  const [pageOpsResult, setPageOpsResult] = useState<string | null>(null);
 
   // Hulgivalik + liigutamine
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -279,6 +292,19 @@ const WorkManage: React.FC = () => {
 
   const hasReorderChanges = pages.some(p => draftPositions[p.filename] !== p.page_num);
 
+  // Ootel toiming lehel, mis vahepeal kadus (redaktoris poolitatud, kustutatud),
+  // ei tohi „Rakenda" peale serverisse jõuda — server lükkaks terve paki tagasi.
+  useEffect(() => {
+    setPendingOps((ops) => pruneMissing(ops, pages.map((p) => p.filename)));
+  }, [pages]);
+
+  const pageOpsCount = pendingCount(pendingOps);
+  // Üldjoon protsendina tekstiväljas (type="text", vt CLAUDE.md); kehtetu → 50 %.
+  const splitX = (() => {
+    const v = Number(splitPercent.replace(',', '.'));
+    return Number.isFinite(v) && v > 0 && v < 100 ? clampSplitX(v / 100) : 0.5;
+  })();
+
   // Nähtav (effective) järjekord: draft kui olemas, muidu serveri page_num.
   // Iga lehe nähtav number on tema indeks selles järjestuses + 1.
   // useMemo: tagab stabiilse identiteedi, et fookus-effect ei käivitu iga renderi järel.
@@ -341,7 +367,7 @@ const WorkManage: React.FC = () => {
   // Hõljuv alumine tegevusriba nähtav ainult lehekülgede tabis, kui on valik
   // VÕI salvestamata järjekorra-muudatus. Kasutatakse nii sisu alaserva padding'uks
   // (et viimane pisipiltide rida ei jää riba taha) kui riba renderdamiseks.
-  const showActionBar = activeTab === 'pages' && (selectedFiles.size > 0 || hasReorderChanges);
+  const showActionBar = activeTab === 'pages' && (selectedFiles.size > 0 || hasReorderChanges || pageOpsCount > 0);
 
   // Vali/tühista; shift = vahemik viimasest ankrust nähtaval järjekorral
   const handleToggle = (filename: string, shiftKey: boolean) => {
@@ -510,12 +536,40 @@ const WorkManage: React.FC = () => {
 
   const handleReorderSave = () => { setReorderConfirmOpen(true); };
 
+  /** Rakendab ootel pöörded ja poolitused ühe päringuga (kinnituse järel). */
+  const savePageOps = async (): Promise<boolean> => {
+    if (!workId || !authToken || pageOpsCount === 0) return false;
+    setPageOpsConfirmOpen(false);
+    setPageOpsSaving(true);
+    setPageOpsError(null);
+    setPageOpsResult(null);
+    try {
+      const r = await applyWorkPageOps(workId, authToken, toRequest(pendingOps, splitX));
+      setPendingOps({});
+      handleClearSelection();
+      setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, split: r.split ?? 0 }));
+      return true;
+    } catch (e: any) {
+      // Osaline tulemus on võimalik (server ütleb, mitu tehti) — ootel plaan jääb
+      // alles ja prune viskab ära lehed, mida enam ei ole.
+      setPageOpsError(e?.message || t('manage.pageOps.error'));
+      return false;
+    } finally {
+      // Nii edu kui vea korral: ketas võis muutuda → värske nimekiri + pisipildid.
+      await loadPages();
+      setThumbCacheBust(Date.now());
+      setPageOpsSaving(false);
+    }
+  };
+
   // Salvestamata järjekorra mustand on samasugune salvestamata muudatus nagu tekst.
   // NB: `saveReorder` (mitte `handleReorderSave`) — dialoog ei tohi küsida teist
   // kinnitust "Salvesta ja jätka" peale.
+  // Järjekorra mustand ja ootel pöörded/poolitused ei saa korraga olla (nupud
+  // blokeerivad teineteist), seega salvestab dialoog selle, mis ootel on.
   const { dialogProps } = useUnsavedChangesGuard({
-    isDirty: changedCount > 0,
-    onSave: saveReorder,
+    isDirty: changedCount > 0 || pageOpsCount > 0,
+    onSave: pageOpsCount > 0 ? savePageOps : saveReorder,
   });
 
   const handleBulkDelete = async () => {
@@ -983,11 +1037,19 @@ const WorkManage: React.FC = () => {
                         imageToken={imageToken}
                         onToggle={handleToggle}
                         onEdit={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
+                        pendingOp={pendingOps[page.filename]}
+                        splitX={splitX}
                       />
                     );
                   })}
                 </div>
               </>
+            )}
+
+            {pageOpsResult && (
+              <div className="mx-5 mb-2 mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                {pageOpsResult}
+              </div>
             )}
 
             {reorderError && (
@@ -1301,11 +1363,11 @@ const WorkManage: React.FC = () => {
           onClearSelection={handleClearSelection}
           moveTarget={moveTarget}
           setMoveTarget={setMoveTarget}
-          moveCanApply={moveTarget.trim() !== '' && !!(moveResult && moveResult.ok)}
+          moveCanApply={pageOpsCount === 0 && moveTarget.trim() !== '' && !!(moveResult && moveResult.ok)}
           moveHintText={moveHintText}
           onMove={handleMove}
-          actionsDisabled={hasReorderChanges}
-          actionsDisabledTitle={t('manage.bulkDelete.draftBlocked')}
+          actionsDisabled={hasReorderChanges || pageOpsCount > 0}
+          actionsDisabledTitle={pageOpsCount > 0 ? t('manage.pageOps.blocked') : t('manage.bulkDelete.draftBlocked')}
           onReocrClick={() => { setBatchProvider('loss'); setBatchConfirm(true); }}
           onGeminiReocrClick={() => { setBatchProvider('gemini'); setBatchConfirm(true); }}
           geminiEnabled={geminiEnabled}
@@ -1326,6 +1388,17 @@ const WorkManage: React.FC = () => {
           reorderSaving={reorderSaving}
           onReorderSave={handleReorderSave}
           onDiscardReorder={handleDiscardReorder}
+          pageOpsCount={pageOpsCount}
+          pageOpsDisabled={hasReorderChanges || pageOpsSaving}
+          onSplitSelected={() => setPendingOps((o) => setPendingSplit(o, selectedFiles, true))}
+          onNoSplitSelected={() => setPendingOps((o) => setPendingSplit(o, selectedFiles, false))}
+          onRotateSelected={(delta) => setPendingOps((o) => rotatePending(o, selectedFiles, delta))}
+          splitPercent={splitPercent}
+          setSplitPercent={setSplitPercent}
+          pageOpsSaving={pageOpsSaving}
+          pageOpsError={pageOpsError}
+          onApplyPageOps={() => setPageOpsConfirmOpen(true)}
+          onDiscardPageOps={() => { setPendingOps({}); setPageOpsError(null); }}
         />
       )}
 
@@ -1344,6 +1417,14 @@ const WorkManage: React.FC = () => {
         message={t('manage.reorderConfirm')}
         onConfirm={() => { void saveReorder(); }}
         onCancel={() => setReorderConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={pageOpsConfirmOpen}
+        title={t('manage.pageOps.confirmTitle')}
+        message={t('manage.pageOps.confirm', { count: pageOpsCount })}
+        onConfirm={() => { void savePageOps(); }}
+        onCancel={() => setPageOpsConfirmOpen(false)}
       />
 
       <UnsavedChangesDialog {...dialogProps} />

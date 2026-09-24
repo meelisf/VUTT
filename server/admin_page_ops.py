@@ -304,6 +304,152 @@ def split_text_at_pb(text: str) -> tuple:
     return text, text
 
 
+def _right_half_sequence(path: str, images: list, page_num: int, orig_seq: int) -> int:
+    """Parema poole jadanumber: +50, aga ALATI enne järgmist lehte.
+
+    Pime +50 põrkas kokku, kui järgmise lehe jada oli ≤ 50 võrra suurem
+    (nt varem poolitatud lehe paremast poolest järgmine) — kaks lehte sama
+    jadaga ja järjekord sõltus failinimest. Pakk-poolitus (#431) teeb selle
+    tavaliseks. Vahe < 2 korral jääb vana käitumine (ümbernummerdust ei tee).
+    """
+    right = orig_seq + 50
+    if page_num < len(images):
+        nxt = get_page_sequence(os.path.join(path, os.path.splitext(images[page_num])[0] + '.json'))
+        if nxt != float('inf') and int(nxt) <= right and int(nxt) - orig_seq >= 2:
+            right = orig_seq + (int(nxt) - orig_seq) // 2
+    return right
+
+
+def _split_page_locked(path: str, work_id: str, page_num: int, split_x: float,
+                       username: str, images: list) -> tuple:
+    """Poolituse tuum: eeldab, et work_lock on KUTSUJA käes ja split_x kontrollitud.
+
+    Ei sünki Meilit — seda teeb kutsuja üks kord (pakk-rakendus teeks muidu
+    iga lehe peale täisteose sünki). Tagastab (vasak, parem) failinime.
+    """
+    folder_name = os.path.basename(path)
+    orig_filename = images[page_num - 1]
+    orig_base = os.path.splitext(orig_filename)[0]
+    orig_img_path = os.path.join(path, orig_filename)
+    orig_txt_path = os.path.join(path, orig_base + '.txt')
+    orig_json_path = os.path.join(path, orig_base + '.json')
+
+    # Loe originaali sequence
+    orig_seq = get_page_sequence(orig_json_path)
+    if orig_seq == float('inf'):
+        orig_seq = page_num * 100
+    orig_seq = int(orig_seq)
+
+    # Loe originaali metaandmed (staatus jne)
+    orig_meta = {'status': 'Toores'}
+    if os.path.exists(orig_json_path):
+        try:
+            with open(orig_json_path, 'r', encoding='utf-8') as f:
+                orig_meta = json.load(f)
+        except Exception:
+            pass
+
+    # Loe ja lõika tekst <pb/> juures
+    orig_txt = ''
+    if os.path.exists(orig_txt_path):
+        with open(orig_txt_path, 'r', encoding='utf-8') as f:
+            orig_txt = f.read()
+    left_txt, right_txt = split_text_at_pb(orig_txt)
+
+    # Lõika pilt Pillowiga
+    try:
+        from PIL import Image as PILImage, ImageOps
+        with PILImage.open(orig_img_path) as raw:
+            img = ImageOps.exif_transpose(raw)  # rakenda EXIF orientatsioon pikslitele
+            width, height = img.size
+            split_pixel = max(1, int(width * split_x))
+
+            left_crop = img.crop((0, 0, split_pixel, height)).copy()
+            right_crop = img.crop((split_pixel, 0, width, height)).copy()
+    except ImportError:
+        raise RuntimeError("Pillow pole paigaldatud")
+
+    # Genereeri unikaalsed failinimed
+    def _unique_name():
+        nid = generate_nanoid()
+        name = f"{folder_name}-{work_id}-{nid}.jpg"
+        while os.path.exists(os.path.join(path, name)):
+            nid = generate_nanoid()
+            name = f"{folder_name}-{work_id}-{nid}.jpg"
+        return name
+
+    left_filename = _unique_name()
+    right_filename = _unique_name()
+    left_base = os.path.splitext(left_filename)[0]
+    right_base = os.path.splitext(right_filename)[0]
+
+    # Salvesta pildifailid kettale (ei ole git-tracked)
+    left_img_path = os.path.join(path, left_filename)
+    right_img_path = os.path.join(path, right_filename)
+    left_crop.save(left_img_path, "JPEG", quality=95)
+    right_crop.save(right_img_path, "JPEG", quality=95)
+    os.chmod(left_img_path, 0o644)
+    os.chmod(right_img_path, 0o644)
+
+    # Koosta .json andmed mõlemale
+    left_meta = {**orig_meta, 'sequence': orig_seq}
+    right_meta = {**orig_meta, 'sequence': _right_half_sequence(path, images, page_num, orig_seq)}
+
+    left_txt_path = os.path.join(path, left_base + '.txt')
+    left_json_path = os.path.join(path, left_base + '.json')
+    right_txt_path = os.path.join(path, right_base + '.txt')
+    right_json_path = os.path.join(path, right_base + '.json')
+
+    # Kirjuta tekstifailid ja JSON-id kettale enne git commiti
+    for fpath, content in [
+        (left_txt_path, left_txt),
+        (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
+        (right_txt_path, right_txt),
+        (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
+    ]:
+        with open(fpath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        os.chmod(fpath, 0o644)
+
+    # Git commit 1: lisa mõlemad uued lehed ühes commitinas
+    save_with_git(
+        left_txt_path, left_txt, username,
+        message=f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): vasakpoolne [{work_id}]",
+        additional_files=[
+            (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
+            (right_txt_path, right_txt),
+            (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
+        ]
+    )
+
+    # Populeeri MÕLEMA poole ._originals poolituseelse topeltlehega, et
+    # "Taasta originaal" tooks kummalt poolelt terve topeltlehe tagasi.
+    # Eelista originaali enda ._originals-it (pristine enne kõike) kui olemas.
+    orig_dir = os.path.join(BASE_DIR, '._originals', work_id)
+    os.makedirs(orig_dir, exist_ok=True)
+    existing_orig = os.path.join(orig_dir, orig_filename)
+    src_original = existing_orig if os.path.exists(existing_orig) else orig_img_path
+    for half in (left_filename, right_filename):
+        dest = os.path.join(orig_dir, half)
+        if not os.path.exists(dest):
+            shutil.copy2(src_original, dest)
+
+    # Liiguta originaali .jpg prügikasti (ei ole git-tracked)
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'pages')
+    os.makedirs(trash_dir, exist_ok=True)
+    if os.path.exists(orig_img_path):
+        shutil.move(orig_img_path, os.path.join(trash_dir, orig_filename))
+
+    # Git commit 2: eemalda originaali .txt ja .json
+    delete_page_from_git(
+        folder_name, orig_base,
+        f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): eemalda originaal [{work_id}]",
+        username
+    )
+
+    return left_filename, right_filename
+
+
 def split_page(work_id: str, page_num: int, split_x: float, username: str) -> dict:
     """Lõikab topeltlehekülje kaheks vertikaalse lõikejoone alusel.
 
@@ -332,124 +478,7 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
         if page_num < 1 or page_num > len(images):
             return {"found": False}
 
-        orig_filename = images[page_num - 1]
-        orig_base = os.path.splitext(orig_filename)[0]
-        orig_img_path = os.path.join(path, orig_filename)
-        orig_txt_path = os.path.join(path, orig_base + '.txt')
-        orig_json_path = os.path.join(path, orig_base + '.json')
-
-        # Loe originaali sequence
-        orig_seq = get_page_sequence(orig_json_path)
-        if orig_seq == float('inf'):
-            orig_seq = page_num * 100
-        orig_seq = int(orig_seq)
-
-        # Loe originaali metaandmed (staatus jne)
-        orig_meta = {'status': 'Toores'}
-        if os.path.exists(orig_json_path):
-            try:
-                with open(orig_json_path, 'r', encoding='utf-8') as f:
-                    orig_meta = json.load(f)
-            except Exception:
-                pass
-
-        # Loe ja lõika tekst <pb/> juures
-        orig_txt = ''
-        if os.path.exists(orig_txt_path):
-            with open(orig_txt_path, 'r', encoding='utf-8') as f:
-                orig_txt = f.read()
-        left_txt, right_txt = split_text_at_pb(orig_txt)
-
-        # Lõika pilt Pillowiga
-        try:
-            from PIL import Image as PILImage, ImageOps
-            with PILImage.open(orig_img_path) as raw:
-                img = ImageOps.exif_transpose(raw)  # rakenda EXIF orientatsioon pikslitele
-                width, height = img.size
-                split_pixel = max(1, int(width * split_x))
-
-                left_crop = img.crop((0, 0, split_pixel, height)).copy()
-                right_crop = img.crop((split_pixel, 0, width, height)).copy()
-        except ImportError:
-            raise RuntimeError("Pillow pole paigaldatud")
-
-        # Genereeri unikaalsed failinimed
-        def _unique_name():
-            nid = generate_nanoid()
-            name = f"{folder_name}-{work_id}-{nid}.jpg"
-            while os.path.exists(os.path.join(path, name)):
-                nid = generate_nanoid()
-                name = f"{folder_name}-{work_id}-{nid}.jpg"
-            return name
-
-        left_filename = _unique_name()
-        right_filename = _unique_name()
-        left_base = os.path.splitext(left_filename)[0]
-        right_base = os.path.splitext(right_filename)[0]
-
-        # Salvesta pildifailid kettale (ei ole git-tracked)
-        left_img_path = os.path.join(path, left_filename)
-        right_img_path = os.path.join(path, right_filename)
-        left_crop.save(left_img_path, "JPEG", quality=95)
-        right_crop.save(right_img_path, "JPEG", quality=95)
-        os.chmod(left_img_path, 0o644)
-        os.chmod(right_img_path, 0o644)
-
-        # Koosta .json andmed mõlemale
-        left_meta = {**orig_meta, 'sequence': orig_seq}
-        right_meta = {**orig_meta, 'sequence': orig_seq + 50}
-
-        left_txt_path = os.path.join(path, left_base + '.txt')
-        left_json_path = os.path.join(path, left_base + '.json')
-        right_txt_path = os.path.join(path, right_base + '.txt')
-        right_json_path = os.path.join(path, right_base + '.json')
-
-        # Kirjuta tekstifailid ja JSON-id kettale enne git commiti
-        for fpath, content in [
-            (left_txt_path, left_txt),
-            (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
-            (right_txt_path, right_txt),
-            (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
-        ]:
-            with open(fpath, 'w', encoding='utf-8') as f:
-                f.write(content)
-            os.chmod(fpath, 0o644)
-
-        # Git commit 1: lisa mõlemad uued lehed ühes commitinas
-        save_with_git(
-            left_txt_path, left_txt, username,
-            message=f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): vasakpoolne [{work_id}]",
-            additional_files=[
-                (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
-                (right_txt_path, right_txt),
-                (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
-            ]
-        )
-
-        # Populeeri MÕLEMA poole ._originals poolituseelse topeltlehega, et
-        # "Taasta originaal" tooks kummalt poolelt terve topeltlehe tagasi.
-        # Eelista originaali enda ._originals-it (pristine enne kõike) kui olemas.
-        orig_dir = os.path.join(BASE_DIR, '._originals', work_id)
-        os.makedirs(orig_dir, exist_ok=True)
-        existing_orig = os.path.join(orig_dir, orig_filename)
-        src_original = existing_orig if os.path.exists(existing_orig) else orig_img_path
-        for half in (left_filename, right_filename):
-            dest = os.path.join(orig_dir, half)
-            if not os.path.exists(dest):
-                shutil.copy2(src_original, dest)
-
-        # Liiguta originaali .jpg prügikasti (ei ole git-tracked)
-        trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'pages')
-        os.makedirs(trash_dir, exist_ok=True)
-        if os.path.exists(orig_img_path):
-            shutil.move(orig_img_path, os.path.join(trash_dir, orig_filename))
-
-        # Git commit 2: eemalda originaali .txt ja .json
-        delete_page_from_git(
-            folder_name, orig_base,
-            f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): eemalda originaal [{work_id}]",
-            username
-        )
+        _split_page_locked(path, work_id, page_num, split_x, username, images)
 
         # Meilisearch sync
         sync_work_to_meilisearch(folder_name)
@@ -466,6 +495,72 @@ from .image_transform import (  # noqa: E402,F401
     validate_quad as _validate_quad, compute_crop_box as _compute_crop_box,
     apply_transform,
 )
+
+
+def _transform_locked(path: str, work_id: str, filename: str, angle: float,
+                      crop, quad_pts, quad, username: str) -> dict:
+    """Teisenduse tuum: eeldab, et work_lock on KUTSUJA käes ja fail olemas."""
+    folder_name = os.path.basename(path)
+    img_path = os.path.join(path, filename)
+    ext_l = os.path.splitext(filename)[1].lower()
+
+    # 1) Pristine originaal — ainult esimesel korral.
+    # Vahesamme EI varundata (#325): iga kärbe/pööre kirjutas varem uue faili
+    # ._trash/{work_id}/replaced_images/ alla, mis kasvas piiramatult, kuigi
+    # taastamiseks kasutatakse ainult siinset pristine originaali.
+    orig_dir = os.path.join(BASE_DIR, '._originals', work_id)
+    os.makedirs(orig_dir, exist_ok=True)
+    orig_backup = os.path.join(orig_dir, filename)
+    if not os.path.exists(orig_backup):
+        shutil.copy2(img_path, orig_backup)  # enne exif_transpose'i → 100% muutumatu
+
+    # 2) Teisendus Pillow'ga
+    from PIL import Image as PILImage, ImageOps
+    with PILImage.open(img_path) as raw:
+        img = ImageOps.exif_transpose(raw)
+        is_jpeg = ext_l in ('.jpg', '.jpeg')
+        if is_jpeg and img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+        img = apply_transform(img, angle=angle, crop=crop, quad_pts=quad_pts)
+        out_w, out_h = img.size
+
+        # 3) Salvesta tmp-faili SAMAS kaustas (EXDEV kaitse), siis atomaarne replace
+        tmp_path = img_path + '.tmp'
+        if is_jpeg:
+            img.save(tmp_path, "JPEG", quality=95)
+        else:
+            img.save(tmp_path, "PNG")
+    os.replace(tmp_path, img_path)
+    os.chmod(img_path, 0o644)
+
+    # 4) Regenereeri thumbnail — vea korral ei rollback'i
+    thumbnail_warning = False
+    try:
+        from .image_server import generate_thumbnail, invalidate_cover
+        thumbs_dir = os.path.join(path, '_thumbs')
+        os.makedirs(thumbs_dir, exist_ok=True)
+        thumb_path = os.path.join(thumbs_dir, f"_thumb_{filename}")
+        if os.path.exists(thumb_path):
+            os.remove(thumb_path)
+        generate_thumbnail(img_path, thumb_path)
+        invalidate_cover(path, filename)  # dashboardi kaas on eraldi variant (#178)
+    except Exception as e:
+        logger.error(f"TRANSFORM: thumbnaili regen ebaõnnestus {filename}: {e}")
+        thumbnail_warning = True
+
+    # 5) Logi (struktureeritud). NB: Meilit EI sünki — failinimi/tekst/sequence ei muutu.
+    log_path = os.path.join(BASE_DIR, 'transform_image.log')
+    with open(log_path, 'a', encoding='utf-8') as lf:
+        lf.write(
+            f"{datetime.now().isoformat()} | {username} | {work_id} | {filename} | "
+            f"angle={angle} crop={crop} quad={quad} | -> {out_w}x{out_h}\n"
+        )
+
+    logger.info(f"TRANSFORM: {folder_name}/{filename} ({username})")
+    return {
+        "success": True, "changed": True, "filename": filename,
+        "size": [out_w, out_h], "thumbnail_warning": thumbnail_warning,
+    }
 
 
 def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, username="admin"):
@@ -498,66 +593,104 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, use
         if filename not in get_sorted_images(path):
             return {"found": False}
 
-        img_path = os.path.join(path, filename)
-        ext_l = os.path.splitext(filename)[1].lower()
+        return _transform_locked(path, work_id, filename, angle, crop, quad_pts, quad, username)
 
-        # 1) Pristine originaal — ainult esimesel korral.
-        # Vahesamme EI varundata (#325): iga kärbe/pööre kirjutas varem uue faili
-        # ._trash/{work_id}/replaced_images/ alla, mis kasvas piiramatult, kuigi
-        # taastamiseks kasutatakse ainult siinset pristine originaali.
-        orig_dir = os.path.join(BASE_DIR, '._originals', work_id)
-        os.makedirs(orig_dir, exist_ok=True)
-        orig_backup = os.path.join(orig_dir, filename)
-        if not os.path.exists(orig_backup):
-            shutil.copy2(img_path, orig_backup)  # enne exif_transpose'i → 100% muutumatu
 
-        # 2) Teisendus Pillow'ga
-        from PIL import Image as PILImage, ImageOps
-        with PILImage.open(img_path) as raw:
-            img = ImageOps.exif_transpose(raw)
-            is_jpeg = ext_l in ('.jpg', '.jpeg')
-            if is_jpeg and img.mode in ('RGBA', 'LA', 'P'):
-                img = img.convert('RGB')
-            img = apply_transform(img, angle=angle, crop=crop, quad_pts=quad_pts)
-            out_w, out_h = img.size
+MAX_PAGE_OPS = 500           # pakk-rakenduse lagi (üks päring, üks lukk)
+VALID_PAGE_ROTATIONS = (0, 90, 180, 270)
 
-            # 3) Salvesta tmp-faili SAMAS kaustas (EXDEV kaitse), siis atomaarne replace
-            tmp_path = img_path + '.tmp'
-            if is_jpeg:
-                img.save(tmp_path, "JPEG", quality=95)
-            else:
-                img.save(tmp_path, "PNG")
-        os.replace(tmp_path, img_path)
-        os.chmod(img_path, 0o644)
 
-        # 4) Regenereeri thumbnail — vea korral ei rollback'i
-        thumbnail_warning = False
+def _normalize_page_ops(ops) -> list:
+    """Valideerib pakk-toimingute nimekirja ENNE ühegi faili puudutamist.
+
+    Kirje: {"filename": str, "rotate": 0|90|180|270, "split_x": float|None}.
+    Tühi kirje (pööre 0, poolitust ei ole) visatakse vaikselt ära.
+    """
+    if not isinstance(ops, list):
+        raise ValueError("ops peab olema list")
+    if len(ops) > MAX_PAGE_OPS:
+        raise ValueError(f"Korraga kuni {MAX_PAGE_OPS} lehte")
+    clean, seen = [], set()
+    for op in ops:
+        if not isinstance(op, dict):
+            raise ValueError("Vigane toiming")
+        fn = op.get("filename")
+        if not isinstance(fn, str) or os.path.basename(fn) != fn or "/" in fn or "\\" in fn:
+            raise ValueError("vigane failinimi")
+        if fn in seen:
+            raise ValueError(f"Leht kordub: {fn}")
+        seen.add(fn)
+        rotate = op.get("rotate", 0) or 0
+        if isinstance(rotate, bool) or not isinstance(rotate, int) or rotate % 360 not in VALID_PAGE_ROTATIONS:
+            raise ValueError("Pööre peab olema 90° kordne")
+        rotate %= 360
+        split_x = op.get("split_x")
+        if split_x is not None:
+            split_x = float(split_x)
+            if not (0.05 <= split_x <= 0.95):
+                raise ValueError(f"split_x peab olema vahemikus [0.05, 0.95], sain {split_x}")
+        if rotate == 0 and split_x is None:
+            continue
+        clean.append({"filename": fn, "rotate": rotate, "split_x": split_x})
+    return clean
+
+
+def apply_page_ops(work_id: str, ops, username: str) -> dict:
+    """Rakendab teose halduse ootel pöörded ja poolitused ÜHE luku all (#431, ADR 0050).
+
+    Järjekord lehe sees on sama mis upload'is: pööre → poolitus (joon on
+    pööratud lehe laiuses). Lehed töödeldakse lehejärjekorras; poolitus
+    kasutab iga kord VÄRSKET lehenumbrit, sest eelmised poolitused nihutavad
+    numbreid. Iga poolitus teeb oma git-commitid (prügikasti rühmitus loeb
+    SPLIT_COMMIT_PREFIX-it), Meili sünk on üks kord lõpus.
+
+    Puuduv leht (vahepeal kustutatud/poolitatud) → ValueError ENNE muutmist.
+    Viga keset pakki → RuntimeError, mille sõnum ütleb, mitu lehte jõuti teha;
+    Meili sünkitakse ka siis, et indeks vastaks kettale.
+    """
+    clean = _normalize_page_ops(ops)
+    if not clean:
+        return {"success": True, "rotated": 0, "split": 0, "changed": False}
+
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"found": False}
+
+    folder_name = os.path.basename(path)
+    rotated = split = 0
+    with work_lock(folder_name, path):
+        images = get_sorted_images(path)
+        missing = [op["filename"] for op in clean if op["filename"] not in images]
+        if missing:
+            raise ValueError("Lehti ei leitud (leht muutus vahepeal): " + ", ".join(missing))
+        order = {fn: i for i, fn in enumerate(images)}
+        clean.sort(key=lambda op: order[op["filename"]])
+
         try:
-            from .image_server import generate_thumbnail, invalidate_cover
-            thumbs_dir = os.path.join(path, '_thumbs')
-            os.makedirs(thumbs_dir, exist_ok=True)
-            thumb_path = os.path.join(thumbs_dir, f"_thumb_{filename}")
-            if os.path.exists(thumb_path):
-                os.remove(thumb_path)
-            generate_thumbnail(img_path, thumb_path)
-            invalidate_cover(path, filename)  # dashboardi kaas on eraldi variant (#178)
+            for op in clean:
+                fn = op["filename"]
+                if op["rotate"]:
+                    _transform_locked(path, work_id, fn, float(op["rotate"]),
+                                      None, None, None, username)
+                    rotated += 1
+                if op["split_x"] is not None:
+                    images = get_sorted_images(path)
+                    _split_page_locked(path, work_id, images.index(fn) + 1,
+                                       op["split_x"], username, images)
+                    split += 1
         except Exception as e:
-            logger.error(f"TRANSFORM: thumbnaili regen ebaõnnestus {filename}: {e}")
-            thumbnail_warning = True
-
-        # 5) Logi (struktureeritud). NB: Meilit EI sünki — failinimi/tekst/sequence ei muutu.
-        log_path = os.path.join(BASE_DIR, 'transform_image.log')
-        with open(log_path, 'a', encoding='utf-8') as lf:
-            lf.write(
-                f"{datetime.now().isoformat()} | {username} | {work_id} | {filename} | "
-                f"angle={angle} crop={crop} quad={quad} | -> {out_w}x{out_h}\n"
+            logger.error(f"PAGE-OPS {folder_name}: katkes pärast {rotated} pööret / {split} poolitust: {e}")
+            raise RuntimeError(
+                f"Katkes: tehtud {rotated} pööret ja {split} poolitust {len(clean)} lehest. Viga: {e}"
             )
+        finally:
+            if split:
+                sync_work_to_meilisearch(folder_name)
 
-        logger.info(f"TRANSFORM: {folder_name}/{filename} ({username})")
-        return {
-            "success": True, "changed": True, "filename": filename,
-            "size": [out_w, out_h], "thumbnail_warning": thumbnail_warning,
-        }
+        new_page_count = len(get_sorted_images(path))
+    logger.info(f"PAGE-OPS {folder_name}: {rotated} pööret, {split} poolitust ({username})")
+    return {"success": True, "changed": True, "rotated": rotated, "split": split,
+            "new_page_count": new_page_count}
 
 
 def clear_original_backup(work_id, filename):

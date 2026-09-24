@@ -231,6 +231,22 @@ export function reorderWorkPages(workId: string, token: string, order: string[])
   return apiPost<ApiStatusResponse>(`/admin/work/${workId}/reorder-pages`, { order }, authJson(token, { timeout: 30000 }));
 }
 
+export interface PageOpsResult extends ApiStatusResponse {
+  rotated?: number;
+  split?: number;
+  new_page_count?: number;
+}
+
+/** Ootel pöörded ja poolitused ühe päringuga (#431). Pikk timeout: poolitus
+ *  teeb iga lehe kohta pildilõike + git-commitid; nginx lubab 600 s. */
+export function applyWorkPageOps(
+  workId: string,
+  token: string,
+  ops: { filename: string; rotate: number; split_x: number | null }[],
+): Promise<PageOpsResult> {
+  return apiPost<PageOpsResult>(`/admin/work/${workId}/page-ops`, { ops }, authJson(token, { timeout: 590000 }));
+}
+
 export function deleteWorkPages(workId: string, token: string, baseNames: string[]): Promise<ApiStatusResponse> {
   return apiPost<ApiStatusResponse>(`/admin/work/${workId}/delete-pages`, { base_names: baseNames }, authJson(token, { timeout: 30000 }));
 }

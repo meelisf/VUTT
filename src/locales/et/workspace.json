@@ -280,7 +280,22 @@
     "replaceHint": "Lae üles uus skänn. Metaandmed säilitatakse automaatselt.",
     "replaceWarning": "Asendamine kustutab kõik praegused leheküljed ja asendab need uute OCR-itud lehekülgedega.",
     "openUploadWizard": "Ava üleslaadimise viisard",
-    "directory": "Kataloog"
+    "directory": "Kataloog",
+    "pageOps": {
+      "split": "Poolita",
+      "noSplit": "Ära poolita",
+      "summary": "{{count}} lehel on ootel pööre või poolitus",
+      "line": "Poolitusjoon",
+      "apply": "Rakenda",
+      "discard": "Tühista muudatused",
+      "applying": "Rakendan…",
+      "confirmTitle": "Rakenda pöörded ja poolitused",
+      "confirm": "Rakendada {{count}} lehe muudatused? Poolitus lõikab pildi ja teksti (<pb/> kohalt) kaheks leheküljeks; originaal liigub prügikasti ja on taastatav.",
+      "error": "Rakendamine ebaõnnestus",
+      "done": "Rakendatud: {{rotated}} pööret, {{split}} poolitust",
+      "blocked": "Enne salvesta või tühista ootel muudatused.",
+      "badgeSplit": "poolitatakse"
+    }
   },
   "metadata": {
     "title": "Metaandmed",
