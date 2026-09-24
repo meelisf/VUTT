@@ -293,10 +293,13 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   useEffect(() => {
+    // Tekstisisel paneelil (`/persons/new`) ei ole Esc-il sulgemist kuhugi tagasi
+    // minna — `onClose` võib seal olla no-op, seega kuularit ei registreerita üldse.
+    if (inline) return;
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [inline, onClose]);
 
   // focusRef: väljastpoolt viidatud kandidaat avatakse kohe, aga ainult ÜKS kord —
   // muidu avab efekt grupi uuesti iga `groups`-muutuse peale ka siis, kui kasutaja
@@ -397,9 +400,11 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
         : 'fixed inset-y-0 right-0 w-full sm:w-[28rem] z-[1300] bg-white shadow-2xl flex flex-col'}>
         <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3">
           <h2 className="text-base font-semibold text-gray-900">{t('panel.title')}</h2>
-          <button type="button" onClick={onClose} aria-label={t('common:buttons.close')} className="text-gray-400 hover:text-gray-600">
-            <X size={18} />
-          </button>
+          {!inline && (
+            <button type="button" onClick={onClose} aria-label={t('common:buttons.close')} className="text-gray-400 hover:text-gray-600">
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         <div className="px-4 pt-3">
