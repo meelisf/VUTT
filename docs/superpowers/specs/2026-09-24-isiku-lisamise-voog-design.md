@@ -1,7 +1,7 @@
 # Isiku lisamise voog: isikupaneel, automaatrikastus, ülevaatusjärjekord
 
 Kuupäev: 2026-09-24
-Staatus: kokku lepitud disain (brainstorm 2026-09-24; rev 3 pärast kahte ülevaatust — §10);
+Staatus: kokku lepitud disain (brainstorm 2026-09-24; rev 4 pärast kolme ülevaatust — §10);
 teostus neljas PR-is (§8)
 Seotud: #240 (prosopograafia kvaliteedi kogumiskoht); PR #415 (Wikidata entity API);
 ADR 0007 (read-modelid), 0022 (välise ID kanooniline kuju), 0039 (eluloo väljad)
@@ -302,9 +302,25 @@ GND ID vabana ja lisada selle eri kaartidele — sama võidujooks nagu kahe loom
 - **Järjekord on alati: `_ext_id_claim_lock` → `person_lock`**, mitte kunagi vastupidi.
   Teed, mis ID-sid ei lisa, võtavad ainult `person_lock`-i (ja ei tohi seejärel
   `_ext_id_claim_lock`-i küsida).
-- `ext_id_index` uuendatakse praegu `_update_index_entry`-s pärast salvestust ja väljaspool
-  isiku lukku (`apply_enrichment`). ID-lisavates teedes peab see jääma
-  `_ext_id_claim_lock`-i sisse — muidu näeb järgmine kontroll vana indeksit.
+- **Invariant: väliste ID-de indeksisse ei kirjutata kunagi aegunud kaardiversiooni —
+  ka ID-sid mittemuutvast teest.** Praegu kutsuvad viis kirjutusteed kuuest
+  `_update_index_entry`-t **pärast** `person_lock`-i vabastamist (`person_crud.py:390, 432,
+  496, 535, 590`), ja `ext_id_index.update_for_person` kustutab isiku kõik võtmed ning
+  lisab need talle antud koopiast. Võidujooks:
+  1. tavaline rikastus salvestab kaardi vana ID-loendiga ja vabastab `person_lock`-i;
+  2. teine toiming lisab ID ja uuendab indeksi oma lukkude all;
+  3. esimese toimingu hilinenud indeksiuuendus kirjutab vana ID-loendi tagasi;
+  4. järgmine loomine peab lisatud ID-d vabaks → duplikaat.
+
+  **Lahendus:** `ext_id_index`-i uuendus eraldatakse `_update_index_entry`-st ja tehakse
+  **kõigis** kirjutusteedes kaardi salvestusega samas kriitilises sektsioonis
+  (`person_lock` all, ID-lisavates teedes ka `_ext_id_claim_lock` all), just salvestatud
+  koopiast. Üldine otsinguindeksi kirje (`prosopography_index.json`) võib jääda luku
+  järele — ta ei ole duplikaadikontrolli alus.
+- **`apply_enrichment` / `POST /{id}/enrich` ei tohi `identifiers`-it muuta**: iga
+  `identifiers` või `identifiers.*` väljarada → **400**. ID lisamiseks on `add_identifier`
+  (ID-luku ja duplikaadikontrolliga). Otspunktil ei ole praegu ühtki kutsujat (frontend,
+  `scripts/`, `mcp/` kontrollitud 2026-09-24) — keeld ei murra midagi.
 - Välisallika päringut ei tehta kunagi ühegi luku all.
 - Protsessilokaalne — sama hoiatus mis `_work_sets_lock`-il ja `RENDER_SEMAPHORE`-il
   (mitme workeri korral vaja protsessideülest lukku).
@@ -450,6 +466,9 @@ pytest:
   **kaart kustutati/liideti** päringu ajal → midagi ei kirjutata;
 - **lõppolekud** (§4.3 tabel): iga rida; `enrich_pending` eemaldub alati,
   `possible_duplicate` / `no_source` säilivad;
+- **Aegunud indeksikirjutus:** §4.6 nelja sammu järjestus (rikastus vana ID-loendiga +
+  samaaegne ID lisamine) → lisatud ID jääb indeksisse, järgmine loomine saab 409;
+- `/enrich` `identifiers` / `identifiers.0.id` väljarajaga → 400;
 - **ID-lukk:** kaks samaaegset taustatööd sama `_linked_gnd`-iga eri kaartidel → ID ühel
   kaardil, teine saab `possible_duplicate`; `update_person` identifiers-muudatus ja
   `create` sama ID-ga korraga → üks kaart;
@@ -527,3 +546,11 @@ välisallika päringu ajal. Tuletatud floruit on read-model ega kasuta
    `ext_id_index`-i; järjekord ID-lukk → `person_lock` (§4.6).
 4. Iga lõppenud katse eemaldab `enrich_pending`-i; lõppolekute tabel, sh `nothing_to_fill` (§4.3).
 5. `identifiers` lisandus on nimetatud „ainult tühja" erandina; §6 eristab 409 `exists`/`split`.
+
+**Rev 4 (2026-09-24, kolmanda ülevaatuse järel):**
+
+1. Invariant: väliste ID-de indeksisse ei kirjutata aegunud kaardiversiooni ühestki
+   teest; `ext_id_index` uuendus eraldatakse ja tehakse salvestusega samas kriitilises
+   sektsioonis kõigis kirjutusteedes; konkurentsitest (§4.6).
+2. `/enrich` keelab `identifiers` väljarajad (400); ID lisamine ainult `add_identifier`
+   kaudu (§4.6).
