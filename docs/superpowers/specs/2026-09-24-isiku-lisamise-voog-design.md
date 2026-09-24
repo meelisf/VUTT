@@ -1,7 +1,8 @@
 # Isiku lisamise voog: isikupaneel, automaatrikastus, ülevaatusjärjekord
 
 Kuupäev: 2026-09-24
-Staatus: kokku lepitud disain (brainstorm 2026-09-24); teostus neljas PR-is (§8)
+Staatus: kokku lepitud disain (brainstorm 2026-09-24; rev 2 pärast ülevaatust — §10);
+teostus neljas PR-is (§8)
 Seotud: #240 (prosopograafia kvaliteedi kogumiskoht); PR #415 (Wikidata entity API);
 ADR 0007 (read-modelid), 0022 (välise ID kanooniline kuju), 0039 (eluloo väljad)
 
@@ -56,7 +57,12 @@ Serveripoolne väli kaardil:
   "reasons": ["auto_enriched"],
   "context": {"work_id": "jqsc3i", "role": "respondens"},
   "created_via": "picker",
-  "auto_filled": ["birth.date", "_occupations"],
+  "auto_filled": ["birth.date", "occupations"],
+  "source_conflicts": [
+    {"field": "birth.date", "values": [{"scheme": "wikidata", "value": "1592"},
+                                       {"scheme": "gnd", "value": "1593"}]}
+  ],
+  "failed_sources": ["gnd"],
   "done_by": null,
   "done_at": null
 }
@@ -66,15 +72,30 @@ Serveripoolne väli kaardil:
 - `reasons` (mitu korraga): `enrich_pending` | `auto_enriched` | `enrich_failed` |
   `no_source` | `possible_duplicate`.
 - `created_via`: `picker` | `form` | `server_stub` | `backfill`.
+- `auto_filled` loetleb **tegelikke kaardivälju** (`occupations`, `identifiers`), mitte
+  rikastaja tehnilisi võtmeid (`_occupations`, `_linked_gnd`) — vt §4.3 teisendus.
+- `source_conflicts`: väljad, mida allikad pakkusid omavahel vastuolus — jäid täitmata.
+- `failed_sources`: allikad, mille päring ebaõnnestus (osaline õnnestumine, §4.3).
 - `context` on valikuline (puudub vormist loomisel ilma teoseta).
 - **Kõik uued kaardid** saavad märke — ka admini loodud (tema stub'id tekivad samuti
   kontrollimata). Kinnitab ainult admin.
 
-**Invariant:** `review` on serveri väli nagu `ANCHOR_FIELDS`. `update_person` teeb
-`person.update(data)` ja vorm saadab terve kaardi tagasi — ilma popita saaks toimetaja
-märke vormi kaudu kustutada ja vana avatud vorm kirjutaks selle üle. `update_person`
-**viskab kliendi `review`-i alati ära**; muuta saab ainult §4.5 otspunktidest ja
-taustarikastusest. Valvurtest kohustuslik.
+**Invariant:** `review` on serveri väli nagu `ANCHOR_FIELDS` — **kõigis kliendi
+kirjutusteedes**, mitte ainult ühes:
+
+- `update_person` teeb `person.update(data)` ja vorm saadab terve kaardi tagasi — ilma
+  popita saaks toimetaja märke kustutada ja vana avatud vorm kirjutaks selle üle;
+- `apply_enrichment` (`POST /{id}/enrich`) kirjutab kliendi antud **väljaradu** otse
+  (`_deep_set`) — sealt läheks läbi nii `review` kui `review.state`.
+
+Mõlemad visavad ära võtme `review` JA iga välja­raja, mis algab `review.`-ga. Kaitse on
+ühes abifunktsioonis (`strip_server_fields`), mida kõik kliendi kirjutusteed kutsuvad —
+ka tulevased. `review`-i muudavad ainult loomine (§4.2), taustarikastus (§4.3) ja admini
+kinnitus (§4.5), kõik serveri sisefunktsioonide kaudu. Valvurtestid: `update_person`
+ning `/enrich` nii `review` kui `review.state` kujul.
+
+**Kinnitust uuesti ei avata.** Hilisem käsitsi muudatus (ka toimetaja oma) ei vii kaarti
+tagasi järjekorda; muudatused on git-ajaloos.
 
 Liitmisel (merge) läheb märge koos tombstone'iga ajalukku; järjekord näitab ainult
 aktiivseid kaarte.
@@ -139,32 +160,88 @@ Lisaks vastuses `similar_persons`: nimepõhine VUTT-i vaste (sama loogika mis
 ### 4.2 `POST /prosopography/persons/create` (editor+)
 
 Keha: `{name, identifiers: [{scheme, id}, …], aliases?: [str], context?: {work_id, role},
-note?: str, created_via: "picker"|"form"}`.
+note?: str, created_via: "picker"|"form", card?: {…}}`.
+
+`card` on vormi **kogu algne sisu** (sama kuju mis `draftToPayload`): loomine on ÜKS
+samm. Praegu teeb `PersonEditPage` `createPerson` + `updatePerson`; kui taustarikastus
+satub nende vahele, saab teine samm versioonikonflikti ja kasutaja voog katkeb.
+Kogu vormisisu salvestub enne, kui taustatöö üldse järjekorda läheb; rikastus täidab
+seejärel ainult seda, mis vormis tühjaks jäi. `card`-ist visatakse serveriväljad ära
+(`strip_server_fields`, §3.1).
 
 1. Normaliseeri ID-d (ADR 0022).
-2. **Loomise luku all** kontrolli iga ID `ext_id_index`-ist. Kui mõni on kaardil →
-   **409** `{existing_person_id}`. (Kaks kasutajat samal ajal → üks kaart.) Lukk on uus
+2. **Loomise luku all** kontrolli iga ID `ext_id_index`-ist:
+   - kõik leitud ID-d on ÜHEL kaardil → **409** `{conflict: "exists", existing_person_id}`;
+   - ID-d on **eri kaartidel** → **409** `{conflict: "split", existing_person_ids: [...]}` —
+     allikad väidavad, et kaks VUTT-i kaarti on üks isik. Paneel ei loo midagi, näitab
+     mõlemat kaarti ja soovitab liitmist (admin). Kaks kasutajat samal ajal → üks kaart.
+   Lukk on uus
    moodulitasandi `_create_lock`, mis katab kontrolli JA kirjutuse; protsessilokaalne —
    sama hoiatus mis `_work_sets_lock`-il (mitme workeri korral vaja protsessideülest).
 3. Loo kaart (`create_person`), `review = {state: pending, reasons: [...], context,
    created_via}`: ID-dega → `enrich_pending`; ID-ta → `no_source`. Server teeb ise
    nimepõhise sarnasusotsingu (sama mis `similar_persons` §4.1) — vaste korral lisandub
    `possible_duplicate`. Kliendi väidet selle kohta ei usaldata.
-4. Pane taustarikastus järjekorda (§4.3), vasta **kohe** kaardiga.
+4. Salvesta kaart (koos `card` sisuga) ühe git-commitiga, **siis** pane taustarikastus
+   järjekorda (§4.3), vasta kohe kaardiga.
 
 Brauseri `createPerson` (`EntityPicker`, vorm) asendub selle otspunktiga.
 
 ### 4.3 Taustarikastus
 
-- Protsessisisene piiratud executor (2 lõime).
-- Töö: `person_lock` → `fetch_and_diff` iga ID skeemi kohta → rakenda **ainult
-  `auto_filled`** (tühjad väljad, valik C) sama funktsiooniga, mida käsitsi „Rakenda"
-  kasutab (`apply_enrichment`) → `review.auto_filled` += väljad; `enrich_pending` →
-  `auto_enriched` (või `enrich_failed`).
-- **Konflikte ei rakendata kunagi.**
-- **Taaste:** käivitusel otsib taustalõim üles kaardid `review.reasons ∋ enrich_pending`
-  ja kordab. Märge on töö püsiv jälg; mälusisest järjekorda ei usaldata.
-- Git-commit nagu tavalisel rikastusel (autor = looja, sõnum „Automaatne rikastus").
+Protsessisisene piiratud executor (2 lõime). Üks töö = üks kaart, kõik tema ID-d.
+
+**Järjekord (lukk ainult kirjutuse ümber):**
+
+1. **Väljaspool lukku:** küsi iga ID skeemi kohta allika andmed (`_fetch_*`). Aeglane
+   välisallikas ei hoia kaardi muutmist kinni.
+2. **Koonda kõigi allikate ettepanekud väljade kaupa** enne ühtegi kirjutust (vt reeglid).
+3. **Luku all:** loe kaart uuesti (vahepeal võis keegi muuta), arvuta rakendatav hulk
+   värske kaardi pealt, rakenda, uuenda `review`, salvesta **ühe** kirjutuse + commitiga.
+
+`person_lock` on tavaline `threading.Lock` ja `apply_enrichment` võtab selle ise —
+taustatöö EI kutsu `apply_enrichment`-i luku seest (ummikseis). Mõlemad kasutavad ühist
+**lukuta sisefunktsiooni** (`_apply_fields(person, fields)`), mis eeldab, et kutsuja
+lukku hoiab; `apply_enrichment` = lukk + `strip_server_fields` + `_apply_fields` + salvestus.
+
+**Teisendus kaardiväljadeks (serveris, ühes kohas).** Rikastaja tagastab tehnilisi
+võtmeid; `apply_enrichment` kirjutaks need praegu samanimeliste väljadena kaardile.
+Uus `enrichment_to_card_fields(proposals)`:
+
+- `_occupations` / `_occupation_label` → `occupations` kirjed (sama kuju, mida kliendi
+  `applyEnrichmentToDraft` praegu teeb, `helpers.ts`);
+- `_linked_wikidata` / `_linked_gnd` → `identifiers` lisandused, **normaliseeritud** (ADR 0022)
+  ja duplikaadikontrolliga: kui seotud ID on juba **teisel** kaardil, seda ei lisata,
+  `review.reasons += possible_duplicate` ja kaart märgitakse konteksti;
+- ülejäänud võtmed (`birth.date` jne) on juba kaardiradu.
+
+Kliendi `applyEnrichmentToDraft` jääb käsitsi rikastuse vaatesse; ühe teisenduse
+viimine serverisse ka seal on hilisem koristus (märgitud #240 alla), mitte selle töö osa.
+
+**Reeglid:**
+
+- **Täidab ainult tühja.** Välja, millel on kaardil väärtus, ei muudeta.
+- **Erand: hulgaväljad** (`name.aliases`, `_HULGA_VÄLJAD`) — ühendatakse (NFC-võrdlusega
+  dedup), olemasolevat ei eemaldata kunagi. See on ainus juhtum, kus täidetud välja
+  sisu muutub, ja ainult lisamise suunas.
+- **Allikatevaheline vastuolu:** kui tühja välja jaoks pakuvad kaks allikat erinevat
+  väärtust, jääb väli **täitmata** ja mõlemad väärtused koos allikatega lähevad
+  `review.source_conflicts`-i. Nii ei otsusta järjekord (kumb allikas enne vastas).
+- **Kokkusobivad kuupäevad ei ole vastuolu:** kui vähem täpne on täpsema eesliide
+  (`1592` vs `1592-02-10`), täidetakse täpsemaga koos tema `precision`-iga ja mõlemad
+  väärtused jäävad `source_conflicts`-i alla märkega `compatible: true` (admin näeb).
+- **Konflikti kaardiga (kaardil on väärtus, allikas pakub muud) ei rakendata kunagi**;
+  need on käsitsi rikastuse vaates nagu praegu.
+- **Osaline õnnestumine:** kui mõni allikas vastas ja mõni mitte, rakendatakse vastanute
+  ettepanekud, `review.reasons` saab nii `auto_enriched` kui `enrich_failed`,
+  `review.failed_sources` loetleb ebaõnnestunud skeemid. Automaatset kordust ebaõnnestunud
+  allikale ei ole — admin saab käsitsi rikastuse vaatest uuesti proovida.
+- Kui ükski allikas ei vastanud: ainult `enrich_failed`.
+
+**Taaste:** käivitusel otsib taustalõim üles kaardid `review.reasons ∋ enrich_pending`
+ja kordab. Märge on töö püsiv jälg; mälusisest järjekorda ei usaldata.
+
+Git-commit nagu tavalisel rikastusel (autor = looja, sõnum „Automaatne rikastus").
 
 ### 4.4 Serveri stub'id
 
@@ -175,8 +252,13 @@ Brauseri `createPerson` (`EntityPicker`, vorm) asendub selle otspunktiga.
 
 - `GET /prosopography/admin/review?reason=…` — `review.state == pending` kaardid,
   uuemad ees, teose konteksti pealkirjaga.
-- `POST /prosopography/{id}/review/done` — `require_role("admin")`; `state = done`,
-  `done_by`, `done_at`; git-commit.
+- `POST /prosopography/{id}/review/done` — `require_role("admin")`; keha
+  `{updated_at}` — **admin kinnitab kindla kaardiversiooni**:
+  - `updated_at` ei vasta → **409** (kaarti on vahepeal muudetud, nt taustarikastus lisas
+    andmeid, mida admin ei näinud); UI laeb kaardi uuesti;
+  - `review.reasons ∋ enrich_pending` → **409** `enrich_pending` (rikastus pooleli —
+    kinnitus pärast seda);
+  - muidu `state = done`, `done_by`, `done_at`; git-commit. Kinnitust uuesti ei avata (§3.1).
 
 ## 5. Otsing ja nimevalik
 
@@ -193,8 +275,13 @@ brauserisse (lobid serverist kättesaamatu).
 
 ### 5.2 Kaardi nimi (`name.label`) vaikimisi
 
-**Allika täisnimi (label või alias), mis sisaldab kõiki otsitud sõnu.** Mitte kunagi
+**Allika täisnimi (label või alias), mis sobib kõigi otsitud sõnadega.** Mitte kunagi
 otsitud nimeosa ise.
+
+**Sobivus = sõna-eesliide:** iga otsitud sõna peab olema täisnime MÕNE sõna algus.
+„Luden" sobib nii „Luden"-i kui „Ludenius"-ega; „denius" ei sobi millegagi (mitte
+alamsõne). Sõnad eraldatakse tühikute ja kirjavahemärkide järgi. Sama loogika mis
+Meili prefiksotsingul, nii et kasutaja kogemus on mõlemas ühesugune.
 
 | Otsing | Allika nimed | Vaikimisi |
 |---|---|---|
@@ -288,15 +375,26 @@ teose vorm jääb nähtavaks.
 | välisallikas ei vasta | kandidaadil „GND ei vastanud"; teised + loomine töötavad |
 | `/candidates` üle eelarve | tagastatakse jõudnu, puuduv märgitud |
 | rikastus ebaõnnestub | kaart olemas, `enrich_failed` järjekorras nähtav |
+| üks allikas vastas, teine mitte | vastanu rakendatud; `auto_enriched` + `enrich_failed`, `failed_sources` |
+| allikad vastuolus tühja välja osas | väli täitmata, `source_conflicts` järjekorras nähtav |
 | samaaegne loomine | luku all kontroll → 409 + olemasolev id |
 | server taaskäivitub rikastuse ajal | käivitusel `enrich_pending` kordus |
 
 ### 7.3 Testid
 
 pytest:
-- loomine: märge + kontekst + `created_via`; 409 duplikaadil (ka normaliseerimata ID);
-- **`review` ei ole kliendilt kirjutatav** (`update_person` valvur);
-- taustarikastus täidab ainult tühjad, konfliktid puutumata, `auto_filled` salvestub;
+- loomine: märge + kontekst + `created_via`; `card` salvestub ühe sammuga;
+  409 `exists` (ka normaliseerimata ID); 409 `split` (ID-d eri kaartidel);
+- **`review` ei ole kliendilt kirjutatav**: `update_person` (`review`) JA `/enrich`
+  (`review` ning `review.state` väljarajana);
+- taustarikastus: täidab ainult tühjad; aliased ühendatakse; kaardiga konflikt puutumata;
+  allikatevaheline vastuolu → täitmata + `source_conflicts`; kokkusobiv kuupäev → täpsem;
+  osaline õnnestumine → `auto_enriched` + `enrich_failed` + `failed_sources`;
+  `auto_filled` = kaardiväljad (`occupations`, mitte `_occupations`);
+- `enrichment_to_card_fields`: `_linked_gnd` teisel kaardil → ei lisata + `possible_duplicate`;
+- taustatöö ei võta lukku välisallika päringu ajaks; kaart loetakse luku all uuesti
+  (vahepealne käsitsi muudatus jääb alles);
+- kinnitus: vale `updated_at` → 409; `enrich_pending` ajal → 409;
 - käivitusel `enrich_pending` kordus;
 - tuletatud floruit: ainult tegevusrollid; käsitsi võidab;
 - teose salvestamine värskendab mõjutatud isikute indeksikirjeid (`work_count`);
@@ -307,7 +405,7 @@ pytest:
 vitest:
 - kandidaatide grupeerimine seotud ID-de järgi;
 - kahe Wikidata otsingu ühendamine + dedup;
-- nimevalik (§5.2 tabel + keelejärjestus + NFC).
+- nimevalik (§5.2 tabel + sõna-eesliite reegel („denius" ei sobi) + keelejärjestus + NFC).
 
 jsdom (`/** @vitest-environment jsdom */`):
 - paneel: olemasolev isik ees; „Loo ja vali" kutsub `onChange`-i; 409 → valik.
@@ -316,9 +414,13 @@ jsdom (`/** @vitest-environment jsdom */`):
 
 Iga PR on tootmises eraldi testitav (kasutaja töövoog: merge → deploy → test tootmises).
 
-1. **Serveri alus** — `review` märge + invariant + ADR 0048; `persons/create`;
-   taustarikastus + taaste; stub-teed; `EntityPicker`/vorm kutsuvad uut otspunkti.
-   *Kasu kohe:* uusi tühje kaarte ei teki, ka praeguse valija kaudu.
+1. **Serveri alus** — `review` märge + `strip_server_fields` kõigis kirjutusteedes +
+   ADR 0048; `persons/create` (ühesammuline, `card`); `_apply_fields` lukuta
+   sisefunktsioon; `enrichment_to_card_fields`; taustarikastus (koondamine, vastuolud,
+   osaline õnnestumine) + taaste; stub-teed; `EntityPicker` ja `PersonEditPage` kutsuvad
+   uut otspunkti (vorm ühe sammuga). *Kasu kohe:* ID-ga loodud kaartidele proovitakse
+   automaatrikastust ja kõik uued kaardid saavad ülevaatusmärke. (Allikata loomine ja
+   allikate tõrked võivad endiselt anda tühja kaardi — aga see on järjekorras nähtav.)
 2. **Tuletatud floruit** + indeksikirjete värskendus teose salvestamisel.
 3. **Isikupaneel** — `/candidates`, kahe otsingu ühendamine, nimevalik, paneel valijas ja
    `/persons/new`.
@@ -327,6 +429,29 @@ Iga PR on tootmises eraldi testitav (kasutaja töövoog: merge → deploy → te
 ## 9. ADR
 
 **0048 — Ülevaatusmärge on serveri väli** (PR 1 koosseisus): `review` kirjutavad ainult
-loomine, taustarikastus ja admini kinnitus; `update_person` viskab kliendi väärtuse
-ära. Automaatrikastus täidab ainult tühja, konflikte ei rakenda kunagi. Tuletatud
-floruit on read-model ega kasuta `subject`/`mentioned` rolle.
+loomine, taustarikastus ja admini kinnitus. KÕIK kliendi kirjutusteed (`update_person`,
+`apply_enrichment` väljarajad, `persons/create` `card`) läbivad `strip_server_fields`-i.
+Automaatrikastus täidab ainult tühja (hulgaväljad ühendatakse), ei rakenda kunagi
+konflikti kaardiga ega allikatevahelist vastuolu. Taustatöö ei hoia kaardi lukku
+välisallika päringu ajal. Tuletatud floruit on read-model ega kasuta
+`subject`/`mentioned` rolle.
+
+## 10. Muudatuste logi
+
+**Rev 2 (2026-09-24, ülevaatuse järel):**
+
+1. `review` kaitse katab kõik kliendi kirjutusteed, sh `apply_enrichment`-i väljarajad
+   (`review.*`) — ühine `strip_server_fields` (§3.1).
+2. Taustarikastus ei kutsu `apply_enrichment`-i luku seest (`threading.Lock` →
+   ummikseis): allikad väljaspool lukku, luku all uuesti lugemine + ühine lukuta
+   `_apply_fields` (§4.3).
+3. Serveripoolne `enrichment_to_card_fields` (`_occupations` → `occupations`,
+   `_linked_*` → `identifiers` duplikaadikontrolliga); `auto_filled` = kaardiväljad;
+   hulgaväljade ühendamine on sõnastatud erandina (§4.3).
+4. Allikatevaheline vastuolu: ettepanekud koondatakse enne kirjutust, vastuoluline väli
+   jääb täitmata (`source_conflicts`); osalise õnnestumise olek (`failed_sources`) (§4.3).
+5. Kinnitus käib kaardiversiooni kohta (`updated_at`), keelatud `enrich_pending` ajal;
+   kinnitust uuesti ei avata (kasutaja otsus) (§3.1, §4.5).
+6. Vormi loomine ühe sammuga (`card`), enne taustatööd (§4.2).
+7. Väiksemad: sõna-eesliite sobivusreegel (§5.2); 409 `split` mitme kaardi korral (§4.2);
+   PR 1 lubadus täpsustatud (§8).
