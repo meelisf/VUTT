@@ -81,6 +81,23 @@ def _id_to_path(person_id: str) -> str:
     return path
 
 
+def _save_person_locked(person: dict, username: str, message: str) -> None:
+    """Kaardi salvestus + väliste ID-de indeks SAMAS kriitilises sektsioonis (ADR 0048).
+
+    Kutsuja PEAB hoidma `person_lock(person["id"])`-i (ID-lisavas teel ka
+    `ext_id_claim_lock`-i). Indeks uuendatakse just salvestatud koopiast — luku
+    järel tehtud uuendus võiks kirjutada aegunud ID-loendi tagasi ja kustutada
+    vahepeal teise tee lisatud ID (spekk §4.6).
+    """
+    state.save_with_git(
+        _id_to_path(person["id"]),
+        json.dumps(person, ensure_ascii=False, indent=2),
+        username,
+        message=message,
+    )
+    ext_id_index.update_for_person(person)
+
+
 # Markdowni süntaks, mis tuleb snippetist välja võtta. Biograafia on Markdown
 # (ADR 0008), snippet läheb kaardile lihttekstina — ilma selle sammuta jõudis
 # `**Carl Lund**` ekraanile toorelt (#240).
@@ -220,12 +237,8 @@ def create_person(data: dict, username: str) -> dict:
     name = (person.get("name") or {}).get("label") or person_id
     # Täida inline labels registrist (self-healing), et EN-UI ei kuvaks ET-silte
     fill_person_labels_from_registry(person)
-    state.save_with_git(
-        _id_to_path(person_id),
-        json.dumps(person, ensure_ascii=False, indent=2),
-        username,
-        message=f"Prosopo loomine: {name} [{person_id}]",
-    )
+    with person_lock(person_id):
+        _save_person_locked(person, username, f"Prosopo loomine: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     _indices()._update_aliases_entry(person)
     return person
@@ -381,12 +394,7 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
         name = (person.get("name") or {}).get("label") or person_id
         # Täida inline labels registrist (self-healing), et EN-UI ei kuvaks ET-silte
         fill_person_labels_from_registry(person)
-        state.save_with_git(
-            _id_to_path(person_id),
-            json.dumps(person, ensure_ascii=False, indent=2),
-            username,
-            message=f"Prosopo muudatus: {name} [{person_id}]",
-        )
+        _save_person_locked(person, username, f"Prosopo muudatus: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     _indices()._update_aliases_entry(person)
 
@@ -423,12 +431,7 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
         person["updated_at"] = now
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
-        state.save_with_git(
-            _id_to_path(person_id),
-            json.dumps(person, ensure_ascii=False, indent=2),
-            username,
-            message=f"Prosopo identifikaator: {name} [{person_id}]",
-        )
+        _save_person_locked(person, username, f"Prosopo identifikaator: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     _indices()._update_aliases_entry(person)
     return person, diff
@@ -487,12 +490,7 @@ def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, us
         person["updated_at"] = datetime.now(timezone.utc).isoformat()
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
-        state.save_with_git(
-            _id_to_path(person_id),
-            json.dumps(person, ensure_ascii=False, indent=2),
-            username,
-            message=f"Prosopo pildi lisamine: {name} [{person_id}]",
-        )
+        _save_person_locked(person, username, f"Prosopo pildi lisamine: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     return person
 
@@ -526,12 +524,7 @@ def delete_person_image(person_id: str, username: str) -> dict:
         person["updated_at"] = datetime.now(timezone.utc).isoformat()
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
-        state.save_with_git(
-            _id_to_path(person_id),
-            json.dumps(person, ensure_ascii=False, indent=2),
-            username,
-            message=f"Prosopo pildi kustutamine: {name} [{person_id}]",
-        )
+        _save_person_locked(person, username, f"Prosopo pildi kustutamine: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     return person
 
@@ -581,12 +574,7 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         person["updated_at"] = now
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
-        state.save_with_git(
-            _id_to_path(person_id),
-            json.dumps(person, ensure_ascii=False, indent=2),
-            username,
-            message=f"Prosopo rikastus: {name} [{person_id}]",
-        )
+        _save_person_locked(person, username, f"Prosopo rikastus: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     _indices()._update_aliases_entry(person)
     return person
@@ -708,16 +696,11 @@ def bulk_update_occupation(
             person["updated_at"] = datetime.now(timezone.utc).isoformat()
             person["updated_by"] = username
             name = (person.get("name") or {}).get("label") or person_id
-            state.save_with_git(
-                _id_to_path(person_id),
-                json.dumps(person, ensure_ascii=False, indent=2),
-                username,
-                message=f"Prosopo ametite massmuudatus: {name} [{person_id}]",
-            )
+            _save_person_locked(person, username, f"Prosopo ametite massmuudatus: {name} [{person_id}]")
             _indices()._update_index_entry(person)
             updated += 1
 
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 
 
-__all__ = ['_safe_nanoid', '_id_to_path', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation']
+__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation']

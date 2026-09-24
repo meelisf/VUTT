@@ -276,3 +276,52 @@ def make_upload(backend_env):
         return upload_dir, state
 
     return _make_upload
+
+
+@pytest.fixture
+def prosopo_env(tmp_path, monkeypatch):
+    """Isoleeritud prosopograafia: kaardid tmp-kaustas, git = failikirjutus, indeksid tmp-is.
+
+    Patch käib `server.prosopography.ops` fassaadil — `sync_from_facade` kannab
+    selle domeenimoodulitesse (vt `_compat._SYNC_NAMES`).
+    """
+    import json as _json
+    from types import SimpleNamespace
+    from server.prosopography import ops, ext_id_index
+
+    d = tmp_path / "prosopography"
+    d.mkdir()
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    monkeypatch.setattr(ops, "PROSOPOGRAPHY_DIR", str(d))
+    monkeypatch.setattr(ops, "PROSOPOGRAPHY_INDEX_FILE", str(cfg / "prosopography_index.json"))
+    monkeypatch.setattr(ops, "PERSON_TO_WORKS_FILE", str(cfg / "person_to_works.json"))
+    monkeypatch.setattr(ops, "PERSON_ALIASES_FILE", str(cfg / "person_aliases.json"))
+    monkeypatch.setattr(ops, "WORK_COLLECTIONS_INDEX_FILE", str(cfg / "work_collections_index.json"))
+
+    def fake_save(path, content, username, message=None, additional_files=None):
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        for p, c in additional_files or []:
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(c)
+        return {"success": True}
+
+    monkeypatch.setattr(ops, "save_with_git", fake_save)
+    ext_id_index.invalidate()
+
+    def write(nanoid, **fields):
+        card = {
+            "id": f"vutt:P{nanoid}", "name": {"label": f"Isik {nanoid}", "aliases": []},
+            "identifiers": [], "updated_at": "2026-01-01T00:00:00+00:00",
+            "record_status": "draft", "merged_into": None, **fields,
+        }
+        (d / f"{nanoid}.json").write_text(_json.dumps(card, ensure_ascii=False), encoding="utf-8")
+        ext_id_index.invalidate()
+        return card
+
+    def read(nanoid):
+        return _json.loads((d / f"{nanoid}.json").read_text(encoding="utf-8"))
+
+    yield SimpleNamespace(dir=d, write=write, read=read)
+    ext_id_index.invalidate()

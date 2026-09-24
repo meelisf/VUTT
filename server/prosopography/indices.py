@@ -205,15 +205,13 @@ def _person_collections(person_id: str) -> list:
 def _update_index_entry(person: dict):
     """Uuendab ühe kirje prosopography_index.json-s.
 
-    Ühtlasi hoiab väliste ID-de pöördindeksit värskena (#180): see funktsioon on
-    ainus lehter, mida KÕIK isiku kirjutusteed läbivad (create, update,
-    add_identifier, enrichment, merge), seega piisab ühest haakepunktist.
+    Väliste ID-de indeksit (`ext_id_index`) SIIN EI uuendata: see käib
+    `person_crud._save_person_locked`-is salvestusega samas kriitilises
+    sektsioonis (ADR 0048). See funktsioon jookseb luku järel ja võib saada
+    aegunud koopia — otsinguindeksile on see talutav, duplikaadikontrollile mitte.
     """
     sync_from_facade()
     from .person_search import _index_entry_from_person
-    from . import ext_id_index
-
-    ext_id_index.update_for_person(person)
 
     person_id = person["id"]
     works = _load_person_to_works()
