@@ -248,9 +248,8 @@ def _new_person_skeleton(data: dict, username: str) -> dict:
 
 
 def create_person(data: dict, username: str) -> dict:
-    """Madala taseme loomine (ilma ID-kontrolli ja ülevaatusmärketa). Praegused
-    kutsujad: `ensure_prosopo_for_entity` (kuni Task 7) ja testid — uus kood
-    kutsub `create_person_checked`-i."""
+    """Madala taseme loomine (ilma ID-kontrolli ja ülevaatusmärketa). Kutsujad:
+    ainult testid — tootmiskood kutsub `create_person_checked`-i."""
     sync_from_facade()
     person = _new_person_skeleton(data, username)
     os.makedirs(state.PROSOPOGRAPHY_DIR, exist_ok=True)
@@ -788,8 +787,10 @@ def _added_identifiers(old: list, new: list) -> list:
             if isinstance(i, dict) and (i.get("scheme"), i.get("id")) not in vana]
 
 
-def ensure_prosopo_for_entity(entity: dict, username: str) -> dict:
-    """Tagab, et LinkedEntity objektil on vutt:P ID."""
+def ensure_prosopo_for_entity(entity: dict, username: str, work_id: Optional[str] = None,
+                              role: Optional[str] = None) -> dict:
+    """Tagab, et LinkedEntity objektil on vutt:P ID. Uus kaart käib
+    `create_person_checked`-i kaudu (ülevaatusmärge + rikastus, spekk §4.4)."""
     if not isinstance(entity, dict):
         return entity
     eid = (entity.get("id") or "").strip()
@@ -809,27 +810,35 @@ def ensure_prosopo_for_entity(entity: dict, username: str) -> dict:
         return {**entity, "id": existing["id"]}
 
     label = (entity.get("label") or entity.get("name") or eid).strip()
-    stub = create_person(
-        {"name": label, "identifiers": [{"scheme": scheme, "id": eid}]},
-        username=username,
-    )
+    context = {"work_id": work_id, "role": role or entity.get("role")} if work_id else None
+    try:
+        stub = create_person_checked(
+            username=username, created_via="server_stub", name=label,
+            identifiers=[{"scheme": scheme, "id": eid}], context=context)
+    except IdentifierConflict as e:
+        # Võidujooks: keegi lõi sama ID-ga kaardi vahepeal. `split` ei saa siin
+        # tekkida (üks ID), aga kui tekib, jäta entiteet sidumata ja logi.
+        if e.kind == "exists":
+            return {**entity, "id": e.person_ids[0]}
+        state.logger.warning("Stub: %s:%s konflikt %s", scheme, eid, e.person_ids)
+        return entity
     return {**entity, "id": stub["id"]}
 
 
-def ensure_prosopo_stubs(updates: dict, username: str) -> dict:
+def ensure_prosopo_stubs(updates: dict, username: str, work_id: Optional[str] = None) -> dict:
     """Asendab creators/tags/publisher Wikidata/GND/VIAF ID-d vutt:P ID-dega."""
     changed = {}
 
     if "creators" in updates:
         changed["creators"] = [
-            ensure_prosopo_for_entity(c, username)
+            ensure_prosopo_for_entity(c, username, work_id=work_id)
             if isinstance(c, dict) else c
             for c in (updates["creators"] or [])
         ]
 
     if "tags" in updates:
         changed["tags"] = [
-            ensure_prosopo_for_entity(t, username)
+            ensure_prosopo_for_entity(t, username, work_id=work_id, role="subject")
             if isinstance(t, dict) and t.get("entity_type") == "person" else t
             for t in (updates["tags"] or [])
         ]
@@ -837,7 +846,7 @@ def ensure_prosopo_stubs(updates: dict, username: str) -> dict:
     if "publisher" in updates:
         pub = updates["publisher"]
         if isinstance(pub, dict) and pub.get("entity_type") == "person":
-            changed["publisher"] = ensure_prosopo_for_entity(pub, username)
+            changed["publisher"] = ensure_prosopo_for_entity(pub, username, work_id=work_id, role="publisher")
 
     if changed:
         return {**updates, **changed}

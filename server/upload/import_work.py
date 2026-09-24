@@ -439,7 +439,7 @@ def _teosta_import(
     try:
         from ..prosopography.person_crud import ensure_prosopo_stubs
         metadata = {**metadata, **{
-            k: v for k, v in ensure_prosopo_stubs(metadata, username).items()
+            k: v for k, v in ensure_prosopo_stubs(metadata, username, work_id=work_id).items()
             if k in ("creators", "tags", "publisher")
         }}
     except Exception as e:
