@@ -1,6 +1,6 @@
 """Automaatrikastuse puhas loogika (spekk §4.3, ADR 0048).
 
-Siin ei ole võrku, lukke ega faile — `auto_enrich_runner` teeb need. Reeglid:
+Siin ei ole võrku, lukke ega faile — `auto_enrich_runner` tegeleb nendega. Reeglid:
   * täidetakse ainult tühja; erandid (ainult lisamise suunas): `name.aliases`
     ühendatakse, seotud ID-d (`linked`) lisab runner;
   * allikatevaheline vastuolu jääb täitmata ja läheb `conflicts`-i;
@@ -27,11 +27,33 @@ def _list_key(item: dict) -> str:
     return item.get("id") or _norm(item.get("label", ""))
 
 
+def _pad_date(date: str) -> str:
+    """Täidab puuduva kuu/päeva "01"-ga — kaardiväli on ALATI YYYY-MM-DD.
+
+    GND ja AA saadavad ainult aasta ("1592") või aasta-kuu ("1592-08"),
+    Wikidata annab alati täiskuupäeva. Ilma padita jäid sama teadmise kaks
+    kirjakuju (nt "1592" vs "1592-01-01") omavahel võrreldes erinevaks —
+    tulemus sõltus allikate järjekorrast ja kaardile oleks jõudnud kuju,
+    mida `buildDatePayload` (personForm) ei tunne.
+    """
+    osad = str(date).split("-")
+    while len(osad) < 3:
+        osad.append("01")
+    return "-".join(osad[:3])
+
+
+def _trunc_date(v: dict) -> tuple:
+    """Kuupäev + täpsus, kärbitud täpsuse pikkuseni — kõrvalejäetud osa
+    (nt kuu/päev "01"-täide aastatäpsuse taga) ei tohi vastuolu tekitada."""
+    n = _PREC_LEN.get(v["precision"], 10)
+    return v["date"][:n], v["precision"]
+
+
 def _date_unit(remote: dict, prefix: str) -> Optional[dict]:
     date = remote.get(f"{prefix}.date")
     if not date:
         return None
-    return {"date": date, "precision": remote.get(f"{prefix}.precision") or "day"}
+    return {"date": _pad_date(date), "precision": remote.get(f"{prefix}.precision") or "day"}
 
 
 def _dates_compatible(a: dict, b: dict) -> Optional[dict]:
@@ -67,13 +89,15 @@ def aggregate(sources: list) -> dict:
         if r.get("aa_raw"):
             scalars.setdefault("aa_raw", []).append((scheme, r["aa_raw"]))
         for occ in r.get("_occupations") or []:
-            lists["occupations"].append({k: v for k, v in (("id", occ.get("id")), ("label", occ.get("label"))) if v})
+            lists["occupations"].append({k: v for k, v in (
+                ("id", occ.get("id")), ("label", occ.get("label")), ("labels", occ.get("labels"))
+            ) if v})
         if r.get("_occupation_label") and not r.get("_occupations"):
             lists["occupations"].append({"label": r["_occupation_label"]})
         for key, target in (("confession", "confessions"), ("status", "statuses")):
             v = r.get(key)
             if isinstance(v, dict) and v.get("label"):
-                lists[target].append({k: v[k] for k in ("id", "label") if v.get(k)})
+                lists[target].append({k: v[k] for k in ("id", "label", "labels") if v.get(k)})
         aliases.extend(r.get("name.aliases") or [])
         for lk, ls in (("_linked_wikidata", "wikidata"), ("_linked_gnd", "gnd")):
             if r.get(lk):
@@ -97,10 +121,14 @@ def aggregate(sources: list) -> dict:
                 if not same:
                     clash = True
                     break
+                # Sildid klapivad — eelista ID-ga väärtust, sõltumata sellest,
+                # kumb allikas vastas enne (muidu jäi ID-ta esimene püsima).
+                if not chosen.get("id") and v.get("id"):
+                    chosen = v
             elif _norm(chosen) != _norm(v):
                 clash = True
                 break
-        differs = path in ("birth", "death") and len({(v["date"], v["precision"]) for _, v in vals}) > 1
+        differs = path in ("birth", "death") and len({_trunc_date(v) for _, v in vals}) > 1
         if clash or differs:
             field = f"{path}.date" if path in ("birth", "death") else path
             shown = [{"scheme": sc, "value": (v["date"] if path in ("birth", "death") else v)} for sc, v in vals]
@@ -143,7 +171,12 @@ def apply_to_card(card: dict, agg: dict) -> list:
         if prefix in f and not obj.get("date"):
             obj = {**obj, "date": f[prefix]["date"], "precision": f[prefix]["precision"]}
             applied.append(f"{prefix}.date")
-        if f"{prefix}.place" in f and not (obj.get("place") or {}).get("label"):
+        # Vana kaart võib kanda kohta lihtstringina — see loetakse täidetuks,
+        # mitte üle ei kirjutata (paljal stringil pole `.get`-meetodit).
+        existing_place = obj.get("place")
+        place_filled = (isinstance(existing_place, str) and existing_place.strip()) or \
+            (isinstance(existing_place, dict) and existing_place.get("label"))
+        if f"{prefix}.place" in f and not place_filled:
             obj = {**obj, "place": f[f"{prefix}.place"]}
             applied.append(f"{prefix}.place")
         if obj:
@@ -176,17 +209,25 @@ def new_review(*, created_via: str, context: Optional[dict],
 
 def finish_review(review: dict, *, ids_left: bool, answered: list, failed: list,
                   applied: list, conflicts: list, possible_duplicate: bool) -> dict:
-    """Lõppolek (spekk §4.3 tabel). `enrich_pending` eemaldub ALATI."""
+    """Lõppolek (spekk §4.3 tabel). `enrich_pending` eemaldub ALATI.
+
+    Kui kaardil ei ole enam ühtegi rikastatavat ID-d (`ids_left=False`), ei
+    loe ükski teine parameeter — ainus muutus on `enrich_pending` kadumine
+    (spekk §4.3 tabeli viimane rida). See juhtub nt kui kasutaja kustutas
+    kõik ID-d enne, kui runner jõudis lõpetada.
+    """
     r = {**review}
     reasons = [x for x in r.get("reasons") or [] if x != "enrich_pending"]
+    if not ids_left:
+        r["reasons"] = reasons
+        return r
     if possible_duplicate and "possible_duplicate" not in reasons:
         reasons.append("possible_duplicate")
-    if ids_left:
-        if answered:
-            reasons.append("auto_enriched" if applied else "nothing_to_fill")
-        if failed:
-            reasons.append("enrich_failed")
-            r["failed_sources"] = list(dict.fromkeys((r.get("failed_sources") or []) + failed))
+    if answered:
+        reasons.append("auto_enriched" if applied else "nothing_to_fill")
+    if failed:
+        reasons.append("enrich_failed")
+        r["failed_sources"] = list(dict.fromkeys((r.get("failed_sources") or []) + failed))
     r["reasons"] = reasons
     r["auto_filled"] = list(dict.fromkeys((r.get("auto_filled") or []) + applied))
     r["source_conflicts"] = (r.get("source_conflicts") or []) + conflicts

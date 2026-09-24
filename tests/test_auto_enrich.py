@@ -117,3 +117,60 @@ def test_finish_review_sailitab_muud_pohjused_ja_lisab_duplikaadi():
                          failed=[], applied=[], conflicts=[{"field": "x"}], possible_duplicate=True)
     assert r["reasons"] == ["possible_duplicate", "nothing_to_fill"]
     assert r["source_conflicts"] == [{"field": "x"}]
+
+
+# --- Fix round 1/5 ---------------------------------------------------------
+
+def test_aasta_tapsusega_kuupaevad_erinevas_kujus_ei_ole_vastuolus():
+    """GND/AA saadavad paljast aastat ("1592"), Wikidata täiskuupäeva
+    ("1592-01-01") — sama teadmine kahes kujus ei tohi vastuolu tekitada."""
+    agg = ae.aggregate([
+        src("wikidata", **{"birth.date": "1592-01-01", "birth.precision": "year"}),
+        src("gnd", **{"birth.date": "1592", "birth.precision": "year"})])
+    assert agg["fields"]["birth"] == {"date": "1592-01-01", "precision": "year"}
+    assert agg["conflicts"] == []
+
+
+def test_aasta_tapsusega_kuupaevad_erinevas_kujus_vastupidises_jarjekorras():
+    """Sama mis eelmine, aga allikate järjekord vahetatud — tulemus ei tohi sõltuda järjekorrast."""
+    agg = ae.aggregate([
+        src("gnd", **{"birth.date": "1592", "birth.precision": "year"}),
+        src("wikidata", **{"birth.date": "1592-01-01", "birth.precision": "year"})])
+    assert agg["fields"]["birth"] == {"date": "1592-01-01", "precision": "year"}
+    assert agg["conflicts"] == []
+
+
+def test_apply_ei_lange_kokku_pargitud_stringkohaga():
+    """Vana kaart võib kanda kohta lihtstringina ("Tartu") — apply ei tohi
+    selle peal krahhida ega seda üle kirjutada."""
+    card = {"birth": {"date": None, "place": "Tartu"}}
+    agg = {"fields": {"birth.place": {"id": "Q1", "label": "Greifswald",
+                                       "labels": None, "source": "wikidata"}},
+           "conflicts": [], "linked": {}}
+    applied = ae.apply_to_card(card, agg)
+    assert card["birth"]["place"] == "Tartu"
+    assert "birth.place" not in applied
+
+
+def test_koha_id_eelistatakse_kui_sildid_klapivad():
+    """Kui kaks allikat lepivad kohas kokku (sama silt), eelistatakse ID-ga
+    väärtust — sõltumata sellest, kumb allikas vastas enne."""
+    agg = ae.aggregate([
+        src("gnd", **{"birth.place": {"id": None, "label": "Greifswald"}}),
+        src("wikidata", **{"birth.place": {"id": "Q1", "label": "Greifswald"}})])
+    assert agg["fields"]["birth.place"]["id"] == "Q1"
+
+
+def test_seisuse_sildid_sailivad():
+    agg = ae.aggregate([src("album_academicum",
+                            status={"id": "Q5", "label": "x", "labels": {"et": "x", "de": "y"}})])
+    assert agg["fields"]["statuses"] == [{"id": "Q5", "label": "x", "labels": {"et": "x", "de": "y"}}]
+
+
+def test_finish_review_kui_ykski_id_pole_enam_alles():
+    """`ids_left=False` — ainult `enrich_pending` kaob, kõik muu jääb puutumata."""
+    r = ae.finish_review(_pending(), ids_left=False, answered=["wikidata"], failed=["gnd"],
+                         applied=["gender"], conflicts=[{"field": "x"}], possible_duplicate=True)
+    assert r["reasons"] == []
+    assert r["auto_filled"] == []
+    assert r["source_conflicts"] == []
