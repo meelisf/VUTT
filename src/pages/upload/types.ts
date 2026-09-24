@@ -115,6 +115,17 @@ export interface UploadImportResponse {
 export type PrepressMode = 'default' | 'custom' | 'nosplit';
 export type PreviewStatus = 'idle' | 'rendering' | 'ready' | 'error' | 'cancelled';
 
+/**
+ * Kalle / kärbe / perspektiiv PÖÖRATUD lehe raamis (#431). Sama leping nagu
+ * teose halduse pildiredaktoril (`transform_page_image`): koordinaadid 0..1.
+ * Apply järjekord: pööre → adjust → poolitus.
+ */
+export interface PageAdjust {
+  angle: number;
+  crop: { x: number; y: number; w: number; h: number } | null;
+  quad: [number, number][] | null;
+}
+
 export interface PrepressPage {
   n: number;
   mode: PrepressMode;
@@ -123,6 +134,8 @@ export interface PrepressPage {
   /** Pööre päripäeva: 0 | 90 | 180 | 270. Puudub vanas plaanis → 0.
    *  Apply pöörab renderdatud lehe ENNE lõikamist. */
   rotate?: number;
+  /** Puudub / null = teisendust ei ole. Pööre teeb selle kehtetuks (raam muutub). */
+  adjust?: PageAdjust | null;
 }
 
 export interface PrepressPlan {

@@ -458,83 +458,14 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
         return {"success": True, "new_page_count": new_page_count}
 
 
-ANGLE_EPS = 1e-4   # alla selle nurka käsitleme nullina (float-müra slidersist)
-MIN_CROP_PX = 8    # minimaalne kärpe-mõõde pärast klampimist
-QUAD_MIN_EDGE = 0.02   # minimaalne quad serva pikkus (normaliseeritud)
-QUAD_MIN_OUT_PX = 8    # minimaalne perspektiivi väljundmõõt pikslites
-
-
-def dist(a, b) -> float:
-    """Eukleidiline kaugus kahe (x,y) punkti vahel."""
-    return math.hypot(b[0] - a[0], b[1] - a[1])
-
-
-def _validate_quad(quad):
-    """Valideerib perspektiivi nelinurga ja tagastab 4 (x,y) tuple'it [0..1].
-
-    Nõuded: täpselt 4 punkti; lõplikud arvud; [0,1]; iga serv ≥ QUAD_MIN_EDGE;
-    kumer (mitte bow-tie/concave). Raise ValueError igal rikkumisel.
-    """
-    if not isinstance(quad, (list, tuple)) or len(quad) != 4:
-        raise ValueError("quad peab olema täpselt 4 punkti")
-    pts = []
-    for p in quad:
-        if isinstance(p, dict):
-            x, y = p.get("x"), p.get("y")
-        elif isinstance(p, (list, tuple)) and len(p) == 2:
-            x, y = p
-        else:
-            raise ValueError("quad punkt peab olema {x,y} või [x,y]")
-        x, y = float(x), float(y)
-        if not (math.isfinite(x) and math.isfinite(y)):
-            raise ValueError("quad punkt peab olema lõplik arv")
-        if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
-            raise ValueError("quad punkt peab olema vahemikus [0,1]")
-        pts.append((x, y))
-    # Serva pikkused
-    for i in range(4):
-        if dist(pts[i], pts[(i + 1) % 4]) < QUAD_MIN_EDGE:
-            raise ValueError("quad serv on liiga lühike")
-    # Kumerus: kõigi ristkorrutiste märk peab olema järjepidev
-    sign = 0
-    for i in range(4):
-        ax, ay = pts[i]
-        bx, by = pts[(i + 1) % 4]
-        cx, cy = pts[(i + 2) % 4]
-        cross = (bx - ax) * (cy - by) - (by - ay) * (cx - bx)
-        if abs(cross) < 1e-9:
-            continue
-        s = 1 if cross > 0 else -1
-        if sign == 0:
-            sign = s
-        elif s != sign:
-            raise ValueError("quad peab olema kumer (mitte bow-tie)")
-    return pts
-
-
-def _compute_crop_box(crop, w: int, h: int):
-    """Teisendab normaliseeritud kärpe (0–1) klampitud pikslikastiks (left,top,right,bottom).
-
-    Tagastab None kui crop puudub. Raise ValueError kui pärast klampimist liiga väike.
-    """
-    if crop is None:
-        return None
-    for k in ("x", "y", "w", "h"):
-        if k not in crop:
-            raise ValueError(f"crop väli '{k}' puudub")
-        if not (0.0 <= float(crop[k]) <= 1.0):
-            raise ValueError(f"crop '{k}' peab olema vahemikus [0,1]")
-    if float(crop["w"]) <= 0 or float(crop["h"]) <= 0:
-        raise ValueError("crop w,h peavad olema > 0")
-
-    left = max(0, min(w, int(round(float(crop["x"]) * w))))
-    top = max(0, min(h, int(round(float(crop["y"]) * h))))
-    right = max(0, min(w, int(round((float(crop["x"]) + float(crop["w"])) * w))))
-    bottom = max(0, min(h, int(round((float(crop["y"]) + float(crop["h"])) * h))))
-
-    if (right - left) < MIN_CROP_PX or (bottom - top) < MIN_CROP_PX:
-        raise ValueError("kärbe on pärast klampimist liiga väike")
-    return (left, top, right, bottom)
+# Teisenduse geomeetria elab puhtas moodulis, mida kasutab ka upload'i
+# prepress (#431). Nimed jäävad siia re-eksporditud — testid ja vanad
+# kutsujad impordivad neid admin_page_ops-ist.
+from .image_transform import (  # noqa: E402,F401
+    ANGLE_EPS, MIN_CROP_PX, QUAD_MIN_EDGE, QUAD_MIN_OUT_PX, dist,
+    validate_quad as _validate_quad, compute_crop_box as _compute_crop_box,
+    apply_transform,
+)
 
 
 def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, username="admin"):
@@ -587,27 +518,7 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, use
             is_jpeg = ext_l in ('.jpg', '.jpeg')
             if is_jpeg and img.mode in ('RGBA', 'LA', 'P'):
                 img = img.convert('RGB')
-            fill = (255, 255, 255) if img.mode == 'RGB' else 255
-            if abs(angle) >= ANGLE_EPS:
-                # CSS positiivne = päripäeva → Pillow vastupäeva → -angle
-                img = img.rotate(-angle, expand=True, fillcolor=fill)
-            if quad_pts is not None:
-                # Perspektiivi sirgestus: quad ([0..1] rotated-raamis) → ristkülik
-                W, H = img.width, img.height
-                pxs = [(x * W, y * H) for (x, y) in quad_pts]
-                TL, TR, BR, BL = pxs
-                out_w = round((dist(TL, TR) + dist(BL, BR)) / 2)
-                out_h = round((dist(TL, BL) + dist(TR, BR)) / 2)
-                if out_w < QUAD_MIN_OUT_PX or out_h < QUAD_MIN_OUT_PX:
-                    raise ValueError("quad väljund on liiga väike")
-                # Image.QUAD data: UL, LL, LR, UR (Pillow konventsioon)
-                data = [TL[0], TL[1], BL[0], BL[1], BR[0], BR[1], TR[0], TR[1]]
-                img = img.transform((out_w, out_h), PILImage.QUAD, data,
-                                    resample=PILImage.BICUBIC, fillcolor=fill)
-            else:
-                box = _compute_crop_box(crop, img.width, img.height)
-                if box is not None:
-                    img = img.crop(box)
+            img = apply_transform(img, angle=angle, crop=crop, quad_pts=quad_pts)
             out_w, out_h = img.size
 
             # 3) Salvesta tmp-faili SAMAS kaustas (EXDEV kaitse), siis atomaarne replace

@@ -90,7 +90,7 @@ const SplitContactSheet: React.FC<Props> = ({
             >
               {ready ? (
                 <img
-                  src={prepressPreviewUrl(uploadId, page.n, token, page.rotate ?? 0)}
+                  src={prepressPreviewUrl(uploadId, page.n, token, page.rotate ?? 0, page.adjust ?? null)}
                   alt={`${page.n}`}
                   loading="lazy"
                   onLoad={(e) => {

@@ -1,4 +1,4 @@
-import type { PrepressPage, PrepressPlan } from './types';
+import type { PageAdjust, PrepressPage, PrepressPlan } from './types';
 import { addRotation } from '../../components/pagePrep/geometry';
 
 // Poolitusjoone piir on ühine teose haldusega (#431).
@@ -162,8 +162,29 @@ export function rotatePages(
   ns: number[],
   delta: number,
 ): PrepressPlan {
-  return mapPages(plan, ns, (p) => ({
-    ...p,
-    rotate: addRotation(p.rotate ?? 0, delta),
-  }));
+  return mapPages(plan, ns, (p) => withRotation(p, addRotation(p.rotate ?? 0, delta)));
+}
+
+/**
+ * Uus pööre lehele. Kärbe/kalle (`adjust`) on EELMISE pöörde raamis ja
+ * muutuks uues raamis valeks — pööre eemaldab selle, nagu teose halduse
+ * pildiredaktoris jäme pööre lähtestab kärpekasti (#431).
+ */
+export function withRotation(page: PrepressPage, rotate: number): PrepressPage {
+  if (page.adjust && rotate !== (page.rotate ?? 0)) {
+    return { ...page, rotate, adjust: null };
+  }
+  return { ...page, rotate };
+}
+
+/** Teose halduse pildiredaktori serveriparameetrid → plaani `adjust`. */
+export function adjustFromParams(p: {
+  angle: number;
+  crop: { x: number; y: number; w: number; h: number } | null;
+  quad: { x: number; y: number }[] | null;
+}): PageAdjust | null {
+  const quad = p.quad ? p.quad.map((q) => [q.x, q.y] as [number, number]) : null;
+  const angle = Math.abs(p.angle) < 1e-4 || Math.abs(p.angle - 360) < 1e-4 ? 0 : p.angle;
+  if (angle === 0 && !p.crop && !quad) return null;
+  return { angle, crop: p.crop, quad };
 }

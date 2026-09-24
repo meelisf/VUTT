@@ -60,6 +60,43 @@ def rotated_preview_path(upload_id: str, n: int, angle: int) -> str:
     return dst
 
 
+def adjusted_preview_path(upload_id: str, n: int, angle: int,
+                          adjust: Optional[dict]) -> str:
+    """Eelvaade pöörde JA kalde/kärpe/perspektiiviga (#431).
+
+    Sama põhimõte nagu `rotated_preview_path`: teisendus on RENDERDUS-
+    PARAMEETER, brauser saab valmis pildi ja poolitusjoone geomeetria käib
+    kohandatud pildi laiuse järgi — täpselt nagu apply lõikab. `adjust` tuleb
+    päringust (mitte plaanist): URL on siis deterministlik ja salvestamata
+    muudatus ei saa brauseri vahemällu valet pilti jätta.
+
+    Vahemälu võti on normaliseeritud `adjust`-i räsi; fail elab eelvaate
+    kaustas ja koristatakse koos sellega.
+    """
+    base = rotated_preview_path(upload_id, n, angle)
+    if not adjust:
+        return base
+
+    import hashlib
+    import json
+
+    key = hashlib.sha1(
+        json.dumps(adjust, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+    dst = "{}_a{}.jpg".format(base[:-4], key)
+    if os.path.isfile(dst):
+        return dst
+
+    from PIL import Image
+    from ..image_transform import apply_adjust, rgb_or_gray as _rgb_or_gray
+
+    tmp = dst + ".part"
+    with Image.open(base) as im:
+        apply_adjust(_rgb_or_gray(im), adjust).save(tmp, "JPEG", quality=80)
+    os.replace(tmp, dst)
+    return dst
+
+
 def source_path(upload_id: str) -> Optional[str]:
     """Salvestatud lähteallikas: source.pdf (fail) või source/ (pildikaust)."""
     base = upload_state.upload_dir(upload_id)

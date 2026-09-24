@@ -1,5 +1,6 @@
 from ..work_dating import dating_updates
 import asyncio
+import json
 import os
 import time
 from typing import Optional
@@ -9,6 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from .. import image_transform
 from ..ada import client as ada_client
 from ..ada import fetch as ada_fetch
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
@@ -218,22 +220,27 @@ def admin_prepress_start(upload_id: str, user=Depends(require_role("admin"))):
 
 @router.get("/admin/upload/{upload_id}/preview/{page_num}")
 def admin_prepress_preview(upload_id: str, page_num: int, rot: int = 0,
+                           adj: Optional[str] = None,
                            user=Depends(require_role("admin"))):
-    """100 DPI kontaktlehe pisipilt, valikuliselt pööratuna (`?rot=90`).
+    """100 DPI kontaktlehe pisipilt, valikuliselt pööratuna (`?rot=90`) ja
+    kärbituna/kallutatuna (`?adj=<JSON>`, #431).
 
-    Pööre on RENDERDUSPARAMEETER: brauser saab juba pööratud pildi, seega
-    kontaktlehe ja täisvaate joone-geomeetria ei tea pöördest midagi.
+    Pööre ja adjust on RENDERDUSPARAMEETRID: brauser saab valmis pildi, seega
+    kontaktlehe ja täisvaate joone-geomeetria ei tea neist midagi.
     """
     _load_prepress(upload_id)
     path = prepress.preview_path(upload_id, page_num)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404)
-    if rot:
-        try:
-            path = prepress.rotated_preview_path(
-                upload_id, page_num, prepress_plan.normalize_rotate(rot))
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+    try:
+        angle = prepress_plan.normalize_rotate(rot) if rot else 0
+        adjust = image_transform.normalize_adjust(json.loads(adj)) if adj else None
+        if adjust:
+            path = prepress.adjusted_preview_path(upload_id, page_num, angle, adjust)
+        elif angle:
+            path = prepress.rotated_preview_path(upload_id, page_num, angle)
+    except (ValueError, TypeError) as e:   # json.JSONDecodeError on ValueError
+        raise HTTPException(status_code=400, detail=str(e))
     return FileResponse(path, media_type="image/jpeg")
 
 
@@ -274,6 +281,14 @@ async def admin_prepress_save(upload_id: str, request: Request,
             "excluded": bool(entry.get("excluded")),
             "rotate": rotate,
         }
+        # adjust (#431) ainult siis, kui klient selle saatis: vanem klient
+        # (vahemälus JS deploy ajal) ei tohi olemasolevat kärbet pühkida.
+        if "adjust" in entry:
+            try:
+                clean[entry.get("n")]["adjust"] = image_transform.normalize_adjust(
+                    entry.get("adjust"))
+            except (ValueError, TypeError) as e:
+                raise HTTPException(status_code=400, detail=str(e))
 
     def _apply(plan):
         plan["default_split_x"] = default_x

@@ -21,6 +21,10 @@ mode: "default" = kasuta globaalset joont, "custom" = oma joon,
 "nosplit" = ära poolita (VAIKEVÄÄRTUS).
 rotate: 0 | 90 | 180 | 270, päripäeva. Mittedestruktiivne — apply pöörab
 renderdatud lehe ENNE lõikamist, seega `page_cuts` saab juba pööratud laiuse.
+adjust (valikuline, #431): {"angle", "crop", "quad"} — kalle, kärbe või
+perspektiiv PÖÖRATUD lehe raamis (sama leping nagu teose halduse
+`transform_page_image`). Järjekord apply's: pööre → adjust → poolitus, seega
+`split_x` on osa KOHANDATUD lehe laiusest. Puuduv väli = teisendust ei ole.
 """
 from typing import List, Optional, Tuple
 
@@ -197,3 +201,18 @@ def rotate_of(plan: Optional[dict], n: int) -> int:
             except ValueError:
                 return 0
     return 0
+
+
+def adjust_of(plan: Optional[dict], n: int) -> Optional[dict]:
+    """Lehe N kalle/kärbe/perspektiiv või None. Puuduv või vigane väli = None:
+    salvestus valideerib (`normalize_adjust`), siin ei tohi vana plaan apply't
+    kukutada."""
+    from ..image_transform import normalize_adjust
+
+    entry = _page_entry(plan, n)
+    if not entry:
+        return None
+    try:
+        return normalize_adjust(entry.get("adjust"))
+    except ValueError:
+        return None

@@ -142,7 +142,13 @@
       "headerNoSplit": "Page {{n}} of {{total}} · not split",
       "arrowHint": "← → moves between pages",
       "resetToGlobal": "Reset to global line",
-      "headerExcluded": "Page {{n}} of {{total}} · excluded"
+      "headerExcluded": "Page {{n}} of {{total}} · excluded",
+      "crop": "Crop / straighten",
+      "cropApply": "Confirm crop",
+      "cropCancel": "Cancel",
+      "cropRemove": "Remove crop",
+      "cropReplaces": "A new crop replaces the current one. Rotating removes the crop.",
+      "cropped": "cropped"
     },
     "excludedExplain": "Not OCR’d and not split — this page will not appear in the work",
     "waitingRender": "Preview is finishing — the button unlocks shortly ({{done}} / {{total}})"

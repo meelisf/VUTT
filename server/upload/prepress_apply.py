@@ -66,6 +66,9 @@ def can_copy_source_bytes(source, plan: Optional[dict], n: int, width: int) -> b
     # Pööratud pilt EI OLE identity-koopia.
     if prepress_plan.rotate_of(plan, n) != 0:
         return False
+    # Kärbitud/kallutatud pilt samuti mitte (#431).
+    if prepress_plan.adjust_of(plan, n) is not None:
+        return False
     if prepress_plan.page_cuts(plan, n, width) != [(0, width)]:
         return False
     try:
@@ -95,6 +98,23 @@ def _rotate_in_place(path: str, angle: int) -> None:
         im.rotate(-angle, expand=True).save(
             path, "JPEG", quality=page_source.JPEG_QUALITY
         )
+
+
+def _adjust_in_place(path: str, adjust: Optional[dict]) -> None:
+    """Rakendab kalde/kärpe/perspektiivi renderdatud lehele KOHAPEAL (#431).
+
+    Kutsutakse PÄRAST `_rotate_in_place`-i ja ENNE `page_cuts`-i: adjust on
+    pööratud lehe raamis ja poolitusjoon kohandatud lehe laiuses. Sama
+    teisendus (`image_transform`) nagu teose halduse pildiredaktoris.
+    """
+    if not adjust:
+        return
+    from PIL import Image
+    from ..image_transform import apply_adjust, rgb_or_gray as _rgb_or_gray
+
+    with Image.open(path) as im:
+        out = apply_adjust(_rgb_or_gray(im), adjust)
+    out.save(path, "JPEG", quality=page_source.JPEG_QUALITY)
 
 
 def _write_thumb(upload_id: str, thumbs_dir: str, out_index: int, src: str) -> None:
@@ -190,6 +210,7 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
             try:
                 # Pööre ENNE laiuse mõõtmist ja lõikamist — vt _rotate_in_place.
                 _rotate_in_place(full, prepress_plan.rotate_of(plan, n))
+                _adjust_in_place(full, prepress_plan.adjust_of(plan, n))
                 from PIL import Image
                 with Image.open(full) as im:
                     width = im.size[0]

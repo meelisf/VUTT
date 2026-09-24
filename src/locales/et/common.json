@@ -320,6 +320,12 @@
   "pagePrep": {
     "rotateLeft": "Pööra vasakule 90°",
     "rotateRight": "Pööra paremale 90°",
-    "rotate180": "Pööra 180°"
+    "rotate180": "Pööra 180°",
+    "deskew": "Peenhäälestus (kraadid)",
+    "perspective": "Perspektiiv",
+    "perspectiveReset": "Lähtesta perspektiivinurgad",
+    "cropReset": "Eemalda kärpekast ja unusta viimati kasutatud suurus",
+    "cropHint": "Lohista ristkülik; sangadest muuda suurust, seest liiguta, ülemisest nupust kalluta",
+    "perspectiveHint": "Aseta nurgad lehe nurkadesse. Pilt sirgestatakse ja lõigatakse nelinurga järgi mõõtu."
   }
 }
