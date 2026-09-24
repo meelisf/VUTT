@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUpDown, RefreshCw, Trash2, X, Loader2, Sparkles } from 'lucide-react';
+import FloatingActionBar from '../../components/pagePrep/FloatingActionBar';
 
 /**
  * Hõljuv alumine kontekstiriba manage-lehe lehekülgede tabis.
@@ -60,8 +61,7 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
   if (!hasSelection && !props.hasReorderChanges) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[1100] flex justify-center px-3 pb-3 pointer-events-none">
-      <div className="pointer-events-auto w-full max-w-4xl rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+    <FloatingActionBar className="overflow-hidden">
 
         {/* Kinnitus: kustutamine (avaneb riba kohale) */}
         {props.bulkDeleteConfirm && (
@@ -191,8 +191,7 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
             )}
           </div>
         )}
-      </div>
-    </div>
+    </FloatingActionBar>
   );
 };
 

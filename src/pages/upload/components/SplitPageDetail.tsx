@@ -1,8 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronLeft, ChevronRight, Columns2, Eye, EyeOff, FlipVertical2, LayoutGrid, RotateCcw, RotateCw } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Columns2, Eye, EyeOff, LayoutGrid } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
-import { clampSplitX, willSplit } from '../prepressPlan';
+import { willSplit } from '../prepressPlan';
+import { addRotation, clampSplitX } from '../../../components/pagePrep/geometry';
+import { useSplitDrag } from '../../../components/pagePrep/useSplitDrag';
+import SplitLine from '../../../components/pagePrep/SplitLine';
+import RotateButtons from '../../../components/pagePrep/RotateButtons';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 interface Props {
@@ -22,9 +26,8 @@ interface Props {
  * eemaldati: 100 DPI eelvaade näitab joone asukoha juba piisava täpsusega,
  * riba aga tõi kaasa oma endpointi, x-kvantimise ja ketta-vahemälu.
  *
- * Joon ja käepide järgivad TAHTLIKULT sama kuju nagu Manage-lehe poolitamine
- * (`PageImageEditorModal`) — sama žest peab mõlemas kohas ühtemoodi välja
- * nägema ja käituma, sh lohistuse kuulamine aknast (kursor tohib pildilt välja).
+ * Joon, käepide, lohistus ja pööramisnupud tulevad `components/pagePrep`-ist —
+ * samad osad kasutab Manage-lehe `PageImageEditorModal` (#431).
  */
 const SplitPageDetail: React.FC<Props> = ({
   uploadId, token, plan, pageNum, onPageChange, onNavigate, onClose,
@@ -35,7 +38,6 @@ const SplitPageDetail: React.FC<Props> = ({
     ? page.split_x
     : plan.default_split_x;
 
-  const [dragging, setDragging] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -71,20 +73,7 @@ const SplitPageDetail: React.FC<Props> = ({
   const setX = (x: number) =>
     onPageChange(pageNum, { mode: 'custom', split_x: clampSplitX(Number(x.toFixed(4))) });
 
-  // Ref hoiab värskeimat setX-i, et aknakuulajad ei tellitaks iga renderi peale
-  // uuesti (onPageChange on vanemas inline-arrow).
-  const setXRef = useRef(setX);
-  setXRef.current = setX;
-
-  const xFromClient = (clientX: number) => {
-    // Mõõda sündmuse hetkel: kerimine/akna muutus võib olekus oleva kasti
-    // vananenuks teha, ja vale x kirjutataks plaani.
-    const img = imgRef.current;
-    if (!img) return;
-    const rect = img.getBoundingClientRect();
-    if (!rect.width) return;
-    setXRef.current((clientX - rect.left) / rect.width);
-  };
+  const { startDrag, updateFromClientX } = useSplitDrag(imgRef, setX);
 
   // Pildi kasti mõõtmine: laadimisel, akna muutusel ja lehe vahetusel.
   // ResizeObserver katab ka modaali sisemised nihked (nupurea murdumine).
@@ -112,20 +101,6 @@ const SplitPageDetail: React.FC<Props> = ({
       window.removeEventListener('resize', measure);
     };
   }, [measure, pageNum]);
-
-  // Lohistus: kuula AKNAST, et kursor võiks väljuda pildi raamist
-  // (sama muster nagu PageImageEditorModal).
-  useEffect(() => {
-    if (!dragging) return;
-    const move = (e: MouseEvent) => xFromClient(e.clientX);
-    const up = () => setDragging(false);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    return () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-  }, [dragging]);
 
   // Klaviatuur: nooled vahetavad LEHTE (mitte joont), Escape sulgeb.
   // Sama leping nagu Manage-lehe pildiredaktoris — ära kaaperda nooli,
@@ -191,7 +166,7 @@ const SplitPageDetail: React.FC<Props> = ({
           <div
             ref={boxRef}
             className={`relative flex h-full w-full select-none touch-none items-center justify-center ${splits ? 'cursor-col-resize' : ''}`}
-            onPointerDown={(e) => { if (splits) xFromClient(e.clientX); }}
+            onPointerDown={(e) => { if (splits) updateFromClientX(e.clientX); }}
           >
             <img
               ref={imgRef}
@@ -201,34 +176,16 @@ const SplitPageDetail: React.FC<Props> = ({
               className="block max-h-full max-w-full object-contain"
               draggable={false}
             />
-            {/* Joon + käepide: sama kuju nagu Manage-lehe poolitamisel.
-                Nähtaval AINULT siis, kui leht päriselt poolitatakse, ja
-                paigutatud PILDI kasti järgi (vt imgBox) — muidu jookseks
-                joon letterboxi tühja alasse. */}
+            {/* Joon + käepide: nähtaval AINULT siis, kui leht päriselt
+                poolitatakse, ja paigutatud PILDI kasti järgi (vt imgBox). */}
             {splits && imgBox.width > 0 && (
-              <>
-                <div
-                  data-testid="detail-line"
-                  className="pointer-events-none absolute w-0.5 bg-red-500 opacity-90"
-                  style={{
-                    left: imgBox.left + liveX * imgBox.width,
-                    top: imgBox.top,
-                    height: imgBox.height,
-                  }}
-                />
-                <div
-                  data-testid="detail-handle"
-                  className="absolute flex h-10 w-5 -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded bg-red-500 shadow-md"
-                  style={{
-                    left: imgBox.left + liveX * imgBox.width,
-                    top: imgBox.top + imgBox.height / 2,
-                  }}
-                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
-                >
-                  <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
-                  <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
-                </div>
-              </>
+              <SplitLine
+                x={liveX}
+                box={imgBox}
+                onHandleDown={startDrag}
+                lineTestId="detail-line"
+                handleTestId="detail-handle"
+              />
             )}
 
             {!splits && imgBox.width > 0 && (
@@ -323,42 +280,16 @@ const SplitPageDetail: React.FC<Props> = ({
                   <Columns2 size={15} />
                   {noSplitMode ? t('step3split.card.split') : t('step3split.card.noSplit')}
                 </button>
-                {/* Pööre — samad ikoonid nagu PageImageEditorModal-is (§ tuttav
-                    žest). KOGUV: kaks klõpsu paremale = 180°. Pööre rakendub
+                {/* Pööre on KOGUV: kaks klõpsu paremale = 180°. Pööre rakendub
                     enne poolitamist, seega joon liigub pööratud pildiga kaasa. */}
-                <button
-                  type="button"
-                  data-testid="detail-rotate-left"
-                  title={t('step3split.bar.rotateLeft')}
-                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
-                  onClick={() => onPageChange(pageNum, {
-                    rotate: (((page.rotate ?? 0) - 90) % 360 + 360) % 360,
+                <RotateButtons
+                  onRotate={(delta) => onPageChange(pageNum, {
+                    rotate: addRotation(page.rotate ?? 0, delta),
                   })}
-                >
-                  <RotateCcw size={15} />
-                </button>
-                <button
-                  type="button"
-                  data-testid="detail-rotate-right"
-                  title={t('step3split.bar.rotateRight')}
-                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
-                  onClick={() => onPageChange(pageNum, {
-                    rotate: (((page.rotate ?? 0) + 90) % 360 + 360) % 360,
-                  })}
-                >
-                  <RotateCw size={15} />
-                </button>
-                <button
-                  type="button"
-                  data-testid="detail-rotate-180"
-                  title={t('step3split.bar.rotate180')}
-                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
-                  onClick={() => onPageChange(pageNum, {
-                    rotate: (((page.rotate ?? 0) + 180) % 360 + 360) % 360,
-                  })}
-                >
-                  <FlipVertical2 size={15} />
-                </button>
+                  buttonClassName="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
+                  iconSize={15}
+                  testIdPrefix="detail-rotate"
+                />
 
                 <button
                   type="button"

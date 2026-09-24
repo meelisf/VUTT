@@ -316,5 +316,10 @@
     },
     "unparsed": "The date is preserved as text, but no year can be derived for searching."
   },
-  "refresh": "Refresh"
+  "refresh": "Refresh",
+  "pagePrep": {
+    "rotateLeft": "Rotate left 90°",
+    "rotateRight": "Rotate right 90°",
+    "rotate180": "Rotate 180°"
+  }
 }

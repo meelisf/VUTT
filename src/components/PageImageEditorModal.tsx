@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Scissors, RotateCcw, RotateCw, FlipVertical2, Crop, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
+import { X, Scissors, Crop, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -10,6 +10,10 @@ import { computeNextAnchor, resolveIndexAfter } from '../utils/pageNavAnchor';
 import { resizeRotatedBox, CropHandle, CenterBox } from '../utils/cropBoxInteraction';
 import { rotatedCropToServerParams } from '../utils/rotatedCropParams';
 import { defaultQuad, quadFromCropRect, quadToDisplayPx, quadPtFromDisplayPx, Quad4 } from '../utils/perspectiveQuad';
+import { addRotation, clampSplitX } from './pagePrep/geometry';
+import { useSplitDrag } from './pagePrep/useSplitDrag';
+import SplitLine from './pagePrep/SplitLine';
+import RotateButtons from './pagePrep/RotateButtons';
 
 interface PageInfo {
   filename: string;
@@ -57,7 +61,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   const [restoring, setRestoring] = useState(false);
   const [skipConfirm, setSkipConfirm] = useState(false);
   const [dragging, setDragging] = useState(false);            // kärbe-interaktsioon aktiivne
-  const [splitDragging, setSplitDragging] = useState(false);  // poolitusjoone lohistus aktiivne
   const [replacing, setReplacing] = useState(false);          // pildi asendamine käib
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
@@ -304,7 +307,7 @@ const PageImageEditorModal: React.FC<Props> = ({
   // Jäme 90°/180° pööre rakendub PILDILE; kärbe/kalle lähtestatakse (display-raam muutub).
   // Perspektiivirežiimis lähtestatakse quad vaikenelinurgaks (me ei teisenda nurki).
   const rotateBy = (delta: number) => {
-    setGrossAngle((a) => ((a + delta) % 360 + 360) % 360);
+    setGrossAngle((a) => addRotation(a, delta));
     setCropRect(null);
     setCropDraft(null);
     setBoxAngle(0);
@@ -373,26 +376,11 @@ const PageImageEditorModal: React.FC<Props> = ({
     { id: 'w', style: { left: 0, top: '50%' }, cursor: 'ew-resize' },
   ];
 
-  // --- Split-lohistus (split-tab) ---
-  const updateSplitX = useCallback((clientX: number) => {
-    if (!splitContainerRef.current) return;
-    const rect = splitContainerRef.current.getBoundingClientRect();
-    const x = (clientX - rect.left) / rect.width;
-    setSplitX(Math.max(0.05, Math.min(0.95, x)));
-  }, []);
-
-  // Poolitusjoone lohistus: kuula AKNAST, et kursor võiks väljuda pildi raamist
-  useEffect(() => {
-    if (!splitDragging) return;
-    const move = (e: MouseEvent) => updateSplitX(e.clientX);
-    const up = () => setSplitDragging(false);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    return () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-  }, [splitDragging, updateSplitX]);
+  // --- Split-lohistus (split-tab) --- ühine upload'i ülevaatusega (#431)
+  const { startDrag: startSplitDrag } = useSplitDrag(
+    splitContainerRef,
+    useCallback((x: number) => setSplitX(clampSplitX(x)), []),
+  );
 
   // --- Navigeerimine ---
   const goTo = useCallback((idx: number) => {
@@ -752,15 +740,11 @@ const PageImageEditorModal: React.FC<Props> = ({
                   >
                     <GripHorizontal size={14} />
                   </div>
-                  <button onClick={() => rotateBy(-90)} title={t('manage.editor.rotateLeft')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
-                    <RotateCcw size={16} />
-                  </button>
-                  <button onClick={() => rotateBy(90)} title={t('manage.editor.rotateRight')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
-                    <RotateCw size={16} />
-                  </button>
-                  <button onClick={() => rotateBy(180)} title={t('manage.editor.rotate180')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
-                    <FlipVertical2 size={16} />
-                  </button>
+                  <RotateButtons
+                    onRotate={rotateBy}
+                    buttonClassName="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100"
+                    iconSize={16}
+                  />
                   <button
                     onClick={togglePerspective}
                     title={t('manage.editor.perspective')}
@@ -806,15 +790,11 @@ const PageImageEditorModal: React.FC<Props> = ({
                   draggable={false}
                   style={{ width: baseDispW, height: baseDispH }}
                 />
-                <div className="absolute top-0 bottom-0 w-0.5 bg-red-500 opacity-90 pointer-events-none" style={{ left: `${splitX * 100}%` }} />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-10 bg-red-500 rounded cursor-col-resize flex items-center justify-center shadow-md"
-                  style={{ left: `${splitX * 100}%` }}
-                  onMouseDown={(e) => { e.preventDefault(); setSplitDragging(true); }}
-                >
-                  <div className="w-0.5 h-6 bg-white/70 mx-0.5" />
-                  <div className="w-0.5 h-6 bg-white/70 mx-0.5" />
-                </div>
+                <SplitLine
+                  x={splitX}
+                  box={{ left: 0, top: 0, width: baseDispW, height: baseDispH }}
+                  onHandleDown={startSplitDrag}
+                />
               </div>
               )}
               </div>

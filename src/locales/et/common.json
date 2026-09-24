@@ -316,5 +316,10 @@
     },
     "unparsed": "Dateering säilib tekstina, kuid otsinguks ei saa sellest aastat tuletada."
   },
-  "refresh": "Värskenda"
+  "refresh": "Värskenda",
+  "pagePrep": {
+    "rotateLeft": "Pööra vasakule 90°",
+    "rotateRight": "Pööra paremale 90°",
+    "rotate180": "Pööra 180°"
+  }
 }

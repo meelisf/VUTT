@@ -1,4 +1,5 @@
 import { BookOpen, FolderInput, Tag, Users, X } from 'lucide-react';
+import FloatingActionBar from '../pagePrep/FloatingActionBar';
 
 interface DashboardBulkActionBarProps {
   selectedCount: number;
@@ -38,8 +39,7 @@ export default function DashboardBulkActionBar({
   if (selectedCount === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[1100] flex justify-center px-3 pb-3 pointer-events-none">
-      <div className="pointer-events-auto w-full max-w-4xl rounded-xl border border-gray-200 bg-white shadow-lg px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+    <FloatingActionBar className="px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-sm font-medium text-primary-800 shrink-0">
           {labels.selectedCount}
         </span>
@@ -104,7 +104,6 @@ export default function DashboardBulkActionBar({
           <X size={15} />
           {labels.clearSelection}
         </button>
-      </div>
-    </div>
+    </FloatingActionBar>
   );
 }

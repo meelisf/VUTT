@@ -1,4 +1,8 @@
 import type { PrepressPage, PrepressPlan } from './types';
+import { addRotation } from '../../components/pagePrep/geometry';
+
+// Poolitusjoone piir on ühine teose haldusega (#431).
+export { clampSplitX } from '../../components/pagePrep/geometry';
 
 /**
  * Muudab globaalset poolitusjoont. `custom` ja `nosplit` lehti EI puutu —
@@ -32,16 +36,6 @@ export function countOutputPages(plan: PrepressPlan): number {
     if (page.mode === 'custom' && page.split_x == null) return total + 1;
     return total + 2;
   }, 0);
-}
-
-/**
- * Hoiab poolitusjoone vahemikus, kus mõlemad pooled jäävad sisukaks.
- * Vastab backendi `page_cuts` servapiirangule (`max(1, min(width - 1, …))`),
- * ainult heldemalt — 5% servast pole kunagi õige poolituskoht.
- */
-export function clampSplitX(x: number): number {
-  if (!Number.isFinite(x)) return 0.5;
-  return Math.min(0.95, Math.max(0.05, x));
 }
 
 /**
@@ -170,6 +164,6 @@ export function rotatePages(
 ): PrepressPlan {
   return mapPages(plan, ns, (p) => ({
     ...p,
-    rotate: (((p.rotate ?? 0) + delta) % 360 + 360) % 360,
+    rotate: addRotation(p.rotate ?? 0, delta),
   }));
 }
