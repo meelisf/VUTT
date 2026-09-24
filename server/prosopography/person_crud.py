@@ -248,8 +248,9 @@ def _new_person_skeleton(data: dict, username: str) -> dict:
 
 
 def create_person(data: dict, username: str) -> dict:
-    """Madala taseme loomine (ilma ID-kontrolli ja ülevaatusmärketa) — ainult
-    create_person_checked ja testid kasutavad. Uus kood kutsub create_person_checked-i."""
+    """Madala taseme loomine (ilma ID-kontrolli ja ülevaatusmärketa). Praegused
+    kutsujad: `ensure_prosopo_for_entity` (kuni Task 7) ja testid — uus kood
+    kutsub `create_person_checked`-i."""
     sync_from_facade()
     person = _new_person_skeleton(data, username)
     os.makedirs(state.PROSOPOGRAPHY_DIR, exist_ok=True)
@@ -342,8 +343,9 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
 def _apply_card_update(person: dict, data: dict, now: str) -> None:
     """Kliendi kaardisisu rakendamine (update_person JA create_person_checked).
 
-    Viskab kliendi serverivälja, ankrud, pärandvälja; normaliseerib ID-d;
-    kinnitab tõlke; rikastab päritolukoha. Muteerib `person`-it.
+    Viskab kliendi saadetud serveriväljad, ankrud ja pärandvälja ära;
+    normaliseerib ID-d; kinnitab tõlke; rikastab päritolukoha. Muteerib
+    `person`-it.
     """
     for key in ("id", "created_at", "created_by", "schema_version",
                 "import_batch_ids", "merged_into") + SECRET_FIELDS:
@@ -667,18 +669,41 @@ def create_person_checked(*, username: str, created_via: str, name: Optional[str
     if card is not None and any(v is not None for v in (name, identifiers, aliases, note)):
         raise ValueError("card_and_fields")
 
+    # Kuju kontrollitakse ENNE ühtki muud tööd — vale kuju peab andma 400,
+    # mitte AttributeError'i (500) esimesel `.get`-kutsel.
+    if card is not None and not isinstance(card, dict):
+        raise ValueError("invalid_card")
+    if card is not None and card.get("name") is not None and not isinstance(card["name"], dict):
+        raise ValueError("invalid_card")
+    if identifiers is not None and (
+            not isinstance(identifiers, list) or not all(isinstance(i, dict) for i in identifiers)):
+        raise ValueError("invalid_identifiers")
+    if aliases is not None and (
+            not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases)):
+        raise ValueError("invalid_aliases")
+
     now = datetime.now(timezone.utc).isoformat()
     if card is not None:
-        label = ((card.get("name") or {}).get("label") or "").strip()
+        card_data = strip_server_fields(dict(card))
+        card_name = card_data.get("name")
+        label = ((card_name or {}).get("label") or "").strip()
+        if not label:
+            raise ValueError("name_required")
+        if isinstance(card_name, dict):
+            # Trimmitud silt salvestatakse kaardile tagasi — muidu jõuaks
+            # tühikutega ümbritsetud nimi salvestusse (spekk §4.2).
+            card_data["name"] = {**card_name, "label": label}
         person = _new_person_skeleton({"name": label}, username)
-        _apply_card_update(person, strip_server_fields(dict(card)), now)
+        _apply_card_update(person, card_data, now)
+        person["updated_at"] = now
+        person["updated_by"] = username
     else:
         label = (name or "").strip()
+        if not label:
+            raise ValueError("name_required")
         person = _new_person_skeleton({"name": label, "notes": note}, username)
         person["identifiers"] = _normalize_identifiers(identifiers or [])
         person["name"]["aliases"] = [a for a in dict.fromkeys(aliases or []) if a and a != label]
-    if not (person.get("name") or {}).get("label"):
-        raise ValueError("name_required")
 
     enrichable = any(isinstance(i, dict) and i.get("scheme") in ENRICH_SCHEMES
                      for i in person.get("identifiers") or [])

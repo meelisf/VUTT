@@ -41,11 +41,51 @@ def test_vormi_card_uhe_sammuga_ja_serveriväljad_maha(prosopo_env, ajastatud):
     p = person_crud.create_person_checked(username="u", created_via="form", card={
         "name": {"label": "X", "aliases": []}, "gender": "M", "notes": "n",
         "identifiers": [{"scheme": "gnd", "id": "GND:5"}],
-        "review": {"state": "done"}, "id": "vutt:Phack", "created_by": "keegi"})
+        "review": {"state": "done"}, "id": "vutt:Phack", "created_by": "keegi",
+        "updated_at": "1999-01-01T00:00:00+00:00", "updated_by": "keegi"})
     kaart = prosopo_env.read(p["id"].removeprefix("vutt:P"))
     assert kaart["gender"] == "M" and kaart["identifiers"][0]["id"] == "5"
     assert kaart["review"]["state"] == "pending" and kaart["created_by"] == "u"
     assert p["id"] != "vutt:Phack"
+    assert kaart["updated_by"] == "u"
+    assert kaart["updated_at"] != "1999-01-01T00:00:00+00:00"
+
+
+def test_card_vigane_kuju_on_viga(prosopo_env):
+    with pytest.raises(ValueError, match="invalid_card"):
+        person_crud.create_person_checked(username="u", created_via="form", card="x")
+
+
+def test_card_nimi_stringina_on_viga(prosopo_env):
+    with pytest.raises(ValueError, match="invalid_card"):
+        person_crud.create_person_checked(username="u", created_via="form",
+                                          card={"name": "X"})
+
+
+def test_identifiers_vigane_kuju_on_viga(prosopo_env):
+    with pytest.raises(ValueError, match="invalid_identifiers"):
+        person_crud.create_person_checked(username="u", created_via="picker", name="X",
+                                          identifiers="Q1")
+
+
+def test_aliases_vigane_kuju_on_viga(prosopo_env):
+    with pytest.raises(ValueError, match="invalid_aliases"):
+        person_crud.create_person_checked(username="u", created_via="picker", name="X",
+                                          aliases=[["a"]])
+
+
+def test_route_400_vigane_card(client, login, prosopo_env):
+    token = login("editor", "editorpass")
+    r = client.post("/prosopography/persons/create",
+                     json={"card": {"name": "X"}, "created_via": "form"},
+                     headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 400
+
+
+def test_card_nimi_tuhjaks_trimmitud_on_name_required(prosopo_env):
+    with pytest.raises(ValueError, match="name_required"):
+        person_crud.create_person_checked(username="u", created_via="form",
+                                          card={"name": {"label": "   "}})
 
 
 def test_card_ja_tipuvali_korraga_on_viga(prosopo_env):
