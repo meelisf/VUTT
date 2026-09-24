@@ -31,6 +31,8 @@ export interface CandidateSummary {
   occupations: { id: string | null; label: string }[];
   url: string;
   links: Partial<Record<SourceScheme, string>>;
+  /** Wikidata täistekstiotsing toob ka mitte-isikuid (P31≠Q5); GND/VIAF on isik-ainult (alati true). */
+  is_human?: boolean;
 }
 
 export interface CandidateResult {
