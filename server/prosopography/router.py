@@ -15,7 +15,7 @@ from ..config import get_logger
 from ..entity_labels_ops import enrich_entity_labels_from_person_async
 from .person_crud import (
     get_person,
-    create_person,
+    create_person_checked,
     update_person,
     add_identifier,
     apply_enrichment,
@@ -385,14 +385,46 @@ async def prosopography_translate(
     return {"status": "ok", "text": tolge, "usage": usage}
 
 
+_ALLOWED_CREATED_VIA = ("picker", "form")
+
+
+@router.post("/persons/create")
+async def prosopography_create_checked(request: Request, user=Depends(require_role("editor"))):
+    """Isiku loomine ühe sammuga (spekk §4.2): paneel saadab tipuväljad, vorm `card`-i."""
+    data = await request.json()
+    created_via = data.get("created_via") if data.get("created_via") in _ALLOWED_CREATED_VIA else "form"
+    try:
+        person = await run_in_threadpool(
+            lambda: create_person_checked(
+                username=user["username"], created_via=created_via,
+                name=data.get("name"), identifiers=data.get("identifiers"),
+                aliases=data.get("aliases"), note=data.get("note"),
+                card=data.get("card"), context=data.get("context")))
+    except IdentifierConflict as e:
+        raise _identifier_conflict_http(e)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    enrich_entity_labels_from_person_async(person)
+    return person
+
+
 @router.post("")
 async def prosopography_create(
     request: Request,
     user=Depends(require_role("editor")),
 ):
-    """Loob uue vutt:P kirje."""
+    """Loob uue vutt:P kirje (vana tee — delegeerib create_person_checked-ile)."""
     data = await request.json()
-    person = await run_in_threadpool(create_person, data, username=user["username"])
+    try:
+        person = await run_in_threadpool(
+            lambda: create_person_checked(
+                username=user["username"], created_via="form",
+                name=data.get("name"), identifiers=data.get("identifiers"),
+                note=data.get("notes")))
+    except IdentifierConflict as e:
+        raise _identifier_conflict_http(e)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     enrich_entity_labels_from_person_async(person)
     return person
 

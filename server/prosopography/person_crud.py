@@ -195,13 +195,11 @@ def get_person(person_id: str) -> Optional[dict]:
     return person
 
 
-def create_person(data: dict, username: str) -> dict:
-    """Loob uue prosopograafia kirje."""
-    sync_from_facade()
+def _new_person_skeleton(data: dict, username: str) -> dict:
+    """Uue kaardi põhi (ei salvesta). Väljade kuju on sama mis create_person-il."""
     nanoid = state.generate_nanoid()
     person_id = f"vutt:P{nanoid}"
     now = datetime.now(timezone.utc).isoformat()
-
     person = {
         "id": person_id,
         "identifiers": _normalize_identifiers(data.get("identifiers", [])),
@@ -246,13 +244,19 @@ def create_person(data: dict, username: str) -> dict:
         "image_url": None,
         "source_data": {},
     }
+    return person
 
+
+def create_person(data: dict, username: str) -> dict:
+    """Madala taseme loomine (ilma ID-kontrolli ja ülevaatusmärketa) — ainult
+    create_person_checked ja testid kasutavad. Uus kood kutsub create_person_checked-i."""
+    sync_from_facade()
+    person = _new_person_skeleton(data, username)
     os.makedirs(state.PROSOPOGRAPHY_DIR, exist_ok=True)
-    name = (person.get("name") or {}).get("label") or person_id
-    # Täida inline labels registrist (self-healing), et EN-UI ei kuvaks ET-silte
     fill_person_labels_from_registry(person)
-    with person_lock(person_id):
-        _save_person_locked(person, username, f"Prosopo loomine: {name} [{person_id}]")
+    name = (person.get("name") or {}).get("label") or person["id"]
+    with person_lock(person["id"]):
+        _save_person_locked(person, username, f"Prosopo loomine: {name} [{person['id']}]")
     _indices()._update_index_entry(person)
     _indices()._update_aliases_entry(person)
     return person
@@ -335,6 +339,64 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
         sync_work_to_meilisearch_async(dir_name)
 
 
+def _apply_card_update(person: dict, data: dict, now: str) -> None:
+    """Kliendi kaardisisu rakendamine (update_person JA create_person_checked).
+
+    Viskab kliendi serverivälja, ankrud, pärandvälja; normaliseerib ID-d;
+    kinnitab tõlke; rikastab päritolukoha. Muteerib `person`-it.
+    """
+    for key in ("id", "created_at", "created_by", "schema_version",
+                "import_batch_ids", "merged_into") + SECRET_FIELDS:
+        data.pop(key, None)
+
+    # Ankur on SERVERI TULETIS: kliendi saadetu visatakse alati ära, nagu
+    # `id` ja `created_at`. Lubadus, et uus frontend seda ei saada, ei ole
+    # kaitse (spekk, „Avaliku API üleminek").
+    for key in ANCHOR_FIELDS:
+        data.pop(key, None)
+
+    # Kinnitusruut („Vastab eestikeelsele tekstile"). Ajutine võti — kaardile
+    # ei jõua. Väärtus on sihtväljade loend: `biography_en` tähendab, et
+    # kinnitatakse `biography_en` vastavust `biography_et`-le.
+    confirm = data.pop("_confirm_translation", None) or []
+
+    # Pärandväli: vana avatud vorm saadab `biography` tagasi ja tekitaks
+    # välja uuesti ka pärast migratsiooni passi B.
+    if LEGACY_BIOGRAPHY in data:
+        saadetud = data.pop(LEGACY_BIOGRAPHY)
+        salvestatud = person.get(LEGACY_BIOGRAPHY)
+        if (saadetud or None) != (salvestatud or None):
+            # Vaikne teisendus `biography_et`-sse võiks üle kirjutada teksti,
+            # mida uus vorm vahepeal muutis — seepärast 409, mitte parandus.
+            raise ValueError("legacy_biography_changed")
+
+    if "identifiers" in data:
+        data["identifiers"] = _normalize_identifiers(data["identifiers"])
+    person.update(data)
+
+    # Ankur on serveri tuletis: räsi arvutatakse SIIN, salvestatava seisu
+    # pealt. Klient räsi ei saada (vt ANCHOR pop ülal).
+    for field in (BIOGRAPHY_ET, BIOGRAPHY_EN):
+        anchor_field = ANCHOR_OF[field]
+        if field in confirm:
+            source_text = (person.get(ANCHOR_SOURCE[anchor_field]) or "").strip()
+            if not source_text:
+                raise ValueError("confirm_without_source")
+            person[anchor_field] = {"hash": text_hash(source_text), "at": now}
+        elif not (person.get(field) or "").strip():
+            # Tühjaks jäänud tekstil ei ole midagi kinnitada — jäänud ankur
+            # tekitaks hoiatuse tekstile, mida ei ole.
+            person[anchor_field] = None
+
+    origin = person.get("origin") or {}
+    if origin.get("place"):
+        try:
+            person["origin"] = state._enrich_origin_from_places(origin)
+        except ValueError:
+            state.logger.warning("Tundmatu päritolukoht: %r — place tühjendatakse", origin.get("place"))
+            person["origin"] = {**origin, "place": None, "place_id": None, "place_labels": None}
+
+
 def update_person(person_id: str, data: dict, username: str) -> dict:
     """Uuendab isiku kirjet optimistliku konkurentsikontrolliga."""
     sync_from_facade()
@@ -356,62 +418,17 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
         old_label = (person.get("name") or {}).get("label") or ""
 
         now = datetime.now(timezone.utc).isoformat()
-        for key in ("id", "created_at", "created_by", "schema_version",
-                    "import_batch_ids", "merged_into") + SECRET_FIELDS:
-            data.pop(key, None)
-
-        # Ankur on SERVERI TULETIS: kliendi saadetu visatakse alati ära, nagu
-        # `id` ja `created_at`. Lubadus, et uus frontend seda ei saada, ei ole
-        # kaitse (spekk, „Avaliku API üleminek").
-        for key in ANCHOR_FIELDS:
-            data.pop(key, None)
-
-        # Kinnitusruut („Vastab eestikeelsele tekstile"). Ajutine võti — kaardile
-        # ei jõua. Väärtus on sihtväljade loend: `biography_en` tähendab, et
-        # kinnitatakse `biography_en` vastavust `biography_et`-le.
-        confirm = data.pop("_confirm_translation", None) or []
-
-        # Pärandväli: vana avatud vorm saadab `biography` tagasi ja tekitaks
-        # välja uuesti ka pärast migratsiooni passi B.
-        if LEGACY_BIOGRAPHY in data:
-            saadetud = data.pop(LEGACY_BIOGRAPHY)
-            salvestatud = person.get(LEGACY_BIOGRAPHY)
-            if (saadetud or None) != (salvestatud or None):
-                # Vaikne teisendus `biography_et`-sse võiks üle kirjutada teksti,
-                # mida uus vorm vahepeal muutis — seepärast 409, mitte parandus.
-                raise ValueError("legacy_biography_changed")
 
         if "identifiers" in data:
-            data["identifiers"] = _normalize_identifiers(data["identifiers"])
+            normalized = _normalize_identifiers(data["identifiers"])
             # Ainult LISANDUNUD ID-d: pärandduplikaat (sama AA kahel kaardil)
             # ei tohi kaardi tavasalvestust blokeerida.
             _check_identifiers_free(
-                person_id, _added_identifiers(person.get("identifiers"), data["identifiers"]))
-        person.update(data)
+                person_id, _added_identifiers(person.get("identifiers"), normalized))
+
+        _apply_card_update(person, data, now)
         person["updated_at"] = now
         person["updated_by"] = username
-
-        # Ankur on serveri tuletis: räsi arvutatakse SIIN, salvestatava seisu
-        # pealt. Klient räsi ei saada (vt ANCHOR pop ülal).
-        for field in (BIOGRAPHY_ET, BIOGRAPHY_EN):
-            anchor_field = ANCHOR_OF[field]
-            if field in confirm:
-                source_text = (person.get(ANCHOR_SOURCE[anchor_field]) or "").strip()
-                if not source_text:
-                    raise ValueError("confirm_without_source")
-                person[anchor_field] = {"hash": text_hash(source_text), "at": now}
-            elif not (person.get(field) or "").strip():
-                # Tühjaks jäänud tekstil ei ole midagi kinnitada — jäänud ankur
-                # tekitaks hoiatuse tekstile, mida ei ole.
-                person[anchor_field] = None
-
-        origin = person.get("origin") or {}
-        if origin.get("place"):
-            try:
-                person["origin"] = state._enrich_origin_from_places(origin)
-            except ValueError:
-                state.logger.warning("Tundmatu päritolukoht: %r — place tühjendatakse", origin.get("place"))
-                person["origin"] = {**origin, "place": None, "place_id": None, "place_labels": None}
 
         name = (person.get("name") or {}).get("label") or person_id
         # Täida inline labels registrist (self-healing), et EN-UI ei kuvaks ET-silte
@@ -617,6 +634,72 @@ def restore_person(person_id: str, restored: dict, username: str) -> dict:
     return restored
 
 
+_enrichment_scheduler = lambda person_id: None  # noqa: E731 — Task 6 registreerib
+
+
+def set_enrichment_scheduler(fn) -> None:
+    """auto_enrich_runner registreerib käivitusel; testid asendavad."""
+    global _enrichment_scheduler
+    _enrichment_scheduler = fn
+
+
+def _has_similar_name(label: str, exclude: Optional[str] = None) -> bool:
+    """Nimepõhine sarnasus (sama mis vormi SimilarPersonsWarning). Server otsustab
+    ise — kliendi väidet `possible_duplicate` kohta ei usaldata (spekk §4.2)."""
+    from .person_search import list_persons
+    if len((label or "").strip()) < 3:
+        return False
+    res = list_persons(q=label.strip(), limit=5)
+    return any(r.get("id") != exclude and r.get("record_status") != "tombstone"
+               for r in res.get("results") or [])
+
+
+def create_person_checked(*, username: str, created_via: str, name: Optional[str] = None,
+                          identifiers: Optional[list] = None, aliases: Optional[list] = None,
+                          note: Optional[str] = None, card: Optional[dict] = None,
+                          context: Optional[dict] = None) -> dict:
+    """Uue kaardi AINUS loomistee (spekk §4.2): üks allikas (card VÕI tipuväljad),
+    lõplik kaart enne kontrolli, ID-lukk üle kontrolli + salvestuse, ülevaatusmärge,
+    rikastus järjekorda alles pärast salvestust."""
+    from .auto_enrich import ENRICH_SCHEMES, new_review
+
+    sync_from_facade()
+    if card is not None and any(v is not None for v in (name, identifiers, aliases, note)):
+        raise ValueError("card_and_fields")
+
+    now = datetime.now(timezone.utc).isoformat()
+    if card is not None:
+        label = ((card.get("name") or {}).get("label") or "").strip()
+        person = _new_person_skeleton({"name": label}, username)
+        _apply_card_update(person, strip_server_fields(dict(card)), now)
+    else:
+        label = (name or "").strip()
+        person = _new_person_skeleton({"name": label, "notes": note}, username)
+        person["identifiers"] = _normalize_identifiers(identifiers or [])
+        person["name"]["aliases"] = [a for a in dict.fromkeys(aliases or []) if a and a != label]
+    if not (person.get("name") or {}).get("label"):
+        raise ValueError("name_required")
+
+    enrichable = any(isinstance(i, dict) and i.get("scheme") in ENRICH_SCHEMES
+                     for i in person.get("identifiers") or [])
+    person["review"] = new_review(created_via=created_via, context=context,
+                                  has_enrichable_ids=enrichable,
+                                  possible_duplicate=_has_similar_name(label))
+    os.makedirs(state.PROSOPOGRAPHY_DIR, exist_ok=True)
+    fill_person_labels_from_registry(person)
+    with ext_id_claim_lock:
+        # Kontroll käib just salvestatavate (normaliseeritud) ID-de peal.
+        _check_identifiers_free(None, person.get("identifiers") or [])
+        with person_lock(person["id"]):
+            _save_person_locked(person, username,
+                                f"Prosopo loomine: {label} [{person['id']}]")
+    _indices()._update_index_entry(person)
+    _indices()._update_aliases_entry(person)
+    if enrichable:
+        _enrichment_scheduler(person["id"])
+    return person
+
+
 def _find_by_external_id(scheme: str, ext_id: str) -> Optional[dict]:
     """Otsib prosopo kaarti välise identifikaatori (scheme + id) järgi.
 
@@ -787,4 +870,4 @@ def bulk_update_occupation(
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 
 
-__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_make_date_obj', '_propagate_name_to_works', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation', 'SERVER_FIELDS', 'strip_server_fields']
+__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_new_person_skeleton', '_make_date_obj', '_propagate_name_to_works', '_apply_card_update', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation', 'SERVER_FIELDS', 'strip_server_fields', 'create_person_checked', 'set_enrichment_scheduler', '_has_similar_name']
