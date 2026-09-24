@@ -13,6 +13,8 @@ import { listPersons } from '../prosopography/services/prosopographyService';
 import type { ProsopoIndexEntry } from '../prosopography/types';
 import PersonAddPanel from '../prosopography/components/PersonAddPanel';
 import { normalizeExtId } from '../prosopography/utils/externalIds';
+import { useUser } from '../contexts/UserContext';
+import { isAtLeast } from '../utils/roleUtils';
 
 interface SuggestionItem {
   label: string;
@@ -91,6 +93,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   personContext,
 }) => {
   const { t, i18n } = useTranslation('common');
+  const { user } = useUser();
+  // I1: token üksi ei tähenda "tohib luua" — contributor'il on token
+  // PageTagsPanel'i tarbeks (showPersonToggle + valik), aga /candidates ja
+  // isiku loomine nõuavad serveris vähemalt editor rolli.
+  const canCreatePerson = !!token && isAtLeast(user?.role, 'editor');
   const panelLang: 'et' | 'en' = i18n.language.startsWith('en') ? 'en' : 'et';
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -380,8 +387,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
   const handleSelect = async (result: Suggestion) => {
     // Person-režiimis avab välise tulemuse klikk isikupaneeli fokuseeritud viitega —
-    // paneel on nüüd ainus isiku loomise/valimise tee valijast (PR 3).
-    if (isPersonSearch && token && !result.id.startsWith('local-') && !(result.isLocal && !/^Q\d+$/.test(result.id))) {
+    // paneel on nüüd isiku loomise/valimise tee valijast (PR 3), aga AINULT
+    // editor+ jaoks (I1). Contributor'i klikk lingib välise kirje otse, nagu
+    // enne PR 1-t — paneel/loomine jääks talle niikuinii 401-ks.
+    if (isPersonSearch && canCreatePerson && !result.id.startsWith('local-') && !(result.isLocal && !/^Q\d+$/.test(result.id))) {
       justSelectedRef.current = true;
       let scheme: 'wikidata' | 'gnd' | 'viaf';
       let rawId: string;
@@ -695,8 +704,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                   </>
                 )}
 
-                {/* Lisa isik — avab isikupaneeli samal lehel (PR 3, task 6) */}
-                {token && (
+                {/* Lisa isik — avab isikupaneeli samal lehel (PR 3, task 6); editor+ (I1) */}
+                {canCreatePerson && (
                   <button
                     type="button"
                     onMouseDown={() => { justSelectedRef.current = true; }}
@@ -831,7 +840,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           </div>
         </div>
       )}
-      {personPanel && token && createPortal(
+      {personPanel && canCreatePerson && token && createPortal(
         <PersonAddPanel
           initialQuery={inputValue}
           token={token}
