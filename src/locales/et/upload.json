@@ -120,10 +120,7 @@
       "include": "Lisa OCR-i",
       "clear": "Tühista valik",
       "shiftHint": "Shift+klõps valib vahemiku",
-      "splitResult": "{{applied}} lehte sai üldjoone, {{kept}} käsitsi seatut jäi puutumata",
-      "rotateLeft": "Pööra vasakule",
-      "rotateRight": "Pööra paremale",
-      "rotate180": "Pööra 180°"
+      "splitResult": "{{applied}} lehte sai üldjoone, {{kept}} käsitsi seatut jäi puutumata"
     },
     "splitAll": "Poolita kõik",
     "clearGlobalSplit": "Eemalda üldpoolitus",
@@ -145,7 +142,13 @@
       "headerNoSplit": "Lk {{n}} · {{total}}-st · ei poolitata",
       "arrowHint": "← → liigub lehtede vahel",
       "resetToGlobal": "Lähtesta üldjoonele",
-      "headerExcluded": "Lk {{n}} · {{total}}-st · jäetakse välja"
+      "headerExcluded": "Lk {{n}} · {{total}}-st · jäetakse välja",
+      "crop": "Kärbi / sirgesta",
+      "cropApply": "Kinnita kärbe",
+      "cropCancel": "Tühista",
+      "cropRemove": "Eemalda kärbe",
+      "cropReplaces": "Uus kärbe asendab praeguse. Pööramine eemaldab kärpe.",
+      "cropped": "kärbitud"
     },
     "excludedExplain": "Ei OCR-ita ega poolitata — seda lehte teosesse ei teki",
     "waitingRender": "Eelvaade lõpetab — nupp avaneb kohe ({{done}} / {{total}})"

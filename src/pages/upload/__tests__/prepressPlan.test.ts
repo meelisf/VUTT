@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adjustFromParams,
   applyDefaultSplitTo,
   applyGlobalSplit,
   clampSplitX,
@@ -13,6 +14,7 @@ import {
   setNoSplit,
   summarizePlan,
   willSplit,
+  withRotation,
 } from '../prepressPlan';
 import type { PrepressPlan } from '../types';
 
@@ -353,5 +355,53 @@ describe('rotatePages', () => {
   it('tühja valikuga ei muuda midagi', () => {
     const alg = plan();
     expect(rotatePages(alg, [], 90).pages).toEqual(alg.pages);
+  });
+});
+
+// --- Kärbe/kalle plaanis (#431) ---
+
+
+describe('withRotation', () => {
+  const kärbitud = {
+    n: 1, mode: 'nosplit' as const, split_x: null, excluded: false, rotate: 0,
+    adjust: { angle: 0, crop: { x: 0, y: 0, w: 0.5, h: 1 }, quad: null },
+  };
+
+  it('pööre eemaldab kärpe — see on eelmise pöörde raamis', () => {
+    expect(withRotation(kärbitud, 90)).toMatchObject({ rotate: 90, adjust: null });
+  });
+
+  it('sama nurk jätab kärpe alles', () => {
+    expect(withRotation(kärbitud, 0).adjust).toEqual(kärbitud.adjust);
+  });
+
+  it('rotatePages eemaldab kärpe ainult pööratud lehtedelt', () => {
+    const plan = {
+      default_split_x: 0.5, preview_status: 'ready', preview_done: 2, preview_cancel: false,
+      page_count: 2, output_page_count: 2, trivial: true, status: 'awaiting_split', ocr_model: 'print',
+      pages: [kärbitud, { ...kärbitud, n: 2 }],
+    } as unknown as Parameters<typeof rotatePages>[0];
+    const out = rotatePages(plan, [1], 90);
+    expect(out.pages[0].adjust).toBeNull();
+    expect(out.pages[1].adjust).toEqual(kärbitud.adjust);
+  });
+});
+
+describe('adjustFromParams', () => {
+  it('teisendusteta parameetrid → null (plaan ei kanna tühja kesta)', () => {
+    expect(adjustFromParams({ angle: 0, crop: null, quad: null })).toBeNull();
+    expect(adjustFromParams({ angle: 360, crop: null, quad: null })).toBeNull();
+  });
+
+  it('quad-punktid lähevad serveri [x, y] kujule', () => {
+    const q = [{ x: 0.1, y: 0.1 }, { x: 0.9, y: 0.1 }, { x: 0.9, y: 0.9 }, { x: 0.1, y: 0.9 }];
+    expect(adjustFromParams({ angle: 0, crop: null, quad: q })).toEqual({
+      angle: 0, crop: null, quad: [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]],
+    });
+  });
+
+  it('kärbe ja kalle säilivad', () => {
+    const crop = { x: 0.1, y: 0.2, w: 0.5, h: 0.6 };
+    expect(adjustFromParams({ angle: 358, crop, quad: null })).toEqual({ angle: 358, crop, quad: null });
   });
 });

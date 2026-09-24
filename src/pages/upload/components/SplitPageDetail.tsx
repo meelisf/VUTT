@@ -1,8 +1,14 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronLeft, ChevronRight, Columns2, Eye, EyeOff, FlipVertical2, LayoutGrid, RotateCcw, RotateCw } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Check, CircleX, Columns2, Crop, Eye, EyeOff, Frame, LayoutGrid } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
-import { clampSplitX, willSplit } from '../prepressPlan';
+import { adjustFromParams, willSplit, withRotation } from '../prepressPlan';
+import { addRotation, clampSplitX } from '../../../components/pagePrep/geometry';
+import { useSplitDrag } from '../../../components/pagePrep/useSplitDrag';
+import SplitLine from '../../../components/pagePrep/SplitLine';
+import RotateButtons from '../../../components/pagePrep/RotateButtons';
+import { useCropBox } from '../../../components/pagePrep/useCropBox';
+import CropOverlay from '../../../components/pagePrep/CropOverlay';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 interface Props {
@@ -22,9 +28,13 @@ interface Props {
  * eemaldati: 100 DPI eelvaade näitab joone asukoha juba piisava täpsusega,
  * riba aga tõi kaasa oma endpointi, x-kvantimise ja ketta-vahemälu.
  *
- * Joon ja käepide järgivad TAHTLIKULT sama kuju nagu Manage-lehe poolitamine
- * (`PageImageEditorModal`) — sama žest peab mõlemas kohas ühtemoodi välja
- * nägema ja käituma, sh lohistuse kuulamine aknast (kursor tohib pildilt välja).
+ * Joon, käepide, lohistus, pööramisnupud ja kärpekast tulevad
+ * `components/pagePrep`-ist — samad osad kasutab Manage-lehe
+ * `PageImageEditorModal` (#431).
+ *
+ * Kärpimisrežiim näitab KOHANDAMATA (ainult pööratud) eelvaadet ja kinnitus
+ * kirjutab plaani `adjust` välja; tavavaade näitab kohandatud eelvaadet, seega
+ * poolitusjoon asetub täpselt nagu apply lõikab (pööre → adjust → poolitus).
  */
 const SplitPageDetail: React.FC<Props> = ({
   uploadId, token, plan, pageNum, onPageChange, onNavigate, onClose,
@@ -35,7 +45,6 @@ const SplitPageDetail: React.FC<Props> = ({
     ? page.split_x
     : plan.default_split_x;
 
-  const [dragging, setDragging] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -49,6 +58,13 @@ const SplitPageDetail: React.FC<Props> = ({
    * `max-h-full max-w-full` korral ON img-elemendi kast juba renderdatud kast.
    */
   const [imgBox, setImgBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
+
+  // Kärpimisrežiim püsib lehtede vahel liikudes — nagu teose halduses saab
+  // sama suure kastiga (kleepuv suurus) järjest lehti läbi käia.
+  const [cropMode, setCropMode] = useState(false);
+  const crop = useCropBox(imgBox.width, imgBox.height, cropMode && imgBox.width > 0);
+  const resetCrop = crop.reset;
+  useEffect(() => { resetCrop(); }, [pageNum, cropMode, resetCrop]);
 
   // Kas seda lehte päriselt poolitatakse. Joon ja käepide EI TOHI olla nähtaval,
   // kui vastus on ei — muidu näitab vaade tegevust, mida ei toimu.
@@ -71,20 +87,7 @@ const SplitPageDetail: React.FC<Props> = ({
   const setX = (x: number) =>
     onPageChange(pageNum, { mode: 'custom', split_x: clampSplitX(Number(x.toFixed(4))) });
 
-  // Ref hoiab värskeimat setX-i, et aknakuulajad ei tellitaks iga renderi peale
-  // uuesti (onPageChange on vanemas inline-arrow).
-  const setXRef = useRef(setX);
-  setXRef.current = setX;
-
-  const xFromClient = (clientX: number) => {
-    // Mõõda sündmuse hetkel: kerimine/akna muutus võib olekus oleva kasti
-    // vananenuks teha, ja vale x kirjutataks plaani.
-    const img = imgRef.current;
-    if (!img) return;
-    const rect = img.getBoundingClientRect();
-    if (!rect.width) return;
-    setXRef.current((clientX - rect.left) / rect.width);
-  };
+  const { startDrag, updateFromClientX } = useSplitDrag(imgRef, setX);
 
   // Pildi kasti mõõtmine: laadimisel, akna muutusel ja lehe vahetusel.
   // ResizeObserver katab ka modaali sisemised nihked (nupurea murdumine).
@@ -113,20 +116,6 @@ const SplitPageDetail: React.FC<Props> = ({
     };
   }, [measure, pageNum]);
 
-  // Lohistus: kuula AKNAST, et kursor võiks väljuda pildi raamist
-  // (sama muster nagu PageImageEditorModal).
-  useEffect(() => {
-    if (!dragging) return;
-    const move = (e: MouseEvent) => xFromClient(e.clientX);
-    const up = () => setDragging(false);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    return () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-  }, [dragging]);
-
   // Klaviatuur: nooled vahetavad LEHTE (mitte joont), Escape sulgeb.
   // Sama leping nagu Manage-lehe pildiredaktoris — ära kaaperda nooli,
   // kui fookus on sisestusväljal.
@@ -137,11 +126,12 @@ const SplitPageDetail: React.FC<Props> = ({
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || role === 'slider') return;
       if (e.key === 'ArrowLeft') goTo(index - 1);
       else if (e.key === 'ArrowRight') goTo(index + 1);
-      else if (e.key === 'Escape') onClose();
+      // Kärpimisrežiimis viib Escape tagasi lehe vaatesse, mitte ülevaatesse.
+      else if (e.key === 'Escape') { if (cropMode) setCropMode(false); else onClose(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goTo, index, onClose]);
+  }, [goTo, index, onClose, cropMode]);
 
   if (!page) return null;
 
@@ -175,6 +165,11 @@ const SplitPageDetail: React.FC<Props> = ({
                 : t('step3split.detail.headerNoSplit', {
                   n: pageNum, total: plan.pages.length,
                 })}
+            {page?.adjust && (
+              <span data-testid="detail-cropped" className="ml-2 text-sm font-normal text-primary-700">
+                · {t('step3split.detail.cropped')}
+              </span>
+            )}
           </h3>
           <button
             type="button"
@@ -190,48 +185,46 @@ const SplitPageDetail: React.FC<Props> = ({
         <div className="min-h-0 flex-1 overflow-hidden p-4">
           <div
             ref={boxRef}
-            className={`relative flex h-full w-full select-none touch-none items-center justify-center ${splits ? 'cursor-col-resize' : ''}`}
-            onPointerDown={(e) => { if (splits) xFromClient(e.clientX); }}
+            className={`relative flex h-full w-full select-none touch-none items-center justify-center ${splits && !cropMode ? 'cursor-col-resize' : ''}`}
+            onPointerDown={(e) => { if (splits && !cropMode) updateFromClientX(e.clientX); }}
           >
             <img
               ref={imgRef}
-              src={prepressPreviewUrl(uploadId, pageNum, token, page?.rotate ?? 0)}
+              src={prepressPreviewUrl(
+                uploadId, pageNum, token, page?.rotate ?? 0,
+                cropMode ? null : page?.adjust ?? null,
+              )}
               alt={`${pageNum}`}
               onLoad={measure}
               className="block max-h-full max-w-full object-contain"
               draggable={false}
             />
-            {/* Joon + käepide: sama kuju nagu Manage-lehe poolitamisel.
-                Nähtaval AINULT siis, kui leht päriselt poolitatakse, ja
-                paigutatud PILDI kasti järgi (vt imgBox) — muidu jookseks
-                joon letterboxi tühja alasse. */}
-            {splits && imgBox.width > 0 && (
-              <>
-                <div
-                  data-testid="detail-line"
-                  className="pointer-events-none absolute w-0.5 bg-red-500 opacity-90"
-                  style={{
-                    left: imgBox.left + liveX * imgBox.width,
-                    top: imgBox.top,
-                    height: imgBox.height,
-                  }}
-                />
-                <div
-                  data-testid="detail-handle"
-                  className="absolute flex h-10 w-5 -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded bg-red-500 shadow-md"
-                  style={{
-                    left: imgBox.left + liveX * imgBox.width,
-                    top: imgBox.top + imgBox.height / 2,
-                  }}
-                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
-                >
-                  <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
-                  <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
-                </div>
-              </>
+            {/* Joon + käepide: nähtaval AINULT siis, kui leht päriselt
+                poolitatakse, ja paigutatud PILDI kasti järgi (vt imgBox). */}
+            {cropMode && imgBox.width > 0 && (
+              <div
+                data-testid="detail-crop-area"
+                className="absolute"
+                style={{
+                  left: imgBox.left, top: imgBox.top,
+                  width: imgBox.width, height: imgBox.height,
+                }}
+              >
+                <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />
+              </div>
             )}
 
-            {!splits && imgBox.width > 0 && (
+            {!cropMode && splits && imgBox.width > 0 && (
+              <SplitLine
+                x={liveX}
+                box={imgBox}
+                onHandleDown={startDrag}
+                lineTestId="detail-line"
+                handleTestId="detail-handle"
+              />
+            )}
+
+            {!cropMode && !splits && imgBox.width > 0 && (
               <div
                 data-testid="detail-nosplit-badge"
                 className="pointer-events-none absolute flex flex-col items-center justify-start gap-1 bg-white/40 pt-6"
@@ -306,6 +299,61 @@ const SplitPageDetail: React.FC<Props> = ({
               </button>
 
               <div className="ml-2 flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3">
+                {cropMode ? (
+                  <>
+                    {/* Kärpimisrežiim: samad tööriistad nagu teose halduse
+                        pildiredaktoris (common:pagePrep). */}
+                    <button
+                      type="button"
+                      data-testid="detail-perspective"
+                      onClick={crop.togglePerspective}
+                      title={t('common:pagePrep.perspective')}
+                      aria-pressed={crop.perspective}
+                      className={`rounded border p-2 ${crop.perspective ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
+                    >
+                      <Frame size={15} />
+                    </button>
+                    {crop.perspective && crop.quad && (
+                      <button type="button" onClick={crop.resetQuad} title={t('common:pagePrep.perspectiveReset')}
+                        className="rounded border border-gray-300 bg-white p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                        <CircleX size={15} />
+                      </button>
+                    )}
+                    {crop.cropRect && !crop.perspective && (
+                      <button type="button" onClick={crop.clearCrop} title={t('common:pagePrep.cropReset')}
+                        className="rounded border border-gray-300 bg-white p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                        <CircleX size={15} />
+                      </button>
+                    )}
+                    {crop.cropRect && !crop.perspective && Math.abs(crop.boxAngle) > 0.05 && (
+                      <span title={t('common:pagePrep.deskew')} className="text-xs tabular-nums text-gray-600">
+                        {crop.boxAngle.toFixed(1)}°
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      data-testid="detail-crop-apply"
+                      disabled={!crop.hasEdit}
+                      onClick={() => {
+                        onPageChange(pageNum, { adjust: adjustFromParams(crop.toServerParams(0)) });
+                        setCropMode(false);
+                      }}
+                      className="flex items-center gap-1.5 rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      <Check size={15} />
+                      {t('step3split.detail.cropApply')}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="detail-crop-cancel"
+                      onClick={() => setCropMode(false)}
+                      className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100"
+                    >
+                      {t('step3split.detail.cropCancel')}
+                    </button>
+                  </>
+                ) : (
+                  <>
                 <button
                   type="button"
                   data-testid="detail-nosplit"
@@ -323,42 +371,18 @@ const SplitPageDetail: React.FC<Props> = ({
                   <Columns2 size={15} />
                   {noSplitMode ? t('step3split.card.split') : t('step3split.card.noSplit')}
                 </button>
-                {/* Pööre — samad ikoonid nagu PageImageEditorModal-is (§ tuttav
-                    žest). KOGUV: kaks klõpsu paremale = 180°. Pööre rakendub
+                {/* Pööre on KOGUV: kaks klõpsu paremale = 180°. Pööre rakendub
                     enne poolitamist, seega joon liigub pööratud pildiga kaasa. */}
-                <button
-                  type="button"
-                  data-testid="detail-rotate-left"
-                  title={t('step3split.bar.rotateLeft')}
-                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
-                  onClick={() => onPageChange(pageNum, {
-                    rotate: (((page.rotate ?? 0) - 90) % 360 + 360) % 360,
-                  })}
-                >
-                  <RotateCcw size={15} />
-                </button>
-                <button
-                  type="button"
-                  data-testid="detail-rotate-right"
-                  title={t('step3split.bar.rotateRight')}
-                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
-                  onClick={() => onPageChange(pageNum, {
-                    rotate: (((page.rotate ?? 0) + 90) % 360 + 360) % 360,
-                  })}
-                >
-                  <RotateCw size={15} />
-                </button>
-                <button
-                  type="button"
-                  data-testid="detail-rotate-180"
-                  title={t('step3split.bar.rotate180')}
-                  className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
-                  onClick={() => onPageChange(pageNum, {
-                    rotate: (((page.rotate ?? 0) + 180) % 360 + 360) % 360,
-                  })}
-                >
-                  <FlipVertical2 size={15} />
-                </button>
+                <RotateButtons
+                  onRotate={(delta) => {
+                    // withRotation eemaldab kärpe: see on eelmise pöörde raamis.
+                    const next = withRotation(page, addRotation(page.rotate ?? 0, delta));
+                    onPageChange(pageNum, { rotate: next.rotate, adjust: next.adjust });
+                  }}
+                  buttonClassName="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
+                  iconSize={15}
+                  testIdPrefix="detail-rotate"
+                />
 
                 <button
                   type="button"
@@ -374,9 +398,40 @@ const SplitPageDetail: React.FC<Props> = ({
                   {excluded ? <EyeOff size={15} /> : <Eye size={15} />}
                   {excluded ? t('step3split.card.include') : t('step3split.card.exclude')}
                 </button>
+
+                {/* Kärbe/kalle/perspektiiv (#431). Värv näitab olekut: indigo =
+                    lehel on kinnitatud kärbe (must jääb „ei poolita / ei OCR-i"
+                    tähenduseks). */}
+                <button
+                  type="button"
+                  data-testid="detail-crop"
+                  aria-pressed={Boolean(page.adjust)}
+                  onClick={() => setCropMode(true)}
+                  className={`flex items-center gap-1.5 rounded border px-3 py-1 text-sm ${
+                    page.adjust
+                      ? 'border-indigo-600 bg-indigo-50 font-medium text-indigo-700'
+                      : 'border-gray-300'
+                  }`}
+                >
+                  <Crop size={15} />
+                  {t('step3split.detail.crop')}
+                </button>
+                {page.adjust && (
+                  <button
+                    type="button"
+                    data-testid="detail-crop-remove"
+                    onClick={() => onPageChange(pageNum, { adjust: null })}
+                    className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100"
+                  >
+                    {t('step3split.detail.cropRemove')}
+                  </button>
+                )}
+                  </>
+                )}
               </div>
             </div>
 
+            {!cropMode && (
             <button
               type="button"
               className={`rounded border px-3 py-1 text-sm ${
@@ -388,8 +443,16 @@ const SplitPageDetail: React.FC<Props> = ({
             >
               {t('step3split.detail.resetToGlobal')}
             </button>
+            )}
           </div>
-          <p className="mt-2 text-xs text-gray-500">{t('step3split.detail.arrowHint')}</p>
+          <p className="mt-2 text-xs text-gray-500">
+            {cropMode
+              ? <>
+                {crop.perspective ? t('common:pagePrep.perspectiveHint') : t('common:pagePrep.cropHint')}
+                {' '}{t('step3split.detail.cropReplaces')}
+              </>
+              : t('step3split.detail.arrowHint')}
+          </p>
         </div>
       </div>
     </div>

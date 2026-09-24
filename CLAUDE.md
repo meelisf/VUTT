@@ -361,6 +361,12 @@ nullib) ja seda kontrollitakse IGA lehe alguses — apply ja eelvaade jagavad
 `RENDER_SEMAPHORE(1)`-i. Renderdaja tohib staatust lähtestada ainult siis, kui ta on
 selle omanik (`_reset_status_if_prepping`), muidu lubaks ta teise apply CAS-i sisse.
 
+**Lehe teisendus (ADR 0049)** — kalle/kärbe/perspektiiv käib AINULT
+`server/image_transform.py` kaudu (teose haldus JA upload'i prepress); UI osad
+`src/components/pagePrep/`. Upload'i apply järjekord: **pööre → `adjust` → poolitus**;
+pööre eemaldab `adjust`-i (`withRotation`). Plaani salvestuses puuduv `adjust` võti =
+ära puutu, ainult `null` eemaldab. Eelvaade saab `adjust`-i URL-ist (`?adj=`), mitte plaanist.
+
 **Kaugkoristus (ADR 0024)** — katkestamine kustutab OCR-serveris ainult **failid**
 (`ocr_client.cleanup_run_files`), kataloog jääb alles: `rm -rf`/`rmdir` lennusoleva batchi
 alt annab OCR-valvuri veakäsitluseta `.txt`-kirjutusele `FileNotFoundError`, mis kukutab

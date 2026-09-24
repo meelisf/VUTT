@@ -3,6 +3,7 @@ import { apiDelete, apiGet, apiPost, ApiError } from '../../services/apiClient';
 import { getAuthHeaders } from '../../utils/fetchWithTimeout';
 import type {
   PollResult,
+  PageAdjust,
   PrepressPlan,
   PrepressSaveResult,
   UploadCreateResponse,
@@ -518,7 +519,11 @@ export async function applyPrepressWithRecovery(
  *  muutub `src` string pöörde muutumisel iseenesest (ei vaja cache-bust'i). */
 export function prepressPreviewUrl(
   uploadId: string, n: number, token: string | null, rotate = 0,
+  adjust: PageAdjust | null = null,
 ): string {
   const rot = rotate ? `&rot=${rotate}` : '';
-  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}${rot}`;
+  // adjust käib URL-is, mitte plaanist: pilt on siis deterministlik ja
+  // salvestamata muudatus ei jäta brauseri vahemällu valet pilti (#431).
+  const adj = adjust ? `&adj=${encodeURIComponent(JSON.stringify(adjust))}` : '';
+  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}${rot}${adj}`;
 }

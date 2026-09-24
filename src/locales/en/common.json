@@ -316,5 +316,16 @@
     },
     "unparsed": "The date is preserved as text, but no year can be derived for searching."
   },
-  "refresh": "Refresh"
+  "refresh": "Refresh",
+  "pagePrep": {
+    "rotateLeft": "Rotate left 90°",
+    "rotateRight": "Rotate right 90°",
+    "rotate180": "Rotate 180°",
+    "deskew": "Fine-tune (degrees)",
+    "perspective": "Perspective",
+    "perspectiveReset": "Reset perspective corners",
+    "cropReset": "Remove crop box and forget last used size",
+    "cropHint": "Drag a rectangle; resize from handles, move from inside, tilt from the top knob",
+    "perspectiveHint": "Place the corners on the page corners. The image will be straightened and cropped to the quadrilateral."
+  }
 }

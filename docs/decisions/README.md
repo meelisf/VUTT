@@ -68,3 +68,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0046](0046-sessioon-on-oiguste-ainus-tode.md) | Sessioon on kutsuja õiguste ainus tõde (iga õigusvälja kirjutus katkestab sessiooni); tokenit loeb ainult `deps.py` | kehtib |
 | [0047](0047-jatkatav-uleslaadimine.md) | Üksikfail laetakse üles tükkidena; jätkamise tõde on kettal olev baitide arv, uut upload'i staatust ei ole | kehtib |
 | [0048](0048-ulevaatusmarge-on-serveri-vali.md) | Ülevaatusmärge on serveri väli; automaatrikastus täidab ainult tühja; väline ID ühel kaardil | kehtib |
+| [0049](0049-lehe-teisendus-on-uks-tee.md) | Lehe teisendus on üks tee (`image_transform` + `components/pagePrep`); upload'is pööre → kärbe → poolitus | kehtib |

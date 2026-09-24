@@ -223,3 +223,19 @@ describe('uploadApi failide üleslaadimine', () => {
     await expect(promise).rejects.toBeInstanceOf(ApiError);
   });
 });
+
+describe('prepressPreviewUrl (#431)', () => {
+  it('ilma adjustita URL ei muutu', async () => {
+    const { prepressPreviewUrl } = await import('../uploadApi');
+    expect(prepressPreviewUrl('u1', 3, 'tok', 90)).not.toContain('adj=');
+  });
+
+  it('adjust käib URL-is: iga kärbe annab eri pildi-URL-i', async () => {
+    const { prepressPreviewUrl } = await import('../uploadApi');
+    const a = { angle: 0, crop: { x: 0, y: 0, w: 0.5, h: 1 }, quad: null };
+    const url = prepressPreviewUrl('u1', 3, 'tok', 0, a);
+    const adj = new URL(url, 'http://x').searchParams.get('adj');
+    expect(JSON.parse(adj!)).toEqual(a);
+    expect(prepressPreviewUrl('u1', 3, 'tok', 0, { ...a, crop: { ...a.crop, w: 0.6 } })).not.toBe(url);
+  });
+});

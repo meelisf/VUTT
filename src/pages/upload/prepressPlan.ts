@@ -1,4 +1,8 @@
-import type { PrepressPage, PrepressPlan } from './types';
+import type { PageAdjust, PrepressPage, PrepressPlan } from './types';
+import { addRotation } from '../../components/pagePrep/geometry';
+
+// Poolitusjoone piir on ühine teose haldusega (#431).
+export { clampSplitX } from '../../components/pagePrep/geometry';
 
 /**
  * Muudab globaalset poolitusjoont. `custom` ja `nosplit` lehti EI puutu —
@@ -32,16 +36,6 @@ export function countOutputPages(plan: PrepressPlan): number {
     if (page.mode === 'custom' && page.split_x == null) return total + 1;
     return total + 2;
   }, 0);
-}
-
-/**
- * Hoiab poolitusjoone vahemikus, kus mõlemad pooled jäävad sisukaks.
- * Vastab backendi `page_cuts` servapiirangule (`max(1, min(width - 1, …))`),
- * ainult heldemalt — 5% servast pole kunagi õige poolituskoht.
- */
-export function clampSplitX(x: number): number {
-  if (!Number.isFinite(x)) return 0.5;
-  return Math.min(0.95, Math.max(0.05, x));
 }
 
 /**
@@ -168,8 +162,29 @@ export function rotatePages(
   ns: number[],
   delta: number,
 ): PrepressPlan {
-  return mapPages(plan, ns, (p) => ({
-    ...p,
-    rotate: (((p.rotate ?? 0) + delta) % 360 + 360) % 360,
-  }));
+  return mapPages(plan, ns, (p) => withRotation(p, addRotation(p.rotate ?? 0, delta)));
+}
+
+/**
+ * Uus pööre lehele. Kärbe/kalle (`adjust`) on EELMISE pöörde raamis ja
+ * muutuks uues raamis valeks — pööre eemaldab selle, nagu teose halduse
+ * pildiredaktoris jäme pööre lähtestab kärpekasti (#431).
+ */
+export function withRotation(page: PrepressPage, rotate: number): PrepressPage {
+  if (page.adjust && rotate !== (page.rotate ?? 0)) {
+    return { ...page, rotate, adjust: null };
+  }
+  return { ...page, rotate };
+}
+
+/** Teose halduse pildiredaktori serveriparameetrid → plaani `adjust`. */
+export function adjustFromParams(p: {
+  angle: number;
+  crop: { x: number; y: number; w: number; h: number } | null;
+  quad: { x: number; y: number }[] | null;
+}): PageAdjust | null {
+  const quad = p.quad ? p.quad.map((q) => [q.x, q.y] as [number, number]) : null;
+  const angle = Math.abs(p.angle) < 1e-4 || Math.abs(p.angle - 360) < 1e-4 ? 0 : p.angle;
+  if (angle === 0 && !p.crop && !quad) return null;
+  return { angle, crop: p.crop, quad };
 }
