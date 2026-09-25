@@ -632,7 +632,9 @@ def _keepwarm_loop():
     Hoiab Meilisearchi eesliitetabeli (prefixSearch: indexingTime) sooja,
     et vältida ~60s viivitust esimesel indekseerimistehingul pärast pikka pausi.
     """
-    last_sync_warmup = time.time()
+    # 0, mitte time.time(): restardi järel on Meili külm ja esimene soojendus
+    # peab tulema kohe, mitte 2 h pärast (import ootas muidu ~85 s).
+    last_sync_warmup = 0.0
     while True:
         try:
             _warm_dashboard_searches()
