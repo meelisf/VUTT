@@ -8,16 +8,19 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { checkMixedContent, normalizePage } from './meiliService';
 import type { Index } from 'meilisearch';
 import type { Quad4 } from '../utils/perspectiveQuad';
+import { PageConflictError, conflictFromResponse, type PageFields } from '../components/editor/pageConflict';
 
 // Abifunktsioon failisüsteemi salvestamiseks
-const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, authToken?: string): Promise<boolean> => {
+const saveToFileSystem = async (
+  page: Page, original_catalog: string, image_url: string, authToken?: string, base?: PageFields,
+): Promise<{ merged?: boolean; page?: PageFields }> => {
   try {
     const imageFilename = image_url.split('/').pop() || '';
     const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
 
     if (!textFilename) {
       console.error("Ei suutnud tuletada failinime pildi URL-ist:", image_url);
-      return false;
+      return {};
     }
 
     const metaContent = {
@@ -35,7 +38,9 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       meta_content: metaContent,
       original_path: original_catalog,
       file_name: textFilename,
-      work_id: page.work_id
+      work_id: page.work_id,
+      // Kolmesuunalise liitmise baas (#455, ADR 0054)
+      ...(base ? { base } : {}),
     };
 
     const response = await fetchWithTimeout(`${FILE_API_URL}/save`, {
@@ -47,6 +52,8 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      const conflict = conflictFromResponse(response.status, errorData);
+      if (conflict) throw conflict;
       if (errorData.message?.includes('Autentimine') || response.status === 401) {
         const err = new Error('AUTH_EXPIRED');
         (err as any).status = 401;
@@ -73,10 +80,10 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       }
     }
 
-    return true;
+    return result;
   } catch (e: any) {
-    // Lase 401 vead läbi — Workspace käsitleb neid
-    if (e.message === 'AUTH_EXPIRED' || e.status === 401) {
+    // Lase 401 vead ja kokkupõrge läbi — Workspace/redaktor käsitleb neid
+    if (e.message === 'AUTH_EXPIRED' || e.status === 401 || e instanceof PageConflictError) {
       throw e;
     }
     console.error("Failed to save to file system:", e);
@@ -110,19 +117,24 @@ export const savePage = async (
   page: Page,
   _actionDescription: string = 'Muutis andmeid',
   _userName: string = 'Anonüümne',
-  authToken?: string
-): Promise<Page> => {
+  authToken?: string,
+  base?: PageFields,
+): Promise<{ page: Page; merged: PageFields | null }> => {
   try {
     // Meilisearchi uuendamine toimub backendis (file_server.py kutsub sync_work_to_meilisearch)
     // Frontend kasutab ainult otsinguvõtit, millel pole kirjutamisõigust
 
     if (page.original_path && page.image_url) {
-      await saveToFileSystem(page, page.original_path, page.image_url, authToken);
+      const result = await saveToFileSystem(page, page.original_path, page.image_url, authToken, base);
+      // Server liitis vahepealse ketta seisu (#455) — see on nüüd salvestatud leht.
+      if (result.merged && result.page) {
+        return { page: { ...page, ...result.page }, merged: result.page };
+      }
     } else {
       console.warn("Ei saa faili salvestada: puudub original_path või image_url");
     }
 
-    return page;
+    return { page, merged: null };
   } catch (error) {
     console.error("Save Page Error:", error);
     throw error;

@@ -515,5 +515,19 @@
     "shareable": "Shareable (via direct link)",
     "copied": "Copied",
     "copy": "Copy"
+  },
+  "conflict": {
+    "title": "The page was changed meanwhile",
+    "message": "Someone changed this page after you opened it. These changes cannot be merged automatically:",
+    "takeTheirsHint": "“Use server version” copies your text to the clipboard first.",
+    "keepMine": "Save my version",
+    "takeTheirs": "Use server version",
+    "cancel": "Cancel",
+    "field": {
+      "text": "Text",
+      "status": "Status",
+      "page_tags": "Tags",
+      "comment": "Comment “{{text}}”"
+    }
   }
 }

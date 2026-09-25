@@ -35,6 +35,7 @@ from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..page_history import build_page_history
 from ..page_locks import page_lock
+from ..page_merge import PAGE_FIELDS, merge_page, read_page_view
 from ..page_paths import check_page_filename, require_existing_page
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
@@ -88,21 +89,70 @@ def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
     return catalog, "/".join(parts)
 
 
-def _save_page_locked(txt_path, text, client_meta, username):
-    """Lehe kirjutus lehe luku all (#416): serveripoolsete väljade liitmine,
-    muutusteta kontroll ja kirjutus näevad sama seisu. Tagastab `save_with_git`
-    tulemuse või None, kui salvestus oli muutusteta.
+def _normalize_page_text(text):
+    """Salvestatava lehe teksti kanooniline kuju: NFC + marginaalia-tägid (<m> välimiseks)."""
+    if not text:
+        return ""
+    return normalize_marginalia_tags(unicodedata.normalize('NFC', text))
 
-    NB: klient saadab `meta_content`-i tervikuna (sh kommentaarid) — lukk ei
-    kaitse VANA avatud redaktori seisu eest; see vajab versioonikontrolli.
+
+class _PageConflict(Exception):
+    """Kolmesuunalise liitmise kokkupõrge (#455): midagi ei kirjutatud."""
+
+    def __init__(self, fields, current):
+        super().__init__(", ".join(fields))
+        self.fields = fields
+        self.current = current
+
+
+def _merge_with_base(txt_path, json_path, text, client_meta, base):
+    """Liida kliendi seis baasseisu vastu kettal olevaga (ADR 0054). Kutsutakse
+    lehe luku all. Tagastab (tekst, meta, liidetud_leht | None) — viimane on
+    olemas, kui ketta seis panustas (klient peab selle üle võtma)."""
+    theirs = read_page_view(txt_path, json_path)
+    mine = {
+        "text_content": text,
+        **{k: client_meta.get(k) if client_meta.get(k) is not None else ([] if k != "status" else "Toores")
+           for k in ("status", "page_tags", "comments", "text_annotations")},
+    }
+    base_view = {
+        "text_content": _normalize_page_text(base.get("text_content") or ""),
+        "status": base.get("status") or "Toores",
+        **{k: base.get(k) or [] for k in ("page_tags", "comments", "text_annotations")},
+    }
+    merged, konfliktid = merge_page(base_view, mine, theirs)
+    if konfliktid:
+        raise _PageConflict(konfliktid, theirs)
+    panustas = any(
+        json.dumps(merged[k], sort_keys=True, ensure_ascii=False)
+        != json.dumps(mine[k], sort_keys=True, ensure_ascii=False)
+        for k in PAGE_FIELDS
+    )
+    meta = {**client_meta, **{k: merged[k] for k in PAGE_FIELDS if k != "text_content"}}
+    return merged["text_content"], meta, (merged if panustas else None)
+
+
+def _save_page_locked(txt_path, text, client_meta, username, base=None):
+    """Lehe kirjutus lehe luku all (#416): serveripoolsete väljade liitmine,
+    muutusteta kontroll ja kirjutus näevad sama seisu.
+
+    `base` (kliendi baasseis, #455) → kolmesuunaline liitmine kettal olevaga;
+    kokkupõrge viskab `_PageConflict`-i ja midagi ei kirjutata. `base`-ita
+    (vana bundle) kirjutatakse kliendi seis nagu varem.
+
+    Tagastab (save_with_git tulemus | None kui muutusteta, liidetud leht | None).
     """
     json_path = None
     meta_content = None
+    merged_page = None
     additional = []
     with page_lock(txt_path):
         if client_meta:
             json_path = os.path.splitext(txt_path)[0] + ".json"
             meta_content = client_meta
+            if isinstance(base, dict):
+                text, meta_content, merged_page = _merge_with_base(
+                    txt_path, json_path, text, client_meta, base)
             # Säilita serveripoolsed väljad (nt sequence, source), mida klient ei saada.
             if os.path.exists(json_path):
                 try:
@@ -114,14 +164,14 @@ def _save_page_locked(txt_path, text, client_meta, username):
 
         # Kliendi värske updated_at üksi ei ole muudatus — vt server/save_diff.py.
         if page_content_unchanged(txt_path, text, json_path, meta_content):
-            return None
+            return None, merged_page
 
         return save_with_git(
             txt_path,
             text,
             username,
             additional_files=additional if additional else None,
-        )
+        ), merged_page
 
 
 @router.post("/save")
@@ -129,10 +179,9 @@ def _save_page_locked(txt_path, text, client_meta, username):
 # ulatuse kontrollib _require_catalog_access(write=True) allpool (ADR 0031).
 async def save(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
-    text = unicodedata.normalize('NFC', data.get('text_content', '')) if data.get('text_content') else ""
-    # Marginaalia-tägid kanoonilisele kujule (<m> välimiseks) — hoiab failid puhtana
-    # ja teeb editori/otsingu usaldusväärseks (vt server/marginalia_normalize.py).
-    text = normalize_marginalia_tags(text)
+    # NFC + marginaalia-tägid kanoonilisele kujule (<m> välimiseks) — hoiab failid
+    # puhtana ja teeb editori/otsingu usaldusväärseks (vt server/marginalia_normalize.py).
+    text = _normalize_page_text(data.get('text_content', ''))
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename: raise HTTPException(status_code=400, detail="Vigased teed")
     check_page_filename(filename)
@@ -142,12 +191,21 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     await run_in_threadpool(require_existing_page, BASE_DIR, catalog, filename)
 
     txt_path = os.path.join(BASE_DIR, catalog, filename)
-    git_result = await run_in_threadpool(
-        _save_page_locked, txt_path, text, data.get('meta_content'), user['username']
-    )
+    try:
+        git_result, merged_page = await run_in_threadpool(
+            _save_page_locked, txt_path, text, data.get('meta_content'), user['username'],
+            data.get('base'),
+        )
+    except _PageConflict as e:
+        # Ketas puutumata; klient näitab konfliktidialoogi (#455).
+        raise HTTPException(status_code=409, detail={
+            "conflict": True, "fields": e.fields, "current": e.current,
+        })
+    # Liidetud seis tagasi kliendile: ketta panus peab redaktorisse jõudma.
+    merged_extra = {"merged": True, "page": merged_page} if merged_page is not None else {}
     # Muutusteta Ctrl+S: ei kirjuta kettale, ei commiti ega indekseeri (#173).
     if git_result is None:
-        return {"status": "success", "changed": False, "git_committed": True, "commit_hash": ""}
+        return {"status": "success", "changed": False, "git_committed": True, "commit_hash": "", **merged_extra}
 
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     work_id = (data.get('meta_content') or {}).get('work_id')
@@ -161,7 +219,7 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     if page_tag_qcodes:
         background_tasks.add_task(enrich_entity_labels_async_qcodes, page_tag_qcodes)
 
-    response = {"status": "success", "changed": True, "commit_hash": git_result.get("commit_hash", "")[:8], "git_committed": True}
+    response = {"status": "success", "changed": True, "commit_hash": git_result.get("commit_hash", "")[:8], "git_committed": True, **merged_extra}
     if git_result.get("success") is False:
         response["git_committed"] = False
         response["warning"] = "Tekst salvestati kettale, aga Git versioonihalduse commit ebaõnnestus."

@@ -39,6 +39,8 @@ export function parseRestoreResponse(data: unknown): RestoreResult | null {
 export function savedStateAfterRestore(prev: EditorSavedState, r: RestoreResult): EditorSavedState {
   return {
     ...prev,
+    // Taastatud tekst on kettal — see on uus liitmise baas (#455).
+    text: r.content,
     text_annotations: r.textAnnotations ?? prev.text_annotations,
     comments: r.comments ?? prev.comments,
   };
