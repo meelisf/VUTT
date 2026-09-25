@@ -78,12 +78,18 @@ def get_work_sets(include_archived: bool = False, user=Depends(optional_user)):
     return {"status": "success", "work_sets": [_public_view(ws, user) for ws in sets]}
 
 
+def _kontrolli_nimi(name) -> None:
+    """Nimi on {et, en}; vähemalt üks keel peab olema antud. Sama reegel
+    loomisel ja muutmisel — muidu saaks PATCH-iga nimeta kogu."""
+    if not isinstance(name, dict) or not (name.get("et") or name.get("en")):
+        raise HTTPException(status_code=400, detail="Nimi on kohustuslik")
+
+
 @router.post("/work-sets")
 async def post_work_set(request: Request, user=Depends(require_role("admin"))):
     body = await get_json_data(request)
     name = body.get("name") or {}
-    if not (name.get("et") or name.get("en")):
-        raise HTTPException(status_code=400, detail="Nimi on kohustuslik")
+    _kontrolli_nimi(name)
     ws = await run_in_threadpool(create_work_set, name, body.get("description"),
                                  user["username"])
     return {"status": "success", "work_set": _public_view(ws, user)}
@@ -132,6 +138,8 @@ async def patch_work_set(set_id: str, request: Request, user=Depends(get_user)):
         raise HTTPException(status_code=403, detail="Puudub haldusõigus")
     body = await get_json_data(request)
     changes = {k: body[k] for k in ("name", "description", "status") if k in body}
+    if "name" in changes:
+        _kontrolli_nimi(changes["name"])
     if "visibility" in body:
         # Avaldamine on admini otsus: haldur kureerib sisu, mitte nähtavust.
         if not is_at_least(user.get("role") or "contributor", "admin"):
