@@ -132,10 +132,27 @@ def test_nimevaste_q_koodita_kirjega_on_ettepanek(register):
     assert register["commits"] == []
 
 
-def test_sama_voti_teise_q_koodiga_saab_q_koodiga_votme(register):
-    plan = pr.ensure_register_place("Q2000")
-    assert plan["key"] == "Frankfurt (Q2000)"
-    assert register["read"]()["Frankfurt"]["id"] == "Q1794"
+def test_sama_voti_teise_q_koodiga_on_ettepanek(register):
+    """Urvaste (vald) vs registri Urvaste (küla) — peaaegu-duplikaati ei looda."""
+    assert pr.ensure_register_place("Q2000") == {"action": "name_match", "key": "Frankfurt"}
+    assert register["commits"] == []
+
+
+def test_rootsi_koha_voti_on_rootsikeelne(register):
+    """Saksa silt „Gemeinde Strängnäs" ei sobi Rootsi koha ajalooliseks nimeks."""
+    WD["Q106909"]["labels"]["de"] = "Gemeinde Strängnäs"
+    try:
+        assert pr.ensure_register_place("Q106909")["key"] == "Strängnäs"
+    finally:
+        WD["Q106909"]["labels"]["de"] = "Strängnäs"
+
+
+def test_saksa_koha_voti_on_saksakeelne(register):
+    WD["Q1055"]["labels"]["sv"] = "Hamborg"
+    try:
+        assert pr.ensure_register_place("Q1055")["key"] == "Hamburg"
+    finally:
+        del WD["Q1055"]["labels"]["sv"]
 
 
 def test_wikidata_toorge_ei_kirjuta(register, monkeypatch):
