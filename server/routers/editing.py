@@ -34,6 +34,7 @@ from ..marginalia_normalize import normalize_marginalia_tags
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..page_history import build_page_history
+from ..page_paths import check_page_filename, require_existing_page
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
 from ..save_diff import page_content_unchanged
@@ -97,9 +98,11 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     text = normalize_marginalia_tags(text)
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename: raise HTTPException(status_code=400, detail="Vigased teed")
+    check_page_filename(filename)
 
     # Puuduv/vigane meta ei tohi muuta piiratud teose kontrolli fail-open'iks.
     await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
+    await run_in_threadpool(require_existing_page, BASE_DIR, catalog, filename)
 
     txt_path = os.path.join(BASE_DIR, catalog, filename)
     additional = []
@@ -304,6 +307,7 @@ def _validate_page_paths(data):
     raw_file = data.get('file_name', '')
     if not raw_file or os.path.basename(raw_file) != raw_file:
         raise HTTPException(status_code=400, detail="Vigane failinimi")
+    check_page_filename(raw_file)
     catalog = os.path.basename(data.get('original_path', ''))
     if not catalog:
         raise HTTPException(status_code=400, detail="Vigane tee")
@@ -462,7 +466,9 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename:
         raise HTTPException(status_code=400, detail="Vigane failitee")
+    check_page_filename(filename)
     await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
+    await run_in_threadpool(require_existing_page, BASE_DIR, catalog, filename)
     path = os.path.join(BASE_DIR, catalog, filename)
     content = await run_in_threadpool(
         get_file_at_commit, os.path.join(catalog, filename), data.get('commit_hash')

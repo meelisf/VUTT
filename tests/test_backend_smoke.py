@@ -519,6 +519,8 @@ def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, t
     (work_dir / "_metadata.json").write_text(
         json.dumps({"id": "workAAA", "collections": []}), encoding="utf-8"
     )
+    # Salvestus läheb ainult olemasolevale lehele (R24-01): pilt on, .txt veel ei ole.
+    (work_dir / "leht1.jpg").write_bytes(b"\xff\xd8\xff")
 
     calls = []
     monkeypatch.setattr(editing_router, "update_page_person_mentions", lambda wid, wdir: calls.append((wid, wdir)))
@@ -550,6 +552,8 @@ def test_save_reports_git_commit_failure(client, login, monkeypatch, tmp_path):
     (work_dir / "_metadata.json").write_text(
         json.dumps({"id": "workAAA", "collections": []}), encoding="utf-8"
     )
+    # Salvestus läheb ainult olemasolevale lehele (R24-01): pilt on, .txt veel ei ole.
+    (work_dir / "leht1.jpg").write_bytes(b"\xff\xd8\xff")
 
     token = login("editor", "editorpass")
     response = client.post("/save", headers={"Authorization": f"Bearer {token}"}, json={
