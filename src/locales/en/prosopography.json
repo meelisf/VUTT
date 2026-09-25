@@ -6,6 +6,8 @@
   "backToList": "Back to persons list",
   "backToProfile": "Back to profile",
   "loadError": "Failed to load persons.",
+  "refreshing": "Updating…",
+  "retry": "Try again",
   "loadErrorSingle": "Failed to load person.",
   "notFound": "Person not found.",
   "noResults": "No persons found matching the search.",

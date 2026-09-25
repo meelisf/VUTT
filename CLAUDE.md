@@ -29,7 +29,7 @@ Väravad (samad jooksevad CI-s, `.github/workflows/ci.yml`):
 |------|--------|
 | `npm run typecheck` | Vite EI typecheck'i — `build` üksi ei püüa tüübivigu |
 | `npm test` | vitest. Loogikatestid jooksevad `node`-keskkonnas; **komponenditest** (`*.test.tsx`) valib jsdom-i failipäises `/** @vitest-environment jsdom */` — vaikimisi jsdom-it EI ole, sest ta maksaks aega igas failis |
-| `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 43` — parandades LANGETA arvu |
+| `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 42` — parandades LANGETA arvu |
 | `.venv/bin/pytest tests/` | Kasuta ALATI projekti venv-i (`.venv/bin/python`), süsteemi `python3`-l puuduvad sõltuvused |
 
 CI käivitub ainult main'i-PR-idel: virnastatud PR checke ei saa (baasi ümbersuunamine EI käivita, close+reopen käivitab). Merge-stiil = merge-commit.
