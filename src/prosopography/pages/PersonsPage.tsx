@@ -12,6 +12,7 @@ import { getPersonFacets, listPersons, mergePersons } from '../services/prosopog
 import { getVocabularies, getCollectionColorClasses } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
+import { useLatestQuery } from '../../hooks/useLatestQuery';
 import type { ProsopoIndexEntry, ProsopoMapResponse } from '../types';
 
 const LIMIT = 48;
@@ -30,11 +31,6 @@ const PersonsPage: React.FC = () => {
   const workSetParam = selection.kind === 'work_set' ? selection.id : undefined;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  const [persons, setPersons] = useState<ProsopoIndexEntry[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const query  = searchParams.get('q') ?? '';
   const originGroup = searchParams.get('origin_group') ?? '';
@@ -60,9 +56,6 @@ const PersonsPage: React.FC = () => {
   const focusPlace = searchParams.get('focus_place') ?? '';
   const relatedTo = searchParams.get('related_to') ?? '';
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
-  const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
-  const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
-  const [tagFacets, setTagFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [seisused, setSeisused] = useState<{ id: string; label: { et: string; en: string } }[]>([]);
 
   // Eraldi state otsingukastile — debounce enne URL uuendamist
@@ -206,80 +199,80 @@ const PersonsPage: React.FC = () => {
 
   const selectedIds = new Set(selectedPersons.map(p => p.id));
 
-  // Serveripäring — käivitatakse filtri/offset muutusel
-  const fetchPersons = useCallback(() => {
-    if (view === 'map') {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    listPersons({
-      q: query || undefined,
-      origin_group: originGroup || undefined,
-      origin_place: originPlace || undefined,
-      institution: institution || undefined,
-      source: source || undefined,
-      gender: gender || undefined,
-      year_from: hasExplicitYearRange && yearFrom ? parseInt(yearFrom) : undefined,
-      year_to: hasExplicitYearRange && yearTo ? parseInt(yearTo) : undefined,
-      imm_year_from: !hasExplicitYearRange && legacyImmYearFrom ? parseInt(legacyImmYearFrom) : undefined,
-      imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
-      status_id: statusId || undefined,
-      tag: tags.length ? tags : undefined,
-      sort_by: sortBy !== 'alpha' ? sortBy : undefined,
-      collection: effectiveSelectedCollection || undefined,
-      work_set: workSetParam,
-      limit: LIMIT,
-      offset,
-    }, token)
-      .then(data => {
-        setPersons(data.results);
-        setTotal(data.total);
-        setError(null);
-      })
-      .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
-      .finally(() => setLoading(false));
-  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, tags, sortBy, effectiveSelectedCollection, workSetParam, offset, token, t]);
+  // Ligipääsu- ja kollektsiooniulatus: selle vahetusel vana loendit ei näidata
+  // (#425), sest tema isikud ei pruugi uues ulatuses nähtavad olla.
+  const scopeKey = JSON.stringify([effectiveSelectedCollection, workSetParam, user?.username ?? null, token]);
 
-  const fetchFacets = useCallback(() => {
-    getPersonFacets({
-      q: query || undefined,
-      gender: gender || undefined,
-      collection: effectiveSelectedCollection || undefined,
-      work_set: workSetParam,
-    }, token)
-      .then(data => {
-        const lang = i18n.language?.slice(0, 2) ?? 'et';
-        setOriginGroupFacets((data.origin_groups || []).map(item => ({
-          value: item.value,
-          label: item.labels?.[lang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.value,
-          count: item.count,
-        })));
-        setInstitutionFacets(data.institutions || []);
-        setTagFacets((data.tags || []).map(item => ({
-          value: item.value,
-          label: item.labels?.[lang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.label,
-          count: item.count,
-        })));
-      })
-      .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); setTagFacets([]); });
-  }, [query, gender, effectiveSelectedCollection, workSetParam, token, i18n.language]);
+  // Päringu parameetrid ÜHES objektis: võti tuletatakse neist, seega ei saa
+  // ükski filter päringu käivitajast välja jääda (#421: origin_place jäi).
+  const listParams = {
+    q: query || undefined,
+    origin_group: originGroup || undefined,
+    origin_place: originPlace || undefined,
+    institution: institution || undefined,
+    source: source || undefined,
+    gender: gender || undefined,
+    year_from: hasExplicitYearRange && yearFrom ? parseInt(yearFrom) : undefined,
+    year_to: hasExplicitYearRange && yearTo ? parseInt(yearTo) : undefined,
+    imm_year_from: !hasExplicitYearRange && legacyImmYearFrom ? parseInt(legacyImmYearFrom) : undefined,
+    imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
+    status_id: statusId || undefined,
+    tag: tags.length ? tags : undefined,
+    sort_by: sortBy !== 'alpha' ? sortBy : undefined,
+    collection: effectiveSelectedCollection || undefined,
+    work_set: workSetParam,
+    limit: LIMIT,
+    offset,
+  };
+  const personsQuery = useLatestQuery(
+    view === 'map' ? null : JSON.stringify(listParams),
+    scopeKey,
+    () => listPersons(listParams, token),
+  );
+  const persons = personsQuery.data?.results ?? [];
+  const total = personsQuery.data?.total ?? 0;
 
-  useEffect(() => {
-    fetchPersons();
-  }, [fetchPersons]);
-
-  useEffect(() => {
-    fetchFacets();
-  }, [fetchFacets]);
+  const facetParams = {
+    q: query || undefined,
+    gender: gender || undefined,
+    collection: effectiveSelectedCollection || undefined,
+    work_set: workSetParam,
+  };
+  const facetsQuery = useLatestQuery(
+    JSON.stringify(facetParams),
+    scopeKey,
+    () => getPersonFacets(facetParams, token),
+  );
+  // Vea korral tühjad facetid, nagu varem.
+  const facets = facetsQuery.error ? undefined : facetsQuery.data;
+  const facetLang = i18n.language?.slice(0, 2) ?? 'et';
+  const originGroupFacets = useMemo(() => (facets?.origin_groups || []).map(item => ({
+    value: item.value,
+    label: item.labels?.[facetLang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.value,
+    count: item.count,
+  })), [facets, facetLang]);
+  const institutionFacets = facets?.institutions || [];
+  const tagFacets = useMemo(() => (facets?.tags || []).map(item => ({
+    value: item.value,
+    label: item.labels?.[facetLang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.label,
+    count: item.count,
+  })), [facets, facetLang]);
 
   useEffect(() => {
     getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
   }, []);
 
   const hasActiveFilters = !!(originGroup || originPlace || institution || source || gender || yearFrom || yearTo || statusId || tags.length);
+  // Leheküljed kuuluvad NÄIDATUD tulemusele, mitte URL-i uuele offsetile:
+  // kordusotsingu ajal ei esitata vana koguarvu uue päringu tulemusena (#425).
+  const shownOffset = personsQuery.data?.offset ?? 0;
   const totalPages = Math.ceil(total / LIMIT);
-  const currentPage = Math.floor(offset / LIMIT) + 1;
+  const currentPage = Math.floor(shownOffset / LIMIT) + 1;
+  const { initialLoading, refreshing } = personsQuery;
+  const listError = personsQuery.error ? t('loadError', 'Isikute laadimine ebaõnnestus.') : null;
+  // Vana loend on nähtav ainult siis, kui uus päring pole veel vastanud;
+  // vea järel teda uue päringu vastuseks ei jäeta.
+  const showList = !initialLoading && !listError && personsQuery.data !== undefined;
   const mapFilters = {
     q: query || undefined,
     origin_group: originGroup || undefined,
@@ -323,7 +316,7 @@ const PersonsPage: React.FC = () => {
       const result = await mergePersons(sourceId, targetId, token);
       setShowMergeModal(false);
       exitSelectMode();
-      fetchPersons();
+      personsQuery.reload();
       navigate(`/persons/${result.id}`);
     } catch (e) {
       setMergeError(e instanceof Error ? e.message : t('loadError'));
@@ -528,38 +521,57 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Arv */}
-        {view === 'list' && !(loading || false) && !error && (
-          <p className="text-xs text-gray-400 mb-4">
-            {offset === 0 && total <= LIMIT
-              ? t('totalCount', '{{count}} isikut', { count: total })
-              : t('filteredCount', '{{filtered}} / {{total}} isikut', { filtered: Math.min(offset + LIMIT, total), total })}
+        {/* Arv / uuendamise märge. Üks püsiv live-piirkond: ekraanilugeja
+            kuuleb „Uuendan…" ja siis uue koguarvu. Kordusotsingu ajal vana
+            koguarvu ei näidata, sest see ei ole uue päringu tulemus (#425). */}
+        {view === 'list' && (
+          <p role="status" aria-live="polite" className="text-xs text-gray-400 mb-4 min-h-4">
+            {refreshing
+              ? <span className="inline-flex items-center gap-1.5 text-primary-600">
+                  <span className="h-3 w-3 rounded-full border-2 border-primary-300 border-t-primary-600 animate-spin" aria-hidden="true" />
+                  {t('refreshing', 'Uuendan…')}
+                </span>
+              : showList && (shownOffset === 0 && total <= LIMIT
+                ? t('totalCount', '{{count}} isikut', { count: total })
+                : t('filteredCount', '{{filtered}} / {{total}} isikut', { filtered: Math.min(shownOffset + LIMIT, total), total }))}
           </p>
         )}
 
-        {/* Sisu */}
-        {view === 'list' && (loading || false) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Sisu: laadimiskaardid ainult esmalaadimisel (või ulatuse vahetusel) */}
+        {view === 'list' && initialLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-busy="true">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-64 bg-white border border-gray-200 rounded-lg animate-pulse" />
             ))}
           </div>
         )}
 
-        {view === 'list' && error && (
-          <div className="text-center py-16 text-red-600 text-sm">{error}</div>
+        {view === 'list' && listError && (
+          <div className="text-center py-16 text-sm">
+            <p className="text-red-600">{listError}</p>
+            <button
+              type="button"
+              onClick={personsQuery.reload}
+              className="mt-3 text-sm font-medium text-primary-600 hover:text-primary-700 underline"
+            >
+              {t('retry', 'Proovi uuesti')}
+            </button>
+          </div>
         )}
 
-        {view === 'list' && !(loading || false) && !error && persons.length === 0 && (
-          <div className="text-center py-16 text-gray-400 text-sm">
+        {view === 'list' && showList && persons.length === 0 && (
+          <div className={`text-center py-16 text-gray-400 text-sm transition-opacity ${refreshing ? 'opacity-50' : ''}`} aria-busy={refreshing}>
             {query || hasActiveFilters
               ? t('noResults', 'Otsingule vastavaid isikuid ei leitud.')
               : t('empty', 'Prosopograafia andmebaas on tühi.')}
           </div>
         )}
 
-        {view === 'list' && !(loading || false) && !error && persons.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {view === 'list' && showList && persons.length > 0 && (
+          <div
+            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity ${refreshing ? 'opacity-50' : ''}`}
+            aria-busy={refreshing}
+          >
             {persons.map(person => (
               <PersonCard
                 key={person.id}
@@ -585,13 +597,17 @@ const PersonsPage: React.FC = () => {
           </React.Suspense>
         )}
 
-        {view === 'list' && !loading && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page) => { setOffset((page - 1) * LIMIT); window.scrollTo(0, 0); }}
-            className="mt-8 pt-6 border-t border-gray-200"
-          />
+        {/* Kordusotsingu ajal jääb alles (vaade ei hüppa), aga on inertne:
+            tema leheküljed kuuluvad vanale tulemusele. */}
+        {view === 'list' && showList && (
+          <div inert={refreshing} className={`transition-opacity ${refreshing ? 'opacity-50' : ''}`}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => { setOffset((page - 1) * LIMIT); window.scrollTo(0, 0); }}
+              className="mt-8 pt-6 border-t border-gray-200"
+            />
+          </div>
         )}
       </main>
 

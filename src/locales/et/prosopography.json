@@ -6,6 +6,8 @@
   "backToList": "Tagasi isikute nimekirja",
   "backToProfile": "Tagasi profiilile",
   "loadError": "Isikute laadimine ebaõnnestus.",
+  "refreshing": "Uuendan…",
+  "retry": "Proovi uuesti",
   "loadErrorSingle": "Isiku laadimine ebaõnnestus.",
   "notFound": "Isikut ei leitud.",
   "noResults": "Otsingule vastavaid isikuid ei leitud.",
