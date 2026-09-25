@@ -388,6 +388,8 @@ poolitatud lehe ühe poole kustutamine jätaks ankru kustutatud lehele.
 **Lehe JSON serveripoolsed väljad** — `editing.py` kirjutab `meta_content`-i kliendilt
 TERVIKUNA üle. Uus serveripoolne lehe-väli PEAB minema `SERVERIPOOLSED_LEHE_VALJAD`-i,
 muidu kaob ta esimese Ctrl+S peale, ilma vea ja logita.
+Iga lehe JSON-i lugev-ja-tagasikirjutav tee hoiab `page_lock`-i (`server/page_locks.py`)
+lugemisest kirjutamiseni; kommentaaritoimingud kirjutavad ainult `.json`-i (ADR 0053).
 
 **OCR vea-märgend (ADR 0025)** — OCR-server kirjutab ebaõnnestunud lehe kõrvale
 `{tüvi}.err` (üks rida: `ErandiTüüp: sõnum`). Märgend on **lõplik**: `main_loop` ei võta
