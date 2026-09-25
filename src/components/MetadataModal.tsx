@@ -551,6 +551,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                         showPersonToggle
                         defaultPersonSearch
                         token={authToken}
+                        personContext={{ work_id: workId, role: creator.role }}
                       />
                     </div>
                     <select
@@ -622,6 +623,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   showPersonToggle
                   defaultPersonSearch
                   token={authToken}
+                  personContext={{ work_id: workId, role: 'publisher' }}
                 />
               </div>
             </div>

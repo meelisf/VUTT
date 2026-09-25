@@ -57,8 +57,10 @@ function normalizeViafName(name: string): string {
 /**
  * Searches VIAF for persons matching the query.
  * Kasutab SRU API-t, mis otsib kõikidest nimekujudest.
+ * @param opts `throwOnError: true` korral viskab tõrke edasi vaikimisi tühja
+ *   loendi asemel — vaikimisi (opts puudub) käitub TÄPSELT nagu enne.
  */
-export async function searchViaf(query: string): Promise<ViafSearchResult[]> {
+export async function searchViaf(query: string, opts?: { throwOnError?: boolean }): Promise<ViafSearchResult[]> {
   if (!query || query.length < 2) return [];
 
   try {
@@ -134,6 +136,7 @@ export async function searchViaf(query: string): Promise<ViafSearchResult[]> {
     return results;
   } catch (error) {
     console.error('VIAF search error:', error);
+    if (opts?.throwOnError) throw error;
     return [];
   }
 }

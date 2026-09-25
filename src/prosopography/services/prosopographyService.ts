@@ -654,3 +654,19 @@ export async function fetchSourceDiff(
   if (!resp.ok) throw new Error(`fetchSourceDiff: ${resp.status}`);
   return resp.json();
 }
+
+export interface SimilarPerson { id: string; label: string; birth_year: number | null; death_year: number | null; work_count: number }
+
+/** Isikupaneeli kandidaatide kokkuvõtted (spekk §6) + sarnased olemasolevad kaardid. */
+export async function fetchCandidates(
+  name: string, refs: { scheme: string; id: string }[], token: string,
+): Promise<{ results: import('../panel/types').CandidateResult[]; similar_persons: SimilarPerson[] }> {
+  const resp = await fetchWithTimeout(`${BASE}/candidates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify({ name, refs }),
+    timeout: 15000,
+  });
+  if (!resp.ok) throw new Error(`fetchCandidates: ${resp.status}`);
+  return resp.json();
+}
