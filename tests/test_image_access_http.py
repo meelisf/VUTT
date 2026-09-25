@@ -238,3 +238,42 @@ def test_internal_work_alias_cannot_bypass_directory_restriction(image_http, met
         status, headers, _ = request(method, f'/{alias}/page.jpg')
         assert status == 403
         assert headers['Cache-Control'] == 'no-store'
+
+
+@pytest.mark.parametrize('folder_name', [
+    '1632-10-Gouverneur_der_Fürs',        # täpitäht: sanitize_id → „Furs"
+    '1633-32-Oratio_in_Universam_',        # lõpu-alakriips: sanitize_id lõikab ära
+])
+def test_legacy_folder_name_resolves_by_exact_name(image_http, folder_name):
+    """Pilditee kannab kausta nime (Meili `teose_kaust`). Vanadel teostel ei
+    ühti see ei `id`, `slug` ega `sanitize_id(kaust)`-iga — #423 järel said
+    341/1406 teost 404 „Teost ei leitud"."""
+    import urllib.parse
+    request, _, tmp_path = image_http
+    folder = tmp_path / folder_name
+    folder.mkdir()
+    Image.new('RGB', (16, 24), 'white').save(folder / 'page.jpg')
+    (folder / '_metadata.json').write_text(json.dumps({
+        'id': 'legacy1', 'slug': folder_name.split('-')[0] + '-' + folder_name.split('-')[1],
+        'collections': ['private'], 'shareable': False,
+    }), encoding='utf-8')
+    quoted = urllib.parse.quote(folder_name)
+
+    status, _, _ = request('GET', f'/{quoted}/page.jpg')
+    assert status == 403  # piiratud teos: kaust leitud, aga token puudub
+    status, headers, _ = request('GET', f'/{quoted}/page.jpg{_signed("legacy1")}')
+    assert status == 200
+    assert headers['Content-Type'] == 'image/jpeg'
+    status, _, _ = request('GET', f'/{quoted}/_thumbs/_thumb_page.jpg{_signed("legacy1")}')
+    assert status == 200
+
+
+def test_exact_folder_name_does_not_follow_symlink_out_of_root(image_http, tmp_path_factory):
+    request, _, tmp_path = image_http
+    outside = tmp_path_factory.mktemp('outside')
+    Image.new('RGB', (16, 24), 'white').save(outside / 'page.jpg')
+    (outside / '_metadata.json').write_text(json.dumps({'id': 'out1', 'collections': []}),
+                                             encoding='utf-8')
+    (tmp_path / 'linked').symlink_to(outside, target_is_directory=True)
+    status, _, _ = request('GET', '/linked/page.jpg')
+    assert status in (403, 404)

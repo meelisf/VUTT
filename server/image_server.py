@@ -424,7 +424,16 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(403, "Keelatud")
             return
 
-        work_dir = find_directory_by_id(parts[0])
+        # Pilditee kannab tavaliselt kausta nime (Meili `teose_kaust`). Täpne
+        # kaustanimi enne ID/slug-otsingut: `find_directory_by_id` võrdleb
+        # kaustanime ainult `sanitize_id`-kujul, mis ei ühti täpitähtede ega
+        # lõpu-alakriipsuga vanade kaustadega (#423 järel 341 teost 404).
+        # Symlink ja andmejuurest välja osutamine lükatakse allpool tagasi.
+        exact_dir = os.path.join(DIRECTORY, parts[0])
+        if os.path.isfile(os.path.join(exact_dir, '_metadata.json')):
+            work_dir = exact_dir
+        else:
+            work_dir = find_directory_by_id(parts[0])
         if not work_dir:
             self.send_error(404, "Teost ei leitud")
             return
