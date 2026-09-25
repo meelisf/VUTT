@@ -165,7 +165,7 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
     meta_path = os.path.join(path, '_metadata.json')
     slug = os.path.basename(path)
 
-    meta, changed = await run_in_threadpool(
+    tulemus = await run_in_threadpool(
         save_work_metadata,
         meta_path,
         data.get('metadata', {}),
@@ -177,12 +177,18 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
         sync_meili=False,
         call_ptw=True,
     )
+    meta, changed = tulemus
     # Muutusteta salvestus ei vaja rikastamist ega cache'ide tühjendamist (#173).
     if changed:
         background_tasks.add_task(process_person_fields_metadata, meta)
         background_tasks.add_task(enrich_entity_labels_async, meta)
         _invalidate_all_caches()
-    return {"status": "success", "changed": changed}
+    response = {"status": "success", "changed": changed, "git_committed": True}
+    # Sama leping nagu /save-il (#418): fail on kettal, ajalugu võib puududa.
+    if getattr(tulemus, "git_committed", True) is False:
+        response["git_committed"] = False
+        response["warning"] = "Metaandmed salvestati, aga Git versioonihalduse commit ebaõnnestus."
+    return response
 
 @router.post("/get-work-metadata")
 async def get_work_meta_direct(request: Request, user=Depends(require_role("contributor"))):
@@ -236,7 +242,11 @@ async def _run_bulk(work_ids, transform, username, label, background_tasks, *, c
     )
     counts["failed"] += unknown
     _invalidate_all_caches()
-    return {"status": "success", **counts}
+    response = {"status": "success", **counts}
+    # Commitimata salvestused ei ole täielik edu (#418).
+    if counts.get("git_committed") is False:
+        response["warning"] = "Muudatused salvestati, aga Git versioonihalduse commit ebaõnnestus."
+    return response
 
 
 @router.get("/recent-edits")
@@ -396,7 +406,7 @@ async def page_comments_restore(
     # .txt jääb muutmata (taastame ainult kommentaari)
     txt = await run_in_threadpool(_read_text_file, txt_path)
 
-    await run_in_threadpool(
+    git_result = await run_in_threadpool(
         save_with_git,
         txt_path,
         txt,
@@ -405,7 +415,12 @@ async def page_comments_restore(
         additional_files=[(json_path, json.dumps(cur_data, indent=2, ensure_ascii=False))],
     )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
-    return {"status": "success", "comments": new_comments}
+    # Sama leping nagu /save-il: fail on kettal, aga commit võis ebaõnnestuda (#412 p1).
+    response = {"status": "success", "comments": new_comments, "git_committed": True}
+    if git_result.get("success") is False:
+        response["git_committed"] = False
+        response["warning"] = "Kommentaar taastati, aga Git versioonihalduse commit ebaõnnestus."
+    return response
 
 
 @router.post("/page-annotations/restore-as-comment")

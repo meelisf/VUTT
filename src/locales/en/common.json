@@ -228,7 +228,8 @@
   },
   "error": {
     "unknown": "Error",
-    "network": "Network error"
+    "network": "Network error",
+    "gitCommitFailed": "The changes were saved, but the version history commit failed. Please tell an administrator."
   },
   "notFound": {
     "title": "Page Not Found",

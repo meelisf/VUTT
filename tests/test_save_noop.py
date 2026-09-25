@@ -244,7 +244,7 @@ def test_update_work_metadata_returns_changed_false(monkeypatch):
         user={"username": "admin", "role": "admin"},
     ))
 
-    assert result == {"status": "success", "changed": False}
+    assert result == {"status": "success", "changed": False, "git_committed": True}
     assert tasks.tasks == []
     assert "caches" not in background
 
@@ -263,7 +263,7 @@ def test_update_work_metadata_returns_changed_true(monkeypatch):
         user={"username": "admin", "role": "admin"},
     ))
 
-    assert result == {"status": "success", "changed": True}
+    assert result == {"status": "success", "changed": True, "git_committed": True}
     assert len(tasks.tasks) == 2
 
 

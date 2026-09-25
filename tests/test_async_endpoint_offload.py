@@ -160,7 +160,7 @@ def test_metadata_save_jookseb_threadpoolis(monkeypatch):
         user={"username": "admin", "role": "admin"},
     ))
 
-    assert result == {"status": "success", "changed": True}
+    assert result == {"status": "success", "changed": True, "git_committed": True}
     assert seen["thread"] != MAIN_THREAD
     assert seen["sync_meili"] is False
     assert isinstance(seen["background_tasks"], BackgroundTasks)
@@ -313,3 +313,49 @@ def test_admin_ocr_jobs_jookseb_threadpoolis(monkeypatch):
 
     assert result == {"status": "success", "jobs": [{"id": "j1"}]}
     assert seen["thread"] != MAIN_THREAD
+
+
+def test_upload_files_kirjutab_threadpoolis(monkeypatch):
+    """#412 p4: /admin/upload/{id}/files ei tohi faili event-loopis avada ega kirjutada."""
+    seen = {"open": None, "write": [], "close": None}
+
+    class FakeFile:
+        def write(self, chunk):
+            seen["write"].append((chunk, _worker_thread_name()))
+
+        def close(self):
+            seen["close"] = _worker_thread_name()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self.close()
+
+    def fake_open(path, mode="r", *a, **k):
+        seen["open"] = _worker_thread_name()
+        return FakeFile()
+
+    monkeypatch.setattr(upload, "open", fake_open, raising=False)
+    monkeypatch.setattr(upload, "add_image_page", lambda *a: 1)
+
+    sent = False
+
+    async def receive():
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {"type": "http.request", "body": b"jpg-baidid", "more_body": False}
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    request = Request({
+        "type": "http", "method": "POST",
+        "headers": [(b"x-page-number", b"1"), (b"x-total-pages", b"1")],
+    }, receive)
+
+    result = asyncio.run(upload.admin_upload_files("up1", request, user={"username": "admin"}))
+
+    assert result["status"] == "accepted"
+    assert seen["open"] not in (None, MAIN_THREAD)
+    assert seen["write"] and all(t != MAIN_THREAD for _, t in seen["write"])
+    assert seen["close"] not in (None, MAIN_THREAD)

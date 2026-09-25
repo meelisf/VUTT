@@ -115,9 +115,9 @@ def _cleanup_expired_sessions():
             print(f"Sessioonide puhastuse viga: {e}")
 
 
-# Käivita puhastuse taustalõim
-_cleanup_thread = threading.Thread(target=_cleanup_expired_sessions, daemon=True)
-_cleanup_thread.start()
+# Puhastuse taustalõim käivitatakse `start_background()`-is, MITTE impordil:
+# pildiserver impordib `auth`-i paketi kaudu ja lõimel pole seal tööd (#412 p5).
+_cleanup_thread = None
 
 # =========================================================
 # KASUTAJATE CACHE
@@ -252,8 +252,19 @@ def users_role_snapshot():
         return {u: d.get("role", "contributor") for u, d in load_users().items()}
 
 
-# Lae cache serveri stardil
-load_users()
+def start_background():
+    """API-serveri käivitus (FastAPI lifespan): kasutajate cache + sessioonipuhastus.
+
+    Impordil neid ei tehta — `vutt-images` ei mounti `state/`-i ja logis muidu
+    iga käivituse peale „Kasutajate fail puudub" (#412 p5). Kordus on no-op.
+    """
+    global _cleanup_thread
+    load_users()
+    if _cleanup_thread is None:
+        _cleanup_thread = threading.Thread(
+            target=_cleanup_expired_sessions, daemon=True, name="session-cleanup",
+        )
+        _cleanup_thread.start()
 
 
 # Dummy bcrypt hash ajastuse-leke vältimiseks: kui kasutajat pole, jooksutame

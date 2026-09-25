@@ -415,9 +415,14 @@ async def admin_upload_files(upload_id: str, request: Request, user=Depends(requ
     x_total = int(request.headers.get("X-Total-Pages", "0"))
     tmp_path = f"/tmp/vutt-upload-{upload_id}-pg{x_pg}" if x_pg > 0 else f"/tmp/vutt-upload-{upload_id}"
     try:
-        with open(tmp_path, "wb") as f:
+        # Voog jääb vooks (vana vahemälus bundle võib saata terve PDF-i), aga
+        # iga faili-I/O käib threadpoolis — ADR 0002 (#412 p4).
+        f = await run_in_threadpool(open, tmp_path, "wb")
+        try:
             async for chunk in request.stream():
-                f.write(chunk)
+                await run_in_threadpool(f.write, chunk)
+        finally:
+            await run_in_threadpool(f.close)
         loop = asyncio.get_running_loop()
         if x_pg > 0:
             pages = await loop.run_in_executor(None, add_image_page, upload_id, tmp_path, x_pg, x_total)

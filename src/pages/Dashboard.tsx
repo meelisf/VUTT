@@ -584,6 +584,8 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const result = await bulkAssignCollection(token, Array.from(selectedWorkIds), collectionId);
       if (result.status === 'success') {
+        // Salvestatud, aga versiooniajalugu puudu (#418)
+        if (result.git_committed === false) alert(t('common:error.gitCommitFailed'));
         // Tühjenda valik ja uuenda otsing
         setSelectedWorkIds(new Set());
         setSelectMode(false);
@@ -610,6 +612,8 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const result = await bulkAssignTags(token, Array.from(selectedWorkIds), tags, mode);
       if (result.status === 'success') {
+        // Salvestatud, aga versiooniajalugu puudu (#418)
+        if (result.git_committed === false) alert(t('common:error.gitCommitFailed'));
         setSelectedWorkIds(new Set());
         setSelectMode(false);
         setRefreshCounter(prev => prev + 1);
@@ -634,6 +638,8 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const result = await bulkAssignGenre(token, Array.from(selectedWorkIds), genre);
       if (result.status === 'success') {
+        // Salvestatud, aga versiooniajalugu puudu (#418)
+        if (result.git_committed === false) alert(t('common:error.gitCommitFailed'));
         setSelectedWorkIds(new Set());
         setSelectMode(false);
         setRefreshCounter(prev => prev + 1);

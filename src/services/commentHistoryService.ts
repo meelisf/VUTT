@@ -59,7 +59,7 @@ export async function restoreComment(
   page: Page,
   params: { mode: 'version' | 'deleted'; comment_id: string; commit_hash: string },
   authToken?: string,
-): Promise<Annotation[]> {
+): Promise<{ comments: Annotation[]; gitCommitted: boolean }> {
   const response = await fetchWithTimeout(`${FILE_API_URL}/page-comments/restore`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
@@ -71,5 +71,6 @@ export async function restoreComment(
     throw new Error(e.detail || `Restore failed: ${response.status}`);
   }
   const data = await response.json();
-  return data.comments || [];
+  // Kommentaar on kettal ka siis, kui commit ebaõnnestus (#412 p1).
+  return { comments: data.comments || [], gitCommitted: data.git_committed !== false };
 }
