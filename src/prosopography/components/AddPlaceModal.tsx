@@ -448,13 +448,22 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             <select value={group} onChange={e => setGroup(e.target.value)}
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none">
               <option value="">—</option>
+              {/* Alamgrupid (Götaland jt) oma ülemgrupi järel — ADR 0052: Rootsi koht
+                  kuulub ajaloolise maakonna järgi alamgruppi, `rootsi` on ainult varu */}
               {Object.entries(meta?.groups ?? {})
                 .filter(([, v]: any) => !v.parent)
                 .sort((a: any, b: any) => (a[1].sort_order ?? 50) - (b[1].sort_order ?? 50))
-                .map(([k, v]: any) => (
-                  <option key={k} value={k}>{v.labels?.et ?? k}</option>
-                ))}
+                .flatMap(([k, v]: any) => [
+                  <option key={k} value={k}>{v.labels?.et ?? k}</option>,
+                  ...Object.entries(meta?.groups ?? {})
+                    .filter(([, c]: any) => c.parent === k)
+                    .sort((a: any, b: any) => (a[1].sort_order ?? 50) - (b[1].sort_order ?? 50))
+                    .map(([ck, c]: any) => (
+                      <option key={ck} value={ck}>{'   '}{c.labels?.et ?? ck}</option>
+                    )),
+                ])}
             </select>
+            <p className="mt-1 text-xs text-gray-500">{t('placeModal.groupHint')}</p>
           </div>
         </div>
 

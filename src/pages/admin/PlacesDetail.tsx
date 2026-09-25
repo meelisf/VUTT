@@ -108,7 +108,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
   placeKey, entry, places, meta, personCount, personSample,
   token, lang, onUpdated, onMerged, onDeleted, onSelectKey, onDirtyChange, saveRef,
 }) => {
-  const { t } = useTranslation('admin');
+  const { t } = useTranslation(['admin', 'prosopography']);
   const [editing, setEditing] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -371,6 +371,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
                 <option key={k} value={k}>{resolveLabel(v.labels, lang) || k}</option>
               ))}
           </select>
+          <p className="mt-1 text-xs text-gray-500">{t('prosopography:placeModal.groupHint')}</p>
         </div>
 
         {/* Ajaloolised nimed */}
