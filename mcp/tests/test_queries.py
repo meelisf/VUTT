@@ -28,6 +28,27 @@ def test_kollektsioonifilter():
     assert 'collections_hierarchy = "Disputatsioonid"' in body["filter"]
 
 
+def test_tyybifilter():
+    # Q87167 = käsikiri, Q1261026 = trükis
+    body = queries.build_search_body("x", type_id="Q87167")
+    assert body["filter"] == 'type_ids = "Q87167"'
+
+
+def test_marksonafilter():
+    body = queries.build_search_body("x", tag_id="Q34178")
+    assert body["filter"] == 'tags_ids = "Q34178"'
+
+
+def test_tyyp_marksona_ja_kollektsioon_koos():
+    body = queries.build_search_body(
+        "x", collection="academia-gustaviana", type_id="Q87167", tag_id="Q34178")
+    assert body["filter"].split(" AND ") == [
+        'collections_hierarchy = "academia-gustaviana"',
+        'type_ids = "Q87167"',
+        'tags_ids = "Q34178"',
+    ]
+
+
 def test_aastavahemik_kasutab_kattuvust():
     body = queries.build_search_body("x", year_from=1630, year_to=1650)
     assert "year_end >= 1630" in body["filter"]

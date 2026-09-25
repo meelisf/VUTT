@@ -32,8 +32,8 @@ KEELED - arvesta neid, muidu otsid tühja:
   "Buchdrucker".
 
 TÖÖKÄIK:
-1. list_filter_values (collections, languages, genres, types) - suletud loend,
-   ära oleta väärtusi.
+1. list_filter_values (collections, languages, genres, types, tags) - suletud
+   loend, ära oleta väärtusi.
 2. search_works = MILLISED teosed teemat käsitlevad; search_pages = KUS midagi
    mainitakse.
 3. get_pages(work_id, from_page, to_page) = täistekst.
