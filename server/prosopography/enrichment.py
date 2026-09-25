@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 from typing import Optional
 
 from .ext_ids import normalize_ext_id
+from ..cache import get_cached_vocabularies
 from ..prosopo_biography_fields import AA_RAW
 
 logger = logging.getLogger(__name__)
@@ -303,6 +304,42 @@ def _wd_time(entity: dict, prop: str):
     return None, None, None
 
 
+# Wikidata P140 → konfessioonide sõnastiku id. Wikidata segab õpetust (Q1841
+# katolitsism), institutsiooni (Q9592 katoliku kirik) ja isikut (Q51698274
+# luterlane); meie sõnastik on suletud ja kannab õpetust. Kristiina (Q52937)
+# sai kaardile Q9592, mida vorm ei näidanud ega lasknud eemaldada (2026-09-25).
+_WD_KONFESSIOON = {
+    "Q9592": "Q1841",       # Catholic Church
+    "Q7361618": "Q1841",    # Roman Catholic
+    "Q597526": "Q1841",     # Latin Church
+    "Q51698274": "Q75809",  # Lutheran (isik)
+    "Q749243": "Q75809",    # Church of Sweden
+    "Q1379849": "Q75809",   # Evangelical Lutheran Church of Finland
+    "Q855585": "Q75809",    # Church of Denmark
+    "Q35032": "Q60995",     # Eastern Orthodox Church
+    "Q3333484": "Q60995",   # Eastern Orthodoxy
+}
+
+
+def _sonastikku(ids: list, vocab_key: str, vastavus: Optional[dict] = None) -> list:
+    """Q-koodid suletud sõnastiku kirjeteks; sõnastikuväline jääb VÄLJA.
+
+    Vorm pakub ainult sõnastiku väärtusi — väline väärtus oleks kaardil
+    nähtamatu ja eemaldamatu. Silt tuleb sõnastikust (nagu vormi salvestusel).
+    Laadimata sõnastik → tühi loend: parem jätta täitmata kui täita valesti.
+    """
+    vocab = {i["id"]: i for i in (get_cached_vocabularies() or {}).get(vocab_key) or []
+             if isinstance(i, dict) and i.get("id")}
+    out: list = []
+    for q in ids:
+        q = (vastavus or {}).get(q, q)
+        item = vocab.get(q)
+        if item and all(o["id"] != q for o in out):
+            labels = item.get("label") or {}
+            out.append({"id": q, "label": labels.get("et") or q, "labels": labels})
+    return out
+
+
 def _fetch_wikidata(qid: str) -> Optional[dict]:
     """Isiku andmed Wikidata entity API-st: üks entiteedipäring + üks sildipäring.
 
@@ -329,8 +366,7 @@ def _wikidata_result(entity: dict) -> Optional[dict]:
     confession_ids = _wd_item_ids(entity, "P140")
     status_ids = _wd_item_ids(entity, "P3716")
 
-    viited = set(birth_places[:1] + death_places[:1] + occupation_ids
-                 + confession_ids[:1] + status_ids[:1])
+    viited = set(birth_places[:1] + death_places[:1] + occupation_ids)
     sildid = _wd_labels(viited) if viited else {}
     if sildid is None:
         return None
@@ -377,10 +413,13 @@ def _wikidata_result(entity: dict) -> Optional[dict]:
             occupations.append({"id": q, "label": label})
     if occupations:
         result["_occupations"] = occupations
-    if confession_ids:
-        result["confession"] = viide(confession_ids[0])
-    if status_ids:
-        result["status"] = viide(status_ids[0])
+    # Kõik väärtused, mitte esimene: Kristiinal on luterlus (1626–1654) JA katolitsism.
+    confessions = _sonastikku(confession_ids, "konfessioonid", _WD_KONFESSIOON)
+    if confessions:
+        result["confessions"] = confessions
+    statuses = _sonastikku(status_ids, "seisused")
+    if statuses:
+        result["status"] = statuses[0]
 
     return result
 

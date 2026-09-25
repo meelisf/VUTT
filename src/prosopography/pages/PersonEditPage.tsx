@@ -25,6 +25,7 @@ import NewPersonStart from './NewPersonStart';
 import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
 import SimilarPersonsWarning from '../components/personForm/SimilarPersonsWarning';
 import PlacePicker from '../components/personForm/PlacePicker';
+import OutOfVocabChips from '../components/personForm/OutOfVocabChips';
 import { formatRelationOwnerName, formatRelationTypeLabel } from '../utils/estonianName';
 import { getVocabularies } from '../../services/collectionService';
 import type { VocabularySeisusItem } from '../../services/collectionService';
@@ -579,6 +580,12 @@ const PersonEditPage: React.FC = () => {
                     </button>
                   );
                 })}
+                <OutOfVocabChips
+                  ids={draft.statuses ?? []}
+                  vocab={seisused}
+                  saved={original?.statuses}
+                  onRemove={id => set({ statuses: (draft.statuses ?? []).filter(x => x !== id) })}
+                />
                 {seisused.length === 0 && (
                   <span className="text-xs text-gray-400 italic">{t('loadingVocab', 'Laadin…')}</span>
                 )}
@@ -613,6 +620,12 @@ const PersonEditPage: React.FC = () => {
                     </button>
                   );
                 })}
+                <OutOfVocabChips
+                  ids={draft.confessions ?? []}
+                  vocab={konfessioonid}
+                  saved={original?.confessions}
+                  onRemove={id => set({ confessions: (draft.confessions ?? []).filter(x => x !== id) })}
+                />
                 {konfessioonid.length === 0 && (
                   <span className="text-xs text-gray-400 italic">{t('loadingVocab', 'Laadin…')}</span>
                 )}

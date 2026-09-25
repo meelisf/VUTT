@@ -11,7 +11,7 @@ def test_uhe_allika_valjad_kaardiradadeks():
         "gender": "M", "birth.date": "1592-01-01", "birth.precision": "year",
         "birth.place": {"id": "Q1", "label": "Greifswald"},
         "_occupations": [{"id": "Q2", "label": "jurist"}],
-        "confession": {"id": "Q3", "label": "luterlane"},
+        "confessions": [{"id": "Q3", "label": "luterlane"}],
         "name.aliases": ["Laurentius Ludenius"], "name.label": "ignoreeritakse"})])
     f = agg["fields"]
     assert f["gender"] == "M"

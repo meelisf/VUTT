@@ -310,6 +310,8 @@
     "noChanges": "Muudatusi ei leitud",
     "empty": "Ajalugu puudub"
   },
+  "outOfVocab": "Sõnastikuväline väärtus — eemalda või vali sõnastikust vaste",
+  "outOfVocabRemove": "Eemalda {{label}}",
   "loadingVocab": "Laadin…",
   "scope": {
     "clearHint": "Eemalda piirang — otsib edasi kogu VUTT-ist",

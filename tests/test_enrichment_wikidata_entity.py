@@ -69,7 +69,7 @@ def test_valjund_vastab_vana_sparql_tee_kujule(wikidata):
     assert r["_occupations"][0] == {"id": "Q13418253", "label": "filoloog"}
     assert "Johannes Scheffer" in r["name.aliases"]
     assert len(r["name.aliases"]) == len(set(r["name.aliases"]))
-    assert "confession" not in r and "status" not in r
+    assert "confessions" not in r and "status" not in r
 
 
 def test_ametid_ei_ole_kumne_peale_kaetud(wikidata):

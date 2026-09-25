@@ -28,7 +28,7 @@ const FIELD_I18N: Record<string, string> = {
   'death.place': 'deathPlace',
   _occupations: 'occupations',
   _occupation_label: 'occupationLabel',
-  confession: 'confession',
+  confessions: 'confession',
   status: 'status',
   'name.label': 'nameLabel',
   'name.aliases': 'nameAliases',
