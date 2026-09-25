@@ -29,6 +29,7 @@ def _minimal_args(name: str) -> dict:
         "search_works": {"query": "x"},
         "get_work": {"work_id": "abc"},
         "get_pages": {"work_id": "abc", "from_page": 1, "to_page": 1},
+        "get_page_image": {"work_id": "abc", "page": 1},
         "search_persons": {"q": "x"},
         "get_person": {"person_id": "vutt:abc"},
         "list_filter_values": {"field": "collections"},

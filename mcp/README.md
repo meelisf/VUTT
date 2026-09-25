@@ -78,9 +78,15 @@ Kolm asja, mis üllatavad:
 | `search_works` | Sama teosetasandil + esindav lehekülg |
 | `get_work` | Teose metaandmed + lehekülgede loend |
 | `get_pages` | Lehekülgede vahemiku täistekst (kuni 20 lk) |
+| `get_page_image` | Ühe skaneeringu täisresolutsiooniga pilt OCR-i kontrolliks |
 | `search_persons` | Isikuotsing (nimevariandid kaetud) |
 | `get_person` | Isikukaart + seotud teosed (kuni 50) |
 | `list_filter_values` | Legaalsed filtriväärtused |
+
+OCR-i kontrollimiseks kutsu `get_page_image(work_id, page)` ja võrdle pilti
+`get_pages(work_id, page, page)` tekstiga. `page` on skaneeringu 1-põhine
+järjekorranumber, mitte trükitud paginatsioon. Tööriist tagastab MCP
+pildisisu (vajab seda toetavat klienti), mitte ainult pildilingi.
 
 Otsing on vaikimisi range (`matchingStrategy: "all"` — kõik päringu sõnad peavad
 esinema). `relax_matching=true` lülitab Meili vaikekäitumisele.

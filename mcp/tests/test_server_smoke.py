@@ -2,7 +2,7 @@
 from vutt_mcp.server import build_server
 
 EXPECTED_TOOLS = {
-    "search_pages", "search_works", "get_work", "get_pages",
+    "search_pages", "search_works", "get_work", "get_pages", "get_page_image",
     "search_persons", "get_person", "list_filter_values",
 }
 

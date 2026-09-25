@@ -5,6 +5,7 @@ laieneb see kiht — tööriistu ümber kirjutama ei pea.
 """
 import logging
 import time
+from urllib.parse import quote
 
 import httpx
 
@@ -39,7 +40,21 @@ class VuttClient:
         return self._request("POST", url, json=json_body)
 
     # ── sisemine ───────────────────────────────────────────────────────────
-    def _request(self, method: str, url: str, **kwargs) -> dict | list:
+    def image_get(self, path: str) -> tuple[bytes, str]:
+        """Loeb indeksi pilditee samast VUTT-ist, ilma otsinguvõtit saatmata."""
+        path = path.lstrip("/")
+        if not path or any(part in (".", "..", "") for part in path.split("/")) or "\\" in path:
+            raise VuttError("Vigane leheküljepildi tee indeksis.")
+        url = f"{self._settings.base_url}/api/images/{quote(path, safe='/')}"
+        response = self._request("GET", url, raw=True)
+        mime = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if mime not in {"image/jpeg", "image/png", "image/webp", "image/gif"}:
+            raise VuttError(f"Pildiserver ei tagastanud toetatud pilti ({mime}).")
+        if not response.content:
+            raise VuttError("Pildiserver tagastas tühja pildi.")
+        return response.content, mime
+
+    def _request(self, method: str, url: str, *, raw: bool = False, **kwargs):
         """Üks kordusekatse 5xx / 429 / timeout / ühendusvea korral."""
         last_exc: Exception | None = None
         for attempt in (1, 2):
@@ -57,6 +72,10 @@ class VuttClient:
             if response.status_code in RETRY_STATUSES and attempt == 1:
                 self._sleep_for_retry(response)
                 continue
+            if raw and response.status_code == 200:
+                return response
+            if raw and response.status_code in (401, 403):
+                raise VuttError("Leheküljepildile puudub avalik ligipääs.")
             return self._handle(response)
 
         raise VuttTemporaryError("VUTT ei vasta.") from last_exc

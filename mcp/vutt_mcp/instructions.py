@@ -36,7 +36,7 @@ TÖÖKÄIK:
    loend, ära oleta väärtusi.
 2. search_works = MILLISED teosed teemat käsitlevad; search_pages = KUS midagi
    mainitakse.
-3. get_pages(work_id, from_page, to_page) = täistekst.
+3. get_pages = täistekst; get_page_image = pilt OCR-i kontrolliks.
 4. Isikud: search_persons / get_person (prosopograafia).
 5. Sekundaarkirjandus on ERALDI kogu, mitte korpuse osa: list_literature
    näitab, mis seal on; get_literature_pages nõuab page_ref="printed" (trükise

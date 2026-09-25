@@ -18,6 +18,7 @@ from .client import VuttClient
 from .config import load_settings
 from .errors import VuttError, VuttNotFound
 from .instructions import SERVER_INSTRUCTIONS
+from .images import register_image_tools
 
 MAX_PAGE_SPAN = 20
 
@@ -45,6 +46,7 @@ def build_server(client=None, base_url: str | None = None) -> MCPServer:
         base_url = settings.base_url
     mcp = MCPServer("vutt", instructions=SERVER_INSTRUCTIONS)
     _register_text_tools(mcp, client, base_url)
+    register_image_tools(mcp, client, base_url)
     _register_person_tools(mcp, client, base_url)
 
     # Valikuline kirjanduskogu: registreerub ainult siis, kui indeks on olemas.
