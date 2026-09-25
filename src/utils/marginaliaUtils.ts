@@ -315,3 +315,62 @@ export function marginaliaFromSelection(
     cursor: lineStart + (lastClose >= 0 ? lastClose : wrapped.length),
   };
 }
+
+/**
+ * Avatud marginaaliagrupp, mille sees kursor on (või `null`). Grupp = üks
+ * visuaalne kaart; tema kõik `<m>` liikmed loetakse avatuks, kui mõni on avatud.
+ */
+export function openGroupAt(
+  blocks: MarginaliaBlock[],
+  openMarks: number[],
+  pos: number,
+): MarginaliaGroup | null {
+  return groupMarginaliaBlocks(blocks).find(group =>
+    group.blocks.some(block => openMarks.some(p => p >= block.from && p <= block.to))
+    && group.blocks.some(block => pos >= block.from && pos <= block.to),
+  ) ?? null;
+}
+
+/** Kas sisu on TERVIKUNA ühe `<tag>…</tag>` paari sees (mitte `<i>a</i> b <i>c</i>`). */
+function isWhollyWrapped(content: string, tag: string): boolean {
+  const open = `<${tag}>`;
+  const close = `</${tag}>`;
+  if (!content.startsWith(open) || !content.endsWith(close)) return false;
+  const re = new RegExp(`<(/?)${tag}>`, 'g');
+  let depth = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    depth += m[1] ? -1 : 1;
+    // Esimene paar sulgus enne lõppu → sisu ei ole ühes paaris.
+    if (depth === 0) return m.index + close.length === content.length;
+  }
+  return false;
+}
+
+/**
+ * Lülitab stiilitägi (`i`, `b`, `cs`) terve marginaaliakaardi peal: iga
+ * mittetühja `<m>` rea SISU ümber (`<m>` jääb välimiseks, ADR 0003). Kui kõik
+ * read on juba tervikuna selles tägis, eemaldatakse see; muidu mähitakse kõik
+ * ja sisemised sama tägi paarid eemaldatakse (need oleksid üleliigsed).
+ * Dispositsioon on kõnedes tavaliselt kursiivis, aga naaberkaart ei pruugi olla —
+ * seepärast kaardi, mitte lehe kaupa.
+ */
+export function toggleGroupStyle(
+  doc: string,
+  group: MarginaliaGroup,
+  tag: 'i' | 'b' | 'cs',
+): CleanChangeSpec[] {
+  const nonEmpty = group.blocks.filter(b => doc.slice(b.contentFrom, b.contentTo).trim() !== '');
+  if (nonEmpty.length === 0) return [];
+  const open = `<${tag}>`;
+  const close = `</${tag}>`;
+  const unwrap = nonEmpty.every(b => isWhollyWrapped(doc.slice(b.contentFrom, b.contentTo), tag));
+  const anyTag = new RegExp(`</?${tag}>`, 'g');
+  return nonEmpty.map(b => {
+    const content = doc.slice(b.contentFrom, b.contentTo);
+    const insert = unwrap
+      ? content.slice(open.length, content.length - close.length)
+      : open + content.replace(anyTag, '') + close;
+    return { from: b.contentFrom, to: b.contentTo, insert };
+  });
+}

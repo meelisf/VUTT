@@ -1,6 +1,6 @@
 // src/utils/__tests__/marginaliaUtils.test.ts
 import { describe, it, expect } from 'vitest';
-import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection, groupMarginaliaBlocks, rangeTouchesOpenMarginalia } from '../marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection, groupMarginaliaBlocks, rangeTouchesOpenMarginalia, openGroupAt, toggleGroupStyle } from '../marginaliaUtils';
 
 describe('findMarginaliaBlocks', () => {
   it('leiab omaette real seisva ploki ja ankurdab järgmise rea külge', () => {
@@ -316,5 +316,60 @@ describe('rangeTouchesOpenMarginalia', () => {
   it('ei blokeeri eraldi suletud plokki ega välist teksti', () => {
     expect(rangeTouchesOpenMarginalia(blocks, openMarks, blocks[2].contentFrom, blocks[2].contentTo)).toBe(false);
     expect(rangeTouchesOpenMarginalia(blocks, openMarks, 0, 4)).toBe(false);
+  });
+});
+
+describe('toggleGroupStyle (kaardi kursiiv)', () => {
+  const rakenda = (doc: string, changes: { from: number; to: number; insert: string }[]) =>
+    [...changes].sort((x, y) => y.from - x.from).reduce(
+      (d, c) => d.slice(0, c.from) + c.insert + d.slice(c.to), doc);
+  const text = 'enne\n<m>Exor-</m>\n<m>dium</m>\ntekst\n<m>Propositio</m>\npärast';
+  const blocks = findMarginaliaBlocks(text);
+  const [esimene, teine] = groupMarginaliaBlocks(blocks);
+
+  it('mähib kaardi iga rea sisu, teist kaarti ega põhiteksti ei puutu', () => {
+    expect(rakenda(text, toggleGroupStyle(text, esimene, 'i'))).toBe(
+      'enne\n<m><i>Exor-</i></m>\n<m><i>dium</i></m>\ntekst\n<m>Propositio</m>\npärast');
+  });
+
+  it('teine vajutus eemaldab kursiivi', () => {
+    const kord = rakenda(text, toggleGroupStyle(text, esimene, 'i'));
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(kord))[0];
+    expect(rakenda(kord, toggleGroupStyle(kord, g, 'i'))).toBe(text);
+  });
+
+  it('osaliselt kursiivis kaart läheb tervikuna kursiivi (sisemised paarid kaovad)', () => {
+    const doc = '<m>a <i>b</i> c</m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(rakenda(doc, toggleGroupStyle(doc, g, 'i'))).toBe('<m><i>a b c</i></m>\nx');
+  });
+
+  it('kaks eraldi paari ei ole „tervikuna kursiivis"', () => {
+    const doc = '<m><i>a</i> b <i>c</i></m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(rakenda(doc, toggleGroupStyle(doc, g, 'i'))).toBe('<m><i>a b c</i></m>\nx');
+  });
+
+  it('muud tägid jäävad kursiivi sisse', () => {
+    const doc = '<m><b>A</b></m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(rakenda(doc, toggleGroupStyle(doc, g, 'i'))).toBe('<m><i><b>A</b></i></m>\nx');
+  });
+
+  it('tühi kaart ei muutu', () => {
+    const doc = '<m></m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(toggleGroupStyle(doc, g, 'i')).toEqual([]);
+  });
+
+  it('openGroupAt leiab ainult avatud kaardi', () => {
+    const pos = teine.blocks[0].contentFrom;
+    expect(openGroupAt(blocks, [], pos)).toBeNull();
+    expect(openGroupAt(blocks, [pos], pos)?.from).toBe(teine.from);
+    // avatud esimene kaart, kursor teises → null
+    expect(openGroupAt(blocks, [esimene.blocks[0].contentFrom], pos)).toBeNull();
+    // grupi teise liikme kursor, marker esimesel liikmel → sama kaart
+    expect(openGroupAt(blocks, [esimene.blocks[0].contentFrom], esimene.blocks[1].contentFrom)?.from)
+      .toBe(esimene.from);
   });
 });
