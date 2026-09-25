@@ -10,7 +10,8 @@ import {
   closeAllMarginalia,
   hiddenBlockRanges,
 } from '../MarginaliaExtension';
-import { cleanMarkupSpecs, marginaliaFromSelection } from '../../../utils/marginaliaUtils';
+import { cleanMarkupSpecs, marginaliaFromSelection, openGroupAt, toggleGroupStyle } from '../../../utils/marginaliaUtils';
+import { selectionWrapChanges } from '../wrapTagUtils';
 
 const DOC = 'rida üks\n<m>Apoc. 12.</m>\nrida kaks\n<m>Vide Picrium</m>\nrida kolm';
 
@@ -300,6 +301,78 @@ describe('insertMarginalia valikuga (simulatsioon)', () => {
     expect(result.match(/<m>vana<\/m>/g)).toHaveLength(1);
     // 'vana' ei esine väljaspool oma tägi
     expect(result.replace('<m>vana</m>', '')).not.toContain('vana');
+  });
+});
+
+describe('insertMarginalia terve rea valikuga (tühja rea parandus)', () => {
+  it('rida saab plokiks, plokk on avatud ja tühja rida ei teki', () => {
+    const doc = 'enne\nPropositio.\npärast';
+    let state = mkState(doc);
+    const from = doc.indexOf('Propositio');
+    const to = from + 'Propositio.'.length;
+    const hidden = hiddenBlockRanges(state).filter(h => h.from < to && h.to > from);
+    const { changes, openPositions } = marginaliaFromSelection(doc, from, to, hidden);
+    state = state.update({
+      changes,
+      effects: openPositions.map(pos => openMarginalia.of(pos)),
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+    expect(state.doc.toString()).toBe('enne\n<m>Propositio.</m>\npärast');
+    expect(state.field(marginaliaField).blocks).toHaveLength(1);
+    expect(state.field(marginaliaField).openMarks).toHaveLength(1);
+  });
+});
+
+describe('kaardi kursiiv (toggleGroupStyle editori olekus)', () => {
+  it('avatud kaart läheb kursiivi, jääb avatuks, suletud kaart ja põhitekst ei muutu', () => {
+    const doc = 'enne\n<m>Exor-</m>\n<m>dium</m>\ntekst\n<m>Confirmatio</m>\npärast';
+    let state = mkState(doc);
+    const [b1] = state.field(marginaliaField).blocks;
+    state = state.update({ effects: openMarginalia.of(b1.contentFrom) }).state;
+    const { blocks, openMarks } = state.field(marginaliaField);
+    const group = openGroupAt(blocks, openMarks, b1.contentFrom)!;
+    state = state.update({
+      changes: toggleGroupStyle(state.doc.toString(), group, 'i'),
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+    expect(state.doc.toString()).toBe(
+      'enne\n<m><i>Exor-</i></m>\n<m><i>dium</i></m>\ntekst\n<m>Confirmatio</m>\npärast');
+    const after = state.field(marginaliaField);
+    expect(after.blocks).toHaveLength(3);
+    expect(openGroupAt(after.blocks, after.openMarks, after.blocks[1].contentFrom)).not.toBeNull();
+  });
+});
+
+describe('kaardi ühe sõna kursiivi eemaldus (selectionWrapChanges editori olekus)', () => {
+  const doc = 'enne\n<m><i>Exor-</i></m>\n<m><i>dium lectio</i></m>\ntekst\n<m><i>Confirmatio</i></m>\npärast';
+
+  it('avatud kaart: sõna poolitub, kaart jääb avatuks, teised ei muutu', () => {
+    let state = mkState(doc);
+    const [b1] = state.field(marginaliaField).blocks;
+    state = state.update({ effects: openMarginalia.of(b1.contentFrom) }).state;
+    const from = doc.indexOf('lectio');
+    state = state.update({ selection: { anchor: from, head: from + 'lectio'.length } }).state;
+    state = state.update({
+      changes: selectionWrapChanges(state, 'i'),
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+    expect(state.doc.toString()).toBe(
+      'enne\n<m><i>Exor-</i></m>\n<m><i>dium </i>lectio</m>\ntekst\n<m><i>Confirmatio</i></m>\npärast');
+    const after = state.field(marginaliaField);
+    expect(after.blocks).toHaveLength(3);
+    expect(openGroupAt(after.blocks, after.openMarks, after.blocks[1].contentFrom)).not.toBeNull();
+  });
+
+  it('suletud kaardi üle ulatuv põhiteksti valik ei muuda peidetud plokki', () => {
+    const d = '<i>enne</i>\n<m><i>Exor</i></m>\n<i>tekst</i>';
+    let state = mkState(d);
+    state = state.update({ selection: { anchor: 0, head: d.length } }).state;
+    state = state.update({
+      changes: selectionWrapChanges(state, 'i'),
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+    expect(state.doc.toString()).toBe('enne\n<m><i>Exor</i></m>\ntekst');
+    expect(state.field(marginaliaField).blocks).toHaveLength(1);
   });
 });
 

@@ -278,7 +278,24 @@ export function marginaliaFromSelection(
   selected += doc.slice(cursor, to);
 
   const lineStart = doc.lastIndexOf('\n', from - 1) + 1;
-  const wrapped = wrapMarginaliaLines(selected);
+
+  // Terve rea (või ridade) väljatõstmine jättis vanasti algse rea tühjaks —
+  // kasutaja nägi iga uue marginaalia järel ebavajalikku tühja rida. Kui
+  // valikust väljapoole ei jää real midagi peale tühikute, saab rea enda
+  // plokiks. Kolmikklikk võtab kaasa ka lõpu reavahetuse; see jääb reale.
+  // Peidetud plokkidega valik jääb vana tee peale: nende reavahetused kuuluvad
+  // peidetud alale ja kaitsefilter hoiab neid paigal.
+  let toLine = to;
+  while (toLine > from && doc[toLine - 1] === '\n') toLine--;
+  const nextNl = doc.indexOf('\n', toLine);
+  const lineEnd = nextNl === -1 ? doc.length : nextNl;
+  const touchesHidden = hidden.some(h => h.from < to && h.to > from);
+  const residual = doc.slice(lineStart, from) + doc.slice(toLine, lineEnd);
+  const lineWrapped = touchesHidden ? '' : wrapMarginaliaLines(doc.slice(from, toLine));
+  const replacesLine = !touchesHidden && residual.trim() === ''
+    && lineWrapped !== '' && !lineWrapped.startsWith('\n') && !lineWrapped.endsWith('\n');
+
+  const wrapped = replacesLine ? lineWrapped : wrapMarginaliaLines(selected);
   const insert = `${wrapped}\n`;
   const openPositions: number[] = [];
   const openRe = /<m>/g;
@@ -288,11 +305,72 @@ export function marginaliaFromSelection(
   }
   const lastClose = wrapped.lastIndexOf('</m>');
   return {
-    changes: [
-      { from: lineStart, to: lineStart, insert },
-      { from, to, insert: '' },
-    ],
+    changes: replacesLine
+      ? [{ from: lineStart, to: lineEnd, insert: wrapped }]
+      : [
+        { from: lineStart, to: lineStart, insert },
+        { from, to, insert: '' },
+      ],
     openPositions,
     cursor: lineStart + (lastClose >= 0 ? lastClose : wrapped.length),
   };
+}
+
+/**
+ * Avatud marginaaliagrupp, mille sees kursor on (või `null`). Grupp = üks
+ * visuaalne kaart; tema kõik `<m>` liikmed loetakse avatuks, kui mõni on avatud.
+ */
+export function openGroupAt(
+  blocks: MarginaliaBlock[],
+  openMarks: number[],
+  pos: number,
+): MarginaliaGroup | null {
+  return groupMarginaliaBlocks(blocks).find(group =>
+    group.blocks.some(block => openMarks.some(p => p >= block.from && p <= block.to))
+    && group.blocks.some(block => pos >= block.from && pos <= block.to),
+  ) ?? null;
+}
+
+/** Kas sisu on TERVIKUNA ühe `<tag>…</tag>` paari sees (mitte `<i>a</i> b <i>c</i>`). */
+function isWhollyWrapped(content: string, tag: string): boolean {
+  const open = `<${tag}>`;
+  const close = `</${tag}>`;
+  if (!content.startsWith(open) || !content.endsWith(close)) return false;
+  const re = new RegExp(`<(/?)${tag}>`, 'g');
+  let depth = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    depth += m[1] ? -1 : 1;
+    // Esimene paar sulgus enne lõppu → sisu ei ole ühes paaris.
+    if (depth === 0) return m.index + close.length === content.length;
+  }
+  return false;
+}
+
+/**
+ * Lülitab stiilitägi (`i`, `b`, `cs`) terve marginaaliakaardi peal: iga
+ * mittetühja `<m>` rea SISU ümber (`<m>` jääb välimiseks, ADR 0003). Kui kõik
+ * read on juba tervikuna selles tägis, eemaldatakse see; muidu mähitakse kõik
+ * ja sisemised sama tägi paarid eemaldatakse (need oleksid üleliigsed).
+ * Dispositsioon on kõnedes tavaliselt kursiivis, aga naaberkaart ei pruugi olla —
+ * seepärast kaardi, mitte lehe kaupa.
+ */
+export function toggleGroupStyle(
+  doc: string,
+  group: MarginaliaGroup,
+  tag: 'i' | 'b' | 'cs',
+): CleanChangeSpec[] {
+  const nonEmpty = group.blocks.filter(b => doc.slice(b.contentFrom, b.contentTo).trim() !== '');
+  if (nonEmpty.length === 0) return [];
+  const open = `<${tag}>`;
+  const close = `</${tag}>`;
+  const unwrap = nonEmpty.every(b => isWhollyWrapped(doc.slice(b.contentFrom, b.contentTo), tag));
+  const anyTag = new RegExp(`</?${tag}>`, 'g');
+  return nonEmpty.map(b => {
+    const content = doc.slice(b.contentFrom, b.contentTo);
+    const insert = unwrap
+      ? content.slice(open.length, content.length - close.length)
+      : open + content.replace(anyTag, '') + close;
+    return { from: b.contentFrom, to: b.contentTo, insert };
+  });
 }

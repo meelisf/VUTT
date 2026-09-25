@@ -1,6 +1,6 @@
 // src/utils/__tests__/marginaliaUtils.test.ts
 import { describe, it, expect } from 'vitest';
-import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection, groupMarginaliaBlocks, rangeTouchesOpenMarginalia } from '../marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection, groupMarginaliaBlocks, rangeTouchesOpenMarginalia, openGroupAt, toggleGroupStyle } from '../marginaliaUtils';
 
 describe('findMarginaliaBlocks', () => {
   it('leiab omaette real seisva ploki ja ankurdab järgmise rea külge', () => {
@@ -212,6 +212,11 @@ describe('cleanMarkupSpecs', () => {
 });
 
 describe('marginaliaFromSelection', () => {
+  // Muudatused rakendatakse algse dokumendi koordinaatides (nagu ChangeSet).
+  const rakenda = (doc: string, changes: { from: number; to: number; insert: string }[]) =>
+    [...changes].sort((x, y) => y.from - x.from || y.to - x.to)
+      .reduce((d, c) => d.slice(0, c.from) + c.insert + d.slice(c.to), doc);
+
   it('valik liigub uude <m> plokki valiku algusrea kohale', () => {
     const doc = 'esimene rida\nteine valitud rida\nkolmas';
     const from = doc.indexOf('teine');
@@ -237,10 +242,10 @@ describe('marginaliaFromSelection', () => {
   it('mitmerealine valik saab ühe <m> paari iga füüsilise rea kohta', () => {
     const doc = 'a\nb\nc';
     const r = marginaliaFromSelection(doc, 0, doc.length, []);
-    expect(r.changes[0].insert).toBe('<m>a</m>\n<m>b</m>\n<m>c</m>\n');
-    expect(r.changes[0].insert.trimEnd().split('\n').every(
-      line => /^<m>[^\n]*<\/m>$/.test(line),
-    )).toBe(true);
+    // Terve dokument valitud → read ise saavad plokkideks (tühja rida ei jää).
+    const uus = rakenda(doc, r.changes);
+    expect(uus).toBe('<m>a</m>\n<m>b</m>\n<m>c</m>');
+    expect(uus.split('\n').every(line => /^<m>[^\n]*<\/m>$/.test(line))).toBe(true);
     expect(r.openPositions).toEqual([
       3,
       '<m>a</m>\n'.length + 3,
@@ -249,11 +254,47 @@ describe('marginaliaFromSelection', () => {
     expect(r.cursor).toBe('<m>a</m>\n<m>b</m>\n<m>c'.length);
   });
 
+  it('terve rea valik ei jäta tühja rida (kasutaja tagasiside)', () => {
+    const doc = 'enne\nExordium.\npärast';
+    const from = doc.indexOf('Exordium');
+    const to = from + 'Exordium.'.length;
+    const r = marginaliaFromSelection(doc, from, to, []);
+    const uus = rakenda(doc, r.changes);
+    expect(uus).toBe('enne\n<m>Exordium.</m>\npärast');
+    expect(uus.slice(r.openPositions[0], r.cursor)).toBe('Exordium.');
+  });
+
+  it('kolmikkliki valik koos reavahetusega ei jäta tühja rida', () => {
+    const doc = 'enne\nExordium.\npärast';
+    const from = doc.indexOf('Exordium');
+    const to = doc.indexOf('pärast'); // valik lõpeb järgmise rea alguses
+    const r = marginaliaFromSelection(doc, from, to, []);
+    expect(rakenda(doc, r.changes)).toBe('enne\n<m>Exordium.</m>\npärast');
+  });
+
+  it('mitme terve rea valik asendab read plokkidega', () => {
+    const doc = 'x\nüks\nkaks\ny';
+    const from = doc.indexOf('üks');
+    const to = doc.indexOf('\ny');
+    const r = marginaliaFromSelection(doc, from, to, []);
+    const uus = rakenda(doc, r.changes);
+    expect(uus).toBe('x\n<m>üks</m>\n<m>kaks</m>\ny');
+    expect(r.openPositions.map(p => uus.slice(p, p + 3))).toEqual(['üks', 'kak']);
+  });
+
+  it('osaline rida jääb alles ja plokk tuleb rea kohale (vana käitumine)', () => {
+    const doc = 'enne\nExordium. Sed quia\npärast';
+    const from = doc.indexOf('Exordium');
+    const to = from + 'Exordium.'.length;
+    const r = marginaliaFromSelection(doc, from, to, []);
+    expect(rakenda(doc, r.changes)).toBe('enne\n<m>Exordium.</m>\n Sed quia\npärast');
+  });
+
   it('sulgeb ja taasavab üle rea ulatuva inline-tägi', () => {
     const doc = '<i>esimene\nteine</i>';
     const r = marginaliaFromSelection(doc, 0, doc.length, []);
-    expect(r.changes[0].insert).toBe(
-      '<m><i>esimene</i></m>\n<m><i>teine</i></m>\n',
+    expect(rakenda(doc, r.changes)).toBe(
+      '<m><i>esimene</i></m>\n<m><i>teine</i></m>',
     );
   });
 });
@@ -275,5 +316,60 @@ describe('rangeTouchesOpenMarginalia', () => {
   it('ei blokeeri eraldi suletud plokki ega välist teksti', () => {
     expect(rangeTouchesOpenMarginalia(blocks, openMarks, blocks[2].contentFrom, blocks[2].contentTo)).toBe(false);
     expect(rangeTouchesOpenMarginalia(blocks, openMarks, 0, 4)).toBe(false);
+  });
+});
+
+describe('toggleGroupStyle (kaardi kursiiv)', () => {
+  const rakenda = (doc: string, changes: { from: number; to: number; insert: string }[]) =>
+    [...changes].sort((x, y) => y.from - x.from).reduce(
+      (d, c) => d.slice(0, c.from) + c.insert + d.slice(c.to), doc);
+  const text = 'enne\n<m>Exor-</m>\n<m>dium</m>\ntekst\n<m>Propositio</m>\npärast';
+  const blocks = findMarginaliaBlocks(text);
+  const [esimene, teine] = groupMarginaliaBlocks(blocks);
+
+  it('mähib kaardi iga rea sisu, teist kaarti ega põhiteksti ei puutu', () => {
+    expect(rakenda(text, toggleGroupStyle(text, esimene, 'i'))).toBe(
+      'enne\n<m><i>Exor-</i></m>\n<m><i>dium</i></m>\ntekst\n<m>Propositio</m>\npärast');
+  });
+
+  it('teine vajutus eemaldab kursiivi', () => {
+    const kord = rakenda(text, toggleGroupStyle(text, esimene, 'i'));
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(kord))[0];
+    expect(rakenda(kord, toggleGroupStyle(kord, g, 'i'))).toBe(text);
+  });
+
+  it('osaliselt kursiivis kaart läheb tervikuna kursiivi (sisemised paarid kaovad)', () => {
+    const doc = '<m>a <i>b</i> c</m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(rakenda(doc, toggleGroupStyle(doc, g, 'i'))).toBe('<m><i>a b c</i></m>\nx');
+  });
+
+  it('kaks eraldi paari ei ole „tervikuna kursiivis"', () => {
+    const doc = '<m><i>a</i> b <i>c</i></m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(rakenda(doc, toggleGroupStyle(doc, g, 'i'))).toBe('<m><i>a b c</i></m>\nx');
+  });
+
+  it('muud tägid jäävad kursiivi sisse', () => {
+    const doc = '<m><b>A</b></m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(rakenda(doc, toggleGroupStyle(doc, g, 'i'))).toBe('<m><i><b>A</b></i></m>\nx');
+  });
+
+  it('tühi kaart ei muutu', () => {
+    const doc = '<m></m>\nx';
+    const g = groupMarginaliaBlocks(findMarginaliaBlocks(doc))[0];
+    expect(toggleGroupStyle(doc, g, 'i')).toEqual([]);
+  });
+
+  it('openGroupAt leiab ainult avatud kaardi', () => {
+    const pos = teine.blocks[0].contentFrom;
+    expect(openGroupAt(blocks, [], pos)).toBeNull();
+    expect(openGroupAt(blocks, [pos], pos)?.from).toBe(teine.from);
+    // avatud esimene kaart, kursor teises → null
+    expect(openGroupAt(blocks, [esimene.blocks[0].contentFrom], pos)).toBeNull();
+    // grupi teise liikme kursor, marker esimesel liikmel → sama kaart
+    expect(openGroupAt(blocks, [esimene.blocks[0].contentFrom], esimene.blocks[1].contentFrom)?.from)
+      .toBe(esimene.from);
   });
 });
