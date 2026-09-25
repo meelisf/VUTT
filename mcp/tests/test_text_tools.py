@@ -90,6 +90,14 @@ async def test_search_pages_kollektsioonifilter_jouab_paringusse(server_with):
     assert "Disputatsioonid" in client.bodies[0]["filter"]
 
 
+@pytest.mark.parametrize("tool", ["search_pages", "search_works"])
+async def test_tyybi_ja_marksonafilter_jouavad_paringusse(server_with, tool):
+    server, client = server_with([{"hits": [], "totalHits": 0}])
+    await _call(server, tool, {"query": "x", "type_id": "Q87167", "tag_id": "Q34178"})
+    assert 'type_ids = "Q87167"' in client.bodies[0]["filter"]
+    assert 'tags_ids = "Q34178"' in client.bodies[0]["filter"]
+
+
 async def test_search_works_kasutab_distincti_ja_naitab_esindavat_lehte(server_with):
     server, client = server_with([{"hits": [_hit(page=7)], "totalHits": 1}])
     out = await _call(server, "search_works", {"query": "respublica"})
@@ -276,6 +284,15 @@ async def test_list_filter_values_lisab_q_koodile_sildi(server_with):
     assert "disputatsioon" in out               # et-silt
     assert "disputation" in out                 # en-silt
     assert "sermon" in out                      # et puudub → langeb en peale
+
+
+async def test_list_filter_values_marksonad_tulevad_tags_ids_facetist(server_with):
+    server, client = server_with([
+        {"facetDistribution": {"tags_ids": {"Q999998": 4613}}}
+    ])
+    out = await _call(server, "list_filter_values", {"field": "tags"})
+    assert "Q999998 — 4613 lk" in out
+    assert client.bodies[0]["facets"] == ["tags_ids"]
 
 
 async def test_list_filter_values_tundmatu_kood_jaab_paljaks(server_with):

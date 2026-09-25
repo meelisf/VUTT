@@ -81,6 +81,8 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         year_to: int | None = None,
         language: str | None = None,
         genre_id: str | None = None,
+        type_id: str | None = None,
+        tag_id: str | None = None,
         work_id: str | None = None,
         relax_matching: bool = False,
         compact: bool = False,
@@ -115,6 +117,10 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         work_id on teose püsiv lühikood (nanoid, nt "v7Kq2mXp") — kasuta seda
         otsingu piiramiseks ühe teosega. Filtriväärtusi saad list_filter_values'ist.
 
+        type_id piirab teose tüübiga: "Q87167" = käsikiri, "Q1261026" = trükis.
+        tag_id piirab teose märksõnaga (Wikidata Q-kood, loend:
+        list_filter_values("tags")). Filtrid kombineeruvad AND-iga.
+
         scope valib, MILLEST otsitakse: "text" (vaikimisi) = alliktekst ja
         marginaalia; "annotation" = toimetaja kiht (tekstisisesed märkused,
         lehe kommentaarid, lehe märksõnad) — nii leiad lehed, mille kohta
@@ -137,6 +143,8 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             year_to=year_to,
             language=language,
             genre_id=genre_id,
+            type_id=type_id,
+            tag_id=tag_id,
             work_id=work_id,
             relax_matching=relax_matching,
             search_fields=search_fields,
@@ -168,6 +176,8 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         year_to: int | None = None,
         language: str | None = None,
         genre_id: str | None = None,
+        type_id: str | None = None,
+        tag_id: str | None = None,
         relax_matching: bool = False,
         compact: bool = False,
         limit: int = 10,
@@ -182,6 +192,10 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
 
         compact=true jätab katked välja — kasuta laia päringu puhul, kus
         pealkirjad ja katked koos annavad kümnete kilobaitide kaupa teksti.
+
+        Filtrid (collection, language, genre_id, type_id, tag_id, aastad) on
+        samad mis search_pages'il: type_id "Q87167" = käsikiri, "Q1261026" =
+        trükis; tag_id = teose märksõna Q-kood (list_filter_values("tags")).
         """
         body = queries.build_search_body(
             query,
@@ -191,6 +205,8 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             year_to=year_to,
             language=language,
             genre_id=genre_id,
+            type_id=type_id,
+            tag_id=tag_id,
             relax_matching=relax_matching,
             search_fields=queries.WORK_SEARCH_FIELDS,
             limit=limit,
@@ -265,9 +281,9 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         Kasuta ENNE filtriga otsimist — ilma selleta on lihtne pakkuda väärtust,
         mida indeksis ei ole, ja saada tühi tulemus.
 
-        Lubatud väljad: collections, languages, genres, types.
-        Keeled on ISO-koodid (lat, deu, grc, est…), žanrid ja tüübid Wikidata
-        Q-koodid — need tulevad koos eesti- ja ingliskeelse sildiga, nii et
+        Lubatud väljad: collections, languages, genres, types, tags.
+        Keeled on ISO-koodid (lat, deu, grc, est…), žanrid, tüübid ja
+        märksõnad (tags — teose märksõnad, mitte lehe omad) Wikidata Q-koodid — need tulevad koos eesti- ja ingliskeelse sildiga, nii et
         koodi tähendust ei pea oletama. Filtrisse anna KOOD, mitte silt.
 
         Sildid on Wikidatast ja võivad teose juures kuvatavast erineda:

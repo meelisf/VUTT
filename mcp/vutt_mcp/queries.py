@@ -133,6 +133,7 @@ FACET_FIELDS = {
     "languages": "languages",
     "genres": "genre_ids",
     "types": "type_ids",
+    "tags": "tags_ids",
 }
 
 MAX_LIMIT = 50
@@ -207,6 +208,8 @@ def build_search_body(
     year_to: int | None = None,
     language: str | None = None,
     genre_id: str | None = None,
+    type_id: str | None = None,
+    tag_id: str | None = None,
     work_id: str | None = None,
     relax_matching: bool = False,
     search_fields: list[str] | None = None,
@@ -232,6 +235,10 @@ def build_search_body(
         clauses.append(f"languages = {_quote(language)}")
     if genre_id:
         clauses.append(f"genre_ids = {_quote(genre_id)}")
+    if type_id:
+        clauses.append(f"type_ids = {_quote(type_id)}")
+    if tag_id:
+        clauses.append(f"tags_ids = {_quote(tag_id)}")
 
     per_page = max(1, min(int(limit), MAX_LIMIT))
     body: dict = {
