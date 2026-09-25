@@ -35,8 +35,7 @@ TÖÖKÄIK:
 1. list_filter_values (collections, languages, genres, types, tags) - suletud
    loend, ära oleta väärtusi.
 2. search_works = MILLISED teosed teemat käsitlevad; search_pages = KUS midagi
-   mainitakse. Piira collection, type_id (Q87167 = käsikiri, Q1261026 =
-   trükis) või tag_id (teose märksõna) filtriga.
+   mainitakse.
 3. get_pages(work_id, from_page, to_page) = täistekst.
 4. Isikud: search_persons / get_person (prosopograafia).
 5. Sekundaarkirjandus on ERALDI kogu, mitte korpuse osa: list_literature
