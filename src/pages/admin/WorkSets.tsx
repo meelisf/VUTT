@@ -130,6 +130,20 @@ const WorkSets: React.FC = () => {
     setShowArchived(true);
   }, [setParam]);
 
+  // Deep-linki kogu kerib nähtavale, kui loend on laetud (kerib AKEN).
+  useEffect(() => {
+    if (!setParam || loading) return;
+    document.getElementById(`ws-${setParam}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [setParam, loading]);
+
+  // Kogu nimi valib kogu: avab ligipääsupaneeli (kui kutsuja seda näeb), muidu
+  // liikmed. Varem sai vahetada ainult väikese „Ligipääs" lülitiga ja nimele
+  // klikk ei teinud midagi.
+  const valiKogu = (ws: WorkSetSummary) => {
+    if (ws.access) setAccessOpenId(accessOpenId === ws.id ? null : ws.id);
+    else avaLiikmed(ws.id);
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
     apiPost<{ status: string; users?: KnownUser[] }>('/admin/users', {}, { token: authToken })
@@ -254,8 +268,9 @@ const WorkSets: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header showSearchButton={false} pageTitle={t('workSets.title')} />
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <Link to="/admin" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
-          <ChevronLeft size={16} /> Admin
+        {/* Sisenetakse kollektsioonide hubist — sinna ka tagasi, mitte admini avalehele. */}
+        <Link to="/admin/collections" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
+          <ChevronLeft size={16} /> {t('collections.hub.title')}
         </Link>
 
         <h1 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -302,7 +317,9 @@ const WorkSets: React.FC = () => {
               const arhiveeritud = ws.status === 'archived';
               const arv = counts[ws.id];
               return (
-                <div key={ws.id} className={`bg-white border rounded-lg p-4 ${arhiveeritud ? 'border-gray-200 opacity-70' : 'border-gray-200'}`}>
+                <div key={ws.id} id={`ws-${ws.id}`}
+                  className={`bg-white border rounded-lg p-4 scroll-mt-24 ${arhiveeritud ? 'opacity-70' : ''} ${
+                    accessOpenId === ws.id || openId === ws.id ? 'border-primary-400 ring-1 ring-primary-200' : 'border-gray-200'}`}>
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
                       {editNameId === ws.id ? (
@@ -330,7 +347,9 @@ const WorkSets: React.FC = () => {
                         </div>
                       ) : (
                       <div className="font-medium text-gray-800 flex items-center gap-2">
-                        {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
+                        <button onClick={() => valiKogu(ws)} className="text-left hover:text-primary-700 hover:underline">
+                          {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
+                        </button>
                         {ws.can_manage && (
                           <button
                             onClick={() => alustaNimeMuutmist(ws)}
