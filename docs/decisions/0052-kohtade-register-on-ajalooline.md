@@ -36,7 +36,8 @@ põhjas, Magdeburg keskel.
 | `eesti` / `liivimaa` | Rootsi-aegne provints: Põhja-Eesti → Eestimaa; Lõuna-Eesti ja Põhja-Läti (Vidzeme) → Liivimaa. Tartu, Pärnu, Riia → Liivimaa. |
 | `gootaland` / `svealand` / `norrland` | Rootsi ajalooline maakond (landskap). `rootsi` ainult siis, kui maakond pole teada. |
 | `pohja-saksamaa` / `kesk-saksamaa` | **Benrathi joon** (alamsaksa vs ülemsaksa keeleala): joonest põhjas → Põhja-Saksamaa. Magdeburg põhjas; Halle, Leipzig, Dresden, Weimar lõunas. `kesk-saksamaa` = „Kesk- ja Lõuna-Saksamaa", st kõik joonest lõunas. |
-| ülejäänud | Nimi ütleb (Soome, Karjala, Ingerimaa, Kuramaa); `muu` = väljaspool neid. |
+| `kuramaa` | Kuramaa hertsogkond (Kurzeme, Zemgale): Jelgava (Mitau), Kuldīga (Goldingen), Bauska. |
+| ülejäänud | Nimi ütleb (Soome, Karjala, Ingerimaa); `muu` = väljaspool neid. |
 
 Kriteerium on kasutajale nähtav grupi valiku juures (`placeModal.groupHint`).
 Olemasolevate kohtade gruppe kood ümber EI kirjuta — vastuolud on andmetöö (#240).
@@ -59,10 +60,10 @@ Esialgne loend (Q-koodid lahendatakse ja kontrollitakse teostuses):
 
 - **eesti:** Harju, Rapla, Lääne, Järva, Lääne-Viru, Ida-Viru maakond
 - **liivimaa:** Tartu, Võru, Põlva, Valga, Viljandi, Jõgeva maakond; Vidzeme
+- **kuramaa:** Kurzeme, Zemgale (2026-09-25 viidi Jelgava, Goldingen, Bauska,
+  Iecava ja Tērvete registris `liivimaa` alt `kuramaa` alla)
 - **ankruta:** Pärnu maakond (Hanila/Varbla/Koonga olid Eestimaa), Saare ja
-  Hiiu maakond (Saaremaa oli Rootsi ajal eraldi provints); Kurzeme ja Zemgale
-  (registris on Jelgava, Kuldīga, Bauska grupis `liivimaa`, kuigi grupp
-  `kuramaa` on olemas — otsustada koos #240 andmetööga)
+  Hiiu maakond (Saaremaa oli Rootsi ajal eraldi provints)
 - **svealand:** Stockholmi, Uppsala, Södermanlandi, Västmanlandi, Örebro,
   Värmlandi, Dalarna län
 - **gootaland:** Östergötlandi, Jönköpingi, Kronobergi, Kalmari, Gotlandi,
