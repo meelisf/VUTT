@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatLifeDate, formatFloruit } from '../personDates';
+import { formatLifeDate, formatFloruit, birthPlaceIsOrigin } from '../personDates';
 
 const bounds = { before: 'enne', after: 'pärast' };
 const fmt = (d: any) => formatLifeDate(d, bounds, 'et');
@@ -64,5 +64,26 @@ describe('formatFloruit', () => {
   it('kumbagi ei ole', () => {
     expect(formatFloruit(null, null)).toBe('');
     expect(formatFloruit(undefined, undefined)).toBe('');
+  });
+});
+
+describe('birthPlaceIsOrigin (#427)', () => {
+  const birth = (id: string | null) => ({ date: '1616-01-01', place: { id, label: 'Reval' } }) as any;
+
+  it('sama Q-kood → üks rida', () => {
+    expect(birthPlaceIsOrigin(birth('Q1770'), { place: 'Reval', place_id: 'Q1770' })).toBe(true);
+  });
+
+  it('eri täpsus (eri Q-kood) → mõlemad nähtaval', () => {
+    expect(birthPlaceIsOrigin(birth('Q1770'), { place: 'Estland', place_id: 'Q4532871' })).toBe(false);
+  });
+
+  it('Q-koodita sünnikoht ei ole kunagi sama, ka tühja place_id-ga', () => {
+    expect(birthPlaceIsOrigin(birth(null), { place: 'Reval', place_id: null })).toBe(false);
+  });
+
+  it('päritoluta ei ole midagi ühendada', () => {
+    expect(birthPlaceIsOrigin(birth('Q1770'), { place: null, place_id: 'Q1770' })).toBe(false);
+    expect(birthPlaceIsOrigin(birth('Q1770'), undefined)).toBe(false);
   });
 });

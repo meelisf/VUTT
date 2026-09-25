@@ -20,6 +20,16 @@ FIXTURE = json.loads(
     (Path(__file__).parent / "fixtures" / "wikidata" / "Q13972_place_entity.json")
     .read_text(encoding="utf-8"))
 
+# conftest asendab funktsiooni võrguta variandiga; siin testitakse päris funktsiooni
+# (võrk on asendatud madalamal: `_wd_entity`, `_wd_labels`).
+_PARIS = places_ops.fetch_place_wikidata
+
+
+@pytest.fixture(autouse=True)
+def _paris_funktsioon(monkeypatch):
+    monkeypatch.setattr(places_ops, "fetch_place_wikidata", _PARIS)
+
+
 SILDID = {
     "Q42307965": {"en": "Tartu City", "sv": "Tartu linn"},
 }

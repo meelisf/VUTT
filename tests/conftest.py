@@ -17,6 +17,16 @@ def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+@pytest.fixture(autouse=True)
+def _koha_wikidata_ilma_vorguta(monkeypatch):
+    """Automaatrikastus lahendab sünni-/surmakoha registrisse (#427): ilma selleta
+    läheks iga kohaga rikastustest päris Wikidatasse ja võiks kirjutada päris
+    `places.json`-i. Tõrge (`None`) = koht jääb lahendamata, midagi ei kirjutata.
+    Test, mis kohta lahendab, asendab selle ise (`test_place_resolve.py`)."""
+    from server.prosopography import places_ops
+    monkeypatch.setattr(places_ops, "fetch_place_wikidata", lambda qid: None)
+
+
 @pytest.fixture
 def backend_env(tmp_path, monkeypatch):
     state_dir = tmp_path / "state"

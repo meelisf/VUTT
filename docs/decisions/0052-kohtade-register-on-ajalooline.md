@@ -93,3 +93,22 @@ ei seota: „Kadrina kirikumõis" ≠ „Kadrina", „Kambja kihelkond" ≠ „K
 - `origin_groups.json` on autoriteetne konfiguratsioon → kirjutus ainult
   `save_config_with_git`-iga (ADR 0040).
 - Ankrute katvus on mõõdetav: kuivkäivitus `resolve()` peal enne ja pärast.
+
+## Teostus (#427 PR B)
+
+- `server/prosopography/place_resolve.py`: `resolve_place` (võrk, lukust väljas) →
+  `plan_register_entry` (puhas) → `ensure_register_place` (kirjutus).
+- **`places_write_lock`** (`places_ops`) — KÕIK `places.json` loe-muuda-kirjuta
+  teed (`put_place`, `delete_place`, `merge_places`, `refresh_all_place_labels`,
+  automaatne lisamine) käivad selle all ja loevad registri luku all uuesti.
+  Võrgupäringut luku all ei tehta. Uus kirjutaja → sama lukk.
+- Käivitub automaatrikastuse lõpus (`run_auto_enrichment`, samm 1c) ja
+  tagantjärele (`run_place_fill`, `scripts/backfill_places_from_birth.py`).
+  Käsitsi muudetud sünnikoht praegu automaatselt ei käivitu.
+- Kaardi märked (`review.reasons`): `origin_from_birth`, `place_needs_group`,
+  `place_name_match`; üksikasjad `review.place_proposals`
+  (`{field, qid, kind, key?}`) — järjekorra UI tuleb #426 PR 4-ga.
+  Kinnitatud ülevaatust ei avata; ülevaateta vanale kaardile tekib `pending`
+  (`created_via: "place_backfill"`).
+- UI: sama Q-koodiga sünnikoht ja päritolu → üks rida
+  („Sünni- ja päritolukoht", `birthPlaceIsOrigin`).

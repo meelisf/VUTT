@@ -18,7 +18,8 @@ from typing import Optional
 
 from . import state
 from ._compat import sync_from_facade
-from .auto_enrich import ENRICH_SCHEMES, aggregate, apply_to_card, finish_review
+from .auto_enrich import (ENRICH_SCHEMES, PLACE_FIELDS, add_place_review, aggregate,
+                          apply_place_plans, apply_to_card, card_place_qid, finish_review)
 from .enrichment import fetch_remote
 from .ext_ids import normalize_ext_id
 from .locks import ext_id_claim_lock, person_lock
@@ -61,6 +62,35 @@ def _pairs(card: dict) -> list:
     ))
 
 
+def _place_plans(qids: dict) -> dict:
+    """{prefix: (qid, plaan)} — võrk + registri kirjutus, ÜHEGI isikuluku all ei ole.
+
+    Tõrge ei tohi rikastust ega täitmist katkestada: koht jääb lihtsalt lahendamata.
+    """
+    from .place_resolve import ensure_register_place
+    plans = {}
+    for prefix, qid in qids.items():
+        try:
+            plans[prefix] = (qid, ensure_register_place(qid))
+        except Exception:
+            logger.warning("Kohtade register: %s ebaõnnestus", qid, exc_info=True)
+    return plans
+
+
+def _origin_builder(origin: dict) -> dict:
+    from .places_ops import _enrich_origin_from_places
+    return _enrich_origin_from_places(origin)
+
+
+def _apply_places(card: dict, plans: dict) -> tuple:
+    """Luku all: plaanid kaardile. Koht võis vahepeal registrist kaduda → vahele."""
+    try:
+        return apply_place_plans(card, plans, _origin_builder)
+    except ValueError:
+        logger.warning("Kohtade register: päritolu täitmine vahele (%s)", card.get("id"), exc_info=True)
+        return [], [], []
+
+
 def run_auto_enrichment(person_id: str) -> Optional[dict]:
     crud = _crud()
     sync_from_facade()
@@ -96,6 +126,18 @@ def run_auto_enrichment(person_id: str) -> Optional[dict]:
         except Exception:
             logger.warning("Automaatrikastus: %s seotud %s:%s ebaõnnestus", person_id, *key, exc_info=True)
             linked_results[key] = None
+
+    # 1c. Sünni-/surmakoht registrisse (#427) — samuti lukust väljas. Q-kood tuleb
+    # kaardilt või (kui kaardil kohta pole) allikatest, mis selle kohe täidavad.
+    eel = aggregate(answered + [{"scheme": k[0], "id": k[1], "remote": r}
+                                for k, r in linked_results.items() if r is not None])["fields"]
+    qids = {}
+    for prefix in PLACE_FIELDS:
+        q = card_place_qid(card, prefix) or card_place_qid(
+            {prefix: {"place": eel.get(f"{prefix}.place")}}, prefix)
+        if q:
+            qids[prefix] = q
+    place_plans = _place_plans(qids)
 
     # 2–3. Lukkude all: värske kaart, kehtivus, rakendamine, üks salvestus.
     with ext_id_claim_lock, person_lock(person_id):
@@ -137,12 +179,16 @@ def run_auto_enrichment(person_id: str) -> Optional[dict]:
         applied = apply_to_card(card, agg)
         if added_ids:
             applied.append("identifiers")
+        p_applied, p_reasons, p_proposals = _apply_places(card, place_plans)
+        applied += p_applied
 
         review = card.get("review") or {}
-        card["review"] = finish_review(
-            review, ids_left=ids_left,
-            answered=[a["scheme"] for a in answered], failed=[s for s, _ in failed],
-            applied=applied, conflicts=agg["conflicts"], possible_duplicate=dup)
+        card["review"] = add_place_review(
+            finish_review(
+                review, ids_left=ids_left,
+                answered=[a["scheme"] for a in answered], failed=[s for s, _ in failed],
+                applied=applied, conflicts=agg["conflicts"], possible_duplicate=dup),
+            reasons=p_reasons, proposals=p_proposals, applied=[], created_via="auto_enrich")
         author = card.get("created_by") or "Automaatne"
         card["updated_at"] = datetime.now(timezone.utc).isoformat()
         card["updated_by"] = author
@@ -150,6 +196,43 @@ def run_auto_enrichment(person_id: str) -> Optional[dict]:
         crud._save_person_locked(card, author, f"Automaatne rikastus: {name} [{person_id}]")
     crud._indices()._update_index_entry(card)
     crud._indices()._update_aliases_entry(card)
+    return card
+
+
+def run_place_fill(person_id: str, username: str = "Automaatne") -> Optional[dict]:
+    """Kaardil juba olevad sünni-/surmakohad registrisse + tühi päritolu sünnikohast.
+
+    Tagantjärele täitmine (#427) ja kaardid, mida automaatrikastus ei puuduta.
+    Sama järjekord mis rikastusel: võrk ja register lukust väljas, kaart luku all
+    uuesti. Muutuseta → ei salvestata (tagastab None).
+    """
+    crud = _crud()
+    sync_from_facade()
+    card = crud.get_person(person_id)
+    if _is_dead(card):
+        return None
+    qids = {p: q for p in PLACE_FIELDS if (q := card_place_qid(card, p))}
+    if not qids:
+        return None
+    plans = _place_plans(qids)
+
+    with person_lock(person_id):
+        card = crud.get_person(person_id)
+        if _is_dead(card):
+            return None
+        enne = json.dumps(card, sort_keys=True)
+        applied, reasons, proposals = _apply_places(card, plans)
+        card["review"] = add_place_review(card.get("review"), reasons=reasons, proposals=proposals,
+                                          applied=applied, created_via="place_backfill")
+        if card["review"] is None:
+            del card["review"]
+        if json.dumps(card, sort_keys=True) == enne:
+            return None
+        card["updated_at"] = datetime.now(timezone.utc).isoformat()
+        card["updated_by"] = username
+        name = (card.get("name") or {}).get("label") or person_id
+        crud._save_person_locked(card, username, f"Kohad sünni-/surmakohast: {name} [{person_id}]")
+    crud._indices()._update_index_entry(card)
     return card
 
 
