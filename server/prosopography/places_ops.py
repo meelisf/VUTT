@@ -18,6 +18,7 @@ from ..utils import atomic_write_json
 from ..git_ops import save_config_with_git
 from ..git_ops import save_with_git
 from .locks import merge_operation_lock, person_lock
+from .enrichment import _wd_best_values, _wd_entity, _wd_item_ids, _wd_labels
 
 logger = get_logger(__name__)
 
@@ -517,6 +518,22 @@ def search_places_wikidata(query: str, lang: str = "en", limit: int = 10) -> lis
         return []
 
 
+_PLACE_LABEL_LANGS = ("et", "en", "de", "la", "sv")
+_EARTH = "http://www.wikidata.org/entity/Q2"
+
+
+def _entity_coordinates(entity: dict) -> Optional[dict]:
+    """P625 esimene parima auastmega väärtus → koordinaadid; muu taevakeha → None."""
+    for v in _wd_best_values(entity, "P625"):
+        if not isinstance(v, dict) or v.get("globe", _EARTH) != _EARTH:
+            continue
+        lat, lon = v.get("latitude"), v.get("longitude")
+        if lat is None or lon is None:
+            continue
+        return _parse_wikidata_point(f"Point({lon} {lat})")
+    return None
+
+
 def fetch_place_wikidata(qid: str) -> Optional[dict]:
     """
     Pärib Wikidatast koha andmed: labelid, tüüp, koordinaadid (P625), ülempiirkonnad (P131).
@@ -525,82 +542,42 @@ def fetch_place_wikidata(qid: str) -> Optional[dict]:
       type: meie tüüp või None
       coordinates: {lat, lon, source, wikidata_property} või None
       parents: [{q, label_en, label_sv}] — P131 alusel
+    Vigane Q-kood või päringu tõrge → None.
+
+    Entity API (`Special:EntityData` + `wbgetentities` ülemüksuste siltideks), MITTE
+    SPARQL: avalik päringuteenus vastas külmalt 10–15 s-ga ja andis isikute
+    rikastusel 499 (#415, #427). Väärtused valitakse nagu `wdt:` neid andis —
+    parim auaste, deprecated mitte kunagi (`_wd_best_values`).
     """
     if not qid.startswith("Q") or not qid[1:].isdigit():
         return None
 
-    sparql = f"""
-SELECT ?label_et ?label_en ?label_de ?label_la ?label_sv
-       ?coord
-       ?typeQ (SAMPLE(?typeLabel) AS ?typeLabel)
-       ?parentQ (SAMPLE(?parentLabel_en) AS ?parentLabel_en)
-                (SAMPLE(?parentLabel_sv) AS ?parentLabel_sv)
-WHERE {{
-  OPTIONAL {{ wd:{qid} rdfs:label ?label_et. FILTER(LANG(?label_et)="et") }}
-  OPTIONAL {{ wd:{qid} rdfs:label ?label_en. FILTER(LANG(?label_en)="en") }}
-  OPTIONAL {{ wd:{qid} rdfs:label ?label_de. FILTER(LANG(?label_de)="de") }}
-  OPTIONAL {{ wd:{qid} rdfs:label ?label_la. FILTER(LANG(?label_la)="la") }}
-  OPTIONAL {{ wd:{qid} rdfs:label ?label_sv. FILTER(LANG(?label_sv)="sv") }}
-  OPTIONAL {{ wd:{qid} wdt:P625 ?coord. }}
-  OPTIONAL {{
-    wd:{qid} wdt:P31 ?typeQ.
-    ?typeQ rdfs:label ?typeLabel. FILTER(LANG(?typeLabel)="en")
-  }}
-  OPTIONAL {{
-    wd:{qid} wdt:P131 ?parentQ.
-    ?parentQ rdfs:label ?parentLabel_en. FILTER(LANG(?parentLabel_en)="en")
-    OPTIONAL {{ ?parentQ rdfs:label ?parentLabel_sv. FILTER(LANG(?parentLabel_sv)="sv") }}
-  }}
-}}
-GROUP BY ?label_et ?label_en ?label_de ?label_la ?label_sv ?coord ?typeQ ?parentQ
-LIMIT 20
-"""
-    url = "https://query.wikidata.org/sparql?" + urllib.parse.urlencode({
-        "query": sparql, "format": "json"
-    })
-    try:
-        req = urllib.request.Request(url, headers=_WD_HEADERS)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        bindings = data.get("results", {}).get("bindings", [])
-    except Exception:
+    entity = _wd_entity(qid)
+    if entity is None:
         return None
 
-    if not bindings:
-        return {}
-
-    b0 = bindings[0]
-    labels: dict = {}
-    for lang in ("et", "en", "de", "la", "sv"):
-        v = (b0.get(f"label_{lang}") or {}).get("value")
-        if v:
-            labels[lang] = v
-
-    coordinates = _parse_wikidata_point((b0.get("coord") or {}).get("value", ""))
+    labels = {lang: v["value"] for lang, v in (entity.get("labels") or {}).items()
+              if lang in _PLACE_LABEL_LANGS and v.get("value")}
 
     # Tüüp — esimene tuntud P31
-    place_type = None
-    seen_types: set = set()
-    for b in bindings:
-        tq = (b.get("typeQ") or {}).get("value", "").split("/")[-1]
-        if tq and tq not in seen_types:
-            seen_types.add(tq)
-            if tq in _WD_TYPE_MAP:
-                place_type = _WD_TYPE_MAP[tq]
-                break
+    place_type = next((_WD_TYPE_MAP[t] for t in _wd_item_ids(entity, "P31")
+                       if t in _WD_TYPE_MAP), None)
 
-    # Ülempiirkonnad (P131) — unikaalsed
-    seen_parents: set = set()
+    # Ülempiirkonnad (P131) — unikaalsed, järjekord nagu entiteedis
+    parent_ids = list(dict.fromkeys(_wd_item_ids(entity, "P131")))
     parents = []
-    for b in bindings:
-        pq = (b.get("parentQ") or {}).get("value", "").split("/")[-1]
-        if pq and pq not in seen_parents:
-            seen_parents.add(pq)
-            label_en = (b.get("parentLabel_en") or {}).get("value", "")
-            label_sv = (b.get("parentLabel_sv") or {}).get("value", "")
-            parents.append({"q": pq, "label_en": label_en, "label_sv": label_sv or label_en})
+    if parent_ids:
+        # Tõrge → None, mitte sildita ülemüksused: UI pakuks Q-koodi kohanimeks.
+        sildid = _wd_labels(parent_ids, langs=("en", "sv", "mul"))
+        if sildid is None:
+            return None
+        for pq in parent_ids:
+            s = sildid.get(pq) or {}
+            label_en = s.get("en") or s.get("mul") or pq
+            parents.append({"q": pq, "label_en": label_en, "label_sv": s.get("sv") or label_en})
 
-    return {"labels": labels, "type": place_type, "coordinates": coordinates, "parents": parents}
+    return {"labels": labels, "type": place_type,
+            "coordinates": _entity_coordinates(entity), "parents": parents}
 
 
 def refresh_all_place_labels(username: str = "Automaatne") -> int:

@@ -822,9 +822,11 @@ def places_wikidata_search(request: Request, q: str = "", lang: str = "en"):
 def places_wikidata_fetch(qid: str, request: Request):
     """Pärib Wikidatast koha andmed (labelid, tüüp, P131 ülempiirkonnad). Avalik (rate-limititud)."""
     _check_wikidata_rate_limit(request)
+    if not qid.startswith("Q") or not qid[1:].isdigit():
+        raise HTTPException(status_code=400, detail=f"Vigane Q-kood: {qid}")
     result = fetch_place_wikidata(qid)
     if result is None:
-        raise HTTPException(status_code=400, detail=f"Vigane Q-kood: {qid}")
+        raise HTTPException(status_code=502, detail=f"Wikidata päring ebaõnnestus: {qid}")
     return result
 
 

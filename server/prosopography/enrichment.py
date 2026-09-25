@@ -235,7 +235,7 @@ def _wd_entity(qid: str) -> Optional[dict]:
     return entities.get(qid) or next(iter(entities.values()), None)
 
 
-def _wd_labels(ids) -> Optional[dict]:
+def _wd_labels(ids, langs=_WD_LABEL_LANGS) -> Optional[dict]:
     """Sildid `{qid: {lang: tekst}}` ühe `wbgetentities` päringuga (≤ 50 id-d partii kohta).
 
     Tõrge → None, MITTE osaline tulemus: sildita viide kirjutaks kaardile Q-koodi
@@ -248,7 +248,7 @@ def _wd_labels(ids) -> Optional[dict]:
             "action": "wbgetentities",
             "ids": "|".join(ids[i:i + 50]),
             "props": "labels",
-            "languages": "|".join(_WD_LABEL_LANGS),
+            "languages": "|".join(langs),
             "format": "json",
         })
         data = _wd_get_json(f"{_WD_API}?{params}")
