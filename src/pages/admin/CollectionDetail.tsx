@@ -174,12 +174,12 @@ const CollectionDetail: React.FC = () => {
 
           <div className="p-6">
             {tab === 'works' && (
-              // „Teosed" EI OLE uus lugemistee: link läheb otsingusse, kus
+              // „Teosed" EI OLE uus lugemistee: link läheb töölauale, kus
               // kuuluvus tuleb `_metadata.json`-ist (ADR 0007). Parameeter on
               // `collection` ainsuses ja paljas id — seda loeb
               // `useCollectionUrlSync` → `decideCollectionSync` (ADR 0038).
               <Link
-                to={'/search?collection=' + encodeURIComponent(id)}
+                to={'/?collection=' + encodeURIComponent(id)}
                 className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700"
               >
                 {t('collections.hub.worksLink')}

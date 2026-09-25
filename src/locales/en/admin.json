@@ -227,7 +227,7 @@
       "tabWorks": "Works",
       "tabAccess": "Access",
       "tabSettings": "Settings",
-      "worksLink": "Open this collection's works in search",
+      "worksLink": "Open this collection's works",
       "settingsSuperadminOnly": "Only a superadmin can change collection settings.",
       "newWorkSet": "New work collection"
     }
