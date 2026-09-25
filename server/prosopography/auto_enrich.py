@@ -53,14 +53,25 @@ def _date_unit(remote: dict, prefix: str) -> Optional[dict]:
     date = remote.get(f"{prefix}.date")
     if not date:
         return None
-    return {"date": _pad_date(date), "precision": remote.get(f"{prefix}.precision") or "day"}
+    unit = {"date": _pad_date(date), "precision": remote.get(f"{prefix}.precision") or "day"}
+    if remote.get(f"{prefix}.calendar"):
+        unit["calendar"] = remote[f"{prefix}.calendar"]
+    return unit
 
 
 def _dates_compatible(a: dict, b: dict) -> Optional[dict]:
-    """Tagastab täpsema, kui kokkusobivad; None, kui vastuolus."""
+    """Tagastab täpsema, kui kokkusobivad; None, kui vastuolus.
+
+    Kalender käib kuupäevaga kaasas: teise allika märgend üle ainult siis, kui
+    kuupäev ja täpsus on identsed — muidu kinnitaks ta kuupäeva, mida ei väitnud.
+    """
     lo, hi = sorted((a, b), key=lambda d: _PREC_RANK.get(d["precision"], 2))
     n = _PREC_LEN.get(lo["precision"], 10)
-    return hi if lo["date"][:n] == hi["date"][:n] else None
+    if lo["date"][:n] != hi["date"][:n]:
+        return None
+    if not hi.get("calendar") and lo.get("calendar") and _trunc_date(lo) == _trunc_date(hi):
+        return {**hi, "calendar": lo["calendar"]}
+    return hi
 
 
 def _place(value: dict, scheme: str) -> dict:
@@ -172,6 +183,11 @@ def apply_to_card(card: dict, agg: dict) -> list:
         if prefix in f and not obj.get("date"):
             obj = {**obj, "date": f[prefix]["date"], "precision": f[prefix]["precision"]}
             applied.append(f"{prefix}.date")
+            # Kalender ainult koos allika kuupäevaga ja ainult tühja — käsitsi
+            # märgitud kalendrit (ilma kuupäevata) ei kirjutata üle.
+            if f[prefix].get("calendar") and not obj.get("calendar"):
+                obj["calendar"] = f[prefix]["calendar"]
+                applied.append(f"{prefix}.calendar")
         # Vana kaart võib kanda kohta lihtstringina — seda loetakse täidetuks
         # ega kirjutata üle (paljal stringil pole `.get`-meetodit).
         existing_place = obj.get("place")

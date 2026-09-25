@@ -22,6 +22,8 @@ const FIELD_I18N: Record<string, string> = {
   gender: 'gender',
   'birth.date': 'birthDate',
   'death.date': 'deathDate',
+  'birth.calendar': 'birthCalendar',
+  'death.calendar': 'deathCalendar',
   'birth.place': 'birthPlace',
   'death.place': 'deathPlace',
   _occupations: 'occupations',
@@ -101,6 +103,7 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
     if (typeof val === 'object') return val.label ?? JSON.stringify(val);
     if (val === 'M') return t('enrich.fieldLabels.genderM');
     if (val === 'F') return t('enrich.fieldLabels.genderF');
+    if (val === 'julian') return t('dateField.julian');
     return String(val);
   };
 
