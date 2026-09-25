@@ -37,6 +37,9 @@ _groups_cache: Optional[dict] = None
 _groups_cache_time: float = 0.0
 _CACHE_TTL = 300.0  # 5 min
 _cache_lock = threading.Lock()
+# places.json loe-muuda-kirjuta: admini `put_place` ja taustatöö automaatne
+# kohalisamine (#427, `place_resolve`) ei tohi teineteise muudatust üle kirjutada.
+places_write_lock = threading.RLock()
 
 
 def _load_places_cache(force_reload: bool = False) -> dict:
@@ -424,8 +427,6 @@ def put_place(key: str, data: dict, username: str = "Automaatne") -> dict:
             f"Tundmatu kohatüüp: '{place_type}'. Lubatud: {', '.join(ALLOWED_PLACE_TYPES)}"
         )
 
-    places = _load_places_cache(force_reload=True)
-    entry = places.get(key, {})
     if "coordinates" in data:
         coordinates = data.get("coordinates")
         if coordinates is not None:
@@ -436,13 +437,16 @@ def put_place(key: str, data: dict, username: str = "Automaatne") -> dict:
             if not (-90 <= float(lat) <= 90 and -180 <= float(lon) <= 180):
                 raise ValueError("coordinates väärtused on väljaspool lubatud vahemikku")
 
-    for field in ("id", "labels", "parent_key", "group", "type", "historical_names", "notes", "coordinates"):
-        if field in data:
-            entry[field] = data[field]
-    places[key] = entry
-    save_config_with_git(PLACES_FILE, places, username,
-                         message=f"Koht: uuenda {key}")
-    _load_places_cache(force_reload=True)
+    with places_write_lock:
+        places = _load_places_cache(force_reload=True)
+        entry = places.get(key, {})
+        for field in ("id", "labels", "parent_key", "group", "type", "historical_names", "notes", "coordinates"):
+            if field in data:
+                entry[field] = data[field]
+        places[key] = entry
+        save_config_with_git(PLACES_FILE, places, username,
+                             message=f"Koht: uuenda {key}")
+        _load_places_cache(force_reload=True)
     return entry
 
 
@@ -582,20 +586,27 @@ def fetch_place_wikidata(qid: str) -> Optional[dict]:
 
 def refresh_all_place_labels(username: str = "Automaatne") -> int:
     """Värskendab kõik places.json kirjed Wikidatast mis omavad Q-koodi."""
-    places = _load_places_cache(force_reload=True)
-    updated = 0
-    for key, entry in list(places.items()):
+    # Võrk lukust väljas; kirjutus luku all värske registri peale.
+    fetched = {}
+    for key, entry in list(_load_places_cache(force_reload=True).items()):
         qid = entry.get("id")
         if not qid or not isinstance(qid, str) or not qid.startswith("Q"):
             continue
         result = fetch_place_wikidata(qid)
         if result and result.get("labels"):
-            places[key] = {**entry, "labels": result["labels"]}
-            updated += 1
-    if updated:
-        save_config_with_git(PLACES_FILE, places, username,
-                             message=f"Kohad: {updated} labelit Wikidatast")
-        _load_places_cache(force_reload=True)
+            fetched[key] = (qid, result["labels"])
+    with places_write_lock:
+        places = _load_places_cache(force_reload=True)
+        updated = 0
+        for key, (qid, labels) in fetched.items():
+            entry = places.get(key)
+            if entry is not None and entry.get("id") == qid:
+                places[key] = {**entry, "labels": labels}
+                updated += 1
+        if updated:
+            save_config_with_git(PLACES_FILE, places, username,
+                                 message=f"Kohad: {updated} labelit Wikidatast")
+            _load_places_cache(force_reload=True)
     return updated
 
 
@@ -682,7 +693,7 @@ def _merge_places_locked(source_key: str, target_key: str, username: str) -> dic
 
 def merge_places(source_key: str, target_key: str, username: str = "system") -> dict:
     """Serialiseerib kohaliitmise teiste isiku- ja kohaliitmiste suhtes."""
-    with merge_operation_lock:
+    with merge_operation_lock, places_write_lock:
         return _merge_places_locked(source_key, target_key, username)
 
 
@@ -691,40 +702,41 @@ def delete_place(key: str, username: str = "Automaatne") -> None:
     Kustutab koha places.json-st.
     Blokeerib kui kohale on seotud alamkohti või isikuid.
     """
-    places = _load_places_cache(force_reload=True)
+    with places_write_lock:
+        places = _load_places_cache(force_reload=True)
 
-    if key not in places:
-        raise ValueError(f"Koht ei leitud: {key!r}")
+        if key not in places:
+            raise ValueError(f"Koht ei leitud: {key!r}")
 
-    children = [k for k, e in places.items() if e.get("parent_key") == key]
-    if children:
-        raise ValueError(
-            f"Ei saa kustutada: kohale on seotud alamkohti: {', '.join(children)}"
-        )
+        children = [k for k, e in places.items() if e.get("parent_key") == key]
+        if children:
+            raise ValueError(
+                f"Ei saa kustutada: kohale on seotud alamkohti: {', '.join(children)}"
+            )
 
-    # Kontrolli isikute viiteid
-    pattern = os.path.join(PROSOPOGRAPHY_DIR, "*.json")
-    referencing = []
-    for fpath in glob.glob(pattern):
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                person = json.load(f)
-        except Exception as exc:
-            logger.warning("delete_place: skipping %s: %s", fpath, exc)
-            continue
-        origin = person.get("origin")
-        if isinstance(origin, dict) and origin.get("place") == key:
-            referencing.append(os.path.basename(fpath))
+        # Kontrolli isikute viiteid
+        pattern = os.path.join(PROSOPOGRAPHY_DIR, "*.json")
+        referencing = []
+        for fpath in glob.glob(pattern):
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    person = json.load(f)
+            except Exception as exc:
+                logger.warning("delete_place: skipping %s: %s", fpath, exc)
+                continue
+            origin = person.get("origin")
+            if isinstance(origin, dict) and origin.get("place") == key:
+                referencing.append(os.path.basename(fpath))
 
-    if referencing:
-        raise ValueError(
-            f"Ei saa kustutada: kohale viitab {len(referencing)} isikut. "
-            "Kasuta esmalt ühendamist (merge) isikute suunamiseks."
-        )
+        if referencing:
+            raise ValueError(
+                f"Ei saa kustutada: kohale viitab {len(referencing)} isikut. "
+                "Kasuta esmalt ühendamist (merge) isikute suunamiseks."
+            )
 
-    del places[key]
-    save_config_with_git(PLACES_FILE, places, username,
-                         message=f"Koht: kustuta {key}")
-    _load_places_cache(force_reload=True)
+        del places[key]
+        save_config_with_git(PLACES_FILE, places, username,
+                             message=f"Koht: kustuta {key}")
+        _load_places_cache(force_reload=True)
 
     logger.info("delete_place: %s kustutatud", key)

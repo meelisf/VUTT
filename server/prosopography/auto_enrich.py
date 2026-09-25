@@ -251,3 +251,64 @@ def finish_review(review: dict, *, ids_left: bool, answered: list, failed: list,
     r["auto_filled"] = list(dict.fromkeys((r.get("auto_filled") or []) + applied))
     r["source_conflicts"] = (r.get("source_conflicts") or []) + conflicts
     return r
+
+
+# ── Kohad (#427, ADR 0052) ─────────────────────────────────────────────────
+
+PLACE_FIELDS = ("birth", "death")
+
+
+def card_place_qid(card: dict, prefix: str) -> Optional[str]:
+    place = (card.get(prefix) or {}).get("place") if isinstance(card.get(prefix), dict) else None
+    q = place.get("id") if isinstance(place, dict) else None
+    return q if isinstance(q, str) and q.startswith("Q") and q[1:].isdigit() else None
+
+
+def apply_place_plans(card: dict, plans: dict, origin_builder) -> tuple:
+    """Rakendab registriplaanid VÄRSKELE kaardile. Muteerib.
+
+    `plans`: {prefix: (qid, plan)} — `place_resolve.plan_register_entry` kuju.
+    Plaan kehtib ainult siis, kui kaardi koht on endiselt sama Q-kood.
+    Päritolu täidetakse AINULT sünnikohast ja AINULT tühjana (#427 otsus 1).
+    `origin_builder(origin, key)` → täidetud päritolu (`_enrich_origin_from_places`).
+    Tagastab (applied, reasons, proposals).
+    """
+    applied, reasons, proposals = [], [], []
+    for prefix, (qid, plan) in plans.items():
+        if card_place_qid(card, prefix) != qid:
+            continue
+        action = plan.get("action")
+        if action in ("exists", "create"):
+            origin = card.get("origin") if isinstance(card.get("origin"), dict) else {}
+            if prefix == "birth" and not origin.get("place"):
+                card["origin"] = origin_builder({**origin, "place": plan["key"]})
+                applied.append("origin.place")
+                reasons.append("origin_from_birth")
+        elif action == "needs_group":
+            reasons.append("place_needs_group")
+            proposals.append({"field": f"{prefix}.place", "qid": qid, "kind": "needs_group"})
+        elif action == "name_match":
+            reasons.append("place_name_match")
+            proposals.append({"field": f"{prefix}.place", "qid": qid, "kind": "name_match",
+                              "key": plan["key"]})
+    return applied, list(dict.fromkeys(reasons)), proposals
+
+
+def add_place_review(review: Optional[dict], *, reasons: list, proposals: list,
+                     applied: list, created_via: str) -> Optional[dict]:
+    """Lisab kohamärked ülevaatusse. Kinnitatud ülevaatust EI avata (ADR 0048)."""
+    if not reasons and not proposals:
+        return review
+    if review is None:
+        review = {"state": "pending", "reasons": [], "context": None,
+                  "created_via": created_via, "auto_filled": [], "source_conflicts": [],
+                  "failed_sources": [], "done_by": None, "done_at": None}
+    elif review.get("state") != "pending":
+        return review
+    r = {**review}
+    r["reasons"] = list(dict.fromkeys((r.get("reasons") or []) + reasons))
+    r["auto_filled"] = list(dict.fromkeys((r.get("auto_filled") or []) + applied))
+    seen = {(p.get("field"), p.get("qid")) for p in r.get("place_proposals") or []}
+    r["place_proposals"] = (r.get("place_proposals") or []) + [
+        p for p in proposals if (p["field"], p["qid"]) not in seen]
+    return r

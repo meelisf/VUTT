@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { formatLifeDate, formatFloruit } from '../utils/personDates';
+import { formatLifeDate, formatFloruit, birthPlaceIsOrigin } from '../utils/personDates';
 import MarkdownView from '../../components/MarkdownView';
 import BiographyBlocks from '../components/BiographyBlocks';
 import {
@@ -118,11 +118,12 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
     });
   }
   if (person.origin?.place) {
+    const sama = birthPlaceIsOrigin(person.birth, person.origin);
     const modernOrigin = person.origin.place_labels
       ? (person.origin.place_labels[lang] ?? person.origin.place_labels['et'] ?? person.origin.place_labels['en'] ?? Object.values(person.origin.place_labels)[0] ?? '')
       : '';
     rows.push({
-      label: t('origin', 'Päritolu'),
+      label: sama ? t('bornAndOrigin') : t('origin', 'Päritolu'),
       value: modernOrigin && modernOrigin !== person.origin.place
         ? `${person.origin.place} (${modernOrigin})`
         : person.origin.place,
@@ -416,7 +417,10 @@ const PersonDetailPage: React.FC = () => {
 
   // ── Andmed ───────────────────────────────────────────────
   const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
-  const birth = formatLifeDate(person.birth, boundLabels, lang);
+  // Sama koht on päritolureal („Sünni- ja päritolukoht") — sünniaja järel ei korrata.
+  const birth = formatLifeDate(
+    birthPlaceIsOrigin(person.birth, person.origin) ? { ...person.birth, place: null } : person.birth,
+    boundLabels, lang);
   const death = formatLifeDate(person.death, boundLabels, lang);
   // Sünni-/surmaaasta puudumisel jääks plokk tühjaks — näita tegutsemisperioodi
   const floruit = (!birth && !death)

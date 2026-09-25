@@ -73,3 +73,16 @@ export function formatFloruit(
   if (!from && !to) return '';
   return `${from ?? ''}–${to ?? ''}`;
 }
+
+/**
+ * Kas sünnikoht ja päritolu on sama koht (sama Q-kood)? Siis näidatakse ühte
+ * rida („Sünni- ja päritolukoht"), mitte sama kohta kahes kohas (#427).
+ * Eri täpsus (Tallinn / Estland) = eri Q-kood → mõlemad jäävad nähtavale.
+ */
+export function birthPlaceIsOrigin(
+  birth: HistoricalDate | null | undefined,
+  origin: { place?: string | null; place_id?: string | null } | null | undefined,
+): boolean {
+  const q = birth?.place?.id;
+  return !!q && !!origin?.place && origin.place_id === q;
+}
