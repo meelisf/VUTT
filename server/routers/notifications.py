@@ -30,6 +30,7 @@ from ..config import BASE_DIR
 from ..deps import get_user, require_role, get_json_data
 from ..auth import get_all_users, role_level
 from ..git_ops import save_with_git
+from ..page_paths import check_page_filename
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..notifications_ops import (
     load_notifications,
@@ -173,6 +174,7 @@ async def reply_to_page_comment(
 
     if not catalog or not filename or not comment_id or not reply_text:
         raise HTTPException(status_code=400, detail="Puudulikud vastuse andmed")
+    check_page_filename(filename)
 
     # Ligipääsukontroll oli siin varem puudu (elav auk, #297/ADR 0031) — vastamine
     # on kirjutustegevus, seega nõuab write=True (contributor ulatuse kontroll).

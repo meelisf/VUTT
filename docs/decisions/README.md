@@ -70,3 +70,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0048](0048-ulevaatusmarge-on-serveri-vali.md) | Ülevaatusmärge on serveri väli; automaatrikastus täidab ainult tühja; väline ID ühel kaardil | kehtib |
 | [0049](0049-lehe-teisendus-on-uks-tee.md) | Lehe teisendus on üks tee (`image_transform` + `components/pagePrep`); upload'is pööre → kärbe → poolitus | kehtib |
 | [0050](0050-teose-halduse-ootel-lehetoimingud.md) | Teose halduse pöörded ja poolitused on ootel plaan; rakendus ühe pakina (`/page-ops`), pööre → poolitus | kehtib |
+| [0051](0051-lehekirjutus-ainult-lehe-failipaarile.md) | Lehekirjutus ainult olemasoleva lehe `.txt`/`.json` paarile; nimeleping `server/page_paths.py` | kehtib |

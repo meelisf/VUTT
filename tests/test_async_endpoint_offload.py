@@ -122,6 +122,7 @@ def test_save_git_jookseb_threadpoolis(monkeypatch):
     seen = {}
 
     monkeypatch.setattr(editing, "_require_catalog_access", lambda *_a, **_k: {})
+    monkeypatch.setattr(editing, "require_existing_page", lambda *_a, **_k: None)
 
     def fake_save(*_args, **_kwargs):
         seen["thread"] = _worker_thread_name()
