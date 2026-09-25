@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Loader2, Plus, Users, Archive, RotateCcw, Globe, Lock, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, Users, Archive, RotateCcw, Globe, Lock, Trash2, ChevronDown, ChevronRight, X, Pencil } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -23,6 +23,37 @@ import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { apiPost } from '../../services/apiClient';
 import WorkSetAccessPanel from './WorkSetAccessPanel';
 import { KnownUser } from './workSetAccessDraft';
+
+type KogunNimi = { et: string; en: string };
+const TYHI_NIMI: KogunNimi = { et: '', en: '' };
+
+/** Server nõuab vähemalt ühte keelt; teine võib jääda tühjaks — kuvamine
+ * langeb siis tagasi olemasolevale nimele. */
+const nimiOnAntud = (n: KogunNimi) => !!(n.et.trim() || n.en.trim());
+const puhastaNimi = (n: KogunNimi): KogunNimi => ({ et: n.et.trim(), en: n.en.trim() });
+
+const NimeValjad: React.FC<{
+  value: KogunNimi;
+  onChange: (n: KogunNimi) => void;
+  onEnter: () => void;
+  labelEt: string;
+  labelEn: string;
+}> = ({ value, onChange, onEnter, labelEt, labelEn }) => (
+  <>
+    {(['et', 'en'] as const).map(keel => (
+      <input
+        key={keel}
+        type="text"
+        value={value[keel]}
+        onChange={(e) => onChange({ ...value, [keel]: e.target.value })}
+        onKeyDown={(e) => { if (e.key === 'Enter') onEnter(); }}
+        placeholder={keel === 'et' ? labelEt : labelEn}
+        aria-label={keel === 'et' ? labelEt : labelEn}
+        className="flex-1 min-w-[12rem] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+      />
+    ))}
+  </>
+);
 
 const WorkSets: React.FC = () => {
   const { t, i18n } = useTranslation(['admin', 'common']);
@@ -39,7 +70,12 @@ const WorkSets: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
+  // Nimi on kakskeelne: ühe välja kopeerimine mõlemasse keelde jättis teise
+  // keele vaatesse võõrkeelse nime, mida ei saanud hiljem parandada.
+  const [newName, setNewName] = useState<KogunNimi>(TYHI_NIMI);
+  // Olemasoleva kogu nime muutmine: korraga ainult üks rida.
+  const [editNameId, setEditNameId] = useState<string | null>(null);
+  const [editName, setEditName] = useState<KogunNimi>(TYHI_NIMI);
   // Avatud kogu liikmed. Laetakse nõudmisel: enamik haldustoiminguid ei vaja
   // nimekirja ja 1000 pealkirja laadimine iga kogu kohta oleks raiskamine.
   const [openId, setOpenId] = useState<string | null>(null);
@@ -140,16 +176,18 @@ const WorkSets: React.FC = () => {
     }
   };
 
-  const muuda = async (ws: WorkSetSummary, changes: Record<string, unknown>) => {
+  const muuda = async (ws: WorkSetSummary, changes: Record<string, unknown>): Promise<boolean> => {
     setBusyId(ws.id);
     try {
       await patchWorkSet(ws.id, changes, ws.revision);
       await load();
       await refreshWorkSets();
       setError(null);
+      return true;
     } catch (e) {
       const status = (e as { status?: number }).status;
       setError(status === 409 ? t('workSets.conflict') : t('workSets.saveFailed'));
+      return false;
     } finally {
       setBusyId(null);
     }
@@ -170,12 +208,23 @@ const WorkSets: React.FC = () => {
     }
   };
 
+  const alustaNimeMuutmist = (ws: WorkSetSummary) => {
+    setEditNameId(ws.id);
+    setEditName({ et: ws.name.et || '', en: ws.name.en || '' });
+  };
+
+  const salvestaNimi = async (ws: WorkSetSummary) => {
+    if (!nimiOnAntud(editName)) return;
+    // Ebaõnnestumisel jääb vorm lahti, et sisestus ei kaoks.
+    if (await muuda(ws, { name: puhastaNimi(editName) })) setEditNameId(null);
+  };
+
   const loo = async () => {
-    if (!newName.trim()) return;
+    if (!nimiOnAntud(newName)) return;
     setBusyId('new');
     try {
-      const loodud = await createWorkSet({ et: newName.trim(), en: newName.trim() });
-      setNewName('');
+      const loodud = await createWorkSet(puhastaNimi(newName));
+      setNewName(TYHI_NIMI);
       // Spekk §2: „Kogu loomise järel on sama paneel kohe kättesaadav."
       setAccessOpenId(loodud.id);
       await load();
@@ -187,7 +236,7 @@ const WorkSets: React.FC = () => {
       // tühistata) — täpselt nii tekkis „ebaõnnestus", kuigi kogu oli loodud.
       // Laeme loendi ja ütleme ainult seda, mida tegelikult teame.
       const tulem = loomiseTulem(e);
-      if (tulem === 'kinnitamata') setNewName('');  // kordusklikk = duplikaat
+      if (tulem === 'kinnitamata') setNewName(TYHI_NIMI);  // kordusklikk = duplikaat
       await load();
       await refreshWorkSets();
       // `load()` nullib vea õnnestumisel — teade käib seega PEALE, mitte enne.
@@ -219,17 +268,17 @@ const WorkSets: React.FC = () => {
         )}
 
         {isAdmin && (
-          <div className="mb-6 flex gap-2">
-            <input
-              type="text"
+          <div className="mb-6 flex gap-2 flex-wrap">
+            <NimeValjad
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder={t('workSets.name')}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              onChange={setNewName}
+              onEnter={loo}
+              labelEt={t('workSets.nameEt')}
+              labelEn={t('workSets.nameEn')}
             />
             <button
               onClick={loo}
-              disabled={!newName.trim() || busyId === 'new'}
+              disabled={!nimiOnAntud(newName) || busyId === 'new'}
               className="inline-flex items-center gap-1 px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
             >
               {busyId === 'new' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
@@ -256,8 +305,42 @@ const WorkSets: React.FC = () => {
                 <div key={ws.id} className={`bg-white border rounded-lg p-4 ${arhiveeritud ? 'border-gray-200 opacity-70' : 'border-gray-200'}`}>
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
+                      {editNameId === ws.id ? (
+                        <div className="flex gap-2 flex-wrap items-center">
+                          <NimeValjad
+                            value={editName}
+                            onChange={setEditName}
+                            onEnter={() => salvestaNimi(ws)}
+                            labelEt={t('workSets.nameEt')}
+                            labelEn={t('workSets.nameEn')}
+                          />
+                          <button
+                            onClick={() => salvestaNimi(ws)}
+                            disabled={!nimiOnAntud(editName) || busyId === ws.id}
+                            className="text-xs px-2 py-1 bg-primary-600 text-white rounded disabled:opacity-50"
+                          >
+                            {t('workSets.accessPanel.save')}
+                          </button>
+                          <button
+                            onClick={() => setEditNameId(null)}
+                            className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50"
+                          >
+                            {t('workSets.accessPanel.cancel')}
+                          </button>
+                        </div>
+                      ) : (
                       <div className="font-medium text-gray-800 flex items-center gap-2">
                         {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
+                        {ws.can_manage && (
+                          <button
+                            onClick={() => alustaNimeMuutmist(ws)}
+                            className="text-gray-400 hover:text-gray-700"
+                            aria-label={t('workSets.rename')}
+                            title={t('workSets.rename')}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        )}
                         {ws.visibility === 'public'
                           ? <Globe size={14} className="text-emerald-600" aria-label={t('workSets.visibilityPublic')} />
                           : <Lock size={14} className="text-gray-400" aria-label={t('workSets.visibilityMembers')} />}
@@ -267,6 +350,7 @@ const WorkSets: React.FC = () => {
                           </span>
                         )}
                       </div>
+                      )}
                       <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                         {/* −1 = loendi päring ebaõnnestus. Null EI OLE õige vastus:
                             „0 liiget" ja „ei saanud teada" on eri asjad. */}

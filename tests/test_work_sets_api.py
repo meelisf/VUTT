@@ -94,6 +94,22 @@ def test_haldur_muudab_nime(client, work_sets, manager_token, ws_id):
     assert r.json()["work_set"]["name"]["et"] == "Uus nimi"
 
 
+def test_haldur_ei_saa_nime_tuhjaks_teha(client, work_sets, manager_token, ws_id):
+    r = client.patch(f"/work-sets/{ws_id}", json={"name": {"et": "", "en": ""}, "revision": 2},
+                     headers=auth(manager_token))
+    assert r.status_code == 400
+
+
+def test_nimi_on_kakskeelne(client, work_sets, manager_token, ws_id):
+    r = client.patch(f"/work-sets/{ws_id}",
+                     json={"name": {"et": "Fischeri konverents", "en": "Fischer conference"},
+                           "revision": 2},
+                     headers=auth(manager_token))
+    assert r.status_code == 200
+    assert r.json()["work_set"]["name"] == {"et": "Fischeri konverents",
+                                            "en": "Fischer conference"}
+
+
 def test_vananenud_revision_annab_409(client, work_sets, manager_token, ws_id):
     r = client.patch(f"/work-sets/{ws_id}", json={"name": {"et": "A"}, "revision": 1},
                      headers=auth(manager_token))
