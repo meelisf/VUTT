@@ -310,6 +310,8 @@
     "noChanges": "No changes found",
     "empty": "No history yet"
   },
+  "outOfVocab": "Value not in the vocabulary — remove it or pick a match from the list",
+  "outOfVocabRemove": "Remove {{label}}",
   "loadingVocab": "Loading…",
   "scope": {
     "clearHint": "Remove restriction — search continues across all of VUTT",

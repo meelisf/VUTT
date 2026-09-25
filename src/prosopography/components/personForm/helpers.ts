@@ -87,9 +87,11 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
     patch.death = { ...(patch.death ?? draft.death), place: { label: dp.label, id: dp.id ?? null, labels: dp.labels ?? null, source: 'wikidata' as const } };
   }
 
-  // Konfessioon — lisa auto-täidetud Q-kood massiivi kui veel puudub
-  if (autoFilled['confession']?.id && !(draft.confessions ?? []).includes(autoFilled['confession'].id)) {
-    patch.confessions = [...(draft.confessions ?? []), autoFilled['confession'].id];
+  // Konfessioonid — server annab ainult sõnastiku Q-koodid (Wikidata kõik väärtused)
+  const uuedKonfessioonid = ((autoFilled['confessions'] ?? []) as { id?: string }[])
+    .map(c => c.id).filter((id): id is string => !!id && !(draft.confessions ?? []).includes(id));
+  if (uuedKonfessioonid.length) {
+    patch.confessions = [...(draft.confessions ?? []), ...uuedKonfessioonid];
   }
 
   // Seisus
@@ -278,14 +280,18 @@ export function draftToPayload(
     // tühjendada oli kirjutada sinna `0000` (#240).
     birth: buildDatePayload(draft.birth),
     death: buildDatePayload(draft.death),
+    // Salvesta mitmekeelne labels-objekt → useEntityLabel kuvab UI-keeles.
+    // Sõnastikuväline väärtus kannab oma salvestatud kirje edasi — varem sai
+    // tema sildiks Q-kood (Kristiina "Q9592", 2026-09-25).
     statuses: (draft.statuses ?? []).map(qId => {
       const vocabItem = seisusedVocab.find(s => s.id === qId);
-      // Salvesta mitmekeelne labels-objekt → useEntityLabel kuvab UI-keeles
-      return { id: qId, label: vocabItem?.label?.et ?? qId, labels: vocabItem?.label };
+      if (vocabItem) return { id: qId, label: vocabItem.label.et ?? qId, labels: vocabItem.label };
+      return original?.statuses?.find(s => s.id === qId) ?? { id: qId, label: qId };
     }),
     confessions: (draft.confessions ?? []).map(qId => {
       const vocabItem = konfessioonidVocab.find(k => k.id === qId);
-      return { id: qId, label: vocabItem?.label?.et ?? qId, labels: vocabItem?.label };
+      if (vocabItem) return { id: qId, label: vocabItem.label.et ?? qId, labels: vocabItem.label };
+      return original?.confessions?.find(c => c.id === qId) ?? { id: qId, label: qId };
     }),
     origin: {
       place: draft.origin_place || null,

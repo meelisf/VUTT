@@ -105,10 +105,12 @@ def aggregate(sources: list) -> dict:
             ) if v})
         if r.get("_occupation_label") and not r.get("_occupations"):
             lists["occupations"].append({"label": r["_occupation_label"]})
-        for key, target in (("confession", "confessions"), ("status", "statuses")):
-            v = r.get(key)
-            if isinstance(v, dict) and v.get("label"):
-                lists[target].append({k: v[k] for k in ("id", "label", "labels") if v.get(k)})
+        # Wikidata annab konfessioonid loendina (kõik väärtused), AA seisuse üksikuna.
+        for key, target in (("confessions", "confessions"), ("status", "statuses")):
+            vals = r.get(key)
+            for v in (vals if isinstance(vals, list) else [vals]):
+                if isinstance(v, dict) and v.get("label"):
+                    lists[target].append({k: v[k] for k in ("id", "label", "labels") if v.get(k)})
         aliases.extend(r.get("name.aliases") or [])
         for lk, ls in (("_linked_wikidata", "wikidata"), ("_linked_gnd", "gnd"),
                        ("_linked_viaf", "viaf")):
