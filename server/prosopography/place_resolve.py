@@ -25,8 +25,11 @@ from . import places_ops as po
 logger = logging.getLogger(__name__)
 
 MAX_CHAIN_DEPTH = 6
-# Registri võti on ajalooline nimi: saksa silt esimesena (ADR 0052 / #427).
+# Registri võti on ajalooline nimi: saksa silt esimesena, Rootsi ja Soome
+# kohtadel rootsi (registris Åbo, Strängnäs — mitte „Gemeinde Strängnäs").
 _KEY_LANGS = ("de", "sv", "la", "en", "et")
+_KEY_LANGS_SV = ("sv", "de", "la", "en", "et")
+_SV_GROUPS = ("rootsi", "soome")
 
 
 def _norm(s) -> str:
@@ -113,13 +116,25 @@ def _name_match(labels: dict, places: dict) -> Optional[str]:
     return None
 
 
-def plan_register_entry(res: dict, places: dict) -> dict:
+def _key_langs(group: Optional[str], groups: dict) -> tuple:
+    g = group
+    for _ in range(3):
+        if not g:
+            break
+        if g in _SV_GROUPS:
+            return _KEY_LANGS_SV
+        g = (groups.get(g) or {}).get("parent")
+    return _KEY_LANGS
+
+
+def plan_register_entry(res: dict, places: dict, groups: Optional[dict] = None) -> dict:
     """Puhas otsus resolve'i tulemuse põhjal.
 
     Tagastab ühe:
       `{"action": "exists", "key"}` — Q-kood on registris;
       `{"action": "create", "key", "entry"}` — lisada registrisse;
-      `{"action": "name_match", "key"}` — Q-koodita kirje sama nimega → ettepanek;
+      `{"action": "name_match", "key"}` — sama nimega kirje (Q-koodita või sama
+        võtmega teise Q-koodiga) → ettepanek, mitte peaaegu-duplikaat;
       `{"action": "needs_group"}` — grupp jäi leidmata → admini järjekord;
       `{"action": "error"}`.
     """
@@ -136,9 +151,11 @@ def plan_register_entry(res: dict, places: dict) -> dict:
     if kind == "none":
         return {"action": "needs_group"}
 
-    base = next((labels[lang] for lang in _KEY_LANGS if labels.get(lang)), res["qid"])
-    key = base if base not in places else f"{base} ({res['qid']})"
+    groups = po._load_origin_groups() if groups is None else groups
+    group = res.get("group") if kind == "anchor" else po._walk_to_group(res.get("parent_key"), places)
+    key = next((labels[lang] for lang in _key_langs(group, groups) if labels.get(lang)), res["qid"])
     if key in places:
+        # Urvaste (vald) vs registri Urvaste (küla): kas sama koht, otsustab admin.
         return {"action": "name_match", "key": key}
     wd = res["wd"] or {}
     entry = {
