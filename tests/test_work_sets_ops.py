@@ -32,6 +32,7 @@ def kaust(tmp_path, monkeypatch):
         return {"success": True}
 
     monkeypatch.setattr(ops, "save_config_with_git", fake_save)
+    monkeypatch.setattr(ops, "delete_file_from_git", lambda path, msg, username: True)
     return {"tmp": tmp_path, "kirjutised": kirjutised}
 
 

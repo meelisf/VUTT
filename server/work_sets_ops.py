@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .config import WORK_SETS_DIR, WORK_SET_MAX_MEMBERS, get_logger
-from .git_ops import save_config_with_git
+from .git_ops import delete_file_from_git, save_config_with_git
 from .work_sets_access import check_access_diff, classify_access_diff
 from .utils import generate_nanoid
 
@@ -111,14 +111,20 @@ def create_work_set(name: dict, description: Optional[dict], username: str) -> d
         return _save(ws, username, f"Töökollektsioon: loo {set_id}")
 
 
-def delete_work_set(set_id: str) -> None:
-    """Faili kustutamine. Elutsükli otsuse (kas tohib) teeb router — siin on
-    ainult salvestus. Tee tuleb `_path`-ist, et testid saaksid kausta asendada."""
+def delete_work_set(set_id: str, username: str) -> None:
+    """Faili kustutamine + commit (taastatav `data/` gitist, ADR 0040). Elutsükli
+    otsuse (kas tohib) teeb router — siin on ainult salvestus. Tee tuleb
+    `_path`-ist, et testid saaksid kausta asendada.
+
+    Fail kustutatakse ENNE commiti: jälgimata fail (varasem commit kukkus) peab
+    ka kaduma, ja git-tõrge ei tohi kustutust tagasi pöörata.
+    """
     with _work_sets_lock:
         path = _path(set_id)
         if not os.path.exists(path):
             raise WorkSetNotFound(set_id)
         os.remove(path)
+        delete_file_from_git(path, f"Töökollektsioon: kustuta {set_id}", username)
 
 
 def _check_revision(ws: dict, expected_revision: Optional[int]):

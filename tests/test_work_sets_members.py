@@ -32,6 +32,7 @@ def work_sets(tmp_path, monkeypatch, backend_env):
         return {"success": True}
 
     monkeypatch.setattr(ops, "save_config_with_git", fake_save)
+    monkeypatch.setattr(ops, "delete_file_from_git", lambda path, msg, username: True)
 
     # Teoste metaandmed tulevad sõnastikust, mitte failisüsteemist.
     monkeypatch.setattr(acc, "load_work_metadata_by_id", lambda wid: TEOSED.get(wid))
