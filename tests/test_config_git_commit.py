@@ -143,3 +143,35 @@ def test_save_config_with_git_kirjutab_ka_ilma_repota(tmp_path, monkeypatch):
 
     assert tulemus["success"] is False
     assert json.loads(path.read_text(encoding="utf-8")) == {"a": {"name": "A"}}
+
+
+def test_tookollektsiooni_kustutus_on_commit_ja_taastatav(repo, monkeypatch):
+    """Kustutus jättis faili gitti jälgituks ja `data/` töökausta räpaseks —
+    kustutatud kogu ei olnud ajaloost taastatav (2026-09-25, ws_w24b1g)."""
+    import server.work_sets_ops as ops
+    monkeypatch.setattr(ops, "WORK_SETS_DIR", str(repo["tmp"] / "config" / "work_sets"))
+    ws = ops.create_work_set({"et": "Proov"}, None, "admin")
+    rel = f"config/work_sets/{ws['id']}.json"
+
+    ops.delete_work_set(ws["id"], "toimetaja")
+
+    r = repo["repo"]
+    assert not (repo["tmp"] / rel).exists()
+    assert not r.is_dirty(untracked_files=True)
+    viimane = next(r.iter_commits())
+    assert viimane.message.strip() == f"Töökollektsioon: kustuta {ws['id']}"
+    assert viimane.author.name == "toimetaja"
+    taastatud = json.loads(r.git.show(f"HEAD~1:{rel}"))
+    assert taastatud["name"] == {"et": "Proov"}
+
+
+def test_jalgimata_tookollektsioon_kustub_ka(repo, monkeypatch):
+    """Kui loomise commit kukkus, pole fail gitis — kustutus peab ta ikkagi eemaldama."""
+    import server.work_sets_ops as ops
+    kaust = repo["tmp"] / "config" / "work_sets"
+    kaust.mkdir(parents=True)
+    monkeypatch.setattr(ops, "WORK_SETS_DIR", str(kaust))
+    (kaust / "ws_x.json").write_text(json.dumps({"id": "ws_x"}), encoding="utf-8")
+
+    ops.delete_work_set("ws_x", "admin")
+    assert not (kaust / "ws_x.json").exists()

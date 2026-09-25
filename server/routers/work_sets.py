@@ -193,7 +193,7 @@ def delete_work_set_route(set_id: str, user=Depends(require_role("admin"))):
         # Avaldatud kogu link on levinud: kustutamine teeks temast katkise viite.
         raise HTTPException(status_code=409,
                             detail="Avaldatud kogu arhiveeritakse, mitte ei kustutata")
-    delete_work_set(set_id)
+    delete_work_set(set_id, user["username"])
     return {"status": "success"}
 
 
