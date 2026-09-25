@@ -199,6 +199,8 @@
       "gender": "Gender",
       "birthDate": "Birth date",
       "deathDate": "Death date",
+      "birthCalendar": "Birth date calendar",
+      "deathCalendar": "Death date calendar",
       "birthPlace": "Birthplace",
       "deathPlace": "Place of death",
       "occupations": "Occupations",

@@ -184,6 +184,18 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
     for path, val in remote.items():
         _check(path, val)
 
+    # Kalender on väide KUUPÄEVA kohta, mitte eraldi väli: kui kaardil on teine
+    # kuupäev, kinnitaks allika kalender kaardi kuupäeva, mida allikas ei väitnud.
+    for prefix in ("birth", "death"):
+        kal = f"{prefix}.calendar"
+        if kal not in remote:
+            continue
+        local = person.get(prefix) if isinstance(person.get(prefix), dict) else {}
+        if f"{prefix}.date" in auto_filled or local.get("date") == remote.get(f"{prefix}.date"):
+            continue
+        auto_filled.pop(kal, None)
+        conflicts = [c for c in conflicts if c["field"] != kal]
+
     return {
         "auto_filled": auto_filled,
         "conflicts": conflicts,
@@ -261,11 +273,20 @@ def _wd_item_ids(entity: dict, prop: str) -> list:
             if isinstance(v, dict) and isinstance(v.get("id"), str)]
 
 
+# Wikidata kalendrimudel → kaardi `calendar`. Ainult Juliuse märgend kannab infot:
+# Wikidata UI paneb 1582. aastast hilisemale kuupäevale vaikimisi Gregoriuse
+# mudeli ka siis, kui sisestaja kalendrile ei mõelnud (Kristiina sünd 1626-12-07
+# on Juliuse kuupäev Gregoriuse märgendiga). Juliuse märgend on seal teadlik
+# valik; Gregoriuse oma kaardile ei kanta — `null` = „kalender märkimata".
+_WD_JULIAN = "http://www.wikidata.org/entity/Q1985786"
+
+
 def _wd_time(entity: dict, prop: str):
-    """(kuupäev, täpsus) esimesest parima auastmega väärtusest.
+    """(kuupäev, täpsus, kalender) esimesest parima auastmega väärtusest.
 
     Entity API: `+1621-00-00T00:00:00Z` aasta täpsusel; SPARQL andis
     `1621-01-01` — nullkuu/-päev asendatakse 01-ga, et väljund ei muutuks.
+    Kalender on "julian" või None (vt `_WD_JULIAN`).
     """
     for v in _wd_best_values(entity, prop):
         if not isinstance(v, dict) or not v.get("time"):
@@ -277,8 +298,9 @@ def _wd_time(entity: dict, prop: str):
             aasta, kuu, paev = osad
             kuupaev = f"{aasta}-{kuu if kuu != '00' else '01'}-{paev if paev != '00' else '01'}"
         prec = int(v.get("precision", 11))
-        return kuupaev, ("year" if prec <= 9 else ("month" if prec == 10 else "day"))
-    return None, None
+        kalender = "julian" if v.get("calendarmodel") == _WD_JULIAN else None
+        return kuupaev, ("year" if prec <= 9 else ("month" if prec == 10 else "day")), kalender
+    return None, None, None
 
 
 def _fetch_wikidata(qid: str) -> Optional[dict]:
@@ -325,10 +347,12 @@ def _wikidata_result(entity: dict) -> Optional[dict]:
         result["gender"] = _WD_GENDER.get(gender_ids[0])
 
     for väli, prop in (("birth", "P569"), ("death", "P570")):
-        kuupaev, tapsus = _wd_time(entity, prop)
+        kuupaev, tapsus, kalender = _wd_time(entity, prop)
         if kuupaev:
             result[f"{väli}.date"] = kuupaev
             result[f"{väli}.precision"] = tapsus
+            if kalender:
+                result[f"{väli}.calendar"] = kalender
 
     if birth_places:
         result["birth.place"] = viide(birth_places[0])

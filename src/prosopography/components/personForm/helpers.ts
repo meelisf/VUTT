@@ -50,7 +50,12 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
       year: d.slice(0, 4),
       month: precision !== 'year' && !isNaN(mRaw) ? String(mRaw) : '',
       day: precision === 'day' && !isNaN(dayRaw) ? String(dayRaw) : '',
+      // Kalender käib allika kuupäevaga kaasas; allika vaikimisel jääb käsitsi märgitu.
+      calendar: autoFilled['birth.calendar'] || draft.birth.calendar,
     };
+  } else if (autoFilled['birth.calendar'] && !draft.birth.calendar) {
+    // Sama kuupäev juba kaardil — server saadab kalendri ainult siis (fetch_and_diff).
+    patch.birth = { ...draft.birth, calendar: autoFilled['birth.calendar'] };
   }
   // Sünnikoht — rakenda sõltumata sellest kas kuupäev on olemas
   if (autoFilled['birth.place']?.label && !draft.birth.place) {
@@ -69,7 +74,12 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
       year: d.slice(0, 4),
       month: precision !== 'year' && !isNaN(mRaw) ? String(mRaw) : '',
       day: precision === 'day' && !isNaN(dayRaw) ? String(dayRaw) : '',
+      // Kalender käib allika kuupäevaga kaasas; allika vaikimisel jääb käsitsi märgitu.
+      calendar: autoFilled['death.calendar'] || draft.death.calendar,
     };
+  } else if (autoFilled['death.calendar'] && !draft.death.calendar) {
+    // Sama kuupäev juba kaardil — server saadab kalendri ainult siis (fetch_and_diff).
+    patch.death = { ...draft.death, calendar: autoFilled['death.calendar'] };
   }
   // Surmakoht — rakenda sõltumata sellest kas kuupäev on olemas
   if (autoFilled['death.place']?.label && !draft.death.place) {

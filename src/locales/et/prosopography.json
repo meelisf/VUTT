@@ -199,6 +199,8 @@
       "gender": "Sugu",
       "birthDate": "Sünnikuupäev",
       "deathDate": "Surmakuupäev",
+      "birthCalendar": "Sünnikuupäeva kalender",
+      "deathCalendar": "Surmakuupäeva kalender",
       "birthPlace": "Sünnikoht",
       "deathPlace": "Surmakoht",
       "occupations": "Ametid",
