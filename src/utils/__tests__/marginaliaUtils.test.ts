@@ -212,6 +212,11 @@ describe('cleanMarkupSpecs', () => {
 });
 
 describe('marginaliaFromSelection', () => {
+  // Muudatused rakendatakse algse dokumendi koordinaatides (nagu ChangeSet).
+  const rakenda = (doc: string, changes: { from: number; to: number; insert: string }[]) =>
+    [...changes].sort((x, y) => y.from - x.from || y.to - x.to)
+      .reduce((d, c) => d.slice(0, c.from) + c.insert + d.slice(c.to), doc);
+
   it('valik liigub uude <m> plokki valiku algusrea kohale', () => {
     const doc = 'esimene rida\nteine valitud rida\nkolmas';
     const from = doc.indexOf('teine');
@@ -237,10 +242,10 @@ describe('marginaliaFromSelection', () => {
   it('mitmerealine valik saab ühe <m> paari iga füüsilise rea kohta', () => {
     const doc = 'a\nb\nc';
     const r = marginaliaFromSelection(doc, 0, doc.length, []);
-    expect(r.changes[0].insert).toBe('<m>a</m>\n<m>b</m>\n<m>c</m>\n');
-    expect(r.changes[0].insert.trimEnd().split('\n').every(
-      line => /^<m>[^\n]*<\/m>$/.test(line),
-    )).toBe(true);
+    // Terve dokument valitud → read ise saavad plokkideks (tühja rida ei jää).
+    const uus = rakenda(doc, r.changes);
+    expect(uus).toBe('<m>a</m>\n<m>b</m>\n<m>c</m>');
+    expect(uus.split('\n').every(line => /^<m>[^\n]*<\/m>$/.test(line))).toBe(true);
     expect(r.openPositions).toEqual([
       3,
       '<m>a</m>\n'.length + 3,
@@ -249,11 +254,47 @@ describe('marginaliaFromSelection', () => {
     expect(r.cursor).toBe('<m>a</m>\n<m>b</m>\n<m>c'.length);
   });
 
+  it('terve rea valik ei jäta tühja rida (kasutaja tagasiside)', () => {
+    const doc = 'enne\nExordium.\npärast';
+    const from = doc.indexOf('Exordium');
+    const to = from + 'Exordium.'.length;
+    const r = marginaliaFromSelection(doc, from, to, []);
+    const uus = rakenda(doc, r.changes);
+    expect(uus).toBe('enne\n<m>Exordium.</m>\npärast');
+    expect(uus.slice(r.openPositions[0], r.cursor)).toBe('Exordium.');
+  });
+
+  it('kolmikkliki valik koos reavahetusega ei jäta tühja rida', () => {
+    const doc = 'enne\nExordium.\npärast';
+    const from = doc.indexOf('Exordium');
+    const to = doc.indexOf('pärast'); // valik lõpeb järgmise rea alguses
+    const r = marginaliaFromSelection(doc, from, to, []);
+    expect(rakenda(doc, r.changes)).toBe('enne\n<m>Exordium.</m>\npärast');
+  });
+
+  it('mitme terve rea valik asendab read plokkidega', () => {
+    const doc = 'x\nüks\nkaks\ny';
+    const from = doc.indexOf('üks');
+    const to = doc.indexOf('\ny');
+    const r = marginaliaFromSelection(doc, from, to, []);
+    const uus = rakenda(doc, r.changes);
+    expect(uus).toBe('x\n<m>üks</m>\n<m>kaks</m>\ny');
+    expect(r.openPositions.map(p => uus.slice(p, p + 3))).toEqual(['üks', 'kak']);
+  });
+
+  it('osaline rida jääb alles ja plokk tuleb rea kohale (vana käitumine)', () => {
+    const doc = 'enne\nExordium. Sed quia\npärast';
+    const from = doc.indexOf('Exordium');
+    const to = from + 'Exordium.'.length;
+    const r = marginaliaFromSelection(doc, from, to, []);
+    expect(rakenda(doc, r.changes)).toBe('enne\n<m>Exordium.</m>\n Sed quia\npärast');
+  });
+
   it('sulgeb ja taasavab üle rea ulatuva inline-tägi', () => {
     const doc = '<i>esimene\nteine</i>';
     const r = marginaliaFromSelection(doc, 0, doc.length, []);
-    expect(r.changes[0].insert).toBe(
-      '<m><i>esimene</i></m>\n<m><i>teine</i></m>\n',
+    expect(rakenda(doc, r.changes)).toBe(
+      '<m><i>esimene</i></m>\n<m><i>teine</i></m>',
     );
   });
 });

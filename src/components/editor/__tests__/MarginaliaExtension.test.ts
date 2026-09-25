@@ -303,6 +303,25 @@ describe('insertMarginalia valikuga (simulatsioon)', () => {
   });
 });
 
+describe('insertMarginalia terve rea valikuga (tühja rea parandus)', () => {
+  it('rida saab plokiks, plokk on avatud ja tühja rida ei teki', () => {
+    const doc = 'enne\nPropositio.\npärast';
+    let state = mkState(doc);
+    const from = doc.indexOf('Propositio');
+    const to = from + 'Propositio.'.length;
+    const hidden = hiddenBlockRanges(state).filter(h => h.from < to && h.to > from);
+    const { changes, openPositions } = marginaliaFromSelection(doc, from, to, hidden);
+    state = state.update({
+      changes,
+      effects: openPositions.map(pos => openMarginalia.of(pos)),
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+    expect(state.doc.toString()).toBe('enne\n<m>Propositio.</m>\npärast');
+    expect(state.field(marginaliaField).blocks).toHaveLength(1);
+    expect(state.field(marginaliaField).openMarks).toHaveLength(1);
+  });
+});
+
 describe('paste avatud plokki', () => {
   it('insert avatud ploki sisu positsioonil läbib filtrid', () => {
     const doc = 'rida\n<m></m>\nlõpp';

@@ -278,7 +278,24 @@ export function marginaliaFromSelection(
   selected += doc.slice(cursor, to);
 
   const lineStart = doc.lastIndexOf('\n', from - 1) + 1;
-  const wrapped = wrapMarginaliaLines(selected);
+
+  // Terve rea (või ridade) väljatõstmine jättis vanasti algse rea tühjaks —
+  // kasutaja nägi iga uue marginaalia järel ebavajalikku tühja rida. Kui
+  // valikust väljapoole ei jää real midagi peale tühikute, saab rea enda
+  // plokiks. Kolmikklikk võtab kaasa ka lõpu reavahetuse; see jääb reale.
+  // Peidetud plokkidega valik jääb vana tee peale: nende reavahetused kuuluvad
+  // peidetud alale ja kaitsefilter hoiab neid paigal.
+  let toLine = to;
+  while (toLine > from && doc[toLine - 1] === '\n') toLine--;
+  const nextNl = doc.indexOf('\n', toLine);
+  const lineEnd = nextNl === -1 ? doc.length : nextNl;
+  const touchesHidden = hidden.some(h => h.from < to && h.to > from);
+  const residual = doc.slice(lineStart, from) + doc.slice(toLine, lineEnd);
+  const lineWrapped = touchesHidden ? '' : wrapMarginaliaLines(doc.slice(from, toLine));
+  const replacesLine = !touchesHidden && residual.trim() === ''
+    && lineWrapped !== '' && !lineWrapped.startsWith('\n') && !lineWrapped.endsWith('\n');
+
+  const wrapped = replacesLine ? lineWrapped : wrapMarginaliaLines(selected);
   const insert = `${wrapped}\n`;
   const openPositions: number[] = [];
   const openRe = /<m>/g;
@@ -288,10 +305,12 @@ export function marginaliaFromSelection(
   }
   const lastClose = wrapped.lastIndexOf('</m>');
   return {
-    changes: [
-      { from: lineStart, to: lineStart, insert },
-      { from, to, insert: '' },
-    ],
+    changes: replacesLine
+      ? [{ from: lineStart, to: lineEnd, insert: wrapped }]
+      : [
+        { from: lineStart, to: lineStart, insert },
+        { from, to, insert: '' },
+      ],
     openPositions,
     cursor: lineStart + (lastClose >= 0 ? lastClose : wrapped.length),
   };

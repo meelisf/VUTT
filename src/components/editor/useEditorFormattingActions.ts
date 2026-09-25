@@ -196,8 +196,12 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
 
     if (from === to) {
       const line = view.state.doc.lineAt(from);
+      // Tühjal real saab rida ise plokiks — muidu jääks ploki alla tühi rida.
+      const emptyLine = line.text.trim() === '';
       view.dispatch({
-        changes: { from: line.from, insert: '<m></m>\n' },
+        changes: emptyLine
+          ? { from: line.from, to: line.to, insert: '<m></m>' }
+          : { from: line.from, insert: '<m></m>\n' },
         effects: openMarginalia.of(line.from + 3),
         selection: EditorSelection.cursor(line.from + 3),
         annotations: Transaction.userEvent.of('input.format'),
