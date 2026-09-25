@@ -158,6 +158,8 @@ export const replyToComment = async (
   }
 
   const data = await response.json();
+  // Sama käsitlus nagu lehe salvestusel: vastus on kettal, ajalugu võib puududa.
+  if (data.git_committed === false) console.warn("Git commit hoiatus:", data.warning);
   return data.comments || [];
 };
 

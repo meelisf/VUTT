@@ -30,6 +30,7 @@ from ..config import BASE_DIR
 from ..deps import get_user, require_role, get_json_data
 from ..auth import get_all_users, role_level
 from ..git_ops import save_with_git
+from ..page_locks import page_lock
 from ..page_paths import check_page_filename
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..notifications_ops import (
@@ -45,54 +46,58 @@ router = APIRouter()
 
 def _apply_reply_sync(catalog, filename, comment_id, reply_text, work_id, page_number, user):
     """Blokeeriv osa: faililugemine + git commit + teavitus. Jookseb threadpool'is,
-    et event-loop ei külmuks (vt issue #111)."""
+    et event-loop ei külmuks (vt issue #111).
+
+    Lugemine–lisamine–kirjutamine käib lehe luku all (#416): muidu lugesid kaks
+    samaaegset vastust sama algseisu ja teine kirjutus pühkis esimese. Kirjutatakse
+    AINULT `.json` — `.txt`-i tagasikirjutus kaotas vahepeal salvestatud teksti.
+    """
     txt_path = os.path.join(BASE_DIR, catalog, filename)
     json_path = os.path.join(BASE_DIR, catalog, os.path.splitext(filename)[0] + ".json")
-    if not os.path.exists(txt_path) or not os.path.exists(json_path):
-        raise HTTPException(status_code=404, detail="Lehekülje fail puudub")
 
-    with open(json_path, 'r', encoding='utf-8') as f:
-        meta_content = json.load(f)
+    with page_lock(json_path):
+        if not os.path.exists(txt_path) or not os.path.exists(json_path):
+            raise HTTPException(status_code=404, detail="Lehekülje fail puudub")
 
-    comments = meta_content.get('comments')
-    if not isinstance(comments, list):
-        comments = []
-        meta_content['comments'] = comments
+        with open(json_path, 'r', encoding='utf-8') as f:
+            meta_content = json.load(f)
 
-    target_comment = None
-    for comment in comments:
-        if isinstance(comment, dict) and str(comment.get('id')) == comment_id:
-            target_comment = comment
-            break
-    if target_comment is None:
-        raise HTTPException(status_code=404, detail="Kommentaari ei leitud")
+        comments = meta_content.get('comments')
+        if not isinstance(comments, list):
+            comments = []
+            meta_content['comments'] = comments
 
-    now = datetime.now().isoformat()
-    reply = {
-        "id": uuid.uuid4().hex,
-        "text": reply_text,
-        "author": user.get('name') or user['username'],
-        "author_username": user['username'],
-        "created_at": now,
-    }
-    replies = target_comment.get('replies')
-    if not isinstance(replies, list):
-        replies = []
-        target_comment['replies'] = replies
-    replies.append(reply)
-    meta_content['updated_at'] = now
+        target_comment = None
+        for comment in comments:
+            if isinstance(comment, dict) and str(comment.get('id')) == comment_id:
+                target_comment = comment
+                break
+        if target_comment is None:
+            raise HTTPException(status_code=404, detail="Kommentaari ei leitud")
 
-    with open(txt_path, 'r', encoding='utf-8') as f:
-        text_content = f.read()
+        now = datetime.now().isoformat()
+        reply = {
+            "id": uuid.uuid4().hex,
+            "text": reply_text,
+            "author": user.get('name') or user['username'],
+            "author_username": user['username'],
+            "created_at": now,
+        }
+        replies = target_comment.get('replies')
+        if not isinstance(replies, list):
+            replies = []
+            target_comment['replies'] = replies
+        replies.append(reply)
+        meta_content['updated_at'] = now
 
-    git_result = save_with_git(
-        txt_path,
-        text_content,
-        user['username'],
-        message=f"Vasta kommentaarile: {os.path.relpath(json_path, BASE_DIR)}",
-        additional_files=[(json_path, json.dumps(meta_content, indent=2, ensure_ascii=False))]
-    )
+        git_result = save_with_git(
+            json_path,
+            json.dumps(meta_content, indent=2, ensure_ascii=False),
+            user['username'],
+            message=f"Vasta kommentaarile: {os.path.relpath(json_path, BASE_DIR)}",
+        )
 
+    # Teavitus luku väliselt — tal pole lehefailiga pistmist.
     recipient = target_comment.get('author_username') or find_username_by_display_name(target_comment.get('author'))
     if recipient and recipient != user['username']:
         create_notification(
@@ -111,12 +116,18 @@ def _apply_reply_sync(catalog, filename, comment_id, reply_text, work_id, page_n
             },
         )
 
-    return {
+    response = {
         "status": "success",
         "comments": comments,
         "reply": reply,
-        "commit_hash": git_result.get("commit_hash", "")[:8],
+        "commit_hash": (git_result.get("commit_hash") or "")[:8],
+        "git_committed": True,
     }
+    # Sama leping nagu /save-il: vastus on kettal, ajalugu võib puududa.
+    if git_result.get("success") is False:
+        response["git_committed"] = False
+        response["warning"] = "Vastus salvestati, aga Git versioonihalduse commit ebaõnnestus."
+    return response
 
 
 def _deliver_notifications_sync(recipients, notification_type, title, body, link, user, users_by_username, recipient_mode):

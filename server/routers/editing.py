@@ -34,6 +34,7 @@ from ..marginalia_normalize import normalize_marginalia_tags
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..page_history import build_page_history
+from ..page_locks import page_lock
 from ..page_paths import check_page_filename, require_existing_page
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
@@ -87,6 +88,42 @@ def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
     return catalog, "/".join(parts)
 
 
+def _save_page_locked(txt_path, text, client_meta, username):
+    """Lehe kirjutus lehe luku all (#416): serveripoolsete väljade liitmine,
+    muutusteta kontroll ja kirjutus näevad sama seisu. Tagastab `save_with_git`
+    tulemuse või None, kui salvestus oli muutusteta.
+
+    NB: klient saadab `meta_content`-i tervikuna (sh kommentaarid) — lukk ei
+    kaitse VANA avatud redaktori seisu eest; see vajab versioonikontrolli.
+    """
+    json_path = None
+    meta_content = None
+    additional = []
+    with page_lock(txt_path):
+        if client_meta:
+            json_path = os.path.splitext(txt_path)[0] + ".json"
+            meta_content = client_meta
+            # Säilita serveripoolsed väljad (nt sequence, source), mida klient ei saada.
+            if os.path.exists(json_path):
+                try:
+                    existing = _read_json_file(json_path)
+                    meta_content = merge_serveripoolsed_valjad(existing, meta_content)
+                except Exception:
+                    pass
+            additional.append((json_path, json.dumps(meta_content, indent=2, ensure_ascii=False)))
+
+        # Kliendi värske updated_at üksi ei ole muudatus — vt server/save_diff.py.
+        if page_content_unchanged(txt_path, text, json_path, meta_content):
+            return None
+
+        return save_with_git(
+            txt_path,
+            text,
+            username,
+            additional_files=additional if additional else None,
+        )
+
+
 @router.post("/save")
 # NB: contributor tohib salvestada, aga ainult oma edit_collections'i teostesse —
 # ulatuse kontrollib _require_catalog_access(write=True) allpool (ADR 0031).
@@ -105,33 +142,13 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     await run_in_threadpool(require_existing_page, BASE_DIR, catalog, filename)
 
     txt_path = os.path.join(BASE_DIR, catalog, filename)
-    additional = []
-    json_path = None
-    meta_content = None
-    if data.get('meta_content'):
-        json_path = os.path.join(BASE_DIR, catalog, os.path.splitext(filename)[0] + ".json")
-        meta_content = data['meta_content']
-        # Säilita serveripoolsed väljad (nt sequence, source), mida klient ei saada.
-        if os.path.exists(json_path):
-            try:
-                existing = await run_in_threadpool(_read_json_file, json_path)
-                meta_content = merge_serveripoolsed_valjad(existing, meta_content)
-            except Exception:
-                pass
-        additional.append((json_path, json.dumps(meta_content, indent=2, ensure_ascii=False)))
-
+    git_result = await run_in_threadpool(
+        _save_page_locked, txt_path, text, data.get('meta_content'), user['username']
+    )
     # Muutusteta Ctrl+S: ei kirjuta kettale, ei commiti ega indekseeri (#173).
-    # Kliendi värske updated_at üksi ei ole muudatus — vt server/save_diff.py.
-    if await run_in_threadpool(page_content_unchanged, txt_path, text, json_path, meta_content):
+    if git_result is None:
         return {"status": "success", "changed": False, "git_committed": True, "commit_hash": ""}
 
-    git_result = await run_in_threadpool(
-        save_with_git,
-        txt_path,
-        text,
-        user['username'],
-        additional_files=additional if additional else None,
-    )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     work_id = (data.get('meta_content') or {}).get('work_id')
     if work_id:
@@ -374,47 +391,58 @@ async def page_comments_restore(
     if mode not in ("version", "deleted") or not comment_id or not commit_hash:
         raise HTTPException(status_code=400, detail="Vigased parameetrid")
 
-    catalog, _filename, json_relpath, json_path, txt_path = _validate_page_paths(data)
+    catalog, filename, _json_relpath, _json_path, _txt_path = _validate_page_paths(data)
     await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
 
+    response = await run_in_threadpool(
+        _restore_comment_sync, catalog, filename, mode, comment_id, commit_hash, user
+    )
+    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+    return response
+
+
+def _restore_comment_sync(catalog, filename, mode, comment_id, commit_hash, user):
+    """Kommentaari taaste: ajaloo valideerimine + lehe luku all JSON-i muutmine (#416).
+
+    Kirjutatakse AINULT `.json`: `.txt`-i tagasikirjutus kaotas vahepeal
+    salvestatud teksti. Kutsuja on juba ligipääsu kontrollinud.
+    """
+    _catalog, _filename, json_relpath, json_path, _txt = _validate_page_paths(
+        {"original_path": catalog, "file_name": filename}
+    )
     # commit_hash peab kuuluma SELLE faili ajalukku (mitte suvaline git-objekt)
-    history = await run_in_threadpool(get_file_git_history, json_relpath, max_count=500)
+    history = get_file_git_history(json_relpath, max_count=500)
     valid = {h['full_hash'] for h in history} | {h['hash'] for h in history}
     if commit_hash not in valid:
         raise HTTPException(status_code=400, detail="Commit ei kuulu selle faili ajalukku")
 
-    content = await run_in_threadpool(get_file_at_commit, json_relpath, commit_hash)
+    content = get_file_at_commit(json_relpath, commit_hash)
     if content is None:
         raise HTTPException(status_code=400, detail="Commitist ei leitud faili")
     restored = find_comment_in_content(content, comment_id)
     if restored is None:
         raise HTTPException(status_code=404, detail="Kommentaari ei leitud sellest commitist")
 
-    if not os.path.exists(json_path):
-        raise HTTPException(status_code=404, detail="Lehe metaandmeid ei leitud")
-    cur_data = await run_in_threadpool(_read_json_file, json_path)
-    source = cur_data['meta_content'] if (
-        isinstance(cur_data, dict) and isinstance(cur_data.get('meta_content'), dict)
-    ) else cur_data
-    current = source.get('comments', []) or []
+    with page_lock(json_path):
+        if not os.path.exists(json_path):
+            raise HTTPException(status_code=404, detail="Lehe metaandmeid ei leitud")
+        cur_data = _read_json_file(json_path)
+        source = cur_data['meta_content'] if (
+            isinstance(cur_data, dict) and isinstance(cur_data.get('meta_content'), dict)
+        ) else cur_data
+        current = source.get('comments', []) or []
 
-    new_comments, error = apply_comment_restore(current, restored, mode)
-    if error is not None:
-        raise HTTPException(status_code=error[0], detail=error[1])
-    source['comments'] = new_comments
+        new_comments, error = apply_comment_restore(current, restored, mode)
+        if error is not None:
+            raise HTTPException(status_code=error[0], detail=error[1])
+        source['comments'] = new_comments
 
-    # .txt jääb muutmata (taastame ainult kommentaari)
-    txt = await run_in_threadpool(_read_text_file, txt_path)
-
-    git_result = await run_in_threadpool(
-        save_with_git,
-        txt_path,
-        txt,
-        user['username'],
-        message=f"Restore comment {comment_id}: {commit_hash[:8]}",
-        additional_files=[(json_path, json.dumps(cur_data, indent=2, ensure_ascii=False))],
-    )
-    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+        git_result = save_with_git(
+            json_path,
+            json.dumps(cur_data, indent=2, ensure_ascii=False),
+            user['username'],
+            message=f"Restore comment {comment_id}: {commit_hash[:8]}",
+        )
     # Sama leping nagu /save-il: fail on kettal, aga commit võis ebaõnnestuda (#412 p1).
     response = {"status": "success", "comments": new_comments, "git_committed": True}
     if git_result.get("success") is False:
@@ -450,20 +478,8 @@ async def page_annotation_restore_as_comment(
         raise HTTPException(status_code=404, detail="Lehe metaandmeid ei leitud")
 
     vanem = await run_in_threadpool(get_file_at_commit, json_relpath, f"{commit_hash}^")
-    praegu = await run_in_threadpool(_read_json_file, json_path)
-    try:
-        uus, _kommentaar = restore_annotation_as_comment(praegu, vanem, annotation_id)
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except FileExistsError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    uus['updated_at'] = datetime.now().isoformat()
-    git_result = await run_in_threadpool(
-        save_with_git, json_path, json.dumps(uus, indent=2, ensure_ascii=False),
-        user['username'], message=f"Restore annotation {annotation_id} as comment: {commit_hash[:8]}",
+    git_result, uus = await run_in_threadpool(
+        _restore_annotation_locked, json_path, vanem, annotation_id, commit_hash, user['username']
     )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     meta, _ = split_page_json(uus)
@@ -473,6 +489,62 @@ async def page_annotation_restore_as_comment(
         response["git_committed"] = False
         response["warning"] = "Märge salvestati, aga Git versioonihalduse commit ebaõnnestus."
     return response
+
+
+def _restore_annotation_locked(json_path, vanem, annotation_id, commit_hash, username):
+    """Lehe luku all: praegune JSON → märge lisatud → kirjutus (#416)."""
+    with page_lock(json_path):
+        praegu = _read_json_file(json_path)
+        try:
+            uus, _kommentaar = restore_annotation_as_comment(praegu, vanem, annotation_id)
+        except LookupError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except FileExistsError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        uus['updated_at'] = datetime.now().isoformat()
+        git_result = save_with_git(
+            json_path, json.dumps(uus, indent=2, ensure_ascii=False),
+            username, message=f"Restore annotation {annotation_id} as comment: {commit_hash[:8]}",
+        )
+    return git_result, uus
+
+
+def _git_restore_locked(path, json_path, content, restored_json, username, message):
+    """Versiooni taaste lehe luku all (#416): praegune JSON loetakse ja
+    lepitatakse samas kriitilises sektsioonis, kus kirjutatakse."""
+    additional = None
+    restored_text_annotations = None
+    restored_comments = None
+    with page_lock(path):
+        if os.path.exists(json_path):
+            current_meta = _read_json_file(json_path)
+            # Tekst tuleb ühest commitist, kirjed teisest failist — lepitus hoiab
+            # nad ühes tõdes (ADR 0041). Ilma selleta jättis taaste ankruid ilma
+            # kirjeta ja kirjeid ilma ankruta.
+            content, uus_page_json, changed = apply_restored_annotations(
+                content, restored_json, current_meta
+            )
+            restored_meta, _ = split_page_json(uus_page_json)
+            restored_text_annotations = restored_meta.get('text_annotations', [])
+            # Lepitus võib ankru kaotanud kirje muuta LEHE KOMMENTAARIKS. Klient
+            # peab selle saama, muidu kirjutab järgmine Ctrl+S ta vana
+            # kliendiseisuga üle (#375).
+            restored_comments = restored_meta.get('comments', [])
+            if changed:
+                uus_page_json['updated_at'] = datetime.now().isoformat()
+                additional = [(json_path, json.dumps(uus_page_json, indent=2, ensure_ascii=False))]
+
+        git_result = save_with_git(
+            path,
+            content,
+            username,
+            message=message,
+            additional_files=additional,
+        )
+    return git_result, content, restored_text_annotations, restored_comments
 
 
 @router.post("/git-restore")
@@ -490,39 +562,14 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
     )
     if content is None: raise HTTPException(status_code=400, detail="Ei leitud")
 
-    additional = None
-    restored_text_annotations = None
-    restored_comments = None
     json_filename = os.path.splitext(filename)[0] + ".json"
     json_path = os.path.join(BASE_DIR, catalog, json_filename)
     restored_json = await run_in_threadpool(
         get_file_at_commit, os.path.join(catalog, json_filename), data.get('commit_hash')
     )
-    if os.path.exists(json_path):
-        current_meta = await run_in_threadpool(_read_json_file, json_path)
-        # Tekst tuleb ühest commitist, kirjed teisest failist — lepitus hoiab
-        # nad ühes tõdes (ADR 0041). Ilma selleta jättis taaste ankruid ilma
-        # kirjeta ja kirjeid ilma ankruta.
-        content, uus_page_json, changed = apply_restored_annotations(
-            content, restored_json, current_meta
-        )
-        restored_meta, _ = split_page_json(uus_page_json)
-        restored_text_annotations = restored_meta.get('text_annotations', [])
-        # Lepitus võib ankru kaotanud kirje muuta LEHE KOMMENTAARIKS. Klient
-        # peab selle saama, muidu kirjutab järgmine Ctrl+S ta vana
-        # kliendiseisuga üle (#375).
-        restored_comments = restored_meta.get('comments', [])
-        if changed:
-            uus_page_json['updated_at'] = datetime.now().isoformat()
-            additional = [(json_path, json.dumps(uus_page_json, indent=2, ensure_ascii=False))]
-
-    git_result = await run_in_threadpool(
-        save_with_git,
-        path,
-        content,
-        user['username'],
-        message=f"Restore: {data.get('commit_hash')[:8]}",
-        additional_files=additional,
+    git_result, content, restored_text_annotations, restored_comments = await run_in_threadpool(
+        _git_restore_locked, path, json_path, content, restored_json,
+        user['username'], f"Restore: {data.get('commit_hash')[:8]}",
     )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     # Taaste on SALVESTATUD: klient joondab nende väljadega oma salvestatud

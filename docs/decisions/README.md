@@ -72,3 +72,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0050](0050-teose-halduse-ootel-lehetoimingud.md) | Teose halduse pöörded ja poolitused on ootel plaan; rakendus ühe pakina (`/page-ops`), pööre → poolitus | kehtib |
 | [0051](0051-lehekirjutus-ainult-lehe-failipaarile.md) | Lehekirjutus ainult olemasoleva lehe `.txt`/`.json` paarile; nimeleping `server/page_paths.py` | kehtib |
 | [0052](0052-kohtade-register-on-ajalooline.md) | Kohtade register on ajalooline; grupi kriteeriumid (Saksamaal Benrathi joon); tänapäevane halduskuuluvus → grupp ankrute kaudu | kehtib |
+| [0053](0053-lehe-kirjutus-lehe-luku-all.md) | Lehe JSON-i lugemine–muutmine–kirjutamine käib lehe luku all (`page_locks.page_lock`); kommentaaritoimingud kirjutavad ainult `.json`-i | kehtib |
