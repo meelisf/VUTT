@@ -8,6 +8,9 @@ export interface ApiStatusResponse {
   status?: string;
   message?: string;
   detail?: string;
+  /** false = kettale kirjutatud, aga Git-commit ebaõnnestus (#418). */
+  git_committed?: boolean;
+  warning?: string;
 }
 
 export interface WorkPageInfo {

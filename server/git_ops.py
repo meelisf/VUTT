@@ -528,6 +528,34 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
                 return {"success": False, "error": error_text}
 
 
+def uncommitted_paths(filepaths):
+    """Tagastab need failid, mille kettal olev sisu erineb HEAD-ist (või on jälgimata).
+
+    Kasutus: muutusteta salvestus kontrollib, kas varasem commit ebaõnnestus ja
+    sisu jäi kettale ajaloota (#418). Ainult lugemine — ei kirjuta ega stage'i.
+    Repost väljaspool olevad teed jäetakse vahele; git-viga → tühi loend + logi
+    (kontroll on lisakaitse, salvestus ei tohi selle pärast kukkuda).
+    """
+    rel_to_abs = {}
+    for path in filepaths:
+        rel = os.path.relpath(path, BASE_DIR)
+        if rel.startswith(".."):
+            continue
+        rel_to_abs[rel] = path
+    if not rel_to_abs:
+        return []
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain", "-z", "--untracked-files=all", "--", *rel_to_abs],
+            cwd=BASE_DIR, check=True, capture_output=True, text=True,
+        ).stdout
+    except (subprocess.CalledProcessError, OSError) as e:
+        logger.warning(f"Git status ebaõnnestus ({len(rel_to_abs)} faili): {e}")
+        return []
+    dirty = {entry[3:] for entry in out.split("\0") if len(entry) > 3}
+    return [abs_path for rel, abs_path in rel_to_abs.items() if rel in dirty]
+
+
 def save_config_with_git(filepath, data, username, message=None, indent=2):
     """Kirjutab autoriteetse konfiguratsioonifaili ja commitib selle (#346).
 
@@ -552,29 +580,36 @@ def save_config_with_git(filepath, data, username, message=None, indent=2):
         return {"success": False, "error": str(e)}
 
 
-def get_file_git_history(paths, max_count=50):
+def get_file_git_history_window(paths, max_count=50):
     """
-    Tagastab faili(de) Git ajaloo.
+    Tagastab faili(de) Git ajaloo akna ja lipu, kas aknast jäi vanemaid välja.
+
+    Loeb ühe commiti rohkem kui aken: nii eristub „ajalugu mahtus täpselt"
+    olukorrast „aknast jäi vanemaid välja". Viimasel juhul ei ole akna vanim
+    kirje originaal ja `is_original` jääb kõigil vääraks (#412 p2; sama
+    parandus lehe ajaloos `page_history.py`, PR #409).
 
     Args:
         paths: Suhteline tee failini või failide list (BASE_DIR suhtes)
         max_count: Maksimaalne commitide arv
 
     Returns:
-        list: Commitide nimekiri, iga element on dict
+        tuple: (commitide nimekiri, has_more)
     """
     repo = get_or_init_repo()
 
     try:
-        commits = _read_commit_meta(repo, max_commits=max_count, paths=paths)
+        commits = _read_commit_meta(repo, max_commits=max_count + 1, paths=paths)
     except Exception:
-        return []
+        return [], False
 
+    has_more = len(commits) > max_count
+    commits = commits[:max_count]
     if not commits:
-        return []
+        return [], False
 
-    # Esimene commit (kõige vanem) on originaal
-    original_hash = commits[-1]["hexsha"] if commits else None
+    # Kõige vanem commit on originaal — ainult siis, kui ta aknasse mahtus
+    original_hash = None if has_more else commits[-1]["hexsha"]
 
     history = []
     for commit in commits:
@@ -588,7 +623,12 @@ def get_file_git_history(paths, max_count=50):
             "is_original": commit["hexsha"] == original_hash
         })
 
-    return history
+    return history, has_more
+
+
+def get_file_git_history(paths, max_count=50):
+    """Faili(de) Git ajalugu ilma `has_more` liputa (vt `get_file_git_history_window`)."""
+    return get_file_git_history_window(paths, max_count=max_count)[0]
 
 
 def get_file_at_commit(relative_path, commit_hash):

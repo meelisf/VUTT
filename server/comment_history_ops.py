@@ -5,7 +5,7 @@ Git on ainus tõeallikas — eraldi indeksit ei hoita. Vt
 """
 import json
 
-from .git_ops import get_file_at_commit, get_file_git_history
+from .git_ops import get_file_at_commit, get_file_git_history_window
 
 
 def _extract_comments(file_content):
@@ -44,10 +44,9 @@ def build_comment_history(json_relpath, current_comments, max_count=100):
     deleted:  [{id, text, author, created_at, replies, last_seen_commit}] — id-d,
               mis ajaloos esinevad aga current_comments-ist puuduvad; säilitatud
               uusim esinemine (= viimane seis enne kustutamist).
-    truncated: kas ajalugu jõudis max_count-ini.
+    truncated: kas aknast (max_count) jäi vanemaid commite välja.
     """
-    history = get_file_git_history(json_relpath, max_count=max_count)
-    truncated = len(history) >= max_count
+    history, truncated = get_file_git_history_window(json_relpath, max_count=max_count)
 
     current_by_id = {c.get("id"): c for c in current_comments if isinstance(c, dict)}
     current_text = {cid: c.get("text", "") for cid, c in current_by_id.items()}

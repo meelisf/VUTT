@@ -94,7 +94,8 @@ async def lifespan(app: FastAPI):
     # indeksis) ja klient katkestas 10 s pealt — vt warm_git_index.
     threading.Thread(target=warm_git_index, daemon=True, name="git-warm").start()
     start_git_commit_graph_loop()
-    from .auth import warn_if_no_superadmin
+    from .auth import start_background as start_auth_background, warn_if_no_superadmin
+    await run_in_threadpool(start_auth_background)
     warn_if_no_superadmin()
     threading.Thread(target=rebuild_indices, daemon=True).start()
     # Isikukaartide automaatrikastus (ADR 0048): planeerija + pooleliolevate taaste.

@@ -13,7 +13,7 @@ from typing import Callable, Iterable, Tuple
 
 from .config import get_logger
 from .utils import metadata_lock
-from .git_ops import save_with_git
+from .git_ops import save_with_git, uncommitted_paths
 from .meilisearch_ops import sync_work_to_meilisearch, sync_work_to_meilisearch_async
 from .prosopography.indices import update_person_to_works, update_work_collections
 from .prosopography.person_crud import ensure_prosopo_stubs
@@ -55,6 +55,24 @@ def clean_archive_refs(value):
 _V1_FIELDS = ["pealkiri", "aasta", "koht", "trükkal", "autor", "respondens"]
 
 
+class MetadataSaveResult(tuple):
+    """`(meta, changed)` + atribuut `git_committed` (#418).
+
+    Tuple, et senine `meta, changed = save_work_metadata(...)` jääks kehtima;
+    Git-tulemust vajav kutsuja loeb atribuuti.
+    """
+
+    def __new__(cls, meta, changed, *, git_committed=True):
+        self = super().__new__(cls, (meta, changed))
+        self.git_committed = git_committed
+        return self
+
+
+def _git_ok(git_result) -> bool:
+    """`save_with_git` tulemus → kas commit jõudis ajalukku (no-op on ka OK)."""
+    return not (isinstance(git_result, dict) and git_result.get("success") is False)
+
+
 def bulk_update_works(
     items: Iterable[Tuple[str, Callable[[dict], dict]]],
     username: str,
@@ -75,7 +93,11 @@ def bulk_update_works(
     iga unikaalne teos saab täpselt ühe Meilisearchi sünki — bulk-muudatus ei
     tohi jätta otsinguindeksit failisüsteemist maha (#175).
 
-    Tagastab loendurid `{"updated": n, "skipped": n, "failed": n}`.
+    Muutusteta teos, mille kettal olev sisu on varasema ebaõnnestunud commiti
+    tõttu ajaloost puudu, läheb sama commiti sisse (#418) — järeltegevusi
+    tal ei korrata ja ta loetakse `skipped`-iks.
+
+    Tagastab `{"updated": n, "skipped": n, "failed": n, "git_committed": bool}`.
     """
     originals = {}   # meta_path -> kettalt loetud seis
     pending = {}     # meta_path -> jooksev seis (kordused ahelduvad)
@@ -117,20 +139,27 @@ def bulk_update_works(
         changed = [p for p in usable if not metadata_unchanged(originals[p], pending[p])]
         skipped = len(usable) - len(changed)
         failed = len(failed_paths)
+        # Muutusteta, aga varasemast ebaõnnestunud commitist rippuv sisu (#418).
+        dirty = uncommitted_paths([p for p in usable if p not in changed])
+        to_commit = changed + dirty
 
-        if changed:
-            first_path = changed[0]
+        git_committed = True
+        if to_commit:
+            first_path = to_commit[0]
             extra = [
                 (path, json.dumps(pending[path], indent=2, ensure_ascii=False))
-                for path in changed[1:]
+                for path in to_commit[1:]
             ]
-            save_with_git(
+            git_result = save_with_git(
                 first_path,
                 json.dumps(pending[first_path], indent=2, ensure_ascii=False),
                 username,
                 message=git_message,
                 additional_files=extra or None,
             )
+            git_committed = _git_ok(git_result)
+            if not git_committed:
+                logger.error("BULK: %s — failid kirjutati, aga Git commit ebaõnnestus", git_message)
 
     # Tuletatud indeksid ja sünk ainult päriselt muutunud teostele, üks kord teose kohta.
     for meta_path in changed:
@@ -164,7 +193,7 @@ def bulk_update_works(
         "BULK: %s — uuendatud=%d vahele jäetud=%d ebaõnnestus=%d",
         git_message, len(changed), skipped, failed,
     )
-    return {"updated": len(changed), "skipped": skipped, "failed": failed}
+    return {"updated": len(changed), "skipped": skipped, "failed": failed, "git_committed": git_committed}
 
 
 def _read_work_id(meta_path: str):
@@ -185,7 +214,7 @@ def save_work_metadata(
     background_tasks=None,
     sync_meili: bool = True,
     call_ptw: bool = True,
-) -> Tuple[dict, bool]:
+) -> MetadataSaveResult:
     """
     Kirjutab _metadata.json ja käivitab järeloperatsioonid.
 
@@ -200,9 +229,13 @@ def save_work_metadata(
       call_ptw        — True → kutsub update_person_to_works (nt tags/creators muutumisel)
                         False → jätab vahele (nt bulk-collection, bulk-genre)
 
-    Tagastab (meta, changed). changed=False tähendab, et salvestus oli sisuliselt
-    muutusteta — sel juhul jäävad Git commit, tuletatud indeksid ja Meilisearchi
-    sünk tegemata (#173).
+    Tagastab `MetadataSaveResult` = (meta, changed) + `.git_committed`.
+    changed=False tähendab, et salvestus oli sisuliselt muutusteta — sel juhul
+    jäävad tuletatud indeksid ja Meilisearchi sünk tegemata (#173). Commit
+    tehakse siiski, kui kettal olev sisu on varasema ebaõnnestunud commiti tõttu
+    ajaloost puudu (#418): muidu peidaks muutusteta kordus parandamata vea.
+    `git_committed=False` = fail on kettal (ja järeltegevused käivitati), aga
+    versiooniajalugu puudub.
     """
     updates = dating_updates(updates)
     started = time.monotonic()
@@ -233,6 +266,7 @@ def save_work_metadata(
             meta.pop(field, None)
 
         changed = not file_existed or not metadata_unchanged(previous, meta)
+        git_committed = True
         if changed:
             git_result = save_with_git(
                 meta_path,
@@ -244,6 +278,16 @@ def save_work_metadata(
             # olev sisu on juba sama (nt vormindus). Siis on ka järeltegevused üleliigsed.
             if isinstance(git_result, dict) and git_result.get("is_noop"):
                 changed = False
+            git_committed = _git_ok(git_result)
+        elif uncommitted_paths([meta_path]):
+            git_committed = _git_ok(save_with_git(
+                meta_path,
+                json.dumps(meta, indent=2, ensure_ascii=False),
+                username,
+                message=f"{git_message} (varem commitimata)",
+            ))
+        if not git_committed:
+            logger.error("METADATA SAVE (%s): fail kirjutati, aga Git commit ebaõnnestus", slug)
     git_done = time.monotonic()
 
     if not changed:
@@ -252,7 +296,7 @@ def save_work_metadata(
             slug,
             (git_done - started) * 1000,
         )
-        return meta, False
+        return MetadataSaveResult(meta, False, git_committed=git_committed)
 
     # Kollektsioonid uuenevad ka bulk-collection teel (call_ptw=False) — tingimusteta
     update_work_collections(meta.get("id"), meta.get("collections") or [])
@@ -288,4 +332,4 @@ def save_work_metadata(
         (finished - collections_done) * 1000,
         sync_meili,
     )
-    return meta, True
+    return MetadataSaveResult(meta, True, git_committed=git_committed)

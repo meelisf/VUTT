@@ -57,11 +57,12 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
     mode: 'version' | 'deleted', commentId: string, commitHash: string,
   ) => {
     try {
-      const updated = await restoreComment(
+      const { comments: updated, gitCommitted } = await restoreComment(
         page, { mode, comment_id: commentId, commit_hash: commitHash }, authToken || undefined,
       );
       if (onCommentsRestored) onCommentsRestored(updated);
       else setComments(updated);
+      if (!gitCommitted) alert(t('info.restoreCommentGitWarning'));
       await loadHistory(true);   // värskenda ajaloo-kaart uue seisuga
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : t('info.restoreError'));

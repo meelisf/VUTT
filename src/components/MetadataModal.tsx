@@ -444,6 +444,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           collections: m.collections,
         };
         onSaveSuccess(successData as Partial<Page>, successData as Partial<Work>);
+        // Salvestatud, aga versiooniajalugu puudu (#418)
+        if (data.git_committed === false) alert(t('common:error.gitCommitFailed'));
 
         setSaveStatus('success');
         // Lühike kinnitus on piisav; pikk viivitus jättis mulje, et salvestamine

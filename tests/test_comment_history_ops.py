@@ -127,3 +127,21 @@ def test_apply_restore_deleted_appends():
 def test_apply_restore_deleted_conflict():
     new, err = cho.apply_comment_restore([_c("c1", "x")], _c("c1", "y"), "deleted")
     assert new is None and err[0] == 409
+
+
+def test_taisaken_ei_margi_originaali(repo):
+    """#412 p2: kui aknast jäi vanemaid välja, ei ole akna vanim kirje originaal."""
+    ajalugu = git_ops.get_file_git_history(repo["rel"], max_count=2)
+    assert len(ajalugu) == 2
+    assert not any(h["is_original"] for h in ajalugu)
+
+
+def test_tapselt_mahtuv_ajalugu_margib_originaali(repo):
+    ajalugu = git_ops.get_file_git_history(repo["rel"], max_count=4)
+    assert [h["is_original"] for h in ajalugu] == [False, False, False, True]
+
+
+def test_truncated_ainult_kui_vanemaid_jai_valja(repo):
+    """4 commitit, aken 4 → midagi ei jäänud välja."""
+    res = cho.build_comment_history(repo["rel"], [_c("c1", "C")], max_count=4)
+    assert res["truncated"] is False

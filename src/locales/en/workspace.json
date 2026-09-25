@@ -408,6 +408,7 @@
     "noOlderVersions": "No earlier versions",
     "historyTruncated": "Showing history of the last 100 commits.",
     "restoreError": "Restore failed",
+    "restoreCommentGitWarning": "The comment was restored, but the version history commit failed. Please tell an administrator.",
     "searchTagInCorpus": "Search for this tag across the whole corpus",
     "openEsterRecord": "Open the ESTER record",
     "editWorkMetadata": "Edit work metadata",

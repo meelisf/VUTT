@@ -124,3 +124,33 @@ def test_restore_deleted_conflict_when_id_exists(client, login, page_repo):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r.status_code == 409, r.text
+
+
+def test_restore_reports_failed_git_commit(client, login, page_repo, monkeypatch):
+    """#412 p1: kettale kirjutatud, commit ebaõnnestus → vastus ütleb seda (nagu /save)."""
+    import server.routers.editing as editing
+    monkeypatch.setattr(editing, "save_with_git",
+                        lambda *a, **k: {"success": False, "error": "index.lock"})
+    token = login("editor", "editorpass")
+    r = client.post(
+        "/page-comments/restore",
+        json={"original_path": "1690-w1", "file_name": "pg1.txt",
+              "mode": "deleted", "comment_id": "c2", "commit_hash": page_repo["v1_hash"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["git_committed"] is False
+    assert body["warning"]
+
+
+def test_restore_reports_successful_git_commit(client, login, page_repo):
+    token = login("editor", "editorpass")
+    r = client.post(
+        "/page-comments/restore",
+        json={"original_path": "1690-w1", "file_name": "pg1.txt",
+              "mode": "deleted", "comment_id": "c2", "commit_hash": page_repo["v1_hash"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["git_committed"] is True

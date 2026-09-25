@@ -408,6 +408,7 @@
     "noOlderVersions": "Varasemaid versioone ei ole",
     "historyTruncated": "Näidatakse viimase 100 commiti ajalugu.",
     "restoreError": "Taastamine ebaõnnestus",
+    "restoreCommentGitWarning": "Kommentaar taastati, aga versiooniajaloo commit ebaõnnestus. Teata sellest administraatorile.",
     "searchTagInCorpus": "Otsi seda märksõna kogu korpusest",
     "openEsterRecord": "Ava ESTER-i kirje",
     "editWorkMetadata": "Muuda teose metaandmeid",

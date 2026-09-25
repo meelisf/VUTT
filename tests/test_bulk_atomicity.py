@@ -112,7 +112,7 @@ def test_missing_file_makes_no_commit(tmp_path, spies):
     result = bulk_update_works([(missing, lambda m: {"collections": []})], "user", "msg")
 
     assert spies["git"] == []
-    assert result == {"updated": 0, "skipped": 0, "failed": 1}
+    assert result == {"updated": 0, "skipped": 0, "failed": 1, "git_committed": True}
 
 
 # =========================================================
@@ -176,7 +176,7 @@ def test_unchanged_work_is_skipped(tmp_path, spies):
 
     result = bulk_update_works([(path, lambda m: {"collections": ["olemas"]})], "u", "bulk")
 
-    assert result == {"updated": 0, "skipped": 1, "failed": 0}
+    assert result == {"updated": 0, "skipped": 1, "failed": 0, "git_committed": True}
     assert spies["git"] == []
     assert spies["meili"] == []
     assert spies["collections"] == []
@@ -198,7 +198,7 @@ def test_mixed_batch_counts_updated_skipped_failed(tmp_path, spies):
         "u", "bulk",
     )
 
-    assert result == {"updated": 1, "skipped": 1, "failed": 1}
+    assert result == {"updated": 1, "skipped": 1, "failed": 1, "git_committed": True}
     assert spies["meili"] == ["teos-muutub"]
 
 
@@ -216,7 +216,7 @@ def test_failing_transform_does_not_stop_batch(tmp_path, spies):
         [(boom, explode), (ok, lambda m: {"collections": ["x"]})], "u", "bulk",
     )
 
-    assert result == {"updated": 1, "skipped": 0, "failed": 1}
+    assert result == {"updated": 1, "skipped": 0, "failed": 1, "git_committed": True}
     assert spies["meili"] == ["teos-korras"]
 
 
