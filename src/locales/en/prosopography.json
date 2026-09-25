@@ -296,6 +296,7 @@
     "typeLabel": "type:",
     "addParent": "Add parent region to registry",
     "group": "Group (optional)",
+    "groupHint": "The group records historical, not modern, affiliation. Estonia/Livonia: by the Swedish-era province (Tallinn → Estonia; Tartu, Pärnu, Riga → Livonia). Sweden: by historical province, Götaland/Svealand/Norrland. Germany: the boundary is the Benrath line (Low vs High German) — Magdeburg is north; Halle, Leipzig, Dresden and Weimar are south.",
     "cancel": "Cancel",
     "add": "Add",
     "wikidataError": "Wikidata query failed",

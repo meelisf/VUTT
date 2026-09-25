@@ -455,6 +455,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
                   <option key={k} value={k}>{v.labels?.et ?? k}</option>
                 ))}
             </select>
+            <p className="mt-1 text-xs text-gray-500">{t('placeModal.groupHint')}</p>
           </div>
         </div>
 

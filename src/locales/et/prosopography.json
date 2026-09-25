@@ -296,6 +296,7 @@
     "typeLabel": "tüüp:",
     "addParent": "Lisa ülempiirkond registrisse",
     "group": "Grupp (valikuline)",
+    "groupHint": "Grupp tähistab ajaloolist, mitte tänapäevast kuuluvust. Eestimaa/Liivimaa: Rootsi-aegse provintsi järgi (Tallinn → Eestimaa; Tartu, Pärnu, Riia → Liivimaa). Rootsi: ajaloolise maakonna järgi Götaland/Svealand/Norrland. Saksamaa: piir on Benrathi joon (alam- ja ülemsaksa keeleala) — Magdeburg on põhjas, Halle, Leipzig, Dresden ja Weimar lõunas.",
     "cancel": "Tühista",
     "add": "Lisa",
     "wikidataError": "Wikidata päring ebaõnnestus",
