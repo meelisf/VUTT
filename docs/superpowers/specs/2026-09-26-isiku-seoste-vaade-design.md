@@ -60,6 +60,20 @@ gratulator, dedicator, editor, aui`.
 | 5 | Trükkal | `printer` | ei | kumbki on `publisher` | suunata |
 | — | Perekond / muu | `family` | jah | isikukaardi `relations[]` (mitte teosest) | kaardi järgi |
 
+**Täpsustused:**
+
+- `looja` hõlmab ka rolli `creator`, mis on vaikeväärtus puuduva rolli korral
+  (`indices.py`; tootmises 1 kirje).
+- **Tundmatu roll** (ei ole looja, `subject`, `mentioned` ega `publisher`) ei osale
+  ühegi reegli sobitamisel. Kui paar ei sobitu ühegi reegliga (näiteks mõlemal on
+  ainult tundmatud rollid), on liik `cotext`. Ehitaja logib tundmatu rolli **üks kord
+  rolli kohta**, et uus roll ei jääks märkamata.
+- **Suund** määratakse reeglis nimetatud rollipaari järgi. Kui sama reegel sobitub
+  mõlemat pidi (näiteks mõlemad on `auctor` + `subject`), on serv `directed: false`
+  ja `from`/`to` järjestatakse ID järgi.
+- **Sümmeetria:** paari (A, B) serv teose W kohta on sama, olgu fookus A või B.
+  Liik, `directed` ja `from`/`to` ei sõltu sellest, kelle vaatest arvutatakse.
+
 Kontrollnäited, mis on ühtlasi testid (vt Testimine):
 
 - Dalinus `auctor`, Luden `aui` („Oratio de pietate") → `academic`.
@@ -68,10 +82,17 @@ Kontrollnäited, mis on ühtlasi testid (vt Testimine):
 - Dau `dedicator`, 23 isikut `dedicator` samas teoses → `cotext`.
 - Dau `praeses`, Fischer `mentioned` lk 2 (`3ix06q`) → `mention`, `pages: [2]`.
 
-Kui isikul on fookusega mitu serva, on **isiku liik** tugevaim neist
-(`academic > dedicated > family > cotext > mention > printer`). Seda kasutatakse
-võrgustiku rühmitamiseks ja sõlme värviks. Iga serv kannab siiski oma liiki, nii et
-ajatelg ja hüpikaken näitavad liiki teose kaupa.
+**Isiku liik ja suurus arvutatakse kliendis nähtavatest servadest**, mitte serveris.
+Järjekord on:
+
+1. rakenda liigifilter servadele;
+2. eemalda isikud, kellel ei jäänud ühtki nähtavat serva;
+3. arvuta iga isiku liik (tugevaim nähtav serv: `academic > dedicated > family >
+   cotext > mention > printer`), sõlme suurus ja päise loendurid.
+
+Kui isiku tugevaim serv on filtriga peidetud, saab ta värvi järgmisest nähtavast
+servast. „Ühiste teoste arv" on **unikaalsete `evidence.work_id`-de** arv, mitte servade
+arv, sest samas teoses võib olla mitu rolli.
 
 ## Andmeleping
 
@@ -83,8 +104,8 @@ ajatelg ja hüpikaken näitavad liiki teose kaupa.
   loeb read-model faile. Route PEAB olema routeris enne üldist
   `GET /{person_id:path}`-i, muidu neelab see `…/network` tee isiku-ID-na.
 - `collection` (valikuline): servad ainult nende tõenditega, mille teos kuulub sellesse
-  kogusse või selle alamkogusse. `family` servad jäävad alles (neil ei ole teost).
-  Semantika on sama mis #460 `related_scope=collection`.
+  kogusse või selle alamkogusse. Kogud tulevad `work_collections_index.json`-ist, mitte
+  teoste indeksist (vt Read-model). `family` servad jäävad alles, sest neil ei ole teost.
 - Vastus ei sõltu kutsujast (vt Ligipääs), nii et `server/cache.py` võib selle
   vahemällu panna võtmega `(person_id, collection)`. Kasutajapõhist vastust seal ei hoita
   (ADR 0042).
@@ -96,7 +117,10 @@ ajatelg ja hüpikaken näitavad liiki teose kaupa.
   "focus":   { "id": "vutt:Pu837uz", "label": "Johann Fischer", "birth_year": 1636, "death_year": 1705,
                "origin": { "place": "Lübeck", "place_id": "Q2843", "coordinates": { "lat": 53.87, "lon": 10.69 } } },
   "persons": [ { "id": "vutt:Pay7st5", "label": "Johann Leonhard Schwäger", "birth_year": null,
-                 "death_year": null, "origin": null, "kind": "dedicated" } ],
+                 "death_year": null, "origin": null },
+               { "id": "vutt:P5p7qhj", "label": "Theodoricus Hackspan", "birth_year": 1607,
+                 "death_year": 1659, "origin": { "place": "Weimar", "place_id": "Q3955",
+                 "coordinates": { "lat": 50.98, "lon": 11.33 } } } ],
   "works":   [ { "work_id": "jy30do", "title": "Legitimum Certamen …", "year": 1659,
                  "place": { "id": "Q435295", "label": "Altdorf bei Nürnberg", "coordinates": null },
                  "genres": ["disputatsioon"], "restricted": false } ],
@@ -105,12 +129,28 @@ ajatelg ja hüpikaken näitavad liiki teose kaupa.
                  "year": 1659,
                  "place": { "id": "Q435295", "kind": "print" },
                  "evidence": { "work_id": "jy30do", "pages": [] } },
-               { "kind": "family", "from": "vutt:P2nqvxq", "to": "vutt:Pv7er4ra", "directed": false,
-                 "type": "vend", "evidence": null } ]
+               { "kind": "family", "from": "vutt:Pu837uz", "to": "vutt:P5p7qhj", "directed": false,
+                 "type": "õpetaja", "year": null, "place": null, "evidence": null } ]
 }
 ```
 
-- `persons[].kind` on isiku tugevaim liik (vt ülal).
+(Pereserv on illustratiivne. Fischeri kaardil struktureeritud seoseid tegelikult ei ole.)
+
+**Invariandid** (kontrollitakse testides):
+- iga serv puudutab fookust (`from` või `to` on `focus.id`);
+- iga serva teine otspunkt leidub `persons`-is ja fookus ise ei ole `persons`-is;
+- iga `evidence.work_id` leidub `works`-is.
+
+**Pereseosed:**
+- leitakse mõlemast suunast: fookuse kaardi `relations[]` ja teiste kaartide
+  `relations[]`, mille `target_id` on fookus. See on praeguse
+  `get_person_relation_network_ids` käitumine ja see säilib;
+- tombstone-kaarte ei arvestata;
+- sama isikupaari kirjed ühendatakse **üheks** servaks. Kui mõlemad kaardid kannavad
+  tüüpi, eelistatakse fookuse kaardi tüüpi. Kui tüübid erinevad, kannab serv mõlemat
+  (`types: [...]`).
+- Isikul, kellel on ainult pereserv, ei ole aastat ega teost. Ajatelg näitab teda
+  „Aeg teadmata" veerus (vt Vaated).
 - `edges[].place.kind` on täna alati `print`. #465 lisab `event`, #464 lisab `sent_from`.
   Vaated ei tohi eeldada, et `print` on kohtumiskoht.
 - `edges[].evidence.part_id` lisandub #464-ga (teose osa). Täna seda välja ei ole.
@@ -131,22 +171,56 @@ Vaja on iga teose kohta: pealkiri, aasta, trükikoht (id + silt), žanrid, kogud
 `works_creators_index.json` hoiab praegu ainult pealkirja, aastat ja loojaid ning ainult
 teoseid, **millel on loojaid**. Märksõna- või trükkalipõhise teose kohta seal kirjet pole.
 
-Otsus: laiendada `works_creators_index.json`-it:
-- kirje tehakse **igale** teosele, mis on `person_to_works`-is (ka `creators: []`);
-- uued väljad `location` (`{id, label}`), `genres` (sildid) ja `collections`.
+Otsus: laiendada `works_creators_index.json`-it **ainult teose enda faktidega**:
+- kirje tehakse **igale** teosele, millel on `_metadata.json` (ka `creators: []`);
+- uued väljad on `location` (`{id, label}`) ja `genres` (sildid).
 
-ADR 0007: sama ehitusloogika mõlemas teel, `build_works_creators_index()` (rebuild) ja
-`update_works_creators_index()` (salvestus). Koordinaadid ei ole indeksis: need tulevad
-päringu ajal kohtade registrist (`_get_place_coordinates`), sest kohtade parandus ei
-tohi vajada teoste indeksi ümberehitust. `get_work_relations` jääb tööle: ta itereerib
-`creators`-it ja tühi loend on talle no-op.
+**Kogusid ja `restricted`-lippu teoste indeksisse ei kopeerita.** Need loetakse
+päringu ajal `work_collections_index.json`-ist (+ `collections.json` nähtavus). Seda
+indeksit uuendab juba **tingimusteta** `update_work_collections` kõigil teedel: üksik-
+ja hulgisalvestus (`metadata_ops.py`), import (`import_work.py`) ja kustutus
+(`admin.py`). Koopia uude indeksisse jääks vanaks teedel, kus `call_ptw=False`
+(kogude hulgimuudatus, `public.py` jagamine, `upload_ops` asendus).
+
+**Uuendustee:** teose faktid (pealkiri, aasta, `location`, `genres`, loojad) kirjutab uus
+`update_work_facts(meta)`. Seda kutsutakse **tingimusteta, samas kohas mis
+`update_work_collections`**: `save_work_metadata`-s ja `bulk_update_works`-is
+muutunud teose kohta, ning `import_work`-is. Praegu sõltub `update_works_creators_index`
+`call_ptw`-st, seega pealkirja või koha muutus hulgiteel ei jõua indeksisse. See viga
+kaob samas. Teose kustutamine (`admin.py`, `update_work_collections(work_id, [])`)
+eemaldab kirje.
+
+Lehe mainimised (`update_page_person_mentions`) ei muuda teose fakte. Kuna kirje
+tehakse igale teosele, on esimese mainimisega teose kirje juba olemas.
+
+ADR 0007: `build_works_creators_index()` (rebuild) ja `update_work_facts()` kasutavad
+sama kirje-ehitajat (`_work_facts_entry(meta)`), nii et need ei saa lahku minna.
+Koordinaadid ei ole indeksis: need tulevad päringu ajal kohtade registrist
+(`_get_place_coordinates`), sest kohtade parandus ei tohi vajada teoste indeksi
+ümberehitust. `get_work_relations` jääb tööle: ta itereerib `creators`-it ja tühi
+loend on talle no-op.
 
 ### Üks tõde võrgustiku kohta
 
 `get_person_relation_network_ids` (`/persons?view=map&related_to=`) hakkab kasutama sama
 ehitajat (`build_person_network`) ja võtab isikud kõigist servadest peale `printer`-i.
-Nii näitavad isikulehe võrgustik ja `/persons` seoste kaart sama isikute hulka.
 Praegu on need kaks eraldi arvutust (`relations.py` vs `work_relations_ops.py`).
+
+Ühisest ehitajast üksi ei piisa. `get_person_map_markers` filtreerib praegu **pärast**
+võrgustiku leidmist isikuid `_persons_in_collection` järgi: kas isikul on
+**ükskõik milline** teos kogus. Uus endpoint filtreerib aga **ühiseid teoseid** ja
+säilitab pereseosed. Need annavad eri tulemuse. Seepärast läheb PR 1-sse:
+
+- kui `related_to` ja `collection` on mõlemad antud, kutsub `get_person_map_markers`
+  `build_person_network(related_to, collection=collection)`-i ega rakenda
+  `_persons_in_collection`-it enam. `collection` jõuab serverisse ainult siis, kui
+  klient on piiranud (#460 `related_scope=collection`), seega #460 kliendiloogika jääb
+  samaks;
+- test: isikulehe võrgustiku isikud (miinus `printer`) == `/map?related_to=…` isikud,
+  nii ilma koguta kui kogu ja alamkoguga.
+
+Link „Ava suurel kaardil" kannab kaasa `related_to`, aktiivse kogu ja ulatuse
+(`related_scope=collection`, kui isikulehel on „Ainult kogus" sees).
 
 `GET /work-relations/{id}` jääb muutmata, sest MCP (`mcp/vutt_mcp/persons.py`)
 kasutab seda. Pärast `WorkRelationsCard`-i asendamist on see ainult MCP tee.
@@ -180,16 +254,24 @@ SVG (radiaalne paigutus ja lineaarne skaala). d3 ei ole vaja.
 - „Kaaslaste jooned" on lülitatav;
 - üle 40 isiku korral on nimed ainult suurima seosega isikutel, teised hõljutusel.
 
-**Ajatelg** (millal ja mis rollis): üks rida iga seotud isiku kohta, märk iga serva kohta
-aasta kohal (kuju ja värv = serva liik). Pikk loend keritakse oma konteineris; see on
-lubatud erand „kerib aken" reeglist, nagu Workspace.
+**Ajatelg** (millal ja mis rollis): üks rida iga seotud isiku kohta, märk iga
+**teose** kohta aasta kohal (kuju ja värv = serva liik).
+- **Aeg teadmata:** telje paremal pool on eraldi veerg. Sinna lähevad aastata teoste
+  servad ja pereservad. Isik, kellel on ainult aastata servad, järjestatakse lõppu.
+- **Sama isik, sama aasta, mitu teost:** üks liitmärk koos arvuga (näiteks „3"),
+  värviga tugevaima liigi järgi. Klikk avab hüpikakna, kus on selle aasta kõik teosed.
+  Märke kõrvuti ei nihutata, sest see moonutaks aastaskaalat.
+- Pikk loend keritakse oma konteineris. See on lubatud erand „kerib aken" reeglist,
+  nagu Workspace.
 
 **Kaart** (kus), kolm kihti:
 - **Päritolu (vaikimisi):** seotud isikud päritolukoha järgi. Ring koha kohta, täidis
   näitab liikide jaotust.
-- **Teekond disputatsioonini:** joon isiku päritolust `academic` serva trükikohta.
-  Sildis ja kirjelduses on öeldud, et see on trükikoht, mitte toimumiskoht. Kui #465
-  toob `event_place`-i, kasutab kiht seda ja kirjeldus muutub.
+- **Päritolu ja trükikoht:** joon ühendab isiku päritolukoha tema `academic` serva
+  teose trükikohaga. Joon on **kahe koha ühendus, mitte teekond**: andmed ei tõenda, et
+  isik rändas, ega seda, et akt toimus trükikohas (`academic` hõlmab ka oratsioone).
+  Kui #465 toob `event_place`-i, kasutab kiht seda ja kihi nimi ning kirjeldus
+  muutuvad.
 - **Trükikohad:** ühiste teoste trükikohad. Täis osa = `academic` teosed, õõnes =
   ülejäänud.
 
@@ -227,23 +309,33 @@ neutraalset halli ja kuju (täpp / õõnes ring / kolmnurk).
 ## Testimine
 
 - **Reeglid (pytest):** tabel-test, iga reegli rida + viis kontrollnäidet ülal, sh
-  järjekord (aui+gratulator vs auctor → `academic`, mitte `cotext`).
+  järjekord (aui+gratulator vs auctor → `academic`, mitte `cotext`), `creator`,
+  tundmatu roll (→ `cotext`, üks logikirje) ja vastassuunaline vaste (→ suunata).
+- **Sümmeetria:** iga testandmestiku paari (A, B) serv on identne, olgu fookus A või B.
+- **Invariandid:** iga serv puudutab fookust, otspunktid on `persons`-is, tõendid
+  `works`-is. Pereseosed tulevad mõlemast suunast, üks serv paari kohta.
 - **Ehitaja:** `build_person_network` puhaste sisendite peal (ptw, teoste indeks, isikute
   indeks, kaart). Kontrollitakse `family` servi, `collection` filtrit (alamkogud),
   `restricted` lippu ja `mentioned` lehti.
-- **Read-model (ADR 0007):** `build_works_creators_index()` ja `update_works_creators_index()`
+- **Read-model (ADR 0007):** `build_works_creators_index()` ja `update_work_facts()`
   annavad sama kirje; ka teos ilma loojateta (ainult märksõna või trükkal) saab kirje.
+- **Uuendusteed (integratsioon):** pealkirja/koha muutus hulgiteel (`call_ptw=False`)
+  jõuab teose faktidesse; kogude hulgimuudatus muudab `collection`-filtri ja
+  `restricted`-lipu tulemust ilma rebuildita; teose kustutamine eemaldab kirje.
 - **Endpoint:** sync route (`test_async_endpoint_offload` muster), 404 tundmatu isiku
   korral, vastuse kuju.
-- **Üks tõde:** `get_person_relation_network_ids` == `build_person_network` isikud miinus
-  `printer`.
+- **Üks tõde:** `build_person_network` isikud miinus `printer` == `/map?related_to=…`
+  isikud, ilma koguta ning kogu ja alamkoguga.
 - **Frontend (vitest):** puhtad utiliidid (radiaalne paigutus, isikute järjestus, kaaslaste
-  servad `evidence`-ist, filtri rakendamine) ja i18n mõlemas keeles.
+  servad `evidence`-ist), filtreerimise järjekord (peidetud tugevaim serv → värv
+  järgmisest; unikaalsed teosed, mitte servad), ajatelje „Aeg teadmata" ja liitmärk,
+  i18n mõlemas keeles.
 
 ## Tükeldus PR-ideks
 
-1. **Backend:** read-modeli laiendus + `build_person_network` + endpoint + reeglite testid
-   + `get_person_relation_network_ids` ümber ehitajale.
+1. **Backend:** read-modeli laiendus (`update_work_facts` tingimusteta uuendusteedel) +
+   `build_person_network` + endpoint + reeglite testid + `get_person_relation_network_ids`
+   ja `get_person_map_markers` (`related_to` + `collection`) ümber ehitajale.
 2. **Frontend 1:** „Seosed" sektsioon: Võrgustik, Ajatelg, Loend, filtrid, hüpikaken;
    `WorkRelationsCard` eemaldatakse isikulehelt.
 3. **Frontend 2:** Kaart-vahekaart kolme kihiga.
