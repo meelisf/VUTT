@@ -337,7 +337,19 @@
       "sharedWarning": "Page {{stem}} also belongs to another part; persons mentioned on this page are linked to both.",
       "error": "Saving failed: {{message}}",
       "newPart": "New part",
-      "none": "—"
+      "none": "—",
+      "viewPages": "Pages",
+      "viewToc": "Contents",
+      "thumbSize": "Thumbnail size",
+      "clearSelection": "Clear selection",
+      "close": "Close",
+      "minimize": "Minimise",
+      "expand": "Expand",
+      "dragHint": "Drag by the header",
+      "colNo": "No.",
+      "colWho": "Title / person",
+      "colPages": "Pages",
+      "openPart": "Open part: {{name}}"
     }
   },
   "metadata": {

@@ -58,6 +58,7 @@ describe('PartsTab', () => {
   it('needs_review osa on esile tõstetud', async () => {
     api.parts = [{ id: 'x', kind: 'letter', pages: [], creators: [], attached_to: null, needs_review: true }];
     renderTab();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord/ }));
     expect(await screen.findByText('Lehed puuduvad — vaata üle')).toBeTruthy();
   });
 
@@ -69,14 +70,14 @@ describe('PartsTab', () => {
     renderTab();
     expect(await screen.findByTestId('badge-s2-a')).toBeTruthy();
     expect(screen.getByTestId('badge-s2-b')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('part-a'));
+    fireEvent.click(screen.getByTestId('badge-s1-a'));
     expect(await screen.findByText(/kuulub ka teise osasse/)).toBeTruthy();
   });
 
   it('valitud lehtede lisamine aktiivsele osale', async () => {
     api.parts = [{ id: 'a', kind: 'letter', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
     renderTab();
-    fireEvent.click(await screen.findByTestId('part-a'));
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
     fireEvent.click(screen.getByTestId('page-s3'));
     fireEvent.click(screen.getByRole('button', { name: 'Lisa valitud lehed osale' }));
     await waitFor(() => expect(api.calls).toContain('pages:a:+s3:-'));
@@ -86,7 +87,7 @@ describe('PartsTab', () => {
     api.fail = { status: 409, message: 'Osale viitavad lisad' };
     api.parts = [{ id: 'a', kind: 'session', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
     renderTab();
-    fireEvent.click(await screen.findByTestId('part-a'));
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
     fireEvent.click(screen.getByRole('button', { name: 'Kustuta osa' }));
     expect(await screen.findByText(/Osale viitavad lisad/)).toBeTruthy();
   });
@@ -94,7 +95,7 @@ describe('PartsTab', () => {
   it('pealkirja muutmine teatab salvestamata muudatusest', async () => {
     api.parts = [{ id: 'a', kind: 'letter', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
     renderTab();
-    fireEvent.click(await screen.findByTestId('part-a'));
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
     fireEvent.change(screen.getByLabelText('Pealkiri'), { target: { value: 'Uus' } });
     await waitFor(() => expect(dirty[dirty.length - 1]).toBe(true));
   });
@@ -114,5 +115,63 @@ describe('PartsTab', () => {
     expect(dirty[dirty.length - 1]).toBe(false);
     expect(await saveRef.current()).toBe(true);
     expect(api.calls.filter(c => c.startsWith('create'))).toEqual([]);   // loobutud osa ei looda
+  });
+
+  it('sisukorra vaatest osa avamine', async () => {
+    api.parts = [{ id: 'a', kind: 'letter', title: 'Kiri Ludenile', pages: ['s2'], creators: [], attached_to: null, needs_review: false }];
+    renderTab();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord/ }));
+    fireEvent.click(await screen.findByTestId('part-a'));
+    expect(await screen.findByRole('dialog', { name: 'Kiri Ludenile' })).toBeTruthy();
+  });
+
+  it('paneel on hõljuv (mitte modaalne) ja isikud on vormis esimesed', async () => {
+    api.parts = [{ id: 'a', kind: 'letter', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
+    renderTab();
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('false');
+    expect(dialog.className).toContain('z-[1300]');
+    const persons = screen.getByText('Isikud');
+    const kind = screen.getByLabelText('Liik');
+    expect(persons.compareDocumentPosition(kind) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('paneeli sulgemine käib salvestamata-kaitse kaudu', async () => {
+    api.parts = [{ id: 'a', kind: 'letter', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
+    const guarded: string[] = [];
+    render(
+      <MemoryRouter>
+        <PartsTab workId="w1" pages={PAGES} token="t" imageToken={null} thumbCacheBust={0}
+          onDirtyChange={d => dirty.push(d)} runGuarded={fn => { guarded.push('x'); fn(); }} saveRef={{ current: async () => true }} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
+    await screen.findByRole('dialog');
+    const before = guarded.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Sulge' }));
+    expect(guarded.length).toBe(before + 1);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('kokkutõmmatud paneel peidab vormi, päis jääb', async () => {
+    api.parts = [{ id: 'a', kind: 'letter', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
+    renderTab();
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tõmba kokku' }));
+    expect(screen.queryByLabelText('Pealkiri')).toBeNull();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Ava' }));
+    expect(screen.getByLabelText('Pealkiri')).toBeTruthy();
+  });
+
+  it('suuruse liugur muudab ruudustiku veeru laiust; valiku saab tühistada', async () => {
+    renderTab();
+    await screen.findByText(/Osi pole veel märgitud/);
+    fireEvent.change(screen.getByLabelText('Pisipildi suurus'), { target: { value: '240' } });
+    expect(screen.getByTestId('parts-grid').style.gridTemplateColumns).toContain('240px');
+    fireEvent.click(screen.getByTestId('page-s1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Tühista valik' }));
+    expect(screen.queryByText('1 leht valitud')).toBeNull();
   });
 });

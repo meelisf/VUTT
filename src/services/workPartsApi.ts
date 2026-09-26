@@ -8,7 +8,7 @@ export type PartRole = 'auctor' | 'addressee' | 'praeses' | 'participant' | 'sub
 export const PART_KINDS: PartKind[] = ['letter', 'poem', 'speech', 'session', 'attachment'];
 export const PART_ROLES: PartRole[] = ['auctor', 'addressee', 'praeses', 'participant', 'subject'];
 
-export interface PartCreator { id?: string; name?: string; role: PartRole; source?: string; }
+export interface PartCreator { id?: string | null; name?: string; role: PartRole; source?: string; }
 export interface PartPlace { id: string | null; label: string; }
 export interface WorkPart {
   id: string; kind: PartKind; pages: string[]; title?: string; incipit?: string;
