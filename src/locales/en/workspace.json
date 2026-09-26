@@ -300,6 +300,44 @@
       "badgeSplit": "will be split",
       "progress": "{{done}} / {{total}} pages",
       "interrupted": "The job stopped before finishing (server restart?). The page list was refreshed — check what reached the disk."
+    },
+    "tabParts": "Parts",
+    "parts": {
+      "kinds": {
+        "letter": "Letter",
+        "poem": "Poem",
+        "speech": "Speech",
+        "session": "Session",
+        "attachment": "Attachment"
+      },
+      "create": "Create a part from the selected pages",
+      "addToPart": "Add selected pages to part",
+      "removeFromPart": "Remove selected pages from part",
+      "selected_one": "{{count}} page selected",
+      "selected_other": "{{count}} pages selected",
+      "empty": "No parts yet. Select pages in the grid and create a part.",
+      "needsReview": "No pages — review",
+      "pages_one": "{{count}} page",
+      "pages_other": "{{count}} pages",
+      "kind": "Kind",
+      "title": "Title",
+      "incipit": "Incipit",
+      "dating": "Date",
+      "place": "Place",
+      "placeLetter": "Place of writing",
+      "placeTo": "Destination",
+      "persons": "Persons",
+      "addPerson": "Add person",
+      "role": "Role",
+      "attachedTo": "Attachment to",
+      "notes": "Notes",
+      "save": "Save part",
+      "delete": "Delete part",
+      "openPage": "Open page in workspace",
+      "sharedWarning": "Page {{stem}} also belongs to another part; persons mentioned on this page are linked to both.",
+      "error": "Saving failed: {{message}}",
+      "newPart": "New part",
+      "none": "—"
     }
   },
   "metadata": {
@@ -343,7 +381,9 @@
       "aui": "Author of preface/afterword",
       "subject": "Subject of",
       "publisher": "Publisher",
-      "mentioned": "Mentioned"
+      "mentioned": "Mentioned",
+      "addressee": "Addressee",
+      "participant": "Participant"
     },
     "addCreator": "Add person",
     "removeCreator": "Remove",
