@@ -35,7 +35,7 @@ from .merge_ops import merge_person, delete_person
 from .indices import rebuild_indices
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from . import enrichment_proposals
+from . import enrichment_proposals, registry_candidates
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo
 from ..rate_limit import get_client_ip, check_rate_limit
@@ -436,6 +436,16 @@ async def prosopography_enrichment_proposals(
         enrichment_proposals.list_pending, person_id, user["username"],
         request.state.session_fingerprint,
     )
+
+
+@router.get("/enrichment-registry-search")
+def prosopography_enrichment_registry_search(kind: str, q: str, limit: int = 10):
+    """Avalik, ainult kohalikest kinnitatud registrifailidest lugev kandidaatotsing."""
+    try:
+        return registry_candidates.search(kind, q, limit)
+    except registry_candidates.RegistrySearchError as error:
+        status = 503 if str(error).startswith("registry_") else 400
+        raise HTTPException(status_code=status, detail=str(error))
 
 
 @router.post("/enrichment-proposals/{person_id}/apply")

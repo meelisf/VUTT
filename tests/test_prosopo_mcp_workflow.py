@@ -21,12 +21,14 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     registry = tmp_path / "config"
     registry.mkdir(exist_ok=True)
     (registry / "occupations.json").write_text(json.dumps({
-        "professor": {"labels": {"et": "professor"}},
+        "professor": {"labels": {"et": "professor"}, "variants": ["Prof. theol."]},
     }))
     (registry / "institutions.json").write_text(json.dumps({
-        "agc": {"labels": {"et": "Academia Gustaviana"}},
+        "agc": {"labels": {"et": "Academia Gustaviana"}, "variants": ["AGC"]},
     }))
     monkeypatch.setattr(proposals, "DATA_CONFIG_DIR", str(registry))
+    from server.prosopography import registry_candidates
+    monkeypatch.setattr(registry_candidates, "DATA_CONFIG_DIR", str(registry))
 
     card = prosopo_env.write("abc", occupations=[], education=[])
     token = login("editor", "editorpass")
@@ -47,16 +49,27 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     context = await mcp.call_tool("get_person_enrichment_context", {"person_id": card["id"]})
     version = json.loads(context.content[0].text)["updated_at"]
     assert version == card["updated_at"]
+    occupation_match = await mcp.call_tool("search_enrichment_registry", {
+        "kind": "occupation", "query": "Prof. theol.",
+    })
+    institution_match = await mcp.call_tool("search_enrichment_registry", {
+        "kind": "institution", "query": "AGC",
+    })
+    occupation_key = json.loads(occupation_match.content[0].text)["results"][0]["key"]
+    institution_key = json.loads(institution_match.content[0].text)["results"][0]["key"]
+    institution_variant = json.loads(institution_match.content[0].text)["results"][0]["matched_variant"]
+    assert (occupation_key, institution_key) == ("professor", "agc")
 
     handoff = client.post(f'/prosopography/enrichment-handoff/{card["id"]}',
                           headers={"Authorization": f"Bearer {token}"})
     assert handoff.status_code == 200
     items = [
         {"kind": "occupation", "match_status": "matched", "raw_occupation": "Prof. theol.",
-         "raw_institution": "AGC", "occupation_key": "professor", "institution_key": "agc",
+         "raw_institution": "AGC", "occupation_key": occupation_key, "institution_key": institution_key,
+         "occupation_variant": "Prof. theol.", "institution_variant": institution_variant,
          "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 12}]},
         {"kind": "education", "match_status": "matched", "raw_institution": "AGC",
-         "institution_key": "agc", "edu_type": "immatriculation",
+         "institution_key": institution_key, "edu_type": "immatriculation",
          "evidence": [{"source_kind": "literature", "source_id": "book1", "locator": "lk 4"}]},
     ]
     submitted = await mcp.call_tool("submit_person_enrichment_proposal", {

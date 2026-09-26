@@ -13,8 +13,10 @@ export interface EnrichmentItem {
   kind: 'occupation' | 'education'; match_status: string; existing_index?: number;
   review_error?: string;
   registry_labels?: Record<string, string>;
+  institution_place_key?: string | null;
   raw_occupation?: string; raw_institution?: string; occupation_key?: string;
   institution_key?: string; place_key?: string; edu_type?: string;
+  occupation_variant?: string; institution_variant?: string;
   date_from?: { date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean };
   date_to?: { date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean };
   evidence: EnrichmentEvidence[];

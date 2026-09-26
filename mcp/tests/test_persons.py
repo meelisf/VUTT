@@ -268,3 +268,28 @@ async def test_mcp_ettepanek_esitatakse_ainult_ajutise_api_kaudu():
         "code": "once", "person_id": "vutt:Pabc",
         "base_updated_at": "t", "items": [item],
     })]
+
+
+async def test_mcp_registrikandidaadid_ja_puuduv_register():
+    class RegistryClient(FakeClient):
+        def api_get(self, path, params=None):
+            self.gets.append((path, params))
+            return self.get_map[path]
+
+    path = "/prosopography/enrichment-registry-search"
+    client = RegistryClient({path: {"kind": "occupation", "query": "Pfarrer",
+                                    "registry_available": True, "ambiguous": True,
+                                    "results": [{"key": "pastor", "match_kind": "variant"},
+                                                {"key": "clergyman", "match_kind": "variant"}]}})
+    server = build_server(client=client, base_url=BASE)
+    result = await server.call_tool("search_enrichment_registry", {
+        "kind": "occupation", "query": "Pfarrer",
+    })
+    assert json.loads(result.content[0].text)["ambiguous"] is True
+    assert client.gets == [(path, {"kind": "occupation", "q": "Pfarrer", "limit": 10})]
+    client.get_map[path] = {"kind": "occupation", "query": "Pfarrer",
+                            "registry_available": False, "results": []}
+    result = await server.call_tool("search_enrichment_registry", {
+        "kind": "occupation", "query": "Pfarrer",
+    })
+    assert "Ära järelda" in result.content[0].text

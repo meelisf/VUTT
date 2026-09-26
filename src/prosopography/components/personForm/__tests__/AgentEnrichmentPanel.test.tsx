@@ -23,6 +23,7 @@ const proposal = {
   proposal_id: 'proposal-1', person_id: person.id, base_updated_at: person.updated_at,
   created_at: 1, expires_at: 9999999999,
   items: [{ kind: 'education', match_status: 'matched', raw_institution: 'Academia Gustaviana',
+    institution_variant: 'AGC',
     evidence: [{ source_kind: 'literature', source_id: 'book1', locator: 'lk 4', quote: 'studiosus' }] }],
 };
 
@@ -38,6 +39,7 @@ describe('agendi ettepanekud isikuvormis', () => {
     const onApplied = vi.fn();
     render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={onApplied} /></MemoryRouter>);
     expect(await screen.findByText('studiosus')).toBeTruthy();
+    expect(screen.getByText('Tabanud nimevariant: AGC')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Loo üleandmiskood' }));
     expect(await screen.findByText('one-time-code')).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox'));

@@ -447,6 +447,18 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         return persons.enrichment_context(client, person_id)
 
     @mcp.tool(structured_output=False)
+    async def search_enrichment_registry(kind: str, query: str) -> str:
+        """Otsib VUTT-i ametite või asutuste registrist isikufakti kandidaate.
+
+        kind on occupation või institution. Vastuses on VUTT-i püsivõti,
+        valikuline Q-kood, sildid, tabanud nimevariant ning asutuse kinnitatud
+        place_key. Variant või osaline tabamus on ainult kandidaat: mitme vaste
+        korral ära vali automaatselt. Kui registry_available=false, pole
+        register veel kasutusel ja tühi loend EI tähenda uut kirjet.
+        """
+        return persons.enrichment_registry_candidates(client, kind, query)
+
+    @mcp.tool(structured_output=False)
     async def submit_person_enrichment_proposal(
         handoff_code: str, person_id: str, base_updated_at: str,
         items: list[dict],
@@ -459,6 +471,7 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         get_person_enrichment_context vastusest. Iga item sisaldab `kind`
         (occupation/education), `match_status` (already_present/matched/
         ambiguous/new_registry_candidate), toorsõnastust, registrivõtmeid,
+        registriotsingus tabanud `occupation_variant`/`institution_variant`-i,
         võimalikku aega ja 1–5 täpset `evidence` viidet. Üks kutse kuni 20
         kirjet. See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
         muutmata. Toimetaja otsustab VUTT-i vormis iga rea eraldi.

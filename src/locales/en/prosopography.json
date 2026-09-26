@@ -9,7 +9,7 @@
     "copy": "Copy", "expires": "Expires", "empty": "No pending proposals.",
     "proposal": "Proposal", "stale": "The person record has changed. Ask the agent for a new proposal.",
     "occupation": "Occupation", "education": "Education", "institution": "Institution", "eventType": "Education event", "printedPage": "printed p.", "part": "part",
-    "period": "Period", "noKey": "No registry key", "existing": "Current entry", "currentEntries": "Currently on card", "none": "No entries", "registryMissing": "Registry link cannot be approved yet", "registryMatch": "Registry match",
+    "period": "Period", "noKey": "No registry key", "existing": "Current entry", "currentEntries": "Currently on card", "none": "No entries", "registryMissing": "Registry link cannot be approved yet", "registryMatch": "Registry match", "matchedVariant": "Matched name variant", "institutionPlace": "Institution place", "noMappedPlace": "place not linked",
     "page": "p.", "applySelected": "Approve selected entries", "saved": "Selected entries saved.", "addEvidence": "Add evidence to the existing entry", "evidenceCount": "sources",
     "status": {"already_present": "Already present; this row cannot be added.", "ambiguous": "Ambiguous match; resolve before approval.", "new_registry_candidate": "Missing from registry; create a registry entry before approval."}
   },

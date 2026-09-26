@@ -19,6 +19,7 @@ MAX_RELATIONS = 50
 LIST_PATH = "/prosopography"
 MAX_ENRICHMENT_ENTRIES = 100
 MAX_ENRICHMENT_CHARS = 60000
+MAX_REGISTRY_RESULT_CHARS = 30000
 _PERSON_ID = re.compile(r"^vutt:P[A-Za-z0-9_-]+$")
 
 
@@ -161,6 +162,26 @@ def enrichment_context(client, person_id: str) -> str:
     result = json.dumps(context, ensure_ascii=False, indent=2)
     if len(result) > MAX_ENRICHMENT_CHARS:
         raise VuttError("Isiku ameti- ja haridusandmed ületavad MCP vastuse mahupiiri; ava kaart VUTT-i vormis.")
+    return result
+
+
+def enrichment_registry_candidates(client, kind: str, query: str) -> str:
+    """VUTT-i ametite või asutuste registri kandidaadid, ilma vaikiva uue kirje otsuseta."""
+    if kind not in {"occupation", "institution"}:
+        raise VuttError("kind peab olema occupation või institution.")
+    if not isinstance(query, str) or not query.strip() or len(query) > 120:
+        raise VuttError("Otsisõna peab olema 1–120 märki.")
+    data = client.api_get("/prosopography/enrichment-registry-search",
+                          params={"kind": kind, "q": query.strip(), "limit": 10})
+    if not isinstance(data, dict) or not isinstance(data.get("registry_available"), bool):
+        raise VuttError("VUTT-i registriotsingu vastus on vigane.")
+    if not data["registry_available"]:
+        return json.dumps({
+            **data, "guidance": "Register ei ole veel saadaval. Ära järelda tühjast loendist, et amet või asutus on uus; jäta vaste lahtiseks."
+        }, ensure_ascii=False)
+    result = json.dumps(data, ensure_ascii=False, indent=2)
+    if len(result) > MAX_REGISTRY_RESULT_CHARS:
+        raise VuttError("Registriotsingu vastus on liiga suur; proovi täpsemat otsisõna.")
     return result
 
 

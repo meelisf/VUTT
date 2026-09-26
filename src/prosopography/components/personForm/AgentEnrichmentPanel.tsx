@@ -121,6 +121,9 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
               <p className="text-xs font-mono">{[item.occupation_key, item.institution_key, item.place_key].filter(Boolean).join(' · ') || tr('noKey')}</p>
               {Object.entries(item.registry_labels ?? {}).map(([key, label]) =>
                 <p key={key} className="text-xs text-blue-800">{tr('registryMatch')}: {label} ({key.replace('_key', '')})</p>)}
+              {item.occupation_variant && <p className="text-xs text-blue-800">{tr('matchedVariant')}: {item.occupation_variant}</p>}
+              {item.institution_variant && <p className="text-xs text-blue-800">{tr('matchedVariant')}: {item.institution_variant}</p>}
+              {item.institution_key && <p className="text-xs text-blue-800">{tr('institutionPlace')}: {item.institution_place_key || tr('noMappedPlace')}</p>}
               {existing && <p className="text-xs text-amber-800">{tr('existing')} #{(item.existing_index ?? 0) + 1}: {(existing as any).label || (existing as any).institution}</p>}
               {item.match_status === 'already_present' && canSelect(item) && <p className="text-xs text-blue-800">{tr('addEvidence')}</p>}
               {!canSelect(item) && <p className="text-xs text-amber-800">{tr(`status.${item.match_status}`)}</p>}

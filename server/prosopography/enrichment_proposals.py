@@ -20,7 +20,8 @@ _KINDS = {"occupation", "education"}
 _MATCHES = {"already_present", "matched", "ambiguous", "new_registry_candidate"}
 _ITEM_KEYS = {"kind", "raw_occupation", "raw_institution", "occupation_key",
               "institution_key", "place_key", "date_from", "date_to", "evidence",
-              "match_status", "existing_index", "edu_type"}
+              "match_status", "existing_index", "edu_type", "occupation_variant",
+              "institution_variant"}
 _EVIDENCE_KEYS = {"source_kind", "source_id", "locator", "work_id", "page",
                   "printed_page", "part_id", "quote", "url"}
 
@@ -110,7 +111,8 @@ def _validate_item(item: dict) -> None:
             or not item["raw_institution"].strip()):
         raise ProposalError("raw_institution_required")
     for key in ("raw_occupation", "raw_institution", "occupation_key",
-                "institution_key", "place_key", "edu_type"):
+                "institution_key", "place_key", "edu_type", "occupation_variant",
+                "institution_variant"):
         if key in item and item[key] is not None and not _short_string(item[key]):
             raise ProposalError("invalid_text_field")
     for key in ("date_from", "date_to"):
@@ -224,6 +226,12 @@ def list_pending(person_id: str, username: str, session_fingerprint: str) -> lis
                         if label:
                             labels[key] = label
                 item["registry_labels"] = labels
+                if item.get("institution_key"):
+                    institution = _registry_entry(
+                        os.path.join(DATA_CONFIG_DIR, "institutions.json"),
+                        item["institution_key"],
+                    )
+                    item["institution_place_key"] = institution.get("place_key") if institution else None
             result.append({"proposal_id": row["id"], "person_id": person_id,
                            "base_updated_at": row["base_updated_at"],
                            "created_at": row["created_at"], "expires_at": row["expires_at"],
@@ -231,24 +239,8 @@ def list_pending(person_id: str, username: str, session_fingerprint: str) -> lis
         return result
 
 
-def _registry_contains(filename: str, key: str) -> bool:
+def _registry_entry(filename: str, key: str) -> dict | None:
     """Võtmega seos lubatakse ainult reaalselt olemasoleva registrikirjega."""
-    try:
-        with open(filename, encoding="utf-8") as handle:
-            entries = json.load(handle)
-    except (OSError, ValueError):
-        return False
-    if isinstance(entries, dict):
-        return key in entries or any(
-            isinstance(entry, dict) and entry.get("key") == key
-            for entry in entries.values()
-        )
-    return isinstance(entries, list) and any(
-        isinstance(entry, dict) and entry.get("key") == key for entry in entries
-    )
-
-
-def _registry_label(filename: str, key: str) -> str | None:
     try:
         with open(filename, encoding="utf-8") as handle:
             entries = json.load(handle)
@@ -256,11 +248,16 @@ def _registry_label(filename: str, key: str) -> str | None:
         return None
     if isinstance(entries, dict):
         entry = entries.get(key)
-    elif isinstance(entries, list):
-        entry = next((row for row in entries if isinstance(row, dict) and row.get("key") == key), None)
-    else:
-        return None
-    if not isinstance(entry, dict):
+        return entry if isinstance(entry, dict) else None
+    if isinstance(entries, list):
+        return next((entry for entry in entries
+                     if isinstance(entry, dict) and entry.get("key") == key), None)
+    return None
+
+
+def _registry_label(filename: str, key: str) -> str | None:
+    entry = _registry_entry(filename, key)
+    if entry is None:
         return None
     labels = entry.get("labels") or {}
     if isinstance(labels, dict):
@@ -295,8 +292,17 @@ def _check_links(item: dict) -> None:
         ("institution_key", os.path.join(DATA_CONFIG_DIR, "institutions.json")),
         ("place_key", PLACES_FILE),
     ):
-        if item.get(key) and not _registry_contains(filename, item[key]):
-            raise ProposalError(f"unknown_{key}")
+        if item.get(key):
+            entry = _registry_entry(filename, item[key])
+            if entry is None:
+                raise ProposalError(f"unknown_{key}")
+            variant_key = key.removesuffix("_key") + "_variant"
+            if item.get(variant_key) and item[variant_key] not in (entry.get("variants") or []):
+                raise ProposalError(f"unknown_{variant_key}")
+    if item.get("occupation_variant") and not item.get("occupation_key"):
+        raise ProposalError("occupation_variant_requires_key")
+    if item.get("institution_variant") and not item.get("institution_key"):
+        raise ProposalError("institution_variant_requires_key")
 
 
 def _year(value) -> int | None:

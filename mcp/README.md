@@ -87,6 +87,7 @@ Kolm asja, mis üllatavad:
 | `search_persons` | Isikuotsing (nimevariandid kaetud) |
 | `get_person` | Isikukaart + seotud teosed (kuni 50) |
 | `get_person_enrichment_context` | Ühe isiku ametite ja hariduse täielikud JSON-kirjed + `updated_at` ettepaneku koostamiseks |
+| `search_enrichment_registry` | Ametite või asutuste registrikandidaadid püsivõtme, Q-koodi ja nimevariandi järgi; eristab puuduva registri tühjast tulemusest |
 | `submit_person_enrichment_proposal` | Ühekordse isikupõhise koodiga ootel ettepanek VUTT-i ülevaatuseks; kaarti ei muuda |
 | `list_filter_values` | Legaalsed filtriväärtused |
 
@@ -99,8 +100,9 @@ Koodi ei panda MCP seadistusse. Toimetaja loob koodi isikuvormi „Ametid ja
 haridus” jaotises, värskendab seal ootel ettepanekuid ning kinnitab valitud
 kirjed või lisab tõendi olemasolevale kirjele. Kinnitamine nõuab sama sessiooni
 ja värsket kaardiversiooni; MCP-le kinnitamise tööriista ei ole. Puuduva
-registrivõtmega viidet ei kinnitata seosena. Registriotsing lisandub pärast
-#462/#471 registri-API valmimist.
+registrivõtmega viidet ei kinnitata seosena. `search_enrichment_registry`
+tagastab praegu `registry_available=false`, kuni #462/#471 registrifailid on
+loodud; tühja tulemust ei tohi tõlgendada uue registrikirje vajadusena.
 
 OCR-i kontrollimiseks kutsu `get_page_image(work_id, page)` ja võrdle pilti
 `get_pages(work_id, page, page)` tekstiga. `page` on skaneeringu 1-põhine

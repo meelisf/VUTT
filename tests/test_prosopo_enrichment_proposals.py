@@ -219,6 +219,28 @@ def test_registrivoitmed_salvestuvad_ainult_olemasolevate_seostega(
     assert occupation['evidence'][0]['printed_page'] == '24'
 
 
+def test_voltsitud_registrivariant_ei_joua_kinnitamiseni(
+        client, login, prosopo_env, tmp_path, monkeypatch):
+    registry = tmp_path / 'config'
+    registry.mkdir(exist_ok=True)
+    (registry / 'occupations.json').write_text(json.dumps({
+        'professor': {'labels': {'et': 'professor'}, 'variants': ['Prof. theol.']},
+    }))
+    monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    card = prosopo_env.write('abc', occupations=[])
+    token = login('editor', 'editorpass')
+    proposal_id = _submit_for_review(client, token, card, [
+        _item(occupation_key='professor', institution_key=None,
+              occupation_variant='Võltsitud variant')])
+    pending = client.get(f'/prosopography/enrichment-proposals/{card["id"]}',
+                         headers=_headers(token)).json()
+    assert pending[0]['items'][0]['review_error'] == 'unknown_occupation_variant'
+    result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
+                         headers=_headers(token), json={'proposal_id': proposal_id, 'selected': [0]})
+    assert result.status_code == 400
+    assert prosopo_env.read('abc') == card
+
+
 def test_olemasoleva_kirje_toend_lisataks_molemal_liigil(client, login, prosopo_env, tmp_path, monkeypatch):
     registry = tmp_path / 'config'
     registry.mkdir(exist_ok=True)
