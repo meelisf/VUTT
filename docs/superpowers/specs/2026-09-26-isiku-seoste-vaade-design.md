@@ -56,8 +56,8 @@ gratulator, dedicator, editor, aui`.
 | 1 | Akadeemiline akt | `academic` | jah | praeses ↔ respondens; `aui` ↔ `auctor` | praeses → respondens; aui → auctor |
 | 2 | Teos isikule / isikust | `dedicated` | jah | looja (v.a `dedicator`) ↔ `subject`; `gratulator` ↔ `auctor` / `respondens` | looja → subject; gratulant → autor |
 | 3 | Kaastekst | `cotext` | ei | mõlemad on loojad (nt gratulant–gratulant, aui–gratulant, pühendaja–pühendaja); `dedicator` ↔ `subject` | suunata |
-| 4 | Mainimine | `mention` | ei | kumbki on `mentioned`; või mõlemad on `subject` (kaasmärksõnad) | suunata |
-| 5 | Trükkal | `printer` | ei | kumbki on `publisher` | suunata |
+| 4 | Trükkal | `printer` | ei | kumbki on `publisher` (ka siis, kui teine on `mentioned`) | suunata |
+| 5 | Mainimine | `mention` | ei | kumbki on `mentioned`; või mõlemad on `subject` (kaasmärksõnad) | suunata |
 | — | Perekond / muu | `family` | jah | isikukaardi `relations[]` (mitte teosest) | kaardi järgi |
 
 **Täpsustused:**
