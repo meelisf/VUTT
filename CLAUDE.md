@@ -464,6 +464,8 @@ ID, `people_ops.py` tõmbab taustal aliased (`et, en, de, la`) → `person_alias
 
 **`person_to_works.json` — kaks kirjutajat:** metaandmete rollid (autor jne) JA lehe-tägide
 `mentioned`. **Kumbki ei tohi teise kirjeid pühkida.**
+`/save` skannib `mentioned`-e ainult isikutägide muutusel (ADR 0055) — lehenumbreid nihutav
+tee (järjestus, poolitus, lisamine, kustutamine, taaste) PEAB kutsuma `refresh_work_mentions`-it.
 
 **Autentimine** — rollid `contributor` < `editor` < `admin` < `superadmin`. Kontroll ALATI
 `is_at_least()` / `isAtLeast()`, **mitte** `role == "admin"`. Token UUID, 24h;

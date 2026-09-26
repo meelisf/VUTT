@@ -14,6 +14,7 @@ from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo
 from .utils import WORK_ID_CACHE
 from .meilisearch_ops import sync_work_to_meilisearch
+from .prosopography.relations import refresh_work_mentions
 from .trash_reason import liigita, on_taastatav
 
 logger = get_logger(__name__)
@@ -173,6 +174,8 @@ def restore_deleted_work(work_id, username="VUTT Server"):
         sync_work_to_meilisearch(folder_name)
     except Exception as e:
         logger.warning(f"TRASH: Meilisearch sync ebaõnnestus: {e}")
+    # Taastatud lehtede isikutägid tagasi 'mentioned' seostesse (#420).
+    refresh_work_mentions(folder_path, work_id)
 
     # 8. Cache uuendamine
     WORK_ID_CACHE[work_id] = folder_path
@@ -334,5 +337,7 @@ def restore_deleted_page(work_id, folder_name, filename, username="VUTT Server")
         sync_work_to_meilisearch(folder_name)
     except Exception as e:
         logger.warning(f"TRASH: Meilisearch sync ebaõnnestus: {e}")
+    # Taastatud leht toob oma tägid tagasi ja nihutab järgmiste numbreid (#420).
+    refresh_work_mentions(os.path.join(BASE_DIR, folder_name), work_id)
 
     return {'ok': True}

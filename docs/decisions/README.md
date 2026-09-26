@@ -74,3 +74,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0052](0052-kohtade-register-on-ajalooline.md) | Kohtade register on ajalooline; grupi kriteeriumid (Saksamaal Benrathi joon); tänapäevane halduskuuluvus → grupp ankrute kaudu | kehtib |
 | [0053](0053-lehe-kirjutus-lehe-luku-all.md) | Lehe JSON-i lugemine–muutmine–kirjutamine käib lehe luku all (`page_locks.page_lock`); kommentaaritoimingud kirjutavad ainult `.json`-i | kehtib |
 | [0054](0054-lehe-salvestus-liidab-baasseisu-vastu.md) | Lehe salvestus liidab kolmesuunaliselt kliendi baasseisu vastu (tekst+kirjed koos, kommentaarid id kaupa); kokkupõrge → 409 + dialoog | kehtib |
+| [0055](0055-mainimised-skannitakse-tagimuutusel.md) | Lehe salvestus skannib isikumainimisi ainult `vutt:P` tägide muutusel; lehenumbreid nihutav tee kutsub `refresh_work_mentions` | kehtib |

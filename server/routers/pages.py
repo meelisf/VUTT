@@ -29,6 +29,7 @@ from ..git_ops import delete_page_from_git, save_with_git
 from .. import page_ops_jobs
 from ..image_server import generate_thumbnail, invalidate_cover
 from ..meilisearch_ops import sync_work_to_meilisearch
+from ..prosopography.relations import refresh_work_mentions
 from ..trash_reason import DELETE_COMMIT_PREFIX
 from ..utils import find_directory_by_id
 
@@ -108,6 +109,8 @@ def admin_delete_page(work_id: str, page_num: int, user=Depends(require_role("ad
 
         # Sünkroniseeri Meilisearch (leheküljed renumberdatakse)
         sync_work_to_meilisearch(folder_name)
+        # Kustutatud lehe tägid välja, järgmiste numbrid nihkuvad (#420).
+        refresh_work_mentions(path, work_id)
 
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "new_page_count": new_page_count}
@@ -296,6 +299,8 @@ def admin_add_page(
 
         # Sünkroniseeri Meilisearch
         sync_work_to_meilisearch(folder_name)
+        # Uus leht nihutab järgmiste lehtede numbreid (#420).
+        refresh_work_mentions(path, work_id)
 
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "new_page_count": new_page_count, "sequence": new_seq, "filename": new_filename}
@@ -418,4 +423,6 @@ async def admin_reorder_pages(work_id: str, request: Request, user=Depends(requi
         raise HTTPException(status_code=400, detail=result["error"])
     folder_name = os.path.basename(path)
     await run_in_threadpool(sync_work_to_meilisearch, folder_name)
+    # Järjekord = lehenumbrid; salvestus neid enam ei värskenda (#420).
+    await run_in_threadpool(refresh_work_mentions, path, work_id)
     return {"status": "success"}
