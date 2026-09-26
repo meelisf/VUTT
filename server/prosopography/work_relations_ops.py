@@ -1,13 +1,16 @@
 """
 Teostest tuletatud isiku-isiku seosed.
 
-Indeks: data/config/works_creators_index.json
-  { work_id: { "title": str, "year": int|None, "creators": [{ "person_id": str, "roles": [str] }] } }
+Indeks: data/config/works_creators_index.json — kirje IGALE teosele (#461)
+  { work_id: { "title": str, "year": int|None, "creators": [{ "person_id": str, "roles": [str] }],
+               "location": {"id": str|None, "label": str}|None, "genres": [str] } }
+  Kogud ja avalikkus EI OLE siin: need elavad work_collections_index.json-is (ADR 0056).
 
 Kutsumiskohad:
-  build_works_creators_index()      — rebuild_indices() ja serveri start
-  update_works_creators_index(...)  — /save ja /update-work-metadata järel (background)
-  get_work_relations(...)           — GET /prosopography/work-relations/{person_id}
+  build_works_creators_index()  — rebuild_indices() ja serveri start
+  update_work_facts(meta)       — save_work_metadata, bulk_update_works, import_work (tingimusteta)
+  remove_work_facts(work_id)    — teose kustutus
+  get_work_relations(...)       — GET /prosopography/work-relations/{person_id}
 """
 import json
 import os
@@ -38,58 +41,82 @@ def _creators_to_entries(creators: list) -> list:
     return entries
 
 
-def build_works_creators_index() -> None:
-    """Ehitab works_creators_index.json nullist kõigi teoste _metadata.json põhjal."""
-    index: dict = {}
-    if not os.path.exists(BASE_DIR):
-        atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
-        return
-    for entry in os.scandir(BASE_DIR):
-        if not entry.is_dir():
-            continue
-        meta_path = os.path.join(entry.path, "_metadata.json")
-        if not os.path.exists(meta_path):
-            continue
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-        except Exception:
-            continue
-        work_id = meta.get("id") or meta.get("work_id")
-        if not work_id:
-            continue
-        entries = _creators_to_entries(meta.get("creators") or [])
-        if entries:
-            index[work_id] = {
-                "title": meta.get("title") or "",
-                "year": meta.get("year"),
-                "creators": entries,
-            }
-    with _creators_lock:
-        atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
+def _location_of(meta: dict) -> Optional[dict]:
+    """Trükikoht {id, label} või None (tühi string ja puuduv = None)."""
+    loc = meta.get("location")
+    if isinstance(loc, dict):
+        label = loc.get("label") or ""
+        return {"id": loc.get("id"), "label": label} if (label or loc.get("id")) else None
+    if isinstance(loc, str) and loc.strip():
+        return {"id": None, "label": loc.strip()}
+    return None
 
 
-def update_works_creators_index(
-    work_id: str,
-    creators: list,
-    title: str = "",
-    year: Optional[int] = None,
-) -> None:
-    """Uuendab ühe teose kirjet works_creators_index.json-s."""
-    entries = _creators_to_entries(creators)
+def _genres_of(meta: dict) -> list:
+    g = meta.get("genre")
+    items = g if isinstance(g, list) else ([g] if g else [])
+    out = []
+    for item in items:
+        label = item.get("label") if isinstance(item, dict) else item
+        if isinstance(label, str) and label:
+            out.append(label)
+    return out
+
+
+def _work_facts_entry(meta: dict) -> dict:
+    """Ühe teose kirje — ÜKS ehitaja nii rebuildile kui uuendusele (ADR 0007).
+
+    Kogusid ja avalikkust siia ei kopeerita: need elavad work_collections_index.json-is,
+    mida uuendatakse tingimusteta ka call_ptw=False teedel (#461).
+    """
+    return {
+        "title": meta.get("title") or "",
+        "year": meta.get("year"),
+        "creators": _creators_to_entries(meta.get("creators") or []),
+        "location": _location_of(meta),
+        "genres": _genres_of(meta),
+    }
+
+
+def _write_entry(work_id: str, entry: Optional[dict]) -> None:
     with _creators_lock:
-        if os.path.exists(WORKS_CREATORS_INDEX_FILE):
-            try:
-                with open(WORKS_CREATORS_INDEX_FILE, "r", encoding="utf-8") as f:
-                    index = json.load(f)
-            except Exception:
-                index = {}
-        else:
-            index = {}
-        if entries:
-            index[work_id] = {"title": title, "year": year, "creators": entries}
-        else:
+        index = _load_creators_index()
+        if entry is None:
             index.pop(work_id, None)
+        else:
+            index[work_id] = entry
+        atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
+
+
+def update_work_facts(meta: dict) -> None:
+    """Kirjutab teose faktid. Kutsutakse tingimusteta update_work_collections kõrval."""
+    work_id = meta.get("id") or meta.get("work_id")
+    if work_id:
+        _write_entry(work_id, _work_facts_entry(meta))
+
+
+def remove_work_facts(work_id: str) -> None:
+    if work_id:
+        _write_entry(work_id, None)
+
+
+def build_works_creators_index() -> None:
+    """Ehitab indeksi nullist: kirje IGALE teosele, millel on _metadata.json."""
+    index: dict = {}
+    if os.path.exists(BASE_DIR):
+        for entry in os.scandir(BASE_DIR):
+            meta_path = os.path.join(entry.path, "_metadata.json")
+            if not entry.is_dir() or not os.path.exists(meta_path):
+                continue
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+            except Exception:
+                continue
+            work_id = meta.get("id") or meta.get("work_id")
+            if work_id:
+                index[work_id] = _work_facts_entry(meta)
+    with _creators_lock:
         atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
 
 
