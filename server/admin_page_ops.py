@@ -475,12 +475,15 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
         if page_num < 1 or page_num > len(images):
             return {"found": False}
 
-        _split_page_locked(path, work_id, page_num, split_x, username, images)
+        orig_stem = os.path.splitext(images[page_num - 1])[0]
+        halves = _split_page_locked(path, work_id, page_num, split_x, username, images)
 
         # Meilisearch sync
         sync_work_to_meilisearch(folder_name)
-        # Poolitus nihutab järgmiste lehtede numbreid (#420).
-        refresh_work_mentions(path, work_id)
+        # Poolitus nihutab järgmiste lehtede numbreid (#420); osades asendub algne
+        # tüvi mõlema poolega (#464).
+        renamed = {orig_stem: [os.path.splitext(h)[0] for h in halves]} if halves else None
+        refresh_work_mentions(path, work_id, renamed=renamed)
 
         new_page_count = len(get_sorted_images(path))
         return {"success": True, "new_page_count": new_page_count}
@@ -686,6 +689,7 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
 
         if progress:
             progress(0, len(clean))
+        renamed: dict = {}   # osade sünk (#464): {algne_tüvi: [vasak, parem]}
         try:
             for op in clean:
                 fn = op["filename"]
@@ -695,8 +699,10 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
                     rotated += 1
                 if op["split_x"] is not None:
                     images = get_sorted_images(path)
-                    _split_page_locked(path, work_id, images.index(fn) + 1,
-                                       op["split_x"], username, images)
+                    halves = _split_page_locked(path, work_id, images.index(fn) + 1,
+                                                op["split_x"], username, images)
+                    if halves:
+                        renamed[os.path.splitext(fn)[0]] = [os.path.splitext(h)[0] for h in halves]
                     split += 1
                 if progress:
                     progress(clean.index(op) + 1, len(clean))
@@ -708,7 +714,7 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
         finally:
             if split:
                 sync_work_to_meilisearch(folder_name)
-                refresh_work_mentions(path, work_id)
+                refresh_work_mentions(path, work_id, renamed=renamed)
 
         new_page_count = len(get_sorted_images(path))
     logger.info(f"PAGE-OPS {folder_name}: {rotated} pööret, {split} poolitust ({username})")

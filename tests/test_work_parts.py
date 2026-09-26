@@ -1,5 +1,7 @@
 # tests/test_work_parts.py
 """Teose osad (#464): valideerimine, toimingud, lehetoimingute sünk."""
+import os
+
 import pytest
 
 from server import work_parts as wp
@@ -138,3 +140,51 @@ def test_samaaegne_loomine_ei_kaota_osa(work):
     [t.start() for t in ts]
     [t.join() for t in ts]
     assert not errs and len(_meta(work)["parts"]) == 4
+
+
+# ── Lehetoimingute sünk ───────────────────────────────────────────────────────
+
+def test_remap_poolitus_asendab_molema_poolega():
+    parts = [_p(id="a", pages=["t-001", "t-002"])]
+    out, changed = wp.remap_parts(parts, ["t-001", "L", "R"], {"t-002": ["L", "R"]})
+    assert changed and out[0]["pages"] == ["t-001", "L", "R"]
+
+
+def test_remap_kustutus_eemaldab_ja_tuhi_needs_review():
+    parts = [_p(id="a", pages=["t-001"]), _p(id="b", pages=["t-001", "t-002"])]
+    out, changed = wp.remap_parts(parts, ["t-002"], None)
+    assert changed
+    assert out[0] == {**parts[0], "pages": [], "needs_review": True}
+    assert out[1]["pages"] == ["t-002"] and not out[1].get("needs_review")
+
+
+def test_remap_muutuseta():
+    parts = [_p(id="a", pages=["t-001"])]
+    out, changed = wp.remap_parts(parts, ["t-001", "t-002"], None)
+    assert not changed
+
+
+def test_refresh_work_mentions_kutsub_sync_work_parts(monkeypatch, tmp_path):
+    from server.prosopography import relations
+    calls = []
+    monkeypatch.setattr(wp, "sync_work_parts", lambda d, w=None, renamed=None: calls.append((d, w, renamed)))
+    monkeypatch.setattr(relations, "update_page_person_mentions", lambda *a: None)
+    relations.refresh_work_mentions(str(tmp_path), "w1", renamed={"a": ["b", "c"]})
+    assert calls == [(str(tmp_path), "w1", {"a": ["b", "c"]})]
+
+
+def test_sync_viga_ei_takista_mainimiste_uuendust(monkeypatch, tmp_path):
+    from server.prosopography import relations
+    seen = []
+    def boom(*a, **k): raise RuntimeError("x")
+    monkeypatch.setattr(wp, "sync_work_parts", boom)
+    monkeypatch.setattr(relations, "update_page_person_mentions", lambda *a: seen.append(a))
+    relations.refresh_work_mentions(str(tmp_path), "w1")
+    assert seen
+
+
+def test_sync_work_parts_kirjutab_ainult_muutusel(work, monkeypatch):
+    p = wp.create_part(work, {"kind": "letter", "pages": ["t-001", "t-002"]}, "ed")
+    os.remove(f"{work}/t-002.jpg")
+    wp.sync_work_parts(work, "w1")
+    assert _meta(work)["parts"][0]["pages"] == ["t-001"]

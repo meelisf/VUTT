@@ -208,3 +208,43 @@ def _read_part(work_dir: str, part_id: str) -> dict:
     with open(os.path.join(work_dir, "_metadata.json"), "r", encoding="utf-8") as f:
         parts = (json.load(f) or {}).get("parts") or []
     return parts[_find(parts, part_id)]
+
+
+def remap_parts(parts: list[dict], stems: list[str], renamed: Optional[dict] = None) -> tuple[list[dict], bool]:
+    """Lehetoimingu järel: poolitatud tüvi → mõlemad pooled; puuduv tüvi välja;
+    tühjaks jäänud osa → needs_review (ei kustutata). Järjekord teose järgi."""
+    live = set(stems)
+    changed = False
+    out = []
+    for p in parts:
+        pages: list[str] = []
+        for s in p.get("pages") or []:
+            pages.extend((renamed or {}).get(s, [s]))
+        pages = _ordered([s for s in pages if s in live], stems)
+        np = {**p, "pages": pages}
+        if not pages and p.get("pages"):
+            np["needs_review"] = True
+        if np != p:
+            changed = True
+        out.append(np)
+    return out, changed
+
+
+def sync_work_parts(work_dir: str, work_id: Optional[str] = None, renamed: Optional[dict] = None) -> None:
+    """Kutsutakse refresh_work_mentions'i seest — kõik lehetoimingud katavad osad."""
+    import json
+    meta_path = os.path.join(work_dir, "_metadata.json")
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            if not (json.load(f) or {}).get("parts"):
+                return
+    except FileNotFoundError:
+        return
+    from .metadata_ops import bulk_update_works
+    stems = page_stems(work_dir)
+
+    def transform(meta: dict) -> dict:
+        parts, changed = remap_parts(list(meta.get("parts") or []), stems, renamed)
+        return {"parts": parts} if changed else {}
+
+    bulk_update_works([(meta_path, transform)], "Automaatne", "Osad: lehetoimingu järel ühtlustatud")

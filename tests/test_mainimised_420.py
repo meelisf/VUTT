@@ -157,7 +157,7 @@ def test_poolitus_varskendab_mainimisi(tmp_path, monkeypatch):
     monkeypatch.setattr(admin_page_ops, "_split_page_locked", lambda *a, **k: None)
     monkeypatch.setattr(admin_page_ops, "sync_work_to_meilisearch", lambda *a, **k: None)
     kutsed = []
-    monkeypatch.setattr(admin_page_ops, "refresh_work_mentions", lambda wdir, wid=None: kutsed.append(wid))
+    monkeypatch.setattr(admin_page_ops, "refresh_work_mentions", lambda wdir, wid=None, renamed=None: kutsed.append(wid))
 
     admin_page_ops.split_page("work1", 1, 0.5, "admin")
 
