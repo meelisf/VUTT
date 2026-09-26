@@ -146,3 +146,40 @@ def test_fookus_ise_ei_tule_persons_isse(net):
     res = _build(F)
     assert all(F != p["id"] for p in res["persons"])
     assert all(not (e["from"] == F and e["to"] == F) for e in res["edges"])
+
+
+# ── Endpoint ──────────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def client(net):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from server.prosopography import router as prosopography
+    app = FastAPI()
+    app.include_router(prosopography.router, prefix="/prosopography")
+    return TestClient(app)
+
+
+def test_endpoint_on_sync():
+    import asyncio
+    from server.prosopography import router as prosopography
+    assert not asyncio.iscoroutinefunction(prosopography.prosopography_network)
+
+
+def test_endpoint_vastus_ja_404(client):
+    r = client.get(f"/prosopography/{F}/network")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["focus"]["id"] == F and {"persons", "works", "edges"} <= body.keys()
+    assert client.get("/prosopography/vutt:Pmissing/network").status_code == 404
+
+
+def test_endpoint_kogu_parameeter(client):
+    body = client.get(f"/prosopography/{F}/network", params={"collection": "agc"}).json()
+    assert {e["evidence"]["work_id"] for e in body["edges"] if e["evidence"]} == {"w1", "w4"}
+
+
+def test_network_tee_ei_satu_isiku_route_i(client):
+    """Üldine /{person_id:path} ei tohi neelata …/network teed isiku-ID-na."""
+    r = client.get(f"/prosopography/{F}/network")
+    assert "edges" in r.json()
