@@ -7,12 +7,19 @@ oleks sama suur probleem kui piiramata get_pages.
 Vastuste kujud on kontrollitud päris API vastu — vt mcp/tests/test_persons.py
 mooduli docstring.
 """
+import json
+import re
+from urllib.parse import quote
+
 from . import format as fmt
-from .errors import VuttNotFound
+from .errors import VuttError, VuttNotFound
 
 MAX_RELATED_WORKS = 50
 MAX_RELATIONS = 50
 LIST_PATH = "/prosopography"
+MAX_ENRICHMENT_ENTRIES = 100
+MAX_ENRICHMENT_CHARS = 60000
+_PERSON_ID = re.compile(r"^vutt:P[A-Za-z0-9_-]+$")
 
 
 # Katke varuvariandi ahel. Indeks kannab iga allika kohta oma katget (ADR 0039);
@@ -108,6 +115,53 @@ def detail(client, base_url: str, person_id: str, include_relations: bool) -> st
     if include_relations:
         sections.append(_relations_section(client, person_id))
     return "\n\n".join(s for s in sections if s)
+
+
+def enrichment_context(client, person_id: str) -> str:
+    """Ameti ja hariduse täpsed kirjed koos kaardiversiooniga.
+
+    Kirjeid ei kärbita: puuduv rida võiks panna agendi olemasolevat fakti
+    uuesti pakkuma. Mahupiiri ületamisel tuleb kasutajal kaart vormis avada.
+    """
+    if not _PERSON_ID.fullmatch(person_id):
+        raise VuttError("Vigane person_id; kasuta search_persons tulemusest saadud vutt:P… ID-d.")
+    try:
+        person = client.api_get(f"{LIST_PATH}/{quote(person_id, safe='')}")
+    except VuttNotFound as exc:
+        raise VuttNotFound(
+            f"Isikut person_id={person_id} ei leitud. Otsi õige ID search_persons tööriistaga."
+        ) from exc
+    if not isinstance(person, dict) or person.get("id") != person_id:
+        raise VuttError("VUTT ei tagastanud küsitud isiku kaarti.")
+    if person.get("record_status") == "tombstone" or person.get("merged_into"):
+        raise VuttError("See isikukaart on suletud või liidetud; otsi kehtiv kaart.")
+    if not isinstance(person.get("updated_at"), str) or not person["updated_at"].strip():
+        raise VuttError("Isikukaardil puudub updated_at; ettepanekut ei saa versiooniga siduda.")
+
+    occupations = person.get("occupations")
+    education = person.get("education")
+    occupations = [] if occupations is None else occupations
+    education = [] if education is None else education
+    if not isinstance(occupations, list) or not isinstance(education, list):
+        raise VuttError("Isikukaardi ametite või hariduse kuju on vigane.")
+    if len(occupations) > MAX_ENRICHMENT_ENTRIES or len(education) > MAX_ENRICHMENT_ENTRIES:
+        raise VuttError("Isikukaardil on liiga palju ameti- või hariduskirjeid; ava kaart VUTT-i vormis.")
+
+    context = {
+        "person_id": person_id,
+        "updated_at": person["updated_at"],
+        "name": person.get("name"),
+        "identifiers": person.get("identifiers") or [],
+        "birth": person.get("birth"),
+        "death": person.get("death"),
+        "occupations": occupations,
+        "education": education,
+        "sources": person.get("sources") or [],
+    }
+    result = json.dumps(context, ensure_ascii=False, indent=2)
+    if len(result) > MAX_ENRICHMENT_CHARS:
+        raise VuttError("Isiku ameti- ja haridusandmed ületavad MCP vastuse mahupiiri; ava kaart VUTT-i vormis.")
+    return result
 
 
 def _works_section(client, base_url: str, person) -> str:

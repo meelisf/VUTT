@@ -431,3 +431,17 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         on alati näha) — produktiivsel professoril võib neid olla üle 170.
         """
         return persons.detail(client, base_url, person_id, include_relations)
+
+    @mcp.tool(structured_output=False)
+    async def get_person_enrichment_context(person_id: str) -> str:
+        """Tagastab isiku ametid ja hariduse TÄPSE JSON-kujuga koos `updated_at`-iga.
+
+        Kasuta enne ametite või hariduse rikastuse ettepanekut. Erinevalt
+        get_person'ist sisaldab kõiki olemasolevaid kirjeid, kuupäevi, asutuse
+        ID-sid ja kirjetaseme allikaviiteid, kui need on kaardil olemas.
+        `updated_at` seob ettepaneku nähtud kaardiversiooniga. See tööriist ei
+        salvesta midagi; olemasolevaid kirjeid ei kärbita vaikimisi.
+
+        person_id on kujul „vutt:Pfxxxsc” ja tuleb search_persons'ist.
+        """
+        return persons.enrichment_context(client, person_id)

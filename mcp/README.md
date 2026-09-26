@@ -81,7 +81,13 @@ Kolm asja, mis üllatavad:
 | `get_page_image` | Ühe skaneeringu täisresolutsiooniga pilt OCR-i kontrolliks |
 | `search_persons` | Isikuotsing (nimevariandid kaetud) |
 | `get_person` | Isikukaart + seotud teosed (kuni 50) |
+| `get_person_enrichment_context` | Ühe isiku ametite ja hariduse täielikud JSON-kirjed + `updated_at` ettepaneku koostamiseks |
 | `list_filter_values` | Legaalsed filtriväärtused |
+
+`get_person_enrichment_context` on ainult lugemiseks. See ei kärbi
+ameti- ega hariduskirjeid vaikselt: väga suure või vigase kaardi korral annab
+vea. Ametite ja asutuste registriotsing ning ettepaneku esitamine lisanduvad
+pärast #462/#471 registri-API ja piiratud üleandmis-API valmimist.
 
 OCR-i kontrollimiseks kutsu `get_page_image(work_id, page)` ja võrdle pilti
 `get_pages(work_id, page, page)` tekstiga. `page` on skaneeringu 1-põhine
