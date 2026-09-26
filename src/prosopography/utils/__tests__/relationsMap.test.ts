@@ -1,7 +1,7 @@
 // src/prosopography/utils/__tests__/relationsMap.test.ts
 import { describe, it, expect } from 'vitest';
 import { applyFilters, DEFAULT_FILTER } from '../network';
-import { layerPoints, lifeStations, lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
+import { dimOpacity, layerPoints, lifeStations, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
 import type { PersonNetwork } from '../../services/networkService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 
@@ -146,5 +146,16 @@ describe('layerPoints: kaart sobitub kõigele, mida kiht joonistab', () => {
   it('trükikohad: ainult trükikohad', () => {
     expect(layerPoints('print', v2, { mapped: [] })).toEqual(expect.arrayContaining([ALTDORF, TARTU]));
     expect(layerPoints('print', v2, { mapped: [] })).toHaveLength(2);
+  });
+});
+
+describe('kaardi abilised (viimistlus)', () => {
+  it('originCoverage: päritoluga isikud / kõik nähtavad', () => {
+    expect(originCoverage(v)).toEqual({ mapped: 2, total: 3 });
+  });
+  it('dimOpacity: esiletõstu ajal tuhmuvad teised', () => {
+    expect(dimOpacity(['a'], null, 0.7)).toBe(0.7);
+    expect(dimOpacity(['a'], 'a', 0.7)).toBe(0.7);
+    expect(dimOpacity(['a', 'b'], 'c', 0.7)).toBeCloseTo(0.07);
   });
 });

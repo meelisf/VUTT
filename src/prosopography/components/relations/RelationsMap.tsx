@@ -6,16 +6,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { divIcon } from 'leaflet';
 import { MapContainer, Marker, Polyline, Popup } from 'react-leaflet';
 import HistoricalMapLayer from '../HistoricalMapLayer';
 import { FitToPoints, spreadOverlapping, type LatLon } from '../map/mapBase';
 import { fetchPlaces } from '../../services/prosopographyService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 import type { VisibleNetwork } from '../../utils/network';
-import { KIND_ORDER } from '../../utils/network';
-import { layerPoints, lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces, type MapLayer, type RegistryState } from '../../utils/relationsMap';
+import { dimOpacity, layerPoints, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces, type MapLayer, type RegistryState } from '../../utils/relationsMap';
 import { KIND_COLOR } from './kindStyle';
+import { dotIcon, pieIcon } from './mapIcons';
 import type { usePopover } from './RelationPopover';
 
 type Layer = MapLayer;
@@ -25,33 +24,10 @@ let placesPromise: Promise<Record<string, PlaceEntry>> | null = null;
 // Viga EI muutu tühjaks registriks — siis väidaks elukäik iga jaama kohta „registris puudub".
 const loadPlaces = () => (placesPromise ??= fetchPlaces().catch(err => { placesPromise = null; throw err; }));
 
-function pieIcon(kinds: Partial<Record<string, number>>, count: number) {
-  const total = Object.values(kinds).reduce<number>((a, b) => a + (b ?? 0), 0) || 1;
-  let acc = 0;
-  const stops = KIND_ORDER.filter(k => kinds[k]).map(k => {
-    const from = (acc / total) * 100; acc += kinds[k] ?? 0; const to = (acc / total) * 100;
-    return `${KIND_COLOR[k]} ${from}% ${to}%`;
-  }).join(', ');
-  const size = count >= 20 ? 40 : count >= 10 ? 34 : count >= 3 ? 29 : 24;
-  return divIcon({
-    className: '',
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);background:conic-gradient(${stops});display:flex;align-items:center;justify-content:center;color:#fff;font:600 11px system-ui;text-shadow:0 0 2px #000">${count}</div>`,
-    iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
-  });
-}
-
-function dotIcon(label: string | number, fill: string, hollow = false, size = 22) {
-  return divIcon({
-    className: '',
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;border:2px solid ${hollow ? fill : '#fff'};background:${hollow ? '#fff' : fill};box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:${hollow ? fill : '#fff'};font:600 11px system-ui">${label}</div>`,
-    iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
-  });
-}
-
 const RelationsMap: React.FC<{
   net: VisibleNetwork; card: ProsopoRecord | null;
-  popover: ReturnType<typeof usePopover>; onHighlight: (id: string | null) => void;
-}> = ({ net, card, popover, onHighlight }) => {
+  popover: ReturnType<typeof usePopover>; highlight: string | null; onHighlight: (id: string | null) => void;
+}> = ({ net, card, popover, highlight, onHighlight }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const [layer, setLayer] = useState<Layer>('origin');
@@ -65,6 +41,7 @@ const RelationsMap: React.FC<{
   const origin = useMemo(() => originGroups(net), [net]);
   const prints = useMemo(() => printPlaces(net), [net]);
   const links = useMemo(() => originPrintLinks(net), [net]);
+  const coverage = useMemo(() => originCoverage(net), [net]);
   const life = useMemo(() => lifeView(card, registry), [card, registry]);
   const year = useMemo(() => mapYearOf(net, card?.birth?.date ? Number(card.birth.date.slice(0, 4)) + 30 : 1650), [net, card]);
   const focusCoords = net.focus.origin?.coordinates ?? null;
@@ -96,7 +73,8 @@ const RelationsMap: React.FC<{
             </Marker>
           )}
           {layer === 'origin' && originMarkers.map(g => (
-            <Marker key={g.key} position={[g.display.lat, g.display.lon]} icon={pieIcon(g.kinds, g.persons.length)}>
+            <Marker key={g.key} position={[g.display.lat, g.display.lon]} icon={pieIcon(g.kinds, g.persons.length)}
+              opacity={dimOpacity(g.persons.map(p => p.id), highlight, 1)}>
               <Popup>
                 <div className="min-w-48 max-w-72">
                   <div className="font-semibold text-gray-900">{g.label}</div>
@@ -114,7 +92,7 @@ const RelationsMap: React.FC<{
           ))}
           {layer === 'originPrint' && links.map(l => (
             <Polyline key={`${l.personId}-${l.workId}`} positions={[[l.from.lat, l.from.lon], [l.to.lat, l.to.lon]]}
-              pathOptions={{ color: KIND_COLOR.academic, weight: 2, opacity: 0.7 }}
+              pathOptions={{ color: KIND_COLOR.academic, weight: 2, opacity: dimOpacity([l.personId], highlight, 0.7) }}
               eventHandlers={{
                 mouseover: () => onHighlight(l.personId),
                 mouseout: () => onHighlight(null),
@@ -155,10 +133,15 @@ const RelationsMap: React.FC<{
           ))}
         </MapContainer>
       </div>
-      {layer !== 'life' && layer !== 'print' && origin.unmapped.length > 0 && (
+      {layer !== 'life' && layer !== 'print' && (
         <p className="text-xs text-gray-600">
-          {t('network.unmappedPersons', { count: origin.unmapped.length })}: {origin.unmapped.slice(0, 14).map(p => p.label).join(', ')}
-          {origin.unmapped.length > 14 ? ` …` : ''}
+          {t('network.originCoverage', coverage)}
+          {origin.unmapped.length > 0 && (
+            <>
+              {' · '}{t('network.unmappedPersons', { count: origin.unmapped.length })}: {origin.unmapped.slice(0, 14).map(p => p.label).join(', ')}
+              {origin.unmapped.length > 14 ? ' …' : ''}
+            </>
+          )}
         </p>
       )}
       {layer === 'life' && (

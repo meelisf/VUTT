@@ -312,7 +312,8 @@
     "coLines": "Co-occurrence lines",
     "focusOnly": "Focus only",
     "focus": "Focus",
-    "moreWorks": "… {{count}} more works",
+    "moreWorks_one": "… {{count}} more work",
+    "moreWorks_other": "… {{count}} more works",
     "labelsHint": "Of {{count}} persons, only the most connected are labelled; hover to see others.",
     "openMap": "Open on the large map",
     "table": {
@@ -355,7 +356,8 @@
       "no_coordinates": "place has no coordinates"
     },
     "registryLoading": "Loading the place register…",
-    "registryError": "Could not load the place register; the life course cannot be mapped."
+    "registryError": "Could not load the place register; the life course cannot be mapped.",
+    "originCoverage": "{{mapped}} / {{total}} related persons have an origin on the map"
   },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",
