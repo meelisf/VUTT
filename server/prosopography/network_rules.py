@@ -7,7 +7,7 @@ Funktsioon on sümmeetriline: classify_pair(b, a) annab sama liigi ja pööratud
 """
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 from ..config import get_logger
 
@@ -28,7 +28,7 @@ DEDICATED_PAIRS = tuple((c, "subject") for c in sorted(DEDICATED_CREATORS)) + (
 _logged_unknown: set[str] = set()
 
 
-def _direction(a: set, b: set, pairs) -> Optional[str] | bool:
+def _direction(a: set, b: set, pairs) -> Union[str, None, bool]:
     """"ab"/"ba"/None kui mõni paar sobib; False kui ükski ei sobi."""
     ab = any(p in a and q in b for p, q in pairs)
     ba = any(p in b and q in a for p, q in pairs)
