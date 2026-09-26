@@ -172,6 +172,8 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onF
   if (!data || data.markers.length === 0) {
     // Vihje: kui seoste-kaart on tühi valitud kollektsiooni tõttu, selgita miks
     // ja paku kollektsiooni vahetamist (vt fix: related_to + kollektsioon).
+    // Kollektsioon jõuab siia seoste kaardil ainult piiratud režiimis
+    // (`related_scope=collection`, vt relatedMapScope).
     const selected = filters.related_to ? filters.collection : undefined;
     const focusName = data?.focus?.label || t('map.thisPerson', 'See isik');
     const otherCollections = (data?.focus?.collections ?? []).filter(c => c !== selected);

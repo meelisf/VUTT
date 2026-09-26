@@ -14,6 +14,7 @@ import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useLatestQuery } from '../../hooks/useLatestQuery';
 import type { ProsopoIndexEntry, ProsopoMapResponse } from '../types';
+import { relatedMapScope, RELATED_SCOPE_PARAM, RELATED_SCOPE_COLLECTION } from '../utils/relatedMapScope';
 
 const LIMIT = 48;
 // Unit Separator — märksõna ise võib sisaldada tühikuid ja komasid
@@ -55,6 +56,7 @@ const PersonsPage: React.FC = () => {
   const view = searchParams.get('view') === 'map' ? 'map' : 'list';
   const focusPlace = searchParams.get('focus_place') ?? '';
   const relatedTo = searchParams.get('related_to') ?? '';
+  const relatedScope = searchParams.get(RELATED_SCOPE_PARAM);
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [seisused, setSeisused] = useState<{ id: string; label: { et: string; en: string } }[]>([]);
 
@@ -115,6 +117,7 @@ const PersonsPage: React.FC = () => {
       if (v === 'list') {
         n.delete('focus_place');
         n.delete('related_to');
+        n.delete(RELATED_SCOPE_PARAM);
       }
       n.delete('offset');
       return n;
@@ -129,8 +132,16 @@ const PersonsPage: React.FC = () => {
     setSearchParams(p => {
       const n = new URLSearchParams(p);
       n.delete('related_to');
+      n.delete(RELATED_SCOPE_PARAM);
       n.delete('focus_place');
       n.delete('offset');
+      return n;
+    }, { replace: true });
+  const toggleRelatedScope = () =>
+    setSearchParams(p => {
+      const n = new URLSearchParams(p);
+      if (n.get(RELATED_SCOPE_PARAM) === RELATED_SCOPE_COLLECTION) n.delete(RELATED_SCOPE_PARAM);
+      else n.set(RELATED_SCOPE_PARAM, RELATED_SCOPE_COLLECTION);
       return n;
     }, { replace: true });
 
@@ -273,6 +284,13 @@ const PersonsPage: React.FC = () => {
   // Vana loend on nähtav ainult siis, kui uus päring pole veel vastanud;
   // vea järel teda uue päringu vastuseks ei jäeta.
   const showList = !initialLoading && !listError && personsQuery.data !== undefined;
+  // Seoste kaart eirab aktiivset valikut, kui kasutaja seda ise ei piira.
+  const mapScope = relatedMapScope(relatedTo, relatedScope, {
+    collection: effectiveSelectedCollection || undefined,
+    work_set: workSetParam,
+  });
+  // Kogu-pill ei rakendu ainult kaardivaates; loend ignoreerib related_to-d.
+  const scopeAppliesHere = view !== 'map' || mapScope.applied;
   const mapFilters = {
     q: query || undefined,
     origin_group: originGroup || undefined,
@@ -286,8 +304,7 @@ const PersonsPage: React.FC = () => {
     status_id: statusId || undefined,
     tag: tags.length ? tags : undefined,
     related_to: relatedTo || undefined,
-    collection: effectiveSelectedCollection || undefined,
-    work_set: workSetParam,
+    ...mapScope.filters,
   };
 
   // Select-mood helpers
@@ -429,7 +446,10 @@ const PersonsPage: React.FC = () => {
           {(scopePill || relatedTo) && (
             <div className="flex flex-wrap items-center gap-1.5">
               {scopePill && (
-                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${scopePill.colors.bg} ${scopePill.colors.text} ${scopePill.colors.border}`}>
+                <div
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${scopePill.colors.bg} ${scopePill.colors.text} ${scopePill.colors.border} ${scopeAppliesHere ? '' : 'opacity-50'}`}
+                  title={scopeAppliesHere ? undefined : t('map.scopeNotApplied', 'Ei rakendu seoste kaardile')}
+                >
                   <Library size={11} />
                   <span className="truncate max-w-xs">{scopePill.label}</span>
                   <button
@@ -461,6 +481,17 @@ const PersonsPage: React.FC = () => {
                   <X size={11} />
                 </button>
               </div>
+              )}
+              {relatedTo && view === 'map' && scopePill && (
+                <label className="flex items-center gap-1.5 px-2 py-0.5 text-xs text-gray-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={mapScope.applied}
+                    onChange={toggleRelatedScope}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  {t('map.relatedScopeToggle', 'Ainult kogus: {{name}}', { name: scopePill.label })}
+                </label>
               )}
             </div>
           )}
