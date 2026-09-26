@@ -177,3 +177,35 @@ def test_impordi_lagi_mahub_nginxi_ooteaega():
     assert kliendi_s <= nginx_s, (
         "klient ootab {} s, nginx katkestab {} s — klient ei näeks kunagi "
         "serveri vastust".format(kliendi_s, nginx_s))
+
+
+# ---------------------------------------------------------------------------
+# Isikupildi variandid (#424): server ↔ klient ↔ nginx
+# ---------------------------------------------------------------------------
+
+def test_isikupildi_laiused_kattuvad():
+    """Klient küsib `srcSet`-is ainult laiusi, mida server lubab — muu → 400."""
+    from server.prosopography.image_variants import VARIANT_WIDTHS
+
+    ts = _loe("src/prosopography/utils/personImage.ts")
+    m = re.search(r"PERSON_IMAGE_WIDTHS\s*=\s*\[([\d,\s]+)\]", ts)
+    assert m, "personImage.ts-ist ei leitud PERSON_IMAGE_WIDTHS-i"
+    kliendi = tuple(int(x) for x in m.group(1).split(",") if x.strip())
+    assert kliendi == VARIANT_WIDTHS
+
+
+def test_isikupildi_nginx_blokk_ei_kirjuta_cachet_ule():
+    """Üldine `/api/files/` plokk lisab no-store'i; isikupildil peab olema oma
+    plokk, mis jätab backendi `immutable`-päise alles ja laseb üleslaadimise läbi.
+    """
+    conf = _loe("nginx.host.conf")
+    blokk = re.search(r"location ~ \^/api/files/\(prosopography/\[\^/\]\+/image\)\$ \{(.*?)\n    \}", conf, re.S)
+    assert blokk, "nginx.host.conf-ist ei leitud isikupildi blokki"
+    assert "Cache-Control" not in blokk.group(1)
+
+    m = re.search(r"client_max_body_size\s+(\d+)M", blokk.group(1))
+    assert m, "isikupildi blokis puudub client_max_body_size — nginx-i vaikimisi 1 MB"
+    ts = _loe("src/prosopography/pages/PersonEditPage.tsx")
+    k = re.search(r"file\.size > (\d+) \* 1024 \* 1024", ts)
+    assert k, "PersonEditPage.tsx-ist ei leitud pildi suuruse lage"
+    assert int(k.group(1)) <= int(m.group(1))

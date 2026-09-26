@@ -4,11 +4,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
 from . import state
 from . import ext_id_index
+from . import image_variants
 from ._compat import sync_from_facade
 from .ext_ids import normalize_ext_id
 from .locks import ext_id_claim_lock, person_lock
@@ -517,9 +519,13 @@ def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, us
         img_path = _person_image_path(person_id, ext)
         with open(img_path, "wb") as f:
             f.write(file_bytes)
+        image_variants.remove_variants(state.PROSOPOGRAPHY_IMAGES_DIR, _safe_nanoid(person_id))
 
         encoded_id = person_id.replace(":", "%3A")
-        person["image_url"] = f"/api/files/prosopography/{encoded_id}/image"
+        # `v` muutub igal üleslaadimisel: asendatud pilt saab uue URL-i ja
+        # brauseri vahemälu ei näita vana pilti (#424).
+        version = format(time.time_ns(), "x")
+        person["image_url"] = f"/api/files/prosopography/{encoded_id}/image?v={version}"
         person["updated_at"] = datetime.now(timezone.utc).isoformat()
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
@@ -540,6 +546,17 @@ def get_person_image_path(person_id: str) -> Optional[str]:
     return None
 
 
+def get_person_image_variant(person_id: str, width: int) -> Optional[str]:
+    """Tagastab isiku pildi `width` laiuse variandi tee; None kui pilti ei ole.
+
+    ValueError lubamatu laiuse korral (vt `image_variants.VARIANT_WIDTHS`).
+    """
+    source = get_person_image_path(person_id)
+    if source is None:
+        return None
+    return image_variants.variant_path_for(source, width)
+
+
 def delete_person_image(person_id: str, username: str) -> dict:
     """Kustutab isiku pildi ja tühjendab image_url. Tagastab uuendatud kirje."""
     sync_from_facade()
@@ -552,6 +569,7 @@ def delete_person_image(person_id: str, username: str) -> dict:
             path = _person_image_path(person_id, ext)
             if os.path.exists(path):
                 os.remove(path)
+        image_variants.remove_variants(state.PROSOPOGRAPHY_IMAGES_DIR, _safe_nanoid(person_id))
 
         person["image_url"] = None
         person["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -916,4 +934,4 @@ def bulk_update_occupation(
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 
 
-__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_new_person_skeleton', '_make_date_obj', '_propagate_name_to_works', '_apply_card_update', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation', 'SERVER_FIELDS', 'strip_server_fields', 'create_person_checked', 'set_enrichment_scheduler', '_has_similar_name']
+__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_new_person_skeleton', '_make_date_obj', '_propagate_name_to_works', '_apply_card_update', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'get_person_image_variant', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation', 'SERVER_FIELDS', 'strip_server_fields', 'create_person_checked', 'set_enrichment_scheduler', '_has_similar_name']

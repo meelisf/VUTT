@@ -24,6 +24,7 @@ import type { ProsopoRecord } from '../types';
 import { formatEntryPeriod, institutionLabel } from '../utils/entryPeriod';
 import WorkRelationsCard from '../components/WorkRelationsCard';
 import { mergedRedirectTarget } from '../utils/mergedRedirect';
+import { personImageProps } from '../utils/personImage';
 
 // =========================================================
 // Abifunktsioonid
@@ -490,8 +491,9 @@ const PersonDetailPage: React.FC = () => {
             {/* Portreepilt */}
             {(person as any).image_url && (
               <div className="shrink-0">
+                {/* 80 px kast, aga object-cover katab kõrguse järgi — laiem pilt kuvatakse laiemana. */}
                 <img
-                  src={(person as any).image_url}
+                  {...personImageProps((person as any).image_url, '120px')}
                   alt={person.name.label}
                   className="w-20 h-28 object-cover object-top rounded border border-gray-200"
                 />
