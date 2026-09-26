@@ -8,6 +8,7 @@ salvestusega), et samaaegsed toimetajad ei kirjutaks teineteise osi üle.
 """
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from .config import get_logger
@@ -116,3 +117,94 @@ def new_part(data: dict, existing_ids: set[str]) -> dict:
         pid = generate_nanoid(6)
     return {**{k: v for k, v in (data or {}).items() if k not in ("id", "needs_review")},
             "id": pid, "needs_review": False}
+
+
+def page_stems(work_dir: str) -> list[str]:
+    """Teose lehtede tüved teose järjekorras (sama järjekord mis /work/{id}/{nr})."""
+    from .meili_doc import enumerate_page_images
+    return [os.path.splitext(n)[0] for n in enumerate_page_images(work_dir)]
+
+
+def _ordered(pages: list[str], order: list[str]) -> list[str]:
+    pos = {s: i for i, s in enumerate(order)}
+    return sorted(dict.fromkeys(pages), key=lambda s: pos.get(s, len(pos)))
+
+
+def _write(work_dir: str, username: str, message: str, mutate) -> object:
+    """Loe–muuda–kirjuta metadata_lock'i all. `mutate(parts, stems)` tagastab
+    (uued_osad, tulemus) või viskab PartError'i."""
+    from .metadata_ops import bulk_update_works
+    stems = page_stems(work_dir)
+    box: dict = {}
+
+    def transform(meta: dict) -> dict:
+        try:
+            parts, result = mutate(list(meta.get("parts") or []), stems)
+            parts = validate_parts(parts, set(stems))
+            for p in parts:
+                p["pages"] = _ordered(p["pages"], stems)
+            box["result"] = result
+            return {"parts": parts}
+        except PartError as e:
+            box["error"] = e
+            raise
+
+    res = bulk_update_works([(os.path.join(work_dir, "_metadata.json"), transform)], username, message)
+    if "error" in box:
+        raise box["error"]
+    if res.get("failed"):
+        raise PartError("Teose metaandmeid ei saanud kirjutada", 500)
+    return box.get("result")
+
+
+def _find(parts: list, part_id: str) -> int:
+    for i, p in enumerate(parts):
+        if p.get("id") == part_id:
+            return i
+    raise PartError(f"Osa puudub: {part_id}", 404)
+
+
+def create_part(work_dir: str, data: dict, username: str) -> dict:
+    def mutate(parts, _stems):
+        part = new_part(data, {p.get("id") for p in parts})
+        return parts + [part], part["id"]
+    pid = _write(work_dir, username, f"Osa: lisa ({(data or {}).get('kind')})", mutate)
+    return _read_part(work_dir, pid)
+
+
+def update_part(work_dir: str, part_id: str, data: dict, username: str) -> dict:
+    def mutate(parts, _stems):
+        i = _find(parts, part_id)
+        keep = {"id": part_id, "needs_review": parts[i].get("needs_review", False)}
+        parts[i] = {**{k: v for k, v in (data or {}).items() if k not in ("id", "needs_review")}, **keep}
+        return parts, part_id
+    _write(work_dir, username, f"Osa: muuda [{part_id}]", mutate)
+    return _read_part(work_dir, part_id)
+
+
+def delete_part(work_dir: str, part_id: str, username: str) -> None:
+    def mutate(parts, _stems):
+        _find(parts, part_id)
+        if any(p.get("attached_to") == part_id for p in parts):
+            raise PartError("Osale viitavad lisad; kustuta või sea need enne ümber", 409)
+        return [p for p in parts if p.get("id") != part_id], None
+    _write(work_dir, username, f"Osa: kustuta [{part_id}]", mutate)
+
+
+def change_part_pages(work_dir: str, part_id: str, add: list[str], remove: list[str], username: str) -> dict:
+    def mutate(parts, _stems):
+        i = _find(parts, part_id)
+        pages = [s for s in parts[i].get("pages") or [] if s not in set(remove or [])] + list(add or [])
+        if not pages:
+            raise PartError("Osal peab jääma vähemalt üks leht; kustuta osa", 400)
+        parts[i] = {**parts[i], "pages": pages, "needs_review": False}
+        return parts, part_id
+    _write(work_dir, username, f"Osa: lehed [{part_id}]", mutate)
+    return _read_part(work_dir, part_id)
+
+
+def _read_part(work_dir: str, part_id: str) -> dict:
+    import json
+    with open(os.path.join(work_dir, "_metadata.json"), "r", encoding="utf-8") as f:
+        parts = (json.load(f) or {}).get("parts") or []
+    return parts[_find(parts, part_id)]
