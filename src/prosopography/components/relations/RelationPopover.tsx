@@ -18,7 +18,11 @@ export function usePopover() {
   const pinnedRef = useRef(false);
   const hover = useCallback((personId: string, ev: React.MouseEvent) => {
     if (pinnedRef.current) return;
-    setState({ personId, x: ev.clientX, y: ev.clientY, pinned: false });
+    // Sama isik: olekut ei vahetata — muidu renderdaks iga hiireliigutus kogu võrgustiku
+    // (241 sõlme + kaaslaste kaared) uuesti. Vihje jääb sisenemiskohta.
+    setState(prev => (prev && !prev.pinned && prev.personId === personId
+      ? prev
+      : { personId, x: ev.clientX, y: ev.clientY, pinned: false }));
   }, []);
   const leave = useCallback(() => { if (!pinnedRef.current) setState(null); }, []);
   const pin = useCallback((personId: string, ev: React.MouseEvent) => {

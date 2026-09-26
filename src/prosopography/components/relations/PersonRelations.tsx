@@ -23,7 +23,8 @@ const TABS: Tab[] = ['graph', 'timeline', 'table'];
 const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   const { selectedCollection, getCollectionName } = useCollection();
-  const [data, setData] = useState<PersonNetwork | null>(null);
+  // Andmed koos isikuga: kogu lüliti uuesti päring hoiab eelmise vaate alles, isiku vahetus mitte.
+  const [loaded, setLoaded] = useState<{ personId: string; data: PersonNetwork } | null>(null);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<KindFilter>(DEFAULT_FILTER);
   const [scoped, setScoped] = useState(false);
@@ -35,9 +36,8 @@ const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
   useEffect(() => {
     let cancelled = false;          // vana vastus ei kirjuta uue isiku oma üle
     setError(false);
-    setData(null);
     fetchPersonNetwork(personId, collection)
-      .then(d => { if (!cancelled) setData(d); })
+      .then(d => { if (!cancelled) setLoaded({ personId, data: d }); })
       .catch(() => { if (!cancelled) setError(true); });
     return () => { cancelled = true; };
   }, [personId, collection]);
@@ -45,10 +45,8 @@ const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
   // Isiku vahetus: hüpik ja esiletõst ei tohi üle kanduda (remount ei lähtesta — sama komponent).
   useEffect(() => { popover.close(); setHighlight(null); }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const data = loaded && loaded.personId === personId ? loaded.data : null;
   const net = useMemo(() => (data ? applyFilters(data, filter) : null), [data, filter]);
-
-  if (error) return <Section><p className="text-sm text-red-600">{t('network.error')}</p></Section>;
-  if (!net) return null;
 
   const lang = i18n.language === 'en' ? 'en' : 'et';
   const mapUrl = `/persons?view=map&related_to=${encodeURIComponent(personId)}`
@@ -77,6 +75,10 @@ const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
       )}
     </div>
   );
+
+  // Veaolekus jääb filtririba alles — muidu ei saaks „Ainult kogus" lülitit tagasi keerata.
+  if (error) return <Section mapUrl={mapUrl}>{filters}<p className="mt-3 text-sm text-red-600">{t('network.error')}</p></Section>;
+  if (!net) return null;
 
   if (net.persons.length === 0) {
     return <Section mapUrl={mapUrl}>{filters}<p className="mt-3 text-sm text-gray-500">{t('network.empty')}</p></Section>;

@@ -62,3 +62,11 @@ describe('RelationsTable', () => {
     expect(screen.getByRole('link', { name: 'Anna Praeses' }).getAttribute('href')).toBe('/persons/a');
   });
 });
+
+describe('RelationsTable ligipääsetav tekstivaade', () => {
+  it('näitab isiku rolle ja ühiseid teoseid linkidena (klaviatuuriga kättesaadav)', () => {
+    render(<MemoryRouter><RelationsTable net={v} /></MemoryRouter>);
+    expect(screen.getByText('Eesistuja')).toBeTruthy();                    // Anna: praeses
+    expect(screen.getByRole('link', { name: /Disputatio/ }).getAttribute('href')).toBe('/work/w1/1');
+  });
+});

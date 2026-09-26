@@ -1,6 +1,6 @@
 // src/prosopography/components/relations/__tests__/PersonRelations.test.tsx
 /** @vitest-environment jsdom */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './testI18n';
@@ -71,8 +71,10 @@ describe('PersonRelations', () => {
     const { rerender } = renderIt('vutt:Pold');
     rerender(<MemoryRouter><PersonRelations personId={F} /></MemoryRouter>);
     expect(await screen.findByText('Anna')).toBeTruthy();
-    resolveOld(net([], []));
-    await waitFor(() => expect(screen.getByText('Anna')).toBeTruthy());
+    // Tühjenda mikroülesanded, et vana lubaduse .then jõuaks joosta, siis kontrolli.
+    await act(async () => { resolveOld(net([], [])); await Promise.resolve(); });
+    expect(screen.getByText('Anna')).toBeTruthy();
+    expect(screen.queryByText('Seoseid ei leitud.')).toBeNull();
   });
 
   it('kogu lüliti küsib uuesti collection-parameetriga', async () => {
@@ -82,4 +84,27 @@ describe('PersonRelations', () => {
     fireEvent.click(screen.getByLabelText('Ainult kogus: Rootsi aja ülikool'));
     await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(F, 'agc'));
   });
+  it('kogu lüliti: sektsioon ja lüliti jäävad nähtavaks, kuni uus vastus tuleb', async () => {
+    impl.fn = async () => net([acad], [A]);
+    renderIt();
+    await screen.findByText('Anna');
+    impl.fn = () => new Promise(() => {});                 // uus päring jääb ootele
+    fireEvent.click(screen.getByLabelText('Ainult kogus: Rootsi aja ülikool'));
+    expect(screen.getByLabelText('Ainult kogus: Rootsi aja ülikool')).toBeTruthy();
+    expect(screen.getByText('Anna')).toBeTruthy();
+  });
+
+  it('kogu lüliti: vea järel saab lüliti tagasi keerata', async () => {
+    impl.fn = async () => net([acad], [A]);
+    renderIt();
+    await screen.findByText('Anna');
+    impl.fn = () => Promise.reject(new Error('500'));
+    fireEvent.click(screen.getByLabelText('Ainult kogus: Rootsi aja ülikool'));
+    await screen.findByText('Seoste laadimine ebaõnnestus.');
+    impl.fn = async () => net([acad], [A]);
+    fireEvent.click(screen.getByLabelText('Ainult kogus: Rootsi aja ülikool'));
+    expect(await screen.findByText('Anna')).toBeTruthy();
+    expect(fetchMock).toHaveBeenLastCalledWith(F, null);
+  });
 });
+

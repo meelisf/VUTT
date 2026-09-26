@@ -97,7 +97,11 @@ export function familyLabel(edge: NetworkEdge, focusId: string, labelOf: (id: st
 export interface RadialNode { person: VisiblePerson; x: number; y: number; angle: number; r: number; labelled: boolean; }
 
 const LABEL_ALL_MAX = 40;
-const LABEL_TOP = 0.93;   // üle 40 isiku: sildid ülemisele ~7%-le (workCount järgi)
+// Üle 40 isiku: sildid ~7%-le suurima seosega isikutest, vähemalt 5-le. Järjestuse,
+// mitte väärtuslävendi järgi — väikeste täisarvude (1–3 teost) juures sildistas
+// lävi pool ringist või mitte kedagi.
+const LABEL_SHARE = 0.07;
+const LABEL_MIN = 5;
 
 export function radialLayout(v: VisibleNetwork, size: { w: number; h: number }) {
   const cx = size.w / 2;
@@ -113,8 +117,11 @@ export function radialLayout(v: VisibleNetwork, size: { w: number; h: number }) 
   const span = 2 * Math.PI - gap * kinds.size;
   const step = span / Math.max(1, sorted.length);
   const maxCount = Math.max(1, ...sorted.map(p => p.workCount));
-  const counts = sorted.map(p => p.workCount).sort((a, b) => a - b);
-  const threshold = many ? Math.max(2, counts[Math.floor(LABEL_TOP * (counts.length - 1))]) : 0;
+  const top = new Set(
+    [...sorted].sort((a, b) => b.workCount - a.workCount || a.label.localeCompare(b.label))
+      .slice(0, Math.max(LABEL_MIN, Math.ceil(LABEL_SHARE * sorted.length)))
+      .map(p => p.id),
+  );
   let angle = -Math.PI / 2 + gap / 2;
   let prev: RelationKind | null = null;
   const nodes: RadialNode[] = sorted.map(person => {
@@ -124,7 +131,7 @@ export function radialLayout(v: VisibleNetwork, size: { w: number; h: number }) 
     prev = person.kind;
     const r = 3.5 + Math.sqrt(person.workCount / maxCount) * (many ? 5.5 : 9.5);
     return { person, angle: a, r, x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a),
-             labelled: !many || person.workCount >= threshold };
+             labelled: !many || top.has(person.id) };
   });
   return { cx, cy, radius, nodes };
 }

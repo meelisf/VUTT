@@ -320,7 +320,9 @@
       "origin": "Origin",
       "kind": "Relation",
       "works": "Shared works",
-      "span": "Years"
+      "span": "Years",
+      "roles": "Roles",
+      "worksList": "Shared works"
     }
   },
   "place": {

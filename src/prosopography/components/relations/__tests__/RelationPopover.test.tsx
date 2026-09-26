@@ -72,3 +72,17 @@ describe('usePopover', () => {
     expect(result.current.state).toBeNull();
   });
 });
+
+describe('usePopover jõudlus', () => {
+  it('liikumine sama isiku peal ei loo uut olekut (sektsioon ei renderda uuesti)', () => {
+    const { result } = renderHook(() => usePopover());
+    const ev1 = { clientX: 5, clientY: 6 } as unknown as React.MouseEvent;
+    const ev2 = { clientX: 9, clientY: 12 } as unknown as React.MouseEvent;
+    act(() => result.current.hover('a', ev1));
+    const first = result.current.state;
+    act(() => result.current.hover('a', ev2));
+    expect(result.current.state).toBe(first);
+    act(() => result.current.hover('b', ev2));
+    expect(result.current.state).toMatchObject({ personId: 'b', x: 9, y: 12 });
+  });
+});

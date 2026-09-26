@@ -173,3 +173,26 @@ describe('timelineRows', () => {
     expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('c'));
   });
 });
+
+describe('radialLayout sildid (arvustuse M1)', () => {
+  const mk = (counts: number[]) => {
+    const persons = counts.map((_, i) => P(`p${i}`));
+    const edges: NetworkEdge[] = [];
+    const works = [] as ReturnType<typeof W>[];
+    counts.forEach((c, i) => {
+      for (let k = 0; k < c; k++) { edges.push(E('cotext', `p${i}`, `w${i}_${k}`)); works.push(W(`w${i}_${k}`)); }
+    });
+    return applyFilters({ ...NET, persons, edges, works }, DEFAULT_FILTER);
+  };
+
+  it('väikeste täisarvude korral ei silta pooli ringist (järjestus, mitte väärtuslävi)', () => {
+    const v = mk([...Array(60).fill(1), ...Array(90).fill(2), ...Array(9).fill(3)]);
+    const n = radialLayout(v, { w: 900, h: 900 }).nodes.filter(x => x.labelled).length;
+    expect(n).toBe(Math.ceil(0.07 * 159));
+  });
+
+  it('kõigil üks teos: sildid ikkagi olemas', () => {
+    const v = mk(Array(60).fill(1));
+    expect(radialLayout(v, { w: 900, h: 900 }).nodes.filter(x => x.labelled).length).toBe(5);
+  });
+});

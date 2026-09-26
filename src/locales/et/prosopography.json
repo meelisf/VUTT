@@ -320,7 +320,9 @@
       "origin": "Päritolu",
       "kind": "Seos",
       "works": "Ühiseid teoseid",
-      "span": "Aastad"
+      "span": "Aastad",
+      "roles": "Rollid",
+      "worksList": "Ühised teosed"
     }
   },
   "place": {
