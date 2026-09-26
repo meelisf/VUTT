@@ -14,11 +14,11 @@ import { fetchPlaces } from '../../services/prosopographyService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 import type { VisibleNetwork } from '../../utils/network';
 import { KIND_ORDER } from '../../utils/network';
-import { lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces, type RegistryState } from '../../utils/relationsMap';
+import { layerPoints, lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces, type MapLayer, type RegistryState } from '../../utils/relationsMap';
 import { KIND_COLOR } from './kindStyle';
 import type { usePopover } from './RelationPopover';
 
-type Layer = 'origin' | 'originPrint' | 'print' | 'life';
+type Layer = MapLayer;
 const LAYERS: Layer[] = ['origin', 'originPrint', 'print', 'life'];
 
 let placesPromise: Promise<Record<string, PlaceEntry>> | null = null;
@@ -69,12 +69,7 @@ const RelationsMap: React.FC<{
   const year = useMemo(() => mapYearOf(net, card?.birth?.date ? Number(card.birth.date.slice(0, 4)) + 30 : 1650), [net, card]);
   const focusCoords = net.focus.origin?.coordinates ?? null;
 
-  const points: LatLon[] = useMemo(() => {
-    if (layer === 'origin') return [...origin.groups.map(g => g.coords), ...(focusCoords ? [focusCoords] : [])];
-    if (layer === 'originPrint') return [...links.flatMap(l => [l.from, l.to]), ...(focusCoords ? [focusCoords] : [])];
-    if (layer === 'print') return prints.map(p => p.coords);
-    return life.mapped.map(s => s.coords!) ;
-  }, [layer, origin, links, prints, life, focusCoords]);
+  const points: LatLon[] = useMemo(() => layerPoints(layer, net, life), [layer, net, life]);
 
   const pinFromLeaflet = (id: string, ev: { originalEvent: MouseEvent }) =>
     popover.pin(id, ev.originalEvent as unknown as React.MouseEvent);
