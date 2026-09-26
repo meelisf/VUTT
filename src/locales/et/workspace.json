@@ -300,6 +300,44 @@
       "badgeSplit": "poolitatakse",
       "progress": "{{done}} / {{total}} lehte",
       "interrupted": "Töö katkes enne lõppu (server taaskäivitus?). Lehtede nimekiri värskendati — vaata üle, mis jõudis kettale."
+    },
+    "tabParts": "Osad",
+    "parts": {
+      "kinds": {
+        "letter": "Kiri",
+        "poem": "Luuletus",
+        "speech": "Kõne",
+        "session": "Istung",
+        "attachment": "Lisa"
+      },
+      "create": "Loo osa valitud lehtedest",
+      "addToPart": "Lisa valitud lehed osale",
+      "removeFromPart": "Eemalda valitud lehed osast",
+      "selected_one": "{{count}} leht valitud",
+      "selected_other": "{{count}} lehte valitud",
+      "empty": "Osi pole veel märgitud. Vali ruudustikust lehed ja loo osa.",
+      "needsReview": "Lehed puuduvad — vaata üle",
+      "pages_one": "{{count}} leht",
+      "pages_other": "{{count}} lehte",
+      "kind": "Liik",
+      "title": "Pealkiri",
+      "incipit": "Algus",
+      "dating": "Aeg",
+      "place": "Koht",
+      "placeLetter": "Kirjutamiskoht",
+      "placeTo": "Sihtkoht",
+      "persons": "Isikud",
+      "addPerson": "Lisa isik",
+      "role": "Roll",
+      "attachedTo": "Lisa osale",
+      "notes": "Märkused",
+      "save": "Salvesta osa",
+      "delete": "Kustuta osa",
+      "openPage": "Ava leht töölaual",
+      "sharedWarning": "Leht {{stem}} kuulub ka teise osasse; sellel lehel mainitud isikud seotakse mõlemaga.",
+      "error": "Salvestamine ebaõnnestus: {{message}}",
+      "newPart": "Uus osa",
+      "none": "—"
     }
   },
   "metadata": {
@@ -343,7 +381,9 @@
       "aui": "Eessõna/järelsõna autor",
       "subject": "Tema kohta",
       "publisher": "Trükkal",
-      "mentioned": "Mainitud"
+      "mentioned": "Mainitud",
+      "addressee": "Adressaat",
+      "participant": "Osaleja"
     },
     "addCreator": "Lisa isik",
     "removeCreator": "Eemalda",
