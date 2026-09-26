@@ -30,11 +30,26 @@ export function useDraggablePosition<E extends HTMLElement = HTMLDivElement>(
   { anchor = 'center', storageKey }: { anchor?: Anchor; storageKey?: string } = {},
 ) {
   const ref = useRef<E>(null);
-  const [pos, setPos] = useState<Point | null>(() => readStored(storageKey));
+  // Meelde jäänud asukoht võib pärineda laiemast aknast — piira kohe (suurus pole
+  // veel teada, seega vähemalt vasak-ülanurk ekraanile) ja uuesti iga akna muutuse peale.
+  const [pos, setPos] = useState<Point | null>(() => {
+    const p = readStored(storageKey);
+    return p ? clampPosition(p, { w: 0, h: 0 }, { w: window.innerWidth, h: window.innerHeight }) : null;
+  });
   const cleanup = useRef<(() => void) | null>(null);
 
   // Mahaharakendamisel poolik lohistus lahti, muidu jääksid aknakuularid rippuma.
   useEffect(() => () => cleanup.current?.(), []);
+
+  useEffect(() => {
+    const onResize = () => setPos(p => {
+      if (!p) return p;
+      const rect = ref.current?.getBoundingClientRect();
+      return clampPosition(p, { w: rect?.width ?? 0, h: rect?.height ?? 0 }, { w: window.innerWidth, h: window.innerHeight });
+    });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const onHandleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest('button, input, select, textarea, a')) return;

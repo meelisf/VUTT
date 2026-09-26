@@ -25,7 +25,7 @@ const PartPanel: React.FC<Props> = ({ title, onClose, children }) => {
       aria-modal="false"
       aria-label={title}
       style={drag.style}
-      className="z-[1300] flex w-[min(42rem,calc(100vw-2rem))] max-h-[85vh] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl"
+      className="z-[1300] flex w-[min(42rem,calc(100vw-2rem))] max-h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl"
     >
       <div
         className="flex shrink-0 cursor-grab select-none items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5 active:cursor-grabbing"

@@ -53,4 +53,23 @@ describe('useDraggablePosition', () => {
     expect(screen.getByTestId('panel').style.right).toBe('24px');
     expect(screen.getByTestId('panel').style.left).toBe('');
   });
+
+  it('meelde jäänud asukoht, mis on praegusest aknast väljas, tuuakse tagasi', () => {
+    sessionStorage.setItem('k2', JSON.stringify({ x: 5000, y: 3000 }));
+    render(<Panel storageKey="k2" />);
+    expect(screen.getByTestId('panel').style.left).toBe('1080px');
+    expect(screen.getByTestId('panel').style.top).toBe('756px');
+  });
+
+  it('akna ahenemisel piiratakse asukoht uuesti', () => {
+    render(<Panel />);
+    withRect();
+    fireEvent.mouseDown(screen.getByTestId('handle'), { clientX: 510, clientY: 90, button: 0 });
+    fireEvent.mouseMove(window, { clientX: 1000, clientY: 90 });
+    fireEvent.mouseUp(window);
+    expect(screen.getByTestId('panel').style.left).toBe('990px');
+    Object.assign(window, { innerWidth: 700 });
+    fireEvent(window, new Event('resize'));
+    expect(screen.getByTestId('panel').style.left).toBe('580px');
+  });
 });

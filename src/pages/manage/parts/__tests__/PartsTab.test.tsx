@@ -110,6 +110,7 @@ describe('PartsTab', () => {
     await screen.findByText(/Osi pole veel märgitud/);
     fireEvent.click(screen.getByTestId('page-s1'));
     fireEvent.click(screen.getByRole('button', { name: 'Loo osa valitud lehtedest' }));
+    fireEvent.change(await screen.findByLabelText('Pealkiri'), { target: { value: 'Kiri' } });
     await waitFor(() => expect(dirty[dirty.length - 1]).toBe(true));
     unmount();
     expect(dirty[dirty.length - 1]).toBe(false);
@@ -173,5 +174,32 @@ describe('PartsTab', () => {
     fireEvent.click(screen.getByTestId('page-s1'));
     fireEvent.click(screen.getByRole('button', { name: 'Tühista valik' }));
     expect(screen.queryByText('1 leht valitud')).toBeNull();
+  });
+
+  it('uue osa lehed: paneeli avamise järel valitud lehed lähevad kaasa', async () => {
+    renderTab();
+    await screen.findByText(/Osi pole veel märgitud/);
+    fireEvent.click(screen.getByTestId('page-s1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Loo osa valitud lehtedest' }));
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByTestId('page-s3'));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvesta osa' }));
+    await waitFor(() => expect(api.calls).toContain('create:s1,s3'));
+  });
+
+  it('puutumata uus osa ei ole salvestamata muudatus', async () => {
+    renderTab();
+    await screen.findByText(/Osi pole veel märgitud/);
+    fireEvent.click(screen.getByTestId('page-s1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Loo osa valitud lehtedest' }));
+    await screen.findByRole('dialog');
+    expect(dirty[dirty.length - 1]).toBe(false);
+  });
+
+  it('paneel mahub lühikesse aknasse (kõrgus dvh järgi)', async () => {
+    api.parts = [{ id: 'a', kind: 'letter', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
+    renderTab();
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
+    expect((await screen.findByRole('dialog')).className).toContain('max-h-[calc(100dvh-6rem)]');
   });
 });

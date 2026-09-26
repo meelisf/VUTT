@@ -110,7 +110,7 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
   const startNew = () => runGuarded(() => {
     setEditing({ id: null, pages: stems.filter(s => selected.has(s)) });
     setDraft(emptyDraft());
-    setDirty(true);
+    setDirty(false);   // puutumata uus osa ei ole muudatus — muidu küsiks kaitse tühja osa loomist
     setError(null);
   });
 
@@ -132,7 +132,9 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
     setBusy(true);
     setError(null);
     try {
-      const input = partFromDraft(draft, editing.id ? (active?.pages ?? editing.pages) : editing.pages);
+      // Uus osa: paneel on mittemodaalne, seega avamise järel valitud lehed lähevad kaasa.
+      const newPages = stems.filter(s => editing.pages.includes(s) || selected.has(s));
+      const input = partFromDraft(draft, editing.id ? (active?.pages ?? editing.pages) : newPages);
       const saved = editing.id
         ? await updatePart(workId, editing.id, input, token)
         : await createPart(workId, input, token);
@@ -148,7 +150,7 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
     } finally {
       setBusy(false);
     }
-  }, [editing, draft, active, workId, token, reload]);
+  }, [editing, draft, active, workId, token, reload, stems, selected]);
 
   useEffect(() => { saveRef.current = save; }, [save, saveRef]);
 

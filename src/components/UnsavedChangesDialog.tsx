@@ -72,7 +72,7 @@ const UnsavedChangesDialog: React.FC<UnsavedChangesDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1400]"
       onMouseDown={e => { if (e.target === e.currentTarget && !saving) onStay(); }}
     >
       <div
