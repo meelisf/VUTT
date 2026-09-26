@@ -51,6 +51,7 @@ import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
 import PartsTab from './manage/parts/PartsTab';
+import { initialManageTab, tabSwitch, type ManageTab } from './manage/partsModel';
 import PageActionBar from './manage/PageActionBar';
 import {
   PendingPageOps, pendingCount, pruneMissing, rotatePending, setPendingSplit, setPendingSplitX, toRequest,
@@ -68,7 +69,7 @@ const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
 type PageInfo = WorkPageInfo;
 type DeletedPage = DeletedWorkPage;
 
-type ActiveTab = 'parts' | 'pages' | 'trash' | 'replace';
+type ActiveTab = ManageTab;
 
 const WorkManage: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common']);
@@ -83,7 +84,7 @@ const WorkManage: React.FC = () => {
 
   // „Osad" on esimene ja vaikimisi aktiivne (#464): lehtede haldus on teisejärguline,
   // sest põhitöö (poolitus jms) tehakse juba sisestamisel.
-  const [activeTab, setActiveTab] = useState<ActiveTab>('parts');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => initialManageTab(focus));
   const [partsDirty, setPartsDirty] = useState(false);
   const partsSaveRef = useRef<() => Promise<boolean>>(async () => true);
   const [pages, setPages] = useState<PageInfo[]>([]);
@@ -645,7 +646,7 @@ const WorkManage: React.FC = () => {
     isDirty: partsDirty || changedCount > 0 || pageOpsCount > 0,
     onSave: partsDirty ? () => partsSaveRef.current() : pageOpsCount > 0 ? savePageOps : saveReorder,
   });
-  const switchTab = (tab: ActiveTab) => runGuarded(() => setActiveTab(tab));
+  const switchTab = (tab: ActiveTab) => tabSwitch(partsDirty, runGuarded, () => setActiveTab(tab));
 
   const handleBulkDelete = async () => {
     if (!workId || !authToken || selectedFiles.size === 0) return;
@@ -893,7 +894,7 @@ const WorkManage: React.FC = () => {
             {t('manage.tabs.replace', 'Asenda leheküljed')}
           </button>
           <button
-            onClick={() => runGuarded(() => {
+            onClick={() => tabSwitch(partsDirty, runGuarded, () => {
               setActiveTab('trash');
               if (!trashLoaded) loadTrashPages();
             })}

@@ -1,6 +1,6 @@
 // src/pages/manage/__tests__/partsModel.test.ts
 import { describe, it, expect } from 'vitest';
-import { draftFromPart, emptyDraft, pageBadges, partFromDraft, sharedStems, sortParts } from '../partsModel';
+import { draftFromPart, emptyDraft, initialManageTab, pageBadges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
 import type { WorkPart } from '../../../services/workPartsApi';
 
 const STEMS = ['s1', 's2', 's3', 's4'];
@@ -30,5 +30,32 @@ describe('partsModel', () => {
     expect(input).toEqual({ kind: 'poem', pages: ['s1'], creators: [], attached_to: null });
     const back = draftFromPart(P('a', ['s1'], { title: 'T', kind: 'letter', place_to: { id: 'Q1', label: 'X' } }));
     expect(partFromDraft(back, ['s1'])).toMatchObject({ title: 'T', place_to: { id: 'Q1', label: 'X' } });
+  });
+});
+
+describe('partsModel: tundmatud väljad ei kao (arvustuse I1)', () => {
+  it('PUT säilitab vormile tundmatud väljad (languages), tühjendatud pealkiri kaob', () => {
+    const p = P('a', ['s1'], { title: 'Vana', languages: ['lat'], ...({ future_field: 1 } as object) });
+    const d = { ...draftFromPart(p), title: '' };
+    const out = partFromDraft(d, ['s1']) as Record<string, unknown>;
+    expect(out.languages).toEqual(['lat']);
+    expect(out.future_field).toBe(1);
+    expect('title' in out).toBe(false);
+  });
+});
+
+describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
+  it('?focus=N avab lehtede vahekaardi (töölaua sügavlink), muidu osad', () => {
+    expect(initialManageTab(7)).toBe('pages');
+    expect(initialManageTab(null)).toBe('parts');
+  });
+  it('vahekaardi vahetust kaitstakse ainult osade mustandi korral', () => {
+    const guarded: string[] = [];
+    const run = (fn: () => void) => { guarded.push('guard'); fn(); };
+    const done: string[] = [];
+    tabSwitch(false, run, () => done.push('a'));
+    tabSwitch(true, run, () => done.push('b'));
+    expect(done).toEqual(['a', 'b']);
+    expect(guarded).toEqual(['guard']);
   });
 });

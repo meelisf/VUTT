@@ -98,4 +98,21 @@ describe('PartsTab', () => {
     fireEvent.change(screen.getByLabelText('Pealkiri'), { target: { value: 'Uus' } });
     await waitFor(() => expect(dirty[dirty.length - 1]).toBe(true));
   });
+  it('sulgemisel mustandiga: dirty-lipp nullitakse ja saveRef ei salvesta enam (arvustuse C1)', async () => {
+    const saveRef = { current: async () => true };
+    const { unmount } = render(
+      <MemoryRouter>
+        <PartsTab workId="w1" pages={PAGES} token="t" imageToken={null} thumbCacheBust={0}
+          onDirtyChange={d => dirty.push(d)} runGuarded={fn => fn()} saveRef={saveRef} />
+      </MemoryRouter>,
+    );
+    await screen.findByText(/Osi pole veel märgitud/);
+    fireEvent.click(screen.getByTestId('page-s1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Loo osa valitud lehtedest' }));
+    await waitFor(() => expect(dirty[dirty.length - 1]).toBe(true));
+    unmount();
+    expect(dirty[dirty.length - 1]).toBe(false);
+    expect(await saveRef.current()).toBe(true);
+    expect(api.calls.filter(c => c.startsWith('create'))).toEqual([]);   // loobutud osa ei looda
+  });
 });

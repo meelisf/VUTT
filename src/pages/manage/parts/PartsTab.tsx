@@ -117,6 +117,14 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
 
   useEffect(() => { saveRef.current = save; }, [save, saveRef]);
 
+  // Sulgemisel (vahekaardi vahetus „Loobu" järel): lipp maha ja saveRef tühjaks —
+  // muidu jääks WorkManage'i kaitse igaveseks aktiivseks ja „Salvesta ja jätka"
+  // kutsuks suletud komponendi vana sulgurit (looks loobutud osa).
+  useEffect(() => () => {
+    onDirtyChange(false);
+    saveRef.current = async () => true;
+  }, [onDirtyChange, saveRef]);
+
   const remove = async () => {
     if (!editing?.id) return;
     setBusy(true);
