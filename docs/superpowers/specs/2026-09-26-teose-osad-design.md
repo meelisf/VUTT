@@ -127,8 +127,12 @@ lehed kuuluvad. Need arvutab `collect_page_person_mentions` metaandmete `parts` 
 Kahe kirjutaja reegel (CLAUDE.md) kehtib edasi.
 
 **Teose faktid (`_work_facts_entry`, ADR 0007):** kirjel on lisaks `parts:
-{part_id: {kind, title, year, place (id, label), first_page_stem}}`. Rebuild ja
-uuendus kasutavad sama ehitajat.
+{part_id: {kind, title, year, place (id, label), first_page}}`. `first_page` on
+1-põhine leheküljenumber (positsioon `enumerate_page_images` järjekorras). See
+arvutatakse **kirjutamisel**, mitte päringu ajal, et `/network` ei peaks kausta
+skannima. Rebuild ja uuendus kasutavad sama ehitajat, mis saab teose kausta tee.
+`sync_work_parts` kutsub pärast lehetoimingut `update_work_facts`-i, sest numbrid
+nihkuvad.
 
 **Seoste ehitaja (ADR 0056 laiendus):**
 - **Paarid tehakse osa ulatuses.** Kui kummagi isiku roll tuleb osast, tekib serv ainult
@@ -146,7 +150,7 @@ uuendus kasutavad sama ehitajat.
   - `addressee` ja `participant` lisatakse `KNOWN`-i.
 - **Vastus** saab välja `parts: [{work_id, part_id, kind, title, year, first_page}]`.
   Hüpikaken ja loend näitavad osa („Kiri: Spener → Fischer, 1684") ja link viib osa
-  esimesele lehele. `first_page` on 1-põhine number, mille server arvutab tüvest.
+  esimesele lehele (`first_page` teose faktidest).
 
 **Isikuleht:** teoste loendis on osaga seotud kirje all osa read, näiteks „kiri
 Spenerilt, 1684, lk 7–9, 11", ja link viib esimesele lehele.
