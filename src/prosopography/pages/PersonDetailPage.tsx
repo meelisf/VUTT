@@ -1,5 +1,5 @@
 import type { WorkDating } from '../../utils/workDating';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -22,9 +22,11 @@ import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../../services/collectionService';
 import type { ProsopoRecord } from '../types';
 import { formatEntryPeriod, institutionLabel } from '../utils/entryPeriod';
-import WorkRelationsCard from '../components/WorkRelationsCard';
 import { mergedRedirectTarget } from '../utils/mergedRedirect';
 import { personImageProps } from '../utils/personImage';
+
+// Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
+const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
 
 // =========================================================
 // Abifunktsioonid
@@ -792,8 +794,12 @@ const PersonDetailPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── Seosed teoste kaudu ── */}
-        {id && <WorkRelationsCard personId={id} />}
+        {/* ── Seosed (#461) ── */}
+        {id && (
+          <Suspense fallback={null}>
+            <PersonRelations personId={id} />
+          </Suspense>
+        )}
 
         {/* ── Struktureeritud info (klapitav) ── */}
         <StructuredInfoCard person={person} />
