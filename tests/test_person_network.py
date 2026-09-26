@@ -183,3 +183,36 @@ def test_network_tee_ei_satu_isiku_route_i(client):
     """Üldine /{person_id:path} ei tohi neelata …/network teed isiku-ID-na."""
     r = client.get(f"/prosopography/{F}/network")
     assert "edges" in r.json()
+
+
+# ── Üks tõde: /persons seoste kaart ──────────────────────────────────────────
+
+def _expected_ids(collection=None):
+    res = _build(F, collection=collection)
+    non_printer = {x for e in res["edges"] if e["kind"] != "printer" for x in (e["from"], e["to"])} - {F}
+    return {F} | non_printer
+
+
+@pytest.mark.parametrize("collection", [None, "agc", "agc-sub"])
+def test_id_hulk_enne_koordinaadifiltrit(net, collection):
+    from server.prosopography.relations import get_person_relation_network_ids
+    ids = get_person_relation_network_ids(F, collection=collection)
+    assert ids[0] == F
+    assert set(ids) == _expected_ids(collection)
+    assert T not in ids                      # ainult trükkal → väljas
+
+
+@pytest.mark.parametrize("collection", [None, "agc"])
+def test_markerid_on_koordinaadiga_osa(net, collection):
+    res = ops.get_person_map_markers(related_to=F, collection=collection)
+    mapped = {p["id"] for m in res["markers"] for p in m["persons"]}
+    expected = _expected_ids(collection)
+    if collection:
+        # Fookus jääb piiratud kaardile ainult kogu liikmena (#460 vihje)
+        from server.prosopography.indices import _persons_in_collection
+        if F not in _persons_in_collection(collection):
+            expected = expected - {F}
+    with_coords = {e["id"] for e in json.loads(open(ops.PROSOPOGRAPHY_INDEX_FILE).read())["entries"]
+                   if e.get("origin_coordinates")}
+    assert mapped == expected & with_coords
+    assert res["without_coordinates"] == len(expected - with_coords)

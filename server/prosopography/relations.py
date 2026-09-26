@@ -70,37 +70,19 @@ def _structured_relation_ids(person: Optional[dict]) -> list[str]:
     return result
 
 
-def get_person_relation_network_ids(person_id: str, work_limit: int = 500) -> list[str]:
-    """Tagastab isiku kaardivõrgustiku ID-d."""
-    sync_from_facade()
-    ids: list[str] = []
+def get_person_relation_network_ids(person_id: str, collection: Optional[str] = None) -> list[str]:
+    """Seoste kaardi isikud: fookus + seotud isikud sama ehitajaga nagu isikulehel (#461).
 
-    def add(pid: Optional[str]) -> None:
-        if isinstance(pid, str) and pid.startswith("vutt:P") and pid not in ids:
-            ids.append(pid)
-
-    add(person_id)
-    person = get_person(person_id)
-    for target_id in _structured_relation_ids(person):
-        add(target_id)
-
-    pattern = os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")
-    for path in state._glob.glob(pattern):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                other = json.load(f)
-        except Exception:
-            continue
-        other_id = other.get("id")
-        if other_id == person_id or other.get("record_status") == "tombstone":
-            continue
-        if person_id in _structured_relation_ids(other):
-            add(other_id)
-
-    for relation in state.get_work_relations(person_id, limit=work_limit, offset=0):
-        add(relation.get("person_id"))
-
-    return ids
+    Välja jäävad isikud, kelle kõik servad on `printer` (trükkal on vaikimisi peidus).
+    `collection` filtreerib ühiseid teoseid (alamkogudega); pereseosed jäävad alles.
+    """
+    from .network import build_person_network
+    res = build_person_network(person_id, collection=collection)
+    if res is None:
+        return [person_id]
+    others = {x for e in res["edges"] if e["kind"] != "printer" for x in (e["from"], e["to"])}
+    others.discard(person_id)
+    return [person_id, *sorted(others)]
 
 
 def get_relation_type_suggestions() -> list:
