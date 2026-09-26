@@ -1,6 +1,7 @@
 """Testid topeltlehe lõikamise loogikale."""
 import sys
 import json
+import os
 import pytest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -295,3 +296,54 @@ def test_split_prefers_existing_originals(work_dir):
         with PILImage.open(str(orig_dir / half)) as im:
             r, g, b = im.getpixel((100, 50))
             assert r > 200 and g < 60 and b < 60
+
+
+def test_poolitus_asendab_osa_lehe_molema_poolega(work_dir, monkeypatch):
+    """#464: poolitatud leht jääb osasse mõlema poolena (split_page → renamed →
+    refresh_work_mentions → sync_work_parts)."""
+    from server import metadata_ops
+    from server.admin_page_ops import split_page, get_sorted_images
+
+    def fake_save(path, content, *a, additional_files=None, **k):
+        open(path, "w", encoding="utf-8").write(content)
+        return {"success": True}
+    monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
+    for name in ("sync_work_to_meilisearch", "update_person_to_works", "update_work_collections", "update_work_facts"):
+        monkeypatch.setattr(metadata_ops, name, lambda *a, **k: None)
+
+    folder = work_dir["folder"]
+    meta = json.loads((folder / "_metadata.json").read_text())
+    meta["parts"] = [{"id": "p1", "kind": "letter", "pages": ["1690-test-work-testwork1-pg001"], "creators": []}]
+    (folder / "_metadata.json").write_text(json.dumps(meta))
+
+    split_page(work_dir["work_id"], 1, 0.5, "testadmin")
+
+    stems = [os.path.splitext(n)[0] for n in get_sorted_images(str(folder))]
+    parts = json.loads((folder / "_metadata.json").read_text())["parts"]
+    assert parts[0]["pages"] == stems and len(stems) == 2
+
+
+def test_lehtede_kustutus_uhtlustab_osad(work_dir, monkeypatch):
+    """Arvustuse kriitiline leid: UI kustutab lehti delete_pages'iga, mis kutsus mainimisi
+    otse ja jättis osad sünkroniseerimata. Nüüd refresh_work_mentions → sync_work_parts."""
+    from server import metadata_ops
+    import server.admin_page_ops as aps
+
+    def fake_save(path, content, *a, additional_files=None, **k):
+        open(path, "w", encoding="utf-8").write(content)
+        return {"success": True}
+    monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
+    for name in ("sync_work_to_meilisearch", "update_person_to_works", "update_work_collections", "update_work_facts"):
+        monkeypatch.setattr(metadata_ops, name, lambda *a, **k: None)
+    monkeypatch.setattr(aps, "delete_pages_from_git", lambda *a, **k: None)
+
+    folder = work_dir["folder"]
+    stem = "1690-test-work-testwork1-pg001"
+    meta = json.loads((folder / "_metadata.json").read_text())
+    meta["parts"] = [{"id": "p1", "kind": "letter", "pages": [stem], "creators": []}]
+    (folder / "_metadata.json").write_text(json.dumps(meta))
+
+    aps.delete_pages(work_dir["work_id"], [stem], "testadmin")
+
+    part = json.loads((folder / "_metadata.json").read_text())["parts"][0]
+    assert part["pages"] == [] and part["needs_review"] is True
