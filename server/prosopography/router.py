@@ -21,6 +21,7 @@ from .person_crud import (
     apply_enrichment,
     upload_person_image,
     get_person_image_path,
+    get_person_image_variant,
     delete_person_image,
     bulk_update_occupation,
     _safe_nanoid,
@@ -562,13 +563,28 @@ async def prosopography_upload_image(
 
 
 @router.get("/{person_id:path}/image")
-async def prosopography_get_image(person_id: str):
-    """Tagastab isiku pildi. Ei nõua autentimist (avalik)."""
-    path = get_person_image_path(person_id)
+def prosopography_get_image(
+    person_id: str,
+    w: Optional[int] = Query(None),
+    v: Optional[str] = Query(None),
+):
+    """Tagastab isiku pildi. Ei nõua autentimist (avalik).
+
+    `w` valib vähendatud variandi (#424, laiused `VARIANT_WIDTHS`); ilma selleta
+    lähtepilt. Sync `def`: variandi esimene genereerimine on PIL-töö (ADR 0002).
+    `v` on pildi versioon — see muutub igal üleslaadimisel, seega sellise URL-i
+    vastus ei aegu kunagi. Cache-päise jätab nginx puutumata (`nginx.host.conf`).
+    """
+    try:
+        path = get_person_image_path(person_id) if w is None else get_person_image_variant(person_id, w)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if path is None:
         raise HTTPException(status_code=404, detail="Pilt puudub")
     media_type = "image/webp" if path.endswith(".webp") else "image/jpeg"
-    return FileResponse(path, media_type=media_type)
+    # Versioonita URL (enne #424 salvestatud kaardid) revalideeritakse ETag-iga.
+    headers = {"Cache-Control": "public, max-age=31536000, immutable" if v else "no-cache"}
+    return FileResponse(path, media_type=media_type, headers=headers)
 
 
 @router.delete("/{person_id:path}/image")

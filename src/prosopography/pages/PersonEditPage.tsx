@@ -27,6 +27,7 @@ import SimilarPersonsWarning from '../components/personForm/SimilarPersonsWarnin
 import PlacePicker from '../components/personForm/PlacePicker';
 import OutOfVocabChips from '../components/personForm/OutOfVocabChips';
 import { formatRelationOwnerName, formatRelationTypeLabel } from '../utils/estonianName';
+import { personImageProps } from '../utils/personImage';
 import { getVocabularies } from '../../services/collectionService';
 import type { VocabularySeisusItem } from '../../services/collectionService';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
@@ -412,7 +413,7 @@ const PersonEditPage: React.FC = () => {
               }}
             >
               {imageUrl ? (
-                <img src={imageUrl} alt={t('form.profilePhoto')} className="w-full h-full object-cover" />
+                <img {...personImageProps(imageUrl, '96px')} alt={t('form.profilePhoto')} className="w-full h-full object-cover" />
               ) : (
                 <ImagePlus size={24} className="text-gray-300" />
               )}

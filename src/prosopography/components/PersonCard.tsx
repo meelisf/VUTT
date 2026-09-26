@@ -6,6 +6,7 @@ import { MapPin, ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
 import type { VocabularySeisusItem } from '../../services/collectionService';
 import { formatFloruit } from '../utils/personDates';
+import { personImageProps } from '../utils/personImage';
 
 interface PersonCardProps {
   person: ProsopoIndexEntry;
@@ -93,7 +94,7 @@ const CardInner: React.FC<{
     <div className="h-40 bg-gray-100 relative overflow-hidden">
       {person.image_url ? (
         <img
-          src={person.image_url}
+          {...personImageProps(person.image_url, '(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw')}
           alt={person.label}
           loading="lazy"
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
