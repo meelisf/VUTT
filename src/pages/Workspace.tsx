@@ -6,6 +6,7 @@ import { MeiliSearch } from 'meilisearch';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { useAdjacentPagePrefetch } from '../hooks/useAdjacentPagePrefetch';
 import { getPage, savePage } from '../services/pageService';
+import type { PageFields, SaveOutcome } from '../components/editor/pageConflict';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
 import { PageStatus } from '../types';
@@ -303,32 +304,41 @@ const Workspace: React.FC = () => {
     }
   };
 
-  const handleSave = async (updatedPage: Page) => {
+  const handleSave = async (updatedPage: Page, base: PageFields): Promise<SaveOutcome> => {
     // Kontrolli, kas kasutaja on sisse logitud
     if (!user) {
       setSaveError(t('saveError.notLoggedIn'));
-      return;
+      throw new Error(t('saveError.notLoggedIn'));
     }
     // Kontrolli autentimistõendit
     if (!authToken) {
       setSaveError(t('saveError.tokenMissing'));
-      return;
+      throw new Error(t('saveError.tokenMissing'));
     }
 
 
     // Toimetaja/admin muudatused salvestatakse otse
     const pageWithStatus = { ...updatedPage, status: currentStatus || updatedPage.status };
+    // Staatust omab Workspace (`currentStatus`), mitte redaktor: baasi staatus
+    // on viimati laaditud/salvestatud `page.status` (#455).
+    const baseWithStatus = { ...base, status: page?.status ?? base.status };
     try {
-      const savedPage = await savePage(pageWithStatus, t('history.action.saved_changes'), user.name, authToken);
+      const { page: savedPage, merged } = await savePage(
+        pageWithStatus, t('history.action.saved_changes'), user.name, authToken, baseWithStatus,
+      );
       setPage(savedPage);
       setCurrentStatus(savedPage.status);
       setEditorChanges(false);
+      return { merged };
     } catch (e: any) {
       if (e.message === 'AUTH_EXPIRED' || e.status === 401) {
         // Token aegunud salvestamise ajal — ava LoginModal
         logout();
         setShowLoginModal(true);
       }
+      // Viga edasi redaktorile: muidu märgiks `runSave` ebaõnnestunud
+      // salvestuse salvestatuks (isDirty → false) ja muudatus kaoks vaikselt.
+      throw e;
     }
   };
 
@@ -688,7 +698,11 @@ const Workspace: React.FC = () => {
             triggerSave={editorSaveRef}
             onWorkUpdate={(updatedWork) => setWork(prev => prev ? { ...prev, ...updatedWork } : prev)}
             collections={collections}
-            onPageRestored={(patch) => setPage(prev => prev ? { ...prev, ...patch } : prev)}
+            onPageRestored={(patch) => {
+              setPage(prev => prev ? { ...prev, ...patch } : prev);
+              // „Võta serveri versioon" (#455) võib staatust muuta
+              if (patch.status) setCurrentStatus(patch.status);
+            }}
           />
           </div>
         </div>

@@ -8,6 +8,8 @@ import EditorHeader from './editor/EditorHeader';
 import EditorEditTab from './editor/EditorEditTab';
 import EditorInfoHistoryTabs from './editor/EditorInfoHistoryTabs';
 import AnnotationDialog from './editor/AnnotationDialog';
+import PageConflictDialog from './editor/PageConflictDialog';
+import type { PageFields, SaveOutcome } from './editor/pageConflict';
 import AnnotationPopover from './editor/AnnotationPopover';
 
 
@@ -28,7 +30,7 @@ import type { EditorTab } from './editor/types';
 interface TextEditorProps {
   page: Page;
   work?: Work;
-  onSave: (updatedPage: Page) => Promise<void>;
+  onSave: (updatedPage: Page, base: PageFields) => Promise<SaveOutcome>;
   onUnsavedChanges?: (hasChanges: boolean) => void;
   onOpenMetaModal?: () => void;
   readOnly?: boolean;
@@ -95,6 +97,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     saveError,
     setSaveError,
     setAnnotationDraftDirty,
+    savedState,
     setSavedState,
     hasUnsavedChanges,
   } = useEditorState({ page, viewRef, onUnsavedChanges });
@@ -195,6 +198,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     handleCommentsRestored,
     handlePageRestored,
     handleReplyToComment,
+    pageConflict,
+    resolveConflictKeepMine,
+    resolveConflictTakeTheirs,
+    cancelConflict,
   } = useEditorSave({
     page,
     status,
@@ -204,7 +211,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     textAnnotations,
     setTextAnnotations,
     onSave,
+    savedState,
     setSavedState,
+    setPageTags,
     setIsDirty,
     setIsSaving,
     setSaveError,
@@ -354,6 +363,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         onRemoveAnchor={removeAnnotationFromEditor}
       />
     )}
+
+    <PageConflictDialog
+      conflict={pageConflict}
+      onKeepMine={() => { void resolveConflictKeepMine(); }}
+      onTakeTheirs={() => { void resolveConflictTakeTheirs(); }}
+      onCancel={cancelConflict}
+    />
 
     {annDialogOpen && (
       <AnnotationDialog

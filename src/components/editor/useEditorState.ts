@@ -25,6 +25,7 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
   // Salvestamata mustand-tekst kommentaaride paanil (AnnotationsTab) — enne nupule vajutust.
   const [annotationDraftDirty, setAnnotationDraftDirty] = useState(false);
   const [savedState, setSavedState] = useState<EditorSavedState>({
+    text: page.text_content || '',
     status: page.status,
     comments: page.comments,
     page_tags: page.page_tags || [],
@@ -73,7 +74,7 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
       setComments(page.comments);
       setTextAnnotations(page.text_annotations || []);
       setPageTags(page.page_tags || []);
-      setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
+      setSavedState({ text: page.text_content || '', status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
       setIsDirty(false);
       // Salvestamata kommentaarimustand kuulub eelmisele lehele — muidu jääks
       // hoiatus "salvestamata muudatused" uuel lehel ekslikult püsima.

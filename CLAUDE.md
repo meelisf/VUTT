@@ -390,6 +390,8 @@ TERVIKUNA üle. Uus serveripoolne lehe-väli PEAB minema `SERVERIPOOLSED_LEHE_VA
 muidu kaob ta esimese Ctrl+S peale, ilma vea ja logita.
 Iga lehe JSON-i lugev-ja-tagasikirjutav tee hoiab `page_lock`-i (`server/page_locks.py`)
 lugemisest kirjutamiseni; kommentaaritoimingud kirjutavad ainult `.json`-i (ADR 0053).
+`/save` liidab kliendi `base`-i vastu kolmesuunaliselt (`server/page_merge.py`, ADR 0054):
+uus redaktori lehe-väli PEAB minema `PAGE_FIELDS`-i, `read_page_view` = `meili_doc` projektsioon.
 
 **OCR vea-märgend (ADR 0025)** — OCR-server kirjutab ebaõnnestunud lehe kõrvale
 `{tüvi}.err` (üks rida: `ErandiTüüp: sõnum`). Märgend on **lõplik**: `main_loop` ei võta

@@ -515,5 +515,19 @@
     "shareable": "Jagatav (otselingiga)",
     "copied": "Kopeeritud",
     "copy": "Kopeeri"
+  },
+  "conflict": {
+    "title": "Lehte muudeti vahepeal",
+    "message": "Keegi muutis sama lehte pärast seda, kui sa selle avasid. Neid muudatusi ei saa automaatselt liita:",
+    "takeTheirsHint": "„Võta serveri versioon” kopeerib sinu teksti enne lõikelauale.",
+    "keepMine": "Salvesta minu versioon",
+    "takeTheirs": "Võta serveri versioon",
+    "cancel": "Tühista",
+    "field": {
+      "text": "Tekst",
+      "status": "Staatus",
+      "page_tags": "Märksõnad",
+      "comment": "Kommentaar „{{text}}”"
+    }
   }
 }

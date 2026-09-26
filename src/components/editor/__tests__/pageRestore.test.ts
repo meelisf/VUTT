@@ -4,6 +4,7 @@ import type { EditorSavedState } from '../useEditorSave';
 import { PageStatus } from '../../../types';
 
 const prev: EditorSavedState = {
+  text: 'vana tekst',
   status: PageStatus.IN_PROGRESS,
   comments: [{ id: 'c1', text: 'vana', author: 'u', created_at: '' }],
   page_tags: ['Q1'],
@@ -47,12 +48,13 @@ describe('savedStateAfterRestore', () => {
     const uus = savedStateAfterRestore(prev, {
       content: 't', textAnnotations: [], comments: [], gitWarning: null,
     });
-    expect(uus).toEqual({ ...prev, text_annotations: [], comments: [] });
+    // Taastatud tekst on uus liitmise baas (#455).
+    expect(uus).toEqual({ ...prev, text: 't', text_annotations: [], comments: [] });
   });
 
   it('null väli ei tühjenda senist', () => {
     expect(savedStateAfterRestore(prev, {
       content: 't', textAnnotations: null, comments: null, gitWarning: null,
-    })).toEqual(prev);
+    })).toEqual({ ...prev, text: 't' });
   });
 });

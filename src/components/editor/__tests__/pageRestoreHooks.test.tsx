@@ -25,8 +25,8 @@ function useRedaktor(onPageRestored: (p: Partial<Page>) => void) {
   const save = useEditorSave({
     page, status: st.status, comments: st.comments, setComments: st.setComments,
     page_tags: st.page_tags, textAnnotations: st.textAnnotations,
-    setTextAnnotations: st.setTextAnnotations, onSave: async () => {},
-    setSavedState: st.setSavedState, setIsDirty: st.setIsDirty, setIsSaving: st.setIsSaving,
+    setTextAnnotations: st.setTextAnnotations, onSave: async () => ({ merged: null }),
+    savedState: st.savedState, setSavedState: st.setSavedState, setPageTags: st.setPageTags, setIsDirty: st.setIsDirty, setIsSaving: st.setIsSaving,
     setSaveError: st.setSaveError, viewRef, commentFlushRef, authToken: 't', onPageRestored,
   });
   return { st, save, viewRef };

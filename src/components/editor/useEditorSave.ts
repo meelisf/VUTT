@@ -1,4 +1,4 @@
-import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditorView } from '@codemirror/view';
 import type { Annotation, Page, PageStatus, TextAnnotation } from '../../types';
@@ -6,8 +6,14 @@ import type { LinkedEntity } from '../../types/LinkedEntity';
 import { replyToComment } from '../../services/pageService';
 import { pageSwapAnnotation } from './editorAnnotations';
 import { savedStateAfterRestore, type RestoreResult } from './pageRestore';
+import {
+  PageConflictError, baseFromSavedState, retryBase,
+  type PageFields, type SaveOutcome,
+} from './pageConflict';
 
 export interface EditorSavedState {
+  /** Baastekst (laaditud või viimati salvestatud) — kolmesuunalise liitmise baas (#455). */
+  text: string;
   status: PageStatus;
   comments: Annotation[];
   page_tags: (string | LinkedEntity)[];
@@ -22,8 +28,11 @@ interface UseEditorSaveParams {
   page_tags: (string | LinkedEntity)[];
   textAnnotations: TextAnnotation[];
   setTextAnnotations: (annotations: TextAnnotation[]) => void;
-  onSave: (updatedPage: Page) => Promise<void>;
+  onSave: (updatedPage: Page, base: PageFields) => Promise<SaveOutcome>;
+  /** Praegune salvestatud seis = kolmesuunalise liitmise baas (#455). */
+  savedState: EditorSavedState;
   setSavedState: Dispatch<SetStateAction<EditorSavedState>>;
+  setPageTags: (tags: (string | LinkedEntity)[]) => void;
   setIsDirty: (dirty: boolean) => void;
   setIsSaving: (saving: boolean) => void;
   setSaveError: (error: string | null) => void;
@@ -44,7 +53,9 @@ export function useEditorSave({
   textAnnotations,
   setTextAnnotations,
   onSave,
+  savedState,
   setSavedState,
+  setPageTags,
   setIsDirty,
   setIsSaving,
   setSaveError,
@@ -55,6 +66,18 @@ export function useEditorSave({
 }: UseEditorSaveParams) {
   const { t } = useTranslation(['workspace', 'common']);
   const isSavingRef = useRef(false);
+  // Baas loetakse salvestuse HETKEL (ref): callback'id ei pea iga seisumuutusega uuenema.
+  const savedStateRef = useRef(savedState);
+  savedStateRef.current = savedState;
+  // Kokkupõrge ootab kasutaja otsust (PageConflictDialog). Hoiab kordussalvestuseks
+  // vajaliku: saadetud leht, oodatud salvestatud seis, baas ja serveri seis.
+  const [pageConflict, setPageConflict] = useState<{
+    error: PageConflictError;
+    updatedPage: Page;
+    savedState: EditorSavedState;
+    afterSave?: () => void;
+    base: PageFields;
+  } | null>(null);
 
   const makePage = useCallback((nextComments: Annotation[], nextTextAnnotations: TextAnnotation[]): Page => {
     const text = viewRef.current?.state.doc.toString() ?? '';
@@ -72,19 +95,41 @@ export function useEditorSave({
    */
   const runSave = useCallback(async (
     updatedPage: Page,
-    savedState: EditorSavedState,
+    nextSaved: Omit<EditorSavedState, 'text'>,
     afterSave?: () => void,
+    baseOverride?: PageFields,
   ): Promise<boolean> => {
     if (isSavingRef.current) return false;
     isSavingRef.current = true;
     setIsSaving(true);
+    const base = baseOverride ?? baseFromSavedState(savedStateRef.current);
     try {
-      await onSave(updatedPage);
+      const { merged } = await onSave(updatedPage, base);
       afterSave?.();
-      setSavedState(savedState);
+      if (merged) {
+        // Server liitis vahepealse ketta seisu (#455): see ON nüüd salvestatud
+        // seis. Tekst jõuab redaktorisse Workspace `page` kaudu (useEditorState).
+        setComments(merged.comments);
+        setTextAnnotations(merged.text_annotations);
+        setPageTags(merged.page_tags);
+        setSavedState({
+          text: merged.text_content,
+          status: merged.status,
+          comments: merged.comments,
+          page_tags: merged.page_tags,
+          text_annotations: merged.text_annotations,
+        });
+      } else {
+        setSavedState({ ...nextSaved, text: updatedPage.text_content });
+      }
       setIsDirty(false);
       return true;
     } catch (e: any) {
+      if (e instanceof PageConflictError) {
+        // Midagi ei salvestatud; kasutaja otsustab dialoogis.
+        setPageConflict({ error: e, updatedPage, savedState: { ...nextSaved, text: updatedPage.text_content }, afterSave, base });
+        return false;
+      }
       console.error('Save error:', e);
       setSaveError(formatSaveError(e));
       return false;
@@ -92,7 +137,49 @@ export function useEditorSave({
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [formatSaveError, onSave, setIsDirty, setIsSaving, setSaveError, setSavedState]);
+  }, [formatSaveError, onSave, setComments, setIsDirty, setIsSaving, setPageTags, setSaveError, setSavedState, setTextAnnotations]);
+
+  /** „Salvesta minu versioon": konfliktis üksustes võidab minu seis, teiste muudatused mujal jäävad. */
+  const resolveConflictKeepMine = useCallback(async (): Promise<boolean> => {
+    const c = pageConflict;
+    if (!c) return false;
+    setPageConflict(null);
+    return runSave(c.updatedPage, c.savedState, c.afterSave, retryBase(c.base, c.error.current, c.error.fields));
+  }, [pageConflict, runSave]);
+
+  /** „Võta serveri versioon": redaktor võtab üle kettal oleva seisu; minu tekst lõikelauale. */
+  const resolveConflictTakeTheirs = useCallback(async () => {
+    const c = pageConflict;
+    if (!c) return;
+    setPageConflict(null);
+    try {
+      await navigator.clipboard?.writeText(c.updatedPage.text_content || '');
+    } catch {
+      // Lõikelaud on turvavõrk, mitte eeltingimus.
+    }
+    const cur = c.error.current;
+    setComments(cur.comments);
+    setTextAnnotations(cur.text_annotations);
+    setPageTags(cur.page_tags);
+    setSavedState({
+      text: cur.text_content, status: cur.status, comments: cur.comments,
+      page_tags: cur.page_tags, text_annotations: cur.text_annotations,
+    });
+    setIsDirty(false);
+    const view = viewRef.current;
+    if (view && view.state.doc.toString() !== cur.text_content) {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: cur.text_content },
+        annotations: pageSwapAnnotation.of(true),
+      });
+    }
+    onPageRestored?.({
+      text_content: cur.text_content, status: cur.status, comments: cur.comments,
+      page_tags: cur.page_tags, text_annotations: cur.text_annotations,
+    });
+  }, [onPageRestored, pageConflict, setComments, setIsDirty, setPageTags, setSavedState, setTextAnnotations, viewRef]);
+
+  const cancelConflict = useCallback(() => setPageConflict(null), []);
 
   const handleSave = useCallback(async (): Promise<boolean> => {
     const updatedPage = makePage(comments, textAnnotations);
@@ -142,8 +229,9 @@ export function useEditorSave({
 
   const handleCommentsRestored = useCallback((updatedComments: Annotation[]) => {
     setComments(updatedComments);
-    setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
-  }, [page_tags, setComments, setSavedState, status, textAnnotations]);
+    // Server muutis AINULT kommentaare: ülejäänud baas jääb kettal olevaks (#455).
+    setSavedState(prev => ({ ...prev, comments: updatedComments }));
+  }, [setComments, setSavedState]);
 
   /**
    * Git-taaste (#375). Server on versiooni JUBA salvestanud ja commitinud,
@@ -177,8 +265,9 @@ export function useEditorSave({
     if (!authToken) throw new Error(t('saveError.tokenMissing'));
     const updatedComments = await replyToComment(page, commentId, replyText, authToken);
     setComments(updatedComments);
-    setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
-  }, [authToken, page, page_tags, setComments, setSavedState, status, textAnnotations, t]);
+    // Server muutis AINULT kommentaare: ülejäänud baas jääb kettal olevaks (#455).
+    setSavedState(prev => ({ ...prev, comments: updatedComments }));
+  }, [authToken, page, setComments, setSavedState, t]);
 
   return {
     isSavingRef,
@@ -190,5 +279,9 @@ export function useEditorSave({
     handleCommentsRestored,
     handlePageRestored,
     handleReplyToComment,
+    pageConflict: pageConflict ? { fields: pageConflict.error.fields, current: pageConflict.error.current } : null,
+    resolveConflictKeepMine,
+    resolveConflictTakeTheirs,
+    cancelConflict,
   };
 }
