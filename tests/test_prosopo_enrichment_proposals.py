@@ -78,6 +78,8 @@ def test_uleandmine_nouab_editori_ja_pakkumine_on_sessioonipohine(client, login,
     {"items": [_item(identifiers=[{"scheme": "gnd", "id": "1"}])]},
     {"items": [_item(evidence=[])]},
     {"items": [_item(date_from={"date": "1640", "precision": "millennium"})]},
+    {"items": [_item(date_from={"date": "sometime", "precision": "year"})]},
+    {"items": [_item(date_from={"date": "1640-13-01", "precision": "day"})]},
     {"items": [_item(evidence=[{"source_kind": "vutt_page", "work_id": "w1"}])]},
 ])
 def test_vigane_ettepanek_ei_kuluta_koodi(client, login, prosopo_env, change):
@@ -300,3 +302,97 @@ def test_sama_voti_ja_kattuv_aeg_on_duplikaat_aga_eri_opingusundmus_mitte(
     result = client.post(url, headers=_headers(token), json={'proposal_id': second, 'selected': [0]})
     assert result.status_code == 200, result.text
     assert len(prosopo_env.read('abc')['education']) == 2
+
+
+def test_toimetaja_lahendab_mitmetahendusliku_vaste_registrivalikuga(
+        client, login, prosopo_env, tmp_path, monkeypatch):
+    registry = tmp_path / 'config'
+    registry.mkdir(exist_ok=True)
+    (registry / 'occupations.json').write_text(json.dumps({
+        'pastor': {'id': 'Q1', 'variants': ['Pfarrer']},
+        'clergyman': {'id': 'Q2', 'variants': ['Pfarrer']},
+    }))
+    monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    card = prosopo_env.write('abc', occupations=[])
+    token = login('editor', 'editorpass')
+    proposal_id = _submit_for_review(client, token, card, [{
+        'kind': 'occupation', 'match_status': 'ambiguous', 'raw_occupation': 'Pfarrer',
+        'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}],
+    }])
+    url = f'/prosopography/enrichment-proposals/{card["id"]}/apply'
+    base = {'proposal_id': proposal_id, 'selected': [0]}
+    assert client.post(url, headers=_headers(token), json=base).status_code == 409
+    assert client.post(url, headers=_headers(token), json={
+        **base, 'corrections': {'0': {'review': {'state': 'done'}}},
+    }).status_code == 400
+    result = client.post(url, headers=_headers(token), json={
+        **base, 'corrections': {'0': {'occupation_key': 'pastor',
+                                     'occupation_variant': 'Pfarrer'}},
+    })
+    assert result.status_code == 200, result.text
+    saved = prosopo_env.read('abc')['occupations'][0]
+    assert saved['label'] == 'Pfarrer'
+    assert saved['occupation_key'] == 'pastor'
+    assert 'review' not in saved
+
+
+def test_parandus_ei_voimalda_valitud_reast_valjuda(client, login, prosopo_env):
+    card = prosopo_env.write('abc', occupations=[])
+    token = login('editor', 'editorpass')
+    proposal_id = _submit_for_review(client, token, card, [
+        _item(occupation_key=None, institution_key=None),
+        _item(occupation_key=None, institution_key=None, raw_occupation='Õpetaja'),
+    ])
+    result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
+                         headers=_headers(token), json={
+        'proposal_id': proposal_id, 'selected': [0],
+        'corrections': {'1': {'occupation_key': 'pastor'}},
+    })
+    assert result.status_code == 400
+    assert prosopo_env.read('abc') == card
+
+
+def test_toimetaja_parandab_aja_ja_toendi_koos_kinnitamisega(client, login, prosopo_env):
+    card = prosopo_env.write('abc', education=[])
+    token = login('editor', 'editorpass')
+    item = {'kind': 'education', 'match_status': 'matched', 'raw_institution': 'AGC',
+            'date_from': {'date': '1640', 'precision': 'year'},
+            'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}]}
+    proposal_id = _submit_for_review(client, token, card, [item])
+    corrected = {**item['evidence'][0], 'locator': 'lk 14', 'quote': 'studiosus'}
+    response = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
+                           headers=_headers(token), json={
+        'proposal_id': proposal_id, 'selected': [0],
+        'corrections': {'0': {'date_from': {'date': '1641-01-01', 'precision': 'year'},
+                              'edu_type': 'immatriculation', 'evidence': [corrected]}},
+    })
+    assert response.status_code == 200, response.text
+    saved = prosopo_env.read('abc')['education'][0]
+    assert saved['date_from']['date'] == '1641-01-01'
+    assert saved['type'] == 'immatriculation'
+    assert saved['evidence'] == [corrected]
+
+
+def test_vigane_toimetaja_kuupaev_ei_muuda_kaarti(client, login, prosopo_env):
+    card = prosopo_env.write('abc', education=[])
+    token = login('editor', 'editorpass')
+    proposal_id = _submit_for_review(client, token, card, [{
+        'kind': 'education', 'match_status': 'matched', 'raw_institution': 'AGC',
+        'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}],
+    }])
+    result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
+                         headers=_headers(token), json={
+        'proposal_id': proposal_id, 'selected': [0],
+        'corrections': {'0': {'date_from': {'date': '1640-99-01', 'precision': 'day'}}},
+    })
+    assert result.status_code == 400
+    assert prosopo_env.read('abc') == card
+
+
+def test_kinnitamise_sisendil_on_mahupiir(client, login, prosopo_env):
+    card = prosopo_env.write('abc', occupations=[])
+    token = login('editor', 'editorpass')
+    result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
+                         headers=_headers(token), content='x' * 128_001)
+    assert result.status_code == 413
+    assert prosopo_env.read('abc') == card

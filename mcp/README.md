@@ -97,8 +97,9 @@ kasutab toimetaja autentitud `POST /api/files/prosopography/enrichment-handoff/{
 kaudu loodud ühekordset koodi; ta talletab ainult ajutise ettepaneku. Ootel
 kirjed saab sama sessiooniga `GET /api/files/prosopography/enrichment-proposals/{person_id}`.
 Koodi ei panda MCP seadistusse. Toimetaja loob koodi isikuvormi „Ametid ja
-haridus” jaotises, värskendab seal ootel ettepanekuid ning kinnitab valitud
-kirjed või lisab tõendi olemasolevale kirjele. Kinnitamine nõuab sama sessiooni
+haridus” jaotises, värskendab seal ootel ettepanekuid, valib vajadusel teise
+registrivaste, parandab aja või allikakoha ning kinnitab valitud kirjed või
+lisab tõendi olemasolevale kirjele. Kinnitamine nõuab sama sessiooni
 ja värsket kaardiversiooni; MCP-le kinnitamise tööriista ei ole. Puuduva
 registrivõtmega viidet ei kinnitata seosena. `search_enrichment_registry`
 tagastab praegu `registry_available=false`, kuni #462/#471 registrifailid on

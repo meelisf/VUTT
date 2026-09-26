@@ -9,22 +9,38 @@ export interface EnrichmentEvidence {
   source_kind: string; source_id?: string; locator?: string; work_id?: string;
   page?: number; printed_page?: string; part_id?: string; quote?: string; url?: string;
 }
+export interface EnrichmentDate {
+  date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean;
+}
 export interface EnrichmentItem {
   kind: 'occupation' | 'education'; match_status: string; existing_index?: number;
   review_error?: string;
   registry_labels?: Record<string, string>;
   institution_place_key?: string | null;
   raw_occupation?: string; raw_institution?: string; occupation_key?: string;
-  institution_key?: string; place_key?: string; edu_type?: string;
-  occupation_variant?: string; institution_variant?: string;
-  date_from?: { date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean };
-  date_to?: { date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean };
+  institution_key?: string; place_key?: string | null; edu_type?: string;
+  occupation_variant?: string | null; institution_variant?: string | null;
+  date_from?: EnrichmentDate | null;
+  date_to?: EnrichmentDate | null;
   evidence: EnrichmentEvidence[];
 }
 export interface EnrichmentProposal {
   proposal_id: string; person_id: string; base_updated_at: string;
   created_at: number; expires_at: number; items: EnrichmentItem[];
 }
+export interface EnrichmentRegistryCandidate {
+  key: string; id: string | null; labels: Record<string, string>;
+  match_kind: string; matched_text: string; matched_variant: string | null;
+  type?: string; place_key?: string | null;
+}
+export interface EnrichmentRegistrySearch {
+  kind: 'occupation' | 'institution'; query: string; registry_available: boolean;
+  results: EnrichmentRegistryCandidate[]; total_matches: number;
+  truncated: boolean; ambiguous: boolean;
+}
+export type EnrichmentCorrection = Partial<Pick<EnrichmentItem,
+  'occupation_key' | 'institution_key' | 'place_key' | 'occupation_variant' | 'institution_variant'
+  | 'date_from' | 'date_to' | 'edu_type' | 'evidence'>>;
 
 async function enrichmentResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -51,11 +67,17 @@ export async function listEnrichmentProposals(personId: string, token: string): 
   return enrichmentResponse(response);
 }
 
+export async function searchEnrichmentRegistry(kind: 'occupation' | 'institution', query: string): Promise<EnrichmentRegistrySearch> {
+  const params = new URLSearchParams({ kind, q: query, limit: '10' });
+  const response = await fetchWithTimeout(`${BASE}/enrichment-registry-search?${params}`, { timeout: 10000 });
+  return enrichmentResponse(response);
+}
+
 export async function applyEnrichmentProposal(personId: string, proposalId: string,
-  selected: number[], token: string): Promise<ProsopoRecord> {
+  selected: number[], token: string, corrections: Record<number, EnrichmentCorrection> = {}): Promise<ProsopoRecord> {
   const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ proposal_id: proposalId, selected }), timeout: 15000,
+    body: JSON.stringify({ proposal_id: proposalId, selected, corrections }), timeout: 15000,
   });
   return enrichmentResponse(response);
 }

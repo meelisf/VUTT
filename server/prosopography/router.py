@@ -455,14 +455,24 @@ async def prosopography_apply_enrichment_proposal(
     """Toimetaja kinnitab valitud read oma sessioonis; MCP ei saa seda kutsuda."""
     if not enrichment_proposals.valid_person_id(person_id):
         raise HTTPException(status_code=400, detail="invalid_person_id")
-    data = await request.json()
-    if (not isinstance(data, dict) or set(data) != {"proposal_id", "selected"}
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 128_000:
+            raise HTTPException(status_code=413, detail="apply_request_too_large")
+    try:
+        data = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="invalid_apply_request")
+    if (not isinstance(data, dict) or not {"proposal_id", "selected"} <= set(data)
+            or not set(data) <= {"proposal_id", "selected", "corrections"}
             or not isinstance(data["proposal_id"], str)):
         raise HTTPException(status_code=400, detail="invalid_apply_request")
     try:
         return await run_in_threadpool(
             enrichment_proposals.apply_selected, data["proposal_id"], person_id,
             user["username"], request.state.session_fingerprint, data["selected"],
+            data.get("corrections"),
         )
     except enrichment_proposals.ProposalError as e:
         status = 409 if str(e) in {"stale_person", "duplicate_entry", "unresolved_match"} else 400

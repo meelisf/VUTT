@@ -16,6 +16,7 @@ PROPOSAL_TTL = 7 * 24 * 60 * 60
 MAX_ITEMS = 20
 MAX_BODY_BYTES = 32_000
 _PERSON_ID = re.compile(r"^vutt:P[A-Za-z0-9_-]+$")
+_DATE_RE = re.compile(r"^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$")
 _KINDS = {"occupation", "education"}
 _MATCHES = {"already_present", "matched", "ambiguous", "new_registry_candidate"}
 _ITEM_KEYS = {"kind", "raw_occupation", "raw_institution", "occupation_key",
@@ -121,6 +122,10 @@ def _validate_item(item: dict) -> None:
             if not isinstance(value, dict) or not set(value) <= {"date", "precision", "bound", "calendar", "is_circa"}:
                 raise ProposalError("invalid_date")
             if not _short_string(value.get("date"), 32) or not value["date"].strip():
+                raise ProposalError("invalid_date")
+            match = _DATE_RE.fullmatch(value["date"])
+            if (not match or (match.group(2) and not 1 <= int(match.group(2)) <= 12)
+                    or (match.group(3) and not 1 <= int(match.group(3)) <= 31)):
                 raise ProposalError("invalid_date")
             if value.get("precision") not in (None, "day", "month", "year"):
                 raise ProposalError("invalid_date_precision")
@@ -325,7 +330,8 @@ def _same_fact(existing: dict, candidate: dict, kind: str) -> bool:
 
 
 def apply_selected(proposal_id: str, person_id: str, username: str,
-                   session_fingerprint: str, selected: list[int]) -> dict:
+                   session_fingerprint: str, selected: list[int],
+                   corrections: dict | None = None) -> dict:
     """Salvestab ainult toimetaja valitud uued read kaardi versioonikontrolliga."""
     from .person_crud import get_person, update_person
 
@@ -333,6 +339,17 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
         not isinstance(index, int) or isinstance(index, bool) for index in selected
     ) or len(set(selected)) != len(selected):
         raise ProposalError("invalid_selection")
+    corrections = {} if corrections is None else corrections
+    allowed = {"occupation_key", "institution_key", "place_key",
+               "occupation_variant", "institution_variant", "date_from", "date_to",
+               "edu_type", "evidence"}
+    if not isinstance(corrections, dict) or any(
+        not isinstance(index, str) or not index.isdecimal() or str(int(index)) != index
+        or int(index) not in selected
+        or not isinstance(patch, dict) or not set(patch) <= allowed
+        for index, patch in corrections.items()
+    ):
+        raise ProposalError("invalid_corrections")
     with _db() as db:
         row = db.execute(
             "SELECT * FROM proposal WHERE id=? AND person_id=? AND username=? AND session_fingerprint=? AND applied_at IS NULL AND expires_at>?",
@@ -343,11 +360,25 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
         items = json.loads(row["payload"])
         if any(index < 0 or index >= len(items) for index in selected):
             raise ProposalError("invalid_selection")
-        chosen = [items[index] for index in selected]
-        for item in chosen:
+        chosen = []
+        for index in selected:
+            item = items[index].copy()
+            patch = corrections.get(str(index), {})
+            if patch and item["match_status"] == "already_present" and set(patch) != {"evidence"}:
+                raise ProposalError("cannot_correct_existing_entry")
+            if "occupation_key" in patch and patch["occupation_key"] != item.get("occupation_key"):
+                item.pop("occupation_variant", None)
+            if "institution_key" in patch and patch["institution_key"] != item.get("institution_key"):
+                item.pop("institution_variant", None)
+            item.update(patch)
             if item["match_status"] in {"ambiguous", "new_registry_candidate"}:
-                raise ProposalError("unresolved_match")
+                required_key = "occupation_key" if item["kind"] == "occupation" else "institution_key"
+                if required_key not in patch or not item.get(required_key):
+                    raise ProposalError("unresolved_match")
+                item["match_status"] = "matched"
+            _validate_item(item)
             _check_links(item)
+            chosen.append(item)
 
         person = get_person(person_id)
         if person is None:
