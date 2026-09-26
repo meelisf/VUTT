@@ -260,3 +260,23 @@ def test_pereseoste_poordkaart_ei_loe_kaarte_igal_paringul(net, monkeypatch):
     assert len(loads) > first                   # uus kaart → kaart ehitatakse uuesti
     fam = {({e["from"], e["to"]} - {F}).pop() for e in res["edges"] if e["kind"] == "family"}
     assert fam == {"vutt:Pfam", "vutt:Pother"}
+
+
+# ── Trükikoha koordinaadid registrist (Q-kood → silt → nimekujud) ─────────────
+
+def test_trukikoht_leitakse_registri_siltidest(monkeypatch):
+    """Teose koht „Berliin" ilma Q-koodita; registris võti „Berlin", silt et „Berliin".
+    Ka Q-kood, mida registris pole (vana Pärnu Q164673), langeb tagasi sildile."""
+    from server.prosopography import network
+    reg = {
+        "Berlin": {"id": "Q64", "labels": {"et": "Berliin", "de": "Berlin"}, "coordinates": {"lat": 52.5, "lon": 13.4}},
+        "Pernau": {"id": "Q102365", "labels": {"et": "Pärnu", "la": "Pernavia"}, "historical_names": ["Pernau"],
+                   "coordinates": {"lat": 58.39, "lon": 24.5}},
+    }
+    monkeypatch.setattr(network, "_load_places_cache", lambda: reg)
+    monkeypatch.setattr(network, "_get_place_coordinates",
+                        lambda key: reg.get(key, {}).get("coordinates"))
+    assert network._place_coords({"id": None, "label": "Berliin"}) == {"lat": 52.5, "lon": 13.4}
+    assert network._place_coords({"id": "Q164673", "label": "Pärnu"}) == {"lat": 58.39, "lon": 24.5}
+    assert network._place_coords({"id": None, "label": "Pernau"}) == {"lat": 58.39, "lon": 24.5}
+    assert network._place_coords({"id": None, "label": "Atlantis"}) is None
