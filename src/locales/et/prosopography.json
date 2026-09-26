@@ -1,5 +1,18 @@
 {
   "pageTitle": "Isikud",
+  "agentEnrichment": {
+    "title": "Agendi ameti- ja haridusettepanekud",
+    "intro": "Loo ühekordne kood ja anna see MCP-vestluses agendile. Vaata iga kirje, seos ja tõend siin üle enne kinnitamist.",
+    "createCode": "Loo üleandmiskood", "refresh": "Värskenda ettepanekuid",
+    "unsaved": "Salvesta või tühista esmalt vormi muudatused.",
+    "codeHelp": "Kopeeri see kood agendi vestlusse. Kood lubab ainult sellele isikule ettepaneku esitada.",
+    "copy": "Kopeeri", "expires": "Aegub", "empty": "Ootel ettepanekuid ei ole.",
+    "proposal": "Ettepanek", "stale": "Isikukaart on vahepeal muutunud. Palu agendil teha uus ettepanek.",
+    "occupation": "Amet", "education": "Haridus", "institution": "Asutus", "eventType": "Õpingusündmus", "printedPage": "trükise lk", "part": "osa",
+    "period": "Aeg", "noKey": "Registrivõti puudub", "existing": "Praegune kirje", "currentEntries": "Kaardil praegu", "none": "Kirjeid pole", "registryMissing": "Registriseost ei saa veel kinnitada", "registryMatch": "Registrivaste",
+    "page": "lk", "applySelected": "Kinnita valitud kirjed", "saved": "Valitud kirjed salvestati.", "addEvidence": "Lisa tõend olemasolevale kirjele", "evidenceCount": "tõendit",
+    "status": {"already_present": "Juba olemas; seda rida ei lisata.", "ambiguous": "Mitmetähenduslik vaste; lahenda enne kinnitamist.", "new_registry_candidate": "Registris puudub; loo registrikirje enne kinnitamist."}
+  },
   "searchPlaceholder": "Otsi nime järgi…",
   "addPerson": "Lisa isik",
   "edit": "Muuda",

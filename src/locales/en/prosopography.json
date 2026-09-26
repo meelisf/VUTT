@@ -1,5 +1,18 @@
 {
   "pageTitle": "Persons",
+  "agentEnrichment": {
+    "title": "Agent occupation and education proposals",
+    "intro": "Create a one-time code and give it to the agent in the MCP conversation. Review each entry, link, and source here before approval.",
+    "createCode": "Create handoff code", "refresh": "Refresh proposals",
+    "unsaved": "Save or discard form changes first.",
+    "codeHelp": "Copy this code to the agent conversation. It only allows a proposal for this person.",
+    "copy": "Copy", "expires": "Expires", "empty": "No pending proposals.",
+    "proposal": "Proposal", "stale": "The person record has changed. Ask the agent for a new proposal.",
+    "occupation": "Occupation", "education": "Education", "institution": "Institution", "eventType": "Education event", "printedPage": "printed p.", "part": "part",
+    "period": "Period", "noKey": "No registry key", "existing": "Current entry", "currentEntries": "Currently on card", "none": "No entries", "registryMissing": "Registry link cannot be approved yet", "registryMatch": "Registry match",
+    "page": "p.", "applySelected": "Approve selected entries", "saved": "Selected entries saved.", "addEvidence": "Add evidence to the existing entry", "evidenceCount": "sources",
+    "status": {"already_present": "Already present; this row cannot be added.", "ambiguous": "Ambiguous match; resolve before approval.", "new_registry_candidate": "Missing from registry; create a registry entry before approval."}
+  },
   "searchPlaceholder": "Search by name…",
   "addPerson": "Add person",
   "edit": "Edit",

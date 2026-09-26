@@ -95,9 +95,12 @@ väga suure või vigase kaardi korral annab vea. `submit_person_enrichment_propo
 kasutab toimetaja autentitud `POST /api/files/prosopography/enrichment-handoff/{person_id}`
 kaudu loodud ühekordset koodi; ta talletab ainult ajutise ettepaneku. Ootel
 kirjed saab sama sessiooniga `GET /api/files/prosopography/enrichment-proposals/{person_id}`.
-Koodi ei panda MCP seadistusse. Vormi üleandmisnupp, kinnitamisvaade ja
-isikukaardi rakendustee valmivad eraldi: praegune ettepanek ei jõua isikukaardile.
-Registriotsing lisandub pärast #462/#471 registri-API valmimist.
+Koodi ei panda MCP seadistusse. Toimetaja loob koodi isikuvormi „Ametid ja
+haridus” jaotises, värskendab seal ootel ettepanekuid ning kinnitab valitud
+kirjed või lisab tõendi olemasolevale kirjele. Kinnitamine nõuab sama sessiooni
+ja värsket kaardiversiooni; MCP-le kinnitamise tööriista ei ole. Puuduva
+registrivõtmega viidet ei kinnitata seosena. Registriotsing lisandub pärast
+#462/#471 registri-API valmimist.
 
 OCR-i kontrollimiseks kutsu `get_page_image(work_id, page)` ja võrdle pilti
 `get_pages(work_id, page, page)` tekstiga. `page` on skaneeringu 1-põhine

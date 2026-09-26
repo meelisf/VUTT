@@ -32,6 +32,7 @@ import { getVocabularies } from '../../services/collectionService';
 import type { VocabularySeisusItem } from '../../services/collectionService';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
+import AgentEnrichmentPanel from '../components/personForm/AgentEnrichmentPanel';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -775,6 +776,14 @@ const PersonEditPage: React.FC = () => {
           open={occupOpen}
           onToggle={() => setOccupOpen(v => !v)}
         >
+          {!isNew && original && <AgentEnrichmentPanel
+            person={original} token={token} isDirty={isDirty}
+            onApplied={person => {
+              setOriginal(person);
+              setDraft(recordToDraft(person));
+              setIsDirty(false);
+            }}
+          />}
           <DynamicList
             label={t('occupations', 'Ametid')}
             items={draft.occupations}
@@ -787,7 +796,7 @@ const PersonEditPage: React.FC = () => {
                       placeholder={t('form.occupationPlaceholder')}
                       type="topic"
                       value={item.id ? { label: item.label, id: item.id, labels: item.labels, source: 'wikidata' } : (item.label ? { label: item.label, id: null, labels: null, source: 'manual' } : null)}
-                      onChange={v => onChange({ ...item, label: v?.label ?? '', id: v?.id ?? null, labels: v?.labels ?? undefined })}
+                      onChange={v => onChange({ ...item, label: v?.label ?? '', id: v?.id ?? null, labels: v?.labels ?? undefined, occupation_key: undefined })}
                       lang={lang}
                       localSuggestions={entityLabels}
                     />
@@ -798,7 +807,7 @@ const PersonEditPage: React.FC = () => {
                       placeholder={t('form.institutionPlaceholder')}
                       type="topic"
                       value={item.institution_id ? { label: item.institution ?? '', id: item.institution_id, labels: item.institution_labels, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
-                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
+                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined, institution_key: undefined, place_key: undefined })}
                       lang={lang}
                       localSuggestions={entityLabels}
                     />
@@ -807,6 +816,11 @@ const PersonEditPage: React.FC = () => {
                     <X size={14} />
                   </button>
                 </div>
+                {(item.occupation_key || item.institution_key || item.place_key || item.evidence?.length) &&
+                  <p className="text-xs text-gray-500">
+                    {[item.occupation_key, item.institution_key, item.place_key].filter(Boolean).join(' · ')}
+                    {item.evidence?.length ? ` · ${item.evidence.length} ${t('agentEnrichment.evidenceCount')}` : ''}
+                  </p>}
                 <div className="grid grid-cols-2 gap-2">
                   <DateField
                     label={t('form.from')}
@@ -839,7 +853,7 @@ const PersonEditPage: React.FC = () => {
                       placeholder={t('form.educationInstitutionPlaceholder')}
                       type="topic"
                       value={item.institution_id ? { label: item.institution, id: item.institution_id, labels: item.institution_labels ?? null, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
-                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
+                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined, institution_key: undefined })}
                       lang={lang}
                       localSuggestions={entityLabels}
                     />
@@ -848,6 +862,11 @@ const PersonEditPage: React.FC = () => {
                     <X size={14} />
                   </button>
                 </div>
+                {(item.institution_key || item.evidence?.length) &&
+                  <p className="text-xs text-gray-500">
+                    {item.institution_key}
+                    {item.evidence?.length ? ` · ${item.evidence.length} ${t('agentEnrichment.evidenceCount')}` : ''}
+                  </p>}
                 <div className="grid grid-cols-2 gap-2">
                   <DateField
                     label={t('form.from')}

@@ -26,7 +26,7 @@ asutuste, kohtade ja daatumite valikuid.
    teadusandmete git-repot. See aegub seitsme päevaga. Ülevaatuse API nõuab
    sama toimetajasessiooni; ettepaneku ID ega üleandmiskood ei anna lugemis-
    ega salvestamisõigust.
-4. Kaardi salvestamiseks tuleb eraldi VUTT-i vormi kinnitamistoiming, mis
+4. Kaardi salvestamiseks on eraldi VUTT-i vormi kinnitamistoiming, mis
    kontrollib uuesti kaardiversiooni, registrivastet ja iga valitud rida.
    MCP-l ei ole selle toimingu tööriista. Kinnitusloogika ei kasuta üldist
    `/{id}/enrich` väljaradade kirjutust.
@@ -38,6 +38,6 @@ asutuste, kohtade ja daatumite valikuid.
 
 ADR 0023 read-only piir kehtib jätkuvalt autoriteetsete andmete kohta, kuid
 MCP-le lisandub kitsas ajutise ettepaneku kirjutus. Uus kasutajale nähtav
-kinnitusvaade peab enne kaartide muutmise kasutuselevõttu näitama kõiki
+kinnitusvaade näitab kõiki
 kirjeid koos algse sõnastuse ja allikaviitega. Ajutise faili kadumine kaotab
 ainult kinnitamata ettepanekud; isikukaardid ja registrid jäävad terveks.

@@ -5,6 +5,59 @@ import type { HistoricalRegionsResponse, ProsopoIndexEntry, ProsopoMapResponse, 
 
 const BASE = `${FILE_API_URL}/prosopography`;
 
+export interface EnrichmentEvidence {
+  source_kind: string; source_id?: string; locator?: string; work_id?: string;
+  page?: number; printed_page?: string; part_id?: string; quote?: string; url?: string;
+}
+export interface EnrichmentItem {
+  kind: 'occupation' | 'education'; match_status: string; existing_index?: number;
+  review_error?: string;
+  registry_labels?: Record<string, string>;
+  raw_occupation?: string; raw_institution?: string; occupation_key?: string;
+  institution_key?: string; place_key?: string; edu_type?: string;
+  date_from?: { date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean };
+  date_to?: { date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean };
+  evidence: EnrichmentEvidence[];
+}
+export interface EnrichmentProposal {
+  proposal_id: string; person_id: string; base_updated_at: string;
+  created_at: number; expires_at: number; items: EnrichmentItem[];
+}
+
+async function enrichmentResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let detail = String(response.status);
+    try { detail = (await response.json()).detail ?? detail; } catch { /* HTTP error */ }
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+  }
+  return response.json();
+}
+
+export async function createEnrichmentHandoff(personId: string, token: string): Promise<{
+  code: string; expires_at: number; base_updated_at: string;
+}> {
+  const response = await fetchWithTimeout(`${BASE}/enrichment-handoff/${encodeURIComponent(personId)}`, {
+    method: 'POST', headers: getAuthHeaders(token), timeout: 10000,
+  });
+  return enrichmentResponse(response);
+}
+
+export async function listEnrichmentProposals(personId: string, token: string): Promise<EnrichmentProposal[]> {
+  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}`, {
+    headers: getAuthHeaders(token), timeout: 10000,
+  });
+  return enrichmentResponse(response);
+}
+
+export async function applyEnrichmentProposal(personId: string, proposalId: string,
+  selected: number[], token: string): Promise<ProsopoRecord> {
+  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify({ proposal_id: proposalId, selected }), timeout: 15000,
+  });
+  return enrichmentResponse(response);
+}
+
 export async function listPersons(params?: {
   q?: string;
   gender?: string;

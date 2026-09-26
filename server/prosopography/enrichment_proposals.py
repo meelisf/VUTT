@@ -1,4 +1,4 @@
-"""Agendi ootel ameti- ja haridusettepanekud; isikukaarti see moodul ei kirjuta."""
+"""Agendi ameti- ja haridusettepanekud ning toimetaja kinnitamine."""
 import hashlib
 import json
 import os
@@ -8,7 +8,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 
-from ..config import STATE_DIR
+from ..config import STATE_DIR, DATA_CONFIG_DIR, PLACES_FILE
 
 DB_PATH = os.path.join(STATE_DIR, "prosopo_enrichment_proposals.sqlite3")
 CODE_TTL = 15 * 60
@@ -20,7 +20,7 @@ _KINDS = {"occupation", "education"}
 _MATCHES = {"already_present", "matched", "ambiguous", "new_registry_candidate"}
 _ITEM_KEYS = {"kind", "raw_occupation", "raw_institution", "occupation_key",
               "institution_key", "place_key", "date_from", "date_to", "evidence",
-              "match_status", "existing_index"}
+              "match_status", "existing_index", "edu_type"}
 _EVIDENCE_KEYS = {"source_kind", "source_id", "locator", "work_id", "page",
                   "printed_page", "part_id", "quote", "url"}
 
@@ -58,9 +58,11 @@ def _db():
                 username TEXT NOT NULL, session_fingerprint TEXT NOT NULL,
                 base_updated_at TEXT NOT NULL,
                 created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
-                payload TEXT NOT NULL
+                payload TEXT NOT NULL, applied_at INTEGER
             );
         """)
+        if not any(column[1] == "applied_at" for column in db.execute("PRAGMA table_info(proposal)")):
+            db.execute("ALTER TABLE proposal ADD COLUMN applied_at INTEGER")
         with db:
             yield db
     finally:
@@ -108,7 +110,7 @@ def _validate_item(item: dict) -> None:
             or not item["raw_institution"].strip()):
         raise ProposalError("raw_institution_required")
     for key in ("raw_occupation", "raw_institution", "occupation_key",
-                "institution_key", "place_key"):
+                "institution_key", "place_key", "edu_type"):
         if key in item and item[key] is not None and not _short_string(item[key]):
             raise ProposalError("invalid_text_field")
     for key in ("date_from", "date_to"):
@@ -186,7 +188,7 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
         if changed != 1:
             raise ProposalError("handoff_already_used")
         db.execute(
-            "INSERT INTO proposal VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO proposal VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
             (proposal_id, person_id, row["username"], row["session_fingerprint"], base_updated_at,
              now, now + PROPOSAL_TTL, payload),
         )
@@ -200,10 +202,181 @@ def list_pending(person_id: str, username: str, session_fingerprint: str) -> lis
     with _db() as db:
         _clean(db, now)
         rows = db.execute(
-            "SELECT * FROM proposal WHERE person_id=? AND username=? AND session_fingerprint=? ORDER BY created_at DESC",
+            "SELECT * FROM proposal WHERE person_id=? AND username=? AND session_fingerprint=? AND applied_at IS NULL ORDER BY created_at DESC",
             (person_id, username, session_fingerprint),
         ).fetchall()
-        return [{"proposal_id": row["id"], "person_id": person_id,
-                 "base_updated_at": row["base_updated_at"],
-                 "created_at": row["created_at"], "expires_at": row["expires_at"],
-                 "items": json.loads(row["payload"])} for row in rows]
+        result = []
+        for row in rows:
+            items = json.loads(row["payload"])
+            for item in items:
+                try:
+                    _check_links(item)
+                except ProposalError as error:
+                    item["review_error"] = str(error)
+                labels = {}
+                for key, filename in (
+                    ("occupation_key", os.path.join(DATA_CONFIG_DIR, "occupations.json")),
+                    ("institution_key", os.path.join(DATA_CONFIG_DIR, "institutions.json")),
+                    ("place_key", PLACES_FILE),
+                ):
+                    if item.get(key):
+                        label = _registry_label(filename, item[key])
+                        if label:
+                            labels[key] = label
+                item["registry_labels"] = labels
+            result.append({"proposal_id": row["id"], "person_id": person_id,
+                           "base_updated_at": row["base_updated_at"],
+                           "created_at": row["created_at"], "expires_at": row["expires_at"],
+                           "items": items})
+        return result
+
+
+def _registry_contains(filename: str, key: str) -> bool:
+    """Võtmega seos lubatakse ainult reaalselt olemasoleva registrikirjega."""
+    try:
+        with open(filename, encoding="utf-8") as handle:
+            entries = json.load(handle)
+    except (OSError, ValueError):
+        return False
+    if isinstance(entries, dict):
+        return key in entries or any(
+            isinstance(entry, dict) and entry.get("key") == key
+            for entry in entries.values()
+        )
+    return isinstance(entries, list) and any(
+        isinstance(entry, dict) and entry.get("key") == key for entry in entries
+    )
+
+
+def _registry_label(filename: str, key: str) -> str | None:
+    try:
+        with open(filename, encoding="utf-8") as handle:
+            entries = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if isinstance(entries, dict):
+        entry = entries.get(key)
+    elif isinstance(entries, list):
+        entry = next((row for row in entries if isinstance(row, dict) and row.get("key") == key), None)
+    else:
+        return None
+    if not isinstance(entry, dict):
+        return None
+    labels = entry.get("labels") or {}
+    if isinstance(labels, dict):
+        return labels.get("et") or labels.get("en") or entry.get("label")
+    return entry.get("label")
+
+
+def _card_item(item: dict) -> dict:
+    kind = item["kind"]
+    if kind == "occupation":
+        result = {"label": item["raw_occupation"].strip()}
+        if item.get("raw_institution"):
+            result["institution"] = item["raw_institution"].strip()
+    else:
+        result = {"institution": item["raw_institution"].strip()}
+        if item.get("edu_type"):
+            result["type"] = item["edu_type"].strip()
+    for key in ("occupation_key", "institution_key", "place_key", "date_from", "date_to"):
+        if item.get(key) is not None:
+            result[key] = item[key]
+    result["evidence"] = item["evidence"]
+    return result
+
+
+def _check_links(item: dict) -> None:
+    if item.get("institution_key") and item.get("place_key"):
+        raise ProposalError("institution_and_place_are_exclusive")
+    if item["kind"] == "education" and (item.get("occupation_key") or item.get("place_key")):
+        raise ProposalError("invalid_education_links")
+    for key, filename in (
+        ("occupation_key", os.path.join(DATA_CONFIG_DIR, "occupations.json")),
+        ("institution_key", os.path.join(DATA_CONFIG_DIR, "institutions.json")),
+        ("place_key", PLACES_FILE),
+    ):
+        if item.get(key) and not _registry_contains(filename, item[key]):
+            raise ProposalError(f"unknown_{key}")
+
+
+def _year(value) -> int | None:
+    if not isinstance(value, dict):
+        return None
+    match = re.match(r"^(\d{4})", str(value.get("date") or ""))
+    return int(match.group(1)) if match else None
+
+
+def _same_fact(existing: dict, candidate: dict, kind: str) -> bool:
+    identity = ("occupation_key", "institution_key", "place_key") if kind == "occupation" else ("institution_key", "type")
+    if not candidate.get("occupation_key" if kind == "occupation" else "institution_key"):
+        return False
+    if any(existing.get(key) != candidate.get(key) for key in identity):
+        return False
+    a_from, a_to = _year(existing.get("date_from")), _year(existing.get("date_to"))
+    b_from, b_to = _year(candidate.get("date_from")), _year(candidate.get("date_to"))
+    return not ((a_to is not None and b_from is not None and a_to < b_from)
+                or (b_to is not None and a_from is not None and b_to < a_from))
+
+
+def apply_selected(proposal_id: str, person_id: str, username: str,
+                   session_fingerprint: str, selected: list[int]) -> dict:
+    """Salvestab ainult toimetaja valitud uued read kaardi versioonikontrolliga."""
+    from .person_crud import get_person, update_person
+
+    if not isinstance(selected, list) or not selected or len(selected) > MAX_ITEMS or any(
+        not isinstance(index, int) or isinstance(index, bool) for index in selected
+    ) or len(set(selected)) != len(selected):
+        raise ProposalError("invalid_selection")
+    with _db() as db:
+        row = db.execute(
+            "SELECT * FROM proposal WHERE id=? AND person_id=? AND username=? AND session_fingerprint=? AND applied_at IS NULL AND expires_at>?",
+            (proposal_id, person_id, username, session_fingerprint, int(time.time())),
+        ).fetchone()
+        if row is None:
+            raise ProposalError("proposal_not_found")
+        items = json.loads(row["payload"])
+        if any(index < 0 or index >= len(items) for index in selected):
+            raise ProposalError("invalid_selection")
+        chosen = [items[index] for index in selected]
+        for item in chosen:
+            if item["match_status"] in {"ambiguous", "new_registry_candidate"}:
+                raise ProposalError("unresolved_match")
+            _check_links(item)
+
+        person = get_person(person_id)
+        if person is None:
+            raise ProposalError("person_not_found")
+        if person.get("updated_at") != row["base_updated_at"]:
+            raise ProposalError("stale_person")
+        occupations = list(person.get("occupations") or [])
+        education = list(person.get("education") or [])
+        for item in chosen:
+            target = occupations if item["kind"] == "occupation" else education
+            candidate = _card_item(item)
+            matching = [index for index, existing in enumerate(target) if isinstance(existing, dict)
+                        and _same_fact(existing, candidate, item["kind"])]
+            if item["match_status"] == "already_present":
+                index = item.get("existing_index")
+                if index is None or matching != [index]:
+                    raise ProposalError("unresolved_existing_entry")
+                evidence = target[index].get("evidence") or []
+                target[index] = {**target[index], "evidence": evidence + [
+                    source for source in item["evidence"] if source not in evidence
+                ]}
+                continue
+            if matching:
+                raise ProposalError("duplicate_entry")
+            target.append(candidate)
+        # update_person teeb isikuluku all teise versioonikontrolli ja uuendab indeksi.
+        updated = update_person(person_id, {
+            "updated_at": row["base_updated_at"],
+            "occupations": occupations, "education": education,
+        }, username)
+        remaining = [item for index, item in enumerate(items) if index not in set(selected)]
+        if remaining:
+            db.execute("UPDATE proposal SET payload=?, base_updated_at=? WHERE id=? AND applied_at IS NULL",
+                       (json.dumps(remaining, ensure_ascii=False), updated["updated_at"], proposal_id))
+        else:
+            db.execute("UPDATE proposal SET applied_at=? WHERE id=? AND applied_at IS NULL",
+                       (int(time.time()), proposal_id))
+    return updated

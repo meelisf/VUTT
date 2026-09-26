@@ -438,6 +438,31 @@ async def prosopography_enrichment_proposals(
     )
 
 
+@router.post("/enrichment-proposals/{person_id}/apply")
+async def prosopography_apply_enrichment_proposal(
+    person_id: str, request: Request, user=Depends(require_role("editor")),
+):
+    """Toimetaja kinnitab valitud read oma sessioonis; MCP ei saa seda kutsuda."""
+    if not enrichment_proposals.valid_person_id(person_id):
+        raise HTTPException(status_code=400, detail="invalid_person_id")
+    data = await request.json()
+    if (not isinstance(data, dict) or set(data) != {"proposal_id", "selected"}
+            or not isinstance(data["proposal_id"], str)):
+        raise HTTPException(status_code=400, detail="invalid_apply_request")
+    try:
+        return await run_in_threadpool(
+            enrichment_proposals.apply_selected, data["proposal_id"], person_id,
+            user["username"], request.state.session_fingerprint, data["selected"],
+        )
+    except enrichment_proposals.ProposalError as e:
+        status = 409 if str(e) in {"stale_person", "duplicate_entry", "unresolved_match"} else 400
+        raise HTTPException(status_code=status, detail=str(e))
+    except ValueError as e:
+        if str(e).startswith("conflict:"):
+            raise HTTPException(status_code=409, detail="stale_person")
+        raise
+
+
 @router.post("/enrichment-proposals/submit")
 async def prosopography_enrichment_proposal_submit(request: Request):
     """Ainult ootel ettepaneku talletamine; kood ei anna kaardi kirjutamisõigust."""
