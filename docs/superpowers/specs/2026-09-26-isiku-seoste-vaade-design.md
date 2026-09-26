@@ -129,8 +129,10 @@ arv, sest samas teoses võib olla mitu rolli.
                  "year": 1659,
                  "place": { "id": "Q435295", "kind": "print" },
                  "evidence": { "work_id": "jy30do", "pages": [] } },
-               { "kind": "family", "from": "vutt:Pu837uz", "to": "vutt:P5p7qhj", "directed": false,
-                 "type": "õpetaja", "year": null, "place": null, "evidence": null } ]
+               { "kind": "family", "from": "vutt:P5p7qhj", "to": "vutt:Pu837uz", "directed": false,
+                 "records": [ { "source_id": "vutt:Pu837uz", "target_id": "vutt:P5p7qhj", "type": "õpetaja" },
+                              { "source_id": "vutt:P5p7qhj", "target_id": "vutt:Pu837uz", "type": "õpilane" } ],
+                 "year": null, "place": null, "evidence": null } ]
 }
 ```
 
@@ -146,9 +148,14 @@ arv, sest samas teoses võib olla mitu rolli.
   `relations[]`, mille `target_id` on fookus. See on praeguse
   `get_person_relation_network_ids` käitumine ja see säilib;
 - tombstone-kaarte ei arvestata;
-- sama isikupaari kirjed ühendatakse **üheks** servaks. Kui mõlemad kaardid kannavad
-  tüüpi, eelistatakse fookuse kaardi tüüpi. Kui tüübid erinevad, kannab serv mõlemat
-  (`types: [...]`).
+- sama isikupaari kirjed ühendatakse **üheks** servaks, aga algkirjed säilivad
+  `records: [{source_id, target_id, type}]` kujul. Iga kirje ütleb, **kelle kaardil**
+  seos on (`source_id`) ja kellele see osutab. „isa" ja „poeg" ei ole kaks alternatiivset
+  silti, vaid sama seose kaks otsa, ning suund peab säilima. Serv ise on fookusest
+  sõltumatu: `from`/`to` järjestatakse ID järgi, `directed: false`. **Kuvateksti
+  valib klient** fookuse järgi. Eelistatud on kirje, mille `source_id` on fookus; muidu
+  näidatakse teise kaardi kirjet koos allikaga („Hackspani kaardil: õpilane").
+  Tüübita kirje (`reciprocal_auto`, 9 tootmises) jääb `records`-isse `type: null`-iga.
 - Isikul, kellel on ainult pereserv, ei ole aastat ega teost. Ajatelg näitab teda
   „Aeg teadmata" veerus (vt Vaated).
 - `edges[].place.kind` on täna alati `print`. #465 lisab `event`, #464 lisab `sent_from`.
@@ -190,6 +197,21 @@ muutunud teose kohta, ning `import_work`-is. Praegu sõltub `update_works_creato
 kaob samas. Teose kustutamine (`admin.py`, `update_work_collections(work_id, [])`)
 eemaldab kirje.
 
+**Vana kirjutaja eemaldatakse.** `update_person_to_works` (`indices.py`) kutsub praegu
+`update_works_creators_index(work_id, creators, title, year)`-i. See kirjutab kirje
+tervikuna üle vana kujuga (`{title, year, creators}`) ja **eemaldab** loojateta teose
+kirje (`index.pop`). Kui see kutse jääks alles, kustutaks taustatöö pärast iga
+`call_ptw=True` salvestust `location`/`genres` väljad ja märksõna- või trükkalipõhise
+teose kirje. Seepärast:
+- kutse eemaldatakse `update_person_to_works`-ist; teose faktid kirjutab ainult
+  `update_work_facts`;
+- `update_works_creators_index` eemaldatakse koos re-eksportidega (`ops.py`,
+  `state.py`, `_compat._SYNC_NAMES`, `server/__init__.py`, kui seal on) ja seda
+  patchivad testid viiakse üle;
+- test: tavaline `call_ptw=True` salvestus (sh taustatööna jooksev
+  `update_person_to_works`) jätab kirjesse `location` ja `genres` alles, ning
+  loojateta teose kirje ei kao.
+
 Lehe mainimised (`update_page_person_mentions`) ei muuda teose fakte. Kuna kirje
 tehakse igale teosele, on esimese mainimisega teose kirje juba olemas.
 
@@ -216,8 +238,16 @@ säilitab pereseosed. Need annavad eri tulemuse. Seepärast läheb PR 1-sse:
   `_persons_in_collection`-it enam. `collection` jõuab serverisse ainult siis, kui
   klient on piiranud (#460 `related_scope=collection`), seega #460 kliendiloogika jääb
   samaks;
-- test: isikulehe võrgustiku isikud (miinus `printer`) == `/map?related_to=…` isikud,
-  nii ilma koguta kui kogu ja alamkoguga.
+- **fookus jääb suurele kaardile** nagu praegu: `get_person_relation_network_ids`
+  tagastab fookuse + seotud isikud (miinus `printer`). Kaart näitab fookust tema
+  päritolukohas, kui see on teada. Endpointi `persons` fookust ei sisalda, sest fookus on
+  eraldi `focus` väljal;
+- testid kahes astmes, nii ilma koguta kui koguga ja alamkoguga:
+  1. **ID-hulk enne koordinaadifiltrit:** `get_person_relation_network_ids(id,
+     collection)` == `{focus} ∪ build_person_network(id, collection).persons` miinus
+     `printer`-ainult isikud;
+  2. **markerid:** `/map?related_to=…` markerite isikud == eelmise hulga see osa, kelle
+     indeksikirjel on `origin_coordinates`; `without_coordinates` == ülejäänute arv.
 
 Link „Ava suurel kaardil" kannab kaasa `related_to`, aktiivse kogu ja ulatuse
 (`related_scope=collection`, kui isikulehel on „Ainult kogus" sees).
@@ -324,8 +354,13 @@ neutraalset halli ja kuju (täpp / õõnes ring / kolmnurk).
   `restricted`-lipu tulemust ilma rebuildita; teose kustutamine eemaldab kirje.
 - **Endpoint:** sync route (`test_async_endpoint_offload` muster), 404 tundmatu isiku
   korral, vastuse kuju.
-- **Üks tõde:** `build_person_network` isikud miinus `printer` == `/map?related_to=…`
-  isikud, ilma koguta ning kogu ja alamkoguga.
+- **Üks tõde:** kaheastmeline võrdlus (ID-hulk enne koordinaadifiltrit, siis markerid),
+  fookus kaasa arvatud, ilma koguta ning kogu ja alamkoguga (vt „Üks tõde võrgustiku
+  kohta").
+- **Pereseoste suund:** vastastikused kirjed „isa"/„poeg" jäävad ühe serva `records`-isse
+  mõlema `source_id`-ga; serv on sama, olgu fookus kumb tahes.
+- **Vana kirjutaja:** `call_ptw=True` salvestus ei kustuta `location`/`genres` välju ega
+  loojateta teose kirjet.
 - **Frontend (vitest):** puhtad utiliidid (radiaalne paigutus, isikute järjestus, kaaslaste
   servad `evidence`-ist), filtreerimise järjekord (peidetud tugevaim serv → värv
   järgmisest; unikaalsed teosed, mitte servad), ajatelje „Aeg teadmata" ja liitmärk,
