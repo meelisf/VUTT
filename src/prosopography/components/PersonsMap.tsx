@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LatLngBoundsExpression, divIcon } from 'leaflet';
-import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
+import { divIcon } from 'leaflet';
+import { MapContainer, Marker, Popup } from 'react-leaflet';
 import { Loader2, MapPin, Users } from 'lucide-react';
 import { fetchPersonMapMarkers } from '../services/prosopographyService';
 import { useCollection } from '../../contexts/CollectionContext';
 import { deriveMapYear } from '../utils/mapYear';
 import HistoricalMapLayer from './HistoricalMapLayer';
-import type { ProsopoMapMarker, ProsopoMapResponse } from '../types';
+import { FitToPoints, resolveLabel, spreadOverlapping } from './map/mapBase';
+import type { ProsopoMapResponse } from '../types';
 
 interface PersonsMapProps {
   filters: {
@@ -32,11 +33,6 @@ interface PersonsMapProps {
   onFocusChange?: (focus: ProsopoMapResponse['focus'] | null) => void;
 }
 
-function resolveLabel(labels: Record<string, string> | null | undefined, lang: string): string | null {
-  if (!labels) return null;
-  return labels[lang] ?? labels.et ?? labels.en ?? Object.values(labels)[0] ?? null;
-}
-
 function markerIcon(count: number, focused: boolean) {
   const size = count >= 20 ? 42 : count >= 10 ? 36 : count >= 3 ? 31 : 26;
   return divIcon({
@@ -47,60 +43,6 @@ function markerIcon(count: number, focused: boolean) {
     popupAnchor: [0, -size / 2],
   });
 }
-
-type DisplayMarker = ProsopoMapMarker & {
-  displayCoordinates: { lat: number; lon: number };
-  hasCoordinateOverlap: boolean;
-};
-
-function coordinateKey(marker: ProsopoMapMarker): string {
-  return `${marker.coordinates.lat.toFixed(6)},${marker.coordinates.lon.toFixed(6)}`;
-}
-
-function spreadOverlappingMarkers(markers: ProsopoMapMarker[]): DisplayMarker[] {
-  const groups = new Map<string, ProsopoMapMarker[]>();
-  for (const marker of markers) {
-    const key = coordinateKey(marker);
-    groups.set(key, [...(groups.get(key) ?? []), marker]);
-  }
-
-  return markers.map(marker => {
-    const group = groups.get(coordinateKey(marker)) ?? [marker];
-    if (group.length <= 1) {
-      return { ...marker, displayCoordinates: marker.coordinates, hasCoordinateOverlap: false };
-    }
-    const index = group.indexOf(marker);
-    const angle = (Math.PI * 2 * index) / group.length;
-    const radius = 0.04 + Math.min(group.length, 8) * 0.003;
-    return {
-      ...marker,
-      displayCoordinates: {
-        lat: marker.coordinates.lat + Math.sin(angle) * radius,
-        lon: marker.coordinates.lon + Math.cos(angle) * radius,
-      },
-      hasCoordinateOverlap: true,
-    };
-  });
-}
-
-const FitMapToMarkers: React.FC<{ markers: ProsopoMapMarker[]; focusPlace?: string }> = ({ markers, focusPlace }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (markers.length === 0) return;
-    const focused = focusPlace
-      ? markers.find(marker => marker.place_key === focusPlace || marker.place_id === focusPlace)
-      : null;
-    if (focused) {
-      map.setView([focused.coordinates.lat, focused.coordinates.lon], 8, { animate: false });
-      return;
-    }
-    const bounds = markers.map(marker => [marker.coordinates.lat, marker.coordinates.lon]) as LatLngBoundsExpression;
-    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 8, animate: false });
-  }, [focusPlace, map, markers]);
-
-  return null;
-};
 
 const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onFocusChange }) => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
@@ -154,7 +96,9 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onF
     if (!focusPlace || !data) return null;
     return data.markers.find(marker => marker.place_key === focusPlace || marker.place_id === focusPlace) ?? null;
   }, [data, focusPlace]);
-  const displayMarkers = useMemo(() => data ? spreadOverlappingMarkers(data.markers) : [], [data]);
+  const displayMarkers = useMemo(() => data ? spreadOverlapping(data.markers, m => m.coordinates) : [], [data]);
+  const points = useMemo(() => (data?.markers ?? []).map(m => m.coordinates), [data]);
+  const focusCoords = focusedMarker?.coordinates ?? null;
 
   if (loading) {
     return (
@@ -273,7 +217,7 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onF
           className="h-full w-full"
         >
           <HistoricalMapLayer year={mapYear} lang={lang} />
-          <FitMapToMarkers markers={data.markers} focusPlace={focusPlace} />
+          <FitToPoints points={points} focus={focusCoords} />
           {displayMarkers.map(marker => {
             const placeLabel = resolveLabel(marker.place_labels, lang) ?? marker.place_key ?? marker.place_id ?? '';
             const parentLabel = resolveLabel(marker.parent?.labels, lang) ?? marker.parent?.key;
@@ -281,7 +225,7 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onF
             return (
               <Marker
                 key={marker.place_key ?? marker.place_id ?? `${marker.coordinates.lat},${marker.coordinates.lon}`}
-                position={[marker.displayCoordinates.lat, marker.displayCoordinates.lon]}
+                position={[marker.display.lat, marker.display.lon]}
                 icon={markerIcon(marker.count, focused)}
               >
                 <Popup>
@@ -290,7 +234,7 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onF
                       <h3 className="font-semibold text-gray-900">{placeLabel}</h3>
                       {parentLabel && parentLabel !== placeLabel && <p className="text-xs text-gray-500">{parentLabel}</p>}
                       <p className="text-xs text-gray-400">{marker.count} {t('persons', 'isikut')}</p>
-                      {marker.hasCoordinateOverlap && (
+                      {marker.overlapped && (
                         <p className="text-[11px] text-amber-700">
                           {t('map.shiftedMarker', 'Marker on kattuvuse vältimiseks veidi nihutatud.')}
                         </p>

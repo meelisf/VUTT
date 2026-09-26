@@ -444,7 +444,6 @@ const PersonDetailPage: React.FC = () => {
   const uniqueRoles = [...new Set(works.map(w => w.role))];
   const filteredWorks = selectedRole ? works.filter(w => w.role === selectedRole) : works;
   const displayedWorks = filteredWorks.slice(0, visibleCount);
-  const relationMapUrl = `/persons?view=map&related_to=${encodeURIComponent(person.id)}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -469,7 +468,7 @@ const PersonDetailPage: React.FC = () => {
             action={(
               <div className="flex items-center gap-2">
                 <Link
-                  to={relationMapUrl}
+                  to="#seosed-kaart"
                   className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
                 >
                   <Map size={12} />
@@ -797,7 +796,7 @@ const PersonDetailPage: React.FC = () => {
         {/* ── Seosed (#461) ── */}
         {id && (
           <Suspense fallback={null}>
-            <PersonRelations personId={id} />
+            <PersonRelations personId={id} card={person} />
           </Suspense>
         )}
 

@@ -281,6 +281,7 @@
     "tabs": {
       "graph": "Network",
       "timeline": "Timeline",
+      "map": "Map",
       "table": "List"
     },
     "kinds": {
@@ -323,7 +324,38 @@
       "span": "Years",
       "roles": "Roles",
       "worksList": "Shared works"
-    }
+    },
+    "layers": {
+      "origin": "Origin",
+      "originPrint": "Origin and place of printing",
+      "print": "Places of printing",
+      "life": "Life course"
+    },
+    "layerHelp": {
+      "origin": "Related persons by place of origin; the circle colour shows the kinds of relations.",
+      "originPrint": "A line joins the place of origin of a participant in an academic act with the work's place of printing. It connects two places; it is not a journey, and the place of printing is not necessarily where the act took place.",
+      "print": "Places of printing of shared works. Filled: academic act; hollow: other print. The place of printing does not prove a meeting.",
+      "life": "The person's own life course from the person record: birth or origin, education, offices, death."
+    },
+    "unmappedPersons_one": "{{count}} related person has no origin coordinates",
+    "unmappedPersons_other": "{{count}} related persons have no origin coordinates",
+    "unmappedStations": "Stations not on the map",
+    "noStations": "The person record has no stations with a place.",
+    "stations": {
+      "origin": "Origin",
+      "birth": "Birth",
+      "education": "Education",
+      "occupation": "Office",
+      "death": "Death",
+      "burial": "Burial"
+    },
+    "reasons": {
+      "no_place": "place not recorded",
+      "not_in_registry": "place missing from the register",
+      "no_coordinates": "place has no coordinates"
+    },
+    "registryLoading": "Loading the place register…",
+    "registryError": "Could not load the place register; the life course cannot be mapped."
   },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",

@@ -307,8 +307,22 @@ SVG (radiaalne paigutus ja lineaarne skaala). d3 ei ole vaja.
 - **Trükikohad:** ühiste teoste trükikohad. Täis osa = `academic` teosed, õõnes =
   ülejäänud.
 
+- **Elukäik** (lisatud 2026-09-26, osa #463-st): fookusisiku enda daatumitega jaamad
+  isikukaardilt: päritolu või sünd, haridus, ametid (asutus/koht), surm, matus. Jaamad on
+  nummerdatud, järjestatud aja järgi ja joonega ühendatud. Koht leitakse kohtade registrist
+  Q-koodi (või sildi) järgi. Leidmata jaamad on kaardi all loendis „Kaardita jaamad"
+  koos põhjusega („koht registris puudub" / „kohal pole koordinaate" / „koht märkimata").
+  Kui #462 annab asutustele koha, lisanduvad jaamad ilma koodimuutuseta.
+
 Kaardi all on loendur „X / Y seotud isikul on päritolu kaardil" ja päritoluta nimed.
 Link „Ava suurel kaardil" viib `/persons?view=map&related_to=` vaatesse.
+
+**Suhe suure kaardiga:** isikulehe kaart ehitatakse samast `/network` vastusest mis teised
+vahekaardid (filtrid, esiletõst ja hüpikaken kehtivad ühtemoodi). Kaardi alus (Leaflet,
+`HistoricalMapLayer`, kattuvate markerite nihutamine, piiridele sobitamine) on ühine
+`PersonsMap`-iga. Suur kaart jääb korpuse vaateks ristfiltreerimiseks ja uusi kihte ei saa.
+Isikulehe päise nupp „Seoste kaart" avab isikulehel „Kaart" vahekaardi (`#seosed-kaart`);
+suurele kaardile viib sektsiooni link „Ava suurel kaardil".
 
 **Loend:** tabel (isik, eluaastad, päritolu, liik, ühiseid teoseid, aastad, rollid).
 See on ühtlasi ligipääsetav tekstivaade diagrammidele.
