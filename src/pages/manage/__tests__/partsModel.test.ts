@@ -1,6 +1,6 @@
 // src/pages/manage/__tests__/partsModel.test.ts
 import { describe, it, expect } from 'vitest';
-import { draftFromPart, emptyDraft, initialManageTab, pageBadges, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
+import { draftFromPart, emptyDraft, initialManageTab, pageBadges, pageRangeList, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
 import type { WorkPart } from '../../../services/workPartsApi';
 
 const STEMS = ['s1', 's2', 's3', 's4'];
@@ -65,5 +65,10 @@ describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
     expect(pageRanges(['s4'], nums)).toBe('4');
     expect(pageRanges(['s4', 'gone'], nums)).toBe('4');
     expect(pageRanges([], nums)).toBe('');
+  });
+
+  it('pageRangeList: vahemikud lingiks (from/to)', () => {
+    const nums = new Map([['s1', 1], ['s2', 2], ['s4', 4]]);
+    expect(pageRangeList(['s4', 's2', 's1'], nums)).toEqual([{ from: 1, to: 2 }, { from: 4, to: 4 }]);
   });
 });

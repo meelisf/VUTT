@@ -11,16 +11,21 @@ export function sortParts(parts: WorkPart[], stems: string[]): WorkPart[] {
   return [...parts].sort((a, b) => first(a) - first(b) || a.id.localeCompare(b.id));
 }
 
-/** Osa lehed lehenumbritena: järjestikused vahemikuks („1–3, 9"); kadunud tüvi jääb välja. */
-export function pageRanges(pageStems: string[], pageNums: Map<string, number>): string {
+/** Osa lehed lehenumbrite vahemikena (järjestikused kokku); kadunud tüvi jääb välja. */
+export function pageRangeList(pageStems: string[], pageNums: Map<string, number>): { from: number; to: number }[] {
   const nums = [...new Set(pageStems.map(s => pageNums.get(s)).filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
-  const out: string[] = [];
+  const out: { from: number; to: number }[] = [];
   for (let i = 0; i < nums.length; i++) {
-    const start = nums[i];
+    const from = nums[i];
     while (i + 1 < nums.length && nums[i + 1] === nums[i] + 1) i++;
-    out.push(start === nums[i] ? `${start}` : `${start}–${nums[i]}`);
+    out.push({ from, to: nums[i] });
   }
-  return out.join(', ');
+  return out;
+}
+
+/** Sama tekstina: „1–3, 9". */
+export function pageRanges(pageStems: string[], pageNums: Map<string, number>): string {
+  return pageRangeList(pageStems, pageNums).map(r => (r.from === r.to ? `${r.from}` : `${r.from}–${r.to}`)).join(', ');
 }
 
 export function pageBadges(parts: WorkPart[], stems: string[]): Map<string, Badge[]> {

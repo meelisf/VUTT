@@ -25,6 +25,11 @@ export async function listParts(workId: string, token: string | null): Promise<W
   const r = await apiGet<{ parts: WorkPart[] }>(base(workId), opts(token));
   return r.parts ?? [];
 }
+/** Töölaua sisukord: osad + nende lehtede numbrid (/work/{id}/{nr}). */
+export async function getPartsToc(workId: string, token: string | null): Promise<{ parts: WorkPart[]; pageNumbers: Record<string, number> }> {
+  const r = await apiGet<{ parts: WorkPart[]; page_numbers?: Record<string, number> }>(base(workId), opts(token));
+  return { parts: r.parts ?? [], pageNumbers: r.page_numbers ?? {} };
+}
 export const createPart = (workId: string, part: PartInput, token: string | null) =>
   apiPost<WorkPart>(base(workId), part, opts(token));
 export const updatePart = (workId: string, partId: string, part: PartInput, token: string | null) =>
