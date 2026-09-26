@@ -267,6 +267,8 @@
     "shiftedMarker": "Marker on kattuvuse vältimiseks veidi nihutatud.",
     "thisPerson": "See isik",
     "relationsFilter": "Seosed: {{name}}",
+    "scopeNotApplied": "Ei rakendu seoste kaardile",
+    "relatedScopeToggle": "Ainult kogus: {{name}}",
     "clearRelationsFilter": "Eemalda seoste filter",
     "collectionHintNamed": "{{name}} kuulub teise kollektsiooni kui praegu valitud („{{selected}}\"). Tema seoste nägemiseks vaheta kollektsiooni.",
     "collectionHintGeneric": "Valitud kollektsioonis („{{selected}}\") pole selle isiku seoseid.",
