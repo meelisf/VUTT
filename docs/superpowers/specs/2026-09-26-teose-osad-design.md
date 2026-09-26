@@ -104,19 +104,30 @@ viited sõltuvad osade lehtedest.
 
 ## 3. Lehetoimingud (üks koht)
 
-Uus `sync_work_parts(work_dir, work_id, renamed: dict[str, list[str]] | None = None)`.
-Seda kutsutakse **igas** lehe numbreid või faile muutvas teekonnas kohe
-`refresh_work_mentions`-i kõrval: `admin_page_ops` (poolitus, kustutus, järjestus),
-`routers/pages.py` (lisamine, kustutus) ja `trash_ops` (taaste).
+Uus `sync_work_parts(work_dir, work_id, renamed: dict[str, list[str]] | None = None)`
+kutsutakse **`refresh_work_mentions`-i sees**, enne mainimiste arvutamist, sest mainimiste
+osa viited sõltuvad osade lehtedest. `refresh_work_mentions` saab valikulise argumendi
+`renamed`, mille ta annab edasi.
 
-- **Poolitus:** `renamed = {algne_tüvi: [vasak, parem]}`, algne tüvi asendatakse igas
+Sellest tuleneb, et iga praegune ja tulevane lehe numbreid või faile muutev tee sünkroniseerib
+osad automaatselt. Kutsekohti on praegu kaheksa:
+- `admin_page_ops`: poolitus, `apply_page_ops` ja lisamine;
+- `routers/pages.py`: kustutus, lisamine ja **ümberjärjestamine** (`/reorder-pages`, kus
+  kutse on ruuteris);
+- `trash_ops`: kaks taastet.
+
+Eraldi kutset ei saa seega unustada. Valvur (ADR 0055 muster) kontrollib, et
+ümberjärjestamine, poolitus ja kustutus värskendavad osa `first_page`-i.
+
+- **Poolitus** annab `renamed = {algne_tüvi: [vasak, parem]}`. Algne tüvi asendatakse igas
   osas mõlema poolega.
 - **Puuduv tüvi** (kustutatud leht) eemaldatakse osast.
 - **Tühjaks jäänud osa:** `pages: []`, `needs_review: true`. Osa ei kustutata.
 - **Prügikastist taastatud leht** ei lähe osasse automaatselt tagasi. See on teadlik
   piirang: taaste on harv ja toimetaja lisab lehe ruudustikus uuesti.
-- **Ümberjärjestamine** tüvesid ei muuda, sest kuvamisjärjekord tuleb teose lehtede
-  järjekorrast.
+- **Ümberjärjestamine** tüvesid ei muuda, kuid lehtede numbrid muutuvad.
+  `sync_work_parts` kutsub seepärast alati `update_work_facts`-i, et osade `first_page`
+  vastaks uuele järjekorrale (§ 4).
 
 ## 4. Indeksid ja seosed
 
@@ -125,6 +136,14 @@ Kirjutab sama `update_person_to_works` (metaandmete tee), mis loeb ka `parts[].c
 Mainimise kirjed (`role: "mentioned"`) saavad lisaks `part_ids`: osad, kuhu mainimise
 lehed kuuluvad. Need arvutab `collect_page_person_mentions` metaandmete `parts` põhjal.
 Kahe kirjutaja reegel (CLAUDE.md) kehtib edasi.
+
+**Teadaolev piirang: jagatud leht.** Kui lehel `…-006` lõpeb kiri A ja algab kiri B,
+kuulub mainimine sellel lehel mõlemasse osasse ja seotakse mõlema kirja isikutega.
+Lehetasemel märgendus ei saa seda eristada. Toimetajale tehakse see nähtavaks:
+- ruudustikus on jagatud lehel mõlema osa märk;
+- osa vormis on hoiatus „Leht …-006 kuulub ka osasse B; sellel lehel mainitud isikud
+  seotakse mõlemaga".
+Täpsem lahendus (mainimine teksti positsiooni järgi) jääb v1-st välja.
 
 **Teose faktid (`_work_facts_entry`, ADR 0007):** kirjel on lisaks `parts:
 {part_id: {kind, title, year, place (id, label), first_page}}`. `first_page` on
@@ -182,8 +201,20 @@ Spenerilt, 1684, lk 7–9, 11", ja link viib esimesele lehele.
 - `correspAction type="received"` + adressaat + `place_to`;
 - `@source` viitab VUTT-i teose URL-ile (osa esimene leht).
 
-Isik või koht ilma välise ID-ta kantakse nimena ilma `ref`-ita. Täpne XML-kuju ja
-correspSearchi registreerimine on PR 4 plaanis.
+- **Eksporditakse ainult `kind == "letter"`.** Lisad (`attachment`), vahelehed, luuletused,
+  kõned ja istungid eraldi CMIF-kirjeid ei saa. Kirjaga seotud lisa võib põhikirje juures
+  olla viitena (`note` / `ref`); täpne kuju pannakse paika PR 4 plaanis.
+- **Lünklikud kirjed:**
+  - isik või koht ilma välise ID-ta kantakse nimena ilma `ref`-ita;
+  - teadmata või anonüümne saatja ja pseudonüüm kantakse allika kujul (või „[teadmata]")
+    ilma `ref`-ita;
+  - kiri ilma adressaadita (nt avalik kiri) saab ainult `correspAction type="sent"`, kui
+    CMIF seda lubab, muidu tähise „[teadmata]";
+  - puuduv kuupäev jääb `date` elemendist välja.
+
+  Täpne kuju kontrollitakse CMIF 1.0 juhendi vastu PR 4 plaanis. **Eksporditakse ainult
+  seda, mis andmetes on**: VUTT ei täida lünki oletustega.
+- XML-kuju ja correspSearchi registreerimine on PR 4 plaanis.
 
 ## Väljaspool skoopi (v1)
 
@@ -199,8 +230,11 @@ correspSearchi registreerimine on PR 4 plaanis.
 - **Kirjutustee:** samaaegsed osa-muudatused ei kirjuta teineteist üle (lukk);
   `parts` üldises metaandmete salvestuses → 400; õigused (`can_write_work`); git-commit.
 - **Lehetoimingud:** poolitus asendab tüve mõlema poolega; kustutus eemaldab; tühi osa
-  saab `needs_review`; igast teekonnast (`admin_page_ops`, `pages.py`, `trash_ops`)
-  kutsutakse `sync_work_parts`-i (valvur nagu ADR 0055 puhul).
+  saab `needs_review`; `refresh_work_mentions` kutsub `sync_work_parts`-i. Valvur
+  kontrollib, et **ümberjärjestamise** (`/reorder-pages`), poolituse ja kustutuse järel
+  vastab osa `first_page` uuele järjekorrale.
+- **Jagatud leht:** mainimine jagatud lehel saab mõlema osa `part_ids`-i; osa vorm
+  näitab hoiatust.
 - **Indeksid:** osa isikud `person_to_works`-is koos `part_id`-ga; mainimise
   `part_ids`; rebuild ja uuendus annavad sama teose faktide kirje (ADR 0007).
 - **Seosed:** kirjakogus ei teki eri kirjade kirjutajate vahel servi; saatja →
