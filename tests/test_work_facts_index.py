@@ -126,3 +126,51 @@ def test_call_ptw_false_uuendab_fakte(monkeypatch, tmp_path):
     mo.save_work_metadata(str(path), {"location": {"id": "Q13972", "label": "Tartu"}},
                           "tester", "test", sync_meili=False, call_ptw=False)
     assert _read(tmp_path)["w1"]["location"] == {"id": "Q13972", "label": "Tartu"}
+
+
+# ── Arvustuse I1: ülejäänud uuendusteed ──────────────────────────────────────
+
+def test_hulgitee_uuendab_fakte(monkeypatch, tmp_path):
+    """bulk_update_works (call_ptw=False) — nt hulgižanr või -koht."""
+    mo = _env(monkeypatch, tmp_path)
+    path = _work_dir(tmp_path, _meta())
+    mo.bulk_update_works([(str(path), lambda _m: {"title": "Hulgi"})], "tester", "test")
+    assert _read(tmp_path)["w1"]["title"] == "Hulgi"
+
+
+def test_teose_kustutus_eemaldab_faktid(monkeypatch, tmp_path):
+    from server.routers import admin
+    _env(monkeypatch, tmp_path)
+    _work_dir(tmp_path, _meta())
+    wro.update_work_facts(_meta())
+    monkeypatch.setattr(admin, "BASE_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(admin, "find_directory_by_id", lambda _w: str(tmp_path / "data" / "slug-w1"))
+    monkeypatch.setattr(admin, "delete_work_from_git", lambda *a, **k: None)
+    monkeypatch.setattr(admin, "delete_work_from_meilisearch", lambda *a, **k: None)
+    monkeypatch.setattr(admin, "build_work_id_cache", lambda: None)
+    admin.admin_work_delete("w1", user={"username": "admin", "role": "admin"})
+    assert "w1" not in _read(tmp_path)
+
+
+def test_import_kirjutab_faktid(monkeypatch, tmp_path):
+    from server.upload import import_work
+    _env(monkeypatch, tmp_path)
+    import_work._update_indices_after_import("w9", _meta(id="w9", title="Imporditud"))
+    assert _read(tmp_path)["w9"]["title"] == "Imporditud"
+
+
+def test_kogude_hulgimuudatus_muudab_restricted_ilma_rebuildita(monkeypatch, tmp_path, prosopo_env):
+    """Kogud tulevad work_collections_index-ist, mida hulgitee uuendab tingimusteta."""
+    from unittest import mock
+    from server.prosopography.network import build_person_network
+    mo = _env(monkeypatch, tmp_path)
+    prosopo_env.write("aaaaa")
+    prosopo_env.write("bbbbb")
+    path = _work_dir(tmp_path, _meta(creators=[{"id": A, "role": "praeses"},
+                                               {"id": "vutt:Pbbbbb", "role": "respondens"}]))
+    mo.save_work_metadata(str(path), {"title": "T"}, "tester", "test", sync_meili=False, call_ptw=True)
+    cols = {"salajane": {"visibility": "restricted"}}
+    with mock.patch("server.access_ops.get_cached_collections", return_value=cols):
+        assert build_person_network(A)["works"][0]["restricted"] is False
+        mo.bulk_update_works([(str(path), lambda _m: {"collections": ["salajane"]})], "tester", "kogu")
+        assert build_person_network(A)["works"][0]["restricted"] is True

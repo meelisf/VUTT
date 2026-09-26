@@ -474,18 +474,7 @@ def _teosta_import(
 
     # Person-to-works indeks (uus teos võib juba sisaldada creators/tags isikuid)
     try:
-        from ..prosopography.indices import update_person_to_works, update_work_collections
-        update_person_to_works(
-            work_id,
-            metadata.get("creators", []),
-            metadata.get("tags") or [],
-            metadata.get("publisher"),
-            metadata.get("title") or "",
-            metadata.get("year"),
-        )
-        update_work_collections(work_id, metadata.get("collections") or [])
-        from ..prosopography.work_relations_ops import update_work_facts
-        update_work_facts({**metadata, "id": work_id})
+        _update_indices_after_import(work_id, metadata)
     except Exception as e:
         logger.warning(f"import {upload_id}: person_to_works viga: {e}")
 
@@ -542,3 +531,19 @@ def _teosta_import(
     if work_sets_skipped is not None:
         result["work_sets_skipped"] = work_sets_skipped
     return result
+
+
+def _update_indices_after_import(work_id: str, metadata: dict) -> None:
+    """Uue teose tuletatud indeksid: isikud, kogud ja teose faktid (#461)."""
+    from ..prosopography.indices import update_person_to_works, update_work_collections
+    from ..prosopography.work_relations_ops import update_work_facts
+    update_person_to_works(
+        work_id,
+        metadata.get("creators", []),
+        metadata.get("tags") or [],
+        metadata.get("publisher"),
+        metadata.get("title") or "",
+        metadata.get("year"),
+    )
+    update_work_collections(work_id, metadata.get("collections") or [])
+    update_work_facts({**metadata, "id": work_id})

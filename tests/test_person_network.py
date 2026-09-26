@@ -216,3 +216,47 @@ def test_markerid_on_koordinaadiga_osa(net, collection):
                    if e.get("origin_coordinates")}
     assert mapped == expected & with_coords
     assert res["without_coordinates"] == len(expected - with_coords)
+
+
+def test_pereliige_jaab_kogu_kaardile_ilma_teoseta_kogus(net, tmp_path):
+    """Arvustuse I2: kogu filtreerib ühiseid teoseid, mitte isikuid. Pereliige, kellel
+    pole ühtki teost kogus, jääb related_to + collection kaardile (vana
+    _persons_in_collection oleks ta eemaldanud)."""
+    net.write("focus", relations=[{"target_id": "vutt:Pfam", "type": "isa"}])
+    net.write("fam")
+    idx = json.loads(open(ops.PROSOPOGRAPHY_INDEX_FILE).read())
+    idx["entries"].append({"id": "vutt:Pfam", "label": "Isa", "origin_place": "Riga",
+                           "origin_coordinates": {"lat": 56.95, "lon": 24.1}})
+    open(ops.PROSOPOGRAPHY_INDEX_FILE, "w").write(json.dumps(idx))
+    res = ops.get_person_map_markers(related_to=F, collection="agc")
+    mapped = {p["id"] for m in res["markers"] for p in m["persons"]}
+    assert "vutt:Pfam" in mapped
+
+
+def test_pereseoste_poordkaart_ei_loe_kaarte_igal_paringul(net, monkeypatch):
+    """Arvustuse I3: avalik endpoint ei tohi igal päringul parsida kõiki ~2350 kaarti.
+    Muutunud kaart peab aga kohe mõjuma."""
+    from server.prosopography import network
+    net.write("fam", relations=[{"target_id": F, "type": "poeg"}])
+    loads = []
+    real = network.json.load
+    card_dir = str(net.dir)
+
+    def counting_load(f, *a, **k):
+        # network.json on globaalne json-moodul — loe ainult isikukaartide faile
+        if str(getattr(f, "name", "")).startswith(card_dir):
+            loads.append(1)
+        return real(f, *a, **k)
+    monkeypatch.setattr(network.json, "load", counting_load)
+    _build(F)
+    first = len(loads)
+    assert first > 0
+    _build(F)
+    # Teine päring loeb ainult sihipäraselt fookuse ja indeksita pereliikme kaardi
+    # (get_person), mitte kõiki kaarte uuesti.
+    assert len(loads) - first == 2
+    net.write("other", relations=[{"target_id": F, "type": "vend"}])
+    res = _build(F)
+    assert len(loads) > first                   # uus kaart → kaart ehitatakse uuesti
+    fam = {({e["from"], e["to"]} - {F}).pop() for e in res["edges"] if e["kind"] == "family"}
+    assert fam == {"vutt:Pfam", "vutt:Pother"}

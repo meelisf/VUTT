@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from typing import Optional
 
 from . import state
@@ -65,6 +66,53 @@ def _is_public(collections_of_work: list) -> bool:
     return is_work_public({"collections": collections_of_work})
 
 
+# Pöördkaart {sihtisik: [(allikas, tüüp)]} kõigist kaartidest. Kõigi ~2350 kaardi
+# parsimine igal avalikul päringul oleks ~80 ms GIL-i all (#461 arvustus), seega
+# ehitatakse kaart uuesti ainult siis, kui kaardikausta allkiri muutub. Allkiri on
+# scandir-i stat (failide arv + mtime-d), mis on JSON-i lugemisest palju odavam.
+# Kaardi salvestus käib atomic write'iga (uus fail + rename) → mtime muutub alati.
+_reverse_lock = threading.Lock()
+_reverse_cache: dict = {"sig": None, "map": {}}
+
+
+def _cards_signature(directory: str) -> tuple:
+    count = total = latest = 0
+    try:
+        with os.scandir(directory) as it:
+            for entry in it:
+                if entry.name.endswith(".json") and entry.is_file():
+                    mtime = entry.stat().st_mtime_ns
+                    count += 1
+                    total += mtime
+                    latest = max(latest, mtime)
+    except FileNotFoundError:
+        pass
+    return (directory, count, total, latest)
+
+
+def _reverse_relations() -> dict:
+    sig = _cards_signature(state.PROSOPOGRAPHY_DIR)
+    with _reverse_lock:
+        if _reverse_cache["sig"] == sig:
+            return _reverse_cache["map"]
+        rev: dict = {}
+        for path in state._glob.glob(os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    card = json.load(f)
+            except Exception:
+                continue
+            oid = card.get("id")
+            if not oid or card.get("record_status") == "tombstone":
+                continue
+            for r in card.get("relations") or []:
+                if isinstance(r, dict) and isinstance(r.get("target_id"), str):
+                    rev.setdefault(r["target_id"], []).append((oid, r.get("type")))
+        _reverse_cache["sig"] = sig
+        _reverse_cache["map"] = rev
+        return rev
+
+
 def _family_records(person_id: str, focus_card: dict) -> dict:
     """{teine_id: [{source_id, target_id, type}]} mõlemast suunast, tombstone'ideta."""
     recs: dict = {}
@@ -80,18 +128,9 @@ def _family_records(person_id: str, focus_card: dict) -> dict:
     for r in focus_card.get("relations") or []:
         if isinstance(r, dict):
             add(person_id, r.get("target_id"), r.get("type"))
-    for path in state._glob.glob(os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                other = json.load(f)
-        except Exception:
-            continue
-        oid = other.get("id")
-        if oid == person_id or other.get("record_status") == "tombstone":
-            continue
-        for r in other.get("relations") or []:
-            if isinstance(r, dict) and r.get("target_id") == person_id:
-                add(oid, person_id, r.get("type"))
+    for oid, typ in _reverse_relations().get(person_id, []):
+        if oid != person_id:
+            add(oid, person_id, typ)
     return recs
 
 
