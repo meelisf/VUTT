@@ -279,6 +279,51 @@
     "yearHelp": "Year shown on the historical map. The midpoint is used by default when a year range is selected.",
     "openPlace": "Show on map"
   },
+  "network": {
+    "title": "Relations",
+    "tabs": {
+      "graph": "Network",
+      "timeline": "Timeline",
+      "table": "List"
+    },
+    "kinds": {
+      "academic": "Academic act",
+      "dedicated": "Work for / about the person",
+      "family": "Family / other",
+      "cotext": "Co-contribution",
+      "mention": "Mention",
+      "printer": "Printer"
+    },
+    "weak": "Weak relations",
+    "onlyInCollection": "Only in: {{name}}",
+    "empty": "No relations found.",
+    "error": "Could not load relations.",
+    "persons": "{{count}} related persons",
+    "sharedWorks": "{{count}} shared works",
+    "pinHint": "Click to pin and open links",
+    "openPerson": "Open person page",
+    "close": "Close",
+    "restricted": "restricted",
+    "pages": "p. {{pages}}",
+    "unknownPlace": "place of printing unknown",
+    "originUnknown": "origin unknown",
+    "origin": "origin {{place}}",
+    "undated": "Date unknown",
+    "coLines": "Co-occurrence lines",
+    "focusOnly": "Focus only",
+    "focus": "Focus",
+    "moreWorks": "… {{count}} more works",
+    "labelsHint": "Of {{count}} persons, only the most connected are labelled; hover to see others.",
+    "openMap": "Open on the large map",
+    "table": {
+      "person": "Person",
+      "years": "Lifespan",
+      "origin": "Origin",
+      "kind": "Relation",
+      "works": "Shared works",
+      "span": "Years"
+    }
+  },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",
     "notFound": "Not found. Ask an editor to add."

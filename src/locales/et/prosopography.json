@@ -279,6 +279,51 @@
     "yearHelp": "Ajaloolise kaardi aasta. Aastavahemiku korral kasutatakse vaikimisi selle keskpunkti.",
     "openPlace": "Näita kaardil"
   },
+  "network": {
+    "title": "Seosed",
+    "tabs": {
+      "graph": "Võrgustik",
+      "timeline": "Ajatelg",
+      "table": "Loend"
+    },
+    "kinds": {
+      "academic": "Akadeemiline akt",
+      "dedicated": "Teos isikule / isikust",
+      "family": "Perekond / muu",
+      "cotext": "Kaastekst",
+      "mention": "Mainimine",
+      "printer": "Trükkal"
+    },
+    "weak": "Nõrgad seosed",
+    "onlyInCollection": "Ainult kogus: {{name}}",
+    "empty": "Seoseid ei leitud.",
+    "error": "Seoste laadimine ebaõnnestus.",
+    "persons": "{{count}} seotud isikut",
+    "sharedWorks": "{{count}} ühist teost",
+    "pinHint": "Klõpsa, et kinnitada ja avada lingid",
+    "openPerson": "Ava isikuleht",
+    "close": "Sulge",
+    "restricted": "kaitstud",
+    "pages": "lk {{pages}}",
+    "unknownPlace": "trükikoht teadmata",
+    "originUnknown": "päritolu teadmata",
+    "origin": "päritolu {{place}}",
+    "undated": "Aeg teadmata",
+    "coLines": "Kaaslaste jooned",
+    "focusOnly": "Ainult fookus",
+    "focus": "Fookus",
+    "moreWorks": "… veel {{count}} teost",
+    "labelsHint": "Nimed kuvatakse {{count}}-st ainult suurima seosega isikutele; hõljuta, et näha teisi.",
+    "openMap": "Ava suurel kaardil",
+    "table": {
+      "person": "Isik",
+      "years": "Eluaastad",
+      "origin": "Päritolu",
+      "kind": "Seos",
+      "works": "Ühiseid teoseid",
+      "span": "Aastad"
+    }
+  },
   "place": {
     "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",
     "notFound": "Ei leitud. Paluge editoril lisada."
