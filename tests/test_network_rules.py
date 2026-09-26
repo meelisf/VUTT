@@ -32,6 +32,7 @@ from server.prosopography.network_rules import classify_pair
     # 5. printer
     (["auctor"], ["publisher"], ("printer", None)),
     (["subject"], ["publisher"], ("printer", None)),
+    (["mentioned"], ["publisher"], ("printer", None)),        # trükkal enne mainimist
 ])
 def test_reeglitabel(a, b, expected):
     assert classify_pair(a, b) == expected

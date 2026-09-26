@@ -57,8 +57,9 @@ def classify_pair(a_roles: Iterable[str], b_roles: Iterable[str]) -> tuple[str, 
         return "dedicated", d
     if (a & CREATOR and b & CREATOR) or _direction(a, b, (("dedicator", "subject"),)) is not False:
         return "cotext", None
-    if "mentioned" in a or "mentioned" in b or ("subject" in a and "subject" in b):
-        return "mention", None
+    # Trükkal enne mainimist: mainitud isiku teose trükkal on trükkal, mitte mainimine.
     if "publisher" in a or "publisher" in b:
         return "printer", None
+    if "mentioned" in a or "mentioned" in b or ("subject" in a and "subject" in b):
+        return "mention", None
     return "cotext", None
