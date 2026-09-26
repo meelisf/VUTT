@@ -42,6 +42,9 @@ export function boundsOf(points: LatLon[]): [[number, number], [number, number]]
 export const FitToPoints: React.FC<{ points: LatLon[]; focus?: LatLon | null }> = ({ points, focus }) => {
   const map = useMap();
   useEffect(() => {
+    // Laisalt laetud / vahekaardis kaart: Leaflet võis konteineri mõõta enne lõplikku
+    // paigutust — ilma selleta arvutab fitBounds suumi vale suuruse järgi.
+    map.invalidateSize({ animate: false });
     if (focus) { map.setView([focus.lat, focus.lon], 8, { animate: false }); return; }
     const b = boundsOf(points);
     if (b) map.fitBounds(b, { padding: [28, 28], maxZoom: 8, animate: false });

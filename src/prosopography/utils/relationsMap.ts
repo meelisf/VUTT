@@ -164,3 +164,20 @@ export function lifeView(card: ProsopoRecord | null, registry: RegistryState) {
   if (!card) return { status: 'ready' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
   return { status: 'ready' as const, ...lifeStations(card, registry) };
 }
+
+export type MapLayer = 'origin' | 'originPrint' | 'print' | 'life';
+
+/**
+ * Punktid, millele kaart kihi vahetusel sobitub — täpselt need, mida kiht joonistab.
+ * „Päritolu ja trükikoht" joonistab kõik trükikohad, mitte ainult joonte otsi: varem
+ * sobitus kaart ainult joontele ja ülejäänud trükikohad jäid vaatest välja.
+ */
+export function layerPoints(layer: MapLayer, v: VisibleNetwork, life: { mapped: LifeStation[] }): LatLon[] {
+  const focus = v.focus.origin?.coordinates ? [v.focus.origin.coordinates] : [];
+  if (layer === 'origin') return [...originGroups(v).groups.map(g => g.coords), ...focus];
+  if (layer === 'originPrint') {
+    return [...originPrintLinks(v).flatMap(l => [l.from, l.to]), ...printPlaces(v).map(p => p.coords), ...focus];
+  }
+  if (layer === 'print') return printPlaces(v).map(p => p.coords);
+  return life.mapped.map(s => s.coords as LatLon);
+}

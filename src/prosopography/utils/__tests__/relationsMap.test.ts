@@ -1,7 +1,7 @@
 // src/prosopography/utils/__tests__/relationsMap.test.ts
 import { describe, it, expect } from 'vitest';
 import { applyFilters, DEFAULT_FILTER } from '../network';
-import { lifeStations, lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
+import { layerPoints, lifeStations, lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
 import type { PersonNetwork } from '../../services/networkService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 
@@ -125,5 +125,26 @@ describe('lifeView registri olek (arvustuse M2)', () => {
     const ready = lifeView(CARD, REG);
     expect(ready.status).toBe('ready');
     expect(ready.mapped.length).toBe(3);
+  });
+});
+
+describe('layerPoints: kaart sobitub kõigele, mida kiht joonistab', () => {
+  const TARTU = { lat: 58.38, lon: 26.72 };
+  const net2: PersonNetwork = {
+    ...NET,
+    focus: { ...NET.focus, origin: { place: 'Lübeck', place_id: 'Q2843', coordinates: { lat: 53.87, lon: 10.69 } } },
+    works: [...NET.works, { work_id: 'w3', title: 'Oratio', year: 1696, place: { id: 'Q13972', label: 'Tartu', coordinates: TARTU }, genres: [], restricted: false }],
+    edges: [...NET.edges, { kind: 'cotext', from: 'b', to: F, directed: false, year: 1696, place: null, roles: {}, evidence: { work_id: 'w3', pages: [] } }],
+  };
+  const v2 = applyFilters(net2, DEFAULT_FILTER);
+
+  it('päritolu ja trükikoht: joonte otsad + KÕIK trükikohad + fookus', () => {
+    const pts = layerPoints('originPrint', v2, { mapped: [] });
+    expect(pts).toEqual(expect.arrayContaining([RIGA, ALTDORF, TARTU, { lat: 53.87, lon: 10.69 }]));
+  });
+
+  it('trükikohad: ainult trükikohad', () => {
+    expect(layerPoints('print', v2, { mapped: [] })).toEqual(expect.arrayContaining([ALTDORF, TARTU]));
+    expect(layerPoints('print', v2, { mapped: [] })).toHaveLength(2);
   });
 });
