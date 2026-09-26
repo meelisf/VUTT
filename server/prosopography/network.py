@@ -19,7 +19,34 @@ from .indices import _collection_descendants, _load_index, _load_person_to_works
 from .network_rules import classify_pair
 from .person_crud import get_person
 from .places_ops import _get_place_coordinates, _load_places_cache
+from . import work_relations_ops as _wro
 from .work_relations_ops import _load_creators_index
+
+# Read-modelid mälus faili allkirja (mtime_ns, suurus) järgi. Iga /network päring luges
+# varem neli indeksifaili kettalt (~80 ms ka väikese isiku puhul); isikuleht küsib seda
+# igal avamisel. Tuletatud struktuur (nt rollid teose kaupa) hoitakse koos failiga.
+_index_cache: dict = {}
+_index_lock = threading.Lock()
+
+
+def _file_sig(path: str) -> tuple:
+    try:
+        st = os.stat(path)
+        return (path, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return (path, None, None)
+
+
+def _cached(name: str, path: str, load, derive=lambda x: x):
+    sig = _file_sig(path)
+    with _index_lock:
+        hit = _index_cache.get(name)
+        if hit and hit[0] == sig:
+            return hit[1]
+    value = derive(load())
+    with _index_lock:
+        _index_cache[name] = (sig, value)
+    return value
 
 
 def _roles_by_work(ptw: dict) -> dict:
@@ -151,15 +178,16 @@ def build_person_network(person_id: str, collection: Optional[str] = None) -> Op
     card = get_person(person_id)
     if card is None:
         return None
-    index = {e.get("id"): e for e in _load_index().get("entries", [])}
-    facts = _load_creators_index()
-    wc = _load_work_collections()
+    index = _cached("index", state.PROSOPOGRAPHY_INDEX_FILE, _load_index,
+                    lambda d: {e.get("id"): e for e in d.get("entries", [])})
+    facts = _cached("facts", _wro.WORKS_CREATORS_INDEX_FILE, _load_creators_index)
+    wc = _cached("wc", state.WORK_COLLECTIONS_INDEX_FILE, _load_work_collections)
     allowed_cols = None
     if collection:
         from ..cache import get_cached_collections
         allowed_cols = _collection_descendants(collection, get_cached_collections() or {})
 
-    by_work = _roles_by_work(_load_person_to_works())
+    by_work = _cached("by_work", state.PERSON_TO_WORKS_FILE, _load_person_to_works, _roles_by_work)
     edges: list = []
     works: dict = {}
     others: set = set()

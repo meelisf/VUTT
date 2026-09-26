@@ -181,3 +181,13 @@ export function layerPoints(layer: MapLayer, v: VisibleNetwork, life: { mapped: 
   if (layer === 'print') return printPlaces(v).map(p => p.coords);
   return life.mapped.map(s => s.coords as LatLon);
 }
+
+/** Kaardi alla: mitu nähtavat seotud isikut on päritoluga kaardil (spekk, „Kaart"). */
+export function originCoverage(v: VisibleNetwork): { mapped: number; total: number } {
+  return { mapped: v.persons.filter(p => p.origin?.coordinates).length, total: v.persons.length };
+}
+
+/** Esiletõst kaardil: kui esile on tõstetud keegi teine, tuhmub element (nagu võrgustikus). */
+export function dimOpacity(ids: string[], highlight: string | null, base: number): number {
+  return !highlight || ids.includes(highlight) ? base : base * 0.1;
+}

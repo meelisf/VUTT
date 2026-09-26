@@ -70,3 +70,12 @@ describe('RelationsTable ligipääsetav tekstivaade', () => {
     expect(screen.getByRole('link', { name: /Disputatio/ }).getAttribute('href')).toBe('/work/w1/1');
   });
 });
+
+describe('RelationsTimeline telg', () => {
+  it('telg on samas keritavas konteineris kui read (sama laius → sama skaala)', () => {
+    const { container } = withPopover(p => <RelationsTimeline net={v} popover={p} highlight={null} onHighlight={() => {}} />);
+    const scroller = container.querySelector('[data-timeline-scroller]');
+    expect(scroller).toBeTruthy();
+    expect(scroller!.querySelector('[data-timeline-axis]')).toBeTruthy();
+  });
+});

@@ -280,3 +280,33 @@ def test_trukikoht_leitakse_registri_siltidest(monkeypatch):
     assert network._place_coords({"id": "Q164673", "label": "Pärnu"}) == {"lat": 58.39, "lon": 24.5}
     assert network._place_coords({"id": None, "label": "Pernau"}) == {"lat": 58.39, "lon": 24.5}
     assert network._place_coords({"id": None, "label": "Atlantis"}) is None
+
+
+def test_indeksid_hoitakse_malus_kuni_fail_muutub(net, tmp_path, monkeypatch):
+    """Iga /network päring luges neli indeksifaili kettalt (~80 ms ka väikesel isikul).
+    Teine päring ei tohi neid uuesti lugeda; failimuutus peab kohe mõjuma."""
+    import json as _json
+    from server.prosopography import network
+    watched = {"ptw.json", "wci.json", "wc.json", "idx.json"}
+    reads = []
+    real = _json.load
+
+    def counting(f, *a, **k):
+        name = str(getattr(f, "name", "")).rsplit("/", 1)[-1]
+        if name in watched:
+            reads.append(name)
+        return real(f, *a, **k)
+    monkeypatch.setattr(network.json, "load", counting)
+    network._index_cache.clear()
+
+    _build(F)
+    assert set(reads) == watched
+    reads.clear()
+    _build(F)
+    assert reads == []                                   # kõik mälust
+
+    ptw = _json.loads((tmp_path / "ptw.json").read_text())
+    ptw[F].append({"work_id": "w9", "role": "auctor"})    # suurus muutub → uus allkiri
+    (tmp_path / "ptw.json").write_text(_json.dumps(ptw))
+    _build(F)
+    assert reads == ["ptw.json"]                         # ainult muutunud fail

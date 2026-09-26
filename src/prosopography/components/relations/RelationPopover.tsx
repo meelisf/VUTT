@@ -11,7 +11,8 @@ import { X } from 'lucide-react';
 import type { VisibleNetwork } from '../../utils/network';
 import { familyLabel } from '../../utils/network';
 
-export interface PopoverState { personId: string; x: number; y: number; pinned: boolean; }
+/** `year` (valikuline): ajatelje liitmärk — näita ainult selle aasta teoseid. */
+export interface PopoverState { personId: string; x: number; y: number; pinned: boolean; year?: number | null; }
 
 export function usePopover() {
   const [state, setState] = useState<PopoverState | null>(null);
@@ -25,10 +26,10 @@ export function usePopover() {
       : { personId, x: ev.clientX, y: ev.clientY, pinned: false }));
   }, []);
   const leave = useCallback(() => { if (!pinnedRef.current) setState(null); }, []);
-  const pin = useCallback((personId: string, ev: React.MouseEvent) => {
+  const pin = useCallback((personId: string, ev: React.MouseEvent, year?: number | null) => {
     ev.stopPropagation();
     pinnedRef.current = true;
-    setState({ personId, x: ev.clientX, y: ev.clientY, pinned: true });
+    setState({ personId, x: ev.clientX, y: ev.clientY, pinned: true, ...(year !== undefined ? { year } : {}) });
   }, []);
   const close = useCallback(() => { pinnedRef.current = false; setState(null); }, []);
   useEffect(() => {
@@ -66,7 +67,10 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
   if (!p) return null;
   const labelOf = (id: string) => (id === net.focus.id ? net.focus.label : net.persons.find(x => x.id === id)?.label ?? id);
   const roles = (rs?: string[]) => (rs ?? []).map(r => t(`workspace:metadata.roles.${r}`, { defaultValue: r })).join(', ');
-  const workEdges = p.edges.filter(e => e.evidence).sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999));
+  const yearOnly = state.year !== undefined;
+  const workEdges = p.edges
+    .filter(e => e.evidence && (!yearOnly || (e.year ?? null) === state.year))
+    .sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999));
   const shown = state.pinned ? workEdges : workEdges.slice(0, MAX_HOVER_WORKS);
   const fam = p.edges.find(e => e.kind === 'family');
   const years = p.birth_year || p.death_year ? `${p.birth_year ?? '?'}–${p.death_year ?? '?'}` : '';

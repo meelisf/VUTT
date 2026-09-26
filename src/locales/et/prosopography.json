@@ -312,7 +312,8 @@
     "coLines": "Kaaslaste jooned",
     "focusOnly": "Ainult fookus",
     "focus": "Fookus",
-    "moreWorks": "… veel {{count}} teost",
+    "moreWorks_one": "… veel {{count}} teos",
+    "moreWorks_other": "… veel {{count}} teost",
     "labelsHint": "Nimed kuvatakse {{count}}-st ainult suurima seosega isikutele; hõljuta, et näha teisi.",
     "openMap": "Ava suurel kaardil",
     "table": {
@@ -355,7 +356,8 @@
       "no_coordinates": "kohal pole koordinaate"
     },
     "registryLoading": "Laadin kohtade registrit…",
-    "registryError": "Kohtade registri laadimine ebaõnnestus; elukäiku ei saa kaardile panna."
+    "registryError": "Kohtade registri laadimine ebaõnnestus; elukäiku ei saa kaardile panna.",
+    "originCoverage": "{{mapped}} / {{total}} seotud isikul on päritolu kaardil"
   },
   "place": {
     "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",
