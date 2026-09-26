@@ -1,9 +1,14 @@
 # VUTT MCP-server
 
 Annab lokaalsetele agentidele (Claude Code, Codex CLI, Gemini CLI, Antigravity)
-ligipääsu VUTT-i transkriptsioonidele ja prosopograafiale. Read-only, stdio.
+ligipääsu VUTT-i transkriptsioonidele ja prosopograafiale. stdio.
 
-Server on VUTT-i avaliku HTTPS-API õhuke klient — backendis midagi muutma ei pea.
+Enamik tööriistu on lugemiseks. Ühekordse üleandmiskoodiga saab MCP esitada
+ainult **ootel prosopo ettepaneku**; isikukaarti või registreid ta ei muuda
+(ADR 0057).
+
+Server on VUTT-i HTTPS-API õhuke klient. Ootel ettepaneku üleandmiseks lisandub
+backendis eraldi piiratud API; ülejäänud tööriistad kasutavad seniseid päringuid.
 
 ## Paigaldus
 
@@ -82,12 +87,17 @@ Kolm asja, mis üllatavad:
 | `search_persons` | Isikuotsing (nimevariandid kaetud) |
 | `get_person` | Isikukaart + seotud teosed (kuni 50) |
 | `get_person_enrichment_context` | Ühe isiku ametite ja hariduse täielikud JSON-kirjed + `updated_at` ettepaneku koostamiseks |
+| `submit_person_enrichment_proposal` | Ühekordse isikupõhise koodiga ootel ettepanek VUTT-i ülevaatuseks; kaarti ei muuda |
 | `list_filter_values` | Legaalsed filtriväärtused |
 
-`get_person_enrichment_context` on ainult lugemiseks. See ei kärbi
-ameti- ega hariduskirjeid vaikselt: väga suure või vigase kaardi korral annab
-vea. Ametite ja asutuste registriotsing ning ettepaneku esitamine lisanduvad
-pärast #462/#471 registri-API ja piiratud üleandmis-API valmimist.
+`get_person_enrichment_context` ei kärbi ameti- ega hariduskirjeid vaikselt:
+väga suure või vigase kaardi korral annab vea. `submit_person_enrichment_proposal`
+kasutab toimetaja autentitud `POST /api/files/prosopography/enrichment-handoff/{person_id}`
+kaudu loodud ühekordset koodi; ta talletab ainult ajutise ettepaneku. Ootel
+kirjed saab sama sessiooniga `GET /api/files/prosopography/enrichment-proposals/{person_id}`.
+Koodi ei panda MCP seadistusse. Vormi üleandmisnupp, kinnitamisvaade ja
+isikukaardi rakendustee valmivad eraldi: praegune ettepanek ei jõua isikukaardile.
+Registriotsing lisandub pärast #462/#471 registri-API valmimist.
 
 OCR-i kontrollimiseks kutsu `get_page_image(work_id, page)` ja võrdle pilti
 `get_pages(work_id, page, page)` tekstiga. `page` on skaneeringu 1-põhine

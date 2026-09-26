@@ -94,6 +94,19 @@ def test_400_ei_proovita_uuesti():
     assert calls["n"] == 1
 
 
+def test_ettepaneku_post_on_uhekordne_ja_ei_saada_otsinguvotit():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(503)
+
+    with pytest.raises(VuttTemporaryError):
+        _client(handler).api_post_once("/prosopography/enrichment-proposals/submit", {"code": "x"})
+    assert len(seen) == 1
+    assert seen[0].headers.get("authorization") is None
+
+
 def test_404_annab_VuttNotFound():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, json={"detail": "puudub"})

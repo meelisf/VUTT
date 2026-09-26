@@ -35,6 +35,7 @@ from .merge_ops import merge_person, delete_person
 from .indices import rebuild_indices
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
+from . import enrichment_proposals
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo
 from ..rate_limit import get_client_ip, check_rate_limit
@@ -398,6 +399,71 @@ def prosopography_candidates(data: dict = Body(...), user=Depends(require_role("
 
 
 _ALLOWED_CREATED_VIA = ("picker", "form")
+
+
+@router.post("/enrichment-handoff/{person_id}")
+async def prosopography_enrichment_handoff(
+    person_id: str, request: Request, user=Depends(require_role("editor")),
+):
+    """Annab toimetaja sessiooniga seotud ühe isiku ühekordse esituskoodi."""
+    if not enrichment_proposals.valid_person_id(person_id):
+        raise HTTPException(status_code=400, detail="Vigane person_id")
+    allowed, retry_after = check_rate_limit(
+        user["username"], '/prosopography/enrichment-handoff')
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Liiga palju üleandmisi",
+                            headers={"Retry-After": str(retry_after)})
+    person = await run_in_threadpool(get_person, person_id)
+    if person is None or person.get("record_status") == "tombstone" or person.get("merged_into"):
+        raise HTTPException(status_code=404, detail="Isikut ei leitud")
+    try:
+        return await run_in_threadpool(
+            enrichment_proposals.issue_handoff, person_id, user["username"],
+            request.state.session_fingerprint, person["updated_at"],
+        )
+    except enrichment_proposals.ProposalError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/enrichment-proposals/{person_id}")
+async def prosopography_enrichment_proposals(
+    person_id: str, request: Request, user=Depends(require_role("editor")),
+):
+    """Tagastab ainult sama isiku ja sama toimetajasessiooni ootel ettepanekud."""
+    if not enrichment_proposals.valid_person_id(person_id):
+        raise HTTPException(status_code=400, detail="Vigane person_id")
+    return await run_in_threadpool(
+        enrichment_proposals.list_pending, person_id, user["username"],
+        request.state.session_fingerprint,
+    )
+
+
+@router.post("/enrichment-proposals/submit")
+async def prosopography_enrichment_proposal_submit(request: Request):
+    """Ainult ootel ettepaneku talletamine; kood ei anna kaardi kirjutamisõigust."""
+    allowed, retry_after = check_rate_limit(
+        get_client_ip(request), '/prosopography/enrichment-proposal-submit')
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Liiga palju katseid",
+                            headers={"Retry-After": str(retry_after)})
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > enrichment_proposals.MAX_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="Ettepanek on liiga suur")
+    try:
+        data = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Vigane JSON")
+    if not isinstance(data, dict) or set(data) != {"code", "person_id", "base_updated_at", "items"}:
+        raise HTTPException(status_code=400, detail="Vigane ettepaneku kuju")
+    try:
+        return await run_in_threadpool(
+            enrichment_proposals.submit, data["code"], data["person_id"],
+            data["base_updated_at"], data["items"],
+        )
+    except enrichment_proposals.ProposalError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/persons/create")

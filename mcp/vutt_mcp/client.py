@@ -1,7 +1,7 @@
 """AINUS moodul, mis räägib HTTP-d.
 
-Kui tuleb autenditud kirjutustee (prosopograafia täiendamine agendi poolt),
-laieneb see kiht — tööriistu ümber kirjutama ei pea.
+Ühekordse koodiga ettepaneku esitamine käib siit ilma editori sessioonita.
+Autoriteetse isikukaardi kirjutust MCP ei tee.
 """
 import logging
 import time
@@ -39,6 +39,11 @@ class VuttClient:
         url = f"{self._settings.base_url}/api/files{path}"
         return self._request("POST", url, json=json_body)
 
+    def api_post_once(self, path: str, json_body: dict) -> dict | list:
+        """Ühekordse koodiga kirjutus: katkestuse järel ei tohi pimesi korrata."""
+        url = f"{self._settings.base_url}/api/files{path}"
+        return self._request("POST", url, json=json_body, retry=False)
+
     # ── sisemine ───────────────────────────────────────────────────────────
     def image_get(self, path: str) -> tuple[bytes, str]:
         """Loeb indeksi pilditee samast VUTT-ist, ilma otsinguvõtit saatmata."""
@@ -54,22 +59,23 @@ class VuttClient:
             raise VuttError("Pildiserver tagastas tühja pildi.")
         return response.content, mime
 
-    def _request(self, method: str, url: str, *, raw: bool = False, **kwargs):
+    def _request(self, method: str, url: str, *, raw: bool = False,
+                 retry: bool = True, **kwargs):
         """Üks kordusekatse 5xx / 429 / timeout / ühendusvea korral."""
         last_exc: Exception | None = None
-        for attempt in (1, 2):
+        for attempt in ((1, 2) if retry else (1,)):
             try:
                 response = self._http.request(method, url, **kwargs)
             except (httpx.TimeoutException, httpx.TransportError) as exc:
                 last_exc = exc
-                if attempt == 1:
+                if attempt == 1 and retry:
                     logger.warning("Võrgutõrge (%s), proovin uuesti: %s", url, exc)
                     continue
                 raise VuttTemporaryError(
                     f"VUTT ei vasta ({exc.__class__.__name__}). Proovi hiljem uuesti."
                 ) from exc
 
-            if response.status_code in RETRY_STATUSES and attempt == 1:
+            if response.status_code in RETRY_STATUSES and attempt == 1 and retry:
                 self._sleep_for_retry(response)
                 continue
             if raw and response.status_code == 200:

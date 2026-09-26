@@ -246,3 +246,25 @@ async def test_rikastuse_kontekst_on_mcp_tooriist():
         "get_person_enrichment_context", {"person_id": "vutt:Pabc"}
     )
     assert json.loads(response.content[0].text)["updated_at"] == "t"
+
+
+async def test_mcp_ettepanek_esitatakse_ainult_ajutise_api_kaudu():
+    class ProposalClient(FakeClient):
+        def api_post_once(self, path, json_body):
+            self.posts.append((path, json_body))
+            return {"proposal_id": "prop1", "status": "pending"}
+
+    client = ProposalClient()
+    server = build_server(client=client, base_url=BASE)
+    item = {"kind": "education", "match_status": "ambiguous",
+            "raw_institution": "AGC",
+            "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 3}]}
+    response = await server.call_tool("submit_person_enrichment_proposal", {
+        "handoff_code": "once", "person_id": "vutt:Pabc",
+        "base_updated_at": "t", "items": [item],
+    })
+    assert "prop1" in response.content[0].text
+    assert client.posts == [("/prosopography/enrichment-proposals/submit", {
+        "code": "once", "person_id": "vutt:Pabc",
+        "base_updated_at": "t", "items": [item],
+    })]

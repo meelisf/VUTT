@@ -15,6 +15,8 @@ Need on AINSAD kutsuja-lugejad (#356). Prosopograafia routeri oma ``_get_user``
 (luges tokeni ka JSON-kehast) ja ``_optional_user`` (ainult ``?token=``) on
 kustutatud. Valvur: ``tests/test_token_lugeja_uks_reegel.py``.
 """
+import hashlib
+
 from fastapi import HTTPException, Request
 
 from .auth import require_token
@@ -41,6 +43,9 @@ async def get_user(request: Request, min_role: str = "contributor"):
     user, error = require_token({"auth_token": token}, min_role=min_role)
     if error:
         raise HTTPException(status_code=401, detail=error["message"])
+    # Piiratud agendi üleandmine seotakse just selle sessiooniga; toortoken
+    # jääb deps.py-sse ega jõua domeeni endpointi või ajutisse andmebaasi.
+    request.state.session_fingerprint = hashlib.sha256(token.encode()).hexdigest()
     return user
 
 
