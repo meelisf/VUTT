@@ -49,15 +49,27 @@ def _person_view(entry: Optional[dict], pid: str, card: Optional[dict] = None) -
 
 
 def _place_coords(location: Optional[dict]) -> Optional[dict]:
-    """Trükikoha koordinaadid kohtade registrist (Q-kood või silt → võti)."""
+    """Trükikoha koordinaadid kohtade registrist.
+
+    Järjekord: Q-kood → registri võti → sildid (et/en/de/la/sv) → ajaloolised nimekujud.
+    Sildi tagavara on vajalik: teose kohal võib Q-kood puududa („Berliin") või olla
+    registris teine (Pärnu kandis kuni 2026-09-26 olematut Q164673-t), samas kui
+    registri võti on ajalooline nimi („Berlin", „Pernau").
+    """
     if not location:
         return None
     places = _load_places_cache()
     key = None
     if location.get("id"):
         key = next((k for k, v in places.items() if isinstance(v, dict) and v.get("id") == location["id"]), None)
-    if key is None and location.get("label") in places:
-        key = location["label"]
+    label = location.get("label")
+    if key is None and label:
+        if label in places:
+            key = label
+        else:
+            key = next((k for k, v in places.items() if isinstance(v, dict) and (
+                label in (v.get("labels") or {}).values() or label in (v.get("historical_names") or [])
+            )), None)
     return _get_place_coordinates(key) if key else None
 
 
