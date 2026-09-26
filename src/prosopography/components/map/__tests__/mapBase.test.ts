@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 // src/prosopography/components/map/__tests__/mapBase.test.ts
 import { describe, it, expect } from 'vitest';
 import { boundsOf, resolveLabel, spreadOverlapping } from '../mapBase';
