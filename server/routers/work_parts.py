@@ -44,7 +44,12 @@ def list_parts(work_id: str, user=Depends(optional_user)):
     path, meta = _dir_and_meta(work_id)
     if not can_read_work(meta, user):
         raise HTTPException(status_code=403, detail="Puudub ligipääs")
-    return {"parts": meta.get("parts") or []}
+    parts = meta.get("parts") or []
+    # Lehenumbrid (/work/{id}/{nr}) ainult osades olevatele tüvedele — töölaua sisukord
+    # ei tea lehtede loendit. Sama järjekord mis indekseerijal (page_stems).
+    used = {s for p in parts for s in p.get("pages") or []}
+    numbers = {s: i + 1 for i, s in enumerate(wp.page_stems(path)) if s in used} if used else {}
+    return {"parts": parts, "page_numbers": numbers}
 
 
 @router.post("/works/{work_id}/parts", status_code=201)

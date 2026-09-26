@@ -464,7 +464,9 @@
     "searchTagInCorpus": "Otsi seda märksõna kogu korpusest",
     "openEsterRecord": "Ava ESTER-i kirje",
     "editWorkMetadata": "Muuda teose metaandmeid",
-    "noImage": "Pilt puudub"
+    "noImage": "Pilt puudub",
+    "toc": "Sisukord",
+    "tocPages": "lk"
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"

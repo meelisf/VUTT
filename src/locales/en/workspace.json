@@ -464,7 +464,9 @@
     "searchTagInCorpus": "Search for this tag across the whole corpus",
     "openEsterRecord": "Open the ESTER record",
     "editWorkMetadata": "Edit work metadata",
-    "noImage": "No image"
+    "noImage": "No image",
+    "toc": "Contents",
+    "tocPages": "p."
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"

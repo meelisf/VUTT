@@ -228,6 +228,17 @@ def test_endpointide_voog(client):
     assert client.delete(f"/works/w1/parts/{pid}").status_code == 204
 
 
+def test_get_annab_osade_lehtede_numbrid(client):
+    """Töölaua sisukord vajab lehenumbrit (/work/{id}/{nr}) — sama järjekord mis indekseerijal."""
+    client.post("/works/w1/parts", json={"kind": "letter", "pages": ["t-002", "t-004"]})
+    body = client.get("/works/w1/parts").json()
+    assert body["page_numbers"] == {"t-002": 2, "t-004": 4}
+
+
+def test_get_ilma_osadeta_tuhi_numbrikaart(client):
+    assert client.get("/works/w1/parts").json() == {"parts": [], "page_numbers": {}}
+
+
 def test_endpointide_vead(client):
     assert client.post("/works/w1/parts", json={"kind": "x", "pages": ["t-001"]}).status_code == 400
     assert client.put("/works/w1/parts/nope", json={"kind": "letter", "pages": ["t-001"]}).status_code == 404
