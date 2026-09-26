@@ -1,0 +1,34 @@
+// src/pages/manage/__tests__/partsModel.test.ts
+import { describe, it, expect } from 'vitest';
+import { draftFromPart, emptyDraft, pageBadges, partFromDraft, sharedStems, sortParts } from '../partsModel';
+import type { WorkPart } from '../../../services/workPartsApi';
+
+const STEMS = ['s1', 's2', 's3', 's4'];
+const P = (id: string, pages: string[], extra: Partial<WorkPart> = {}): WorkPart =>
+  ({ id, kind: 'letter', pages, creators: [], attached_to: null, needs_review: false, ...extra });
+
+describe('partsModel', () => {
+  it('sortParts: esimese lehe järgi, lehtedeta lõpus', () => {
+    const out = sortParts([P('b', ['s3']), P('x', [], { needs_review: true }), P('a', ['s2', 's4'])], STEMS);
+    expect(out.map(p => p.id)).toEqual(['a', 'b', 'x']);
+  });
+
+  it('pageBadges: jagatud lehel mitu märki, number = sisukorra järjekord', () => {
+    const m = pageBadges([P('b', ['s3']), P('a', ['s2', 's3'])], STEMS);
+    expect(m.get('s3')!.map(b => [b.partId, b.index])).toEqual([['a', 1], ['b', 2]]);
+    expect(m.get('s1')).toBeUndefined();
+  });
+
+  it('sharedStems: teiste osadega jagatud tüved', () => {
+    const a = P('a', ['s2', 's3']);
+    expect([...sharedStems(a, [a, P('b', ['s3'])])]).toEqual([['s3', ['b']]]);
+  });
+
+  it('draft ↔ osa: tühjad väljad välja, place_to ainult kirjal', () => {
+    const d = { ...emptyDraft('poem'), title: ' ', place_to: { id: 'Q1', label: 'X' } };
+    const input = partFromDraft(d, ['s1']);
+    expect(input).toEqual({ kind: 'poem', pages: ['s1'], creators: [], attached_to: null });
+    const back = draftFromPart(P('a', ['s1'], { title: 'T', kind: 'letter', place_to: { id: 'Q1', label: 'X' } }));
+    expect(partFromDraft(back, ['s1'])).toMatchObject({ title: 'T', place_to: { id: 'Q1', label: 'X' } });
+  });
+});
