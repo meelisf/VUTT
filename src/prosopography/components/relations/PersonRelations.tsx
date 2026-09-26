@@ -38,7 +38,6 @@ const PersonRelations: React.FC<{ personId: string; card?: ProsopoRecord | null 
   const [highlight, setHighlight] = useState<string | null>(null);
   const popover = usePopover();
   const location = useLocation();
-  useEffect(() => { if (location.hash === `#${MAP_ANCHOR}`) setTab('map'); }, [location.hash]);
   const collection = scoped ? selectedCollection : null;
 
   useEffect(() => {
@@ -55,6 +54,16 @@ const PersonRelations: React.FC<{ personId: string; card?: ProsopoRecord | null 
 
   const data = loaded && loaded.personId === personId ? loaded.data : null;
   const net = useMemo(() => (data ? applyFilters(data, filter) : null), [data, filter]);
+
+  // Päise „Seoste kaart" (#seosed-kaart): ava kaart ja keri sektsioonini. Võti on
+  // location.key, mitte hash — korduv klikk sama hash'iga peab samuti töötama. Kerimine
+  // alles siis, kui sektsioon on renderdatud (laisk chunk + päring); router hash'iga ei keri.
+  const hasNet = !!net;
+  useEffect(() => {
+    if (location.hash !== `#${MAP_ANCHOR}` || !hasNet) return;
+    setTab('map');
+    document.getElementById(MAP_ANCHOR)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [location.key, location.hash, hasNet]);
 
   const lang = i18n.language === 'en' ? 'en' : 'et';
   const mapUrl = `/persons?view=map&related_to=${encodeURIComponent(personId)}`

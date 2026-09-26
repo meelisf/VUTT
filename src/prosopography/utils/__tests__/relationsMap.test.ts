@@ -1,7 +1,7 @@
 // src/prosopography/utils/__tests__/relationsMap.test.ts
 import { describe, it, expect } from 'vitest';
 import { applyFilters, DEFAULT_FILTER } from '../network';
-import { lifeStations, mapYearOf, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
+import { lifeStations, lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
 import type { PersonNetwork } from '../../services/networkService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 
@@ -100,5 +100,30 @@ describe('lifeStations (Fischer)', () => {
   it('Q-koodita koht leitakse sildi järgi', () => {
     const card = { ...CARD, birth: date('1636', { id: null, label: 'Lübeck' }), origin: { ...CARD.origin, place_id: null } } as ProsopoRecord;
     expect(lifeStations(card, REG).mapped[0]).toMatchObject({ kind: 'birth', placeLabel: 'Lübeck' });
+  });
+});
+
+describe('lifeStations kuupäevaväljad (arvustuse I2)', () => {
+  const REG2: Record<string, PlaceEntry> = { ...REG, 'Riia': { id: 'Q1773', labels: { et: 'Riia' }, coordinates: { lat: 56.95, lon: 24.1 } } };
+  it('haridus: kanooniline date_from, mitte ainult date_start; järjestus õige', () => {
+    const card = { ...CARD, education: [{ institution: 'Riia', institution_id: 'Q1773', date_from: { date: '1655-09-25', precision: 'day' } }] } as unknown as ProsopoRecord;
+    const kinds = lifeStations(card, REG2).mapped.map(s => [s.kind, s.year]);
+    expect(kinds.slice(0, 3)).toEqual([['birth', 1636], ['education', 1655], ['occupation', 1700]]);
+  });
+  it('vanad year_from / year väljad', () => {
+    const card = { ...CARD, occupations: [{ label: 'Pastor', institution: 'Riia', institution_id: 'Q1773', year_from: 1690 }],
+                   education: [{ institution: 'Riia', institution_id: 'Q1773', year: 1655 }] } as unknown as ProsopoRecord;
+    const years = lifeStations(card, REG2).mapped.map(s => s.year);
+    expect(years).toEqual([1636, 1655, 1690, 1705]);
+  });
+});
+
+describe('lifeView registri olek (arvustuse M2)', () => {
+  it('laadimisel ja vea korral ei väida, et koht registris puudub', () => {
+    expect(lifeView(CARD, 'loading').status).toBe('loading');
+    expect(lifeView(CARD, 'error').status).toBe('error');
+    const ready = lifeView(CARD, REG);
+    expect(ready.status).toBe('ready');
+    expect(ready.mapped.length).toBe(3);
   });
 });

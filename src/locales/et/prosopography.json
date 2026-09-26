@@ -353,7 +353,9 @@
       "no_place": "koht märkimata",
       "not_in_registry": "koht registris puudub",
       "no_coordinates": "kohal pole koordinaate"
-    }
+    },
+    "registryLoading": "Laadin kohtade registrit…",
+    "registryError": "Kohtade registri laadimine ebaõnnestus; elukäiku ei saa kaardile panna."
   },
   "place": {
     "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",

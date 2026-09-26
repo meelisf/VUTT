@@ -14,7 +14,7 @@ import { fetchPlaces } from '../../services/prosopographyService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 import type { VisibleNetwork } from '../../utils/network';
 import { KIND_ORDER } from '../../utils/network';
-import { lifeStations, mapYearOf, originGroups, originPrintLinks, printPlaces } from '../../utils/relationsMap';
+import { lifeView, mapYearOf, originGroups, originPrintLinks, printPlaces, type RegistryState } from '../../utils/relationsMap';
 import { KIND_COLOR } from './kindStyle';
 import type { usePopover } from './RelationPopover';
 
@@ -22,7 +22,8 @@ type Layer = 'origin' | 'originPrint' | 'print' | 'life';
 const LAYERS: Layer[] = ['origin', 'originPrint', 'print', 'life'];
 
 let placesPromise: Promise<Record<string, PlaceEntry>> | null = null;
-const loadPlaces = () => (placesPromise ??= fetchPlaces().catch(() => { placesPromise = null; return {}; }));
+// Viga EI muutu tühjaks registriks — siis väidaks elukäik iga jaama kohta „registris puudub".
+const loadPlaces = () => (placesPromise ??= fetchPlaces().catch(err => { placesPromise = null; throw err; }));
 
 function pieIcon(kinds: Partial<Record<string, number>>, count: number) {
   const total = Object.values(kinds).reduce<number>((a, b) => a + (b ?? 0), 0) || 1;
@@ -54,13 +55,17 @@ const RelationsMap: React.FC<{
   const { t, i18n } = useTranslation(['prosopography']);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const [layer, setLayer] = useState<Layer>('origin');
-  const [registry, setRegistry] = useState<Record<string, PlaceEntry> | null>(null);
-  useEffect(() => { let alive = true; loadPlaces().then(r => { if (alive) setRegistry(r); }); return () => { alive = false; }; }, []);
+  const [registry, setRegistry] = useState<RegistryState>('loading');
+  useEffect(() => {
+    let alive = true;
+    loadPlaces().then(r => { if (alive) setRegistry(r); }).catch(() => { if (alive) setRegistry('error'); });
+    return () => { alive = false; };
+  }, []);
 
   const origin = useMemo(() => originGroups(net), [net]);
   const prints = useMemo(() => printPlaces(net), [net]);
   const links = useMemo(() => originPrintLinks(net), [net]);
-  const life = useMemo(() => (card && registry ? lifeStations(card, registry) : { mapped: [], unmapped: [] }), [card, registry]);
+  const life = useMemo(() => lifeView(card, registry), [card, registry]);
   const year = useMemo(() => mapYearOf(net, card?.birth?.date ? Number(card.birth.date.slice(0, 4)) + 30 : 1650), [net, card]);
   const focusCoords = net.focus.origin?.coordinates ?? null;
 
@@ -163,7 +168,9 @@ const RelationsMap: React.FC<{
       )}
       {layer === 'life' && (
         <div className="text-xs text-gray-600">
-          {life.mapped.length === 0 && life.unmapped.length === 0 && <p>{t('network.noStations')}</p>}
+          {life.status === 'loading' && <p>{t('network.registryLoading')}</p>}
+          {life.status === 'error' && <p className="text-red-600">{t('network.registryError')}</p>}
+          {life.status === 'ready' && life.mapped.length === 0 && life.unmapped.length === 0 && <p>{t('network.noStations')}</p>}
           {life.mapped.length > 0 && (
             <ol className="list-decimal pl-5">
               {life.mapped.map(s => (

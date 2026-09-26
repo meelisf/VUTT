@@ -353,7 +353,9 @@
       "no_place": "place not recorded",
       "not_in_registry": "place missing from the register",
       "no_coordinates": "place has no coordinates"
-    }
+    },
+    "registryLoading": "Loading the place register…",
+    "registryError": "Could not load the place register; the life course cannot be mapped."
   },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",

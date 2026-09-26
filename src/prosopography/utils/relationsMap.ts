@@ -92,6 +92,14 @@ const yearOf = (d?: string | null): number | null => {
 
 type PlaceRef = { id?: string | null; label?: string | null } | null | undefined;
 
+/** Kirje aasta: kanooniline `date_from.date`, siis vanad `date_start` / `year_from` / `year`. */
+function entryYear(e: { date_from?: { date?: string | null } | null; date_start?: string | null; year_from?: number | null; year?: number | null } | null | undefined): number | null {
+  if (!e) return null;
+  return yearOf(e.date_from?.date) ?? yearOf(e.date_start)
+    ?? (typeof e.year_from === 'number' ? e.year_from : null)
+    ?? (typeof e.year === 'number' ? e.year : null);
+}
+
 function resolve(place: PlaceRef, registry: Record<string, PlaceEntry>) {
   if (!place || (!place.id && !place.label)) return { placeLabel: null, coords: null, reason: 'no_place' as const };
   const entry = (place.id && Object.values(registry).find(e => e.id === place.id))
@@ -122,11 +130,11 @@ export function lifeStations(card: ProsopoRecord, registry: Record<string, Place
     first.unshift({ kind: 'origin', label: null, year: null, ...resolve(originRef, registry) });
   }
   for (const e of card.education ?? []) {
-    middle.push({ kind: 'education', label: e?.institution ?? null, year: yearOf(e?.date_start),
+    middle.push({ kind: 'education', label: e?.institution ?? null, year: entryYear(e),
       ...resolve({ id: e?.institution_id ?? null, label: e?.institution ?? null }, registry) });
   }
   for (const o of card.occupations ?? []) {
-    middle.push({ kind: 'occupation', label: o?.label ?? null, year: yearOf(o?.date_from?.date),
+    middle.push({ kind: 'occupation', label: o?.label ?? null, year: entryYear(o),
       ...resolve({ id: o?.institution_id ?? null, label: o?.institution ?? null }, registry) });
   }
   middle.sort((a, b) => (a.year ?? Infinity) - (b.year ?? Infinity));
@@ -142,4 +150,17 @@ export function lifeStations(card: ProsopoRecord, registry: Record<string, Place
   const mapped = all.filter(s => s.coords).map((s, i) => ({ ...s, n: i + 1 }));
   const unmapped = all.filter(s => !s.coords);
   return { mapped, unmapped };
+}
+
+export type RegistryState = Record<string, PlaceEntry> | 'loading' | 'error';
+
+/**
+ * Elukäigu vaade koos registri olekuga: laadimisel ja vea korral EI väideta, et koht
+ * registris puudub (see oleks vale väide andmete kohta).
+ */
+export function lifeView(card: ProsopoRecord | null, registry: RegistryState) {
+  if (registry === 'loading') return { status: 'loading' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
+  if (registry === 'error') return { status: 'error' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
+  if (!card) return { status: 'ready' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
+  return { status: 'ready' as const, ...lifeStations(card, registry) };
 }

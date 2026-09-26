@@ -1,7 +1,7 @@
 // src/prosopography/components/relations/__tests__/PersonRelations.test.tsx
 /** @vitest-environment jsdom */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Link } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import './testI18n';
 
@@ -118,6 +118,32 @@ describe('PersonRelations', () => {
   it('#seosed-kaart avab kaardi vahekaardi', async () => {
     impl.fn = async () => net([acad], [A]);
     render(<MemoryRouter initialEntries={['/persons/x#seosed-kaart']}><PersonRelations personId={F} /></MemoryRouter>);
+    expect(await screen.findByText('KAART-MOCK')).toBeTruthy();
+  });
+  it('#seosed-kaart kerib sektsioonini, kui andmed on olemas (külm laadimine)', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    impl.fn = async () => net([acad], [A]);
+    render(<MemoryRouter initialEntries={['/persons/x#seosed-kaart']}><PersonRelations personId={F} /></MemoryRouter>);
+    await screen.findByText('KAART-MOCK');
+    expect(scroll).toHaveBeenCalled();
+  });
+
+  it('päise nupu korduv klikk avab kaardi uuesti ka sama hash\'iga', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    impl.fn = async () => net([acad], [A]);
+    render(
+      <MemoryRouter initialEntries={['/persons/x']}>
+        <Link to="#seosed-kaart">Seoste kaart</Link>
+        <PersonRelations personId={F} />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Anna');
+    fireEvent.click(screen.getByText('Seoste kaart'));
+    expect(await screen.findByText('KAART-MOCK')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Loend' }));
+    expect(screen.queryByText('KAART-MOCK')).toBeNull();
+    fireEvent.click(screen.getByText('Seoste kaart'));
     expect(await screen.findByText('KAART-MOCK')).toBeTruthy();
   });
 });
