@@ -461,10 +461,16 @@ def get_person_map_markers(
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
     sync_from_facade()
     if related_to:
-        network_ids = get_person_relation_network_ids(related_to)
+        # Üks tõde (#461): kogu filtreerib ühiseid teoseid ehitajas, mitte isikuid
+        # pärast (_persons_in_collection vaatab isiku KÕIKI teoseid ja andis teise hulga).
+        network_ids = get_person_relation_network_ids(related_to, collection=collection)
+        if collection and related_to not in _persons_in_collection(collection):
+            # Fookus jääb piiratud kaardile ainult kogu liikmena — muidu kaoks #460
+            # tühja kaardi vihje „… kuulub teise kollektsiooni".
+            network_ids = [i for i in network_ids if i != related_to]
         ids = list(dict.fromkeys([*(ids or []), *network_ids])) if ids else network_ids
 
-    if collection:
+    if collection and not related_to:
         collection_ids = _persons_in_collection(collection)
         if ids is not None:
             ids = [i for i in ids if i in collection_ids]

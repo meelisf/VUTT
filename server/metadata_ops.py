@@ -16,6 +16,7 @@ from .utils import metadata_lock
 from .git_ops import save_with_git, uncommitted_paths
 from .meilisearch_ops import sync_work_to_meilisearch, sync_work_to_meilisearch_async
 from .prosopography.indices import update_person_to_works, update_work_collections
+from .prosopography.work_relations_ops import update_work_facts
 from .prosopography.person_crud import ensure_prosopo_stubs
 from .save_diff import metadata_unchanged
 
@@ -167,6 +168,7 @@ def bulk_update_works(
         slug = os.path.basename(os.path.dirname(meta_path))
 
         update_work_collections(meta.get("id"), meta.get("collections") or [])
+        update_work_facts(meta)
 
         if call_ptw:
             ptw_args = (
@@ -300,6 +302,7 @@ def save_work_metadata(
 
     # Kollektsioonid uuenevad ka bulk-collection teel (call_ptw=False) — tingimusteta
     update_work_collections(meta.get("id"), meta.get("collections") or [])
+    update_work_facts(meta)
     collections_done = time.monotonic()
 
     if call_ptw:

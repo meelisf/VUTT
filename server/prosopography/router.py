@@ -587,6 +587,20 @@ def prosopography_get_image(
     return FileResponse(path, media_type=media_type, headers=headers)
 
 
+@router.get("/{person_id:path}/network")
+def prosopography_network(person_id: str, collection: Optional[str] = None):
+    """Isiku seoste võrgustik (#461). Avalik; vastus ei sõltu kutsujast.
+
+    Piiratud kogu teose pealkiri on kaasas märkega restricted (sama poliitika mis
+    POST /work-titles). Sync def: loeb read-model faile (ADR 0002).
+    """
+    from .network import build_person_network
+    result = build_person_network(person_id, collection=collection or None)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    return result
+
+
 @router.delete("/{person_id:path}/image")
 async def prosopography_delete_image(
     person_id: str,

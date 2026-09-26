@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from server.prosopography.work_relations_ops import (
     build_works_creators_index,
-    update_works_creators_index,
+    update_work_facts,
     get_work_relations,
 )
 
@@ -111,7 +111,7 @@ def test_build_index_ignores_non_vutt(tmp_path):
     assert A_ID in creator_ids
 
 
-# ── update_works_creators_index ───────────────────────────────────────────────
+# ── update_work_facts ───────────────────────────────────────────────
 
 def test_update_index_adds_new_work(tmp_path):
     """Uue teose lisamisel uuendatakse indeksit."""
@@ -119,14 +119,14 @@ def test_update_index_adds_new_work(tmp_path):
     state_dir.mkdir()
     patches = _patch(tmp_path, state_dir=state_dir)
     with patches[0], patches[1], patches[2], patches[3]:
-        update_works_creators_index("w2", [{"id": A_ID, "role": "autor"}], title="Uus teos", year=1690)
+        update_work_facts({"id": "w2", "title": "Uus teos", "year": 1690, "creators": [{"id": A_ID, "role": "autor"}]})
     idx = _read_index(state_dir)
     assert "w2" in idx
     assert idx["w2"]["creators"][0]["person_id"] == A_ID
 
 
-def test_update_index_removes_empty_work(tmp_path):
-    """Kui creators on tühi, eemaldatakse teos indeksist."""
+def test_update_index_hoiab_loojateta_teost(tmp_path):
+    """Loojateta teos saab kirje (#461): märksõna- või trükkalipõhine teos vajab fakte."""
     state_dir = tmp_path / "state"
     state_dir.mkdir()
     (state_dir / "works_creators_index.json").write_text(
@@ -135,9 +135,10 @@ def test_update_index_removes_empty_work(tmp_path):
     )
     patches = _patch(tmp_path, state_dir=state_dir)
     with patches[0], patches[1], patches[2], patches[3]:
-        update_works_creators_index("w1", [], title="X", year=1680)
+        update_work_facts({"id": "w1", "title": "X", "year": 1680, "creators": []})
     idx = _read_index(state_dir)
-    assert "w1" not in idx
+    assert "w1" in idx
+    assert idx["w1"]["creators"] == []
 
 
 # ── get_work_relations ────────────────────────────────────────────────────────

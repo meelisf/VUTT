@@ -75,3 +75,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0053](0053-lehe-kirjutus-lehe-luku-all.md) | Lehe JSON-i lugemine–muutmine–kirjutamine käib lehe luku all (`page_locks.page_lock`); kommentaaritoimingud kirjutavad ainult `.json`-i | kehtib |
 | [0054](0054-lehe-salvestus-liidab-baasseisu-vastu.md) | Lehe salvestus liidab kolmesuunaliselt kliendi baasseisu vastu (tekst+kirjed koos, kommentaarid id kaupa); kokkupõrge → 409 + dialoog | kehtib |
 | [0055](0055-mainimised-skannitakse-tagimuutusel.md) | Lehe salvestus skannib isikumainimisi ainult `vutt:P` tägide muutusel; lehenumbreid nihutav tee kutsub `refresh_work_mentions` | kehtib |
+| [0056](0056-isikuseose-liik-rollipaarist.md) | Isikuseose liik tuleneb rollipaarist ühes kohas (`network_rules.classify_pair`, sümmeetriline); üks võrgustiku ehitaja; teose faktid kirjutab ainult `update_work_facts`, kogud tulevad `work_collections_index`-ist | kehtib |

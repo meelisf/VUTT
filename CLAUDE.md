@@ -301,6 +301,13 @@ sektsioonis. ID-lisav tee võtab `ext_id_claim_lock`-i ENNE `person_lock`-i.
 Automaatrikastus täidab ainult tühja; välisallika päringut ei tehta luku all.
 Uus isik ainult `create_person_checked` kaudu (`POST /prosopography/persons/create`).
 
+**Isiku seosed (ADR 0056)** — seose liik tuleneb rollipaarist AINULT
+`network_rules.classify_pair`-is (sümmeetriline); võrgustiku ehitaja on üks
+(`network.build_person_network`) nii isikulehele kui `/persons` seoste kaardile.
+`works_creators_index.json` kirjutab AINULT `update_work_facts` (tingimusteta,
+`update_work_collections` kõrval); kogud ja `restricted` tulevad
+`work_collections_index.json`-ist. Trükikoht EI OLE kohtumiskoht.
+
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
 allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `urlTransform`
