@@ -241,7 +241,9 @@ säilitab pereseosed. Need annavad eri tulemuse. Seepärast läheb PR 1-sse:
 - **fookus jääb suurele kaardile** nagu praegu: `get_person_relation_network_ids`
   tagastab fookuse + seotud isikud (miinus `printer`). Kaart näitab fookust tema
   päritolukohas, kui see on teada. Endpointi `persons` fookust ei sisalda, sest fookus on
-  eraldi `focus` väljal;
+  eraldi `focus` väljal. Piiratud režiimis (`collection` antud) jääb fookus kaardile
+  ainult siis, kui ta ise kuulub kogusse (`_persons_in_collection`). Nii säilib #460
+  tühja kaardi vihje „… kuulub teise kollektsiooni";
 - testid kahes astmes, nii ilma koguta kui koguga ja alamkoguga:
   1. **ID-hulk enne koordinaadifiltrit:** `get_person_relation_network_ids(id,
      collection)` == `{focus} ∪ build_person_network(id, collection).persons` miinus
