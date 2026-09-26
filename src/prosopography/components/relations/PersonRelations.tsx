@@ -4,8 +4,8 @@
  * kolm vaadet (Võrgustik · Ajatelg · Loend), ühised filtrid, esiletõst ja hüpikaken.
  * Kogu lüliti: vaikimisi kogu ei piira (sama mis #460 seoste kaart).
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Waypoints, Map as MapIcon } from 'lucide-react';
 import { useCollection } from '../../../contexts/CollectionContext';
@@ -16,11 +16,17 @@ import RelationPopover, { usePopover } from './RelationPopover';
 import RelationsGraph from './RelationsGraph';
 import RelationsTimeline from './RelationsTimeline';
 import RelationsTable from './RelationsTable';
+import type { ProsopoRecord } from '../../types';
 
-type Tab = 'graph' | 'timeline' | 'table';
-const TABS: Tab[] = ['graph', 'timeline', 'table'];
+// Kaart on oma chunk'is (Leaflet on raske).
+const RelationsMap = lazy(() => import('./RelationsMap'));
 
-const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
+type Tab = 'graph' | 'timeline' | 'map' | 'table';
+const TABS: Tab[] = ['graph', 'timeline', 'map', 'table'];
+/** Päise „Seoste kaart" nupp viib siia (#461). */
+export const MAP_ANCHOR = 'seosed-kaart';
+
+const PersonRelations: React.FC<{ personId: string; card?: ProsopoRecord | null }> = ({ personId, card }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   const { selectedCollection, getCollectionName } = useCollection();
   // Andmed koos isikuga: kogu lüliti uuesti päring hoiab eelmise vaate alles, isiku vahetus mitte.
@@ -31,6 +37,8 @@ const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
   const [tab, setTab] = useState<Tab>('graph');
   const [highlight, setHighlight] = useState<string | null>(null);
   const popover = usePopover();
+  const location = useLocation();
+  useEffect(() => { if (location.hash === `#${MAP_ANCHOR}`) setTab('map'); }, [location.hash]);
   const collection = scoped ? selectedCollection : null;
 
   useEffect(() => {
@@ -98,6 +106,11 @@ const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
       <div className="mt-3">
         {tab === 'graph' && <RelationsGraph net={net} popover={popover} highlight={highlight} onHighlight={setHighlight} />}
         {tab === 'timeline' && <RelationsTimeline net={net} popover={popover} highlight={highlight} onHighlight={setHighlight} />}
+        {tab === 'map' && (
+          <Suspense fallback={null}>
+            <RelationsMap net={net} card={card ?? null} popover={popover} onHighlight={setHighlight} />
+          </Suspense>
+        )}
         {tab === 'table' && <RelationsTable net={net} />}
       </div>
       <RelationPopover state={popover.state} net={net} onClose={popover.close} />
@@ -108,7 +121,7 @@ const PersonRelations: React.FC<{ personId: string }> = ({ personId }) => {
 const Section: React.FC<{ children: React.ReactNode; mapUrl?: string; count?: number }> = ({ children, mapUrl, count }) => {
   const { t } = useTranslation(['prosopography']);
   return (
-    <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+    <div id={MAP_ANCHOR} className="mb-6 scroll-mt-24 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-2 text-gray-800">
         <span className="text-primary-600"><Waypoints size={18} /></span>
         <h4 className="font-bold">{t('network.title')}</h4>

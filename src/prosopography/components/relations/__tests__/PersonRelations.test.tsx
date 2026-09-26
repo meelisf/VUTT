@@ -19,6 +19,8 @@ vi.mock('../../../../contexts/CollectionContext', () => ({
   useCollection: () => ({ selectedCollection: 'agc', getCollectionName: () => 'Rootsi aja ülikool' }),
 }));
 
+vi.mock('../RelationsMap', () => ({ default: () => <div>KAART-MOCK</div> }));
+
 import PersonRelations from '../PersonRelations';
 
 const F = 'vutt:Pfocus';
@@ -106,5 +108,16 @@ describe('PersonRelations', () => {
     expect(await screen.findByText('Anna')).toBeTruthy();
     expect(fetchMock).toHaveBeenLastCalledWith(F, null);
   });
-});
+  it('Kaart vahekaart näitab kaarti (laisk)', async () => {
+    impl.fn = async () => net([acad], [A]);
+    renderIt();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Kaart' }));
+    expect(await screen.findByText('KAART-MOCK')).toBeTruthy();
+  });
 
+  it('#seosed-kaart avab kaardi vahekaardi', async () => {
+    impl.fn = async () => net([acad], [A]);
+    render(<MemoryRouter initialEntries={['/persons/x#seosed-kaart']}><PersonRelations personId={F} /></MemoryRouter>);
+    expect(await screen.findByText('KAART-MOCK')).toBeTruthy();
+  });
+});
