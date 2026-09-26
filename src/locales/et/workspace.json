@@ -337,7 +337,19 @@
       "sharedWarning": "Leht {{stem}} kuulub ka teise osasse; sellel lehel mainitud isikud seotakse mõlemaga.",
       "error": "Salvestamine ebaõnnestus: {{message}}",
       "newPart": "Uus osa",
-      "none": "—"
+      "none": "—",
+      "viewPages": "Lehed",
+      "viewToc": "Sisukord",
+      "thumbSize": "Pisipildi suurus",
+      "clearSelection": "Tühista valik",
+      "close": "Sulge",
+      "minimize": "Tõmba kokku",
+      "expand": "Ava",
+      "dragHint": "Lohista päisest",
+      "colNo": "Nr",
+      "colWho": "Pealkiri / isik",
+      "colPages": "Lehed",
+      "openPart": "Ava osa: {{name}}"
     }
   },
   "metadata": {

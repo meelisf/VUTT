@@ -1,6 +1,6 @@
 // src/pages/manage/__tests__/partsModel.test.ts
 import { describe, it, expect } from 'vitest';
-import { draftFromPart, emptyDraft, initialManageTab, pageBadges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
+import { draftFromPart, emptyDraft, initialManageTab, pageBadges, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
 import type { WorkPart } from '../../../services/workPartsApi';
 
 const STEMS = ['s1', 's2', 's3', 's4'];
@@ -57,5 +57,13 @@ describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
     tabSwitch(true, run, () => done.push('b'));
     expect(done).toEqual(['a', 'b']);
     expect(guarded).toEqual(['guard']);
+  });
+
+  it('pageRanges: järjestikused lehenumbrid vahemikuks, katkendlik komaga, tundmatu tüvi välja', () => {
+    const nums = new Map([['s1', 1], ['s2', 2], ['s3', 3], ['s4', 4], ['s9', 9]]);
+    expect(pageRanges(['s3', 's1', 's2', 's9'], nums)).toBe('1–3, 9');
+    expect(pageRanges(['s4'], nums)).toBe('4');
+    expect(pageRanges(['s4', 'gone'], nums)).toBe('4');
+    expect(pageRanges([], nums)).toBe('');
   });
 });
