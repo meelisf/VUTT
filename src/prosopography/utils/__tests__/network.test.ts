@@ -1,6 +1,6 @@
 // src/prosopography/utils/__tests__/network.test.ts
 import { describe, it, expect } from 'vitest';
-import { applyFilters, coEdges, familyLabel, otherEnd, DEFAULT_FILTER } from '../network';
+import { applyFilters, coEdges, familyLabel, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
 import type { PersonNetwork, NetworkEdge } from '../../services/networkService';
 
 const F = 'vutt:Pfocus';
@@ -106,5 +106,70 @@ describe('familyLabel', () => {
   it('tüübita kirje → null', () => {
     const e3 = { ...edge, records: [{ source_id: F, target_id: 'a', type: null }] };
     expect(familyLabel(e3, F, labelOf)).toBeNull();
+  });
+});
+
+describe('radialLayout', () => {
+  it('rühmitab liigi järgi, siis esimese aasta järgi, ringil', () => {
+    const v = applyFilters(NET, DEFAULT_FILTER);
+    const { nodes, cx, cy, radius } = radialLayout(v, { w: 600, h: 600 });
+    expect(nodes.map(n => n.person.id)).toEqual(['a', 'b', 'c']);   // academic, siis cotext (b 1658 enne c 1660)
+    for (const n of nodes) {
+      expect(Math.hypot(n.x - cx, n.y - cy)).toBeCloseTo(radius, 5);
+    }
+  });
+
+  it('üle 40 isiku: sildid ainult suurima seosega isikutel', () => {
+    const many: PersonNetwork = {
+      ...NET,
+      persons: Array.from({ length: 60 }, (_, i) => P(`p${i}`)),
+      edges: Array.from({ length: 60 }, (_, i) => E('cotext', `p${i}`, i < 5 ? 'w1' : `x${i}`)),
+      works: [W('w1'), ...Array.from({ length: 60 }, (_, i) => W(`x${i}`))],
+    };
+    // p0..p4 saavad lisaks teise teose → workCount 2
+    many.edges.push(...Array.from({ length: 5 }, (_, i) => E('cotext', `p${i}`, 'w2')));
+    many.works.push(W('w2'));
+    const { nodes } = radialLayout(applyFilters(many, DEFAULT_FILTER), { w: 800, h: 800 });
+    const labelled = nodes.filter(n => n.labelled).map(n => n.person.id).sort();
+    expect(labelled).toEqual(['p0', 'p1', 'p2', 'p3', 'p4']);
+  });
+
+  it('kuni 40 isikut: kõik sildiga', () => {
+    const { nodes } = radialLayout(applyFilters(NET, DEFAULT_FILTER), { w: 600, h: 600 });
+    expect(nodes.every(n => n.labelled)).toBe(true);
+  });
+});
+
+describe('timelineRows', () => {
+  it('sama aasta teosed = üks liitmärk, tugevaim liik', () => {
+    const v = applyFilters(NET, DEFAULT_FILTER);
+    const a = timelineRows(v).rows.find(r => r.person.id === 'a')!;
+    const y1658 = a.marks.find(m => m.year === 1658)!;
+    expect(y1658.works).toEqual(['w1']);
+    expect(y1658.kind).toBe('academic');
+  });
+
+  it('aastata teos ja pereserv → „Aeg teadmata" (year null), rida ei kao', () => {
+    const net: PersonNetwork = {
+      ...NET,
+      persons: [P('d'), P('fam')],
+      works: [W('w3', null)],
+      edges: [E('cotext', 'd', 'w3', null),
+              { kind: 'family', from: 'fam', to: F, directed: false, year: null, place: null, evidence: null,
+                records: [{ source_id: F, target_id: 'fam', type: 'isa' }] }],
+    };
+    const t = timelineRows(applyFilters(net, DEFAULT_FILTER));
+    expect(t.hasUndated).toBe(true);
+    expect(t.rows.map(r => r.person.id).sort()).toEqual(['d', 'fam']);
+    expect(t.rows.every(r => r.marks.every(m => m.year === null))).toBe(true);
+    expect(t.minYear).toBeNull();
+  });
+
+  it('read järjestatud esimese aasta järgi, aastata read lõpus', () => {
+    const net: PersonNetwork = { ...NET, persons: [...NET.persons, P('d')], works: [...NET.works],
+      edges: [...NET.edges, E('cotext', 'd', 'w3', null)] };
+    const ids = timelineRows(applyFilters(net, DEFAULT_FILTER)).rows.map(r => r.person.id);
+    expect(ids[ids.length - 1]).toBe('d');
+    expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('c'));
   });
 });

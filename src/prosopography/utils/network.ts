@@ -94,3 +94,67 @@ export function familyLabel(edge: NetworkEdge, focusId: string, labelOf: (id: st
   const other = recs.find(r => r.type);
   return other ? `${labelOf(other.source_id)}: ${other.type}` : null;
 }
+export interface RadialNode { person: VisiblePerson; x: number; y: number; angle: number; r: number; labelled: boolean; }
+
+const LABEL_ALL_MAX = 40;
+const LABEL_TOP = 0.93;   // üle 40 isiku: sildid ülemisele ~7%-le (workCount järgi)
+
+export function radialLayout(v: VisibleNetwork, size: { w: number; h: number }) {
+  const cx = size.w / 2;
+  const cy = size.h / 2;
+  const many = v.persons.length > LABEL_ALL_MAX;
+  const radius = Math.min(size.w, size.h) / 2 - (many ? 110 : 130);
+  const sorted = [...v.persons].sort((a, b) =>
+    rank(a.kind) - rank(b.kind)
+    || (a.firstYear ?? 9999) - (b.firstYear ?? 9999)
+    || a.label.localeCompare(b.label));
+  const kinds = new Set(sorted.map(p => p.kind));
+  const gap = 0.1;
+  const span = 2 * Math.PI - gap * kinds.size;
+  const step = span / Math.max(1, sorted.length);
+  const maxCount = Math.max(1, ...sorted.map(p => p.workCount));
+  const counts = sorted.map(p => p.workCount).sort((a, b) => a - b);
+  const threshold = many ? Math.max(2, counts[Math.floor(LABEL_TOP * (counts.length - 1))]) : 0;
+  let angle = -Math.PI / 2 + gap / 2;
+  let prev: RelationKind | null = null;
+  const nodes: RadialNode[] = sorted.map(person => {
+    if (prev && person.kind !== prev) angle += gap;
+    const a = angle + step / 2;
+    angle += step;
+    prev = person.kind;
+    const r = 3.5 + Math.sqrt(person.workCount / maxCount) * (many ? 5.5 : 9.5);
+    return { person, angle: a, r, x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a),
+             labelled: !many || person.workCount >= threshold };
+  });
+  return { cx, cy, radius, nodes };
+}
+
+export interface TimelineMark { year: number | null; works: string[]; kind: RelationKind; }
+export interface TimelineRow { person: VisiblePerson; marks: TimelineMark[]; }
+
+export function timelineRows(v: VisibleNetwork) {
+  let minYear: number | null = null;
+  let maxYear: number | null = null;
+  let hasUndated = false;
+  const rows: TimelineRow[] = v.persons.map(person => {
+    const byYear = new Map<number | null, { works: Set<string>; kind: RelationKind }>();
+    for (const e of person.edges) {
+      const y = typeof e.year === 'number' ? e.year : null;
+      if (y === null) hasUndated = true;
+      else {
+        minYear = minYear === null ? y : Math.min(minYear, y);
+        maxYear = maxYear === null ? y : Math.max(maxYear, y);
+      }
+      const slot = byYear.get(y) ?? { works: new Set<string>(), kind: e.kind };
+      if (e.evidence?.work_id) slot.works.add(e.evidence.work_id);
+      if (rank(e.kind) < rank(slot.kind)) slot.kind = e.kind;
+      byYear.set(y, slot);
+    }
+    const marks = [...byYear].map(([year, s]) => ({ year, works: [...s.works], kind: s.kind }))
+      .sort((a, b) => (a.year ?? Infinity) - (b.year ?? Infinity));
+    return { person, marks };
+  });
+  rows.sort((a, b) => (a.person.firstYear ?? Infinity) - (b.person.firstYear ?? Infinity)
+    || b.person.workCount - a.person.workCount || a.person.label.localeCompare(b.person.label));
+  return { rows, minYear, maxYear, hasUndated };
+}
