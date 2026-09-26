@@ -75,3 +75,54 @@ def test_rebuild_ja_update_annavad_sama_kirje(tmp_path):
         (tmp_path / "wci.json").unlink()
         wro.update_work_facts(meta)
         assert _read(tmp_path)["w1"] == rebuilt
+
+
+# ── Uuendusteed (integratsioon) ───────────────────────────────────────────────
+
+def _work_dir(tmp_path, meta):
+    d = tmp_path / "data" / f"slug-{meta['id']}"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "_metadata.json").write_text(json.dumps(meta), encoding="utf-8")
+    return d / "_metadata.json"
+
+
+def _env(monkeypatch, tmp_path):
+    """Metaandmete salvestus ilma giti ja Meilita; indeksid tmp-is."""
+    from server import metadata_ops
+    from server.prosopography import ops
+    monkeypatch.setattr(wro, "BASE_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
+    monkeypatch.setattr(ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json"))
+    monkeypatch.setattr(ops, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json"))
+    monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch", lambda *_a, **_k: None)
+    # Git-kirjutus nagu tests/test_metadata_git_tulemus.py-s
+    monkeypatch.setattr(metadata_ops, "save_with_git", lambda *_a, **_k: {"success": True})
+    return metadata_ops
+
+
+def test_call_ptw_true_ei_kustuta_uusi_valju(monkeypatch, tmp_path):
+    """Vana update_works_creators_index kirjutas kirje üle ilma location/genres-ita."""
+    mo = _env(monkeypatch, tmp_path)
+    path = _work_dir(tmp_path, _meta(creators=[{"id": A, "role": "auctor"}]))
+    mo.save_work_metadata(str(path), {"title": "Uus pealkiri"}, "tester", "test",
+                          sync_meili=False, call_ptw=True)
+    e = _read(tmp_path)["w1"]
+    assert e["title"] == "Uus pealkiri"
+    assert e["location"] == {"id": "Q435295", "label": "Altdorf bei Nürnberg"}
+    assert e["genres"] == ["disputatsioon"]
+
+
+def test_loojateta_teos_ei_kao_call_ptw_true_jarel(monkeypatch, tmp_path):
+    mo = _env(monkeypatch, tmp_path)
+    path = _work_dir(tmp_path, _meta(creators=[], tags=[{"id": A, "entity_type": "person", "label": "X"}]))
+    mo.save_work_metadata(str(path), {"year": 1660}, "tester", "test", sync_meili=False, call_ptw=True)
+    assert _read(tmp_path)["w1"]["year"] == 1660
+
+
+def test_call_ptw_false_uuendab_fakte(monkeypatch, tmp_path):
+    """Hulgi- ja jagamisteed kasutavad call_ptw=False — faktid peavad ikka uuenema."""
+    mo = _env(monkeypatch, tmp_path)
+    path = _work_dir(tmp_path, _meta())
+    mo.save_work_metadata(str(path), {"location": {"id": "Q13972", "label": "Tartu"}},
+                          "tester", "test", sync_meili=False, call_ptw=False)
+    assert _read(tmp_path)["w1"]["location"] == {"id": "Q13972", "label": "Tartu"}

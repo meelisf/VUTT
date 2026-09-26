@@ -484,6 +484,8 @@ def _teosta_import(
             metadata.get("year"),
         )
         update_work_collections(work_id, metadata.get("collections") or [])
+        from ..prosopography.work_relations_ops import update_work_facts
+        update_work_facts({**metadata, "id": work_id})
     except Exception as e:
         logger.warning(f"import {upload_id}: person_to_works viga: {e}")
 

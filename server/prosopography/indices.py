@@ -319,10 +319,9 @@ def update_person_to_works(
 
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, data)
 
-    try:
-        state.update_works_creators_index(work_id, creators, title=title, year=year)
-    except Exception:
-        state.logger.exception("update_works_creators_index viga teose %s jaoks", work_id)
+    # Teose faktid (works_creators_index) kirjutab AINULT update_work_facts, mida
+    # metaandmete kirjutajad kutsuvad tingimusteta (#461). Siin kutsutud vana kirjutaja
+    # kirjutas kirje üle ilma location/genres-ita ja kustutas loojateta teose.
 
 
 def rebuild_indices():
