@@ -506,7 +506,7 @@ def test_delete_pages_refreshes_person_mentions(tmp_path, monkeypatch):
 def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, tmp_path):
     """
     POST /save peab käivitama update_page_person_mentions background task-i
-    kui meta_content sisaldab work_id välja.
+    kui meta_content sisaldab work_id välja JA lehe isikutägid muutusid (#420).
     """
     from server.routers import editing as editing_router
 
@@ -530,7 +530,7 @@ def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, t
         "original_path": "teos1",
         "file_name": "leht1.txt",
         "text_content": "uus tekst",
-        "meta_content": {"work_id": "workAAA", "page_tags": []},
+        "meta_content": {"work_id": "workAAA", "page_tags": [{"id": "vutt:Paaa", "label": "A"}]},
     })
 
     assert response.status_code == 200

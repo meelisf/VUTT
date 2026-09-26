@@ -38,6 +38,7 @@ from ..page_locks import page_lock
 from ..page_merge import PAGE_FIELDS, merge_page, read_page_view
 from ..page_paths import check_page_filename, require_existing_page
 from ..people_ops import process_person_fields_metadata
+from ..prosopography.indices import page_person_ids
 from ..prosopography.relations import update_page_person_mentions
 from ..save_diff import page_content_unchanged
 from ..utils import find_directory_by_id
@@ -140,12 +141,15 @@ def _save_page_locked(txt_path, text, client_meta, username, base=None):
     kokkupõrge viskab `_PageConflict`-i ja midagi ei kirjutata. `base`-ita
     (vana bundle) kirjutatakse kliendi seis nagu varem.
 
-    Tagastab (save_with_git tulemus | None kui muutusteta, liidetud leht | None).
+    Tagastab (save_with_git tulemus | None kui muutusteta, liidetud leht | None,
+    kas lehe isikutägid muutusid). Viimane otsustab, kas teose mainimisi on vaja
+    uuesti skannida (#420) — puhas tekstimuudatus seda ei vaja.
     """
     json_path = None
     meta_content = None
     merged_page = None
     additional = []
+    isikud_enne = isikud_parast = set()
     with page_lock(txt_path):
         if client_meta:
             json_path = os.path.splitext(txt_path)[0] + ".json"
@@ -157,21 +161,23 @@ def _save_page_locked(txt_path, text, client_meta, username, base=None):
             if os.path.exists(json_path):
                 try:
                     existing = _read_json_file(json_path)
+                    isikud_enne = page_person_ids(existing)
                     meta_content = merge_serveripoolsed_valjad(existing, meta_content)
                 except Exception:
                     pass
+            isikud_parast = page_person_ids(meta_content)
             additional.append((json_path, json.dumps(meta_content, indent=2, ensure_ascii=False)))
 
         # Kliendi värske updated_at üksi ei ole muudatus — vt server/save_diff.py.
         if page_content_unchanged(txt_path, text, json_path, meta_content):
-            return None, merged_page
+            return None, merged_page, False
 
         return save_with_git(
             txt_path,
             text,
             username,
             additional_files=additional if additional else None,
-        ), merged_page
+        ), merged_page, isikud_enne != isikud_parast
 
 
 @router.post("/save")
@@ -192,7 +198,7 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 
     txt_path = os.path.join(BASE_DIR, catalog, filename)
     try:
-        git_result, merged_page = await run_in_threadpool(
+        git_result, merged_page, isikud_muutusid = await run_in_threadpool(
             _save_page_locked, txt_path, text, data.get('meta_content'), user['username'],
             data.get('base'),
         )
@@ -209,7 +215,9 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     work_id = (data.get('meta_content') or {}).get('work_id')
-    if work_id:
+    # Teose täisskann ainult isikutägide muutusel (#420); lehenumbreid nihutavad
+    # teed kutsuvad `refresh_work_mentions`-it ise.
+    if work_id and isikud_muutusid:
         work_dir = os.path.join(BASE_DIR, catalog)
         background_tasks.add_task(update_page_person_mentions, work_id, work_dir)
     page_tag_qcodes = {

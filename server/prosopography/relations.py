@@ -8,8 +8,11 @@ from typing import Optional
 
 from . import state
 from .indices import _load_index, _load_person_to_works, collect_page_person_mentions
+from ..config import get_logger
 from .person_crud import get_person
 from ._compat import sync_from_facade
+
+logger = get_logger(__name__)
 
 _work_to_persons_cache = {"map": None, "expires": 0.0}
 _WORK_TO_PERSONS_TTL = 300  # sekundit
@@ -151,4 +154,20 @@ def update_page_person_mentions(work_id: str, work_dir: str):
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, data)
 
 
-__all__ = ['get_person_with_works', '_build_work_to_persons', 'get_persons_for_work', '_structured_relation_ids', 'get_person_relation_network_ids', 'get_relation_type_suggestions', 'update_page_person_mentions']
+def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None) -> None:
+    """Teose 'mentioned' seosed uuesti pärast lehtede hulga või järjekorra
+    muutust (#420). Salvestus skannib ainult isikutägide muutusel, seega PEAB
+    iga lehenumbreid nihutav tee selle ise kutsuma — muidu jäävad numbrid vanaks.
+
+    Viga logitakse, ei visata: lehetoiming on juba kettal ja commititud.
+    """
+    try:
+        if not work_id:
+            with open(os.path.join(work_dir, '_metadata.json'), 'r', encoding='utf-8') as f:
+                work_id = (json.load(f) or {}).get('id')
+        update_page_person_mentions(work_id, work_dir)
+    except Exception:
+        logger.exception(f"Mainimiste indeksi uuendus ebaõnnestus ({work_id or work_dir})")
+
+
+__all__ = ['get_person_with_works', '_build_work_to_persons', 'get_persons_for_work', '_structured_relation_ids', 'get_person_relation_network_ids', 'get_relation_type_suggestions', 'update_page_person_mentions', 'refresh_work_mentions']

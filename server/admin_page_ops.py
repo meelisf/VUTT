@@ -22,7 +22,7 @@ from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
-from .prosopography.relations import update_page_person_mentions
+from .prosopography.relations import refresh_work_mentions, update_page_person_mentions
 from .trash_reason import SPLIT_COMMIT_PREFIX, DELETE_COMMIT_PREFIX
 
 logger = get_logger(__name__)
@@ -479,6 +479,8 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
 
         # Meilisearch sync
         sync_work_to_meilisearch(folder_name)
+        # Poolitus nihutab järgmiste lehtede numbreid (#420).
+        refresh_work_mentions(path, work_id)
 
         new_page_count = len(get_sorted_images(path))
         return {"success": True, "new_page_count": new_page_count}
@@ -706,6 +708,7 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
         finally:
             if split:
                 sync_work_to_meilisearch(folder_name)
+                refresh_work_mentions(path, work_id)
 
         new_page_count = len(get_sorted_images(path))
     logger.info(f"PAGE-OPS {folder_name}: {rotated} pööret, {split} poolitust ({username})")
@@ -1019,6 +1022,8 @@ def add_pages(work_id, files, after_page_num, username):
         except Exception as e:
             meili_warning = str(e)
             logger.error(f"add_pages meili sync ebaõnnestus ({folder_name}): {e}")
+        # Lisatud lehed nihutavad järgmiste lehtede numbreid (#420).
+        refresh_work_mentions(path, work_id)
 
         inserted = [{"filename": p["filename"], "sequence": s}
                     for p, s in zip(written_pages, new_seqs)]

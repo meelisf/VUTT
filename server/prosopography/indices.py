@@ -12,6 +12,21 @@ from ._compat import sync_from_facade
 from ..meili_doc import enumerate_page_images
 
 
+def page_person_ids(page_data: Optional[dict]) -> set[str]:
+    """Lehe JSON-i (ümbrisega või ilma) `vutt:P` isikutägid — ÜKS reegel, mida
+    kasutavad nii teose skann kui salvestuse muutusekontroll (#420)."""
+    if not isinstance(page_data, dict):
+        return set()
+    source = page_data.get('meta_content', page_data)
+    if not isinstance(source, dict):
+        return set()
+    return {
+        tag['id'] for tag in source.get('page_tags') or []
+        if isinstance(tag, dict) and isinstance(tag.get('id'), str)
+        and tag['id'].startswith('vutt:P')
+    }
+
+
 def collect_page_person_mentions(work_dir: str) -> dict[str, list[int]]:
     """Kogub teose leheküljefailidest isiku-tägid: { person_id: [leheküljenumbrid] }.
 
@@ -41,14 +56,8 @@ def collect_page_person_mentions(work_dir: str) -> dict[str, list[int]]:
                 page_data = json.load(f)
         except Exception:
             continue
-        source = page_data.get('meta_content', page_data)
         page_num = page_nums.get(os.path.splitext(page_fname)[0])
-        for tag in source.get('page_tags') or []:
-            if not isinstance(tag, dict):
-                continue
-            pid = tag.get('id') or ''
-            if not pid.startswith('vutt:P'):
-                continue
+        for pid in page_person_ids(page_data):
             pages = mentions.setdefault(pid, [])
             if page_num is not None and page_num not in pages:
                 pages.append(page_num)
