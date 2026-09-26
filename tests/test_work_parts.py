@@ -259,3 +259,41 @@ def test_uldine_metaandmete_salvestus_lukkab_parts_tagasi():
         asyncio.run(editing.update_work_metadata(FakeRequest(), None, user={"username": "a", "role": "admin"}))
     assert e.value.status_code == 400
     assert "parts" in ALLOWED_METADATA_FIELDS
+
+
+# ── Arvustuse leiud (lukk, vananenud tüved) ───────────────────────────────────
+
+def test_vananenud_osa_ei_blokeeri_teisi_muudatusi(work):
+    """Üks vananenud tüvi (sünk ebaõnnestus / käsitsi) ei tohi blokeerida kõiki
+    selle teose osade muudatusi: iga kirjutus parandab puuduvad tüved enne muutust."""
+    meta = _meta(work)
+    meta["parts"] = [{"id": "old", "kind": "letter", "pages": ["t-001", "t-kadunud"], "creators": []},
+                     {"id": "gone", "kind": "poem", "pages": ["t-kadunud"], "creators": []}]
+    open(f"{work}/_metadata.json", "w").write(json.dumps(meta))
+    wp.create_part(work, {"kind": "speech", "pages": ["t-002"]}, "ed")
+    parts = {p["id"]: p for p in _meta(work)["parts"]}
+    assert parts["old"]["pages"] == ["t-001"]
+    assert parts["gone"]["pages"] == [] and parts["gone"]["needs_review"] is True
+    assert len(parts) == 3
+
+
+def test_kirjutus_hoiab_teose_lukku(work, monkeypatch):
+    """Tüvede lugemine ja kirjutus käivad work_lock'i all (sama järjekord mis lehetoimingutel:
+    work_lock → metadata_lock) — muidu võib samaaegne poolitus tüve vahepeal asendada."""
+    import contextlib
+    import server.admin_page_ops as aps
+    held = []
+    real_stems = wp.page_stems
+
+    @contextlib.contextmanager
+    def fake_lock(key, work_dir):
+        held.append(True)
+        try:
+            yield
+        finally:
+            held.pop()
+    monkeypatch.setattr(aps, "work_lock", fake_lock)
+    seen = []
+    monkeypatch.setattr(wp, "page_stems", lambda d: (seen.append(bool(held)), real_stems(d))[1])
+    wp.create_part(work, {"kind": "poem", "pages": ["t-001"]}, "ed")
+    assert seen and all(seen)

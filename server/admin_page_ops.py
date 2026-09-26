@@ -22,7 +22,7 @@ from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
-from .prosopography.relations import refresh_work_mentions, update_page_person_mentions
+from .prosopography.relations import refresh_work_mentions
 from .trash_reason import SPLIT_COMMIT_PREFIX, DELETE_COMMIT_PREFIX
 
 logger = get_logger(__name__)
@@ -1112,10 +1112,9 @@ def delete_pages(work_id, base_names, username):
             raise
 
         sync_work_to_meilisearch(folder_name)
-        # Kustutatud lehe isiku-tägid ei tohi 'mentioned' indeksisse rippuma jääda.
-        try:
-            update_page_person_mentions(work_id, path)
-        except Exception:
-            logger.exception(f"delete_pages: mainimiste indeksi uuendus ebaõnnestus ({work_id})")
+        # Kustutatud lehe isiku-tägid ei tohi 'mentioned' indeksisse rippuma jääda ja
+        # kustutatud leht peab osadest kaduma (#464) — refresh_work_mentions teeb mõlemat
+        # ega viska (vead logitakse).
+        refresh_work_mentions(path, work_id)
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "deleted": list(base_names), "new_page_count": new_page_count}

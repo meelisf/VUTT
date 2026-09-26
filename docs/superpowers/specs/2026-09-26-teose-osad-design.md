@@ -110,8 +110,8 @@ osa viited sõltuvad osade lehtedest. `refresh_work_mentions` saab valikulise ar
 `renamed`, mille ta annab edasi.
 
 Sellest tuleneb, et iga praegune ja tulevane lehe numbreid või faile muutev tee sünkroniseerib
-osad automaatselt. Kutsekohti on praegu kaheksa:
-- `admin_page_ops`: poolitus, `apply_page_ops` ja lisamine;
+osad automaatselt. Kutsekohti on praegu üheksa:
+- `admin_page_ops`: poolitus, `apply_page_ops`, lisamine ja **hulgikustutus `delete_pages`** (kasutajaliidese kustutustee; kutsus varem mainimiste uuendust otse ja jättis osad vahele);
 - `routers/pages.py`: kustutus, lisamine ja **ümberjärjestamine** (`/reorder-pages`, kus
   kutse on ruuteris);
 - `trash_ops`: kaks taastet.

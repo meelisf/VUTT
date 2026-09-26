@@ -134,12 +134,15 @@ def _write(work_dir: str, username: str, message: str, mutate) -> object:
     """Loe–muuda–kirjuta metadata_lock'i all. `mutate(parts, stems)` tagastab
     (uued_osad, tulemus) või viskab PartError'i."""
     from .metadata_ops import bulk_update_works
-    stems = page_stems(work_dir)
+    from . import admin_page_ops
     box: dict = {}
 
     def transform(meta: dict) -> dict:
         try:
-            parts, result = mutate(list(meta.get("parts") or []), stems)
+            # Vananenud tüved (ebaõnnestunud sünk, käsitsi muudatus) parandatakse enne
+            # muutust — muidu blokeeriks üks vigane osa kõik selle teose osade muudatused.
+            current, _ = remap_parts(list(meta.get("parts") or []), stems, None)
+            parts, result = mutate(current, stems)
             parts = validate_parts(parts, set(stems))
             for p in parts:
                 p["pages"] = _ordered(p["pages"], stems)
@@ -149,7 +152,11 @@ def _write(work_dir: str, username: str, message: str, mutate) -> object:
             box["error"] = e
             raise
 
-    res = bulk_update_works([(os.path.join(work_dir, "_metadata.json"), transform)], username, message)
+    # Tüvede lugemine ja kirjutus teose luku all: sama järjekord mis lehetoimingutel
+    # (work_lock → metadata_lock), muidu võib samaaegne poolitus tüve vahepeal asendada.
+    with admin_page_ops.work_lock(os.path.basename(work_dir), work_dir):
+        stems = page_stems(work_dir)
+        res = bulk_update_works([(os.path.join(work_dir, "_metadata.json"), transform)], username, message)
     if "error" in box:
         raise box["error"]
     if res.get("failed"):

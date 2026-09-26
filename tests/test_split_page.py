@@ -321,3 +321,29 @@ def test_poolitus_asendab_osa_lehe_molema_poolega(work_dir, monkeypatch):
     stems = [os.path.splitext(n)[0] for n in get_sorted_images(str(folder))]
     parts = json.loads((folder / "_metadata.json").read_text())["parts"]
     assert parts[0]["pages"] == stems and len(stems) == 2
+
+
+def test_lehtede_kustutus_uhtlustab_osad(work_dir, monkeypatch):
+    """Arvustuse kriitiline leid: UI kustutab lehti delete_pages'iga, mis kutsus mainimisi
+    otse ja jättis osad sünkroniseerimata. Nüüd refresh_work_mentions → sync_work_parts."""
+    from server import metadata_ops
+    import server.admin_page_ops as aps
+
+    def fake_save(path, content, *a, additional_files=None, **k):
+        open(path, "w", encoding="utf-8").write(content)
+        return {"success": True}
+    monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
+    for name in ("sync_work_to_meilisearch", "update_person_to_works", "update_work_collections", "update_work_facts"):
+        monkeypatch.setattr(metadata_ops, name, lambda *a, **k: None)
+    monkeypatch.setattr(aps, "delete_pages_from_git", lambda *a, **k: None)
+
+    folder = work_dir["folder"]
+    stem = "1690-test-work-testwork1-pg001"
+    meta = json.loads((folder / "_metadata.json").read_text())
+    meta["parts"] = [{"id": "p1", "kind": "letter", "pages": [stem], "creators": []}]
+    (folder / "_metadata.json").write_text(json.dumps(meta))
+
+    aps.delete_pages(work_dir["work_id"], [stem], "testadmin")
+
+    part = json.loads((folder / "_metadata.json").read_text())["parts"][0]
+    assert part["pages"] == [] and part["needs_review"] is True
