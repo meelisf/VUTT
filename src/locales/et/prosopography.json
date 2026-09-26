@@ -281,6 +281,7 @@
     "tabs": {
       "graph": "Võrgustik",
       "timeline": "Ajatelg",
+      "map": "Kaart",
       "table": "Loend"
     },
     "kinds": {
@@ -323,6 +324,35 @@
       "span": "Aastad",
       "roles": "Rollid",
       "worksList": "Ühised teosed"
+    },
+    "layers": {
+      "origin": "Päritolu",
+      "originPrint": "Päritolu ja trükikoht",
+      "print": "Trükikohad",
+      "life": "Elukäik"
+    },
+    "layerHelp": {
+      "origin": "Seotud isikud päritolukoha järgi; ringi värv näitab seose liike.",
+      "originPrint": "Joon ühendab akadeemilise akti osalise päritolukoha teose trükikohaga. See on kahe koha ühendus, mitte teekond: trükikoht ei ole tingimata toimumiskoht.",
+      "print": "Ühiste teoste trükikohad. Täis ring: akadeemiline akt; õõnes: muu trükis. Trükikoht ei tõenda kohtumist.",
+      "life": "Isiku enda elukäik isikukaardilt: sünd või päritolu, haridus, ametid, surm."
+    },
+    "unmappedPersons_one": "{{count}} seotud isikul puudub päritolu koordinaat",
+    "unmappedPersons_other": "{{count}} seotud isikul puudub päritolu koordinaat",
+    "unmappedStations": "Kaardita jaamad",
+    "noStations": "Isikukaardil pole kohaga jaamu.",
+    "stations": {
+      "origin": "Päritolu",
+      "birth": "Sünd",
+      "education": "Haridus",
+      "occupation": "Amet",
+      "death": "Surm",
+      "burial": "Matus"
+    },
+    "reasons": {
+      "no_place": "koht märkimata",
+      "not_in_registry": "koht registris puudub",
+      "no_coordinates": "kohal pole koordinaate"
     }
   },
   "place": {
