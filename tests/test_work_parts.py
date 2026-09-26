@@ -188,3 +188,74 @@ def test_sync_work_parts_kirjutab_ainult_muutusel(work, monkeypatch):
     os.remove(f"{work}/t-002.jpg")
     wp.sync_work_parts(work, "w1")
     assert _meta(work)["parts"][0]["pages"] == ["t-001"]
+
+
+# ── Otspunktid ───────────────────────────────────────────────────────────────
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+
+@pytest.fixture
+def client(work, monkeypatch):
+    from server.routers import work_parts as r
+    from server import deps
+    monkeypatch.setattr(r, "find_directory_by_id", lambda wid: work if wid == "w1" else None)
+    monkeypatch.setattr(r, "load_work_metadata_by_id",
+                        lambda wid: json.load(open(f"{work}/_metadata.json")) if wid == "w1" else None)
+    app = FastAPI()
+    app.include_router(r.router)
+    state = {"user": {"username": "ed", "role": "editor"}, "write": True}
+
+    # require_role loob iga kutsega uue sulguri, mis otsib get_user'it deps moodulist.
+    async def fake_get_user(request, min_role="contributor"):
+        return state["user"]
+    monkeypatch.setattr(deps, "get_user", fake_get_user)
+    app.dependency_overrides[deps.optional_user] = lambda: state["user"]
+    monkeypatch.setattr(r, "can_write_work", lambda meta, user: state["write"])
+    monkeypatch.setattr(r, "can_read_work", lambda meta, user: True)
+    c = TestClient(app)
+    c.state = state
+    return c
+
+
+def test_endpointide_voog(client):
+    r = client.post("/works/w1/parts", json={"kind": "letter", "pages": ["t-001"]})
+    assert r.status_code == 201
+    pid = r.json()["id"]
+    assert client.put(f"/works/w1/parts/{pid}", json={"kind": "letter", "pages": ["t-001"], "title": "X"}).json()["title"] == "X"
+    assert client.post(f"/works/w1/parts/{pid}/pages", json={"add": ["t-002"], "remove": []}).json()["pages"] == ["t-001", "t-002"]
+    assert client.get("/works/w1/parts").json()["parts"][0]["id"] == pid
+    assert client.delete(f"/works/w1/parts/{pid}").status_code == 204
+
+
+def test_endpointide_vead(client):
+    assert client.post("/works/w1/parts", json={"kind": "x", "pages": ["t-001"]}).status_code == 400
+    assert client.put("/works/w1/parts/nope", json={"kind": "letter", "pages": ["t-001"]}).status_code == 404
+    assert client.post("/works/zz/parts", json={"kind": "letter", "pages": ["t-001"]}).status_code == 404
+    client.state["write"] = False
+    assert client.post("/works/w1/parts", json={"kind": "letter", "pages": ["t-001"]}).status_code == 403
+
+
+def test_endpointid_on_sync():
+    import asyncio
+    from server.routers import work_parts as r
+    for fn in (r.list_parts, r.create, r.update, r.delete, r.change_pages):
+        assert not asyncio.iscoroutinefunction(fn)
+
+
+def test_uldine_metaandmete_salvestus_lukkab_parts_tagasi():
+    """/update-work-metadata ei tohi osi üle kirjutada (samaaegsed toimetajad) → 400."""
+    import asyncio
+    from fastapi import HTTPException
+    from server.routers import editing
+    from server.metadata_ops import ALLOWED_METADATA_FIELDS
+
+    class FakeRequest:
+        headers = {}
+        async def json(self):
+            return {"work_id": "w1", "metadata": {"parts": []}}
+
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(editing.update_work_metadata(FakeRequest(), None, user={"username": "a", "role": "admin"}))
+    assert e.value.status_code == 400
+    assert "parts" in ALLOWED_METADATA_FIELDS
