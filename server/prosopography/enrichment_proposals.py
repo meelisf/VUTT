@@ -342,6 +342,32 @@ def _same_fact(existing: dict, candidate: dict, kind: str) -> bool:
                 or (b_to is not None and a_from is not None and b_to < a_from))
 
 
+def _same_legacy_fact(existing: dict, candidate: dict, kind: str) -> bool:
+    """Match an unlinked row by its preserved wording before adding a registry key."""
+    key = "occupation_key" if kind == "occupation" else "institution_key"
+    raw = "label" if kind == "occupation" else "institution"
+    if (existing.get(key) or not candidate.get(key)
+            or str(existing.get(raw) or "").strip().casefold()
+            != str(candidate.get(raw) or "").strip().casefold()):
+        return False
+    if kind == "occupation" and (
+            str(existing.get("institution") or "").strip().casefold()
+            != str(candidate.get("institution") or "").strip().casefold()):
+        return False
+    if kind == "education" and existing.get("type") != candidate.get("type"):
+        return False
+    for link in ("institution_key", "place_key"):
+        if existing.get(link) and existing.get(link) != candidate.get(link):
+            return False
+    for identifier in ("id", "institution_id"):
+        if existing.get(identifier) and existing.get(identifier) != candidate.get(identifier):
+            return False
+    a_from, a_to = _year(existing.get("date_from")), _year(existing.get("date_to"))
+    b_from, b_to = _year(candidate.get("date_from")), _year(candidate.get("date_to"))
+    return not ((a_to is not None and b_from is not None and a_to < b_from)
+                or (b_to is not None and a_from is not None and b_to < a_from))
+
+
 def apply_selected(proposal_id: str, person_id: str, username: str,
                    session_fingerprint: str, selected: list[int],
                    corrections: Optional[dict] = None) -> dict:
@@ -407,14 +433,24 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
                         and _same_fact(existing, candidate, item["kind"])]
             if item["match_status"] == "already_present":
                 index = item.get("existing_index")
-                if index is None or matching != [index]:
+                if index is None or index >= len(target) or not isinstance(target[index], dict):
+                    raise ProposalError("unresolved_existing_entry")
+                legacy = _same_legacy_fact(target[index], candidate, item["kind"])
+                if matching != [index] and not (legacy and not matching):
                     raise ProposalError("unresolved_existing_entry")
                 evidence = target[index].get("evidence") or []
-                target[index] = {**target[index], "evidence": evidence + [
+                links = {}
+                if legacy:
+                    for key in ("occupation_key", "institution_key", "place_key", "id", "institution_id"):
+                        if candidate.get(key) and not target[index].get(key):
+                            links[key] = candidate[key]
+                target[index] = {**target[index], **links, "evidence": evidence + [
                     source for source in item["evidence"] if source not in evidence
                 ]}
                 continue
-            if matching:
+            if matching or any(isinstance(existing, dict)
+                               and _same_legacy_fact(existing, candidate, item["kind"])
+                               for existing in target):
                 raise ProposalError("duplicate_entry")
             target.append(candidate)
         # update_person teeb isikuluku all teise versioonikontrolli ja uuendab indeksi.

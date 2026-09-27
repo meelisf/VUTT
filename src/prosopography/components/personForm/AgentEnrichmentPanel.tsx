@@ -179,7 +179,10 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
               {item.institution_key && <p className="text-xs text-blue-800">{tr('institutionPlace')}: {item.institution_place_key || tr('noMappedPlace')}</p>}
               {existing && <p className="text-xs text-amber-800">{tr('existing')} #{(item.existing_index ?? 0) + 1}: {(existing as any).label || (existing as any).institution}</p>}
               {Object.keys(patch).length > 0 && <p className="text-xs font-semibold text-green-800">{tr('editorChoice')}: {[effective.occupation_key, effective.institution_key, effective.place_key].filter(Boolean).join(' · ')}</p>}
-              {item.match_status === 'already_present' && canSelect(item, patch) && <p className="text-xs text-blue-800">{tr('addEvidence')}</p>}
+              {item.match_status === 'already_present' && canSelect(item, patch) && <p className="text-xs text-blue-800">{
+                existing && !(item.kind === 'occupation' ? (existing as any).occupation_key : (existing as any).institution_key)
+                  ? tr('linkExisting') : tr('addEvidence')
+              }</p>}
               {!canSelect(item, patch) && <p className="text-xs text-amber-800">{tr(`status.${item.match_status}`)}</p>}
               {item.review_error && <p className="text-xs text-red-700">{Object.keys(patch).length ? tr('originalWarning') : tr('registryMissing')}: {item.review_error}</p>}
               {item.match_status !== 'already_present' && <div className="space-y-2">

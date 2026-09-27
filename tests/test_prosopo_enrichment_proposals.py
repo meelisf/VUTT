@@ -282,6 +282,39 @@ def test_olemasoleva_kirje_toend_lisataks_molemal_liigil(client, login, prosopo_
     assert len(saved['education'][0]['evidence']) == 2
 
 
+def test_olemasolevale_agc_reale_lisatakse_registriseos_ilma_sonastust_muutmata(
+        client, login, prosopo_env, tmp_path, monkeypatch):
+    registry = tmp_path / 'config'
+    registry.mkdir(exist_ok=True)
+    (registry / 'institutions.json').write_text(json.dumps({
+        'academia-gustavo-carolina': {
+            'id': 'Q138710754', 'labels': {'et': 'Academia Gustavo-Carolina'},
+            'variants': ['AGC'], 'place_key': 'Dorpat',
+        },
+    }))
+    monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
+    card = prosopo_env.write('abc', education=[
+        {'institution': 'Academia Gustaviana', 'date_from': {'date': '1691', 'precision': 'year'}},
+        {'institution': 'AGC'},
+    ])
+    token = login('editor', 'editorpass')
+    evidence = [{'source_kind': 'literature', 'source_id': 'album_academicum',
+                 'locator': 'NR 1254', 'quote': 'AGC: juris stud.'}]
+    item = {'kind': 'education', 'match_status': 'already_present',
+            'existing_index': 1, 'raw_institution': 'AGC',
+            'institution_key': 'academia-gustavo-carolina',
+            'institution_variant': 'AGC', 'evidence': evidence}
+    proposal_id = _submit_for_review(client, token, card, [item])
+    response = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
+                           headers=_headers(token), json={'proposal_id': proposal_id, 'selected': [0]})
+    assert response.status_code == 200, response.text
+    saved = prosopo_env.read('abc')['education']
+    assert saved[0] == card['education'][0]
+    assert saved[1] == {'institution': 'AGC', 'institution_key': 'academia-gustavo-carolina',
+                        'institution_id': 'Q138710754', 'evidence': evidence}
+
+
 def test_sama_voti_ja_kattuv_aeg_on_duplikaat_aga_eri_opingusundmus_mitte(
         client, login, prosopo_env, tmp_path, monkeypatch):
     registry = tmp_path / 'config'
