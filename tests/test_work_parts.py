@@ -77,12 +77,13 @@ def work(tmp_path, monkeypatch):
         (d / f"t-00{i}.jpg").write_bytes(b"x")
     (d / "_metadata.json").write_text(json.dumps({"id": "w1", "title": "T"}), encoding="utf-8")
     def fake_save(path, content, *a, additional_files=None, **k):
-        # bulk_update_works kirjutab faili save_with_git kaudu
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        # bulk_update_works kirjutab faili save_with_git kaudu. Atomaarselt nagu päris
+        # save_with_git (atomic_write_text): lukuväline lugeja (_read_part) nägi muidu
+        # samaaegses testis poolikut faili → JSONDecodeError (CI, #484).
+        from server.utils import atomic_write_text
+        atomic_write_text(path, content)
         for p2, c2 in additional_files or []:
-            with open(p2, "w", encoding="utf-8") as f:
-                f.write(c2)
+            atomic_write_text(p2, c2)
         return {"success": True}
     monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
     monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch", lambda *a, **k: None)

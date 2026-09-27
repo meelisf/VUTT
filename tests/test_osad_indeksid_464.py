@@ -154,8 +154,8 @@ def work(workdir, monkeypatch):
     (workdir / "_metadata.json").write_text(json.dumps(meta), encoding="utf-8")
 
     def fake_save(path, content, *a, additional_files=None, **k):
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        from server.utils import atomic_write_text     # nagu päris save_with_git
+        atomic_write_text(path, content)
         return {"success": True}
     monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
     monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch", lambda *a, **k: None)
