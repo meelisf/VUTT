@@ -174,6 +174,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     occupations: (p.occupations ?? []).map((o: any) => ({
       label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined,
       institution: o.institution ?? '', institution_id: o.institution_id ?? null, institution_labels: o.institution_labels ?? undefined,
+      occupation_key: o.occupation_key, institution_key: o.institution_key, place_key: o.place_key, evidence: o.evidence,
       date_from: o.date_from ? historicalDateToDraft(o.date_from)
         : (o.year_from ? { ...emptyDateDraft(), year: String(o.year_from) }
         : (o.year ? { ...emptyDateDraft(), year: String(o.year) } : emptyDateDraft())),
@@ -183,6 +184,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     education: (p.education ?? []).map((e: any) => ({
       institution: e.institution ?? e.label ?? String(e),
       institution_id: e.institution_id ?? null, institution_labels: e.institution_labels ?? undefined,
+      institution_key: e.institution_key, evidence: e.evidence,
       date_from: e.date_from ? historicalDateToDraft(e.date_from)
         : (e.date_start ? isoStringToDraft(e.date_start)
         : (e.year_from ? { ...emptyDateDraft(), year: String(e.year_from) }
@@ -309,6 +311,10 @@ export function draftToPayload(
       ...(o.institution?.trim() ? { institution: o.institution.trim() } : {}),
       ...(o.institution_id ? { institution_id: o.institution_id } : {}),
       ...(o.institution_labels ? { institution_labels: o.institution_labels } : {}),
+      ...(o.occupation_key ? { occupation_key: o.occupation_key } : {}),
+      ...(o.institution_key ? { institution_key: o.institution_key } : {}),
+      ...(o.place_key ? { place_key: o.place_key } : {}),
+      ...(o.evidence ? { evidence: o.evidence } : {}),
       ...(o.date_from?.year?.trim() ? { date_from: buildDatePayload(o.date_from) } : {}),
       ...(o.date_to?.year?.trim() ? { date_to: buildDatePayload(o.date_to) } : {}),
     })),
@@ -316,6 +322,8 @@ export function draftToPayload(
       institution: e.institution.trim(),
       ...(e.institution_id ? { institution_id: e.institution_id } : {}),
       ...(e.institution_labels ? { institution_labels: e.institution_labels } : {}),
+      ...(e.institution_key ? { institution_key: e.institution_key } : {}),
+      ...(e.evidence ? { evidence: e.evidence } : {}),
       ...(e.date_from?.year?.trim() ? { date_from: buildDatePayload(e.date_from) } : {}),
       ...(e.date_to?.year?.trim() ? { date_to: buildDatePayload(e.date_to) } : {}),
       ...(e.edu_type ? { type: e.edu_type } : {}),

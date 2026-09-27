@@ -240,7 +240,7 @@ keeld; ettepaneku katsed muuta `review`, `identifiers`, `biography_*` või
 registrit → keeld; piiratud allika sisu kuvamine ainult õigustatud kasutajale.
 
 Visuaalses kontrollis tuleb päris näidetega läbi teha vähemalt „Pfarrer”
-(laiem/kitsam amet), „AGC”/„Academia Gustaviana” (sama asutus), „Uppsala”/
+(laiem/kitsam amet), „AGC”/„Academia Gustavo-Carolina” (sama asutus), „Uppsala”/
 „Univ. Uppsala” (koht või asutus) ja üks puuduva Q-koodiga kirje. Valmis on
 siis, kui toimetaja näeb iga kinnitatud fakti juures algset sõnastust ja
 täpset allikaviidet, registrivalik on kontrollitav ning agent ei saa ühegi
@@ -271,7 +271,7 @@ arvestada, muidu lähevad plaan ja tootmises olev kood lahku.
    - **asutuse sildi järgi kohta ei tuletata** (§5). Tühja või kahtlase `place_key`
      korral läheb jaam loendisse „Kaardita jaamad" põhjusega, mitte kaardile;
    - sünni-, surma-, matuse- ja päritolukoha sildi tagavara jääb, sest need on kohad;
-   - testides Fischeri näide (territooriumiga ametid), „AGC"/„Academia Gustaviana"
+   - testides Fischeri näide (territooriumiga ametid), „AGC"/„Academia Gustavo-Carolina"
      (üks asutus → Tartu) ja asutus ilma `place_key`-ta.
 
    Trükikoha sildi tagavara `server/prosopography/network.py` `_place_coords`-is

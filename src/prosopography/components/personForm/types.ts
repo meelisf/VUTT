@@ -15,11 +15,13 @@ export const emptyDateDraft = (): DateDraft => ({ year: '', month: '', day: '', 
 export interface OccupationDraft {
   label: string; id?: string | null; labels?: Record<string, string>;
   institution?: string; institution_id?: string | null; institution_labels?: Record<string, string>;
+  occupation_key?: string; institution_key?: string; place_key?: string; evidence?: Record<string, unknown>[];
   date_from?: DateDraft; date_to?: DateDraft;
 }
 
 export interface EducationDraft {
   institution: string; institution_id?: string | null; institution_labels?: Record<string, string>;
+  institution_key?: string; evidence?: Record<string, unknown>[];
   date_from?: DateDraft; date_to?: DateDraft;
   edu_type?: string; source?: string;
 }

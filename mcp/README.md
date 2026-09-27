@@ -1,9 +1,14 @@
 # VUTT MCP-server
 
 Annab lokaalsetele agentidele (Claude Code, Codex CLI, Gemini CLI, Antigravity)
-ligipääsu VUTT-i transkriptsioonidele ja prosopograafiale. Read-only, stdio.
+ligipääsu VUTT-i transkriptsioonidele ja prosopograafiale. stdio.
 
-Server on VUTT-i avaliku HTTPS-API õhuke klient — backendis midagi muutma ei pea.
+Enamik tööriistu on lugemiseks. Ühekordse üleandmiskoodiga saab MCP esitada
+ainult **ootel prosopo ettepaneku**; isikukaarti või registreid ta ei muuda
+(ADR 0058).
+
+Server on VUTT-i HTTPS-API õhuke klient. Ootel ettepaneku üleandmiseks lisandub
+backendis eraldi piiratud API; ülejäänud tööriistad kasutavad seniseid päringuid.
 
 ## Paigaldus
 
@@ -81,7 +86,24 @@ Kolm asja, mis üllatavad:
 | `get_page_image` | Ühe skaneeringu täisresolutsiooniga pilt OCR-i kontrolliks |
 | `search_persons` | Isikuotsing (nimevariandid kaetud) |
 | `get_person` | Isikukaart + seotud teosed (kuni 50) |
+| `get_person_enrichment_context` | Ühe isiku ametite ja hariduse täielikud JSON-kirjed + `updated_at` ettepaneku koostamiseks |
+| `search_enrichment_registry` | Ametite või asutuste registrikandidaadid püsivõtme, Q-koodi ja nimevariandi järgi; eristab puuduva registri tühjast tulemusest |
+| `submit_person_enrichment_proposal` | Ühekordse isikupõhise koodiga ootel ettepanek VUTT-i ülevaatuseks; kaarti ei muuda |
 | `list_filter_values` | Legaalsed filtriväärtused |
+
+`get_person_enrichment_context` ei kärbi ameti- ega hariduskirjeid vaikselt:
+väga suure või vigase kaardi korral annab vea. `submit_person_enrichment_proposal`
+kasutab toimetaja autentitud `POST /api/files/prosopography/enrichment-handoff/{person_id}`
+kaudu loodud ühekordset koodi; ta talletab ainult ajutise ettepaneku. Ootel
+kirjed saab sama sessiooniga `GET /api/files/prosopography/enrichment-proposals/{person_id}`.
+Koodi ei panda MCP seadistusse. Toimetaja loob koodi isikuvormi „Ametid ja
+haridus” jaotises, värskendab seal ootel ettepanekuid, valib vajadusel teise
+registrivaste, parandab aja või allikakoha ning kinnitab valitud kirjed või
+lisab tõendi olemasolevale kirjele. Kinnitamine nõuab sama sessiooni
+ja värsket kaardiversiooni; MCP-le kinnitamise tööriista ei ole. Puuduva
+registrivõtmega viidet ei kinnitata seosena. `search_enrichment_registry`
+tagastab praegu `registry_available=false`, kuni #462/#471 registrifailid on
+loodud; tühja tulemust ei tohi tõlgendada uue registrikirje vajadusena.
 
 OCR-i kontrollimiseks kutsu `get_page_image(work_id, page)` ja võrdle pilti
 `get_pages(work_id, page, page)` tekstiga. `page` on skaneeringu 1-põhine

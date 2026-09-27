@@ -43,6 +43,7 @@ const AdminCollections = lazyRetry(() => import('./pages/admin/CollectionsHub'))
 const AdminCollectionDetail = lazyRetry(() => import('./pages/admin/CollectionDetail'));
 const AdminMaintenance = lazyRetry(() => import('./pages/admin/Maintenance'));
 const AdminPlaces = lazyRetry(() => import('./pages/admin/Places'));
+const AdminProsopoRegistries = lazyRetry(() => import('./pages/admin/ProsopoRegistries'));
 const AdminWorkSets = lazyRetry(() => import('./pages/admin/WorkSets'));
 
 // Suspense fallback laadimise ajaks
@@ -137,6 +138,11 @@ const router = createBrowserRouter([
   {
     path: "/admin/places",
     element: <Lazy><AdminPlaces /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/prosopo-registries",
+    element: <Lazy><AdminProsopoRegistries /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {

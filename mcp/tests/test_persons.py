@@ -7,10 +7,13 @@ Vastuste kujud on kontrollitud tootmise API vastu (2026-08-15):
   GET  /prosopography/work-relations/{id} → LIST, mitte objekt:
        [{"person_id", "person_name", "shared_works_count", "shared_works": [...]}]
 """
+import json
+
 import pytest
 
 from vutt_mcp import persons
-from vutt_mcp.errors import VuttNotFound
+from vutt_mcp.errors import VuttError, VuttNotFound
+from vutt_mcp.server import build_server
 
 BASE = "https://vutt.utlib.ut.ee"
 
@@ -185,3 +188,108 @@ def test_search_katke_langeb_ahelas_tagasi():
     }]}})
     out = persons.search(client, BASE)
     assert "154. Lünaeus" in out
+
+
+def test_rikastuse_kontekst_sailitab_ametid_ja_hariduse_tapse_kuju():
+    occupation = {
+        "label": "Prof. theol.", "occupation_key": "theology-professor",
+        "institution": "AGC", "institution_key": "academia-gustaviana",
+        "date_from": {"date": "1640", "precision": "year"},
+        "evidence": [{"work_id": "abc123", "page": 12, "printed_page": "24"}],
+    }
+    education = {
+        "institution": "Uppsala", "institution_id": "Q12345",
+        "source": "album_academicum", "date_from": {"date": "1631"},
+    }
+    client = FakeClient({"/prosopography/vutt%3APabc": {
+        "id": "vutt:Pabc", "updated_at": "2026-09-26T10:00:00+00:00",
+        "name": {"label": "Anna Test", "aliases": ["A. Test"]},
+        "identifiers": [{"scheme": "gnd", "id": "123"}],
+        "occupations": [occupation], "education": [education],
+        "sources": [{"text": "AA 123"}],
+        "biography_et": "ei kuulu sellesse vastusesse",
+        "works": [{"work_id": "w1"}],
+    }})
+    result = json.loads(persons.enrichment_context(client, "vutt:Pabc"))
+    assert result["updated_at"] == "2026-09-26T10:00:00+00:00"
+    assert result["occupations"] == [occupation]
+    assert result["education"] == [education]
+    assert result["sources"] == [{"text": "AA 123"}]
+    assert "biography_et" not in result and "works" not in result
+    assert client.gets == [("/prosopography/vutt%3APabc", None)]
+
+
+def test_rikastuse_kontekst_ei_karbi_kirjeid_vaikselt():
+    many = [{"label": f"amet {n}"} for n in range(persons.MAX_ENRICHMENT_ENTRIES + 1)]
+    client = FakeClient({"/prosopography/vutt%3APabc": {
+        "id": "vutt:Pabc", "updated_at": "t", "occupations": many,
+    }})
+    with pytest.raises(VuttError, match="liiga palju"):
+        persons.enrichment_context(client, "vutt:Pabc")
+
+
+def test_rikastuse_kontekst_nouab_versiooni_ja_oiget_isikut():
+    client = FakeClient({"/prosopography/vutt%3APabc": {"id": "vutt:Pabc"}})
+    with pytest.raises(VuttError, match="updated_at"):
+        persons.enrichment_context(client, "vutt:Pabc")
+    with pytest.raises(VuttError, match="Vigane person_id"):
+        persons.enrichment_context(client, "../x")
+    assert len(client.gets) == 1
+
+
+async def test_rikastuse_kontekst_on_mcp_tooriist():
+    client = FakeClient({"/prosopography/vutt%3APabc": {
+        "id": "vutt:Pabc", "updated_at": "t", "occupations": [], "education": [],
+    }})
+    server = build_server(client=client, base_url=BASE)
+    response = await server.call_tool(
+        "get_person_enrichment_context", {"person_id": "vutt:Pabc"}
+    )
+    assert json.loads(response.content[0].text)["updated_at"] == "t"
+
+
+async def test_mcp_ettepanek_esitatakse_ainult_ajutise_api_kaudu():
+    class ProposalClient(FakeClient):
+        def api_post_once(self, path, json_body):
+            self.posts.append((path, json_body))
+            return {"proposal_id": "prop1", "status": "pending"}
+
+    client = ProposalClient()
+    server = build_server(client=client, base_url=BASE)
+    item = {"kind": "education", "match_status": "ambiguous",
+            "raw_institution": "AGC",
+            "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 3}]}
+    response = await server.call_tool("submit_person_enrichment_proposal", {
+        "handoff_code": "once", "person_id": "vutt:Pabc",
+        "base_updated_at": "t", "items": [item],
+    })
+    assert "prop1" in response.content[0].text
+    assert client.posts == [("/prosopography/enrichment-proposals/submit", {
+        "code": "once", "person_id": "vutt:Pabc",
+        "base_updated_at": "t", "items": [item],
+    })]
+
+
+async def test_mcp_registrikandidaadid_ja_puuduv_register():
+    class RegistryClient(FakeClient):
+        def api_get(self, path, params=None):
+            self.gets.append((path, params))
+            return self.get_map[path]
+
+    path = "/prosopography/enrichment-registry-search"
+    client = RegistryClient({path: {"kind": "occupation", "query": "Pfarrer",
+                                    "registry_available": True, "ambiguous": True,
+                                    "results": [{"key": "pastor", "match_kind": "variant"},
+                                                {"key": "clergyman", "match_kind": "variant"}]}})
+    server = build_server(client=client, base_url=BASE)
+    result = await server.call_tool("search_enrichment_registry", {
+        "kind": "occupation", "query": "Pfarrer",
+    })
+    assert json.loads(result.content[0].text)["ambiguous"] is True
+    assert client.gets == [(path, {"kind": "occupation", "q": "Pfarrer", "limit": 10})]
+    client.get_map[path] = {"kind": "occupation", "query": "Pfarrer",
+                            "registry_available": False, "results": []}
+    result = await server.call_tool("search_enrichment_registry", {
+        "kind": "occupation", "query": "Pfarrer",
+    })
+    assert "Ära järelda" in result.content[0].text

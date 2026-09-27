@@ -5,6 +5,107 @@ import type { HistoricalRegionsResponse, ProsopoIndexEntry, ProsopoMapResponse, 
 
 const BASE = `${FILE_API_URL}/prosopography`;
 
+export interface EnrichmentEvidence {
+  source_kind: string; source_id?: string; locator?: string; work_id?: string;
+  page?: number; printed_page?: string; part_id?: string; quote?: string; url?: string;
+}
+export interface EnrichmentDate {
+  date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean;
+}
+export interface EnrichmentItem {
+  kind: 'occupation' | 'education'; match_status: string; existing_index?: number;
+  review_error?: string;
+  registry_labels?: Record<string, string>;
+  institution_place_key?: string | null;
+  raw_occupation?: string; raw_institution?: string; occupation_key?: string;
+  institution_key?: string; place_key?: string | null; edu_type?: string;
+  occupation_variant?: string | null; institution_variant?: string | null;
+  date_from?: EnrichmentDate | null;
+  date_to?: EnrichmentDate | null;
+  evidence: EnrichmentEvidence[];
+}
+export interface EnrichmentProposal {
+  proposal_id: string; person_id: string; base_updated_at: string;
+  created_at: number; expires_at: number; items: EnrichmentItem[];
+}
+export interface EnrichmentRegistryCandidate {
+  key: string; id: string | null; labels: Record<string, string>;
+  match_kind: string; matched_text: string; matched_variant: string | null;
+  type?: string; place_key?: string | null;
+}
+export interface EnrichmentRegistrySearch {
+  kind: 'occupation' | 'institution'; query: string; registry_available: boolean;
+  results: EnrichmentRegistryCandidate[]; total_matches: number;
+  truncated: boolean; ambiguous: boolean;
+}
+export interface InstitutionRegistryEntry {
+  id: string | null; labels: Record<string, string>; variants: string[];
+  type: string; place_key: string | null; notes?: string;
+}
+export async function fetchInstitutions(): Promise<Record<string, InstitutionRegistryEntry>> {
+  const response = await fetchWithTimeout(`${BASE}/registries/institution`, { timeout: 10000 });
+  return enrichmentResponse(response);
+}
+export interface OccupationRegistryEntry {
+  id: string | null; labels: Record<string, string>; variants: string[]; notes?: string;
+}
+export async function fetchRegistry(kind: 'occupation' | 'institution'):
+  Promise<Record<string, OccupationRegistryEntry | InstitutionRegistryEntry>> {
+  const response = await fetchWithTimeout(`${BASE}/registries/${kind}`, { timeout: 10000 });
+  return enrichmentResponse(response);
+}
+export async function saveRegistryEntry(kind: 'occupation' | 'institution', key: string,
+  entry: OccupationRegistryEntry | InstitutionRegistryEntry, token: string): Promise<OccupationRegistryEntry | InstitutionRegistryEntry> {
+  const response = await fetchWithTimeout(`${BASE}/registries/${kind}/${encodeURIComponent(key)}`, {
+    method: 'PUT', headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry), timeout: 15000,
+  });
+  return enrichmentResponse(response);
+}
+export type EnrichmentCorrection = Partial<Pick<EnrichmentItem,
+  'occupation_key' | 'institution_key' | 'place_key' | 'occupation_variant' | 'institution_variant'
+  | 'date_from' | 'date_to' | 'edu_type' | 'evidence'>>;
+
+async function enrichmentResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let detail = String(response.status);
+    try { detail = (await response.json()).detail ?? detail; } catch { /* HTTP error */ }
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+  }
+  return response.json();
+}
+
+export async function createEnrichmentHandoff(personId: string, token: string): Promise<{
+  code: string; expires_at: number; base_updated_at: string;
+}> {
+  const response = await fetchWithTimeout(`${BASE}/enrichment-handoff/${encodeURIComponent(personId)}`, {
+    method: 'POST', headers: getAuthHeaders(token), timeout: 10000,
+  });
+  return enrichmentResponse(response);
+}
+
+export async function listEnrichmentProposals(personId: string, token: string): Promise<EnrichmentProposal[]> {
+  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}`, {
+    headers: getAuthHeaders(token), timeout: 10000,
+  });
+  return enrichmentResponse(response);
+}
+
+export async function searchEnrichmentRegistry(kind: 'occupation' | 'institution', query: string): Promise<EnrichmentRegistrySearch> {
+  const params = new URLSearchParams({ kind, q: query, limit: '10' });
+  const response = await fetchWithTimeout(`${BASE}/enrichment-registry-search?${params}`, { timeout: 10000 });
+  return enrichmentResponse(response);
+}
+
+export async function applyEnrichmentProposal(personId: string, proposalId: string,
+  selected: number[], token: string, corrections: Record<number, EnrichmentCorrection> = {}): Promise<ProsopoRecord> {
+  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify({ proposal_id: proposalId, selected, corrections }), timeout: 15000,
+  });
+  return enrichmentResponse(response);
+}
+
 export async function listPersons(params?: {
   q?: string;
   gender?: string;

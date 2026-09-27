@@ -1,5 +1,14 @@
 {
   "title": "Administration",
+  "prosopoRegistries": {
+    "title": "Occupation and institution registries",
+    "intro": "Approve a registry entry separately from a person fact. The source wording remains on the person record.",
+    "institution": "Institutions", "occupation": "Occupations", "search": "Search registry",
+    "new": "New registry entry", "key": "Stable VUTT key", "qid": "Wikidata Q identifier (optional)",
+    "label": "Label", "variants": "Name variants, one per line", "type": "Institution type",
+    "placeKey": "Place registry key (optional)", "notes": "Notes", "save": "Save registry entry",
+    "saved": "Registry entry saved", "selectExisting": "This key already exists. Select the entry from the list."
+  },
   "tabs": {
     "registrations": "Registrations",
     "users": "Users",
@@ -302,6 +311,7 @@
     "trash": "Trash",
     "maintenance": "Maintenance",
     "places": "Place Register",
+    "prosopoRegistries": "Occupation and institution registries",
     "pending": "{{count}} pending"
   },
   "groups": {

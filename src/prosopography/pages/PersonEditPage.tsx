@@ -32,6 +32,8 @@ import { getVocabularies } from '../../services/collectionService';
 import type { VocabularySeisusItem } from '../../services/collectionService';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
+import AgentEnrichmentPanel from '../components/personForm/AgentEnrichmentPanel';
+import RegistryCandidatePicker from '../components/personForm/RegistryCandidatePicker';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -775,6 +777,14 @@ const PersonEditPage: React.FC = () => {
           open={occupOpen}
           onToggle={() => setOccupOpen(v => !v)}
         >
+          {!isNew && original && <AgentEnrichmentPanel
+            person={original} token={token} isDirty={isDirty}
+            onApplied={person => {
+              setOriginal(person);
+              setDraft(recordToDraft(person));
+              setIsDirty(false);
+            }}
+          />}
           <DynamicList
             label={t('occupations', 'Ametid')}
             items={draft.occupations}
@@ -787,10 +797,14 @@ const PersonEditPage: React.FC = () => {
                       placeholder={t('form.occupationPlaceholder')}
                       type="topic"
                       value={item.id ? { label: item.label, id: item.id, labels: item.labels, source: 'wikidata' } : (item.label ? { label: item.label, id: null, labels: null, source: 'manual' } : null)}
-                      onChange={v => onChange({ ...item, label: v?.label ?? '', id: v?.id ?? null, labels: v?.labels ?? undefined })}
+                      onChange={v => onChange({ ...item, label: v?.label ?? '', id: v?.id ?? null, labels: v?.labels ?? undefined, occupation_key: undefined })}
                       lang={lang}
                       localSuggestions={entityLabels}
                     />
+                    <RegistryCandidatePicker kind="occupation" query={item.label} disabled={!canEdit}
+                      chosenKey={item.occupation_key}
+                      onSelect={candidate => onChange({ ...item, occupation_key: candidate.key,
+                        id: candidate.id, labels: candidate.labels })} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <label className="block text-xs text-gray-400 mb-0.5">{t('form.institution')}</label>
@@ -798,15 +812,29 @@ const PersonEditPage: React.FC = () => {
                       placeholder={t('form.institutionPlaceholder')}
                       type="topic"
                       value={item.institution_id ? { label: item.institution ?? '', id: item.institution_id, labels: item.institution_labels, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
-                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
+                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined, institution_key: undefined, place_key: undefined })}
                       lang={lang}
                       localSuggestions={entityLabels}
                     />
+                    <RegistryCandidatePicker kind="institution" query={item.institution ?? ''} disabled={!canEdit}
+                      chosenKey={item.institution_key}
+                      onSelect={candidate => onChange({ ...item, institution_key: candidate.key,
+                        institution_id: candidate.id, institution_labels: candidate.labels,
+                        place_key: undefined })} />
                   </div>
                   <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-5">
                     <X size={14} />
                   </button>
                 </div>
+                {(item.occupation_key || item.institution_key || item.place_key || item.evidence?.length) &&
+                  <p className="text-xs text-gray-500">
+                    {[item.occupation_key, item.institution_key, item.place_key].filter(Boolean).join(' · ')}
+                    {item.evidence?.length ? ` · ${item.evidence.length} ${t('agentEnrichment.evidenceCount')}` : ''}
+                  </p>}
+                {!item.institution_key && <PlacePicker value={item.place_key ?? null} token={token}
+                  canEdit={canEdit} lang={lang} label={t('form.occupationArea')}
+                  onChange={key => onChange({ ...item, place_key: key ?? undefined,
+                    institution_key: undefined, institution_id: key ? null : item.institution_id })} />}
                 <div className="grid grid-cols-2 gap-2">
                   <DateField
                     label={t('form.from')}
@@ -839,15 +867,24 @@ const PersonEditPage: React.FC = () => {
                       placeholder={t('form.educationInstitutionPlaceholder')}
                       type="topic"
                       value={item.institution_id ? { label: item.institution, id: item.institution_id, labels: item.institution_labels ?? null, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
-                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
+                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined, institution_key: undefined })}
                       lang={lang}
                       localSuggestions={entityLabels}
                     />
+                    <RegistryCandidatePicker kind="institution" query={item.institution} disabled={!canEdit}
+                      chosenKey={item.institution_key}
+                      onSelect={candidate => onChange({ ...item, institution_key: candidate.key,
+                        institution_id: candidate.id, institution_labels: candidate.labels })} />
                   </div>
                   <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-5">
                     <X size={14} />
                   </button>
                 </div>
+                {(item.institution_key || item.evidence?.length) &&
+                  <p className="text-xs text-gray-500">
+                    {item.institution_key}
+                    {item.evidence?.length ? ` · ${item.evidence.length} ${t('agentEnrichment.evidenceCount')}` : ''}
+                  </p>}
                 <div className="grid grid-cols-2 gap-2">
                   <DateField
                     label={t('form.from')}

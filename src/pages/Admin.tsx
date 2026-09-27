@@ -120,6 +120,12 @@ const Admin: React.FC = () => {
       group: t('admin:groups.settings'),
       href: '/admin/places',
     },
+    {
+      key: 'prosopoRegistries',
+      icon: <Library size={18} className="text-teal-600" />,
+      group: t('admin:groups.settings'),
+      href: '/admin/prosopo-registries',
+    },
   ];
 
   return (

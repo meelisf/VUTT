@@ -17,7 +17,7 @@ SERVER_INSTRUCTIONS = """\
 VUTT = ajalooliste tekstide transkriptsioonitöölaud (vutt.utlib.ut.ee).
 Tuum on 17. sajandi Tartu trükised, aga kogu ulatub sellest mõlemas suunas
 välja ja sisaldab ka sekundaarkirjandust - ÄRA eelda kitsast ajapiiri,
-ulatust piira kollektsiooniga. Kõik tööriistad on read-only.
+piira ulatust kollektsiooniga. MCP esitab ootel ettepaneku.
 
 KEELED - arvesta neid, muidu otsid tühja:
 - Alliktekstid on valdavalt ladina- ja saksakeelsed, kõrval rootsi ja kreeka;

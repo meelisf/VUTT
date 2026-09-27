@@ -13,9 +13,10 @@ interface PlacePickerProps {
   token: string;
   canEdit: boolean;
   lang: string;
+  label?: string;
 }
 
-const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEdit, lang }) => {
+const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEdit, lang, label }) => {
   const { t } = useTranslation('prosopography');
   const [places, setPlaces] = useState<Record<string, PlaceEntry>>({});
   const [meta, setMeta] = useState<{ groups: Record<string, any>; allowed_types: string[] } | null>(null);
@@ -82,7 +83,7 @@ const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEd
     <div className="relative">
       <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
         <MapPin size={11} className="inline mr-1 text-primary-600" />
-        {t('originPlace')}
+        {label ?? t('originPlace')}
       </label>
 
       {value ? (

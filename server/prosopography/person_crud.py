@@ -429,6 +429,8 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
             _check_identifiers_free(
                 person_id, _added_identifiers(person.get("identifiers"), normalized))
 
+        from .registries import normalize_person_facts
+        data = normalize_person_facts(data)
         _apply_card_update(person, data, now)
         person["updated_at"] = now
         person["updated_by"] = username

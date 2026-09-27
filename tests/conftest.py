@@ -335,3 +335,8 @@ def prosopo_env(tmp_path, monkeypatch):
 
     yield SimpleNamespace(dir=d, write=write, read=read)
     ext_id_index.invalidate()
+    # Fassaadi patch kandub vajadusel domeenimoodulitesse. Taasta see kohe
+    # pärast testi, et järgmine test ei näeks tmp-kaardi asukohta (#342).
+    monkeypatch.undo()
+    from server.prosopography._compat import sync_from_facade
+    sync_from_facade()
