@@ -88,10 +88,11 @@ services:
       - ./state:/app/state
       # Upload staging kaust
       - ./uploads:/app/uploads
-      # OCR-serveri SSH: AINULT võti ja usaldatud hostivõtmed (S27-05, S27-06) — mitte
+      # OCR-serveri SSH: eraldi OCR-võti ja usaldatud hostivõtmed (S27-05, S27-06) — mitte
       # kogu ~/.ssh (authorized_keys, config). Failimount seob inode'i: kui known_hosts
       # asendatakse uue failiga (ssh-keygen -R), taaskäivita backend.
-      - ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+      # Hostis eraldi võti; konteineris standardnimi olemasoleva võtmelugeja jaoks.
+      - ~/.ssh/vutt_ocr_ed25519:/root/.ssh/id_ed25519:ro
       - ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro
       # Album Academicum referentsandmed (read-only)
       - ./reference_data:/app/reference_data:ro

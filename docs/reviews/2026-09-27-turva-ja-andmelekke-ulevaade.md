@@ -183,6 +183,14 @@ failiõiguste ja töövoogude kontrolliga.
   piiratud OCR-võti loss'is (`authorized_keys` piirangutega — SSH ligipääsu
   muudatus loss'is, kokkuleppel).
 
+S27-05 järeltegevus 2026-09-27: **eraldi OCR-võti on tootmises kasutusel**.
+Uus võti lubab ühenduse ainult VUTTi lähteaadressilt, keelab terminali ja
+edastused; senine üldvõti on backendi mount'ist eemaldatud. Konto `mf`
+failiõigused jäävad samaks. Kontrollid ja tagasipööramine:
+[OCR-võtme tööjuhis](../ocr-ssh-key.md). Eraldi piiratud teenusekonto jääb
+edasiseks tööks. Kasutaja aktsepteeris piiratud kogude lugemistokenite
+säilimise riski; nende sisu on avaldamiseelne, mitte eriti tundlik.
+
 ### S27-06 — OCR-i SSH-ühendus ei kontrolli serveri hostivõtit
 
 **Kinnitatud koodis:** `server/upload/ocr_client.py:get_or_create_ssh` teeb

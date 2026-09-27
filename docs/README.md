@@ -19,6 +19,7 @@ Veel lahtiseks jäänud read tõsta enne `tegemata_tood.md`-sse, et need ei kaok
 | [html-rendering-policy.md](html-rendering-policy.md) | `SafeHtml` allow-list; `dangerouslySetInnerHTML` guard-test | Uue HTML-renderdusjuhtumi lisamisel |
 | [deployment_guide.md](deployment_guide.md) | Serveri nullist püstipanek / kolimine | Katastroofitaastel (igapäevane deploy on CLAUDE.md-s) |
 | [vutt-backup.md](vutt-backup.md) | `scripts/vutt_backup.py` — `data/` + `state/` snapshot'id | Varunduse seadistamisel (issue #131) |
+| [ocr-ssh-key.md](ocr-ssh-key.md) | Eraldi OCR-võti, piirangud ja tagasipööramine | OCR-ühenduse või võtme muutmisel |
 | [monitoring-bot-traffic.md](monitoring-bot-traffic.md) | Bot/scraper-liikluse jälgimise plaan (D1–D4, **veel rakendamata**) | Kui pildikraapimine muutub probleemiks |
 | [reviews/](reviews/) | Ülevaated, millele mujal viidatakse (skaleerimine 2026-07-09 ← ADR 0006) | Skaleerimisküsimuste taustaks |
 | [reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md](reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md) | Andmelekkeriskid: kood, tootmise saladuste ja failide õigused, teenuste eraldatus | Turvaparanduste planeerimisel ja tootmise järelkontrollil |
