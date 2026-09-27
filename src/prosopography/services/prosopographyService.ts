@@ -38,6 +38,30 @@ export interface EnrichmentRegistrySearch {
   results: EnrichmentRegistryCandidate[]; total_matches: number;
   truncated: boolean; ambiguous: boolean;
 }
+export interface InstitutionRegistryEntry {
+  id: string | null; labels: Record<string, string>; variants: string[];
+  type: string; place_key: string | null; notes?: string;
+}
+export async function fetchInstitutions(): Promise<Record<string, InstitutionRegistryEntry>> {
+  const response = await fetchWithTimeout(`${BASE}/registries/institution`, { timeout: 10000 });
+  return enrichmentResponse(response);
+}
+export interface OccupationRegistryEntry {
+  id: string | null; labels: Record<string, string>; variants: string[]; notes?: string;
+}
+export async function fetchRegistry(kind: 'occupation' | 'institution'):
+  Promise<Record<string, OccupationRegistryEntry | InstitutionRegistryEntry>> {
+  const response = await fetchWithTimeout(`${BASE}/registries/${kind}`, { timeout: 10000 });
+  return enrichmentResponse(response);
+}
+export async function saveRegistryEntry(kind: 'occupation' | 'institution', key: string,
+  entry: OccupationRegistryEntry | InstitutionRegistryEntry, token: string): Promise<OccupationRegistryEntry | InstitutionRegistryEntry> {
+  const response = await fetchWithTimeout(`${BASE}/registries/${kind}/${encodeURIComponent(key)}`, {
+    method: 'PUT', headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry), timeout: 15000,
+  });
+  return enrichmentResponse(response);
+}
 export type EnrichmentCorrection = Partial<Pick<EnrichmentItem,
   'occupation_key' | 'institution_key' | 'place_key' | 'occupation_variant' | 'institution_variant'
   | 'date_from' | 'date_to' | 'edu_type' | 'evidence'>>;

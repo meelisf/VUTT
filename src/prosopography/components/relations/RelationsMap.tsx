@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { MapContainer, Marker, Polyline, Popup } from 'react-leaflet';
 import HistoricalMapLayer from '../HistoricalMapLayer';
 import { FitToPoints, spreadOverlapping, type LatLon } from '../map/mapBase';
-import { fetchPlaces } from '../../services/prosopographyService';
+import { fetchInstitutions, fetchPlaces, type InstitutionRegistryEntry } from '../../services/prosopographyService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 import type { VisibleNetwork } from '../../utils/network';
 import { dimOpacity, layerPoints, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces, type MapLayer, type RegistryState } from '../../utils/relationsMap';
@@ -21,8 +21,10 @@ type Layer = MapLayer;
 const LAYERS: Layer[] = ['origin', 'originPrint', 'print', 'life'];
 
 let placesPromise: Promise<Record<string, PlaceEntry>> | null = null;
+let institutionsPromise: Promise<Record<string, InstitutionRegistryEntry>> | null = null;
 // Viga EI muutu tühjaks registriks — siis väidaks elukäik iga jaama kohta „registris puudub".
 const loadPlaces = () => (placesPromise ??= fetchPlaces().catch(err => { placesPromise = null; throw err; }));
+const loadInstitutions = () => (institutionsPromise ??= fetchInstitutions().catch(err => { institutionsPromise = null; throw err; }));
 
 const RelationsMap: React.FC<{
   net: VisibleNetwork; card: ProsopoRecord | null;
@@ -32,9 +34,12 @@ const RelationsMap: React.FC<{
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const [layer, setLayer] = useState<Layer>('origin');
   const [registry, setRegistry] = useState<RegistryState>('loading');
+  const [institutions, setInstitutions] = useState<Record<string, InstitutionRegistryEntry>>({});
   useEffect(() => {
     let alive = true;
-    loadPlaces().then(r => { if (alive) setRegistry(r); }).catch(() => { if (alive) setRegistry('error'); });
+    Promise.all([loadPlaces(), loadInstitutions()])
+      .then(([places, institutions]) => { if (alive) { setInstitutions(institutions); setRegistry(places); } })
+      .catch(() => { if (alive) setRegistry('error'); });
     return () => { alive = false; };
   }, []);
 
@@ -42,7 +47,7 @@ const RelationsMap: React.FC<{
   const prints = useMemo(() => printPlaces(net), [net]);
   const links = useMemo(() => originPrintLinks(net), [net]);
   const coverage = useMemo(() => originCoverage(net), [net]);
-  const life = useMemo(() => lifeView(card, registry), [card, registry]);
+  const life = useMemo(() => lifeView(card, registry, institutions), [card, registry, institutions]);
   const year = useMemo(() => mapYearOf(net, card?.birth?.date ? Number(card.birth.date.slice(0, 4)) + 30 : 1650), [net, card]);
   const focusCoords = net.focus.origin?.coordinates ?? null;
 

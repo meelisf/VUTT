@@ -283,6 +283,18 @@ def _card_item(item: dict) -> dict:
     for key in ("occupation_key", "institution_key", "place_key", "date_from", "date_to"):
         if item.get(key) is not None:
             result[key] = item[key]
+    # Q-koodid jäävad vana andmelepingu ühilduvusväljadeks. Püsiv identiteet on
+    # registrivõti; Q-koodita kirje puhul neid välju ei fabritseerita (#462/#471).
+    if item.get("occupation_key"):
+        occupation = _registry_entry(os.path.join(DATA_CONFIG_DIR, "occupations.json"),
+                                     item["occupation_key"])
+        if occupation and occupation.get("id"):
+            result["id"] = occupation["id"]
+    if item.get("institution_key"):
+        institution = _registry_entry(os.path.join(DATA_CONFIG_DIR, "institutions.json"),
+                                      item["institution_key"])
+        if institution and institution.get("id"):
+            result["institution_id"] = institution["id"]
     result["evidence"] = item["evidence"]
     return result
 

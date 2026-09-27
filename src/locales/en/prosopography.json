@@ -9,7 +9,7 @@
     "copy": "Copy", "expires": "Expires", "empty": "No pending proposals.",
     "occupationSearch": "Search occupations", "institutionSearch": "Search institutions",
     "registryUnavailable": "The registry is not available yet. An empty list does not mean this is a new entry.",
-    "noRegistryMatches": "No registry matches found.", "multipleMatches": "Several possible matches; choose one.",
+    "noRegistryMatches": "No registry matches found.", "askAdmin": "Ask an administrator to review the entry.", "multipleMatches": "Several possible matches; choose one.",
     "moreMatches": "More matches exist. Refine the search.", "editorChoice": "Editor's choice",
     "correctDetails": "Correct date or evidence", "from": "From", "to": "To", "locator": "Source locator", "quote": "Excerpt",
     "proposal": "Proposal", "stale": "The person record has changed. Ask the agent for a new proposal.",
@@ -138,6 +138,7 @@
     "notesPlaceholder": "Internal notes (not shown publicly)…",
     "occupation": "Occupation",
     "occupationPlaceholder": "pastor, jurist, professor…",
+    "occupationArea": "Area of activity (place registry)",
     "occupationsAndEducation": "Occupations and education",
     "period": "Period",
     "photoError": {

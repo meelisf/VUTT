@@ -3,7 +3,7 @@ import os
 import json
 import pytest
 
-from server.prosopography import enrichment_proposals as proposals
+from server.prosopography import enrichment_proposals as proposals, registries
 
 
 @pytest.fixture(autouse=True)
@@ -209,6 +209,7 @@ def test_registrivoitmed_salvestuvad_ainult_olemasolevate_seostega(
     (registry / 'occupations.json').write_text(json.dumps({'theology-professor': {'id': None}}))
     (registry / 'institutions.json').write_text(json.dumps({'academia-gustaviana': {'id': 'Q1'}}))
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[])
     token = login('editor', 'editorpass')
     proposal_id = _submit_for_review(client, token, card, [_item()])
@@ -229,6 +230,7 @@ def test_voltsitud_registrivariant_ei_joua_kinnitamiseni(
         'professor': {'labels': {'et': 'professor'}, 'variants': ['Prof. theol.']},
     }))
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[])
     token = login('editor', 'editorpass')
     proposal_id = _submit_for_review(client, token, card, [
@@ -249,6 +251,7 @@ def test_olemasoleva_kirje_toend_lisataks_molemal_liigil(client, login, prosopo_
     (registry / 'occupations.json').write_text(json.dumps({'professor': {'labels': {'et': 'professor'}}}))
     (registry / 'institutions.json').write_text(json.dumps({'agc': {'labels': {'et': 'Academia Gustaviana'}}}))
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[{
         'label': 'Prof.', 'occupation_key': 'professor', 'institution_key': 'agc',
         'date_from': {'date': '1640', 'precision': 'year'},
@@ -285,6 +288,7 @@ def test_sama_voti_ja_kattuv_aeg_on_duplikaat_aga_eri_opingusundmus_mitte(
     registry.mkdir(exist_ok=True)
     (registry / 'institutions.json').write_text(json.dumps({'agc': {'labels': {'et': 'AGC'}}}))
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', education=[{
         'institution': 'AGC', 'institution_key': 'agc', 'type': 'immatriculation',
         'date_from': {'date': '1640', 'precision': 'year'},
@@ -313,6 +317,7 @@ def test_toimetaja_lahendab_mitmetahendusliku_vaste_registrivalikuga(
         'clergyman': {'id': 'Q2', 'variants': ['Pfarrer']},
     }))
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
+    monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[])
     token = login('editor', 'editorpass')
     proposal_id = _submit_for_review(client, token, card, [{

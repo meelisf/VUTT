@@ -1,7 +1,7 @@
 # 0023: vutt_mcp tohib hoida lokaalset olekut, kui see on valikuline
 
 Kuupäev: 2026-08-19
-Seis: kinnitatud; prosopo ettepaneku kitsas erand ADR 0057
+Seis: kinnitatud; prosopo ettepaneku kitsas erand ADR 0058
 
 ## Kontekst
 

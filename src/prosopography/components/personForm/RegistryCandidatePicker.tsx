@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   searchEnrichmentRegistry, type EnrichmentRegistryCandidate,
@@ -20,6 +20,7 @@ export default function RegistryCandidatePicker({ kind, query, disabled, chosenK
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [searchText, setSearchText] = useState(query);
+  useEffect(() => { setSearchText(query); setResult(null); }, [query, kind]);
 
   const search = async () => {
     setBusy(true); setError('');
@@ -40,7 +41,7 @@ export default function RegistryCandidatePicker({ kind, query, disabled, chosenK
     </div>
     {error && <p role="alert" className="text-red-700">{error}</p>}
     {result && !result.registry_available && <p className="text-amber-800">{tr('registryUnavailable')}</p>}
-    {result?.registry_available && result.results.length === 0 && <p>{tr('noRegistryMatches')}</p>}
+    {result?.registry_available && result.results.length === 0 && <p>{tr('noRegistryMatches')} {tr('askAdmin')}</p>}
     {result?.ambiguous && <p className="text-amber-800">{tr('multipleMatches')}</p>}
     {result?.truncated && <p className="text-amber-800">{tr('moreMatches')}</p>}
     {result?.results.map(candidate => <button key={candidate.key} type="button"

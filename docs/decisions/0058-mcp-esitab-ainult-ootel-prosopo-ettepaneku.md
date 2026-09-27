@@ -1,4 +1,4 @@
-# ADR 0057 — MCP tohib esitada ainult ootel prosopo ettepaneku
+# ADR 0058 — MCP tohib esitada ainult ootel prosopo ettepaneku
 
 Kuupäev: 2026-09-26
 Staatus: vastu võetud

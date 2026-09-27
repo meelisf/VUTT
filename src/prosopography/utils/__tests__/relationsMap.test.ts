@@ -103,6 +103,30 @@ describe('lifeStations (Fischer)', () => {
   });
 });
 
+describe('asutuse ja territooriumi registriviited (#462)', () => {
+  it('asutuse koht tuleb place_key kaudu; toorsilt ei ole koha identiteet', () => {
+    const card = { ...CARD, occupations: [{ label: 'Professor', institution: 'AGC', institution_key: 'agc' }],
+      education: [{ institution: 'Univ. Uppsala', institution_key: 'uppsala' }] } as unknown as ProsopoRecord;
+    const places = { ...REG, tartu: { id: 'Q13972', labels: { et: 'Tartu' }, coordinates: { lat: 58.38, lon: 26.72 } } };
+    const institutions = {
+      agc: { id: null, labels: { et: 'Academia Gustaviana' }, variants: ['AGC'], type: 'university', place_key: 'tartu' },
+      uppsala: { id: null, labels: { et: 'Uppsala ülikool' }, variants: [], type: 'university', place_key: null },
+    };
+    const result = lifeStations(card, places, institutions);
+    expect(result.mapped.find(s => s.kind === 'occupation')?.placeLabel).toBe('Tartu');
+    expect(result.unmapped.find(s => s.kind === 'education')?.reason).toBe('not_in_registry');
+  });
+
+  it('amet võib viidata territooriumile otse; ainult silt kaardikohta ei loo', () => {
+    const card = { ...CARD, occupations: [
+      { label: 'Superintendent', institution: 'Liivimaa', place_key: 'Liivimaa' },
+      { label: 'Pastor', institution: 'Magdeburg' },
+    ], education: [] } as unknown as ProsopoRecord;
+    const result = lifeStations(card, REG);
+    expect(result.unmapped.map(s => s.reason)).toEqual(['no_coordinates', 'not_in_registry']);
+  });
+});
+
 describe('lifeStations kuupäevaväljad (arvustuse I2)', () => {
   const REG2: Record<string, PlaceEntry> = { ...REG, 'Riia': { id: 'Q1773', labels: { et: 'Riia' }, coordinates: { lat: 56.95, lon: 24.1 } } };
   it('haridus: kanooniline date_from, mitte ainult date_start; järjestus õige', () => {

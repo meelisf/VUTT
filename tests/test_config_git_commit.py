@@ -175,3 +175,15 @@ def test_jalgimata_tookollektsioon_kustub_ka(repo, monkeypatch):
 
     ops.delete_work_set("ws_x", "admin")
     assert not (kaust / "ws_x.json").exists()
+
+
+def test_ametite_register_commitib_autori_ja_votme(repo, monkeypatch):
+    from server.prosopography import registries
+    monkeypatch.setattr(registries, "DATA_CONFIG_DIR", str(repo["tmp"] / "config"))
+    registries.put("occupation", "pastor", {
+        "id": "Q152002", "labels": {"et": "pastor"}, "variants": ["Pfarrer"],
+    }, "toimetaja")
+    latest = next(repo["repo"].iter_commits())
+    assert latest.author.name == "toimetaja"
+    assert latest.message.strip() == "Register occupation: uuenda pastor"
+    assert json.loads(repo["repo"].git.show("HEAD:config/occupations.json"))["pastor"]["id"] == "Q152002"

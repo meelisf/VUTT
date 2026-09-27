@@ -35,7 +35,7 @@ from .merge_ops import merge_person, delete_person
 from .indices import rebuild_indices
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from . import enrichment_proposals, registry_candidates
+from . import enrichment_proposals, registry_candidates, registries
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo
 from ..rate_limit import get_client_ip, check_rate_limit
@@ -446,6 +446,27 @@ def prosopography_enrichment_registry_search(kind: str, q: str, limit: int = 10)
     except registry_candidates.RegistrySearchError as error:
         status = 503 if str(error).startswith("registry_") else 400
         raise HTTPException(status_code=status, detail=str(error))
+
+
+@router.get("/registries/{kind}")
+def prosopography_registry(kind: str):
+    """Kinnitatud registrikirjed valijale ja ülevaatusele."""
+    try:
+        return registries.load(kind)
+    except registries.RegistryError as error:
+        raise HTTPException(status_code=400 if str(error) == "invalid_kind" else 503,
+                            detail=str(error))
+
+
+@router.put("/registries/{kind}/{key}")
+async def prosopography_put_registry(kind: str, key: str, request: Request,
+                                    user=Depends(require_role("admin"))):
+    """Admin kinnitab eraldi registrikirje; isikufakt ei loo seda kõrvalmõjuna."""
+    data = await request.json()
+    try:
+        return await run_in_threadpool(registries.put, kind, key, data, user["username"])
+    except registries.RegistryError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.post("/enrichment-proposals/{person_id}/apply")

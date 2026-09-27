@@ -5,7 +5,7 @@ ligipääsu VUTT-i transkriptsioonidele ja prosopograafiale. stdio.
 
 Enamik tööriistu on lugemiseks. Ühekordse üleandmiskoodiga saab MCP esitada
 ainult **ootel prosopo ettepaneku**; isikukaarti või registreid ta ei muuda
-(ADR 0057).
+(ADR 0058).
 
 Server on VUTT-i HTTPS-API õhuke klient. Ootel ettepaneku üleandmiseks lisandub
 backendis eraldi piiratud API; ülejäänud tööriistad kasutavad seniseid päringuid.

@@ -1,5 +1,14 @@
 {
   "title": "Haldus",
+  "prosopoRegistries": {
+    "title": "Ametite ja asutuste registrid",
+    "intro": "Kinnita registrikirje eraldi isikufaktist. Allikast pärit sõnastus jääb isikukaardile alles.",
+    "institution": "Asutused", "occupation": "Ametid", "search": "Otsi registrist",
+    "new": "Uus registrikirje", "key": "Püsiv VUTT-i võti", "qid": "Wikidata Q-kood (valikuline)",
+    "label": "Nimetus", "variants": "Nimevariandid, üks real", "type": "Asutuse liik",
+    "placeKey": "Koha registrivõti (valikuline)", "notes": "Märkused", "save": "Salvesta registrikirje",
+    "saved": "Registrikirje salvestati", "selectExisting": "See võti on juba olemas. Vali kirje loendist."
+  },
   "tabs": {
     "registrations": "Taotlused",
     "users": "Kasutajad",
@@ -302,6 +311,7 @@
     "trash": "Prügikast",
     "maintenance": "Hooldus",
     "places": "Kohtade register",
+    "prosopoRegistries": "Ametite ja asutuste registrid",
     "pending": "{{count}} ootel"
   },
   "groups": {

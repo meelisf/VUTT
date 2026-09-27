@@ -5,6 +5,7 @@
  */
 import type { NetworkWork, RelationKind } from '../services/networkService';
 import type { PlaceEntry, ProsopoRecord } from '../types';
+import type { InstitutionRegistryEntry } from '../services/prosopographyService';
 import type { LatLon } from '../components/map/mapBase';
 import type { VisibleNetwork, VisiblePerson } from './network';
 
@@ -111,12 +112,36 @@ function resolve(place: PlaceRef, registry: Record<string, PlaceEntry>) {
   return { placeLabel: place.label ?? place.id ?? null, coords: { lat: c.lat, lon: c.lon }, reason: null };
 }
 
+function resolveFactPlace(item: any, places: Record<string, PlaceEntry>,
+  institutions: Record<string, InstitutionRegistryEntry>) {
+  const raw = item?.institution ?? null;
+  const placeKey = item?.place_key ?? (item?.institution_key
+    ? institutions[item.institution_key]?.place_key : null);
+  if (placeKey) {
+    const entry = places[placeKey];
+    if (!entry) return { placeLabel: raw, coords: null, reason: 'not_in_registry' as const };
+    const label = entry.labels?.et ?? entry.labels?.en ?? raw;
+    if (!entry.coordinates) return { placeLabel: label, coords: null, reason: 'no_coordinates' as const };
+    return { placeLabel: label, coords: entry.coordinates, reason: null };
+  }
+  // Vanadele, veel migreerimata kaartidele jääb ainult täpse Q-koodi ühilduvus.
+  // Vabatekstilist asutuse nime ei käsitleta kohana (#462).
+  if (!item?.institution_key && item?.institution_id) {
+    const entry = Object.values(places).find(place => place.id === item.institution_id);
+    if (entry) return { placeLabel: raw, coords: entry.coordinates ?? null,
+      reason: entry.coordinates ? null : 'no_coordinates' as const };
+  }
+  return { placeLabel: raw, coords: null,
+    reason: raw || item?.institution_key ? 'not_in_registry' as const : 'no_place' as const };
+}
+
 /**
  * Fookusisiku elukäigu jaamad isikukaardilt (#461, osa #463-st). Järjekord: päritolu/sünd,
  * siis haridus ja ametid aasta järgi (kuupäevata keskmiste lõpus), siis surm ja matus.
  * Päritolu = sünnikoht → üks jaam.
  */
-export function lifeStations(card: ProsopoRecord, registry: Record<string, PlaceEntry>) {
+export function lifeStations(card: ProsopoRecord, registry: Record<string, PlaceEntry>,
+  institutions: Record<string, InstitutionRegistryEntry> = {}) {
   const first: LifeStation[] = [];
   const middle: LifeStation[] = [];
   const last: LifeStation[] = [];
@@ -131,11 +156,11 @@ export function lifeStations(card: ProsopoRecord, registry: Record<string, Place
   }
   for (const e of card.education ?? []) {
     middle.push({ kind: 'education', label: e?.institution ?? null, year: entryYear(e),
-      ...resolve({ id: e?.institution_id ?? null, label: e?.institution ?? null }, registry) });
+      ...resolveFactPlace(e, registry, institutions) });
   }
   for (const o of card.occupations ?? []) {
     middle.push({ kind: 'occupation', label: o?.label ?? null, year: entryYear(o),
-      ...resolve({ id: o?.institution_id ?? null, label: o?.institution ?? null }, registry) });
+      ...resolveFactPlace(o, registry, institutions) });
   }
   middle.sort((a, b) => (a.year ?? Infinity) - (b.year ?? Infinity));
   const deathPlace = card.death?.place;
@@ -158,11 +183,12 @@ export type RegistryState = Record<string, PlaceEntry> | 'loading' | 'error';
  * Elukäigu vaade koos registri olekuga: laadimisel ja vea korral EI väideta, et koht
  * registris puudub (see oleks vale väide andmete kohta).
  */
-export function lifeView(card: ProsopoRecord | null, registry: RegistryState) {
+export function lifeView(card: ProsopoRecord | null, registry: RegistryState,
+  institutions: Record<string, InstitutionRegistryEntry> = {}) {
   if (registry === 'loading') return { status: 'loading' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
   if (registry === 'error') return { status: 'error' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
   if (!card) return { status: 'ready' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
-  return { status: 'ready' as const, ...lifeStations(card, registry) };
+  return { status: 'ready' as const, ...lifeStations(card, registry, institutions) };
 }
 
 export type MapLayer = 'origin' | 'originPrint' | 'print' | 'life';

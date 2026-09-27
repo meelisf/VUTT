@@ -9,7 +9,7 @@
     "copy": "Kopeeri", "expires": "Aegub", "empty": "Ootel ettepanekuid ei ole.",
     "occupationSearch": "Otsi ametiregistrist", "institutionSearch": "Otsi asutuste registrist",
     "registryUnavailable": "Register pole veel saadaval. Ära järelda tühjast loendist, et kirje on uus.",
-    "noRegistryMatches": "Registrist vasteid ei leitud.", "multipleMatches": "Mitu võimalikku vastet; vali käsitsi.",
+    "noRegistryMatches": "Registrist vasteid ei leitud.", "askAdmin": "Palu administraatoril kirje üle vaadata.", "multipleMatches": "Mitu võimalikku vastet; vali käsitsi.",
     "moreMatches": "Vasteid on rohkem. Täpsusta otsingut.", "editorChoice": "Toimetaja valik",
     "correctDetails": "Paranda aeg või tõend", "from": "Alates", "to": "Kuni", "locator": "Allikakoht", "quote": "Katke",
     "proposal": "Ettepanek", "stale": "Isikukaart on vahepeal muutunud. Palu agendil teha uus ettepanek.",
@@ -138,6 +138,7 @@
     "notesPlaceholder": "Sisemised märkmed (ei kuvata avalikult)…",
     "occupation": "Amet",
     "occupationPlaceholder": "pastor, jurist, professor…",
+    "occupationArea": "Tegevuspiirkond (kohtade registrist)",
     "occupationsAndEducation": "Ametid ja haridus",
     "period": "Periood",
     "photoError": {

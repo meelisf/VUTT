@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from server.prosopography import enrichment_proposals as proposals
+from server.prosopography import enrichment_proposals as proposals, registries
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +27,7 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
         "agc": {"labels": {"et": "Academia Gustaviana"}, "variants": ["AGC"]},
     }))
     monkeypatch.setattr(proposals, "DATA_CONFIG_DIR", str(registry))
+    monkeypatch.setattr(registries, "DATA_CONFIG_DIR", str(registry))
     from server.prosopography import registry_candidates
     monkeypatch.setattr(registry_candidates, "DATA_CONFIG_DIR", str(registry))
 
