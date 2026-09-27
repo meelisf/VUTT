@@ -413,6 +413,7 @@
       "addressee": "Adressaat",
       "participant": "Osaleja"
     },
+    "linkPerson": "Seo / loo isik",
     "addCreator": "Lisa isik",
     "removeCreator": "Eemalda",
     "noCreators": "Isikuid pole lisatud",

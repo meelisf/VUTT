@@ -413,6 +413,7 @@
       "addressee": "Addressee",
       "participant": "Participant"
     },
+    "linkPerson": "Link / create person",
     "addCreator": "Add person",
     "removeCreator": "Remove",
     "noCreators": "No creators added",

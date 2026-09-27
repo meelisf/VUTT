@@ -4,8 +4,13 @@
  * register, kohalikud soovitused, keel, token ja teose kontekst isikupaneelile.
  * Rollide loend tuleb kutsujalt (teosel vocabularies.roles, osal PART_ROLES).
  */
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, UserPlus } from 'lucide-react';
+import PersonAddPanel from '../../prosopography/components/PersonAddPanel';
+import { useUser } from '../../contexts/UserContext';
+import { isAtLeast } from '../../utils/roleUtils';
 import EntityPicker, { type PeopleRegisterEntry } from '../EntityPicker';
 import { creatorFromPicker, creatorToPickerValue, type CreatorLike } from './creatorEntity';
 
@@ -32,7 +37,13 @@ function CreatorsEditor<C extends CreatorLike>({
   className = 'bg-gray-50/50',
 }: Props<C>) {
   const { t } = useTranslation(['workspace']);
+  const { user } = useUser();
   const replace = (i: number, c: C) => onChange(creators.map((x, j) => (j === i ? c : x)));
+  // Sidumata nimi (nt agendi ettepanekust, #492): isikupaneel avaneb kohe selle nimega —
+  // olemasolev VUTT-i isik, välisallikate kandidaadid või uus kaart (create_person_checked).
+  const canLink = !!token && isAtLeast(user?.role, 'editor');
+  const [linking, setLinking] = useState<number | null>(null);
+  const unlinked = (c: C) => !!c.name?.trim() && !c.id?.startsWith('vutt:P');
 
   return (
     <div className={`border border-gray-200 rounded-lg p-3 space-y-3 ${className}`}>
@@ -67,6 +78,12 @@ function CreatorsEditor<C extends CreatorLike>({
                   token={token ?? undefined}
                   personContext={workId ? { work_id: workId, role: creator.role } : undefined}
                 />
+                {canLink && unlinked(creator) && (
+                  <button type="button" onClick={() => setLinking(i)}
+                    className="mt-1 inline-flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800 hover:underline">
+                    <UserPlus size={12} /> {t('metadata.linkPerson')}
+                  </button>
+                )}
               </div>
               <select
                 aria-label={t('manage.parts.role')}
@@ -92,6 +109,21 @@ function CreatorsEditor<C extends CreatorLike>({
             </div>
           ))}
         </div>
+      )}
+      {linking !== null && creators[linking] && token && createPortal(
+        <PersonAddPanel
+          initialQuery={creators[linking].name ?? ''}
+          token={token}
+          lang={lang === 'en' ? 'en' : 'et'}
+          context={workId ? { work_id: workId, role: creators[linking].role } : undefined}
+          onDone={p => {
+            replace(linking, creatorFromPicker(creators[linking],
+              { id: p.id, label: p.label, source: 'local', entity_type: 'person', labels: { et: p.label } }));
+            setLinking(null);
+          }}
+          onClose={() => setLinking(null)}
+        />,
+        document.body,
       )}
     </div>
   );
