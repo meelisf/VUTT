@@ -1,6 +1,6 @@
 // src/prosopography/utils/__tests__/network.test.ts
 import { describe, it, expect } from 'vitest';
-import { applyFilters, coEdges, familyLabel, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
+import { applyFilters, coEdges, evidenceTarget, familyLabel, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
 import type { PersonNetwork, NetworkEdge } from '../../services/networkService';
 
 const F = 'vutt:Pfocus';
@@ -77,6 +77,36 @@ describe('coEdges', () => {
     expect(byPair['a|b']).toBe(2);        // w1 ja w2
     expect(byPair['a|c']).toBe(1);
     expect(byPair['b|c']).toBe(1);
+  });
+});
+
+describe('osad (#464)', () => {
+  const partEdge = (other: string, part: string | undefined, pages: number[] = []): NetworkEdge => ({
+    ...E('dedicated', other, 'w9', 1684), evidence: { work_id: 'w9', pages, ...(part ? { part_id: part } : {}) },
+  });
+  const net: PersonNetwork = {
+    focus: P(F, 'Fookus'), persons: [P('a'), P('b'), P('c')], works: [W('w9', 1690)],
+    parts: [{ work_id: 'w9', part_id: 'k1', kind: 'letter', title: 'Kiri', year: 1684, first_page: 7 },
+            { work_id: 'w9', part_id: 'k2', kind: 'letter', title: '', year: null, first_page: 12 }],
+    edges: [partEdge('a', 'k1'), partEdge('b', 'k2'), partEdge('c', 'k1', [8])],
+  };
+
+  it('kaaslaste serv ainult sama osa isikute vahel, mitte kogu kirjakogu peale', () => {
+    const pairs = coEdges(applyFilters(net, DEFAULT_FILTER)).map(c => `${c.a}|${c.b}`);
+    expect(pairs).toEqual(['a|c']);
+  });
+
+  it('evidenceTarget: tõendi leht, osa puhul osa esimene leht, muidu 1', () => {
+    const v = applyFilters(net, DEFAULT_FILTER);
+    expect(evidenceTarget(partEdge('c', 'k1', [8]), v)).toEqual({ page: 8, part: v.parts.get('k1') });
+    expect(evidenceTarget(partEdge('a', 'k1'), v).page).toBe(7);
+    expect(evidenceTarget(partEdge('a', undefined), v)).toEqual({ page: 1, part: undefined });
+  });
+
+  it('osadeta vastus (vana server) annab tühja kaardi', () => {
+    const { parts, ...old } = net;
+    expect(parts).toBeDefined();
+    expect(applyFilters(old, DEFAULT_FILTER).parts.size).toBe(0);
   });
 });
 

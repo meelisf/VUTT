@@ -18,12 +18,14 @@ KINDS = ("academic", "dedicated", "family", "cotext", "mention", "printer")
 # `creator` on puuduva rolli vaikeväärtus (indices.py) — ka tema on looja.
 CREATOR = frozenset({"praeses", "respondens", "auctor", "gratulator", "dedicator",
                      "editor", "aui", "creator"})
-KNOWN = CREATOR | {"subject", "mentioned", "publisher"}
+# `addressee` ja `participant` tulevad teose osadest (#464): kirja adressaat, istungi osaleja.
+KNOWN = CREATOR | {"subject", "mentioned", "publisher", "addressee", "participant"}
 
-ACADEMIC_PAIRS = (("praeses", "respondens"), ("aui", "auctor"))
+ACADEMIC_PAIRS = (("praeses", "respondens"), ("aui", "auctor"),
+                  ("praeses", "participant"), ("participant", "participant"))
 DEDICATED_CREATORS = CREATOR - {"dedicator"}   # pühendus on nõrk seos (spekk, otsus 5)
 DEDICATED_PAIRS = tuple((c, "subject") for c in sorted(DEDICATED_CREATORS)) + (
-    ("gratulator", "auctor"), ("gratulator", "respondens"))
+    ("gratulator", "auctor"), ("gratulator", "respondens"), ("auctor", "addressee"))
 
 _logged_unknown: set[str] = set()
 

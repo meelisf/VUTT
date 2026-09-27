@@ -4,7 +4,8 @@
 Allikad (kõik read-modelid, ADR 0007): person_to_works (rollid, mainimiste lehed),
 works_creators_index (teose faktid), work_collections_index (kogud → filter ja
 restricted), prosopography_index (isikute sildid, päritolu), isikukaardid (pereseosed).
-Serv on alati fookuse ja teise isiku vahel, üks serv teose kohta (ego-võrgustik).
+Serv on alati fookuse ja teise isiku vahel, üks serv teose (osadega teosel osa) kohta
+(ego-võrgustik). Osa ulatus: #464, ADR 0056 laiendus.
 """
 from __future__ import annotations
 
@@ -49,18 +50,54 @@ def _cached(name: str, path: str, load, derive=lambda x: x):
     return value
 
 
+WORK_SCOPE = None   # ulatus = teose tasand; muidu osa id (#464)
+
+
 def _roles_by_work(ptw: dict) -> dict:
-    """{work_id: {person_id: {"roles": set, "pages": set}}} — pöördindeks ühest päringust."""
+    """{work_id: {person_id: {ulatus: set(rollid)}, "pages": set}} — pöördindeks ühest päringust.
+
+    Ulatus on osa id või WORK_SCOPE. Osa isik (`part_id`) on ainult oma osas. Mainimine on
+    kõigis `part_ids` osades ja lisaks teose tasandil, kui mõni leht jääb osadest välja
+    (`part_only` puudub) — ADR 0056 laiendus.
+    """
     out: dict = {}
     for pid, entries in ptw.items():
         for e in entries or []:
             wid = e.get("work_id")
             if not wid:
                 continue
-            slot = out.setdefault(wid, {}).setdefault(pid, {"roles": set(), "pages": set()})
-            slot["roles"].add(e.get("role") or "creator")
+            slot = out.setdefault(wid, {}).setdefault(pid, {"scopes": {}, "pages": set()})
+            role = e.get("role") or "creator"
+            if e.get("part_id"):
+                scopes = [e["part_id"]]
+            else:
+                scopes = list(e.get("part_ids") or [])
+                if not e.get("part_only"):
+                    scopes.append(WORK_SCOPE)
+            for scope in scopes:
+                slot["scopes"].setdefault(scope, set()).add(role)
             slot["pages"].update(e.get("pages") or [])
     return out
+
+
+# Osa koha liik: kiri saadetakse kohast, istung ja kõne toimuvad kohas (#464).
+_PART_PLACE_KIND = {"letter": "sent_from", "session": "event", "speech": "event"}
+
+
+def _edge_place(fact: dict, part: Optional[dict]) -> Optional[dict]:
+    if part and part.get("place") and part.get("kind") in _PART_PLACE_KIND:
+        return {"id": part["place"].get("id"), "kind": _PART_PLACE_KIND[part["kind"]]}
+    loc = fact.get("location")
+    return {"id": loc.get("id"), "kind": "print"} if loc else None
+
+
+def _scope_pages(pages: set, fact: dict, scope) -> list:
+    """Tõendi lehed ulatuse piires: osa lehed või (osadega teosel) osadest välja jäävad."""
+    parts = fact.get("parts") or {}
+    if scope is not WORK_SCOPE:
+        return sorted(pages & set((parts.get(scope) or {}).get("pages") or []))
+    in_parts = {n for p in parts.values() for n in p.get("pages") or []}
+    return sorted(pages - in_parts)
 
 
 def _person_view(entry: Optional[dict], pid: str, card: Optional[dict] = None) -> dict:
@@ -190,6 +227,7 @@ def build_person_network(person_id: str, collection: Optional[str] = None) -> Op
     by_work = _cached("by_work", state.PERSON_TO_WORKS_FILE, _load_person_to_works, _roles_by_work)
     edges: list = []
     works: dict = {}
+    parts_out: dict = {}
     others: set = set()
     focus_works = {w for w, members in by_work.items() if person_id in members}
     for wid in sorted(focus_works):
@@ -200,26 +238,42 @@ def build_person_network(person_id: str, collection: Optional[str] = None) -> Op
         if allowed_cols is not None and not (allowed_cols & set(cols)):
             continue
         mine = by_work[wid][person_id]
+        fact_parts = fact.get("parts") or {}
         for oid, theirs in sorted(by_work[wid].items()):
             if oid == person_id:
                 continue
-            kind, direction = classify_pair(mine["roles"], theirs["roles"])
-            if direction == "ab":
-                frm, to, directed = person_id, oid, True
-            elif direction == "ba":
-                frm, to, directed = oid, person_id, True
-            else:
-                frm, to = sorted((person_id, oid))
-                directed = False
-            loc = fact.get("location")
-            edges.append({
-                "kind": kind, "from": frm, "to": to, "directed": directed,
-                "roles": {person_id: sorted(mine["roles"]), oid: sorted(theirs["roles"])},
-                "year": fact.get("year"),
-                "place": {"id": loc.get("id"), "kind": "print"} if loc else None,
-                "evidence": {"work_id": wid, "pages": sorted(mine["pages"] | theirs["pages"])},
-            })
+            # Paar ainult ühises ulatuses: teose tasand teose tasandiga, osa sama osaga.
+            shared = sorted(set(mine["scopes"]) & set(theirs["scopes"]), key=lambda x: (x is not None, x or ""))
+            for scope in shared:
+                a_roles, b_roles = mine["scopes"][scope], theirs["scopes"][scope]
+                kind, direction = classify_pair(a_roles, b_roles)
+                if direction == "ab":
+                    frm, to, directed = person_id, oid, True
+                elif direction == "ba":
+                    frm, to, directed = oid, person_id, True
+                else:
+                    frm, to = sorted((person_id, oid))
+                    directed = False
+                part = fact_parts.get(scope) if scope is not WORK_SCOPE else None
+                evidence = {"work_id": wid,
+                            "pages": _scope_pages(mine["pages"] | theirs["pages"], fact, scope)}
+                if scope is not WORK_SCOPE:
+                    evidence["part_id"] = scope
+                    if part and scope not in parts_out:
+                        parts_out[scope] = {"work_id": wid, "part_id": scope, "kind": part.get("kind"),
+                                            "title": part.get("title") or "", "year": part.get("year"),
+                                            "first_page": part.get("first_page")}
+                edges.append({
+                    "kind": kind, "from": frm, "to": to, "directed": directed,
+                    "roles": {person_id: sorted(a_roles), oid: sorted(b_roles)},
+                    "year": ((part or {}).get("year") or fact.get("year")),
+                    "place": _edge_place(fact, part),
+                    "evidence": evidence,
+                })
+            if not shared:
+                continue
             others.add(oid)
+            loc = fact.get("location")
             if wid not in works:
                 works[wid] = {"work_id": wid, "title": fact.get("title") or "", "year": fact.get("year"),
                               "place": ({**loc, "coordinates": _place_coords(loc)} if loc else None),
@@ -236,4 +290,5 @@ def build_person_network(person_id: str, collection: Optional[str] = None) -> Op
         entry = index.get(oid)
         persons.append(_person_view(entry, oid, None if entry else get_person(oid)))
     return {"focus": _person_view(index.get(person_id), person_id, card),
-            "persons": persons, "works": list(works.values()), "edges": edges}
+            "persons": persons, "works": list(works.values()), "parts": list(parts_out.values()),
+            "edges": edges}

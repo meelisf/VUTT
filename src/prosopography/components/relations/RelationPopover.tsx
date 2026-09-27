@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { VisibleNetwork } from '../../utils/network';
-import { familyLabel } from '../../utils/network';
+import { evidenceTarget, familyLabel } from '../../utils/network';
 
 /** `year` (valikuline): ajatelje liitmärk — näita ainult selle aasta teoseid. */
 export interface PopoverState { personId: string; x: number; y: number; pinned: boolean; year?: number | null; }
@@ -98,13 +98,22 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
         <ul className="mt-2 space-y-1.5 pl-3 list-disc">
           {shown.map((e, i) => {
             const w = net.works.get(e.evidence!.work_id);
-            const page = e.evidence!.pages[0] ?? 1;
+            const { page, part } = evidenceTarget(e, net);
             const title = w?.title ? (w.title.length > 90 ? `${w.title.slice(0, 89)}…` : w.title) : e.evidence!.work_id;
+            // Osa koht (saatmis- või toimumiskoht) ei ole trükikoht; silti serv ei kanna.
+            const printPlace = !e.place || e.place.kind === 'print';
             return (
               <li key={`${e.evidence!.work_id}-${i}`}>
                 <span className="text-gray-500">
-                  {w?.year ?? '?'} · {w?.place?.label ?? t('network.unknownPlace')} · {t(`network.kinds.${e.kind}`)}
+                  {e.year ?? w?.year ?? '?'}
+                  {printPlace && <> · {w?.place?.label ?? t('network.unknownPlace')}</>}
+                  {' · '}{t(`network.kinds.${e.kind}`)}
                 </span>
+                {part && (
+                  <div className="text-gray-700">
+                    {t(`workspace:manage.parts.kinds.${part.kind}`)}{part.title ? `: ${part.title}` : ''}
+                  </div>
+                )}
                 <div className="text-gray-700">
                   <b>{surname(p.label)}:</b> {roles(e.roles?.[p.id])} · <b>{surname(net.focus.label)}:</b> {roles(e.roles?.[net.focus.id])}
                 </div>

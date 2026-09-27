@@ -306,7 +306,8 @@ Uus isik ainult `create_person_checked` kaudu (`POST /prosopography/persons/crea
 (`network.build_person_network`) nii isikulehele kui `/persons` seoste kaardile.
 `works_creators_index.json` kirjutab AINULT `update_work_facts` (tingimusteta,
 `update_work_collections` kõrval); kogud ja `restricted` tulevad
-`work_collections_index.json`-ist. Trükikoht EI OLE kohtumiskoht.
+`work_collections_index.json`-ist. Trükikoht EI OLE kohtumiskoht. Osadega teosel
+paaritatakse ainult ühises ulatuses (teos↔teos, osa↔sama osa; #464) — ka klient.
 
 **Teose osad (ADR 0057)** — `_metadata.json` `parts[]`: lehed on lehetüvede HULK
 (katkendlik, leht võib olla mitmes osas). Muudetakse AINULT `/works/{id}/parts`

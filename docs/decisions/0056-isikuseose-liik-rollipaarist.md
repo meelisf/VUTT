@@ -30,3 +30,8 @@ väljadeta (#461).
   rebuildile ja uuendusele, ADR 0007).
 - #464 (teose osad) ja #465 (toimumiskoht) lisavad `evidence.part_id` ja
   `place.kind ∈ {event, sent_from}`, ilma vaateid muutmata.
+- **Osa ulatus (#464 PR 3):** paar tehakse ainult ühises ulatuses — teose tasandi roll
+  teose tasandi rolliga, osa roll sama osa rolliga. Mainimine on oma `part_ids` osades
+  ja teose tasandil, kui mõni leht jääb osadest välja (`part_only` puudub). Serv on üks
+  (teos, osa) kohta; kliendi kaaslaste servad (`coEdges`) rühmitavad samuti osa järgi —
+  muidu seoks kirjakogu kõik kirjutajad omavahel.

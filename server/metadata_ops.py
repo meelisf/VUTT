@@ -170,7 +170,7 @@ def bulk_update_works(
         slug = os.path.basename(os.path.dirname(meta_path))
 
         update_work_collections(meta.get("id"), meta.get("collections") or [])
-        update_work_facts(meta)
+        update_work_facts(meta, os.path.dirname(meta_path))
 
         if call_ptw:
             ptw_args = (
@@ -181,10 +181,11 @@ def bulk_update_works(
                 meta.get("title") or "",
                 meta.get("year"),
             )
+            ptw_parts = meta.get("parts") or []
             if background_tasks is not None:
-                background_tasks.add_task(update_person_to_works, *ptw_args)
+                background_tasks.add_task(update_person_to_works, *ptw_args, parts=ptw_parts)
             else:
-                update_person_to_works(*ptw_args)
+                update_person_to_works(*ptw_args, parts=ptw_parts)
 
         # Meilisearchi sünk on kohustuslik, mitte lipuga valitav: ilma selleta
         # jäävad dashboardi filtrid failisüsteemist maha (#175).
@@ -304,7 +305,7 @@ def save_work_metadata(
 
     # Kollektsioonid uuenevad ka bulk-collection teel (call_ptw=False) — tingimusteta
     update_work_collections(meta.get("id"), meta.get("collections") or [])
-    update_work_facts(meta)
+    update_work_facts(meta, os.path.dirname(meta_path))
     collections_done = time.monotonic()
 
     if call_ptw:
@@ -316,10 +317,11 @@ def save_work_metadata(
             meta.get("title") or "",
             meta.get("year"),
         )
+        ptw_parts = meta.get("parts") or []
         if background_tasks is not None:
-            background_tasks.add_task(update_person_to_works, *ptw_args)
+            background_tasks.add_task(update_person_to_works, *ptw_args, parts=ptw_parts)
         else:
-            update_person_to_works(*ptw_args)
+            update_person_to_works(*ptw_args, parts=ptw_parts)
 
     if sync_meili:
         sync_work_to_meilisearch(slug)

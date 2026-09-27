@@ -7,7 +7,7 @@ import time
 from typing import Optional
 
 from . import state
-from .indices import _load_index, _load_person_to_works, collect_page_person_mentions
+from .indices import _load_index, _load_person_to_works, mention_entries
 from ..config import get_logger
 from .person_crud import get_person
 from ._compat import sync_from_facade
@@ -25,8 +25,27 @@ def get_person_with_works(person_id: str) -> Optional[dict]:
     if person is None:
         return None
     works = _load_person_to_works()
-    person["works"] = works.get(person_id, [])
+    person["works"] = _with_part_facts(works.get(person_id, []))
     return person
+
+
+def _with_part_facts(entries: list) -> list:
+    """Osa-kirjele (#464) osa kokkuvõte teose faktidest: liik, pealkiri, aasta, lehed.
+
+    Sama poliitika mis teose pealkirjal (POST /work-titles): pealkiri ei ole salajane,
+    piiratud teose lingi keelab klient. Faktides puuduv osa jääb andmeteta.
+    """
+    if not any(e.get("part_id") for e in entries):
+        return entries
+    from .work_relations_ops import _load_creators_index
+    facts = _load_creators_index()
+    out = []
+    for e in entries:
+        part = ((facts.get(e.get("work_id")) or {}).get("parts") or {}).get(e.get("part_id") or "")
+        if part:
+            e = {**e, "part": {k: part.get(k) for k in ("kind", "title", "year", "first_page", "pages")}}
+        out.append(e)
+    return out
 
 
 def _build_work_to_persons() -> dict:
@@ -115,9 +134,14 @@ def update_page_person_mentions(work_id: str, work_dir: str):
     sync_from_facade()
 
     try:
-        mentions = collect_page_person_mentions(work_dir)
-    except Exception as e:
-        print(f"update_page_person_mentions viga: {e}")
+        parts = []
+        meta_path = os.path.join(work_dir, '_metadata.json')
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                parts = (json.load(f) or {}).get('parts') or []
+        mentions = mention_entries(work_id, work_dir, parts)
+    except Exception:
+        logger.exception("update_page_person_mentions viga")
         return
 
     with state._works_lock:
@@ -129,10 +153,8 @@ def update_page_person_mentions(work_id: str, work_dir: str):
                 if not (e.get('work_id') == work_id and e.get('role') == 'mentioned')
             ]
         # Lisa uued.
-        for pid, pages in mentions.items():
-            if pid not in data:
-                data[pid] = []
-            data[pid].append({'work_id': work_id, 'role': 'mentioned', 'pages': pages})
+        for pid, entry in mentions.items():
+            data.setdefault(pid, []).append(entry)
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, data)
 
 

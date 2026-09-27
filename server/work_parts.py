@@ -156,12 +156,33 @@ def _write(work_dir: str, username: str, message: str, mutate) -> object:
     # (work_lock → metadata_lock), muidu võib samaaegne poolitus tüve vahepeal asendada.
     with admin_page_ops.work_lock(os.path.basename(work_dir), work_dir):
         stems = page_stems(work_dir)
-        res = bulk_update_works([(os.path.join(work_dir, "_metadata.json"), transform)], username, message)
+        # call_ptw: osa isikud person_to_works'i `part_id`-ga (#464 PR 3).
+        res = bulk_update_works([(os.path.join(work_dir, "_metadata.json"), transform)], username, message,
+                                call_ptw=True)
     if "error" in box:
         raise box["error"]
     if res.get("failed"):
         raise PartError("Teose metaandmeid ei saanud kirjutada", 500)
+    if res.get("updated"):
+        _refresh_mention_parts(work_dir)
     return box.get("result")
+
+
+def _refresh_mention_parts(work_dir: str) -> None:
+    """Mainimiste `part_ids` sõltub osade lehtedest → osa muutuse järel uuesti.
+
+    refresh_work_mentions'i asemel otse: lehehulk ei muutunud, osade ühtlustus oleks tühi.
+    Viga logitakse: osa on juba kettal ja commititud.
+    """
+    import json
+    try:
+        with open(os.path.join(work_dir, "_metadata.json"), "r", encoding="utf-8") as f:
+            work_id = (json.load(f) or {}).get("id")
+        # Moodulile viitamine, et testide patch jõuaks kohale.
+        from .prosopography import relations
+        relations.update_page_person_mentions(work_id, work_dir)
+    except Exception:
+        logger.exception(f"Osa järel mainimiste uuendus ebaõnnestus ({work_dir})")
 
 
 def _find(parts: list, part_id: str) -> int:
@@ -254,4 +275,11 @@ def sync_work_parts(work_dir: str, work_id: Optional[str] = None, renamed: Optio
         parts, changed = remap_parts(list(meta.get("parts") or []), stems, renamed)
         return {"parts": parts} if changed else {}
 
-    bulk_update_works([(meta_path, transform)], "Automaatne", "Osad: lehetoimingu järel ühtlustatud")
+    res = bulk_update_works([(meta_path, transform)], "Automaatne", "Osad: lehetoimingu järel ühtlustatud",
+                            call_ptw=True)
+    if not res.get("updated"):
+        # Ümberjärjestus ei muuda tüvesid, aga nihutab numbreid: teose faktide osade
+        # `first_page`/`pages` arvutatakse kirjutamisel, seega kirjutame need ise.
+        from .prosopography import work_relations_ops
+        with open(meta_path, "r", encoding="utf-8") as f:
+            work_relations_ops.update_work_facts(json.load(f) or {}, work_dir)

@@ -113,4 +113,23 @@ describe('liitmärgi hüpik: ainult selle aasta teosed', () => {
     act(() => result.current.pin('a', ev, 1659));
     expect(result.current.state).toMatchObject({ personId: 'a', pinned: true, year: 1659 });
   });
+
+  it('osa (#464): liik ja pealkiri, osa aasta, link osa esimesele lehele', () => {
+    const net = applyFilters({
+      ...NET,
+      works: [{ work_id: 'epi', title: 'Epistolae', year: 1690, place: { id: 'Q2', label: 'Tartu', coordinates: null }, genres: [], restricted: false }],
+      parts: [{ work_id: 'epi', part_id: 'k1', kind: 'letter', title: 'Fischerile', year: 1684, first_page: 7 }],
+      edges: [{ kind: 'dedicated', from: 'vutt:Ps', to: F, directed: true, year: 1684, place: { id: 'Q3', kind: 'sent_from' },
+                roles: { 'vutt:Ps': ['auctor'], [F]: ['addressee'] }, evidence: { work_id: 'epi', pages: [], part_id: 'k1' } }],
+    }, DEFAULT_FILTER);
+    render(
+      <MemoryRouter>
+        <RelationPopover state={{ personId: 'vutt:Ps', x: 10, y: 10, pinned: true }} net={net} onClose={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Kiri: Fischerile')).toBeTruthy();
+    expect(screen.getByText(/^1684 ·/)).toBeTruthy();
+    expect(screen.queryByText(/Tartu/)).toBeNull();          // trükikoht ei ole kirja koht
+    expect(screen.getAllByRole('link').map(a => a.getAttribute('href'))).toContain('/work/epi/7');
+  });
 });
