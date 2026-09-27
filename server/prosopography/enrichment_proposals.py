@@ -7,6 +7,7 @@ import secrets
 import sqlite3
 import time
 from contextlib import contextmanager
+from typing import Optional
 
 from ..config import STATE_DIR, DATA_CONFIG_DIR, PLACES_FILE
 
@@ -244,7 +245,7 @@ def list_pending(person_id: str, username: str, session_fingerprint: str) -> lis
         return result
 
 
-def _registry_entry(filename: str, key: str) -> dict | None:
+def _registry_entry(filename: str, key: str) -> Optional[dict]:
     """Võtmega seos lubatakse ainult reaalselt olemasoleva registrikirjega."""
     try:
         with open(filename, encoding="utf-8") as handle:
@@ -260,7 +261,7 @@ def _registry_entry(filename: str, key: str) -> dict | None:
     return None
 
 
-def _registry_label(filename: str, key: str) -> str | None:
+def _registry_label(filename: str, key: str) -> Optional[str]:
     entry = _registry_entry(filename, key)
     if entry is None:
         return None
@@ -322,7 +323,7 @@ def _check_links(item: dict) -> None:
         raise ProposalError("institution_variant_requires_key")
 
 
-def _year(value) -> int | None:
+def _year(value) -> Optional[int]:
     if not isinstance(value, dict):
         return None
     match = re.match(r"^(\d{4})", str(value.get("date") or ""))
@@ -343,7 +344,7 @@ def _same_fact(existing: dict, candidate: dict, kind: str) -> bool:
 
 def apply_selected(proposal_id: str, person_id: str, username: str,
                    session_fingerprint: str, selected: list[int],
-                   corrections: dict | None = None) -> dict:
+                   corrections: Optional[dict] = None) -> dict:
     """Salvestab ainult toimetaja valitud uued read kaardi versioonikontrolliga."""
     from .person_crud import get_person, update_person
 

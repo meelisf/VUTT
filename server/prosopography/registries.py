@@ -9,6 +9,7 @@ import json
 import os
 import re
 import threading
+from typing import Optional
 
 from ..config import DATA_CONFIG_DIR, PLACES_FILE
 from ..git_ops import save_config_with_git
@@ -44,7 +45,7 @@ def load(kind: str) -> dict:
     return value
 
 
-def _text(value, field: str, *, required: bool = False) -> str | None:
+def _text(value, field: str, *, required: bool = False) -> Optional[str]:
     if value is None and not required:
         return None
     if not isinstance(value, str) or len(value) > 300 or (required and not value.strip()):
@@ -52,7 +53,7 @@ def _text(value, field: str, *, required: bool = False) -> str | None:
     return value.strip() or None
 
 
-def validate_entry(kind: str, key: str, data: dict, *, places: dict | None = None) -> dict:
+def validate_entry(kind: str, key: str, data: dict, *, places: Optional[dict] = None) -> dict:
     _path(kind)
     if not isinstance(key, str) or not _KEY.fullmatch(key) or len(key) > 100:
         raise RegistryError("invalid_key")

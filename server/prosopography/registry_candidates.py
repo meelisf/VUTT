@@ -6,6 +6,7 @@ import json
 import os
 import re
 import unicodedata
+from typing import Optional
 
 from ..config import DATA_CONFIG_DIR
 
@@ -27,7 +28,7 @@ def _fold(value: str) -> str:
                    if not unicodedata.combining(char))
 
 
-def _load(kind: str) -> dict | None:
+def _load(kind: str) -> Optional[dict]:
     path = os.path.join(DATA_CONFIG_DIR, _FILES[kind])
     try:
         with open(path, encoding="utf-8") as handle:
