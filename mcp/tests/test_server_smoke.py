@@ -5,6 +5,7 @@ EXPECTED_TOOLS = {
     "search_pages", "search_works", "get_work", "get_pages", "get_page_image",
     "search_persons", "get_person", "get_person_enrichment_context", "search_enrichment_registry",
     "submit_person_enrichment_proposal", "list_filter_values",
+    "get_work_parts", "submit_work_parts_proposal",
 }
 
 

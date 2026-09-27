@@ -12,6 +12,7 @@ import re
 from mcp.server.mcpserver import MCPServer
 
 from . import format as fmt
+from . import parts as work_parts_mod
 from . import persons
 from . import queries
 from .client import VuttClient
@@ -431,6 +432,44 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         on alati näha) — produktiivsel professoril võib neid olla üle 170.
         """
         return persons.detail(client, base_url, person_id, include_relations)
+
+    @mcp.tool(structured_output=False)
+    async def get_work_parts(work_id: str) -> str:
+        """Teose olemasolevad osad (kirjad, luuletused, kõned, istungid, lisad).
+
+        Tagastab osad leheküljenumbritega, teose lehtede arvu (`page_count`) ja
+        `pages_version`-i — see seob osade ettepaneku nähtud lehtede järjekorraga.
+        Kasuta enne submit_work_parts_proposal'it, et mitte pakkuda juba olemasolevat osa.
+        """
+        return work_parts_mod.work_parts(client, work_id)
+
+    @mcp.tool(structured_output=False)
+    async def submit_work_parts_proposal(
+        handoff_code: str, work_id: str, pages_version: str, parts: list[dict],
+    ) -> str:
+        """Esitab teose osade (sisukorra) ettepaneku toimetaja ülevaatuseks.
+
+        handoff_code tuleb toimetajalt (teose haldus → „Osad" → kood agendile); see
+        kehtib 8 h ja ainult sellele teosele. pages_version tuleb get_work_parts'ist;
+        kui lehti on vahepeal muudetud, lükatakse ettepanek tagasi (stale_pages) —
+        loe osad uuesti.
+
+        Iga osa: kind (letter | poem | speech | session | attachment), pages =
+        LEHEKÜLJENUMBRID nagu get_pages'is (1-põhised, võivad olla katkendlikud;
+        leht võib kuuluda mitmesse osasse), valikuliselt title, incipit, notes,
+        creators [{id?, name, role}] (role: auctor | addressee | praeses |
+        participant | subject; id = search_persons'i vutt:P… kui isik on
+        registris), dating {start: "1684-03-02", end?}, place {id?: Q-kood, label},
+        place_to (ainult kirjal), languages, attached_to (lisa korral: sama
+        ettepaneku osa INDEKS või olemasoleva osa id), evidence [{page, quote}].
+
+        Kirja piirid tunneb ära pöördumisest, dateeringust ja allkirjast;
+        istungi protokolli kuupäevast ja osalejate loetelust. Ära paku juba
+        olemasolevat osa. Kuni 50 osa ühes esituses; see talletab AINULT
+        ettepaneku — teost ei muudeta, toimetaja otsustab osa kaupa.
+        Võrguvea järel ära saada sama ettepanekut pimesi uuesti.
+        """
+        return work_parts_mod.submit_parts(client, handoff_code, work_id, pages_version, parts)
 
     @mcp.tool(structured_output=False)
     async def get_person_enrichment_context(person_id: str) -> str:

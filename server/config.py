@@ -295,6 +295,8 @@ RATE_LIMITS = {
     '/prosopography/translate': (60, 3600),
     '/prosopography/enrichment-handoff': (30, 3600),
     '/prosopography/enrichment-proposal-submit': (30, 300),
+    '/works/parts-handoff': (30, 3600),
+    '/works/parts-proposals-submit': (30, 300),
 }
 
 # =========================================================
