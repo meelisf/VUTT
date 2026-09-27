@@ -10,6 +10,7 @@ import WorkInfoPanel from './WorkInfoPanel';
 import WorkTagsPanel from './WorkTagsPanel';
 import WorkSetsPanel from './WorkSetsPanel';
 import WorkPartsPanel from './WorkPartsPanel';
+import { canEditWork, isAtLeast } from '../../utils/roleUtils';
 import TextAnnotationsPanel from './TextAnnotationsPanel';
 
 interface AnnotationsTabProps {
@@ -84,7 +85,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       />
 
       {/* Teose osade sisukord (#464) — teose info all, kokkuklapitav */}
-      <WorkPartsPanel workId={work?.work_id} token={authToken} currentPage={_page.page_number} />
+      <WorkPartsPanel workId={work?.work_id} token={authToken} currentPage={_page.page_number}
+        canEdit={isAtLeast(user?.role, 'editor') && canEditWork(user, work)} />
 
       {/* Töökollektsioonid on „kõrgema taseme märksõna" — kuraatori, mitte
           sisu tasandi väide teose kohta. Seepärast teose märksõnade EES. */}

@@ -1,17 +1,27 @@
 /** @vitest-environment jsdom */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '../../../pages/manage/parts/__tests__/testI18n';
 
-const { api } = vi.hoisted(() => ({ api: { parts: [] as any[], nums: {} as Record<string, number>, fail: false } }));
+const { api } = vi.hoisted(() => ({ api: { parts: [] as any[], nums: {} as Record<string, number>, fail: false, updates: [] as any[] } }));
 vi.mock('../../../services/workPartsApi', async (orig) => ({
   ...(await orig<typeof import('../../../services/workPartsApi')>()),
   getPartsToc: async () => {
     if (api.fail) throw new Error('403');
     return { parts: api.parts, pageNumbers: api.nums };
   },
+  updatePart: async (_w: string, id: string, part: any) => {
+    api.updates.push({ id, part });
+    api.parts = api.parts.map(p => (p.id === id ? { ...part, id, needs_review: false } : p));
+    return { ...part, id, needs_review: false };
+  },
 }));
+// UserContext impordib rakenduse i18n-i (init kirjutaks testi tõlked üle) — CreatorsEditor kasutab seda.
+vi.mock('../../../contexts/UserContext', () => ({ useUser: () => ({ user: { role: 'editor' } }) }));
+vi.mock('../../../hooks/usePersonSources', () => ({ usePersonSources: () => ({ authors: [], peopleRegister: [] }) }));
+vi.mock('../../EntityPicker', () => ({ default: () => <input aria-label="entity" /> }));
+vi.mock('../../WorkDatingInput', () => ({ default: () => <input aria-label="dating" /> }));
 
 import WorkPartsPanel from '../WorkPartsPanel';
 
@@ -24,7 +34,7 @@ const renderPanel = (page = 1) => render(
 );
 
 beforeEach(() => {
-  api.parts = [POEM, LETTER]; api.nums = { s2: 2, s3: 3, s5: 5, s7: 7 }; api.fail = false;
+  api.parts = [POEM, LETTER]; api.nums = { s2: 2, s3: 3, s5: 5, s7: 7 }; api.fail = false; api.updates = [];
   try { localStorage.clear(); } catch { /* */ }
 });
 
@@ -93,6 +103,24 @@ describe('WorkPartsPanel', () => {
     renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
     expect(screen.queryByRole('button', { name: 'Näita osa andmeid' })).toBeNull();
+  });
+
+  it('muutmisõigusega: pliiats avab osa vormi ja salvestus uuendab osa', async () => {
+    render(<MemoryRouter><WorkPartsPanel workId="w1" token="t" currentPage={1} canEdit /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(2\)/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Näita osa andmeid' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Muuda osa' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvesta osa' }));
+    await waitFor(() => expect(api.updates).toHaveLength(1));
+    expect(api.updates[0].id).toBe('a');
+    expect(api.updates[0].part.pages).toEqual(['s2', 's3', 's5']);
+  });
+
+  it('ilma muutmisõiguseta pliiatsit ei ole', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(2\)/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Näita osa andmeid' })[0]);
+    expect(screen.queryByRole('button', { name: 'Muuda osa' })).toBeNull();
   });
 });
 
