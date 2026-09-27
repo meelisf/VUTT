@@ -16,7 +16,7 @@ export default function ProsopoRegistries() {
   const { t, i18n } = useTranslation('admin');
   const tr = (key: string) => t(`prosopoRegistries.${key}`);
   const lang = i18n.language.slice(0, 2);
-  const { user, authToken } = useUser();
+  const { user, authToken, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
   const [kind, setKind] = useState<Kind>('institution');
   const [entries, setEntries] = useState<Record<string, Entry>>({});
@@ -29,14 +29,17 @@ export default function ProsopoRegistries() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => { if (user && !isAtLeast(user.role, 'admin')) navigate('/'); }, [user, navigate]);
   useEffect(() => {
+    if (!userLoading && !isAtLeast(user?.role, 'admin')) navigate('/');
+  }, [user, userLoading, navigate]);
+  useEffect(() => {
+    if (!authToken || !isAtLeast(user?.role, 'admin')) return;
     let live = true;
     setError(''); setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants('');
     fetchRegistry(kind).then(data => { if (live) setEntries(data); })
       .catch(e => { if (live) setError(String(e)); });
     return () => { live = false; };
-  }, [kind]);
+  }, [kind, authToken, user?.role]);
 
   const shown = useMemo(() => Object.entries(entries).filter(([id, entry]) =>
     [id, ...Object.values(entry.labels), ...entry.variants].some(value =>
@@ -67,6 +70,8 @@ export default function ProsopoRegistries() {
     finally { setBusy(false); }
   };
   const institution = kind === 'institution' ? draft as InstitutionRegistryEntry : null;
+
+  if (!isAtLeast(user?.role, 'admin')) return null;
 
   return <div className="min-h-screen bg-gray-50">
     <Header showSearchButton={false} pageTitle={tr('title')} />

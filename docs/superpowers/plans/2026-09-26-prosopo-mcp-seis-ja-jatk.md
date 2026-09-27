@@ -1,5 +1,19 @@
 # Prosopo ametite ja hariduse rikastus: seis ja jätk
 
+## Tootmiskatse 2026-09-27
+
+PR #478 liideti (`2cacf1c0`) ja backend ning frontend juurutati koos.
+Mõlemad konteinerid olid pärast juurutust terved. Tootmise andmeid lugenud
+eraldatud kontroll valideeris kirjutamata 2416 isikukaarti ja 4257 ameti- või
+hariduskirjet. Registri GET ja kandidaatotsing töötavad; registrifailid on
+endiselt loomata, seega otsing ütleb `registry_available=false`.
+
+Autoriteetsesse andmereposse kahe proovikirje (AGC ja professor) salvestamise
+katse peatas automaatne õiguskontroll, sest täpseid püsivaid andmemuudatusi
+polnud eraldi kinnitatud. Ühtegi registrikirjet ega isikukaarti ei muudetud.
+Adminivaate sisselogimata nähtavus leiti brauserikontrollis ja parandatakse
+eraldi kliendi PR-is; kirjutus-API nõuab juba admini rolli.
+
 ## Jätk 2026-09-27
 
 Tootmise `data/` peal kirjutuseta kuivkäivitus leidis 4347 fakti ja 394
