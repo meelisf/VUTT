@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Bot, Check, Copy, Pencil, RefreshCw, X } from 'lucide-react';
 import {
   createPartsHandoff, decidePartProposal, listPartProposals,
-  type PartProposal, type PartProposalItem, type PartsHandoff,
+  type PartProposal, type PartProposalItem, type PartsHandoff, type WorkPart,
 } from '../../../services/workPartsApi';
 import { compactNumbers } from '../partsModel';
 import ProposedPersons from './ProposedPersons';
@@ -21,9 +21,11 @@ interface Props {
   onPreview: (stems: string[]) => void;
   onEdit: (proposalId: string, index: number, item: PartProposalItem) => void;
   onChanged: () => void;
+  /** Teose praegused osad — parandatava osa nimi. */
+  parts: WorkPart[];
 }
 
-const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, onEdit, onChanged }) => {
+const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, onEdit, onChanged, parts }) => {
   const { t, i18n } = useTranslation(['workspace']);
   const tp = (key: string, opts?: Record<string, unknown>) => t(`manage.parts.proposals.${key}`, opts);
   const [proposals, setProposals] = useState<PartProposal[]>([]);
@@ -54,8 +56,8 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
     }
   };
 
-  const decide = (pid: string, index: number, action: 'accept' | 'reject') => run(async () => {
-    await decidePartProposal(workId, pid, index, action, token);
+  const decide = (pid: string, index: number, action: 'accept' | 'reject', mode?: 'create') => run(async () => {
+    await decidePartProposal(workId, pid, index, action, token, undefined, mode);
     await load();
     if (action === 'accept') onChanged();
   });
@@ -134,12 +136,23 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
                 {creators(item) && <div className="text-xs text-gray-600">{creators(item)}</div>}
                 {item.evidence?.[0]?.quote && <div className="text-xs italic text-gray-500">„{item.evidence[0].quote}"</div>}
                 {item.missing_pages.length > 0 && <div className="text-xs text-amber-800">{tp('missingPages', { count: item.missing_pages.length })}</div>}
+                {item.target_part_id && (() => {
+                  const tgt = parts.find(x => x.id === item.target_part_id);
+                  const label = tgt ? (tgt.title || t(`manage.parts.kinds.${tgt.kind}`)) : item.target_part_id;
+                  return <div className="text-xs font-medium text-violet-800">{tp('updatesExisting', { label })}</div>;
+                })()}
               </div>
               <div className="flex shrink-0 gap-1">
                 <button type="button" disabled={busy} onClick={() => void decide(p.proposal_id, index, 'accept')}
                   className="flex items-center gap-1 rounded bg-violet-700 px-2 py-1 text-xs text-white hover:bg-violet-800 disabled:opacity-50">
-                  <Check size={12} /> {tp('accept')}
+                  <Check size={12} /> {item.target_part_id ? tp('update') : tp('accept')}
                 </button>
+                {item.target_part_id && (
+                  <button type="button" disabled={busy} onClick={() => void decide(p.proposal_id, index, 'accept', 'create')}
+                    className="rounded border border-violet-300 px-2 py-1 text-xs text-violet-800 hover:bg-violet-50 disabled:opacity-50">
+                    {tp('addAsNew')}
+                  </button>
+                )}
                 <button type="button" disabled={busy} onClick={() => onEdit(p.proposal_id, index, item)}
                   className="flex items-center gap-1 rounded border border-violet-300 px-2 py-1 text-xs text-violet-800 hover:bg-violet-50 disabled:opacity-50">
                   <Pencil size={12} /> {tp('edit')}

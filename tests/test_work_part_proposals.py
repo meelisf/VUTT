@@ -311,3 +311,50 @@ def test_isikute_otspunktid(client, work, created):
     assert ok.status_code == 200 and ok.json()["person_id"] == "vutt:Pnew"
     client.state["user"] = {"username": "ed", "role": "admin"}
     assert client.post(f"{url}/name", json={}).status_code == 403
+
+
+# ── Parandus olemasolevale osale (ei tee duplikaati) ─────────────────────────
+
+def _existing(work, **kw):
+    return wp.create_part(work, {"kind": "letter", "pages": ["t-002", "t-003"], "title": "Vana",
+                                 "notes": "Käsitsi märkus", "creators": [{"name": "Spener", "role": "auctor"}], **kw}, "ed")
+
+
+def test_part_id_uuendab_olemasolevat_mitte_ei_loo_uut(work):
+    old = _existing(work)
+    _submit(work, [{**LETTER, "part_id": old["id"], "title": ""}])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    assert p["items"][0]["target_part_id"] == old["id"]
+    assert p["items"][0]["merged"]["title"] == "Vana"       # vormile sama liitmine
+    wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept")
+    parts = _meta(work)["parts"]
+    assert len(parts) == 1 and parts[0]["id"] == old["id"]
+    merged = parts[0]
+    assert merged["title"] == "Vana"                       # tühi ettepanek ei kustuta
+    assert merged["notes"] == "Käsitsi märkus"
+    assert merged["dating"]["start"] == "1684-03-02"      # uus väli lisandub
+    names = [(c.get("id"), c["name"], c["role"]) for c in merged["creators"]]
+    assert ("vutt:Paaaaa", "Spener", "auctor") in names and ("Spener", "auctor") not in [(n, r) for i, n, r in names if not i]
+    assert any(c["role"] == "addressee" for c in merged["creators"])
+
+
+def test_samade_lehtedega_osa_tuvastatakse_ja_uuendatakse(work):
+    old = _existing(work)
+    _submit(work, [LETTER])                                  # part_id puudub, lehed samad
+    (p,) = wpp.list_pending("w1", work, "ed")
+    assert p["items"][0]["target_part_id"] == old["id"]
+    wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept")
+    assert len(_meta(work)["parts"]) == 1
+
+
+def test_uuena_lisamine_on_valitav(work):
+    _existing(work)
+    _submit(work, [LETTER])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept", mode="create")
+    assert len(_meta(work)["parts"]) == 2
+
+
+def test_tundmatu_part_id_lukatakse_tagasi(work):
+    with pytest.raises(wpp.ProposalError, match="unknown part_id"):
+        _submit(work, [{**LETTER, "part_id": "olematu"}])

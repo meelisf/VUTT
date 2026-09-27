@@ -126,8 +126,12 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
 
   // Agendi ettepanek vormi: uus osa ettepaneku lehtedega; salvestus = ettepaneku vastuvõtt.
   const editProposal = (proposalId: string, index: number, item: PartProposalItem) => runGuarded(() => {
-    setEditing({ id: null, pages: item.part.pages, proposal: { id: proposalId, index } });
-    setDraft(draftFromPart({ ...item.part, id: '', needs_review: false, attached_to: null } as WorkPart));
+    // Olemasoleva osa parandus: vorm = olemasolev osa + parandus (serveri liitmine); salvestus uuendab seda osa.
+    const target = item.target_part_id ? parts.find(p => p.id === item.target_part_id) : undefined;
+    const source = target && item.merged ? item.merged : item.part;
+    setEditing({ id: target?.id ?? null, pages: source.pages, proposal: { id: proposalId, index } });
+    setDraft(draftFromPart({ ...source, id: target?.id ?? '', needs_review: false,
+      attached_to: target ? source.attached_to ?? null : null } as WorkPart));
     setDirty(false);
     setError(null);
   });
@@ -258,7 +262,7 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
 
       {showProposals && (
         <PartProposals workId={workId} token={token} refreshKey={proposalsKey}
-          onPreview={setPreviewStems} onEdit={editProposal} onChanged={() => { void reload(); }} />
+          onPreview={setPreviewStems} onEdit={editProposal} onChanged={() => { void reload(); }} parts={parts} />
       )}
 
       {view === 'pages' ? (
