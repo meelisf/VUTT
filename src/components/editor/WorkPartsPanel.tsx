@@ -4,11 +4,17 @@
  * teosel või lugemistõrke korral paneeli ei ole. Lehevahemikud on lingid lehele;
  * praegust lehte sisaldav osa on märgitud.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ListOrdered } from 'lucide-react';
-import { getPartsToc, type WorkPart } from '../../services/workPartsApi';
+import { ChevronDown, ChevronRight, ListOrdered, Pencil } from 'lucide-react';
+import { deletePart, getPartsToc, updatePart, type WorkPart } from '../../services/workPartsApi';
+import { draftFromPart, partFromDraft, sharedStems as sharedStemsOf, type PartDraft } from '../../pages/manage/partsModel';
+import PartForm from '../../pages/manage/parts/PartForm';
+import PartPanel from '../../pages/manage/parts/PartPanel';
+import UnsavedChangesDialog from '../UnsavedChangesDialog';
+import { usePersonSources } from '../../hooks/usePersonSources';
+import { getLangCode } from '../../utils/getLangCode';
 import { datingText } from '../../utils/workDating';
 import { pageRangeList, sortParts } from '../../pages/manage/partsModel';
 import { KIND_STYLE } from '../../pages/manage/parts/kindStyle';
@@ -38,9 +44,11 @@ interface Props {
   workId?: string;
   token: string | null;
   currentPage: number;
+  /** Toimetaja, kes tohib teost muuta: osa andmete juures pliiats → sama vorm mis teose halduses. */
+  canEdit?: boolean;
 }
 
-const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage }) => {
+const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit = false }) => {
   const { t } = useTranslation(['workspace']);
   const [parts, setParts] = useState<WorkPart[]>([]);
   const [nums, setNums] = useState<Map<string, number>>(new Map());
@@ -52,14 +60,24 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage }) => {
     return next;
   });
 
-  useEffect(() => {
+  const load = useCallback(async (isCancelled: () => boolean = () => false) => {
     if (!workId) return;
-    let cancelled = false;
-    getPartsToc(workId, token)
-      .then(r => { if (!cancelled) { setParts(r.parts); setNums(new Map(Object.entries(r.pageNumbers))); } })
-      .catch(() => { if (!cancelled) setParts([]); });   // sisukord on lisainfo — tõrge peidab paneeli
-    return () => { cancelled = true; };
+    try {
+      const r = await getPartsToc(workId, token);
+      if (!isCancelled()) { setParts(r.parts); setNums(new Map(Object.entries(r.pageNumbers))); }
+    } catch {
+      if (!isCancelled()) setParts([]);   // sisukord on lisainfo — tõrge peidab paneeli
+    }
   }, [workId, token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void load(() => cancelled);
+    return () => { cancelled = true; };
+  }, [load]);
+
+  // Osa muutmine töölaualt: vorm (ja isikusoovituste päringud) laetakse alles pliiatsi peale.
+  const [editing, setEditing] = useState<WorkPart | null>(null);
 
   // Järjekord lehenumbri järgi (sama mis halduse sisukorras).
   const sorted = useMemo(
@@ -136,18 +154,92 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage }) => {
                   </button>
                 ) : <span className="-mr-2 w-[18px] shrink-0" />}
                 </div>
-                {isOpen && <PartDetails part={p} attachments={attachments} parts={parts} />}
+                {isOpen && <PartDetails part={p} attachments={attachments} parts={parts} onEdit={canEdit ? () => setEditing(p) : undefined} />}
               </li>
             );
           })}
         </ol>
       )}
+      {editing && workId && (
+        <PartEditPanel key={editing.id} workId={workId} token={token} part={editing} parts={parts}
+          onSaved={() => load()} onClose={() => setEditing(null)} />
+      )}
     </div>
   );
 };
 
+/** Osa vorm töölaual — sama PartForm/PartPanel mis teose halduses; salvestamata kaitse ühtse dialoogiga. */
+const PartEditPanel: React.FC<{ workId: string; token: string | null; part: WorkPart; parts: WorkPart[];
+  onSaved: () => Promise<void>; onClose: () => void }> = ({ workId, token, part, parts, onSaved, onClose }) => {
+  const { t, i18n } = useTranslation(['workspace']);
+  const { authors, peopleRegister } = usePersonSources(token, getLangCode(i18n.language));
+  const [current, setCurrent] = useState(part);
+  const [draft, setDraft] = useState<PartDraft>(() => draftFromPart(part));
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  const save = async (): Promise<boolean> => {
+    setBusy(true); setError(null);
+    try {
+      const saved = await updatePart(workId, current.id, partFromDraft(draft, current.pages), token);
+      await onSaved();
+      setCurrent(saved); setDraft(draftFromPart(saved)); setDirty(false);
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    setBusy(true); setError(null);
+    try {
+      await deletePart(workId, current.id, token);
+      await onSaved();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <PartPanel title={draft.title || t(`manage.parts.kinds.${draft.kind}`)} onClose={() => (dirty ? setConfirmClose(true) : onClose())}>
+        <PartForm
+          isNew={false}
+          draft={draft}
+          onDraft={d => { setDraft(d); setDirty(true); }}
+          otherParts={parts.filter(x => x.id !== current.id && x.kind !== 'attachment')}
+          sharedStems={[...sharedStemsOf(current, parts).keys()]}
+          error={error}
+          busy={busy}
+          token={token}
+          workId={workId}
+          authors={authors}
+          peopleRegister={peopleRegister}
+          onSave={() => { void save(); }}
+          onDelete={() => { void remove(); }}
+        />
+      </PartPanel>
+      <UnsavedChangesDialog
+        open={confirmClose}
+        saving={busy}
+        saveFailed={saveFailed}
+        onDiscard={onClose}
+        onStay={() => setConfirmClose(false)}
+        onSaveAndContinue={() => { void save().then(ok => (ok ? onClose() : setSaveFailed(true))); }}
+      />
+    </>
+  );
+};
+
 /** Osa andmed lahtikeeratuna: liik, dateering, kohad, isikud rollidega, keeled, märkused, lisad. */
-const PartDetails: React.FC<{ part: WorkPart; attachments: WorkPart[]; parts: WorkPart[] }> = ({ part: p, attachments, parts }) => {
+const PartDetails: React.FC<{ part: WorkPart; attachments: WorkPart[]; parts: WorkPart[]; onEdit?: () => void }> = ({ part: p, attachments, parts, onEdit }) => {
   const { t } = useTranslation(['workspace']);
   const row = (label: string, value: React.ReactNode) => (
     <div className="flex gap-2"><dt className="w-24 shrink-0 text-gray-500">{label}</dt><dd className="min-w-0 flex-1">{value}</dd></div>
@@ -175,6 +267,14 @@ const PartDetails: React.FC<{ part: WorkPart; attachments: WorkPart[]; parts: Wo
       {parent && row(t('manage.parts.attachedTo'), parent.title || t(`manage.parts.kinds.${parent.kind}`))}
       {attachments.length > 0 && row(t('info.tocAttachments'), attachments.map(a => a.title || t(`manage.parts.kinds.${a.kind}`)).join('; '))}
       {p.notes && row(t('manage.parts.notes'), <span className="whitespace-pre-wrap">{p.notes}</span>)}
+      {onEdit && (
+        <div className="pt-1">
+          <button type="button" onClick={onEdit}
+            className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-0.5 text-gray-700 hover:border-primary-400 hover:text-primary-700">
+            <Pencil size={12} /> {t('info.tocEdit')}
+          </button>
+        </div>
+      )}
     </dl>
   );
 };
