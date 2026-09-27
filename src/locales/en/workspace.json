@@ -314,6 +314,7 @@
         "pages": "p. {{pages}}",
         "missingPages_one": "{{count}} page has since been deleted",
         "missingPages_other": "{{count}} pages have since been deleted",
+        "acceptAll": "Add all ({{count}})",
         "accept": "Add",
         "edit": "Edit and add",
         "reject": "Reject",
@@ -483,6 +484,8 @@
     "editWorkMetadata": "Edit work metadata",
     "noImage": "No image",
     "toc": "Contents",
+    "tocDetails": "Show part details",
+    "tocAttachments": "Attachments",
     "tocPages": "p."
   },
   "zotero": {

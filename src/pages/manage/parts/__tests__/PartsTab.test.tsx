@@ -26,7 +26,7 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
     api.calls.push(`decide:${pid}:${i}:${action}:${part ? part.title ?? '' : ''}`);
     const np = { ...(part ?? api.proposals[0].items[i].part), id: 'p9', needs_review: false };
     api.parts = [...api.parts, np];
-    api.proposals = [];
+    api.proposals[0].items[i].status = 'accepted';
     return { status: 'accepted', part: np };
   },
   changePartPages: async (_w: string, id: string, add: string[], remove: string[]) => {
@@ -79,6 +79,19 @@ describe('PartsTab', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Salvesta osa' }));
     await waitFor(() => expect(api.calls).toContain('decide:pp:0:accept:Kiri Fischerile'));
     expect(api.calls.some(c => c.startsWith('create:'))).toBe(false);   // mitte eraldi create
+  });
+
+  it('„Lisa kõik": kõik ootel osad, lisa pärast oma kirja', async () => {
+    const mk = (kind: string, pages: string[], attached_to: number | null = null) => ({
+      part: { kind, pages, creators: [], attached_to: null }, attached_to, evidence: [], status: 'pending',
+      page_numbers: [1], missing_pages: [] });
+    api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: false,
+      items: [mk('attachment', ['s3'], 1), mk('letter', ['s1', 's2']), mk('poem', ['s3'])] }];
+    renderTab();
+    fireEvent.click(await screen.findByRole('button', { name: 'Lisa kõik (3)' }));
+    await waitFor(() => expect(api.calls.filter(c => c.startsWith('decide:'))).toEqual([
+      'decide:pp:1:accept:', 'decide:pp:2:accept:', 'decide:pp:0:accept:',
+    ]));
   });
 
   it('agendi ettepanekud ainult superadminile', async () => {

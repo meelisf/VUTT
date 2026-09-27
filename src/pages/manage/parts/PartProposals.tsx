@@ -62,6 +62,18 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
   const pending = proposals.flatMap(p => p.items.map((item, index) => ({ p, item, index })))
     .filter(x => x.item.status === 'pending');
 
+  // Lisa viitab oma kirjale, mis peab olema enne vastu võetud → lisad viimasena.
+  const acceptAll = () => run(async () => {
+    const order = [...pending].sort((a, b) =>
+      Number(a.item.part.kind === 'attachment') - Number(b.item.part.kind === 'attachment'));
+    try {
+      for (const { p, index } of order) await decidePartProposal(workId, p.proposal_id, index, 'accept', token);
+    } finally {
+      await load();
+      onChanged();
+    }
+  });
+
   const creators = (item: PartProposalItem) => (item.part.creators ?? [])
     .map(c => `${c.name || c.id} (${t(`metadata.roles.${c.role}`, { defaultValue: c.role })})`).join(', ');
 
@@ -71,8 +83,14 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
         <Bot size={16} className="text-violet-700" />
         <h3 className="font-semibold text-violet-900">{tp('title')}</h3>
         <span className="tabular-nums text-violet-700">({pending.length})</span>
+        {pending.length > 1 && (
+          <button type="button" disabled={busy} onClick={() => void acceptAll()}
+            className="ml-auto flex items-center gap-1 rounded bg-violet-700 px-2.5 py-1 text-white hover:bg-violet-800 disabled:opacity-50">
+            <Check size={14} /> {tp('acceptAll', { count: pending.length })}
+          </button>
+        )}
         <button type="button" disabled={busy} onClick={() => run(async () => setHandoff(await createPartsHandoff(workId, token)))}
-          className="ml-auto rounded border border-violet-300 bg-white px-2.5 py-1 text-violet-800 hover:bg-violet-100 disabled:opacity-50">
+          className={`${pending.length > 1 ? '' : 'ml-auto '}rounded border border-violet-300 bg-white px-2.5 py-1 text-violet-800 hover:bg-violet-100 disabled:opacity-50`}>
           {tp('createCode')}
         </button>
         <button type="button" disabled={busy} onClick={() => void run(load)} aria-label={tp('refresh')} title={tp('refresh')}
