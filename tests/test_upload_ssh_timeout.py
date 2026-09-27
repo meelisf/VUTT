@@ -42,6 +42,8 @@ def test_get_or_create_ssh_kasutab_piiratud_connect_timeouti(fake_paramiko, monk
     # Tühjenda cache, et test looks uue ühenduse
     upload_ops._ssh_connections.clear()
     monkeypatch.setattr(upload_ops, '_load_ssh_key', lambda: object())
+    # Hostivõtme kontroll (S27-06) on eraldi testitud (test_ocr_hostkey.py).
+    monkeypatch.setattr(ocr_client, 'verify_host_key', lambda *a, **k: None)
 
     calls = {}
 

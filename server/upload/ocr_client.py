@@ -20,6 +20,35 @@ logger = get_logger(__name__)
 # minuteid, kui OCR-server on kättesaamatu.
 OCR_CONNECT_TIMEOUT = 10
 
+# Usaldatud hostivõtmed (S27-06). Konteineris /root/.ssh/known_hosts (hosti kasutaja oma,
+# read-only mount). Vaikimisi sama fail, mida kasutab hosti `ssh`.
+OCR_KNOWN_HOSTS = os.getenv("OCR_KNOWN_HOSTS", os.path.expanduser("~/.ssh/known_hosts"))
+
+
+class HostKeyError(RuntimeError):
+    """OCR-serveri hostivõti puudub usaldatud loendist või erineb sellest."""
+
+
+def verify_host_key(transport, host: str, known_hosts: str) -> None:
+    """Keeldub, kui server ei esita known_hosts-is usaldatud võtit (fail closed).
+
+    Kutsutakse ENNE autentimist: vale server ei saa ühtki päringut ega faili.
+    Usaldus tuleb kinnitada sõltumatu kanali kaudu — kontrollimata esmaühendusest
+    võtit automaatselt ei lisata.
+    """
+    import paramiko
+    presented = transport.get_remote_server_key()
+    try:
+        trusted = paramiko.HostKeys(known_hosts).lookup(host)
+    except (OSError, IOError):
+        trusted = None
+    if not trusted:
+        raise HostKeyError(f"OCR-serveri {host} hostivõti pole usaldatud ({known_hosts})")
+    expected = trusted.get(presented.get_name())
+    if expected is None or expected != presented:
+        raise HostKeyError(f"OCR-serveri {host} hostivõti erineb usaldatust ({presented.get_name()})")
+
+
 # Püsivad SSH ühendused (üks per upload_id)
 ssh_connections: dict = {}
 ssh_lock = threading.Lock()
@@ -86,6 +115,12 @@ def get_or_create_ssh(
         transport = paramiko.Transport(sock)
         transport.set_keepalive(30)
         transport.connect()
+        try:
+            verify_host_key(transport, host, OCR_KNOWN_HOSTS)
+        except HostKeyError:
+            logger.error(f"SSH: {host} hostivõtme kontroll ebaõnnestus — ühendus suletud")
+            transport.close()
+            raise
         key = load_key_func()
         transport.auth_publickey(user, key)
         ssh_connections[upload_id] = transport
