@@ -19,7 +19,7 @@ vi.mock('../../../../contexts/CollectionContext', () => ({
   useCollection: () => ({ selectedCollection: 'agc', getCollectionName: () => 'Rootsi aja ülikool' }),
 }));
 
-vi.mock('../RelationsMap', () => ({ default: () => <div>KAART-MOCK</div> }));
+vi.mock('../RelationsMap', () => ({ default: (p: { layers?: string[] }) => <div>KAART-MOCK{p.layers ? ` ${p.layers.join(',')}` : ''}</div> }));
 
 import PersonRelations from '../PersonRelations';
 
@@ -49,6 +49,15 @@ describe('PersonRelations', () => {
     impl.fn = async () => net([], []);
     renderIt();
     expect(await screen.findByText('Seoseid ei leitud.')).toBeTruthy();
+    expect(screen.queryByRole('tab')).toBeNull();
+  });
+
+  it('seosteta isik elukäiguga: elukäigu kaart ilma vahekaartideta', async () => {
+    impl.fn = async () => net([], []);
+    const card = { id: F, education: [{ institution: 'Kiel', institution_key: 'univ-kiel' }] } as never;
+    render(<MemoryRouter><PersonRelations personId={F} card={card} /></MemoryRouter>);
+    expect(await screen.findByText('Seoseid ei leitud.')).toBeTruthy();
+    expect(await screen.findByText('KAART-MOCK life')).toBeTruthy();
     expect(screen.queryByRole('tab')).toBeNull();
   });
 

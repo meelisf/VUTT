@@ -26,6 +26,13 @@ const TABS: Tab[] = ['graph', 'timeline', 'map', 'table'];
 /** Päise „Seoste kaart" nupp viib siia (#461). */
 export const MAP_ANCHOR = 'seosed-kaart';
 
+/** Kas kaardil on midagi elukäigu kihile näidata (päritolu, sünd, surm, haridus, ametid). */
+function hasLifeFacts(card: ProsopoRecord | null | undefined): boolean {
+  if (!card) return false;
+  return !!(card.origin?.place || card.birth?.place || card.death?.place
+    || card.education?.length || card.occupations?.length);
+}
+
 const PersonRelations: React.FC<{ personId: string; card?: ProsopoRecord | null }> = ({ personId, card }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   const { selectedCollection, getCollectionName } = useCollection();
@@ -98,7 +105,21 @@ const PersonRelations: React.FC<{ personId: string; card?: ProsopoRecord | null 
   if (!net) return null;
 
   if (net.persons.length === 0) {
-    return <Section mapUrl={mapUrl}>{filters}<p className="mt-3 text-sm text-gray-500">{t('network.empty')}</p></Section>;
+    // Elukäik ei sõltu seostest: seosteta isikul näidatakse ainult elukäigu kaarti.
+    return (
+      <Section mapUrl={mapUrl}>
+        {filters}
+        <p className="mt-3 text-sm text-gray-500">{t('network.empty')}</p>
+        {hasLifeFacts(card) && (
+          <div className="mt-3">
+            <Suspense fallback={null}>
+              <RelationsMap net={net} card={card ?? null} popover={popover} highlight={highlight}
+                onHighlight={setHighlight} layers={['life']} />
+            </Suspense>
+          </div>
+        )}
+      </Section>
+    );
   }
 
   return (
