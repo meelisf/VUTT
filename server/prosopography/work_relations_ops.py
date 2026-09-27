@@ -5,7 +5,7 @@ Indeks: data/config/works_creators_index.json — kirje IGALE teosele (#461)
   { work_id: { "title": str, "year": int|None, "creators": [{ "person_id": str, "roles": [str] }],
                "location": {"id": str|None, "label": str}|None, "genres": [str],
                "parts": { part_id: { "kind", "title", "year", "place", "first_page", "pages": [int] } } } }
-  `parts` ainult osadega teosel (#464). Leheküljenumbrid arvutatakse KIRJUTAMISEL teose
+  `manuscript: true` ainult käsikirjal. `parts` ainult osadega teosel (#464). Leheküljenumbrid arvutatakse KIRJUTAMISEL teose
   kausta järgi, et /network ei peaks kausta skannima; lehetoiming kutsub seepärast
   update_work_facts'i ka siis, kui osad ise ei muutu (sync_work_parts).
   Kogud ja avalikkus EI OLE siin: need elavad work_collections_index.json-is (ADR 0056).
@@ -68,6 +68,14 @@ def _genres_of(meta: dict) -> list:
     return out
 
 
+MANUSCRIPT_TYPE = "Q87167"   # `type` kannab Q-koodi (CLAUDE.md, Domeen)
+
+
+def _type_id(meta: dict) -> Optional[str]:
+    t = meta.get("type")
+    return t.get("id") if isinstance(t, dict) else (t if isinstance(t, str) else None)
+
+
 def _part_year(part: dict) -> Optional[int]:
     start = ((part.get("dating") or {}).get("start") or "").split("-")[0]
     return int(start) if start.isdigit() else None
@@ -113,6 +121,9 @@ def _work_facts_entry(meta: dict, work_dir: Optional[str] = None) -> dict:
         "location": _location_of(meta),
         "genres": _genres_of(meta),
     }
+    # Käsikirjal trükikohta ei ole — vaade ei ütle siis „trükikoht teadmata".
+    if _type_id(meta) == MANUSCRIPT_TYPE:
+        entry["manuscript"] = True
     parts = _parts_of(meta, work_dir)
     if parts:
         entry["parts"] = parts

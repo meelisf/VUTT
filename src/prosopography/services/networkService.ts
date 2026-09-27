@@ -23,6 +23,8 @@ export interface NetworkWork {
   place: { id: string | null; label: string; coordinates: { lat: number; lon: number } | null } | null;
   genres: string[];
   restricted: boolean;
+  /** Käsikiri: trükikohta ei ole (vanemas vastuses puudub). */
+  manuscript?: boolean;
 }
 
 /** Teose osa (#464): kiri, luuletus, kõne, istung, lisa. */
@@ -45,7 +47,7 @@ export interface NetworkEdge {
   roles?: Record<string, string[]>;
   records?: FamilyRecord[];
   year: number | null;
-  place: { id: string | null; kind: 'print' | 'event' | 'sent_from' } | null;
+  place: { id: string | null; label?: string; kind: 'print' | 'event' | 'sent_from' } | null;
   evidence: { work_id: string; pages: number[]; part_id?: string } | null;
 }
 
