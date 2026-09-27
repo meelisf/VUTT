@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked, UserPlus, Users, IdCard } from 'lucide-react';
+import { Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked, UserPlus, Users, IdCard, Landmark } from 'lucide-react';
 import { searchWikidata, getEntityLabels, WikidataSearchResult } from '../services/wikidataService';
 import { searchViaf, ViafSearchResult } from '../services/viafService';
 import { searchGnd, GndSearchResult } from '../services/gndService';
@@ -55,6 +55,18 @@ interface EntityPickerProps {
   token?: string;
   // Teose kontekst isikupaneelile (nt loomisel salvestatav seos) — ainult person-režiimis
   personContext?: { work_id: string; role?: string };
+  // Eelvasted (nt VUTT-i ameti-/asutuseregister, ADR 0059): sünkroonne ja kohalik,
+  // näidatakse enne muid. Valik läheb onLeadingSelect-ile, MITTE onChange-ile —
+  // kutsuja otsustab, mida kirjele salvestada. `typed` = otsingukasti tekst valiku hetkel.
+  leadingSuggestions?: (query: string) => LeadingSuggestion[];
+  onLeadingSelect?: (item: LeadingSuggestion, typed: string) => void;
+}
+
+export interface LeadingSuggestion {
+  key: string;
+  label: string;
+  description: string;
+  id?: string | null;
 }
 
 type Suggestion = WikidataSearchResult & {
@@ -63,6 +75,7 @@ type Suggestion = WikidataSearchResult & {
   isGnd?: boolean;
   isRegister?: boolean;
   isAlreadyAdded?: boolean;
+  leading?: LeadingSuggestion;
   displayLabel?: string; // Kuvatav nimi dropdownis (võib erineda salvestatavast label-ist)
   labels?: Record<string, string> | null;
 };
@@ -91,6 +104,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   defaultPersonSearch = false,
   token,
   personContext,
+  leadingSuggestions,
+  onLeadingSelect,
 }) => {
   const { t, i18n } = useTranslation('common');
   const { user } = useUser();
@@ -121,6 +136,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   // Jälgib milliseid Q-koode on juba enrichitud — väldib lõputut silmust
   const enrichedIdsRef = useRef<Set<string>>(new Set());
   localSuggestionsRef.current = localSuggestions;
+  const leadingRef = useRef(leadingSuggestions);
+  leadingRef.current = leadingSuggestions;
   const peopleRegisterRef = useRef(peopleRegister);
   peopleRegisterRef.current = peopleRegister;
   const alreadySelectedRef = useRef(alreadySelected);
@@ -351,7 +368,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             : [];
         }
 
-        setSuggestions([...alreadyAddedMatches, ...localMatches, ...registerMatches, ...gndMatches, ...viafMatches, ...wikidataMatches]);
+        const leadingMatches: Suggestion[] = (leadingRef.current?.(inputValue) ?? []).map(item => ({
+          id: `leading-${item.key}`, label: item.label, description: item.description, url: '',
+          isLocal: true, leading: item,
+        }));
+        setSuggestions([...leadingMatches, ...alreadyAddedMatches, ...localMatches, ...registerMatches, ...gndMatches, ...viafMatches, ...wikidataMatches]);
         setIsLoading(false);
         setSelectedIndex(0);
       }
@@ -386,6 +407,12 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   };
 
   const handleSelect = async (result: Suggestion) => {
+    if (result.leading) {
+      justSelectedRef.current = true;
+      onLeadingSelect?.(result.leading, inputValue);
+      setShowSuggestions(false);
+      return;
+    }
     // Person-režiimis avab välise tulemuse klikk isikupaneeli fokuseeritud viitega —
     // paneel on nüüd isiku loomise/valimise tee valijast (PR 3), aga AINULT
     // editor+ jaoks (I1). Contributor'i klikk lingib välise kirje otse, nagu
@@ -748,7 +775,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                       className={`w-full px-3 py-2 border-b border-gray-50 flex items-start gap-2 group cursor-pointer ${
                         idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' :
                         isAlreadyAdded ? 'bg-blue-50/60 hover:bg-blue-100/60' :
-                        isRegister ? 'bg-teal-50/60 hover:bg-teal-100/60' :
+                        isRegister || result.leading ? 'bg-teal-50/60 hover:bg-teal-100/60' :
                         isLocal ? 'bg-amber-50/60 hover:bg-amber-100/60' :
                         'hover:bg-gray-50'
                       }`}
@@ -758,7 +785,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                       <span className="mt-0.5 shrink-0">
                         {isAlreadyAdded && <Tag size={12} className="text-blue-500" />}
                         {!isAlreadyAdded && isRegister && <Users size={12} className="text-teal-600" />}
-                        {!isAlreadyAdded && isLocal && !isRegister && <Database size={12} className="text-amber-600" />}
+                        {result.leading && <Landmark size={12} className="text-teal-600" />}
+                        {!isAlreadyAdded && isLocal && !isRegister && !result.leading && <Database size={12} className="text-amber-600" />}
                         {isGnd && <BookMarked size={12} className="text-orange-600" />}
                         {isViaf && <Library size={12} className="text-purple-600" />}
                         {!isLocal && !isGnd && !isViaf && <Globe size={12} className="text-blue-400" />}
@@ -769,7 +797,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                         {result.description && (
                           <span className={`text-xs block truncate ${
                             isAlreadyAdded ? 'text-blue-600/80 italic' :
-                            isRegister ? 'text-teal-600/80 italic' :
+                            isRegister || result.leading ? 'text-teal-600/80 italic' :
                             isLocal ? 'text-amber-600/80 italic' :
                             isGnd ? 'text-orange-500/80' :
                             isViaf ? 'text-purple-500/80' :
