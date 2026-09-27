@@ -33,7 +33,11 @@ PROPOSAL_TTL = 14 * 24 * 60 * 60
 MAX_PARTS = 50
 MAX_BODY_BYTES = 64_000
 _PART_KEYS = {"kind", "title", "incipit", "notes", "pages", "creators", "dating", "place",
-              "place_to", "languages", "attached_to", "evidence"}
+              "place_to", "languages", "attached_to", "evidence", "part_id"}
+# Liitmine olemasoleva osaga: inimese kirjutatud tekst jääb, kui on täidetud;
+# struktuurse välja võtab parandus üle (agent parandab dateeringut, kohta, lehti).
+_KEEP_EXISTING_TEXT = ("title", "incipit", "notes")
+_TAKE_PROPOSED = ("kind", "dating", "place", "place_to", "languages")
 _EVIDENCE_KEYS = {"page", "quote"}
 MAX_PERSONS = 50
 _PERSON_KEYS = {"ref", "name", "aliases", "birth_year", "death_year", "identifiers", "note", "evidence"}
@@ -136,7 +140,7 @@ def _clean_persons(persons) -> list[dict]:
 
 
 def _clean_part(raw: dict, index: int, count: int, stems: list[str],
-                persons: Optional[dict] = None) -> dict:
+                persons: Optional[dict] = None, existing_ids: Optional[set] = None) -> dict:
     """Agendi osa → work_parts kuju (tüvedega); valideerib nagu käsitsi lisamine.
 
     Isik võib viidata ettepaneku uuele isikule (`person_ref`): osas on ta seni NIMENA,
@@ -144,6 +148,10 @@ def _clean_part(raw: dict, index: int, count: int, stems: list[str],
     """
     if not isinstance(raw, dict) or set(raw) - _PART_KEYS:
         raise ProposalError("invalid_part")
+    target = raw.get("part_id")
+    if target is not None and (not isinstance(target, str) or target not in (existing_ids or set())):
+        raise ProposalError("invalid_part: unknown part_id")
+    raw = {k: v for k, v in raw.items() if k != "part_id"}
     creator_refs = {}
     if isinstance(raw.get("creators"), list):
         creators = []
@@ -182,9 +190,60 @@ def _clean_part(raw: dict, index: int, count: int, stems: list[str],
         raise ProposalError(f"invalid_part: {e}")
     normalized.pop("id"); normalized.pop("needs_review", None); normalized.pop("attached_to", None)
     item = {"part": normalized, "attached_to": attached, "evidence": evidence, "status": "pending"}
+    if target:
+        item["target_part_id"] = target
     if creator_refs:
         item["creator_refs"] = creator_refs
     return item
+
+
+def _current_parts(work_dir: str) -> list[dict]:
+    try:
+        with open(os.path.join(work_dir, "_metadata.json"), encoding="utf-8") as f:
+            return (json.load(f) or {}).get("parts") or []
+    except (OSError, ValueError):
+        return []
+
+
+def _target(item: dict, parts: list[dict]) -> Optional[str]:
+    """Osa, mida ettepanek parandab: agendi `part_id` või sama liigi ja SAMADE lehtedega osa
+    (agent pakkus olemasoleva kirja parandatud kujul ilma id-ta)."""
+    ids = {p.get("id") for p in parts}
+    if item.get("target_part_id") in ids:
+        return item["target_part_id"]
+    pages, kind = set(item["part"].get("pages") or []), item["part"].get("kind")
+    same = [p["id"] for p in parts if p.get("kind") == kind and set(p.get("pages") or []) == pages]
+    return same[0] if len(same) == 1 else None
+
+
+def _same_person(a: dict, b: dict) -> bool:
+    if a.get("role") != b.get("role"):
+        return False
+    if a.get("id") and b.get("id"):
+        return a["id"] == b["id"]
+    return (a.get("name") or "").strip().casefold() == (b.get("name") or "").strip().casefold() != ""
+
+
+def merge_part(existing: dict, proposed: dict) -> dict:
+    """Olemasolev osa + agendi parandus (ilma id ja needs_review'ta, update_part'ile)."""
+    out = {k: v for k, v in existing.items() if k not in ("id", "needs_review")}
+    for key in _KEEP_EXISTING_TEXT:
+        if not out.get(key) and proposed.get(key):
+            out[key] = proposed[key]
+    for key in _TAKE_PROPOSED:
+        if proposed.get(key):
+            out[key] = proposed[key]
+    if proposed.get("pages"):
+        out["pages"] = proposed["pages"]
+    creators = [dict(c) for c in existing.get("creators") or []]
+    for c in proposed.get("creators") or []:
+        match = next((e for e in creators if _same_person(e, c)), None)
+        if match is None:
+            creators.append(dict(c))
+        elif c.get("id") and not match.get("id"):
+            match.update({"id": c["id"], **({"source": c["source"]} if c.get("source") else {})})
+    out["creators"] = creators
+    return out
 
 
 def _load(payload: str) -> tuple[list, list]:
@@ -224,7 +283,8 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
         raise ProposalError("stale_pages")
     people = _clean_persons(persons)
     by_ref = {p["ref"]: p for p in people}
-    items = [_clean_part(p, i, len(parts), stems, by_ref) for i, p in enumerate(parts)]
+    existing_ids = {p.get("id") for p in _current_parts(work_dir)}
+    items = [_clean_part(p, i, len(parts), stems, by_ref, existing_ids) for i, p in enumerate(parts)]
     payload = _dump(items, people)
     if len(payload.encode()) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")
@@ -256,12 +316,19 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
         _clean(db, now)
         rows = db.execute("SELECT * FROM proposal WHERE work_id=? AND username=? ORDER BY created_at DESC",
                           (work_id, username)).fetchall()
+    parts_now = _current_parts(work_dir)
     for row in rows:
         items, persons = _load(row["payload"])
         if all(it["status"] != "pending" for it in items):
             continue
         for it in items:
             it["part"] = _with_resolved(it["part"], it.get("creator_refs"), persons)
+            if it["status"] == "pending":
+                it["target_part_id"] = _target(it, parts_now)
+                if it["target_part_id"]:
+                    # Sama liitmine, mida vastuvõtt teeb — „Muuda" vorm alustab sellest.
+                    existing = next(x for x in parts_now if x.get("id") == it["target_part_id"])
+                    it["merged"] = merge_part(existing, it["part"])
             it["page_numbers"] = [number[s] for s in it["part"]["pages"] if s in number]
             it["missing_pages"] = [s for s in it["part"]["pages"] if s not in number]
         out.append({"proposal_id": row["id"], "created_at": row["created_at"],
@@ -271,8 +338,12 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
 
 
 def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: int,
-           action: str, override: Optional[dict] = None) -> Optional[dict]:
-    """Toimetaja otsus ühe osa kohta. Vastuvõtt = create_part (tagastab loodud osa)."""
+           action: str, override: Optional[dict] = None, mode: Optional[str] = None) -> Optional[dict]:
+    """Toimetaja otsus ühe osa kohta. Vastuvõtt: kui ettepanek parandab olemasolevat osa
+    (`part_id` või samad lehed), siis update_part liidetud kujuga; muidu create_part.
+    `mode="create"` sunnib uue osa (toimetaja otsus: tegemist on eri tekstiga)."""
+    if mode not in (None, "create"):
+        raise ProposalError("invalid_decision")
     if action not in ("accept", "reject") or not isinstance(index, int) or isinstance(index, bool):
         raise ProposalError("invalid_decision")
     with _db() as db:
@@ -297,8 +368,15 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
                 data["attached_to"] = ref["created_part_id"]
             elif isinstance(target, str):
                 data["attached_to"] = target
+            target = None if mode == "create" else _target(item, _current_parts(work_dir))
             try:
-                created = wp.create_part(work_dir, data, username)
+                if target:
+                    existing = next(p for p in _current_parts(work_dir) if p.get("id") == target)
+                    data = dict(override) if isinstance(override, dict) else merge_part(existing, data)
+                    data.pop("id", None); data.pop("needs_review", None)
+                    created = wp.update_part(work_dir, target, data, username)
+                else:
+                    created = wp.create_part(work_dir, data, username)
             except wp.PartError as e:
                 raise ProposalError(f"invalid_part: {e}")
             item["status"], item["created_part_id"] = "accepted", created["id"]

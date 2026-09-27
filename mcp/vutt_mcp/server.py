@@ -473,6 +473,12 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         evidence [{page, quote}]. Toimetaja otsustab: loo kaart, seo olemasolevaga
         või jäta nimeks. Ära paku uut isikut, kui search_persons leiab ta.
 
+        OLEMASOLEVA OSA PARANDUS: kui osa on get_work_parts'is juba olemas (sama
+        kiri), ÄRA paku seda uuena — lisa osale `part_id` (olemasoleva osa id) ja
+        ainult parandatud/lisatud väljad. Toimetaja vastuvõtt uuendab siis seda
+        osa (tühi väli ei kustuta olemasolevat; isikud liidetakse). Samade
+        lehtedega ja sama liigiga osa tuvastatakse ka ise parandusena.
+
         Kirja piirid tunneb ära pöördumisest, dateeringust ja allkirjast;
         istungi protokolli kuupäevast ja osalejate loetelust. Ära paku juba
         olemasolevat osa. Kuni 50 osa ühes esituses; see talletab AINULT

@@ -28,8 +28,8 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
     api.proposals[0].persons[0].status = action === 'name' ? 'name' : 'created';
     return { ref, status: 'created', person_id: personId ?? 'vutt:Pnew' };
   },
-  decidePartProposal: async (_w: string, pid: string, i: number, action: string, _t: unknown, part?: any) => {
-    api.calls.push(`decide:${pid}:${i}:${action}:${part ? part.title ?? '' : ''}`);
+  decidePartProposal: async (_w: string, pid: string, i: number, action: string, _t: unknown, part?: any, mode?: string) => {
+    api.calls.push(`decide:${pid}:${i}:${action}:${part ? part.title ?? '' : ''}${mode ? `:${mode}` : ''}`);
     const np = { ...(part ?? api.proposals[0].items[i].part), id: 'p9', needs_review: false };
     api.parts = [...api.parts, np];
     api.proposals[0].items[i].status = 'accepted';
@@ -115,6 +115,31 @@ describe('PartsTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Seo' }));
     await waitFor(() => expect(api.calls).toContain('person:pp:np1:link:vutt:Pold'));
     await waitFor(() => expect(screen.queryByText('Uued isikud (1)')).toBeNull());
+  });
+
+  it('olemasoleva osa parandus: „Uuenda" ja „Lisa uuena"; muutmine avab olemasoleva osa', async () => {
+    api.parts = [{ id: 'k1', kind: 'letter', title: 'Vana', pages: ['s1', 's2'], creators: [], attached_to: null, needs_review: false }];
+    const item = { part: { kind: 'letter', pages: ['s1', 's2'], creators: [{ name: 'Fischer', role: 'addressee' }], attached_to: null },
+      attached_to: null, evidence: [], status: 'pending', page_numbers: [1, 2], missing_pages: [], target_part_id: 'k1',
+      merged: { kind: 'letter', title: 'Vana', pages: ['s1', 's2'], creators: [{ name: 'Fischer', role: 'addressee' }], attached_to: null } };
+    api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: false, items: [item] }];
+    renderTab();
+    expect(await screen.findByText('Parandab olemasolevat osa: Vana')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Lisa uuena' }));
+    await waitFor(() => expect(api.calls).toContain('decide:pp:0:accept::create'));
+  });
+
+  it('parandus „Uuenda" ja muutmisvorm olemasoleva osa pealt', async () => {
+    api.parts = [{ id: 'k1', kind: 'letter', title: 'Vana', pages: ['s1', 's2'], creators: [], attached_to: null, needs_review: false }];
+    const item = { part: { kind: 'letter', pages: ['s1', 's2'], creators: [], attached_to: null },
+      attached_to: null, evidence: [], status: 'pending', page_numbers: [1, 2], missing_pages: [], target_part_id: 'k1',
+      merged: { kind: 'letter', title: 'Vana', pages: ['s1', 's2'], creators: [], attached_to: null } };
+    api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: false, items: [item] }];
+    renderTab();
+    fireEvent.click(await screen.findByRole('button', { name: 'Muuda ja lisa' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvesta osa' }));
+    await waitFor(() => expect(api.calls).toContain('decide:pp:0:accept:Vana'));
+    expect(api.calls.some(c => c.startsWith('update:') || c.startsWith('create:'))).toBe(false);
   });
 
   it('agendi ettepanekud ainult superadminile', async () => {

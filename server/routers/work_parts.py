@@ -113,7 +113,7 @@ def parts_proposal_decide(work_id: str, proposal_id: str, index: int, action: st
     """Toimetaja otsus ühe osa kohta: accept (soovi korral parandatud `part`) või reject."""
     path = _writable(work_id, user)
     created = _wpp(wpp.decide, proposal_id, work_id, path, user["username"], index, action,
-                   override=(body or {}).get("part"))
+                   override=(body or {}).get("part"), mode=(body or {}).get("mode"))
     return {"status": "accepted" if created else "rejected", "part": created}
 
 

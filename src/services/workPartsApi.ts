@@ -50,6 +50,10 @@ export interface PartProposalItem {
   created_part_id?: string;
   page_numbers: number[];
   missing_pages: string[];
+  /** Olemasolev osa, mida ettepanek parandab (agendi `part_id` või samad lehed). */
+  target_part_id?: string | null;
+  /** Olemasolev osa + parandus (sama liitmine, mida vastuvõtt teeb). */
+  merged?: PartInput;
 }
 /** Agendi pakutud uus isik (#492): ootel, kuni toimetaja loob, seob või jätab nimeks. */
 export interface ProposedPerson {
@@ -71,10 +75,10 @@ export async function listPartProposals(workId: string, token: string | null): P
 }
 /** Toimetaja otsus ühe pakutud osa kohta; `part` = parandatud kuju vastuvõtul. */
 export const decidePartProposal = (workId: string, proposalId: string, index: number,
-  action: 'accept' | 'reject', token: string | null, part?: PartInput) =>
+  action: 'accept' | 'reject', token: string | null, part?: PartInput, mode?: 'create') =>
   apiPost<{ status: string; part: WorkPart | null }>(
     `${base(workId)}/proposals/${encodeURIComponent(proposalId)}/items/${index}/${action}`,
-    part ? { part } : {}, opts(token));
+    { ...(part ? { part } : {}), ...(mode ? { mode } : {}) }, opts(token));
 /** Pakutud isik: loo kaart, seo olemasolevaga (`personId`) või jäta nimeks. 409 `person_exists:<id>`. */
 export const resolveProposedPerson = (workId: string, proposalId: string, ref: string,
   action: 'create' | 'link' | 'name', token: string | null, personId?: string) =>
