@@ -3,9 +3,9 @@ import { datingError, WorkDating } from '../utils/workDating';
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Edit3, X, Save, Plus, Trash2, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
+import { Edit3, X, Save, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
 import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
-import { Creator, CreatorRole, Page, Work, ArchiveRef } from '../types';
+import { Creator, Page, Work, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -17,6 +17,9 @@ import { ErrorBanner } from './ErrorBanner';
 import { buildMetadataPayload, type YearFieldsExisting } from '../utils/buildMetadataPayload';
 import { parseYearDisplayRange, deriveYearFields } from '../utils/yearDisplayUtils';
 import ArchiveSelect from './ArchiveSelect';
+import { useDraggablePosition } from '../hooks/useDraggablePosition';
+import CreatorsEditor from './creators/CreatorsEditor';
+import { vocabularyRoleOptions } from './creators/roleOptions';
 
 interface MetadataModalProps {
   isOpen: boolean;
@@ -219,40 +222,19 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Drag-to-move
-  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
-  const dragOffset = useRef<{ x: number; y: number } | null>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
+  // Päisest lohistatav (ühine hook osade paneeliga)
+  const drag = useDraggablePosition();
 
   // Aasta-välja invariant (reegel 4): vormi avamisel (ja ESTER auto-filli järel)
   // snap-shotitud algne { year, year_display }. Kui kasutaja kuvastringi ei muuda,
   // säilitatakse olemasolev `year` isegi kui see ei parsi (väldib vaikset andmekao).
   const existingYearRef = useRef<YearFieldsExisting>({});
 
-  const handleDragStart = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return;
-    const rect = modalRef.current?.getBoundingClientRect();
-    const currentX = rect ? rect.left : (dragPos?.x ?? 0);
-    const currentY = rect ? rect.top : (dragPos?.y ?? 0);
-    dragOffset.current = { x: e.clientX - currentX, y: e.clientY - currentY };
-    const onMove = (ev: MouseEvent) => {
-      if (!dragOffset.current) return;
-      setDragPos({ x: ev.clientX - dragOffset.current.x, y: ev.clientY - dragOffset.current.y });
-    };
-    const onUp = () => {
-      dragOffset.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
-
   // Lae andmed kui modal avatakse
   useEffect(() => {
     if (isOpen) {
       loadData();
-      setDragPos(null);
+      drag.reset();
     }
   }, [isOpen]);
 
@@ -473,17 +455,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose}>
       <div
-        ref={modalRef}
+        ref={drag.ref}
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
-        style={dragPos
-          ? { position: 'fixed', left: dragPos.x, top: dragPos.y, transform: 'none', margin: 0 }
-          : { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', margin: 0 }
-        }
+        style={drag.style}
         onClick={e => e.stopPropagation()}
       >
         <div
           className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0 cursor-grab active:cursor-grabbing select-none"
-          onMouseDown={handleDragStart}
+          onMouseDown={drag.onHandleMouseDown}
         >
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
             <Edit3 size={18} className="text-amber-600" />
@@ -506,94 +485,17 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           </div>
 
           {/* Grupp 1: Isikud (creators) */}
-          <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
-            <div className="flex justify-between items-center -mt-1">
-              <h4 className="text-xs font-bold text-gray-600 uppercase">{t('metadata.creators', 'Isikud')}</h4>
-              <button
-                type="button"
-                onClick={() => setMetaForm({
-                  ...metaForm,
-                  creators: [...metaForm.creators, { name: '', role: 'auctor' as CreatorRole }]
-                })}
-                className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
-              >
-                <Plus size={14} />
-                {t('metadata.addCreator', 'Lisa isik')}
-              </button>
-            </div>
-            {metaForm.creators.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">{t('metadata.noCreators', 'Isikuid pole lisatud')}</p>
-            ) : (
-              <div className="space-y-2">
-                {metaForm.creators.map((creator, index) => (
-                  <div key={index} className="flex gap-2 items-start">
-                    <div className="flex-1">
-                      <EntityPicker
-                        type="person"
-                        value={creator.id || creator.source === 'wikidata' ? {
-                          id: creator.id || null,
-                          label: creator.name,
-                          source: creator.source || 'wikidata',
-                          labels: { et: creator.name }
-                        } : creator.name}
-                        onChange={(val) => {
-                          const newCreators = [...metaForm.creators];
-                          newCreators[index] = {
-                            ...creator,
-                            name: val?.label || '',
-                            id: val?.id || null,
-                            source: (val?.source === 'local' ? 'manual' : val?.source) || 'manual'
-                          };
-                          setMetaForm({ ...metaForm, creators: newCreators });
-                        }}
-                        placeholder={t('metadata.creatorName', 'Nimi')}
-                        lang={lang}
-                        localSuggestions={suggestions.authors}
-                        peopleRegister={peopleRegister}
-                        showPersonToggle
-                        defaultPersonSearch
-                        token={authToken}
-                        personContext={{ work_id: workId, role: creator.role }}
-                      />
-                    </div>
-                    <select
-                      className="border border-gray-300 rounded px-2 py-[7px] text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-36"
-                      value={creator.role}
-                      onChange={e => {
-                        const newCreators = [...metaForm.creators];
-                        newCreators[index] = { ...creator, role: e.target.value as CreatorRole };
-                        setMetaForm({ ...metaForm, creators: newCreators });
-                      }}
-                    >
-                      {vocabularies && Object.entries(vocabularies.roles).map(([roleId, roleData]) => (
-                        <option key={roleId} value={roleId}>
-                          {roleData[lang] || roleData.et}
-                        </option>
-                      ))}
-                      {!vocabularies && (
-                        <>
-                          <option value="praeses">{t('metadata.roles.praeses')}</option>
-                          <option value="respondens">{t('metadata.roles.respondens')}</option>
-                          <option value="auctor">{t('metadata.roles.auctor')}</option>
-                        </>
-                      )}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newCreators = metaForm.creators.filter((_, i) => i !== index);
-                        setMetaForm({ ...metaForm, creators: newCreators });
-                      }}
-                      className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                      title={t('metadata.removeCreator', 'Eemalda')}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <CreatorsEditor
+            creators={metaForm.creators}
+            onChange={creators => setMetaForm({ ...metaForm, creators })}
+            roles={vocabularyRoleOptions(vocabularies, lang, t)}
+            newRole="auctor"
+            lang={lang}
+            token={authToken}
+            workId={workId}
+            suggestions={suggestions.authors}
+            peopleRegister={peopleRegister}
+          />
 
           {/* Grupp 2: Kolofoon */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">

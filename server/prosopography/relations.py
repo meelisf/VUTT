@@ -136,13 +136,24 @@ def update_page_person_mentions(work_id: str, work_dir: str):
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, data)
 
 
-def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None) -> None:
+def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None,
+                          renamed: Optional[dict] = None) -> None:
     """Teose 'mentioned' seosed uuesti pärast lehtede hulga või järjekorra
     muutust (#420). Salvestus skannib ainult isikutägide muutusel, seega PEAB
     iga lehenumbreid nihutav tee selle ise kutsuma — muidu jäävad numbrid vanaks.
 
+    Enne mainimisi ühtlustatakse teose osad (#464, ADR 0057): osade lehed ja
+    mainimiste osa-viited sõltuvad samast lehehulgast. Poolitus annab `renamed`
+    = {algne_tüvi: [vasak, parem]}.
+
     Viga logitakse, ei visata: lehetoiming on juba kettal ja commititud.
     """
+    try:
+        # Moodulile viitamine (mitte funktsioonile), et testide patch jõuaks kohale.
+        from .. import work_parts
+        work_parts.sync_work_parts(work_dir, work_id, renamed=renamed)
+    except Exception:
+        logger.exception(f"Osade ühtlustus ebaõnnestus ({work_id or work_dir})")
     try:
         if not work_id:
             with open(os.path.join(work_dir, '_metadata.json'), 'r', encoding='utf-8') as f:

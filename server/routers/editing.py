@@ -240,6 +240,10 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 @router.post("/update-work-metadata")
 async def update_work_metadata(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
+    # Osad muutuvad AINULT /works/{id}/parts otspunktidega (#464): üldine salvestus
+    # saadab terve objekti ja kirjutaks samaaegse toimetaja osad üle.
+    if 'parts' in (data.get('metadata') or {}):
+        raise HTTPException(status_code=400, detail="Osi muudetakse /works/{id}/parts kaudu")
     try:
         data['metadata'] = dating_updates(data.get('metadata', {}))
     except ValueError as e:

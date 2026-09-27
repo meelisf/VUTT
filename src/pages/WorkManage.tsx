@@ -50,6 +50,8 @@ import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
+import PartsTab from './manage/parts/PartsTab';
+import { initialManageTab, tabSwitch, type ManageTab } from './manage/partsModel';
 import PageActionBar from './manage/PageActionBar';
 import {
   PendingPageOps, pendingCount, pruneMissing, rotatePending, setPendingSplit, setPendingSplitX, toRequest,
@@ -67,7 +69,7 @@ const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
 type PageInfo = WorkPageInfo;
 type DeletedPage = DeletedWorkPage;
 
-type ActiveTab = 'pages' | 'trash' | 'replace';
+type ActiveTab = ManageTab;
 
 const WorkManage: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common']);
@@ -80,7 +82,11 @@ const WorkManage: React.FC = () => {
   const [highlightedNum, setHighlightedNum] = useState<number | null>(null);
   const handledFocusRef = useRef<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('pages');
+  // „Osad" on esimene ja vaikimisi aktiivne (#464): lehtede haldus on teisejärguline,
+  // sest põhitöö (poolitus jms) tehakse juba sisestamisel.
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => initialManageTab(focus));
+  const [partsDirty, setPartsDirty] = useState(false);
+  const partsSaveRef = useRef<() => Promise<boolean>>(async () => true);
   const [pages, setPages] = useState<PageInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -635,10 +641,12 @@ const WorkManage: React.FC = () => {
 
   // Järjekorra mustand ja ootel pöörded/poolitused ei saa korraga olla (nupud
   // blokeerivad teineteist), seega salvestab dialoog selle, mis ootel on.
-  const { dialogProps } = useUnsavedChangesGuard({
-    isDirty: changedCount > 0 || pageOpsCount > 0,
-    onSave: pageOpsCount > 0 ? savePageOps : saveReorder,
+  // Osade vormi mustand (#464) käib sama dialoogi kaudu — teist confirm-varianti ei tehta.
+  const { dialogProps, runGuarded } = useUnsavedChangesGuard({
+    isDirty: partsDirty || changedCount > 0 || pageOpsCount > 0,
+    onSave: partsDirty ? () => partsSaveRef.current() : pageOpsCount > 0 ? savePageOps : saveReorder,
   });
+  const switchTab = (tab: ActiveTab) => tabSwitch(partsDirty, runGuarded, () => setActiveTab(tab));
 
   const handleBulkDelete = async () => {
     if (!workId || !authToken || selectedFiles.size === 0) return;
@@ -850,7 +858,17 @@ const WorkManage: React.FC = () => {
         {/* Tabid */}
         <div className="flex gap-1 mb-6 border-b border-gray-200">
           <button
-            onClick={() => setActiveTab('pages')}
+            onClick={() => switchTab('parts')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'parts'
+                ? 'border-primary-600 text-primary-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t('manage.tabParts')}
+          </button>
+          <button
+            onClick={() => switchTab('pages')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'pages'
                 ? 'border-primary-600 text-primary-700'
@@ -865,7 +883,7 @@ const WorkManage: React.FC = () => {
             )}
           </button>
           <button
-            onClick={() => setActiveTab('replace')}
+            onClick={() => switchTab('replace')}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'replace'
                 ? 'border-primary-600 text-primary-700'
@@ -876,10 +894,10 @@ const WorkManage: React.FC = () => {
             {t('manage.tabs.replace', 'Asenda leheküljed')}
           </button>
           <button
-            onClick={() => {
+            onClick={() => tabSwitch(partsDirty, runGuarded, () => {
               setActiveTab('trash');
               if (!trashLoaded) loadTrashPages();
-            }}
+            })}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'trash'
                 ? 'border-primary-600 text-primary-700'
@@ -896,6 +914,19 @@ const WorkManage: React.FC = () => {
         </div>
 
         {/* TAB: Leheküljed */}
+        {activeTab === 'parts' && workId && (
+          <PartsTab
+            workId={workId}
+            pages={pages}
+            token={authToken}
+            imageToken={imageToken}
+            thumbCacheBust={thumbCacheBust}
+            onDirtyChange={setPartsDirty}
+            runGuarded={runGuarded}
+            saveRef={partsSaveRef}
+          />
+        )}
+
         {activeTab === 'pages' && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">

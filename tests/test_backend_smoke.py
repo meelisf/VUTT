@@ -492,15 +492,17 @@ def test_delete_pages_refreshes_person_mentions(tmp_path, monkeypatch):
     monkeypatch.setattr(admin_page_ops, "sync_work_to_meilisearch", lambda *a, **kw: None)
 
     calls = []
+    # #464: mainimised + osad käivad refresh_work_mentions'i kaudu (see kutsub
+    # update_page_person_mentions'it).
     monkeypatch.setattr(
-        admin_page_ops, "update_page_person_mentions", lambda wid, wdir: calls.append((wid, wdir))
+        admin_page_ops, "refresh_work_mentions", lambda wdir, wid=None, renamed=None: calls.append((wid, wdir))
     )
 
     result = admin_page_ops.delete_pages(work_id, ["leht1"], username="admin")
 
     assert result["status"] == "success", result
     assert calls == [(work_id, str(work_dir))], \
-        f"update_page_person_mentions peaks olema kutsutud 1 kord, sain: {calls}"
+        f"refresh_work_mentions peaks olema kutsutud 1 kord, sain: {calls}"
 
 
 def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, tmp_path):

@@ -9,6 +9,7 @@ import PageTagsPanel from './PageTagsPanel';
 import WorkInfoPanel from './WorkInfoPanel';
 import WorkTagsPanel from './WorkTagsPanel';
 import WorkSetsPanel from './WorkSetsPanel';
+import WorkPartsPanel from './WorkPartsPanel';
 import TextAnnotationsPanel from './TextAnnotationsPanel';
 
 interface AnnotationsTabProps {
@@ -81,6 +82,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
         lang={lang}
         onOpenMetaModal={onOpenMetaModal}
       />
+
+      {/* Teose osade sisukord (#464) — teose info all, kokkuklapitav */}
+      <WorkPartsPanel workId={work?.work_id} token={authToken} currentPage={_page.page_number} />
 
       {/* Töökollektsioonid on „kõrgema taseme märksõna" — kuraatori, mitte
           sisu tasandi väide teose kohta. Seepärast teose märksõnade EES. */}

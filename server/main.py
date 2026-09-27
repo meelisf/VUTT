@@ -35,6 +35,7 @@ from .routers.public_registries import router as public_registries_router
 from .routers.public import router as public_router
 from .routers.editing import router as editing_router
 from .routers.work_sets import router as work_sets_router
+from .routers.work_parts import router as work_parts_router
 from .routers.collections import router as collections_router
 from .routers.ocr_jobs import router as ocr_jobs_router
 from .prosopography.indices import rebuild_indices
@@ -137,6 +138,7 @@ app.include_router(public_router)
 app.include_router(editing_router)
 app.include_router(collections_router)
 app.include_router(work_sets_router)
+app.include_router(work_parts_router)
 
 app.add_middleware(
     CORSMiddleware,

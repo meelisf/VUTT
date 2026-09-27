@@ -19,6 +19,8 @@ import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
 import { getLangCode } from '../../utils/getLangCode';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import SafeHtml from '../SafeHtml';
+import WorkPartsPanel from '../editor/WorkPartsPanel';
+import { useUser } from '../../contexts/UserContext';
 
 interface WorkspaceMobileViewProps {
   page: Page;
@@ -58,6 +60,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   skipImageFade = false,
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common', 'dashboard']);
+  const { authToken } = useUser();
   const { collections } = useCollection();
   const lang = getLangCode(i18n.language);
   const [activeTab, setActiveTab] = useState<'image' | 'text' | 'info'>('image');
@@ -474,6 +477,9 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Teose osade sisukord (#464) */}
+                <WorkPartsPanel workId={work.work_id} token={authToken} currentPage={currentPageNum} />
 
                 {/* Teose märksõnad */}
                 {work && work.tags && work.tags.length > 0 && (

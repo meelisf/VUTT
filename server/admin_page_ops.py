@@ -22,7 +22,7 @@ from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
-from .prosopography.relations import refresh_work_mentions, update_page_person_mentions
+from .prosopography.relations import refresh_work_mentions
 from .trash_reason import SPLIT_COMMIT_PREFIX, DELETE_COMMIT_PREFIX
 
 logger = get_logger(__name__)
@@ -475,12 +475,15 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
         if page_num < 1 or page_num > len(images):
             return {"found": False}
 
-        _split_page_locked(path, work_id, page_num, split_x, username, images)
+        orig_stem = os.path.splitext(images[page_num - 1])[0]
+        halves = _split_page_locked(path, work_id, page_num, split_x, username, images)
 
         # Meilisearch sync
         sync_work_to_meilisearch(folder_name)
-        # Poolitus nihutab järgmiste lehtede numbreid (#420).
-        refresh_work_mentions(path, work_id)
+        # Poolitus nihutab järgmiste lehtede numbreid (#420); osades asendub algne
+        # tüvi mõlema poolega (#464).
+        renamed = {orig_stem: [os.path.splitext(h)[0] for h in halves]} if halves else None
+        refresh_work_mentions(path, work_id, renamed=renamed)
 
         new_page_count = len(get_sorted_images(path))
         return {"success": True, "new_page_count": new_page_count}
@@ -686,6 +689,7 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
 
         if progress:
             progress(0, len(clean))
+        renamed: dict = {}   # osade sünk (#464): {algne_tüvi: [vasak, parem]}
         try:
             for op in clean:
                 fn = op["filename"]
@@ -695,8 +699,10 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
                     rotated += 1
                 if op["split_x"] is not None:
                     images = get_sorted_images(path)
-                    _split_page_locked(path, work_id, images.index(fn) + 1,
-                                       op["split_x"], username, images)
+                    halves = _split_page_locked(path, work_id, images.index(fn) + 1,
+                                                op["split_x"], username, images)
+                    if halves:
+                        renamed[os.path.splitext(fn)[0]] = [os.path.splitext(h)[0] for h in halves]
                     split += 1
                 if progress:
                     progress(clean.index(op) + 1, len(clean))
@@ -708,7 +714,7 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
         finally:
             if split:
                 sync_work_to_meilisearch(folder_name)
-                refresh_work_mentions(path, work_id)
+                refresh_work_mentions(path, work_id, renamed=renamed)
 
         new_page_count = len(get_sorted_images(path))
     logger.info(f"PAGE-OPS {folder_name}: {rotated} pööret, {split} poolitust ({username})")
@@ -1106,10 +1112,9 @@ def delete_pages(work_id, base_names, username):
             raise
 
         sync_work_to_meilisearch(folder_name)
-        # Kustutatud lehe isiku-tägid ei tohi 'mentioned' indeksisse rippuma jääda.
-        try:
-            update_page_person_mentions(work_id, path)
-        except Exception:
-            logger.exception(f"delete_pages: mainimiste indeksi uuendus ebaõnnestus ({work_id})")
+        # Kustutatud lehe isiku-tägid ei tohi 'mentioned' indeksisse rippuma jääda ja
+        # kustutatud leht peab osadest kaduma (#464) — refresh_work_mentions teeb mõlemat
+        # ega viska (vead logitakse).
+        refresh_work_mentions(path, work_id)
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "deleted": list(base_names), "new_page_count": new_page_count}

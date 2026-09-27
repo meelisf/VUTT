@@ -27,6 +27,8 @@ ALLOWED_METADATA_FIELDS = {
     "title", "year", "year_display", "dating", "location", "publisher", "creators", "tags", "notes",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
     "series", "relations", "archive_refs", "shareable",
+    # Osad (#464): muudetakse AINULT work_parts otspunktidega; üldine route lükkab tagasi.
+    "parts",
 }
 
 

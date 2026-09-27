@@ -8,8 +8,8 @@ import { datingError, WorkDating } from '../utils/workDating';
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Save, Plus, Trash2, X, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-import { Creator, CreatorRole, ArchiveRef } from '../types';
+import { Save, X, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Creator, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Collections, getVocabularies, Vocabularies } from '../services/collectionService';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
@@ -21,6 +21,8 @@ import { getLabel } from '../utils/metadataUtils';
 import { deriveYearFields } from '../utils/yearDisplayUtils';
 import { cleanCreators, cleanTags, cleanEsterId, cleanArchiveRefs } from '../utils/buildMetadataPayload';
 import ArchiveSelect from './ArchiveSelect';
+import CreatorsEditor from './creators/CreatorsEditor';
+import { vocabularyRoleOptions } from './creators/roleOptions';
 
 interface UploadMetaFormProps {
   uploadId: string;
@@ -297,104 +299,18 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         </div>
 
         {/* Isikud (creators) */}
-        <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-white/70">
-          <div className="flex justify-between items-center -mt-1">
-            <h4 className="text-xs font-bold text-gray-600 uppercase">
-              {t('workspace:metadata.creators', 'Isikud')}
-            </h4>
-            <button
-              type="button"
-              onClick={() =>
-                setForm({
-                  ...form,
-                  creators: [...form.creators, { name: '', role: 'auctor' as CreatorRole }],
-                })
-              }
-              className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
-            >
-              <Plus size={14} />
-              {t('workspace:metadata.addCreator', 'Lisa isik')}
-            </button>
-          </div>
-          {form.creators.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">
-              {t('workspace:metadata.noCreators', 'Isikuid pole lisatud')}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {form.creators.map((creator, i) => (
-                <div key={i} className="flex gap-2 items-start">
-                  <div className="flex-1">
-                    <EntityPicker
-                      type="person"
-                      value={
-                        creator.id || creator.source === 'wikidata'
-                          ? {
-                              id: creator.id || null,
-                              label: creator.name,
-                              source: creator.source || 'wikidata',
-                              labels: { et: creator.name },
-                            }
-                          : creator.name
-                      }
-                      onChange={(val) => {
-                        const next = [...form.creators];
-                        next[i] = {
-                          ...creator,
-                          name: val?.label || '',
-                          id: val?.id || null,
-                          source: (val?.source === 'local' ? 'manual' : val?.source) || 'manual',
-                        };
-                        setForm({ ...form, creators: next });
-                      }}
-                      placeholder={t('workspace:metadata.creatorName', 'Nimi')}
-                      lang={lang}
-                      localSuggestions={suggestions.authors}
-                      peopleRegister={peopleRegister}
-                      showPersonToggle
-                      defaultPersonSearch
-                      token={authToken}
-                      personContext={metaWorkId ? { work_id: metaWorkId, role: creator.role } : undefined}
-                    />
-                  </div>
-                  <select
-                    className="border border-gray-300 rounded px-2 py-[7px] text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-36"
-                    value={creator.role}
-                    onChange={(e) => {
-                      const next = [...form.creators];
-                      next[i] = { ...creator, role: e.target.value as CreatorRole };
-                      setForm({ ...form, creators: next });
-                    }}
-                  >
-                    {vocabularies
-                      ? Object.entries(vocabularies.roles).map(([roleId, roleData]) => (
-                          <option key={roleId} value={roleId}>
-                            {roleData[lang] || roleData.et}
-                          </option>
-                        ))
-                      : (
-                        <>
-                          <option value="praeses">{t('workspace:metadata.roles.praeses')}</option>
-                          <option value="respondens">{t('workspace:metadata.roles.respondens')}</option>
-                          <option value="auctor">{t('workspace:metadata.roles.auctor')}</option>
-                        </>
-                      )}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm({ ...form, creators: form.creators.filter((_, j) => j !== i) })
-                    }
-                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                    title={t('workspace:metadata.removeCreator', 'Eemalda')}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <CreatorsEditor
+          creators={form.creators}
+          onChange={creators => setForm({ ...form, creators })}
+          roles={vocabularyRoleOptions(vocabularies, lang, t)}
+          newRole="auctor"
+          lang={lang}
+          token={authToken}
+          workId={metaWorkId}
+          suggestions={suggestions.authors}
+          peopleRegister={peopleRegister}
+          className="bg-white/70"
+        />
 
         {/* Kolofoon: aasta, koht, trükkal */}
         <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-white/70">

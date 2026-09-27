@@ -86,3 +86,31 @@ describe('usePopover jõudlus', () => {
     expect(result.current.state).toMatchObject({ personId: 'b', x: 9, y: 12 });
   });
 });
+
+describe('RelationPopover „veel N teost" käändub', () => {
+  it('üks lisateos → ainsus', () => {
+    const works = Array.from({ length: 5 }, (_, i) => ({ work_id: `x${i}`, title: `T${i}`, year: 1650 + i, place: null, genres: [], restricted: false }));
+    const edges = works.map(w => ({ kind: 'cotext' as const, from: 'vutt:Ps', to: F, directed: false, year: w.year, place: null,
+      roles: { 'vutt:Ps': ['gratulator'], [F]: ['auctor'] }, evidence: { work_id: w.work_id, pages: [] } }));
+    const net = applyFilters({ ...NET, works, edges }, DEFAULT_FILTER);
+    render(<MemoryRouter><RelationPopover state={{ personId: 'vutt:Ps', x: 1, y: 1, pinned: false }} net={net} onClose={() => {}} /></MemoryRouter>);
+    expect(screen.getByText('… veel 1 teos')).toBeTruthy();
+  });
+});
+
+describe('liitmärgi hüpik: ainult selle aasta teosed', () => {
+  it('state.year piirab teoste loendi sellele aastale', () => {
+    const net = applyFilters(NET, DEFAULT_FILTER);                   // jy30do 1659, sal 1660
+    render(<MemoryRouter><RelationPopover state={{ personId: 'vutt:Ps', x: 1, y: 1, pinned: true, year: 1659 }} net={net} onClose={() => {}} /></MemoryRouter>);
+    const hrefs = screen.getAllByRole('link').map(a => a.getAttribute('href'));
+    expect(hrefs).toContain('/work/jy30do/1');
+    expect(screen.queryByText(/Salajane teos/)).toBeNull();
+  });
+
+  it('usePopover.pin aastaga salvestab aasta', () => {
+    const { result } = renderHook(() => usePopover());
+    const ev = { clientX: 1, clientY: 2, stopPropagation() {} } as unknown as React.MouseEvent;
+    act(() => result.current.pin('a', ev, 1659));
+    expect(result.current.state).toMatchObject({ personId: 'a', pinned: true, year: 1659 });
+  });
+});

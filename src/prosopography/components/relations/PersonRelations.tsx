@@ -117,7 +117,7 @@ const PersonRelations: React.FC<{ personId: string; card?: ProsopoRecord | null 
         {tab === 'timeline' && <RelationsTimeline net={net} popover={popover} highlight={highlight} onHighlight={setHighlight} />}
         {tab === 'map' && (
           <Suspense fallback={null}>
-            <RelationsMap net={net} card={card ?? null} popover={popover} onHighlight={setHighlight} />
+            <RelationsMap net={net} card={card ?? null} popover={popover} highlight={highlight} onHighlight={setHighlight} />
           </Suspense>
         )}
         {tab === 'table' && <RelationsTable net={net} />}

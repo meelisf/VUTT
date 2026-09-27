@@ -76,3 +76,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0054](0054-lehe-salvestus-liidab-baasseisu-vastu.md) | Lehe salvestus liidab kolmesuunaliselt kliendi baasseisu vastu (tekst+kirjed koos, kommentaarid id kaupa); kokkupõrge → 409 + dialoog | kehtib |
 | [0055](0055-mainimised-skannitakse-tagimuutusel.md) | Lehe salvestus skannib isikumainimisi ainult `vutt:P` tägide muutusel; lehenumbreid nihutav tee kutsub `refresh_work_mentions` | kehtib |
 | [0056](0056-isikuseose-liik-rollipaarist.md) | Isikuseose liik tuleneb rollipaarist ühes kohas (`network_rules.classify_pair`, sümmeetriline); üks võrgustiku ehitaja; teose faktid kirjutab ainult `update_work_facts`, kogud tulevad `work_collections_index`-ist | kehtib |
+| [0057](0057-teose-osad.md) | Teose osad `_metadata.json` `parts[]` (lehetüvede hulk); muudetakse ainult `/works/{id}/parts` otspunktidega; `refresh_work_mentions` → `sync_work_parts` | kehtib |

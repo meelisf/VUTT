@@ -308,6 +308,13 @@ Uus isik ainult `create_person_checked` kaudu (`POST /prosopography/persons/crea
 `update_work_collections` kõrval); kogud ja `restricted` tulevad
 `work_collections_index.json`-ist. Trükikoht EI OLE kohtumiskoht.
 
+**Teose osad (ADR 0057)** — `_metadata.json` `parts[]`: lehed on lehetüvede HULK
+(katkendlik, leht võib olla mitmes osas). Muudetakse AINULT `/works/{id}/parts`
+otspunktidega (`server/work_parts.py`, `metadata_lock`); `/update-work-metadata`
+lükkab `parts` tagasi. `refresh_work_mentions` kutsub `sync_work_parts`-i — uus
+lehenumbreid/faile muutev tee saab osade sünkroni kaasa, kui ta kutsub
+`refresh_work_mentions`-it (ADR 0055); poolitus annab `renamed`-i.
+
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
 allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `urlTransform`

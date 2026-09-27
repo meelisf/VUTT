@@ -37,11 +37,13 @@ const RelationsTimeline: React.FC<Props> = ({ net, popover, highlight, onHighlig
 
   return (
     <div>
-      <svg viewBox={`0 0 ${W} 26`} className="h-auto w-full" aria-hidden="true">
-        {ticks.map(tk => <text key={tk} x={x(tk)} y={16} textAnchor="middle" fontSize={11} fill="#4f5761">{tk}</text>)}
-        {hasUndated && <text x={undatedX} y={16} textAnchor="middle" fontSize={11} fill="#4f5761">{t('network.undated')}</text>}
-      </svg>
-      <div className="max-h-[540px] overflow-auto border-t border-gray-100">
+      {/* Telg on samas keritavas konteineris (sticky): eraldi SVG väljaspool skaleerus
+          kerimisriba võrra teisiti ja aastad nihkusid ruudustikust. */}
+      <div data-timeline-scroller className="max-h-[540px] overflow-auto border-t border-gray-100">
+        <svg data-timeline-axis viewBox={`0 0 ${W} 26`} className="sticky top-0 z-10 h-auto w-full bg-white" aria-hidden="true">
+          {ticks.map(tk => <text key={tk} x={x(tk)} y={16} textAnchor="middle" fontSize={11} fill="#4f5761">{tk}</text>)}
+          {hasUndated && <text x={undatedX} y={16} textAnchor="middle" fontSize={11} fill="#4f5761">{t('network.undated')}</text>}
+        </svg>
         <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={t('network.tabs.timeline')}>
           {ticks.map(tk => <line key={tk} x1={x(tk)} x2={x(tk)} y1={0} y2={H} stroke="#eceef1" />)}
           {hasUndated && <line x1={right + 4} x2={right + 4} y1={0} y2={H} stroke="#dde1e5" strokeDasharray="3 3" />}
@@ -65,7 +67,9 @@ const RelationsTimeline: React.FC<Props> = ({ net, popover, highlight, onHighlig
                 {row.marks.map(m => {
                   const mx = m.year === null ? undatedX : x(m.year);
                   return (
-                    <g key={String(m.year)}>
+                    <g key={String(m.year)}
+                      // Liitmärk: klikk näitab ainult selle aasta teoseid (spekk, „Ajatelg").
+                      onClick={m.works.length > 1 ? e => { onHighlight(id); popover.pin(id, e, m.year); } : undefined}>
                       <KindMark kind={m.kind} r={m.works.length > 1 ? 5.5 : 4.2} x={mx} y={y} />
                       {m.works.length > 1 && (
                         <text x={mx + 8} y={y} dy="0.32em" fontSize={9.5} fill="#4f5761">{m.works.length}</text>
