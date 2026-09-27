@@ -169,6 +169,20 @@ eraldi pisipiltide kirjutusala, põhikorpus võimalusel read-only;
 seejärel teenusekasutajad ning `cap_drop`/`no-new-privileges` koos
 failiõiguste ja töövoogude kontrolliga.
 
+**Staatus 2026-09-27: OSALISELT PARANDATUD tootmises (PR #502).**
+- Backend: `~/.ssh` kausta asemel ainult `id_ed25519` ja `known_hosts`
+  (read-only); SSH-d kasutab koodis ainult OCR-klient. Kontrollitud: konteineri
+  `/root/.ssh` sisaldab ainult neid kahte; päris OCR SFTP töötab.
+- Pildiserver: Meilisearchi peavõti eemaldatud (`VUTT_SERVICE=images`,
+  käivituskontroll teenuse järgi); kontrollitud: võtit keskkonnas pole,
+  pildid serveeritakse (200).
+- Mõlemad: `no-new-privileges:true` (kontrollitud `docker inspect`-iga).
+- **Jääb:** non-root teenusekasutajad (root konteineris kirjutab `meelisf`-i
+  omanduses 775 kaustadesse DAC_OVERRIDE'iga — vajab omanike/UID-plaani);
+  pildiserveri `data/` read-only (pisipiltide eraldi kirjutusala); eraldi
+  piiratud OCR-võti loss'is (`authorized_keys` piirangutega — SSH ligipääsu
+  muudatus loss'is, kokkuleppel).
+
 ### S27-06 — OCR-i SSH-ühendus ei kontrolli serveri hostivõtit
 
 **Kinnitatud koodis:** `server/upload/ocr_client.py:get_or_create_ssh` teeb
@@ -209,6 +223,15 @@ mõju ei kontrollitud. Kuulamine ei tõenda internetist ligipääsetavust.
 monitooringule. Võtmega ligipääsu ning varutee kontrollimise järel keelata
 SSH parooliautentimine. UFW-d ei tohi pimesi sisse lülitada: arvestada
 Dockerit, SMTP-releed ja monitooringut.
+
+**Staatus 2026-09-27: EI MUUDETUD — vajab IT-d.** Varundustee on kinnitatud
+(loss → `vutt-backup`, rrsync -ro, võtmega; öine snapshot 27.09 03:15 olemas),
+kuid serveris on teine sisselogitav konto `badmin` (uid 1000; tõenäoliselt
+ülikooli IT administraatorikonto), mille ligipääsuviisi me ei tea. SSH
+paroolide keelamine võiks IT ligipääsu katkestada. Enne muudatust: (1) IT-ga
+kinnitada `badmin`-i võtmepõhine ligipääs ja lubatud lähtevõrgud (22, 25,
+10050 Zabbix); (2) hoida teist SSH-seanssi avatuna; (3) seejärel
+`PasswordAuthentication no`, `PermitRootLogin no` ja `sshd -t` enne reload'i.
 
 ## Mis kontrolliti ja oli korras
 
