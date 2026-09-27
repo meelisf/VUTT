@@ -83,6 +83,7 @@ def change_pages(work_id: str, part_id: str, body: dict = Body(...), user=Depend
 
 
 # ── Agendi ettepanekud (#492 samm 2) ─────────────────────────────────────────
+# Esialgu ainult superadmin (kasutaja otsus 2026-09-27): teised toimetajad seda ei kasuta.
 
 def _wpp(fn, *args, **kwargs):
     try:
@@ -92,7 +93,7 @@ def _wpp(fn, *args, **kwargs):
 
 
 @router.post("/works/{work_id}/parts/handoff")
-def parts_handoff(work_id: str, user=Depends(require_role("editor"))):
+def parts_handoff(work_id: str, user=Depends(require_role("superadmin"))):
     """Kood agendile selle teose osade ettepanekuteks (8 h, mitu esitust)."""
     allowed, retry = check_rate_limit(user["username"], "/works/parts-handoff")
     if not allowed:
@@ -101,13 +102,13 @@ def parts_handoff(work_id: str, user=Depends(require_role("editor"))):
 
 
 @router.get("/works/{work_id}/parts/proposals")
-def parts_proposals(work_id: str, user=Depends(require_role("editor"))):
+def parts_proposals(work_id: str, user=Depends(require_role("superadmin"))):
     return _wpp(wpp.list_pending, work_id, _writable(work_id, user), user["username"])
 
 
 @router.post("/works/{work_id}/parts/proposals/{proposal_id}/items/{index}/{action}")
 def parts_proposal_decide(work_id: str, proposal_id: str, index: int, action: str,
-                          body: dict = Body(default={}), user=Depends(require_role("editor"))):
+                          body: dict = Body(default={}), user=Depends(require_role("superadmin"))):
     """Toimetaja otsus ühe osa kohta: accept (soovi korral parandatud `part`) või reject."""
     path = _writable(work_id, user)
     created = _wpp(wpp.decide, proposal_id, work_id, path, user["username"], index, action,

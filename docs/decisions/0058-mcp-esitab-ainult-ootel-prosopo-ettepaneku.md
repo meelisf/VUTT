@@ -70,3 +70,7 @@ osa kaupa; vastuvõtt käib `work_parts.create_part` kaudu, nii et valideerimine
 indeksid on samad mis käsitsi lisamisel. Lisa `attached_to` võib viidata sama ettepaneku
 osale (indeks) — see lahendub alles siis, kui sihtosa on vastu võetud.
 
+Esialgu (2026-09-27) on teose osade ettepanekute kood, loetelu ja otsused ainult
+**superadminil** (`require_role("superadmin")` + UI) — teised toimetajad seda ei kasuta.
+Laiendamine = rolli langetamine kolmes otspunktis ja `PartsTab`-is.
+

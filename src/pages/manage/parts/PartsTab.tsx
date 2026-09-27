@@ -22,6 +22,8 @@ import PartPanel from './PartPanel';
 import PartProposals from './PartProposals';
 import { usePersonSources } from '../../../hooks/usePersonSources';
 import { getLangCode } from '../../../utils/getLangCode';
+import { useUser } from '../../../contexts/UserContext';
+import { isAtLeast } from '../../../utils/roleUtils';
 
 const THUMB_KEY = 'vutt_parts_thumb';
 const THUMB_MIN = 100;
@@ -55,6 +57,9 @@ type Editing = { id: string | null; pages: string[]; proposal?: { id: string; in
 const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCacheBust, onDirtyChange, runGuarded, saveRef }) => {
   const { t, i18n } = useTranslation(['workspace']);
   const { authors, peopleRegister } = usePersonSources(token, getLangCode(i18n.language));
+  // Agendi ettepanekud esialgu ainult superadminile (#492; server kontrollib sama).
+  const { user } = useUser();
+  const showProposals = isAtLeast(user?.role, 'superadmin');
   const [view, setView] = useState<'pages' | 'toc'>('pages');
   const [thumbSize, setThumbSize] = useState(readThumbSize);
   const [parts, setParts] = useState<WorkPart[]>([]);
@@ -251,8 +256,10 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
         {!editing && error && <p className="text-sm text-red-600">{t('manage.parts.error', { message: error })}</p>}
       </div>
 
-      <PartProposals workId={workId} token={token} refreshKey={proposalsKey}
-        onPreview={setPreviewStems} onEdit={editProposal} onChanged={() => { void reload(); }} />
+      {showProposals && (
+        <PartProposals workId={workId} token={token} refreshKey={proposalsKey}
+          onPreview={setPreviewStems} onEdit={editProposal} onChanged={() => { void reload(); }} />
+      )}
 
       {view === 'pages' ? (
         <>

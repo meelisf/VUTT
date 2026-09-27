@@ -35,6 +35,8 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
   },
 }));
 vi.mock('../../PageThumb', () => ({ default: () => <div /> }));
+const role = vi.hoisted(() => ({ value: 'superadmin' }));
+vi.mock('../../../../contexts/UserContext', () => ({ useUser: () => ({ user: { role: role.value } }) }));
 vi.mock('../../../../components/EntityPicker', () => ({ default: () => <input aria-label="entity" /> }));
 vi.mock('../../../../components/WorkDatingInput', () => ({ default: () => <input aria-label="dating" /> }));
 
@@ -50,7 +52,7 @@ const renderTab = () => render(
   </MemoryRouter>,
 );
 
-beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; api.proposals = []; dirty.length = 0; });
+beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; api.proposals = []; dirty.length = 0; role.value = 'superadmin'; });
 
 describe('PartsTab', () => {
   it('tühi olek + osa loomine valitud lehtedest (Shift-vahemik)', async () => {
@@ -77,6 +79,13 @@ describe('PartsTab', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Salvesta osa' }));
     await waitFor(() => expect(api.calls).toContain('decide:pp:0:accept:Kiri Fischerile'));
     expect(api.calls.some(c => c.startsWith('create:'))).toBe(false);   // mitte eraldi create
+  });
+
+  it('agendi ettepanekud ainult superadminile', async () => {
+    role.value = 'admin';
+    renderTab();
+    expect(await screen.findByText(/Osi pole veel märgitud/)).toBeTruthy();
+    expect(screen.queryByText('Agendi ettepanekud')).toBeNull();
   });
 
   it('agendi ettepaneku otse lisamine ja tagasilükkamine', async () => {

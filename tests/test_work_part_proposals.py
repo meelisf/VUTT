@@ -151,9 +151,13 @@ def client(work, monkeypatch):
                         lambda wid: json.load(open(f"{work}/_metadata.json")) if wid == "w1" else None)
     app = FastAPI()
     app.include_router(r.router)
-    state = {"user": {"username": "ed", "role": "editor"}, "write": True}
+    state = {"user": {"username": "ed", "role": "superadmin"}, "write": True}
 
     async def fake_get_user(request, min_role="contributor"):
+        from fastapi import HTTPException
+        from server.auth import is_at_least
+        if not is_at_least(state["user"]["role"], min_role):
+            raise HTTPException(status_code=403, detail="Puudub õigus")
         return state["user"]
     monkeypatch.setattr(deps, "get_user", fake_get_user)
     app.dependency_overrides[deps.optional_user] = lambda: state["user"]
@@ -184,5 +188,11 @@ def test_otspunktide_piirid(client, work):
         "code": h["code"], "work_id": "w1", "pages_version": "vana", "parts": [LETTER]})
     assert stale.status_code == 409 and stale.json()["detail"] == "stale_pages"
     client.state["write"] = False
+    assert client.post("/works/w1/parts/handoff").status_code == 403
+    assert client.get("/works/w1/parts/proposals").status_code == 403
+
+
+def test_ettepanekud_ainult_superadminile(client):
+    client.state["user"] = {"username": "ed", "role": "admin"}
     assert client.post("/works/w1/parts/handoff").status_code == 403
     assert client.get("/works/w1/parts/proposals").status_code == 403
