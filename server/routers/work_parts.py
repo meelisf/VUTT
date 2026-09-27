@@ -89,7 +89,8 @@ def _wpp(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
     except wpp.ProposalError as e:
-        raise HTTPException(status_code=409 if str(e) == "stale_pages" else 400, detail=str(e))
+        conflict = str(e) == "stale_pages" or str(e).startswith("person_exists:")
+        raise HTTPException(status_code=409 if conflict else 400, detail=str(e))
 
 
 @router.post("/works/{work_id}/parts/handoff")
@@ -131,11 +132,21 @@ async def parts_proposal_submit(request: Request):
         data = json.loads(body)
     except (ValueError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="Vigane JSON")
-    if not isinstance(data, dict) or set(data) != {"code", "work_id", "pages_version", "parts"} \
+    if not isinstance(data, dict) or not {"code", "work_id", "pages_version", "parts"} <= set(data) \
+            or not set(data) <= {"code", "work_id", "pages_version", "parts", "persons"} \
             or not isinstance(data["work_id"], str):
         raise HTTPException(status_code=400, detail="Vigane ettepaneku kuju")
     path = find_directory_by_id(data["work_id"])
     if not path:
         raise HTTPException(status_code=400, detail="invalid_or_expired_handoff")
     return await run_in_threadpool(_wpp, wpp.submit, data["code"], data["work_id"], path,
-                                   data["pages_version"], data["parts"])
+                                   data["pages_version"], data["parts"], data.get("persons"))
+
+
+@router.post("/works/{work_id}/parts/proposals/{proposal_id}/persons/{ref}/{action}")
+def parts_proposal_person(work_id: str, proposal_id: str, ref: str, action: str,
+                          body: dict = Body(default={}), user=Depends(require_role("superadmin"))):
+    """Pakutud isik: create (uus kaart), link (olemasolev, `person_id`) või name (jääb nimeks)."""
+    path = _writable(work_id, user)
+    return _wpp(wpp.resolve_person, proposal_id, work_id, path, user["username"], ref, action,
+                (body or {}).get("person_id"))

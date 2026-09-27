@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -34,6 +35,10 @@ MAX_BODY_BYTES = 64_000
 _PART_KEYS = {"kind", "title", "incipit", "notes", "pages", "creators", "dating", "place",
               "place_to", "languages", "attached_to", "evidence"}
 _EVIDENCE_KEYS = {"page", "quote"}
+MAX_PERSONS = 50
+_PERSON_KEYS = {"ref", "name", "aliases", "birth_year", "death_year", "identifiers", "note", "evidence"}
+_PERSON_SCHEMES = {"gnd", "wikidata", "viaf"}
+_REF = re.compile(r"^[A-Za-z0-9_-]{1,20}$")
 
 
 class ProposalError(ValueError):
@@ -85,10 +90,72 @@ def issue_handoff(work_id: str, work_dir: str, username: str) -> dict:
             "work_id": work_id, "pages_version": pages_version(work_dir)}
 
 
-def _clean_part(raw: dict, index: int, count: int, stems: list[str]) -> dict:
-    """Agendi osa → work_parts kuju (tüvedega); valideerib nagu käsitsi lisamine."""
+def _short(value, limit: int) -> bool:
+    return isinstance(value, str) and len(value) <= limit
+
+
+def _evidence_ok(evidence) -> bool:
+    return isinstance(evidence, list) and len(evidence) <= 5 and all(
+        isinstance(e, dict) and not set(e) - _EVIDENCE_KEYS and isinstance(e.get("page"), int)
+        and _short(e.get("quote", ""), 1000) for e in evidence)
+
+
+def _clean_persons(persons) -> list[dict]:
+    """Agendi pakutud uued isikud (#492): ootel, kuni toimetaja loob, seob või jätab nimeks."""
+    if persons is None:
+        return []
+    if not isinstance(persons, list) or len(persons) > MAX_PERSONS:
+        raise ProposalError("invalid_persons")
+    out, refs = [], set()
+    for p in persons:
+        if not isinstance(p, dict) or set(p) - _PERSON_KEYS or not _short(p.get("ref"), 20) \
+                or not _REF.fullmatch(p["ref"]) or p["ref"] in refs:
+            raise ProposalError("invalid_person")
+        name = p.get("name")
+        if not _short(name, 200) or not name.strip():
+            raise ProposalError("invalid_person")
+        aliases = p.get("aliases") or []
+        ids = p.get("identifiers") or []
+        if not isinstance(aliases, list) or len(aliases) > 10 or not all(_short(a, 200) for a in aliases):
+            raise ProposalError("invalid_person")
+        if not isinstance(ids, list) or len(ids) > 5 or not all(
+                isinstance(i, dict) and set(i) == {"scheme", "id"} and i["scheme"] in _PERSON_SCHEMES
+                and _short(i["id"], 40) and i["id"].strip() for i in ids):
+            raise ProposalError("invalid_person")
+        for key in ("birth_year", "death_year"):
+            if p.get(key) is not None and (not isinstance(p[key], int) or isinstance(p[key], bool)):
+                raise ProposalError("invalid_person")
+        if p.get("note") is not None and not _short(p["note"], 1000):
+            raise ProposalError("invalid_person")
+        if not _evidence_ok(p.get("evidence") or []):
+            raise ProposalError("invalid_person")
+        refs.add(p["ref"])
+        out.append({**{k: v for k, v in p.items() if v not in (None, [], "")},
+                    "name": name.strip(), "status": "pending", "person_id": None})
+    return out
+
+
+def _clean_part(raw: dict, index: int, count: int, stems: list[str],
+                persons: Optional[dict] = None) -> dict:
+    """Agendi osa → work_parts kuju (tüvedega); valideerib nagu käsitsi lisamine.
+
+    Isik võib viidata ettepaneku uuele isikule (`person_ref`): osas on ta seni NIMENA,
+    viide jääb `creator_refs`-i ja lahendub, kui toimetaja isiku loob või seob.
+    """
     if not isinstance(raw, dict) or set(raw) - _PART_KEYS:
         raise ProposalError("invalid_part")
+    creator_refs = {}
+    if isinstance(raw.get("creators"), list):
+        creators = []
+        for ci, c in enumerate(raw["creators"]):
+            if isinstance(c, dict) and "person_ref" in c:
+                ref = c.get("person_ref")
+                if ref not in (persons or {}) or c.get("id"):
+                    raise ProposalError("invalid_part: unknown person_ref")
+                creator_refs[str(ci)] = ref
+                c = {**{k: v for k, v in c.items() if k != "person_ref"}, "name": c.get("name") or persons[ref]["name"]}
+            creators.append(c)
+        raw = {**raw, "creators": creators}
     pages = raw.get("pages")
     if not isinstance(pages, list) or not pages or any(
             not isinstance(n, int) or isinstance(n, bool) for n in pages):
@@ -106,10 +173,7 @@ def _clean_part(raw: dict, index: int, count: int, stems: list[str]) -> dict:
         elif not isinstance(attached, str):
             raise ProposalError("invalid_part")
     evidence = raw.get("evidence") or []
-    if not isinstance(evidence, list) or len(evidence) > 5 or any(
-            not isinstance(e, dict) or set(e) - _EVIDENCE_KEYS
-            or not isinstance(e.get("page"), int) or not isinstance(e.get("quote", ""), str)
-            or len(e.get("quote", "")) > 1000 for e in evidence):
+    if not _evidence_ok(evidence):
         raise ProposalError("invalid_part")
     try:
         # Lisa valideeritakse ilma viiteta: sihtosa ei pruugi veel olemas olla.
@@ -117,10 +181,39 @@ def _clean_part(raw: dict, index: int, count: int, stems: list[str]) -> dict:
     except wp.PartError as e:
         raise ProposalError(f"invalid_part: {e}")
     normalized.pop("id"); normalized.pop("needs_review", None); normalized.pop("attached_to", None)
-    return {"part": normalized, "attached_to": attached, "evidence": evidence, "status": "pending"}
+    item = {"part": normalized, "attached_to": attached, "evidence": evidence, "status": "pending"}
+    if creator_refs:
+        item["creator_refs"] = creator_refs
+    return item
 
 
-def submit(code: str, work_id: str, work_dir: str, version: str, parts: list) -> dict:
+def _load(payload: str) -> tuple[list, list]:
+    """Talletatud ettepanek: {items, persons}; vanem kuju (enne isikuid) oli paljas list."""
+    data = json.loads(payload)
+    if isinstance(data, list):
+        return data, []
+    return data.get("items") or [], data.get("persons") or []
+
+
+def _dump(items: list, persons: list) -> str:
+    return json.dumps({"items": items, "persons": persons}, ensure_ascii=False)
+
+
+def _with_resolved(part: dict, refs: dict, persons: list) -> dict:
+    """Osa isikud: lahendatud viited saavad isiku ID (VUTT-i register)."""
+    by_ref = {p["ref"]: p for p in persons}
+    creators = [dict(c) for c in part.get("creators") or []]
+    for ci, ref in (refs or {}).items():
+        person = by_ref.get(ref)
+        i = int(ci)
+        if person and person.get("person_id") and i < len(creators):
+            creators[i]["id"] = person["person_id"]
+            creators[i]["source"] = "local"
+    return {**part, "creators": creators}
+
+
+def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
+           persons: Optional[list] = None) -> dict:
     """Talletab ainult ootel ettepaneku; teost ei muudeta."""
     if not isinstance(code, str) or len(code) > 100 or not isinstance(version, str):
         raise ProposalError("invalid_handoff")
@@ -129,8 +222,10 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list) ->
     stems = wp.page_stems(work_dir)
     if version != pages_version(work_dir):
         raise ProposalError("stale_pages")
-    items = [_clean_part(p, i, len(parts), stems) for i, p in enumerate(parts)]
-    payload = json.dumps(items, ensure_ascii=False)
+    people = _clean_persons(persons)
+    by_ref = {p["ref"]: p for p in people}
+    items = [_clean_part(p, i, len(parts), stems, by_ref) for i, p in enumerate(parts)]
+    payload = _dump(items, people)
     if len(payload.encode()) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")
     now = int(time.time())
@@ -147,7 +242,7 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list) ->
         db.execute("INSERT INTO proposal VALUES (?, ?, ?, ?, ?, ?, ?)",
                    (proposal_id, work_id, row["username"], version, now, now + PROPOSAL_TTL, payload))
     return {"proposal_id": proposal_id, "work_id": work_id, "status": "pending",
-            "parts": len(items), "expires_at": now + PROPOSAL_TTL}
+            "parts": len(items), "persons": len(people), "expires_at": now + PROPOSAL_TTL}
 
 
 def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
@@ -162,15 +257,16 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
         rows = db.execute("SELECT * FROM proposal WHERE work_id=? AND username=? ORDER BY created_at DESC",
                           (work_id, username)).fetchall()
     for row in rows:
-        items = json.loads(row["payload"])
+        items, persons = _load(row["payload"])
         if all(it["status"] != "pending" for it in items):
             continue
         for it in items:
+            it["part"] = _with_resolved(it["part"], it.get("creator_refs"), persons)
             it["page_numbers"] = [number[s] for s in it["part"]["pages"] if s in number]
             it["missing_pages"] = [s for s in it["part"]["pages"] if s not in number]
         out.append({"proposal_id": row["id"], "created_at": row["created_at"],
                     "expires_at": row["expires_at"], "pages_changed": row["pages_version"] != current,
-                    "items": items})
+                    "items": items, "persons": persons})
     return out
 
 
@@ -184,13 +280,14 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
                          (proposal_id, work_id, username, int(time.time()))).fetchone()
         if row is None:
             raise ProposalError("proposal_not_found")
-        items = json.loads(row["payload"])
+        items, persons = _load(row["payload"])
         if not 0 <= index < len(items) or items[index]["status"] != "pending":
             raise ProposalError("invalid_decision")
         item = items[index]
         created = None
         if action == "accept":
-            data = dict(override) if isinstance(override, dict) else dict(item["part"])
+            data = dict(override) if isinstance(override, dict) else \
+                _with_resolved(item["part"], item.get("creator_refs"), persons)
             data.pop("id", None); data.pop("needs_review", None)
             target = item.get("attached_to")
             if isinstance(target, int):
@@ -207,5 +304,44 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
             item["status"], item["created_part_id"] = "accepted", created["id"]
         else:
             item["status"] = "rejected"
-        db.execute("UPDATE proposal SET payload=? WHERE id=?", (json.dumps(items, ensure_ascii=False), proposal_id))
+        db.execute("UPDATE proposal SET payload=? WHERE id=?", (_dump(items, persons), proposal_id))
     return created
+
+
+def resolve_person(proposal_id: str, work_id: str, work_dir: str, username: str, ref: str,
+                   action: str, person_id: Optional[str] = None) -> dict:
+    """Pakutud isik: `create` (create_person_checked, ADR 0048), `link` olemasolevaga
+    või `name` (jääb nimeks). Olemasolev väline ID → `person_exists:<id>`."""
+    from .prosopography import person_crud
+    if action not in ("create", "link", "name"):
+        raise ProposalError("invalid_decision")
+    with _db() as db:
+        row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND username=? AND expires_at>?",
+                         (proposal_id, work_id, username, int(time.time()))).fetchone()
+        if row is None:
+            raise ProposalError("proposal_not_found")
+        items, persons = _load(row["payload"])
+        person = next((p for p in persons if p["ref"] == ref), None)
+        if person is None or person["status"] != "pending":
+            raise ProposalError("invalid_decision")
+        if action == "create":
+            role = next((it["part"]["creators"][int(ci)]["role"] for it in items
+                         for ci, r in (it.get("creator_refs") or {}).items() if r == ref), None)
+            try:
+                card = person_crud.create_person_checked(
+                    username=username, created_via="agent", name=person["name"],
+                    identifiers=person.get("identifiers") or [], aliases=person.get("aliases") or [],
+                    note=person.get("note"), context={"work_id": work_id, **({"role": role} if role else {})})
+            except person_crud.IdentifierConflict as e:
+                raise ProposalError(f"person_exists:{','.join(e.person_ids)}")
+            except ValueError as e:
+                raise ProposalError(f"invalid_person: {e}")
+            person["status"], person["person_id"] = "created", card["id"]
+        elif action == "link":
+            if not isinstance(person_id, str) or person_crud.get_person(person_id) is None:
+                raise ProposalError("person_not_found")
+            person["status"], person["person_id"] = "linked", person_id
+        else:
+            person["status"] = "name"
+        db.execute("UPDATE proposal SET payload=? WHERE id=?", (_dump(items, persons), proposal_id))
+    return {"ref": ref, "status": person["status"], "person_id": person.get("person_id")}
