@@ -324,6 +324,8 @@
     "close": "Sulge",
     "restricted": "kaitstud",
     "pages": "lk {{pages}}",
+    "linkCount_one": "{{count}} joon (akadeemilised aktid).",
+    "linkCount_other": "{{count}} joont (akadeemilised aktid).",
     "unknownPlace": "trükikoht teadmata",
     "originUnknown": "päritolu teadmata",
     "origin": "päritolu {{place}}",

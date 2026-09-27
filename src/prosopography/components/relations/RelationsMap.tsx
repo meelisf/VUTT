@@ -12,7 +12,7 @@ import { FitToPoints, spreadOverlapping, type LatLon } from '../map/mapBase';
 import { fetchInstitutions, fetchPlaces, type InstitutionRegistryEntry } from '../../services/prosopographyService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 import type { VisibleNetwork } from '../../utils/network';
-import { dimOpacity, layerPoints, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces, type MapLayer, type RegistryState } from '../../utils/relationsMap';
+import { dimOpacity, layerPoints, LIFE_COLOR, lifeSegments, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces, type MapLayer, type RegistryState } from '../../utils/relationsMap';
 import { KIND_COLOR } from './kindStyle';
 import { dotIcon, pieIcon } from './mapIcons';
 import type { usePopover } from './RelationPopover';
@@ -48,6 +48,7 @@ const RelationsMap: React.FC<{
   const links = useMemo(() => originPrintLinks(net), [net]);
   const coverage = useMemo(() => originCoverage(net), [net]);
   const life = useMemo(() => lifeView(card, registry, institutions), [card, registry, institutions]);
+  const lifeArcs = useMemo(() => lifeSegments(life.mapped), [life]);
   const year = useMemo(() => mapYearOf(net, card?.birth?.date ? Number(card.birth.date.slice(0, 4)) + 30 : 1650), [net, card]);
   const focusCoords = net.focus.origin?.coordinates ?? null;
 
@@ -67,7 +68,10 @@ const RelationsMap: React.FC<{
           </button>
         ))}
       </div>
-      <p className="text-xs text-gray-600">{t(`network.layerHelp.${layer}`)}</p>
+      <p className="text-xs text-gray-600">
+        {t(`network.layerHelp.${layer}`)}
+        {layer === 'originPrint' && <> <b>{t('network.linkCount', { count: links.length })}</b></>}
+      </p>
       <div className="h-[520px] overflow-hidden rounded-lg border border-gray-200">
         <MapContainer center={[57.5, 24.5]} zoom={5} minZoom={1} scrollWheelZoom className="h-full w-full">
           <HistoricalMapLayer year={year} lang={lang} />
@@ -124,12 +128,17 @@ const RelationsMap: React.FC<{
               </Popup>
             </Marker>
           ))}
-          {layer === 'life' && life.mapped.length > 1 && (
-            <Polyline positions={life.mapped.map(s => [s.coords!.lat, s.coords!.lon] as [number, number])}
-              pathOptions={{ color: '#1d2126', weight: 2, opacity: 0.6, dashArray: '6 4' }} />
-          )}
+          {/* Kaar = liikumine (ainult elukäigul); valge ääris hoiab joone loetavana igal aluskaardil. */}
+          {layer === 'life' && lifeArcs.map((seg, i) => (
+            <React.Fragment key={i}>
+              <Polyline positions={seg.points.map(p => [p.lat, p.lon] as [number, number])}
+                pathOptions={{ color: '#fff', weight: 6, opacity: 0.9 }} interactive={false} />
+              <Polyline positions={seg.points.map(p => [p.lat, p.lon] as [number, number])}
+                pathOptions={{ color: seg.color, weight: 3, opacity: 0.95 }} interactive={false} />
+            </React.Fragment>
+          ))}
           {layer === 'life' && spreadOverlapping(life.mapped, s => s.coords!).map(s => (
-            <Marker key={s.n} position={[s.display.lat, s.display.lon]} icon={dotIcon(s.n!, '#1d2126')}>
+            <Marker key={s.n} position={[s.display.lat, s.display.lon]} icon={dotIcon(s.n!, LIFE_COLOR)}>
               <Popup>
                 <b>{s.n}. {t(`network.stations.${s.kind}`)}</b>{s.label ? ` · ${s.label}` : ''}
                 <div className="text-xs text-gray-600">{s.placeLabel}{s.year ? ` · ${s.year}` : ''}</div>
