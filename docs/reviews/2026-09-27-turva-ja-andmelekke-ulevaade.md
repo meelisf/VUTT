@@ -119,6 +119,17 @@ kontrolli olemasoleva automaatvärskenduse ja taustatabide käitumist. Kohene
 võtmete/tühistamise lahendust. Pelk lühem TTL piirab, aga ei kõrvalda akent.
 See vajab eraldi muudatust: praegune test nõuab teadlikult sessiooniga sama TTL-i.
 
+**Staatus 2026-09-27: OSALISELT PARANDATUD tootmises (PR #500).** Autenditud
+otsingutoken 24 h → **15 min** (tootmise konteineris kontrollitud: 900 s).
+Sama-TTL nõue pärines juulist (197a6beb) ja töötas ümber vana kliendi
+55-minutilist kontrolliviga; sama commit parandas kliendi (`exp` JWT-st,
+kontroll iga minut, uuendus 5 min ette + fookusesse tulekul), seega lühem
+eluiga ei murra otsingut. **Jääkrisk:** kuni 15 min aken pärast sessiooni
+tühistamist. Kohene tühistus vajaks sessioonikontrolliga otsinguproksit või
+võtmete roteerimist — eraldi otsus. **Kasutaja kontrollida:** sisselogitud
+piiratud kogu otsing töötab üle 15 min avatud lehel (tootmises pole meil
+kasutajatunnuseid selle proovimiseks).
+
 ### S27-04 — otsingutokeni värskendus jättis sessiooni aegumise kontrollimata
 
 **Kinnitatud regressioonitestiga; lokaalselt parandatud, deploy tegemata.**
@@ -131,6 +142,12 @@ Parandus kasutab ühist `deps.get_user` kontrolli. Testid näitasid enne
 parandust kaht ebaõnnestumist (aegunud token sai HTTP 200; õiguste allikas
 lahknes); pärast parandust läbivad aegunud, kehtiva ja tühistatud sessiooni
 kontrollid. Parandus ei lahenda S27-03 juba antud tokenite tühistamist.
+
+**Staatus 2026-09-27: PARANDATUD tootmises (PR #499).** Kontrollitud: madalaim
+roll on `contributor`, seega `get_user` vaikimisi `min_role` ei välista ühtegi
+kasutajat. Tootmises `POST /api/files/api/meili-token/refresh` vale tokeniga →
+401, avalik `GET …/meili-token` → 200, backend terve. Päris aegunud sessiooni
+tootmises ei proovitud (kasutajatunnuseid pole); seda katavad regressioonitestid.
 
 ### S27-05 — konteinerite ligipääs on ülesannetest laiem
 
@@ -165,6 +182,18 @@ SSH privaatvõtit ei saadeta avaliku võtmega autentimisel serverile.
 **Parandus:** pin'itud hostivõti või kontrollitud `known_hosts`; vale või
 puuduva võtme korral keeldumine. Võtme usaldus tuleb kinnitada sõltumatu
 kanali kaudu, mitte esimesest kontrollimata ühendusest automaatselt.
+
+**Staatus 2026-09-27: PARANDATUD (PR #501).** `verify_host_key` võrdleb
+serveri võtit `known_hosts`-iga (konteineris `/root/.ssh/known_hosts`) ENNE
+autentimist; puuduv või erinev võti → ühendus suletakse (fail closed).
+**Leid kontrollimisel:** tegelik OCR-server on `172.17.120.148` (`.env`),
+mitte konfi vaikeväärtus `.146`; `.148` kohta `known_hosts`-is kirjet polnud —
+kontroll oleks OCR-i blokeerinud. Sõltumatu kanaliga kinnitatud: loss
+(`mf-lossis`) ütleb ise oma IP-ks `.148` ja `.148` esitatud ED25519 võti
+(`SHA256:mNwTf…BiDk`) on loss'i enda `/etc/ssh` võti. `.148` kirjed lisati
+loss'i enda avalikest võtmetest (mitte esmaühendusest); varukoopia
+`~/.ssh/known_hosts.bak-s27-06`. Aegunud vaikeväärtus `.146` jäi
+(`config.py`, compose) muutmata — tootmises tuleb väärtus `.env`-ist.
 
 ### S27-07 — hosti võrgupiirid vajavad administraatoriga täpsustamist
 
