@@ -69,4 +69,30 @@ describe('WorkPartsPanel', () => {
     expect(rows[0].getAttribute('aria-current')).toBe('true');
     expect(rows[1].getAttribute('aria-current')).toBeNull();
   });
+
+  it('osa andmed lahti: märkused, koht, sihtkoht, isikud rollidega (lingiga), lisad', async () => {
+    api.parts = [
+      { ...LETTER, notes: 'Kiri on säilinud koopiana.', place: { id: 'Q1794', label: 'Frankfurt' },
+        place_to: { id: null, label: 'Tartu' }, languages: ['lat'],
+        creators: [{ id: 'vutt:Pluden', name: 'Luden', role: 'auctor' }, { name: 'Virginius', role: 'addressee' }] },
+      { id: 'c', kind: 'attachment', title: 'Luuletus kirja juures', pages: ['s5'], creators: [], attached_to: 'a', needs_review: false },
+    ];
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(2\)/ }));
+    expect(screen.queryByText('Kiri on säilinud koopiana.')).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Näita osa andmeid' })[0]);
+    expect(screen.getByText('Kiri on säilinud koopiana.')).toBeTruthy();
+    expect(screen.getByText('Frankfurt → Tartu')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Luden' }).getAttribute('href')).toBe('/persons/vutt:Pluden');
+    expect(screen.getByText('Virginius')).toBeTruthy();
+    expect(screen.getAllByText(/Luuletus kirja juures/)).toHaveLength(2);   // oma rida + kirja lisad
+  });
+
+  it('ilma lisaandmeteta osal lahtikeeramise nuppu ei ole', async () => {
+    api.parts = [POEM];
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
+    expect(screen.queryByRole('button', { name: 'Näita osa andmeid' })).toBeNull();
+  });
 });
+

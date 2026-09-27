@@ -314,6 +314,7 @@
         "pages": "lk {{pages}}",
         "missingPages_one": "{{count}} leht on vahepeal kustutatud",
         "missingPages_other": "{{count}} lehte on vahepeal kustutatud",
+        "acceptAll": "Lisa kõik ({{count}})",
         "accept": "Lisa",
         "edit": "Muuda ja lisa",
         "reject": "Lükka tagasi",
@@ -483,6 +484,8 @@
     "editWorkMetadata": "Muuda teose metaandmeid",
     "noImage": "Pilt puudub",
     "toc": "Sisukord",
+    "tocDetails": "Näita osa andmeid",
+    "tocAttachments": "Lisad",
     "tocPages": "lk"
   },
   "zotero": {
