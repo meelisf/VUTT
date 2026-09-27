@@ -217,3 +217,47 @@ export function originCoverage(v: VisibleNetwork): { mapped: number; total: numb
 export function dimOpacity(ids: string[], highlight: string | null, base: number): number {
   return !highlight || ids.includes(highlight) ? base : base * 0.1;
 }
+
+/** Elukäigu värv: üks lilla toon, varasem käik heledam, hilisem tumedam. Ei kattu seose
+ *  liikide värvidega (kindStyle) — elukäik on isiku enda tee, mitte seos. */
+export const LIFE_COLOR = '#6d28d9';
+export const LIFE_COLOR_FROM = '#a78bfa';
+export const LIFE_COLOR_TO = '#4c1d95';
+
+const ARC_BEND = 0.18;   // kaare kõrvalekalle lõigu pikkusest
+const ARC_STEPS = 24;
+
+/** Ruutkõvera kaar kahe koha vahel. Paindub alati sõidusuunast vasakule, seega
+ *  edasi- ja tagasitee ei kattu. Arvutus laiuskraadiga korrigeeritud tasandil,
+ *  et kaar näeks kaardil ühtlane välja. */
+export function arcPoints(from: LatLon, to: LatLon, bend = ARC_BEND, steps = ARC_STEPS): LatLon[] {
+  const k = Math.cos(((from.lat + to.lat) / 2) * Math.PI / 180) || 1;
+  const x0 = from.lon * k, y0 = from.lat, x1 = to.lon * k, y1 = to.lat;
+  const dx = x1 - x0, dy = y1 - y0;
+  const cx = (x0 + x1) / 2 - dy * bend, cy = (y0 + y1) / 2 + dx * bend;
+  const out: LatLon[] = [from];
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps, u = 1 - t;
+    out.push({ lat: u * u * y0 + 2 * u * t * cy + t * t * y1, lon: (u * u * x0 + 2 * u * t * cx + t * t * x1) / k });
+  }
+  out.push(to);
+  return out;
+}
+
+function mix(a: string, b: string, t: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
+  return '#' + [0, 1, 2].map(i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0')).join('');
+}
+
+/** Elukäigu lõigud järjestikuste jaamade vahel; sama koht lõiku ei anna. */
+export function lifeSegments(stations: { coords?: LatLon | null }[]): { points: LatLon[]; color: string }[] {
+  const pairs: [LatLon, LatLon][] = [];
+  for (let i = 1; i < stations.length; i++) {
+    const a = stations[i - 1].coords, b = stations[i].coords;
+    if (a && b && (a.lat !== b.lat || a.lon !== b.lon)) pairs.push([a, b]);
+  }
+  return pairs.map(([a, b], i) => ({
+    points: arcPoints(a, b),
+    color: pairs.length === 1 ? LIFE_COLOR_TO : mix(LIFE_COLOR_FROM, LIFE_COLOR_TO, i / (pairs.length - 1)),
+  }));
+}

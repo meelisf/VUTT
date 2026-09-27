@@ -1,7 +1,7 @@
 // src/prosopography/utils/__tests__/relationsMap.test.ts
 import { describe, it, expect } from 'vitest';
 import { applyFilters, DEFAULT_FILTER } from '../network';
-import { dimOpacity, layerPoints, lifeStations, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
+import { arcPoints, dimOpacity, layerPoints, lifeSegments, LIFE_COLOR_FROM, LIFE_COLOR_TO, lifeStations, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces } from '../relationsMap';
 import type { PersonNetwork } from '../../services/networkService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 
@@ -181,5 +181,35 @@ describe('kaardi abilised (viimistlus)', () => {
     expect(dimOpacity(['a'], null, 0.7)).toBe(0.7);
     expect(dimOpacity(['a'], 'a', 0.7)).toBe(0.7);
     expect(dimOpacity(['a', 'b'], 'c', 0.7)).toBeCloseTo(0.07);
+  });
+});
+
+
+describe('elukäigu kaared', () => {
+  const A = { lat: 58.38, lon: 26.72 };   // Tartu
+  const B = { lat: 54.09, lon: 12.14 };   // Rostock
+  const side = (from: typeof A, to: typeof A, p: typeof A) =>
+    Math.sign((to.lon - from.lon) * (p.lat - from.lat) - (to.lat - from.lat) * (p.lon - from.lon));
+
+  it('kaar algab ja lõpeb jaamas ning paindub sirgelt joonelt kõrvale', () => {
+    const pts = arcPoints(A, B);
+    expect(pts[0]).toEqual(A);
+    expect(pts[pts.length - 1]).toEqual(B);
+    const mid = pts[Math.floor(pts.length / 2)];
+    expect(side(A, B, mid)).not.toBe(0);
+  });
+
+  it('edasi- ja tagasitee on eri kaartel (ei kattu)', () => {
+    const there = arcPoints(A, B)[12];
+    const back = arcPoints(B, A)[12];
+    expect(side(A, B, there)).toBe(-side(A, B, back));
+  });
+
+  it('lõigud järjestikuste jaamade vahel; sama koht lõiku ei anna; värv tumeneb ajas', () => {
+    const segs = lifeSegments([{ coords: A }, { coords: A }, { coords: B }, { coords: A }]);
+    expect(segs).toHaveLength(2);
+    expect(segs[0].color).toBe(LIFE_COLOR_FROM);
+    expect(segs[1].color).toBe(LIFE_COLOR_TO);
+    expect(lifeSegments([{ coords: A }, { coords: B }])[0].color).toBe(LIFE_COLOR_TO);
   });
 });
