@@ -3,16 +3,24 @@
 ## Tootmiskatse 2026-09-27
 
 PR #478 liideti (`2cacf1c0`) ja backend ning frontend juurutati koos.
-Mõlemad konteinerid olid pärast juurutust terved. Tootmise andmeid lugenud
-eraldatud kontroll valideeris kirjutamata 2416 isikukaarti ja 4257 ameti- või
-hariduskirjet. Registri GET ja kandidaatotsing töötavad; registrifailid on
-endiselt loomata, seega otsing ütleb `registry_available=false`.
+PR #479 (`3201a4cd`) parandas lisaks sisselogimata nähtava adminivormi;
+anonüümne tootmisbrauser suunatakse nüüd avalehele. Mõlemad konteinerid
+olid pärast juurutust terved. Tootmise andmeid lugenud eraldatud kontroll
+valideeris kirjutamata 2416 isikukaarti ja 4257 ameti- või hariduskirjet.
 
-Autoriteetsesse andmereposse kahe proovikirje (AGC ja professor) salvestamise
-katse peatas automaatne õiguskontroll, sest täpseid püsivaid andmemuudatusi
-polnud eraldi kinnitatud. Ühtegi registrikirjet ega isikukaarti ei muudetud.
-Adminivaate sisselogimata nähtavus leiti brauserikontrollis ja parandatakse
-eraldi kliendi PR-is; kirjutus-API nõuab juba admini rolli.
+Kasutaja eraldi kinnituse järel lisati kaks autoriteetset registrikirjet:
+`academia-gustavo-carolina` (Q138710754, variant `AGC`, `place_key=Dorpat`,
+andmerepo commit `235414e1`) ja `professor` (Q121594, commit `25246d3a`).
+Avalik kandidaadiotsing tagastab mõlemale ühe vaste; MCP kandidaadiotsing ja
+ühe avaliku isiku rikastuskontekst töötavad samuti tootmise API vastu.
+Kuivkäivitus leidis 4347 ülevaadatavat viiterida ja 393 rühma; 120 real on
+kandidaat (91 AGC, 12 professor, 17 olemasolev koht). Ühtegi isikukaarti ei
+muudetud. Andmerepo jäi pärast kahte registri commit'it puhtaks.
+
+Järgmine andmesamm on 393 rühma ülevaatus ja kinnitatud otsuste põhjal
+isikukaartide migratsioon. Ühe isiku MCP → vorm → kinnitus läbikäik vajab
+toimetaja sisselogitud brauseriseanssi. Allika värske OCR-oleku ja
+toimetajamärkuste kuvamine kinnitamisvaates on jätkuvalt tegemata.
 
 ## Jätk 2026-09-27
 
@@ -43,13 +51,14 @@ on mitme vaste loend;
 detailtabelis on iga isikufakt omaette real.
 `decision` jääb tühjaks: ühtegi isikukaarti ei muudeta enne käsitsi ülevaatust.
 Kohalikus töökataloogis ei ole päris `data/config/prosopography/` ega
-`places.json`-i, seega tegeliku korpuse tabelit ja autoriteetseid algandmeid
-ei saanud siin veel valmistada. Testid kasutavad väikseid näidisregistreid.
+`places.json`-i. Tegeliku korpuse kuivkäivitus tehti seetõttu tootmisserveris;
+CSV-d jäid sealsesse `/tmp` kausta. Testid kasutavad väikseid näidisregistreid.
 
-**Järgmine andmesamm:** võtta tootmise `data/` koopia, käivitada kuivkäivitus,
-vaadata üle Q-koodita ja mitmetähenduslikud read ning lisada kinnitatud
-`occupations.json` ja `institutions.json` autoriteetsesse andmereposse.
-Seejärel saab teha ühe päris isiku MCP → vorm → kinnitus → kaart läbikäigu.
+**Järgmine andmesamm:** vaadata tootmisserveri kuivkäivituse rühmad üle,
+lisada kinnitatud ameti- ja asutusekirjed ning alles siis seostada
+isikukaarte. Kaks proovikirjet on registris, kuid ülejäänud korpus ootab
+otsuseid. Ühe päris isiku MCP → vorm → kinnitus → kaart läbikäik ootab
+toimetaja brauseriseanssi.
 
 Seis: 2026-09-26. See on töö üleandmismärge 2026-09-27 jätkamiseks, mitte uus lahendusplaan.
 
