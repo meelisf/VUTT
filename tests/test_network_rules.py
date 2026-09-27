@@ -20,6 +20,10 @@ from server.prosopography.network_rules import classify_pair
     (["gratulator"], ["respondens"], ("dedicated", "ab")),
     (["gratulator"], ["auctor"], ("dedicated", "ab")),
     (["creator"], ["subject"], ("dedicated", "ab")),           # puuduv roll = creator = looja
+    (["auctor"], ["addressee"], ("dedicated", "ab")),          # kiri: saatja → adressaat (#464)
+    (["addressee"], ["auctor"], ("dedicated", "ba")),
+    (["participant"], ["participant"], ("academic", None)),    # istungi osalejad (#464)
+    (["praeses"], ["participant"], ("academic", "ab")),
     # 3. cotext
     (["gratulator"], ["gratulator"], ("cotext", None)),
     (["aui"], ["gratulator"], ("cotext", None)),
