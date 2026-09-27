@@ -41,3 +41,21 @@ MCP-le lisandub kitsas ajutise ettepaneku kirjutus. Uus kasutajale nähtav
 kinnitusvaade näitab kõiki
 kirjeid koos algse sõnastuse ja allikaviitega. Ajutise faili kadumine kaotab
 ainult kinnitamata ettepanekud; isikukaardid ja registrid jäävad terveks.
+
+## Täiendus 2026-09-27 (#492): ulatusega üleandmine
+
+Ühekordne 15-minutiline isikukood muutis mahuka töö (kümned isikud) tseremooniaks ja
+seansiga sidumine peitis ootel ettepaneku pärast uut sisselogimist. Muudetud:
+
+- Kood kehtib **8 tundi** ja lubab **mitu esitust** kuni laeni (`uses < max_uses`,
+  tingimuslik UPDATE). Ulatus: üks isik (20 esitust) või **kõik isikud** (200 esitust,
+  `POST /prosopography/enrichment-handoff` ilma isikuta).
+- Ettepanek on seotud **kasutajaga**, mitte seansiga: näeb ja kinnitab sama kasutaja igas
+  oma seansis. See ei nõrgenda piiri — kinnitamine nõuab endiselt selle kasutaja sessiooni
+  (ADR 0046) ja kood annab ainult ootel ettepaneku esitamise õiguse.
+- Kaardiversiooni kontroll liikus koodilt esitusele: `base_updated_at` peab võrduma elava
+  kaardi `updated_at`-iga (`stale_person`), enne kui kasutuskord kulub. Kinnitamine
+  kontrollib versiooni uuesti.
+
+Piir jääb: MCP ei kirjuta isikukaarti ega registreid.
+

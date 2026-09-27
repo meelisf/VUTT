@@ -401,11 +401,30 @@ def prosopography_candidates(data: dict = Body(...), user=Depends(require_role("
 _ALLOWED_CREATED_VIA = ("picker", "form")
 
 
+@router.post("/enrichment-handoff")
+async def prosopography_enrichment_handoff_any(
+    request: Request, user=Depends(require_role("editor")),
+):
+    """Kood kõigi isikute ettepanekuteks (#492): tööpäev, piiratud esituste arv."""
+    allowed, retry_after = check_rate_limit(
+        user["username"], '/prosopography/enrichment-handoff')
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Liiga palju üleandmisi",
+                            headers={"Retry-After": str(retry_after)})
+    try:
+        return await run_in_threadpool(
+            enrichment_proposals.issue_handoff, None, user["username"],
+            request.state.session_fingerprint,
+        )
+    except enrichment_proposals.ProposalError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/enrichment-handoff/{person_id}")
 async def prosopography_enrichment_handoff(
     person_id: str, request: Request, user=Depends(require_role("editor")),
 ):
-    """Annab toimetaja sessiooniga seotud ühe isiku ühekordse esituskoodi."""
+    """Ühe isiku esituskood (#492: tööpäev, mitu esitust, seotud kasutajaga)."""
     if not enrichment_proposals.valid_person_id(person_id):
         raise HTTPException(status_code=400, detail="Vigane person_id")
     allowed, retry_after = check_rate_limit(
@@ -429,7 +448,7 @@ async def prosopography_enrichment_handoff(
 async def prosopography_enrichment_proposals(
     person_id: str, request: Request, user=Depends(require_role("editor")),
 ):
-    """Tagastab ainult sama isiku ja sama toimetajasessiooni ootel ettepanekud."""
+    """Tagastab ainult sama isiku ja sama kasutaja ootel ettepanekud (igas seansis)."""
     if not enrichment_proposals.valid_person_id(person_id):
         raise HTTPException(status_code=400, detail="Vigane person_id")
     return await run_in_threadpool(

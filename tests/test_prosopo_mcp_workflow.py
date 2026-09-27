@@ -33,7 +33,8 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
 
     card = prosopo_env.write("abc", occupations=[], education=[])
     token = login("editor", "editorpass")
-    other_token = login("editor", "editorpass")
+    other_token = login("admin", "adminpass")      # teine kasutaja
+    new_session = login("editor", "editorpass")     # sama kasutaja uus seanss (#492)
 
     class TestApiAdapter:
         def api_get(self, path, params=None):
@@ -82,6 +83,7 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
 
     url = f'/prosopography/enrichment-proposals/{card["id"]}'
     assert client.get(url, headers={"Authorization": f"Bearer {other_token}"}).json() == []
+    assert len(client.get(url, headers={"Authorization": f"Bearer {new_session}"}).json()) == 1
     own = client.get(url, headers={"Authorization": f"Bearer {token}"})
     assert own.status_code == 200
     assert len(own.json()[0]["items"]) == 2

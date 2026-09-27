@@ -49,6 +49,7 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
   const [proposals, setProposals] = useState<EnrichmentProposal[]>([]);
   const [code, setCode] = useState('');
   const [codeExpiry, setCodeExpiry] = useState(0);
+  const [codeScope, setCodeScope] = useState<{ any: boolean; max: number }>({ any: false, max: 0 });
   const [selected, setSelected] = useState<Record<string, number[]>>({});
   const [corrections, setCorrections] = useState<Record<string, Record<number, EnrichmentCorrection>>>({});
   const [busy, setBusy] = useState(false);
@@ -66,11 +67,12 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
     void refresh();
   }, [refresh]);
 
-  const createCode = async () => {
+  const createCode = async (anyPerson = false) => {
     setBusy(true); setError(''); setMessage('');
     try {
-      const result = await createEnrichmentHandoff(person.id, token);
+      const result = await createEnrichmentHandoff(anyPerson ? null : person.id, token);
       setCode(result.code); setCodeExpiry(result.expires_at);
+      setCodeScope({ any: result.scope === 'any', max: result.max_uses ?? 0 });
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
@@ -120,20 +122,22 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
       <h3 className="font-semibold text-sm">{tr('title')}</h3>
       <p className="text-xs text-gray-600">{tr('intro')}</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={createCode} disabled={busy || isDirty}
+        <button type="button" onClick={() => void createCode()} disabled={busy || isDirty}
           className="px-3 py-1.5 rounded bg-blue-700 text-white text-sm disabled:opacity-50">{tr('createCode')}</button>
+        <button type="button" onClick={() => void createCode(true)} disabled={busy}
+          className="px-3 py-1.5 rounded border border-blue-700 text-blue-800 text-sm disabled:opacity-50">{tr('createCodeAny')}</button>
         <button type="button" onClick={() => void refresh()} disabled={busy}
           className="px-3 py-1.5 rounded border border-blue-300 text-sm disabled:opacity-50">{tr('refresh')}</button>
       </div>
       {isDirty && <p className="text-sm text-amber-800">{tr('unsaved')}</p>}
       {code && <div className="rounded border bg-white p-3 text-sm">
-        <p>{tr('codeHelp')}</p>
+        <p>{codeScope.any ? t('agentEnrichment.codeHelpAny', { max: codeScope.max }) : t('agentEnrichment.codeHelp', { max: codeScope.max })}</p>
         <div className="flex items-center gap-2 mt-2">
           <code className="break-all select-all">{code}</code>
           <button type="button" onClick={() => void navigator.clipboard.writeText(code)}
             className="shrink-0 px-2 py-1 rounded border text-xs">{tr('copy')}</button>
         </div>
-        <p className="text-xs text-gray-500 mt-1">{tr('expires')}: {new Date(codeExpiry * 1000).toLocaleTimeString()}</p>
+        <p className="text-xs text-gray-500 mt-1">{tr('expires')}: {new Date(codeExpiry * 1000).toLocaleString()}</p>
       </div>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {message && <p role="status" className="text-sm text-green-700">{message}</p>}

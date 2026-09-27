@@ -465,10 +465,12 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     ) -> str:
         """Esitab ootel ameti-/haridusettepaneku VUTT-i isikuvormis ülevaatuseks.
 
-        handoff_code tuleb toimetaja avatud isikuvormist. Kood on ühekordne,
-        lühiajaline ja seotud ühe isiku kaardiversiooniga; ära kasuta selleks
-        editori sessioonitokenit. `base_updated_at` tuleb
-        get_person_enrichment_context vastusest. Iga item sisaldab `kind`
+        handoff_code tuleb toimetaja isikuvormist. Kood kehtib tööpäeva (8 h)
+        ja lubab mitu esitust: kas ühele isikule või („Kood kõigile isikutele")
+        igale isikule, kuni esituste laeni. Ära kasuta selleks editori
+        sessioonitokenit. `base_updated_at` tuleb iga isiku kohta värskest
+        get_person_enrichment_context vastusest — aegunud versioon lükatakse
+        tagasi (stale_person) ega kuluta koodi. Iga item sisaldab `kind`
         (occupation/education), `match_status` (already_present/matched/
         ambiguous/new_registry_candidate), toorsõnastust, registrivõtmeid,
         registriotsingus tabanud `occupation_variant`/`institution_variant`-i,
@@ -476,8 +478,8 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         kirjet. See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
         muutmata. Toimetaja otsustab VUTT-i vormis iga rea eraldi.
 
-        Pärast võrguviga ära saada sama koodi pimesi uuesti: server võis
-        ettepaneku vastu võtta ja koodi ära kulutada. Vaata tulemust vormis.
+        Pärast võrguviga ära saada sama ettepanekut pimesi uuesti: server võis
+        selle juba vastu võtta ja tekiks topelt ettepanek. Vaata tulemust vormis.
         """
         if not isinstance(items, list) or not 1 <= len(items) <= 20:
             raise VuttError("Ettepanekus peab olema 1–20 kirjet.")
