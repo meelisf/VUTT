@@ -1,4 +1,5 @@
 // Prosopograafia tüübid — eraldiseisvad src/types.ts-ist
+import type { PersonWorkEntry } from './utils/personWorks';
 
 export interface TranslationAnchor {
   /** Teise keele teksti sha256 esimesed 12 hex-märki kinnituse hetkel. */
@@ -212,5 +213,5 @@ export interface ProsopoRecord {
   image_url: string | null;
   source_data: Record<string, any>;
   // lisatakse GET /prosopography/{id} vastuses
-  works?: { work_id: string; role: string; pages?: number[] }[];
+  works?: PersonWorkEntry[];
 }

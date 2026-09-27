@@ -13,7 +13,11 @@ export function sortParts(parts: WorkPart[], stems: string[]): WorkPart[] {
 
 /** Osa lehed lehenumbrite vahemikena (järjestikused kokku); kadunud tüvi jääb välja. */
 export function pageRangeList(pageStems: string[], pageNums: Map<string, number>): { from: number; to: number }[] {
-  const nums = [...new Set(pageStems.map(s => pageNums.get(s)).filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
+  return numberRangeList(pageStems.map(s => pageNums.get(s)).filter((n): n is number => n !== undefined));
+}
+
+function numberRangeList(values: number[]): { from: number; to: number }[] {
+  const nums = [...new Set(values)].sort((a, b) => a - b);
   const out: { from: number; to: number }[] = [];
   for (let i = 0; i < nums.length; i++) {
     const from = nums[i];
@@ -23,9 +27,17 @@ export function pageRangeList(pageStems: string[], pageNums: Map<string, number>
   return out;
 }
 
+const rangesText = (ranges: { from: number; to: number }[]) =>
+  ranges.map(r => (r.from === r.to ? `${r.from}` : `${r.from}–${r.to}`)).join(', ');
+
 /** Sama tekstina: „1–3, 9". */
 export function pageRanges(pageStems: string[], pageNums: Map<string, number>): string {
-  return pageRangeList(pageStems, pageNums).map(r => (r.from === r.to ? `${r.from}` : `${r.from}–${r.to}`)).join(', ');
+  return rangesText(pageRangeList(pageStems, pageNums));
+}
+
+/** Leheküljenumbrid tekstina: [7, 8, 9, 11] → „7–9, 11". */
+export function compactNumbers(nums: number[]): string {
+  return rangesText(numberRangeList(nums));
 }
 
 export function pageBadges(parts: WorkPart[], stems: string[]): Map<string, Badge[]> {

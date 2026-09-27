@@ -32,5 +32,10 @@ järjekorras ning lehetoimingud (järjestus, poolitus, kustutus) nihutavad seda.
   0055 nõuab) ja saab osade sünkroniseerimise sellega kaasa. Kui tee loob uued failinimed
   (nagu poolitus), peab see andma `renamed`-i.
 - Prügikastist taastatud leht ei lähe osasse automaatselt tagasi.
-- Seoste ja indeksite integratsioon (osa ulatusega paarid, `evidence.part_id`,
-  `place.kind = sent_from | event`) on #464 PR 3.
+- Indeksid (#464 PR 3): osa isikud on `person_to_works`-is `part_id`-ga, mainimised
+  `part_ids` / `part_only`-ga (`indices.metadata_entries` ja `mention_entries` — üks
+  ehitaja rebuildile ja uuendusele). Teose faktid kannavad `parts`-i koos
+  leheküljenumbritega, mis arvutatakse **kirjutamisel**: `update_work_facts` vajab
+  teose kausta ja `sync_work_parts` kirjutab faktid ka siis, kui osad ei muutunud
+  (ümberjärjestus nihutab numbreid). Osa toiming uuendab isikud (`call_ptw`) ja
+  mainimised. Seosed osa ulatuses: ADR 0056.

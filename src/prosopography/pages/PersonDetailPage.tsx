@@ -24,6 +24,8 @@ import type { ProsopoRecord } from '../types';
 import { formatEntryPeriod, institutionLabel } from '../utils/entryPeriod';
 import { mergedRedirectTarget } from '../utils/mergedRedirect';
 import { personImageProps } from '../utils/personImage';
+import { groupPersonWorks, type PersonWorkEntry } from '../utils/personWorks';
+import PersonWorkParts from '../components/PersonWorkParts';
 
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
 const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
@@ -436,13 +438,15 @@ const PersonDetailPage: React.FC = () => {
     const range = parseYearDisplayRange(null, meta?.year_display);
     return range ? Math.floor((range.start + range.end) / 2) : 9999;
   };
-  const works: { work_id: string; role: string; pages?: number[] }[] = [...(person.works ?? [])].sort(
+  const works: PersonWorkEntry[] = [...(person.works ?? [])].sort(
     (a, b) => sortYear(a.work_id) - sortYear(b.work_id)
   );
   const identifiers = (person.identifiers ?? []).filter(i => i.id);
 
   const uniqueRoles = [...new Set(works.map(w => w.role))];
-  const filteredWorks = selectedRole ? works.filter(w => w.role === selectedRole) : works;
+  // Üks rida teose kohta; osa rollid (#464) selle all.
+  const allWorkGroups = groupPersonWorks(works);
+  const filteredWorks = groupPersonWorks(selectedRole ? works.filter(w => w.role === selectedRole) : works);
   const displayedWorks = filteredWorks.slice(0, visibleCount);
 
   return (
@@ -704,7 +708,7 @@ const PersonDetailPage: React.FC = () => {
             <CardHeader
               icon={<BookOpen size={18} />}
               title={t('relatedWorks', 'Seotud teosed')}
-              count={selectedRole ? filteredWorks.length : works.length}
+              count={filteredWorks.length}
             />
             {uniqueRoles.length > 1 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
@@ -712,7 +716,7 @@ const PersonDetailPage: React.FC = () => {
                   onClick={() => { setSelectedRole(null); setVisibleCount(30); }}
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${!selectedRole ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
                 >
-                  {t('allRoles', 'Kõik')} ({works.length})
+                  {t('allRoles', 'Kõik')} ({allWorkGroups.length})
                 </button>
                 {uniqueRoles.map(role => (
                   <button
@@ -726,10 +730,8 @@ const PersonDetailPage: React.FC = () => {
               </div>
             )}
             <div className="space-y-1">
-              {displayedWorks.map(({ work_id, role, pages }) => {
-                const roleLabel = t(`workspace:metadata.roles.${role}`, { defaultValue: role });
-                // Mainimise puhul vii lehele, kus isikut mainitakse (muidu esimene lehekülg)
-                const targetPage = pages?.[0] ?? 1;
+              {displayedWorks.map(({ work_id, roles, page: targetPage, parts }) => {
+                const roleLabel = roles.map(r => t(`workspace:metadata.roles.${r}`, { defaultValue: r })).join(', ');
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
                 // Eelista kuvatavat aastat (nt "ca. 1750"); muidu number-aasta, kui see pole 0
@@ -740,8 +742,8 @@ const PersonDetailPage: React.FC = () => {
                 if (meta?.restricted) {
                   const restrictedLabel = t('protectedCollection', 'Kuulub kaitstud kollektsiooni');
                   return (
+                    <React.Fragment key={work_id}>
                     <div
-                      key={`${work_id}-${role}`}
                       title={restrictedLabel}
                       className="flex items-center justify-between py-2 -mx-1 px-1 rounded cursor-default"
                     >
@@ -754,14 +756,16 @@ const PersonDetailPage: React.FC = () => {
                         <span className="text-xs px-1.5 py-0.5 rounded text-gray-400 bg-gray-100 truncate max-w-[10rem]" title={restrictedLabel}>
                           {restrictedLabel}
                         </span>
-                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>
+                        {roleLabel && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>}
                       </div>
                     </div>
+                    <PersonWorkParts workId={work_id} parts={parts} linked={false} />
+                    </React.Fragment>
                   );
                 }
                 return (
+                  <React.Fragment key={work_id}>
                   <Link
-                    key={`${work_id}-${role}`}
                     to={`/work/${work_id}/${targetPage}`}
                     className={`flex items-center justify-between py-2 -mx-1 px-1 rounded group transition-colors ${inCollection ? `${colorClasses?.bg} hover:opacity-90` : 'hover:bg-gray-50'}`}
                   >
@@ -773,12 +777,16 @@ const PersonDetailPage: React.FC = () => {
                       {yearLabel && <span className={`text-xs shrink-0 ${inCollection ? colorClasses?.text + ' opacity-70' : 'text-gray-400'}`}>{yearLabel}</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${inCollection ? `${colorClasses?.text} bg-white/50` : 'text-gray-400 bg-gray-100'}`}>
-                        {roleLabel}
-                      </span>
+                      {roleLabel && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${inCollection ? `${colorClasses?.text} bg-white/50` : 'text-gray-400 bg-gray-100'}`}>
+                          {roleLabel}
+                        </span>
+                      )}
                       <ExternalLink size={12} className={`transition-colors ${inCollection ? colorClasses?.text : 'text-gray-300 group-hover:text-primary-500'}`} />
                     </div>
                   </Link>
+                  <PersonWorkParts workId={work_id} parts={parts} linked />
+                  </React.Fragment>
                 );
               })}
             </div>

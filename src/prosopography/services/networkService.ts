@@ -25,6 +25,16 @@ export interface NetworkWork {
   restricted: boolean;
 }
 
+/** Teose osa (#464): kiri, luuletus, kõne, istung, lisa. */
+export interface NetworkPart {
+  work_id: string;
+  part_id: string;
+  kind: 'letter' | 'poem' | 'speech' | 'session' | 'attachment';
+  title: string;
+  year: number | null;
+  first_page: number | null;
+}
+
 export interface FamilyRecord { source_id: string; target_id: string; type: string | null; }
 
 export interface NetworkEdge {
@@ -43,6 +53,8 @@ export interface PersonNetwork {
   focus: NetworkPerson;
   persons: NetworkPerson[];
   works: NetworkWork[];
+  /** Servade tõendites viidatud osad; vanemas vastuses puudub. */
+  parts?: NetworkPart[];
   edges: NetworkEdge[];
 }
 

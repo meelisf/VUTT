@@ -4,6 +4,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { VisibleNetwork } from '../../utils/network';
+import { evidenceTarget } from '../../utils/network';
 
 const RelationsTable: React.FC<{ net: VisibleNetwork }> = ({ net }) => {
   const { t } = useTranslation(['prosopography', 'workspace']);
@@ -29,8 +30,10 @@ const RelationsTable: React.FC<{ net: VisibleNetwork }> = ({ net }) => {
             const roles = [...new Set(p.edges.flatMap(e => e.roles?.[p.id] ?? []))]
               .map(r => t(`workspace:metadata.roles.${r}`, { defaultValue: r }));
             const works = [...new Set(p.edges.map(e => e.evidence?.work_id).filter((w): w is string => !!w))]
-              .map(id => ({ w: net.works.get(id), id,
-                            page: p.edges.find(e => e.evidence?.work_id === id)?.evidence?.pages[0] ?? 1 }));
+              .map(id => {
+                const first = p.edges.find(e => e.evidence?.work_id === id)!;
+                return { w: net.works.get(id), id, page: evidenceTarget(first, net).page };
+              });
             const span = ys.length ? (Math.min(...ys) === Math.max(...ys) ? `${ys[0]}` : `${Math.min(...ys)}–${Math.max(...ys)}`) : '—';
             return (
               <tr key={p.id} className="border-b border-gray-100 align-top">

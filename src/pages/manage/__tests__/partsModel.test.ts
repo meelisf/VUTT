@@ -1,6 +1,6 @@
 // src/pages/manage/__tests__/partsModel.test.ts
 import { describe, it, expect } from 'vitest';
-import { draftFromPart, emptyDraft, initialManageTab, pageBadges, pageRangeList, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
+import { compactNumbers, draftFromPart, emptyDraft, initialManageTab, pageBadges, pageRangeList, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
 import type { WorkPart } from '../../../services/workPartsApi';
 
 const STEMS = ['s1', 's2', 's3', 's4'];
@@ -65,6 +65,11 @@ describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
     expect(pageRanges(['s4'], nums)).toBe('4');
     expect(pageRanges(['s4', 'gone'], nums)).toBe('4');
     expect(pageRanges([], nums)).toBe('');
+  });
+
+  it('compactNumbers: leheküljenumbrid tekstina', () => {
+    expect(compactNumbers([11, 7, 8, 9])).toBe('7–9, 11');
+    expect(compactNumbers([])).toBe('');
   });
 
   it('pageRangeList: vahemikud lingiks (from/to)', () => {

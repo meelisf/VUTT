@@ -25,8 +25,27 @@ def get_person_with_works(person_id: str) -> Optional[dict]:
     if person is None:
         return None
     works = _load_person_to_works()
-    person["works"] = works.get(person_id, [])
+    person["works"] = _with_part_facts(works.get(person_id, []))
     return person
+
+
+def _with_part_facts(entries: list) -> list:
+    """Osa-kirjele (#464) osa kokkuvõte teose faktidest: liik, pealkiri, aasta, lehed.
+
+    Sama poliitika mis teose pealkirjal (POST /work-titles): pealkiri ei ole salajane,
+    piiratud teose lingi keelab klient. Faktides puuduv osa jääb andmeteta.
+    """
+    if not any(e.get("part_id") for e in entries):
+        return entries
+    from .work_relations_ops import _load_creators_index
+    facts = _load_creators_index()
+    out = []
+    for e in entries:
+        part = ((facts.get(e.get("work_id")) or {}).get("parts") or {}).get(e.get("part_id") or "")
+        if part:
+            e = {**e, "part": {k: part.get(k) for k in ("kind", "title", "year", "first_page", "pages")}}
+        out.append(e)
+    return out
 
 
 def _build_work_to_persons() -> dict:

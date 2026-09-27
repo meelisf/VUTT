@@ -190,3 +190,22 @@ def test_umberjarjestus_uuendab_faktid_ka_osade_muutuseta(work):
     calls["facts"].clear()
     wp.sync_work_parts(wdir, "w1")
     assert calls["facts"] and calls["facts"][-1][1] == wdir
+
+
+# ── Isikuleht ────────────────────────────────────────────────────────────────
+
+def test_isiku_teosed_kannavad_osa_andmeid(prosopo_env, tmp_path, monkeypatch):
+    from server.prosopography import ops
+    from server.prosopography.relations import get_person_with_works
+    prosopo_env.write("aaaaa")
+    with open(ops.PERSON_TO_WORKS_FILE, "w", encoding="utf-8") as f:
+        json.dump({A: [{"work_id": "w1", "role": "auctor", "part_id": "pa"},
+                       {"work_id": "w1", "role": "auctor", "part_id": "kadunud"},
+                       {"work_id": "w2", "role": "praeses"}]}, f)
+    monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
+    (tmp_path / "wci.json").write_text(json.dumps({"w1": {"parts": {"pa": {
+        "kind": "letter", "title": "Kiri A", "year": 1684, "place": None, "first_page": 2, "pages": [2, 3]}}}}))
+    works = get_person_with_works(A)["works"]
+    assert works[0]["part"] == {"kind": "letter", "title": "Kiri A", "year": 1684, "first_page": 2, "pages": [2, 3]}
+    assert "part" not in works[1]           # faktides puudub → kirje jääb, osa andmeteta
+    assert "part" not in works[2]

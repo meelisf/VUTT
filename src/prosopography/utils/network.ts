@@ -3,7 +3,7 @@
  * Seoste vaadete puhas loogika (#461). Järjekord (spekk): filtreeri servad →
  * eemalda seosteta isikud → arvuta NÄHTAVATEST servadest liik, suurus, loendurid.
  */
-import type { NetworkEdge, NetworkPerson, NetworkWork, PersonNetwork, RelationKind } from '../services/networkService';
+import type { NetworkEdge, NetworkPart, NetworkPerson, NetworkWork, PersonNetwork, RelationKind } from '../services/networkService';
 
 export const KIND_ORDER: RelationKind[] = ['academic', 'dedicated', 'family', 'cotext', 'mention', 'printer'];
 export const STRONG: ReadonlySet<RelationKind> = new Set<RelationKind>(['academic', 'dedicated', 'family']);
@@ -23,6 +23,7 @@ export interface VisibleNetwork {
   persons: VisiblePerson[];
   edges: NetworkEdge[];
   works: Map<string, NetworkWork>;
+  parts: Map<string, NetworkPart>;
   counts: Record<RelationKind, number>;
 }
 
@@ -56,16 +57,24 @@ export function applyFilters(net: PersonNetwork, filter: KindFilter): VisibleNet
     persons.push({ ...p, kind, workCount: workIds.size, edges: pe, firstYear: years.length ? Math.min(...years) : null });
     counts[kind] += 1;
   }
-  return { focus: net.focus, persons, edges, works: new Map(net.works.map(w => [w.work_id, w])), counts };
+  return { focus: net.focus, persons, edges, works: new Map(net.works.map(w => [w.work_id, w])),
+           parts: new Map((net.parts ?? []).map(p => [p.part_id, p])), counts };
 }
 
-/** Kaaslaste servad: seotud isikud, kes esinevad OMAVAHEL samas teoses. */
+/** Tõendi lingi sihtleht: esimene tõendileht, osa korral osa esimene leht, muidu 1. */
+export function evidenceTarget(e: NetworkEdge, v: VisibleNetwork): { page: number; part: NetworkPart | undefined } {
+  const part = e.evidence?.part_id ? v.parts.get(e.evidence.part_id) : undefined;
+  return { page: e.evidence?.pages[0] ?? part?.first_page ?? 1, part };
+}
+
+/** Kaaslaste servad: seotud isikud, kes esinevad OMAVAHEL samas teoses — osadega
+ *  teosel samas osas (#464), muidu seoks kirjakogu kõik kirjutajad omavahel. */
 export function coEdges(v: VisibleNetwork): Array<{ a: string; b: string; weight: number }> {
   const byWork = new Map<string, Set<string>>();
   for (const p of v.persons) {
     for (const e of p.edges) {
-      const w = e.evidence?.work_id;
-      if (!w) continue;
+      if (!e.evidence?.work_id) continue;
+      const w = `${e.evidence.work_id}#${e.evidence.part_id ?? ''}`;
       if (!byWork.has(w)) byWork.set(w, new Set());
       byWork.get(w)!.add(p.id);
     }
