@@ -18,9 +18,32 @@ kandidaat (91 AGC, 12 professor, 17 olemasolev koht). Ühtegi isikukaarti ei
 muudetud. Andmerepo jäi pärast kahte registri commit'it puhtaks.
 
 Järgmine andmesamm on 393 rühma ülevaatus ja kinnitatud otsuste põhjal
-isikukaartide migratsioon. Ühe isiku MCP → vorm → kinnitus läbikäik vajab
-toimetaja sisselogitud brauseriseanssi. Allika värske OCR-oleku ja
-toimetajamärkuste kuvamine kinnitamisvaates on jätkuvalt tegemata.
+isikukaartide migratsioon. Allika värske OCR-oleku ja toimetajamärkuste
+kuvamine kinnitamisvaates on jätkuvalt tegemata.
+
+## Ühe isiku täielik tootmisläbikäik 2026-09-27
+
+PR #481 (`9ab345f5`) parandas olemasoleva registrivõtmeta fakti sidumise
+rikastusettepaneku kinnitamisel. Backend ja frontend juurutati; CI mõlemad
+kontrollid läbisid ning tootmise backend ja pilditeenus olid terved.
+
+Isacus Börki (`vutt:Pru2k0dt`) kaardil oli kolm haridusrida: „Academia
+Gustaviana” (1691-09-17), Uppsala (1679) ja eraldi „AGC” (`juris stud.`).
+Sisselogitud vormi registriotsing leidis AGC-le Academia Gustavo-Carolina
+(Q138710754, `place_key=Dorpat`); Gustaviana ei andnud sellele registrivõtmele
+vastet. MCP ettepanek sidus olemasoleva kolmanda rea võtmega
+`academia-gustavo-carolina` ja tõendiga `album_academicum`, NR 1254,
+„AGC: juris stud., alumnus Regius”. Toimetaja eraldi kinnituse järel
+salvestati vormis ainult see rida. API tagasilugemine kinnitas kolme rea
+säilimise, AGC võtme ja Q-koodi ning tõendi; Gustaviana ja Uppsala jäid
+muutmata. Andmerepo commit: `53210b799`; tööpuu jäi puhtaks.
+
+Ettepanekud on seotud täpse sisselogimisseansiga. Vahepealne uus login peitis
+esimese ootel ettepaneku vormist, kuigi see jäi ajutisse SQLite olekusse.
+Sama ettepanek saadeti uue üleandmiskoodiga praegusele seansile ja kinnitati.
+Vana kinnitamata ettepanek aegub seitsme päevaga. See on UX-i jätkuteema.
+1691. aasta „Academia Gustaviana” kirje võimalik ajalooline väärseos vajab
+eraldi allikakontrolli; seda ei parandatud selle läbikäigu käigus.
 
 ## Jätk 2026-09-27
 
