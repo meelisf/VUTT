@@ -81,3 +81,14 @@ describe('shouldRefreshOrPromote', () => {
     expect(shouldRefreshOrPromote(expiresAt + 1, expiresAt, false, false)).toBe(true);
   });
 });
+
+describe('lühike autenditud token (S27-03, 15 min)', () => {
+  it('ette-uuendus mahub eluea sisse ja kontroll ei jää aknast mööda', () => {
+    const ttl = 15 * 60 * 1000;
+    expect(REFRESH_LOOKAHEAD_MS).toBeGreaterThan(CHECK_INTERVAL_MS);
+    expect(REFRESH_LOOKAHEAD_MS).toBeLessThan(ttl / 2);          // ei uuenda pidevalt
+    expect(shouldRefreshToken(0, ttl)).toBe(false);
+    expect(shouldRefreshToken(ttl - REFRESH_LOOKAHEAD_MS + 1, ttl)).toBe(true);
+  });
+});
+
