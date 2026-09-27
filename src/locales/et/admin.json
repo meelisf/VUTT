@@ -1,6 +1,9 @@
 {
   "title": "Haldus",
   "prosopoRegistries": {
+    "placePeriods": "Koht ajas (valikuline)",
+    "placePeriodsHelp": "Üks rida perioodi kohta: koha võti, koolon, aastad. Elukäigu kaart valib koha hariduse või ameti aasta järgi; aastata kirje saab ülemise vaikekoha.",
+    "placePeriodsInvalid": "Vigane perioodirida:",
     "title": "Ametite ja asutuste registrid",
     "intro": "Kinnita registrikirje eraldi isikufaktist. Allikast pärit sõnastus jääb isikukaardile alles.",
     "institution": "Asutused", "occupation": "Ametid", "search": "Otsi registrist",

@@ -41,7 +41,10 @@ export interface EnrichmentRegistrySearch {
 export interface InstitutionRegistryEntry {
   id: string | null; labels: Record<string, string>; variants: string[];
   type: string; place_key: string | null; notes?: string;
+  /** Koht ajas (nt AGC: Tartu kuni 1699, Pärnu alates 1699); `place_key` on vaikekoht. */
+  place_periods?: PlacePeriod[];
 }
+export interface PlacePeriod { place_key: string; from?: number; to?: number; }
 export async function fetchInstitutions(): Promise<Record<string, InstitutionRegistryEntry>> {
   const response = await fetchWithTimeout(`${BASE}/registries/institution`, { timeout: 10000 });
   return enrichmentResponse(response);

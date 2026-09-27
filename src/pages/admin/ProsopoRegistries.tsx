@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { isAtLeast } from '../../utils/roleUtils';
+import { formatPlacePeriods, parsePlacePeriods } from './placePeriods';
 import { fetchRegistry, saveRegistryEntry,
   type InstitutionRegistryEntry, type OccupationRegistryEntry } from '../../prosopography/services/prosopographyService';
 
@@ -25,6 +26,7 @@ export default function ProsopoRegistries() {
   const [selectedExisting, setSelectedExisting] = useState(false);
   const [draft, setDraft] = useState<Entry>(empty('institution'));
   const [variants, setVariants] = useState('');
+  const [periods, setPeriods] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -35,7 +37,7 @@ export default function ProsopoRegistries() {
   useEffect(() => {
     if (!authToken || !isAtLeast(user?.role, 'admin')) return;
     let live = true;
-    setError(''); setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants('');
+    setError(''); setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants(''); setPeriods('');
     fetchRegistry(kind).then(data => { if (live) setEntries(data); })
       .catch(e => { if (live) setError(String(e)); });
     return () => { live = false; };
@@ -49,21 +51,26 @@ export default function ProsopoRegistries() {
   const choose = (id: string) => {
     const entry = entries[id];
     setKey(id); setSelectedExisting(true); setDraft({ ...entry, labels: { ...entry.labels }, variants: [...entry.variants] });
-    setVariants(entry.variants.join('\n')); setError(''); setSaved(false);
+    setVariants(entry.variants.join('\n'));
+    setPeriods(formatPlacePeriods((entry as InstitutionRegistryEntry).place_periods)); setError(''); setSaved(false);
   };
-  const newEntry = () => { setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants(''); setError(''); setSaved(false); };
+  const newEntry = () => { setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants(''); setPeriods(''); setError(''); setSaved(false); };
   const save = async () => {
     if (!authToken) return;
     if (!selectedExisting && entries[key]) { setError(tr('selectExisting')); return; }
+    const parsed = kind === 'institution' ? parsePlacePeriods(periods) : { periods: [] };
+    if ('errorLine' in parsed) { setError(`${tr('placePeriodsInvalid')} ${parsed.errorLine}`); return; }
     setBusy(true); setError(''); setSaved(false);
     try {
       const value = { ...draft,
         labels: Object.fromEntries(Object.entries(draft.labels).filter(([, label]) => label.trim())),
-        variants: variants.split('\n').map(v => v.trim()).filter(Boolean) };
+        variants: variants.split('\n').map(v => v.trim()).filter(Boolean),
+        ...(kind === 'institution' ? { place_periods: parsed.periods } : {}) };
       const stored = await saveRegistryEntry(kind, key, value, authToken);
       setEntries(current => ({ ...current, [key]: stored }));
       setDraft(stored);
       setVariants(stored.variants.join('\n'));
+      setPeriods(formatPlacePeriods((stored as InstitutionRegistryEntry).place_periods));
       setSelectedExisting(true);
       setSaved(true);
     } catch (e) { setError((e as Error).message); }
@@ -126,6 +133,11 @@ export default function ProsopoRegistries() {
             <label className="block text-sm">{tr('placeKey')}
               <input value={institution.place_key ?? ''} onChange={e => setDraft(d => ({ ...d,
                 place_key: e.target.value || null }))} className="mt-1 block w-full rounded border px-2 py-1.5" />
+            </label>
+            <label className="block text-sm">{tr('placePeriods')}
+              <textarea value={periods} onChange={e => setPeriods(e.target.value)} rows={3}
+                placeholder="Dorpat: –1699&#10;Pernau: 1699–1710" className="mt-1 block w-full rounded border px-2 py-1.5 font-mono text-xs" />
+              <span className="mt-1 block text-xs text-gray-500">{tr('placePeriodsHelp')}</span>
             </label>
           </>}
           <label className="block text-sm">{tr('notes')}

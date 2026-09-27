@@ -90,6 +90,8 @@ def search(kind: str, query: str, limit: int = 10) -> dict:
         if kind == "institution":
             candidate["type"] = entry.get("type")
             candidate["place_key"] = entry.get("place_key")
+            if entry.get("place_periods"):
+                candidate["place_periods"] = entry["place_periods"]
         candidates.append((rank, key, candidate))
 
     candidates.sort(key=lambda row: (row[0], row[1]))

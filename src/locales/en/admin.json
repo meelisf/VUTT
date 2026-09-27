@@ -1,6 +1,9 @@
 {
   "title": "Administration",
   "prosopoRegistries": {
+    "placePeriods": "Place over time (optional)",
+    "placePeriodsHelp": "One line per period: place key, colon, years. The life map picks the place by the year of the education or occupation entry; an undated entry gets the default place above.",
+    "placePeriodsInvalid": "Invalid period line:",
     "title": "Occupation and institution registries",
     "intro": "Approve a registry entry separately from a person fact. The source wording remains on the person record.",
     "institution": "Institutions", "occupation": "Occupations", "search": "Search registry",

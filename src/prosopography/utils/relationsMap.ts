@@ -112,11 +112,21 @@ function resolve(place: PlaceRef, registry: Record<string, PlaceEntry>) {
   return { placeLabel: place.label ?? place.id ?? null, coords: { lat: c.lat, lon: c.lon }, reason: null };
 }
 
+/** Asutuse koht fakti aastal: esimene sobiv periood, muidu vaikekoht (`place_key`). */
+export function institutionPlaceKey(entry: InstitutionRegistryEntry | undefined, year: number | null): string | null {
+  if (!entry) return null;
+  if (year !== null) {
+    const hit = (entry.place_periods ?? []).find(p => (p.from ?? -Infinity) <= year && year <= (p.to ?? Infinity));
+    if (hit) return hit.place_key;
+  }
+  return entry.place_key ?? null;
+}
+
 function resolveFactPlace(item: any, places: Record<string, PlaceEntry>,
   institutions: Record<string, InstitutionRegistryEntry>) {
   const raw = item?.institution ?? null;
   const placeKey = item?.place_key ?? (item?.institution_key
-    ? institutions[item.institution_key]?.place_key : null);
+    ? institutionPlaceKey(institutions[item.institution_key], entryYear(item)) : null);
   if (placeKey) {
     const entry = places[placeKey];
     if (!entry) return { placeLabel: raw, coords: null, reason: 'not_in_registry' as const };

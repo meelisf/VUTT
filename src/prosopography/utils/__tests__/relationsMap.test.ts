@@ -117,6 +117,21 @@ describe('asutuse ja territooriumi registriviited (#462)', () => {
     expect(result.unmapped.find(s => s.kind === 'education')?.reason).toBe('not_in_registry');
   });
 
+  it('asutuse koht perioodi järgi: AGC Tartus kuni 1699, siis Pärnus; aastata fakt saab vaikekoha', () => {
+    const card = { ...CARD, occupations: [], education: [
+      { institution: 'AGC', institution_key: 'agc', date_start: '1695' },
+      { institution: 'AGC', institution_key: 'agc', date_start: '1705-03-01' },
+      { institution: 'AGC', institution_key: 'agc' },
+    ] } as unknown as ProsopoRecord;
+    const places = { ...REG,
+      tartu: { id: 'Q13972', labels: { et: 'Tartu' }, coordinates: { lat: 58.38, lon: 26.72 } },
+      parnu: { id: 'Q173633', labels: { et: 'Pärnu' }, coordinates: { lat: 58.38, lon: 24.5 } } };
+    const institutions = { agc: { id: null, labels: { et: 'AGC' }, variants: [], type: 'university', place_key: 'tartu',
+      place_periods: [{ place_key: 'tartu', to: 1699 }, { place_key: 'parnu', from: 1699, to: 1710 }] } };
+    const edu = lifeStations(card, places, institutions).mapped.filter(s => s.kind === 'education');
+    expect(edu.map(s => s.placeLabel)).toEqual(['Tartu', 'Pärnu', 'Tartu']);
+  });
+
   it('amet võib viidata territooriumile otse; ainult silt kaardikohta ei loo', () => {
     const card = { ...CARD, occupations: [
       { label: 'Superintendent', institution: 'Liivimaa', place_key: 'Liivimaa' },
