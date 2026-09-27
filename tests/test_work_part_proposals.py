@@ -358,3 +358,20 @@ def test_uuena_lisamine_on_valitav(work):
 def test_tundmatu_part_id_lukatakse_tagasi(work):
     with pytest.raises(wpp.ProposalError, match="unknown part_id"):
         _submit(work, [{**LETTER, "part_id": "olematu"}])
+
+
+def test_liitmine_ei_tee_dateeringut_ebatapsemaks_ega_vaheta_kohta_keele_parast():
+    old = {"id": "a", "kind": "letter", "pages": ["t-001"], "creators": [], "needs_review": False,
+           "dating": {"start": "1672-11-30"}, "place": {"id": None, "label": "Paris"}, "languages": ["lat"]}
+    new = {"kind": "letter", "pages": ["t-001"], "creators": [],
+           "dating": {"start": "1672"}, "place": {"id": None, "label": "Pariis"}, "languages": ["ger"]}
+    auto = wpp.merge_part(old, new)                    # automaatselt tuvastatud duplikaat
+    assert auto["dating"]["start"] == "1672-11-30" and auto["place"]["label"] == "Paris"
+    assert sorted(auto["languages"]) == ["ger", "lat"]
+    explicit = wpp.merge_part(old, new, explicit=True)  # agent ütles part_id → parandus
+    assert explicit["dating"]["start"] == "1672-11-30"  # ebatäpsem EI võida ka siis
+    assert explicit["place"]["label"] == "Pariis"
+    more = wpp.merge_part(old, {**new, "dating": {"start": "1672-12-01"}}, explicit=True)
+    assert more["dating"]["start"] == "1672-12-01"       # sama täpsus + selge parandus
+    wd = wpp.merge_part(old, {**new, "place": {"id": "Q90", "label": "Pariis"}})
+    assert wd["place"]["id"] == "Q90"                     # ID-ga koht täiendab
