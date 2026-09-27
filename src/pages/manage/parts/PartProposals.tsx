@@ -11,6 +11,7 @@ import {
   type PartProposal, type PartProposalItem, type PartsHandoff,
 } from '../../../services/workPartsApi';
 import { compactNumbers } from '../partsModel';
+import ProposedPersons from './ProposedPersons';
 
 interface Props {
   workId: string;
@@ -23,7 +24,7 @@ interface Props {
 }
 
 const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, onEdit, onChanged }) => {
-  const { t } = useTranslation(['workspace']);
+  const { t, i18n } = useTranslation(['workspace']);
   const tp = (key: string, opts?: Record<string, unknown>) => t(`manage.parts.proposals.${key}`, opts);
   const [proposals, setProposals] = useState<PartProposal[]>([]);
   const [handoff, setHandoff] = useState<PartsHandoff | null>(null);
@@ -113,6 +114,10 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
 
       {error && <p role="alert" className="mt-2 text-red-700">{error}</p>}
       {proposals.some(p => p.pages_changed) && <p className="mt-2 text-amber-800">{tp('pagesChanged')}</p>}
+
+      <ProposedPersons workId={workId} token={token} lang={i18n.language}
+        entries={proposals.flatMap(p => (p.persons ?? []).map(person => ({ proposalId: p.proposal_id, person })))}
+        onResolved={() => void load()} />
 
       {pending.length > 0 && (
         <ul className="mt-2 space-y-1.5">

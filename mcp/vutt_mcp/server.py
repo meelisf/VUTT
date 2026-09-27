@@ -446,6 +446,7 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     @mcp.tool(structured_output=False)
     async def submit_work_parts_proposal(
         handoff_code: str, work_id: str, pages_version: str, parts: list[dict],
+        persons: list[dict] | None = None,
     ) -> str:
         """Esitab teose osade (sisukorra) ettepaneku toimetaja ülevaatuseks.
 
@@ -463,13 +464,22 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         place_to (ainult kirjal), languages, attached_to (lisa korral: sama
         ettepaneku osa INDEKS või olemasoleva osa id), evidence [{page, quote}].
 
+        ISIKUD: otsi iga isik enne search_persons'iga. Kui ta on VUTT-is, anna
+        creators'is `id`. Kui teda pole, lisa ta `persons` loendisse ja viita
+        osas `{"person_ref": "<ref>", "role": ...}`. `persons` kirje: ref (lühike
+        oma tähis, nt "p1"), name (kanooniline nimi), aliases (allika nimekujud),
+        birth_year, death_year, identifiers [{scheme: gnd | wikidata | viaf, id}]
+        — ainult kontrollitud ID-d, mitte oletused —, note (kes ta on, 1–2 lauset),
+        evidence [{page, quote}]. Toimetaja otsustab: loo kaart, seo olemasolevaga
+        või jäta nimeks. Ära paku uut isikut, kui search_persons leiab ta.
+
         Kirja piirid tunneb ära pöördumisest, dateeringust ja allkirjast;
         istungi protokolli kuupäevast ja osalejate loetelust. Ära paku juba
         olemasolevat osa. Kuni 50 osa ühes esituses; see talletab AINULT
         ettepaneku — teost ei muudeta, toimetaja otsustab osa kaupa.
         Võrguvea järel ära saada sama ettepanekut pimesi uuesti.
         """
-        return work_parts_mod.submit_parts(client, handoff_code, work_id, pages_version, parts)
+        return work_parts_mod.submit_parts(client, handoff_code, work_id, pages_version, parts, persons)
 
     @mcp.tool(structured_output=False)
     async def get_person_enrichment_context(person_id: str) -> str:

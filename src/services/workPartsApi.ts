@@ -51,9 +51,16 @@ export interface PartProposalItem {
   page_numbers: number[];
   missing_pages: string[];
 }
+/** Agendi pakutud uus isik (#492): ootel, kuni toimetaja loob, seob või jätab nimeks. */
+export interface ProposedPerson {
+  ref: string; name: string; aliases?: string[]; birth_year?: number; death_year?: number;
+  identifiers?: { scheme: 'gnd' | 'wikidata' | 'viaf'; id: string }[]; note?: string;
+  evidence?: { page: number; quote?: string }[];
+  status: 'pending' | 'created' | 'linked' | 'name'; person_id: string | null;
+}
 export interface PartProposal {
   proposal_id: string; created_at: number; expires_at: number;
-  pages_changed: boolean; items: PartProposalItem[];
+  pages_changed: boolean; items: PartProposalItem[]; persons?: ProposedPerson[];
 }
 export interface PartsHandoff { code: string; expires_at: number; max_uses: number; work_id: string; pages_version: string; }
 
@@ -68,3 +75,9 @@ export const decidePartProposal = (workId: string, proposalId: string, index: nu
   apiPost<{ status: string; part: WorkPart | null }>(
     `${base(workId)}/proposals/${encodeURIComponent(proposalId)}/items/${index}/${action}`,
     part ? { part } : {}, opts(token));
+/** Pakutud isik: loo kaart, seo olemasolevaga (`personId`) või jäta nimeks. 409 `person_exists:<id>`. */
+export const resolveProposedPerson = (workId: string, proposalId: string, ref: string,
+  action: 'create' | 'link' | 'name', token: string | null, personId?: string) =>
+  apiPost<{ ref: string; status: string; person_id: string | null }>(
+    `${base(workId)}/proposals/${encodeURIComponent(proposalId)}/persons/${encodeURIComponent(ref)}/${action}`,
+    personId ? { person_id: personId } : {}, opts(token));

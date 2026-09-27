@@ -74,3 +74,10 @@ Esialgu (2026-09-27) on teose osade ettepanekute kood, loetelu ja otsused ainult
 **superadminil** (`require_role("superadmin")` + UI) — teised toimetajad seda ei kasuta.
 Laiendamine = rolli langetamine kolmes otspunktis ja `PartsTab`-is.
 
+**Agendi pakutud isikud (#492):** osade ettepanek võib kanda `persons` loendit (nimi,
+nimekujud, eluaastad, kontrollitud GND/Wikidata/VIAF, märkus, tõend); osa isik viitab sellele
+`person_ref`-iga ja on kuni lahendamiseni NIMI. Toimetaja: loo (`create_person_checked`,
+`created_via: agent` → isikute ülevaatusjärjekord, ADR 0048), seo olemasolevaga või jäta
+nimeks. Juba kasutusel väline ID → `person_exists:<id>` (409) ja sidumise pakkumine.
+MCP ei loo isikut ise.
+

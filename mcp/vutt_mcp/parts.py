@@ -45,12 +45,18 @@ def work_parts(client, work_id: str) -> str:
                       ensure_ascii=False, indent=1)
 
 
-def submit_parts(client, handoff_code: str, work_id: str, pages_version: str, parts: list) -> str:
+def submit_parts(client, handoff_code: str, work_id: str, pages_version: str, parts: list,
+                 persons: list | None = None) -> str:
     _check_work_id(work_id)
     if not isinstance(parts, list) or not 1 <= len(parts) <= MAX_PARTS:
         raise VuttError(f"Ettepanekus peab olema 1–{MAX_PARTS} osa.")
-    result = client.api_post_once("/works/parts-proposals/submit", {
-        "code": handoff_code, "work_id": work_id, "pages_version": pages_version, "parts": parts})
-    return (f"Ettepanek talletatud teose {work_id} jaoks: {result.get('parts')} osa, "
+    if persons is not None and (not isinstance(persons, list) or len(persons) > MAX_PARTS):
+        raise VuttError(f"Uusi isikuid võib olla kuni {MAX_PARTS}.")
+    body = {"code": handoff_code, "work_id": work_id, "pages_version": pages_version, "parts": parts}
+    if persons:
+        body["persons"] = persons
+    result = client.api_post_once("/works/parts-proposals/submit", body)
+    extra = f", {result.get('persons')} uut isikut" if result.get("persons") else ""
+    return (f"Ettepanek talletatud teose {work_id} jaoks: {result.get('parts')} osa{extra}, "
             f"proposal_id={result.get('proposal_id')}. Toimetaja vaatab need üle teose halduse "
             "„Osad\" vahekaardil; teost ei muudetud.")

@@ -196,3 +196,118 @@ def test_ettepanekud_ainult_superadminile(client):
     client.state["user"] = {"username": "ed", "role": "admin"}
     assert client.post("/works/w1/parts/handoff").status_code == 403
     assert client.get("/works/w1/parts/proposals").status_code == 403
+
+
+# ── Agendi pakutud isikud ────────────────────────────────────────────────────
+
+PERSON = {"ref": "np1", "name": "Johann Fischer", "aliases": ["Johannes Piscator"],
+          "birth_year": 1636, "death_year": 1705,
+          "identifiers": [{"scheme": "gnd", "id": "118691716"}], "note": "Liivimaa superintendent",
+          "evidence": [{"page": 2, "quote": "Fischer"}]}
+LETTER_REF = {**LETTER, "creators": [{"person_ref": "np1", "role": "addressee"}, {"id": "vutt:Paaaaa", "name": "Spener", "role": "auctor"}]}
+
+
+def _submit_p(work, parts, persons, code=None):
+    code = code or wpp.issue_handoff("w1", work, "ed")["code"]
+    return wpp.submit(code, "w1", work, wpp.pages_version(work), parts, persons)
+
+
+@pytest.fixture
+def created(monkeypatch):
+    calls = []
+    from server.prosopography import person_crud
+
+    def fake_create(**kw):
+        calls.append(kw)
+        return {"id": "vutt:Pnew", "name": {"label": kw["name"]}}
+    monkeypatch.setattr(person_crud, "create_person_checked", fake_create)
+    monkeypatch.setattr(person_crud, "get_person", lambda pid: {"id": pid, "name": {"label": "Olemas"}} if pid == "vutt:Pold" else None)
+    return calls
+
+
+def test_isik_viitega_nimena_kuni_lahendamiseni(work):
+    _submit_p(work, [LETTER_REF], [PERSON])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    assert p["persons"][0]["name"] == "Johann Fischer" and p["persons"][0]["status"] == "pending"
+    c = p["items"][0]["part"]["creators"][0]
+    assert c == {"name": "Johann Fischer", "role": "addressee"}
+
+
+def test_loo_isik_seob_osa_isikuga(work, created):
+    _submit_p(work, [LETTER_REF], [PERSON])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    res = wpp.resolve_person(p["proposal_id"], "w1", work, "ed", "np1", "create")
+    assert res["person_id"] == "vutt:Pnew"
+    kw = created[0]
+    assert kw["created_via"] == "agent" and kw["name"] == "Johann Fischer"
+    assert kw["identifiers"] == [{"scheme": "gnd", "id": "118691716"}] and kw["aliases"] == ["Johannes Piscator"]
+    assert kw["context"] == {"work_id": "w1", "role": "addressee"}
+    (p,) = wpp.list_pending("w1", work, "ed")
+    assert p["persons"][0]["status"] == "created"
+    assert p["items"][0]["part"]["creators"][0]["id"] == "vutt:Pnew"
+    wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept")
+    assert _meta(work)["parts"][0]["creators"][0]["id"] == "vutt:Pnew"
+
+
+def test_seo_olemasolevaga_ja_jata_nimeks(work, created):
+    _submit_p(work, [LETTER_REF], [PERSON, {"ref": "np2", "name": "Anonymus"}])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    with pytest.raises(wpp.ProposalError, match="person_not_found"):
+        wpp.resolve_person(p["proposal_id"], "w1", work, "ed", "np1", "link", "vutt:Pmissing")
+    wpp.resolve_person(p["proposal_id"], "w1", work, "ed", "np1", "link", "vutt:Pold")
+    wpp.resolve_person(p["proposal_id"], "w1", work, "ed", "np2", "name")
+    (p,) = wpp.list_pending("w1", work, "ed")
+    assert [x["status"] for x in p["persons"]] == ["linked", "name"]
+    assert p["items"][0]["part"]["creators"][0]["id"] == "vutt:Pold"
+    assert created == []
+
+
+def test_olemasolev_valine_id_annab_isiku(work, monkeypatch):
+    from server.prosopography import person_crud
+
+    def conflict(**kw):
+        raise person_crud.IdentifierConflict("conflict", ["vutt:Pold"])
+    monkeypatch.setattr(person_crud, "create_person_checked", conflict)
+    _submit_p(work, [LETTER_REF], [PERSON])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    with pytest.raises(wpp.ProposalError, match="person_exists:vutt:Pold"):
+        wpp.resolve_person(p["proposal_id"], "w1", work, "ed", "np1", "create")
+
+
+@pytest.mark.parametrize("persons, parts", [
+    ([{**PERSON, "ref": "np1"}, {**PERSON, "ref": "np1"}], [LETTER]),        # kordus
+    ([{**PERSON, "identifiers": [{"scheme": "orcid", "id": "1"}]}], [LETTER]),
+    ([{**PERSON, "name": ""}], [LETTER]),
+    ([{**PERSON, "extra": 1}], [LETTER]),
+    ([PERSON], [{**LETTER, "creators": [{"person_ref": "np9", "role": "auctor"}]}]),  # tundmatu viide
+])
+def test_vigased_isikud(work, persons, parts):
+    with pytest.raises(wpp.ProposalError):
+        _submit_p(work, parts, persons)
+
+
+def test_vana_ettepanek_ilma_isikuteta_loetav(work):
+    """Enne isikute lisamist talletatud ettepanekud (payload = list) jäävad loetavaks."""
+    import sqlite3, time as _t
+    _submit(work, [LETTER])
+    with sqlite3.connect(wpp.DB_PATH) as db:
+        pid, payload = db.execute("SELECT id, payload FROM proposal").fetchone()
+        items = json.loads(payload)["items"]
+        db.execute("UPDATE proposal SET payload=? WHERE id=?", (json.dumps(items), pid))
+    (p,) = wpp.list_pending("w1", work, "ed")
+    assert p["persons"] == [] and p["items"][0]["status"] == "pending"
+
+
+def test_isikute_otspunktid(client, work, created):
+    h = client.post("/works/w1/parts/handoff").json()
+    r = client.post("/works/parts-proposals/submit", json={
+        "code": h["code"], "work_id": "w1", "pages_version": h["pages_version"],
+        "parts": [LETTER_REF], "persons": [PERSON]})
+    assert r.status_code == 200 and r.json()["persons"] == 1
+    (p,) = client.get("/works/w1/parts/proposals").json()
+    url = f"/works/w1/parts/proposals/{p['proposal_id']}/persons/np1"
+    assert client.post(f"{url}/link", json={"person_id": "vutt:Pmissing"}).status_code == 400
+    ok = client.post(f"{url}/create", json={})
+    assert ok.status_code == 200 and ok.json()["person_id"] == "vutt:Pnew"
+    client.state["user"] = {"username": "ed", "role": "admin"}
+    assert client.post(f"{url}/name", json={}).status_code == 403

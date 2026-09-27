@@ -7,7 +7,7 @@ import './testI18n';
 // Mock tavafunktsioonidega (vitest 4 vi.fn käsitleb tagasi lükatud lubadust testi veana).
 const { api } = vi.hoisted(() => ({ api: {
   parts: [] as any[], calls: [] as string[], fail: null as null | { status: number; message: string },
-  proposals: [] as any[],
+  proposals: [] as any[], personExists: false,
 } }));
 vi.mock('../../../../services/workPartsApi', async (orig) => ({
   ...(await orig<typeof import('../../../../services/workPartsApi')>()),
@@ -22,6 +22,12 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
     if (api.fail) { const e: any = new Error(api.fail.message); e.status = api.fail.status; throw e; }
   },
   listPartProposals: async () => api.proposals,
+  resolveProposedPerson: async (_w: string, pid: string, ref: string, action: string, _t: unknown, personId?: string) => {
+    api.calls.push(`person:${pid}:${ref}:${action}:${personId ?? ''}`);
+    if (action === 'create' && api.personExists) { const e: any = new Error('person_exists:vutt:Pold'); e.status = 409; throw e; }
+    api.proposals[0].persons[0].status = action === 'name' ? 'name' : 'created';
+    return { ref, status: 'created', person_id: personId ?? 'vutt:Pnew' };
+  },
   decidePartProposal: async (_w: string, pid: string, i: number, action: string, _t: unknown, part?: any) => {
     api.calls.push(`decide:${pid}:${i}:${action}:${part ? part.title ?? '' : ''}`);
     const np = { ...(part ?? api.proposals[0].items[i].part), id: 'p9', needs_review: false };
@@ -52,7 +58,7 @@ const renderTab = () => render(
   </MemoryRouter>,
 );
 
-beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; api.proposals = []; dirty.length = 0; role.value = 'superadmin'; });
+beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; api.proposals = []; api.personExists = false; dirty.length = 0; role.value = 'superadmin'; });
 
 describe('PartsTab', () => {
   it('tühi olek + osa loomine valitud lehtedest (Shift-vahemik)', async () => {
@@ -92,6 +98,23 @@ describe('PartsTab', () => {
     await waitFor(() => expect(api.calls.filter(c => c.startsWith('decide:'))).toEqual([
       'decide:pp:1:accept:', 'decide:pp:2:accept:', 'decide:pp:0:accept:',
     ]));
+  });
+
+  it('pakutud isik: loo, olemasolev väline ID pakub sidumist', async () => {
+    const person = { ref: 'np1', name: 'Johann Fischer', birth_year: 1636, death_year: 1705,
+      identifiers: [{ scheme: 'gnd', id: '118691716' }], note: 'superintendent', status: 'pending', person_id: null };
+    const item = { part: { kind: 'letter', pages: ['s1'], creators: [{ name: 'Johann Fischer', role: 'addressee' }], attached_to: null },
+      attached_to: null, evidence: [], status: 'pending', page_numbers: [1], missing_pages: [] };
+    api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: false, items: [item], persons: [person] }];
+    api.personExists = true;
+    renderTab();
+    expect(await screen.findByText('Uued isikud (1)')).toBeTruthy();
+    expect(screen.getByText('GND 118691716').getAttribute('href')).toBe('https://d-nb.info/gnd/118691716');
+    fireEvent.click(screen.getByRole('button', { name: 'Loo isik' }));
+    expect(await screen.findByText(/on VUTT-is juba olemas/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Seo' }));
+    await waitFor(() => expect(api.calls).toContain('person:pp:np1:link:vutt:Pold'));
+    await waitFor(() => expect(screen.queryByText('Uued isikud (1)')).toBeNull());
   });
 
   it('agendi ettepanekud ainult superadminile', async () => {

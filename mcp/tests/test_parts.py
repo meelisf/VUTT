@@ -42,3 +42,13 @@ def test_esitus_saadab_ainult_ettepaneku():
 def test_vigane_sisend(work_id, items):
     with pytest.raises(VuttError):
         parts.submit_parts(FakeClient(), "kood", work_id, "v", items)
+
+
+def test_isikud_kaasas_kui_antud():
+    c = FakeClient()
+    parts.submit_parts(c, "kood", "w1ab", "v", [{"kind": "letter", "pages": [1],
+        "creators": [{"person_ref": "p1", "role": "addressee"}]}], [{"ref": "p1", "name": "Fischer"}])
+    assert c.posted[1]["persons"] == [{"ref": "p1", "name": "Fischer"}]
+    c2 = FakeClient()
+    parts.submit_parts(c2, "kood", "w1ab", "v", [{"kind": "letter", "pages": [1]}])
+    assert "persons" not in c2.posted[1]
