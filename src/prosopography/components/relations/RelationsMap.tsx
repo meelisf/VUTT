@@ -29,10 +29,12 @@ const loadInstitutions = () => (institutionsPromise ??= fetchInstitutions().catc
 const RelationsMap: React.FC<{
   net: VisibleNetwork; card: ProsopoRecord | null;
   popover: ReturnType<typeof usePopover>; highlight: string | null; onHighlight: (id: string | null) => void;
-}> = ({ net, card, popover, highlight, onHighlight }) => {
+  /** Näidatavad kihid; seosteta isikul ainult elukäik. */
+  layers?: Layer[];
+}> = ({ net, card, popover, highlight, onHighlight, layers = LAYERS }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
-  const [layer, setLayer] = useState<Layer>('origin');
+  const [layer, setLayer] = useState<Layer>(layers[0]);
   const [registry, setRegistry] = useState<RegistryState>('loading');
   const [institutions, setInstitutions] = useState<Record<string, InstitutionRegistryEntry>>({});
   useEffect(() => {
@@ -60,14 +62,14 @@ const RelationsMap: React.FC<{
 
   return (
     <div className="space-y-2">
-      <div role="radiogroup" aria-label={t('network.tabs.map')} className="inline-flex flex-wrap overflow-hidden rounded border border-gray-200 text-xs">
-        {LAYERS.map((l, i) => (
+      {layers.length > 1 && <div role="radiogroup" aria-label={t('network.tabs.map')} className="inline-flex flex-wrap overflow-hidden rounded border border-gray-200 text-xs">
+        {layers.map((l, i) => (
           <button key={l} type="button" role="radio" aria-checked={layer === l} onClick={() => setLayer(l)}
             className={`px-2.5 py-1 ${i ? 'border-l border-gray-200' : ''} ${layer === l ? 'bg-gray-800 text-white' : 'bg-white text-gray-600'}`}>
             {t(`network.layers.${l}`)}
           </button>
         ))}
-      </div>
+      </div>}
       <p className="text-xs text-gray-600">
         {t(`network.layerHelp.${layer}`)}
         {layer === 'originPrint' && <> <b>{t('network.linkCount', { count: links.length })}</b></>}
