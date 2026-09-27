@@ -61,7 +61,7 @@ def validate_entry(kind: str, key: str, data: dict, *, places: Optional[dict] = 
         raise RegistryError("invalid_entry")
     allowed = {"id", "labels", "variants", "notes"}
     if kind == "institution":
-        allowed |= {"type", "place_key"}
+        allowed |= {"type", "place_key", "place_periods"}
     if set(data) - allowed:
         raise RegistryError("unknown_fields")
     qid = _text(data.get("id"), "id")
@@ -96,7 +96,33 @@ def validate_entry(kind: str, key: str, data: dict, *, places: Optional[dict] = 
         if place_key and places is not None and place_key not in places:
             raise RegistryError("unknown_place_key")
         result["place_key"] = place_key
+        periods = _place_periods(data.get("place_periods"), places)
+        if periods:
+            result["place_periods"] = periods
     return result
+
+
+def _place_periods(value, places: Optional[dict]) -> list:
+    """Asutuse koht ajas (nt AGC: Tartu kuni 1699, Pärnu alates 1699). Klient valib
+    koha faktide aasta järgi; `place_key` jääb vaikekohaks aastata faktile."""
+    if value in (None, []):
+        return []
+    if not isinstance(value, list) or len(value) > 20:
+        raise RegistryError("invalid_place_periods")
+    out = []
+    for period in value:
+        if not isinstance(period, dict) or set(period) - {"place_key", "from", "to"}:
+            raise RegistryError("invalid_place_periods")
+        place_key = _text(period.get("place_key"), "place_key", required=True)
+        if places is not None and place_key not in places:
+            raise RegistryError("unknown_place_key")
+        years = {k: period[k] for k in ("from", "to") if period.get(k) is not None}
+        if any(type(y) is not int or not 1000 <= y <= 2100 for y in years.values()):
+            raise RegistryError("invalid_place_periods")
+        if "from" in years and "to" in years and years["from"] > years["to"]:
+            raise RegistryError("invalid_place_periods")
+        out.append({"place_key": place_key, **years})
+    return out
 
 
 def _places() -> dict:

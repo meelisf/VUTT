@@ -10,7 +10,7 @@ from server.prosopography import registries
 def files(tmp_path, monkeypatch):
     monkeypatch.setattr(registries, "DATA_CONFIG_DIR", str(tmp_path))
     monkeypatch.setattr(registries, "PLACES_FILE", str(tmp_path / "places.json"))
-    (tmp_path / "places.json").write_text(json.dumps({"tartu": {"id": "Q13972"}}))
+    (tmp_path / "places.json").write_text(json.dumps({"tartu": {"id": "Q13972"}, "parnu": {"id": "Q173633"}}))
     saved = []
 
     def write(path, data, username, message=None):
@@ -98,3 +98,31 @@ def test_registri_kinnitamine_nouab_admini(client, login, files):
     saved = client.put(url, json=body, headers={"Authorization": f"Bearer {admin}"})
     assert saved.status_code == 200
     assert client.get("/prosopography/registries/institution").json()["academia-gustaviana"] == saved.json()
+
+
+def test_asutuse_koht_perioodi_kaupa(files):
+    """AGC: Tartu 1690–1699, Pärnu 1699–1710 — koht sõltub hariduskirje aastast."""
+    agc = registries.put("institution", "academia-gustavo-carolina", {
+        "labels": {"et": "Academia Gustavo-Carolina"}, "type": "university", "place_key": "tartu",
+        "place_periods": [{"place_key": "tartu", "to": 1699}, {"place_key": "parnu", "from": 1699, "to": 1710}],
+    }, "admin")
+    assert agc["place_periods"] == [{"place_key": "tartu", "to": 1699}, {"place_key": "parnu", "from": 1699, "to": 1710}]
+    no_periods = registries.put("institution", "gymn", {"labels": {"et": "G"}, "type": "school"}, "admin")
+    assert "place_periods" not in no_periods
+
+
+@pytest.mark.parametrize("periods, code", [
+    ([{"place_key": "unknown"}], "unknown_place_key"),
+    ([{"place_key": "tartu", "from": 1700, "to": 1690}], "invalid_place_periods"),
+    ([{"place_key": "tartu", "from": "1690"}], "invalid_place_periods"),
+    ([{"place_key": "tartu", "extra": 1}], "invalid_place_periods"),
+    ("tartu", "invalid_place_periods"),
+])
+def test_vigane_perioodikoht(files, periods, code):
+    with pytest.raises(registries.RegistryError, match=code):
+        registries.put("institution", "x", {"labels": {"et": "X"}, "type": "school", "place_periods": periods}, "admin")
+
+
+def test_perioodikoht_ainult_asutusel(files):
+    with pytest.raises(registries.RegistryError, match="unknown_fields"):
+        registries.put("occupation", "x", {"labels": {"et": "X"}, "place_periods": []}, "admin")

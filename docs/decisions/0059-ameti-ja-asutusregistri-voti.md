@@ -32,3 +32,15 @@ ja asutustel. Ameti „asutus” võib hoopis olla tegevuspiirkond.
 MCP kandidaatotsing võib tagastada mitu vastet. Ilma registrifailideta näitab ta
 `registry_available=false` ega esita puudumist uue kirjena. Isikukaartide ja
 registrifailide migratsioon vajab päris andmeid ning eraldi ülevaatust.
+
+## Täiendus 2026-09-27: koht ajas
+
+Asutus võib olla eri aegadel eri kohas (Academia Gustavo-Carolina: Tartu 1690–1699,
+Pärnu 1699–1710). Registrikirjel on valikuline `place_periods: [{place_key, from?, to?}]`;
+`place_key` jääb vaikekohaks. Elukäigu kaart valib koha faktide aasta järgi
+(`institutionPlaceKey`: esimene sobiv periood, aastata fakt → vaikekoht). Isikufakt
+ise kohta ei kanna — reegel „haridusel pole otsest `place_key`-d" kehtib edasi.
+
+Q-kood on valikuline ka siis, kui Wikidata kirje kaob: AGC kirje Q138710754 kustutati
+Wikidatast ja eemaldati registrist; identiteet on VUTT-i võti.
+
