@@ -132,4 +132,26 @@ describe('liitmärgi hüpik: ainult selle aasta teosed', () => {
     expect(screen.queryByText(/Tartu/)).toBeNull();          // trükikoht ei ole kirja koht
     expect(screen.getAllByRole('link').map(a => a.getAttribute('href'))).toContain('/work/epi/7');
   });
+
+  it('koht: osa real osa koht, ilma selleta mitte trükikoht; käsikirjal mitte „trükikoht teadmata"', () => {
+    const edge = (work_id: string, part_id?: string, place: { id: string; label: string; kind: 'sent_from' | 'print' } | null = null) => ({
+      kind: 'dedicated' as const, from: 'vutt:Ps', to: F, directed: true, year: 1683, place,
+      roles: { 'vutt:Ps': ['auctor'], [F]: ['addressee'] }, evidence: { work_id, pages: [], ...(part_id ? { part_id } : {}) },
+    });
+    const net = applyFilters({
+      ...NET,
+      works: [{ work_id: 'ms', title: 'Käsikiri', year: 1683, place: null, genres: [], restricted: false, manuscript: true },
+              { work_id: 'pr', title: 'Trükis', year: 1683, place: null, genres: [], restricted: false }],
+      parts: [{ work_id: 'ms', part_id: 'k1', kind: 'letter', title: '', year: null, first_page: 1 },
+              { work_id: 'ms', part_id: 'k2', kind: 'letter', title: '', year: null, first_page: 3 }],
+      edges: [edge('ms', 'k1', { id: 'Q1794', label: 'Frankfurt', kind: 'sent_from' }), edge('ms', 'k2'), edge('ms'), edge('pr')],
+    }, DEFAULT_FILTER);
+    render(
+      <MemoryRouter>
+        <RelationPopover state={{ personId: 'vutt:Ps', x: 10, y: 10, pinned: true }} net={net} onClose={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Frankfurt/)).toBeTruthy();
+    expect(screen.getAllByText(/trükikoht teadmata/)).toHaveLength(1);   // ainult trükis
+  });
 });

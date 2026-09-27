@@ -72,14 +72,14 @@ def test_saatja_adressaat_dedicated_osa_andmetega(net):
     assert (e["kind"], e["from"], e["to"], e["directed"]) == ("dedicated", F, A, True)
     assert e["evidence"]["part_id"] == "k1" and e["evidence"]["work_id"] == "w1"
     assert e["year"] == 1684
-    assert e["place"] == {"id": "Q1794", "kind": "sent_from"}
+    assert e["place"] == {"id": "Q1794", "label": "Frankfurt", "kind": "sent_from"}
 
 
 def test_istungi_osalejad_academic(net):
     (e,) = _edges(_build(F), F, B)            # k2-s ei kohtu, s1-s on mõlemad osalejad
     assert (e["kind"], e["directed"]) == ("academic", False)
     assert e["evidence"]["part_id"] == "s1"
-    assert e["place"] == {"id": "Q13972", "kind": "event"} and e["year"] == 1686
+    assert e["place"] == {"id": "Q13972", "label": "Tartu", "kind": "event"} and e["year"] == 1686
 
 
 def test_mainimine_paarub_osa_isikutega_ja_lehed_osa_piires(net):
@@ -109,10 +109,18 @@ def test_vastus_kannab_osi(net):
 
 def test_osa_aastata_votab_teose_aasta_ja_koht_trukikoht(net):
     (e,) = _edges(_build(B), B, Q)
-    assert e["year"] == 1690 and e["place"] == {"id": "Q13972", "kind": "print"}
+    assert e["year"] == 1690 and e["place"] == {"id": "Q13972", "label": "Tartu", "kind": "print"}
 
 
 def test_summeetria(net):
     a = _edges(_build(F), F, A)[0]
     b = _edges(_build(A), F, A)[0]
     assert (a["kind"], a["from"], a["to"], a["evidence"]) == (b["kind"], b["from"], b["to"], b["evidence"])
+
+
+def test_kasikirja_teos_margitud(net, tmp_path):
+    facts = json.loads((tmp_path / "wci.json").read_text())
+    facts["w1"]["manuscript"] = True
+    (tmp_path / "wci.json").write_text(json.dumps(facts), encoding="utf-8")
+    (w,) = _build(F)["works"]
+    assert w["manuscript"] is True

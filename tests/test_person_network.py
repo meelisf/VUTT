@@ -110,7 +110,7 @@ def test_teose_faktid_ja_restricted(net):
     assert w["w1"]["restricted"] is False
     assert w["w1"]["place"]["label"] == "Altdorf"
     disp = [e for e in _edges(res, P) if e["evidence"]["work_id"] == "w1"][0]
-    assert disp["place"] == {"id": "Q435295", "kind": "print"} and disp["year"] == 1658
+    assert disp["place"] == {"id": "Q435295", "label": "Altdorf", "kind": "print"} and disp["year"] == 1658
 
 
 def test_kogu_filter_alamkogudega(net):

@@ -9,7 +9,15 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { VisibleNetwork } from '../../utils/network';
+import type { NetworkEdge, NetworkWork } from '../../services/networkService';
 import { evidenceTarget, familyLabel } from '../../utils/network';
+
+/** Rea koht. Osa real osa enda koht (saatmis- või toimumiskoht), trükikoht ei ole kirja
+ *  koht (#464). Teose real trükikoht; „teadmata" ainult trükisel — käsikirjal trükikohta pole. */
+function placeLabel(e: NetworkEdge, w: NetworkWork | undefined, isPart: boolean, unknown: string): string | null {
+  if (isPart) return e.place && e.place.kind !== 'print' ? e.place.label || null : null;
+  return w?.place?.label || (w?.manuscript ? null : unknown);
+}
 
 /** `year` (valikuline): ajatelje liitmärk — näita ainult selle aasta teoseid. */
 export interface PopoverState { personId: string; x: number; y: number; pinned: boolean; year?: number | null; }
@@ -100,13 +108,12 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
             const w = net.works.get(e.evidence!.work_id);
             const { page, part } = evidenceTarget(e, net);
             const title = w?.title ? (w.title.length > 90 ? `${w.title.slice(0, 89)}…` : w.title) : e.evidence!.work_id;
-            // Osa koht (saatmis- või toimumiskoht) ei ole trükikoht; silti serv ei kanna.
-            const printPlace = !e.place || e.place.kind === 'print';
+            const place = placeLabel(e, w, !!part, t('network.unknownPlace'));
             return (
               <li key={`${e.evidence!.work_id}-${i}`}>
                 <span className="text-gray-500">
                   {e.year ?? w?.year ?? '?'}
-                  {printPlace && <> · {w?.place?.label ?? t('network.unknownPlace')}</>}
+                  {place && <> · {place}</>}
                   {' · '}{t(`network.kinds.${e.kind}`)}
                 </span>
                 {part && (

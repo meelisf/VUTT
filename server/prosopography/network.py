@@ -86,9 +86,10 @@ _PART_PLACE_KIND = {"letter": "sent_from", "session": "event", "speech": "event"
 
 def _edge_place(fact: dict, part: Optional[dict]) -> Optional[dict]:
     if part and part.get("place") and part.get("kind") in _PART_PLACE_KIND:
-        return {"id": part["place"].get("id"), "kind": _PART_PLACE_KIND[part["kind"]]}
+        return {"id": part["place"].get("id"), "label": part["place"].get("label") or "",
+                "kind": _PART_PLACE_KIND[part["kind"]]}
     loc = fact.get("location")
-    return {"id": loc.get("id"), "kind": "print"} if loc else None
+    return {"id": loc.get("id"), "label": loc.get("label") or "", "kind": "print"} if loc else None
 
 
 def _scope_pages(pages: set, fact: dict, scope) -> list:
@@ -277,7 +278,8 @@ def build_person_network(person_id: str, collection: Optional[str] = None) -> Op
             if wid not in works:
                 works[wid] = {"work_id": wid, "title": fact.get("title") or "", "year": fact.get("year"),
                               "place": ({**loc, "coordinates": _place_coords(loc)} if loc else None),
-                              "genres": fact.get("genres") or [], "restricted": not _is_public(cols)}
+                              "genres": fact.get("genres") or [], "restricted": not _is_public(cols),
+                              "manuscript": bool(fact.get("manuscript"))}
 
     for oid, recs in _family_records(person_id, card).items():
         frm, to = sorted((person_id, oid))

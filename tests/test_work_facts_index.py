@@ -174,3 +174,9 @@ def test_kogude_hulgimuudatus_muudab_restricted_ilma_rebuildita(monkeypatch, tmp
         assert build_person_network(A)["works"][0]["restricted"] is False
         mo.bulk_update_works([(str(path), lambda _m: {"collections": ["salajane"]})], "tester", "kogu")
         assert build_person_network(A)["works"][0]["restricted"] is True
+
+
+def test_kasikiri_margitakse_trukis_mitte():
+    assert wro._work_facts_entry(_meta(type={"id": "Q87167", "label": "käsikiri"}))["manuscript"] is True
+    assert wro._work_facts_entry(_meta(type="Q87167"))["manuscript"] is True
+    assert "manuscript" not in wro._work_facts_entry(_meta(type={"id": "Q1261026"}))
