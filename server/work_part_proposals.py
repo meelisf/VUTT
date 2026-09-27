@@ -34,10 +34,8 @@ MAX_PARTS = 50
 MAX_BODY_BYTES = 64_000
 _PART_KEYS = {"kind", "title", "incipit", "notes", "pages", "creators", "dating", "place",
               "place_to", "languages", "attached_to", "evidence", "part_id"}
-# Liitmine olemasoleva osaga: inimese kirjutatud tekst jääb, kui on täidetud;
-# struktuurse välja võtab parandus üle (agent parandab dateeringut, kohta, lehti).
+# Liitmine olemasoleva osaga: inimese kirjutatud tekst jääb, kui on täidetud.
 _KEEP_EXISTING_TEXT = ("title", "incipit", "notes")
-_TAKE_PROPOSED = ("kind", "dating", "place", "place_to", "languages")
 _EVIDENCE_KEYS = {"page", "quote"}
 MAX_PERSONS = 50
 _PERSON_KEYS = {"ref", "name", "aliases", "birth_year", "death_year", "identifiers", "note", "evidence"}
@@ -192,6 +190,7 @@ def _clean_part(raw: dict, index: int, count: int, stems: list[str],
     item = {"part": normalized, "attached_to": attached, "evidence": evidence, "status": "pending"}
     if target:
         item["target_part_id"] = target
+        item["explicit_target"] = True
     if creator_refs:
         item["creator_refs"] = creator_refs
     return item
@@ -224,15 +223,33 @@ def _same_person(a: dict, b: dict) -> bool:
     return (a.get("name") or "").strip().casefold() == (b.get("name") or "").strip().casefold() != ""
 
 
-def merge_part(existing: dict, proposed: dict) -> dict:
-    """Olemasolev osa + agendi parandus (ilma id ja needs_review'ta, update_part'ile)."""
+def _precision(dating) -> int:
+    return len(((dating or {}).get("start") or "").strip())
+
+
+def merge_part(existing: dict, proposed: dict, explicit: bool = False) -> dict:
+    """Olemasolev osa + agendi parandus (ilma id ja needs_review'ta, update_part'ile).
+
+    `explicit` = agent ütles `part_id`: parandus võidab ka täidetud väljal. Muidu
+    (automaatselt tuvastatud sama osa) on liitmine konservatiivne. Dateering ei muutu
+    kunagi ebatäpsemaks; koht ei vahetu ainult keele pärast („Paris" / „Pariis").
+    """
     out = {k: v for k, v in existing.items() if k not in ("id", "needs_review")}
     for key in _KEEP_EXISTING_TEXT:
         if not out.get(key) and proposed.get(key):
             out[key] = proposed[key]
-    for key in _TAKE_PROPOSED:
-        if proposed.get(key):
-            out[key] = proposed[key]
+    if proposed.get("kind") and explicit:
+        out["kind"] = proposed["kind"]
+    new_d, old_d = proposed.get("dating"), out.get("dating")
+    if new_d and (not old_d or _precision(new_d) > _precision(old_d)
+                  or (explicit and _precision(new_d) == _precision(old_d))):
+        out["dating"] = new_d
+    for key in ("place", "place_to"):
+        new_p, old_p = proposed.get(key), out.get(key)
+        if new_p and (not old_p or explicit or (new_p.get("id") and not old_p.get("id"))):
+            out[key] = new_p
+    if proposed.get("languages"):
+        out["languages"] = list(dict.fromkeys((out.get("languages") or []) + proposed["languages"]))
     if proposed.get("pages"):
         out["pages"] = proposed["pages"]
     creators = [dict(c) for c in existing.get("creators") or []]
@@ -328,7 +345,7 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
                 if it["target_part_id"]:
                     # Sama liitmine, mida vastuvõtt teeb — „Muuda" vorm alustab sellest.
                     existing = next(x for x in parts_now if x.get("id") == it["target_part_id"])
-                    it["merged"] = merge_part(existing, it["part"])
+                    it["merged"] = merge_part(existing, it["part"], explicit=bool(it.get("explicit_target")))
             it["page_numbers"] = [number[s] for s in it["part"]["pages"] if s in number]
             it["missing_pages"] = [s for s in it["part"]["pages"] if s not in number]
         out.append({"proposal_id": row["id"], "created_at": row["created_at"],
@@ -372,7 +389,8 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
             try:
                 if target:
                     existing = next(p for p in _current_parts(work_dir) if p.get("id") == target)
-                    data = dict(override) if isinstance(override, dict) else merge_part(existing, data)
+                    data = dict(override) if isinstance(override, dict) else \
+                        merge_part(existing, data, explicit=bool(item.get("explicit_target")))
                     data.pop("id", None); data.pop("needs_review", None)
                     created = wp.update_part(work_dir, target, data, username)
                 else:
