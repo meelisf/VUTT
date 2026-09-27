@@ -39,3 +39,32 @@ export async function deletePart(workId: string, partId: string, token: string |
 }
 export const changePartPages = (workId: string, partId: string, add: string[], remove: string[], token: string | null) =>
   apiPost<WorkPart>(`${one(workId, partId)}/pages`, { add, remove }, opts(token));
+
+// ── Agendi ettepanekud (#492 samm 2) ─────────────────────────────────────────
+
+export interface PartProposalItem {
+  part: PartInput;
+  attached_to: number | string | null;
+  evidence: { page: number; quote?: string }[];
+  status: 'pending' | 'accepted' | 'rejected';
+  created_part_id?: string;
+  page_numbers: number[];
+  missing_pages: string[];
+}
+export interface PartProposal {
+  proposal_id: string; created_at: number; expires_at: number;
+  pages_changed: boolean; items: PartProposalItem[];
+}
+export interface PartsHandoff { code: string; expires_at: number; max_uses: number; work_id: string; pages_version: string; }
+
+export const createPartsHandoff = (workId: string, token: string | null) =>
+  apiPost<PartsHandoff>(`${base(workId)}/handoff`, {}, opts(token));
+export async function listPartProposals(workId: string, token: string | null): Promise<PartProposal[]> {
+  return apiGet<PartProposal[]>(`${base(workId)}/proposals`, opts(token));
+}
+/** Toimetaja otsus ühe pakutud osa kohta; `part` = parandatud kuju vastuvõtul. */
+export const decidePartProposal = (workId: string, proposalId: string, index: number,
+  action: 'accept' | 'reject', token: string | null, part?: PartInput) =>
+  apiPost<{ status: string; part: WorkPart | null }>(
+    `${base(workId)}/proposals/${encodeURIComponent(proposalId)}/items/${index}/${action}`,
+    part ? { part } : {}, opts(token));

@@ -11,13 +11,15 @@ import { useTranslation } from 'react-i18next';
 import { LayoutGrid, ListOrdered } from 'lucide-react';
 import type { WorkPageInfo } from '../../../services/workApi';
 import {
-  changePartPages, createPart, deletePart, listParts, updatePart, type WorkPart,
+  changePartPages, createPart, decidePartProposal, deletePart, listParts, updatePart, type WorkPart,
+  type PartProposalItem,
 } from '../../../services/workPartsApi';
 import { draftFromPart, emptyDraft, pageBadges, partFromDraft, sharedStems, sortParts, type PartDraft } from '../partsModel';
 import PartsGrid from './PartsGrid';
 import PartsList from './PartsList';
 import PartForm from './PartForm';
 import PartPanel from './PartPanel';
+import PartProposals from './PartProposals';
 import { usePersonSources } from '../../../hooks/usePersonSources';
 import { getLangCode } from '../../../utils/getLangCode';
 
@@ -47,7 +49,8 @@ interface Props {
   saveRef: React.MutableRefObject<() => Promise<boolean>>;
 }
 
-type Editing = { id: string | null; pages: string[] } | null;
+/** `proposal`: uus osa agendi ettepanekust — salvestus kinnitab ettepaneku (#492). */
+type Editing = { id: string | null; pages: string[]; proposal?: { id: string; index: number } } | null;
 
 const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCacheBust, onDirtyChange, runGuarded, saveRef }) => {
   const { t, i18n } = useTranslation(['workspace']);
@@ -62,6 +65,8 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [previewStems, setPreviewStems] = useState<string[]>([]);
+  const [proposalsKey, setProposalsKey] = useState(0);
 
   const stems = useMemo(() => pages.map(p => p.base_name), [pages]);
   const pageNums = useMemo(() => new Map(pages.map(p => [p.base_name, p.page_num])), [pages]);
@@ -114,6 +119,14 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
     setError(null);
   });
 
+  // Agendi ettepanek vormi: uus osa ettepaneku lehtedega; salvestus = ettepaneku vastuvõtt.
+  const editProposal = (proposalId: string, index: number, item: PartProposalItem) => runGuarded(() => {
+    setEditing({ id: null, pages: item.part.pages, proposal: { id: proposalId, index } });
+    setDraft(draftFromPart({ ...item.part, id: '', needs_review: false, attached_to: null } as WorkPart));
+    setDirty(false);
+    setError(null);
+  });
+
   const closePanel = () => runGuarded(() => {
     setEditing(null);
     setDirty(false);
@@ -135,9 +148,13 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
       // Uus osa: paneel on mittemodaalne, seega avamise järel valitud lehed lähevad kaasa.
       const newPages = stems.filter(s => editing.pages.includes(s) || selected.has(s));
       const input = partFromDraft(draft, editing.id ? (active?.pages ?? editing.pages) : newPages);
-      const saved = editing.id
-        ? await updatePart(workId, editing.id, input, token)
-        : await createPart(workId, input, token);
+      const saved = editing.proposal
+        ? (await decidePartProposal(workId, editing.proposal.id, editing.proposal.index, 'accept', token,
+            partFromDraft(draft, editing.pages))).part!
+        : editing.id
+          ? await updatePart(workId, editing.id, input, token)
+          : await createPart(workId, input, token);
+      if (editing.proposal) setProposalsKey(k => k + 1);
       await reload();
       setEditing({ id: saved.id, pages: saved.pages });
       setDraft(draftFromPart(saved));
@@ -194,7 +211,8 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
     }
   };
 
-  const activeStems = useMemo(() => new Set(active?.pages ?? editing?.pages ?? []), [active, editing]);
+  const activeStems = useMemo(
+    () => new Set(active?.pages ?? editing?.pages ?? previewStems), [active, editing, previewStems]);
   const shared = active ? [...sharedStems(active, parts).keys()] : [];
 
   const segBtn = (on: boolean) =>
@@ -232,6 +250,9 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
         )}
         {!editing && error && <p className="text-sm text-red-600">{t('manage.parts.error', { message: error })}</p>}
       </div>
+
+      <PartProposals workId={workId} token={token} refreshKey={proposalsKey}
+        onPreview={setPreviewStems} onEdit={editProposal} onChanged={() => { void reload(); }} />
 
       {view === 'pages' ? (
         <>
