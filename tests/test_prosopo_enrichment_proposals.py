@@ -249,7 +249,7 @@ def test_olemasoleva_kirje_toend_lisataks_molemal_liigil(client, login, prosopo_
     registry = tmp_path / 'config'
     registry.mkdir(exist_ok=True)
     (registry / 'occupations.json').write_text(json.dumps({'professor': {'labels': {'et': 'professor'}}}))
-    (registry / 'institutions.json').write_text(json.dumps({'agc': {'labels': {'et': 'Academia Gustaviana'}}}))
+    (registry / 'institutions.json').write_text(json.dumps({'agc': {'labels': {'et': 'Academia Gustavo-Carolina'}}}))
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
     monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[{
@@ -267,7 +267,7 @@ def test_olemasoleva_kirje_toend_lisataks_molemal_liigil(client, login, prosopo_
               match_status='already_present', existing_index=0,
               date_from={'date': '1640', 'precision': 'year'}),
         {'kind': 'education', 'match_status': 'already_present', 'existing_index': 0,
-         'raw_institution': 'Academia Gustaviana', 'institution_key': 'agc',
+         'raw_institution': 'Academia Gustavo-Carolina', 'institution_key': 'agc',
          'edu_type': 'immatriculation', 'date_from': {'date': '1640', 'precision': 'year'},
          'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}]},
     ]
@@ -294,7 +294,7 @@ def test_sama_voti_ja_kattuv_aeg_on_duplikaat_aga_eri_opingusundmus_mitte(
         'date_from': {'date': '1640', 'precision': 'year'},
     }])
     token = login('editor', 'editorpass')
-    base = {'kind': 'education', 'match_status': 'matched', 'raw_institution': 'Academia Gustaviana',
+    base = {'kind': 'education', 'match_status': 'matched', 'raw_institution': 'Academia Gustavo-Carolina',
             'institution_key': 'agc', 'date_from': {'date': '1640', 'precision': 'year'},
             'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}]}
     proposal_id = _submit_for_review(client, token, card, [{**base, 'edu_type': 'immatriculation'}])

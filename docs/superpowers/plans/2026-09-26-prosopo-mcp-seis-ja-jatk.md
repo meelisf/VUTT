@@ -2,6 +2,11 @@
 
 ## Jätk 2026-09-27
 
+Tootmise `data/` peal kirjutuseta kuivkäivitus leidis 4347 fakti ja 394
+ülevaatusrühma. Kasutaja kinnitas, et lühend `AGC` tähistab Academia
+Gustavo-Carolinat (Q138710754), mitte Academia Gustavianat (Q28966944).
+Nende kahe asutuse registrivõtmed ja nimevariandid peavad jääma lahku.
+
 Haru on nüüd ühendatud 2026-09-26 lõpu `main`-iga (#464 osade UI). ADR-i
 numbrikonflikt lahenes: MCP ettepanek on ADR 0058, teose osad ADR 0057.
 
@@ -55,7 +60,7 @@ Peamised failid: `server/prosopography/enrichment_proposals.py`, `server/prosopo
 
 1. **#462 ja #471 registrid puuduvad päriselt.** Selle haru andmetes ei ole veel autoriteetseid asutuse- ega ametiregistreid. Kandidaadiotsing annab siis `registry_available=false` ning olematu võtmega seotud kirjet ei saa kinnitada. Testid kasutavad ajutisi näidisregistreid. Vaja on registrite skeem, algandmed, mitmetähenduslike variantide ülevaatus ja migratsiooni kuivkäivitus. Mõlemas registris on püsiv VUTT-i võti ning valikuline Q-kood; kirjete algne sõnastus säilib. Ametil võib olla asutus *või* territoorium (`place_key`), haridusel asutus; asutus viitab kaardikoha jaoks `place_key`-le.
 2. **Allika värskuse ja õiguste kontroll kinnitamisvaates vajab viimistlust.** Vaates on allikaviide ja tõendi väljad, kuid tegeliku VUTT-i lehe värsket OCR-olekut ja toimetajamärkusi ei kuvata. Vaadata üle, millal ning mis õigustega näidata kaitstud teose katket. Järgida üldplaani allikate osa.
-3. **Elukäigu ja kaardi projektsioon on eraldi töö.** `lifeStations` peab võtma asutuse koha `place_key` kaudu ja ametikirje territooriumi otse `place_key`-st, ilma asutuse sildi põhjal kohanime äraarvamiseta. Üldplaani §10 näited: Fischer, AGC/Academia Gustaviana, puuduva `place_key`-ga asutus ja otsese territooriumiga amet.
+3. **Elukäigu ja kaardi projektsioon on eraldi töö.** `lifeStations` peab võtma asutuse koha `place_key` kaudu ja ametikirje territooriumi otse `place_key`-st, ilma asutuse sildi põhjal kohanime äraarvamiseta. Üldplaani §10 näited: Fischer, AGC/Academia Gustavo-Carolina, puuduva `place_key`-ga asutus ja otsese territooriumiga amet.
 4. Puuduva registrikirje jaoks ei ole veel toimetaja ettepaneku või registri ülevaatuse voogu. Samuti pole tehtud päris andmetega brauseri läbikäiku, PR-i ega juurutust.
 
 ## Kontrollitud

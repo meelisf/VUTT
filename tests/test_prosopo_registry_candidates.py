@@ -18,7 +18,7 @@ def registries(tmp_path, monkeypatch):
                        "variants": ["Theologe"]},
     }), encoding="utf-8")
     (tmp_path / "institutions.json").write_text(json.dumps({
-        "agc": {"id": None, "labels": {"et": "Academia Gustaviana"},
+        "agc": {"id": None, "labels": {"et": "Academia Gustavo-Carolina"},
                 "variants": ["AGC"], "type": "university", "place_key": "tartu"},
         "abo_academy": {"id": "Q123", "labels": {"et": "Åbo akadeemia"},
                 "variants": ["Åbo"], "type": "university", "place_key": None},
@@ -56,7 +56,7 @@ def test_q_koodita_asutus_ja_koht_sailivad(client, registries):
                         params={"kind": "institution", "q": "AGC"}).json()
     assert result["ambiguous"] is False
     assert result["results"][0] == {
-        "key": "agc", "id": None, "labels": {"et": "Academia Gustaviana"},
+        "key": "agc", "id": None, "labels": {"et": "Academia Gustavo-Carolina"},
         "match_kind": "key", "matched_text": "agc", "matched_variant": "AGC",
         "type": "university", "place_key": "tartu",
     }

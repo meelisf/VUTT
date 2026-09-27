@@ -26,7 +26,7 @@ def files(tmp_path, monkeypatch):
 def test_asutus_ja_amet_ilma_q_koodita(files):
     path, saved = files
     institution = registries.put("institution", "academia-gustaviana", {
-        "id": None, "labels": {"et": "Academia Gustaviana"},
+        "id": None, "labels": {"et": "Academia Gustavo-Carolina"},
         "variants": ["AGC", "agc"], "type": "university", "place_key": "tartu",
     }, "toimetaja")
     occupation = registries.put("occupation", "professor", {
@@ -63,7 +63,7 @@ def test_isikufakt_sailitab_toorsildi_ja_kooskolastab_q_koodi(files):
     registries.put("occupation", "pastor", {
         "id": "Q152002", "labels": {"et": "pastor"}, "variants": ["Pfarrer"]}, "admin")
     registries.put("institution", "agc", {
-        "labels": {"et": "Academia Gustaviana"}, "variants": ["AGC"],
+        "labels": {"et": "Academia Gustavo-Carolina"}, "variants": ["AGC"],
         "type": "university", "place_key": "tartu"}, "admin")
     original = {"occupations": [{"label": "Pfarrer", "id": "Qwrong", "occupation_key": "pastor",
                                  "institution": "AGC", "institution_id": "Qwrong", "institution_key": "agc"}],
@@ -88,7 +88,7 @@ def test_territoorium_ja_asutus_ei_ole_sama_link(files):
 
 
 def test_registri_kinnitamine_nouab_admini(client, login, files):
-    body = {"id": None, "labels": {"et": "Academia Gustaviana"},
+    body = {"id": None, "labels": {"et": "Academia Gustavo-Carolina"},
             "variants": ["AGC"], "type": "university", "place_key": "tartu"}
     url = "/prosopography/registries/institution/academia-gustaviana"
     editor = login("editor", "editorpass")

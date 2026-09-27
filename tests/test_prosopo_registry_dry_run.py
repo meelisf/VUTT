@@ -15,7 +15,7 @@ def test_raw_ja_mitmetahenduslik_vaste_jaavad_ulevaatusse(tmp_path: Path):
         "pastor": {"id": "Q152002", "labels": {"et": "pastor"}, "variants": ["Pfarrer"]},
         "vaimulik": {"id": "Q2259532", "labels": {"et": "vaimulik"}, "variants": ["Pfarrer"]},
     }
-    institutions = {"agc": {"labels": {"et": "Academia Gustaviana"}, "variants": ["AGC"]}}
+    institutions = {"agc": {"labels": {"et": "Academia Gustavo-Carolina"}, "variants": ["AGC"]}}
     places = {"liivimaa": {"id": "Q183464"}}
     rows = report_rows(tmp_path, occupations, institutions, places)
     assert [(r["field"], r["raw"], r["match"], r["candidate"]) for r in rows] == [
@@ -31,12 +31,12 @@ def test_luhend_ja_taisnimi_koondatakse_sama_kandidaadi_alla():
     rows = [
         {"person_id": "vutt:P1", "field": "institution", "raw": "AGC", "legacy_id": "",
          "candidate": "agc", "alternatives": "", "match": "name"},
-        {"person_id": "vutt:P2", "field": "institution", "raw": "Academia Gustaviana", "legacy_id": "",
+        {"person_id": "vutt:P2", "field": "institution", "raw": "Academia Gustavo-Carolina", "legacy_id": "",
          "candidate": "agc", "alternatives": "", "match": "name"},
     ]
     groups = review_groups(rows)
     assert len(groups) == 1
-    assert groups[0]["raw_variants"] == "AGC | Academia Gustaviana"
+    assert groups[0]["raw_variants"] == "AGC | Academia Gustavo-Carolina"
     assert groups[0]["count"] == 2
     assert groups[0]["decision"] == ""
 

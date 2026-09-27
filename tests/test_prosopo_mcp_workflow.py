@@ -24,7 +24,7 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
         "professor": {"labels": {"et": "professor"}, "variants": ["Prof. theol."]},
     }))
     (registry / "institutions.json").write_text(json.dumps({
-        "agc": {"labels": {"et": "Academia Gustaviana"}, "variants": ["AGC"]},
+        "agc": {"labels": {"et": "Academia Gustavo-Carolina"}, "variants": ["AGC"]},
     }))
     monkeypatch.setattr(proposals, "DATA_CONFIG_DIR", str(registry))
     monkeypatch.setattr(registries, "DATA_CONFIG_DIR", str(registry))

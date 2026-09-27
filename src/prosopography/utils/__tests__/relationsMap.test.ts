@@ -109,7 +109,7 @@ describe('asutuse ja territooriumi registriviited (#462)', () => {
       education: [{ institution: 'Univ. Uppsala', institution_key: 'uppsala' }] } as unknown as ProsopoRecord;
     const places = { ...REG, tartu: { id: 'Q13972', labels: { et: 'Tartu' }, coordinates: { lat: 58.38, lon: 26.72 } } };
     const institutions = {
-      agc: { id: null, labels: { et: 'Academia Gustaviana' }, variants: ['AGC'], type: 'university', place_key: 'tartu' },
+      agc: { id: null, labels: { et: 'Academia Gustavo-Carolina' }, variants: ['AGC'], type: 'university', place_key: 'tartu' },
       uppsala: { id: null, labels: { et: 'Uppsala ülikool' }, variants: [], type: 'university', place_key: null },
     };
     const result = lifeStations(card, places, institutions);
