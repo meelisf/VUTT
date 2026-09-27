@@ -78,10 +78,12 @@ async function enrichmentResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-export async function createEnrichmentHandoff(personId: string, token: string): Promise<{
-  code: string; expires_at: number; base_updated_at: string;
+/** Esituskood agendile: ühele isikule või (`null`) kõigile isikutele (#492). */
+export async function createEnrichmentHandoff(personId: string | null, token: string): Promise<{
+  code: string; expires_at: number; base_updated_at?: string; scope?: 'person' | 'any'; max_uses?: number;
 }> {
-  const response = await fetchWithTimeout(`${BASE}/enrichment-handoff/${encodeURIComponent(personId)}`, {
+  const path = personId ? `/enrichment-handoff/${encodeURIComponent(personId)}` : '/enrichment-handoff';
+  const response = await fetchWithTimeout(`${BASE}${path}`, {
     method: 'POST', headers: getAuthHeaders(token), timeout: 10000,
   });
   return enrichmentResponse(response);

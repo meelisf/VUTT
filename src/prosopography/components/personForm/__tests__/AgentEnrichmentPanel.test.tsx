@@ -57,6 +57,15 @@ describe('agendi ettepanekud isikuvormis', () => {
     expect(onApplied).toHaveBeenCalledWith(expect.objectContaining({ updated_at: 'version-2' }));
   });
 
+  it('üldkood kõigile isikutele (#492): kutsub ilma isikuta ja ütleb ulatuse', async () => {
+    handoff.mockResolvedValue({ code: 'any-code', expires_at: 9999999999, scope: 'any', max_uses: 200 });
+    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Kood kõigile isikutele' }));
+    expect(await screen.findByText('any-code')).toBeTruthy();
+    expect(handoff).toHaveBeenCalledWith(null, 'editor-token');
+    expect(screen.getByText(/kõigile isikutele.*200/)).toBeTruthy();
+  });
+
   it('ei luba salvestamata vormi ega puuduva registriseosega rida kinnitada', async () => {
     list.mockResolvedValue([{ ...proposal, items: [{ ...proposal.items[0], review_error: 'unknown_institution_key' }] }]);
     render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={true} onApplied={vi.fn()} /></MemoryRouter>);

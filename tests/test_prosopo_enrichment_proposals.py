@@ -28,28 +28,62 @@ def _headers(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_uleandmine_on_uhekordne_ja_isikukaart_jaab_puutumata(client, login, prosopo_env):
+def test_isikukood_lubab_mitu_esitust_ja_isikukaart_jaab_puutumata(client, login, prosopo_env):
+    """#492: kood kehtib tööpäeva, lubab ulatuse piires mitu esitust kuni laeni."""
     before = prosopo_env.write("abc", occupations=[])
     token = login("editor", "editorpass")
     handoff = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
                           headers=_headers(token))
     assert handoff.status_code == 200
+    assert handoff.json()["scope"] == "person" and handoff.json()["max_uses"] > 1
     code = handoff.json()["code"]
     body = {"code": code, "person_id": "vutt:Pabc",
             "base_updated_at": before["updated_at"], "items": [_item()]}
     submitted = client.post("/prosopography/enrichment-proposals/submit", json=body)
     assert submitted.status_code == 200
     assert submitted.json()["status"] == "pending"
-    assert client.post("/prosopography/enrichment-proposals/submit", json=body).status_code == 400
+    assert client.post("/prosopography/enrichment-proposals/submit", json=body).status_code == 200
     pending = client.get("/prosopography/enrichment-proposals/vutt:Pabc",
                          headers=_headers(token))
-    assert pending.status_code == 200
+    assert pending.status_code == 200 and len(pending.json()) == 2
     assert pending.json()[0]["items"][0]["occupation_key"] == "theology-professor"
     assert pending.json()[0]["items"][0]["review_error"] == "unknown_occupation_key"
     assert prosopo_env.read("abc") == before
 
 
-def test_uleandmine_nouab_editori_ja_pakkumine_on_sessioonipohine(client, login, prosopo_env):
+def test_isikukood_ei_kehti_teisele_isikule(client, login, prosopo_env):
+    prosopo_env.write("abc")
+    other = prosopo_env.write("oth")
+    token = login("editor", "editorpass")
+    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc", headers=_headers(token)).json()["code"]
+    assert client.post("/prosopography/enrichment-proposals/submit", json={
+        "code": code, "person_id": "vutt:Poth", "base_updated_at": other["updated_at"],
+        "items": [_item()]}).status_code == 400
+
+
+def test_uldkood_kehtib_koigile_isikutele_ja_kasutuste_lagi(client, login, prosopo_env, monkeypatch):
+    a = prosopo_env.write("abc")
+    b = prosopo_env.write("oth")
+    token = login("editor", "editorpass")
+    assert client.post("/prosopography/enrichment-handoff").status_code == 401
+    handoff = client.post("/prosopography/enrichment-handoff", headers=_headers(token))
+    assert handoff.status_code == 200 and handoff.json()["scope"] == "any"
+    code = handoff.json()["code"]
+    for card in (a, b):
+        assert client.post("/prosopography/enrichment-proposals/submit", json={
+            "code": code, "person_id": card["id"], "base_updated_at": card["updated_at"],
+            "items": [_item()]}).status_code == 200
+    monkeypatch.setattr(proposals, "ANY_MAX_USES", 2)
+    code2 = client.post("/prosopography/enrichment-handoff", headers=_headers(token)).json()["code"]
+    body = {"code": code2, "person_id": a["id"], "base_updated_at": a["updated_at"], "items": [_item()]}
+    assert client.post("/prosopography/enrichment-proposals/submit", json=body).status_code == 200
+    assert client.post("/prosopography/enrichment-proposals/submit", json=body).status_code == 200
+    third = client.post("/prosopography/enrichment-proposals/submit", json=body)
+    assert third.status_code == 400 and third.json()["detail"] == "handoff_used_up"
+
+
+def test_ettepanek_on_kasutaja_oma_mitte_seansi(client, login, prosopo_env):
+    """#492: uus sisselogimine ei peida ootel ettepanekut; teine kasutaja ei näe."""
     prosopo_env.write("abc")
     assert client.post("/prosopography/enrichment-handoff/vutt:Pabc").status_code == 401
     contrib = login("contrib", "contribpass")
@@ -57,18 +91,16 @@ def test_uleandmine_nouab_editori_ja_pakkumine_on_sessioonipohine(client, login,
                        headers=_headers(contrib)).status_code == 401
     token1 = login("editor", "editorpass")
     token2 = login("editor", "editorpass")
+    other_user = login("admin", "adminpass")
     code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
                        headers=_headers(token1)).json()["code"]
     client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Pabc",
         "base_updated_at": "2026-01-01T00:00:00+00:00", "items": [_item()],
     })
-    own = client.get("/prosopography/enrichment-proposals/vutt:Pabc",
-                     headers=_headers(token1))
-    other_session = client.get("/prosopography/enrichment-proposals/vutt:Pabc",
-                               headers=_headers(token2))
-    assert len(own.json()) == 1
-    assert other_session.json() == []
+    for token, expected in ((token1, 1), (token2, 1), (other_user, 0)):
+        got = client.get("/prosopography/enrichment-proposals/vutt:Pabc", headers=_headers(token))
+        assert len(got.json()) == expected
 
 
 @pytest.mark.parametrize("change", [
@@ -186,16 +218,17 @@ def test_kinnitamine_keeldub_puuduvast_registrist_ja_vananenud_kaardist(client, 
     assert prosopo_env.read('abc') == card2
 
 
-def test_kinnitamine_nouab_sama_sessiooni_ja_varsket_versiooni(client, login, prosopo_env):
+def test_kinnitamine_nouab_sama_kasutajat_ja_varsket_versiooni(client, login, prosopo_env):
     card = prosopo_env.write('abc', occupations=[])
     token1 = login('editor', 'editorpass')
-    token2 = login('editor', 'editorpass')
+    other_user = login('admin', 'adminpass')
     proposal_id = _submit_for_review(client, token1, card, [_item(occupation_key=None, institution_key=None)])
     url = f'/prosopography/enrichment-proposals/{card["id"]}/apply'
-    assert client.post(url, headers=_headers(token2),
+    assert client.post(url, headers=_headers(other_user),
                        json={"proposal_id": proposal_id, "selected": [0]}).status_code == 400
     changed = prosopo_env.write('abc', occupations=[], updated_at='2026-02-01T00:00:00+00:00')
-    result = client.post(url, headers=_headers(token1),
+    token2 = login('editor', 'editorpass')              # uus seanss, sama kasutaja
+    result = client.post(url, headers=_headers(token2),
                          json={"proposal_id": proposal_id, "selected": [0]})
     assert result.status_code == 409
     assert result.json()['detail'] == 'stale_person'

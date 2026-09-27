@@ -12,7 +12,12 @@ from typing import Optional
 from ..config import STATE_DIR, DATA_CONFIG_DIR, PLACES_FILE
 
 DB_PATH = os.path.join(STATE_DIR, "prosopo_enrichment_proposals.sqlite3")
-CODE_TTL = 15 * 60
+# Kood on toimetaja tööpäeva pikkune ja lubab ulatuse piires mitu esitust (#492, ADR 0058
+# täiendus). Kood annab ainult ootel ettepaneku esitamise õiguse: ülevaatus ja kinnitus
+# nõuavad sama kasutaja sessiooni, seega ei ava laiem kood ühtegi andmete kirjutusteed.
+CODE_TTL = 8 * 60 * 60
+PERSON_MAX_USES = 20
+ANY_MAX_USES = 200
 PROPOSAL_TTL = 7 * 24 * 60 * 60
 MAX_ITEMS = 20
 MAX_BODY_BYTES = 32_000
@@ -66,6 +71,15 @@ def _db():
         """)
         if not any(column[1] == "applied_at" for column in db.execute("PRAGMA table_info(proposal)")):
             db.execute("ALTER TABLE proposal ADD COLUMN applied_at INTEGER")
+        handoff_columns = {column[1] for column in db.execute("PRAGMA table_info(handoff)")}
+        # Vanad (ühekordsed) koodid: max_uses 1, kasutatud kood uses 1.
+        if "scope" not in handoff_columns:
+            db.execute("ALTER TABLE handoff ADD COLUMN scope TEXT NOT NULL DEFAULT 'person'")
+        if "max_uses" not in handoff_columns:
+            db.execute("ALTER TABLE handoff ADD COLUMN max_uses INTEGER NOT NULL DEFAULT 1")
+        if "uses" not in handoff_columns:
+            db.execute("ALTER TABLE handoff ADD COLUMN uses INTEGER NOT NULL DEFAULT 0")
+            db.execute("UPDATE handoff SET uses = 1 WHERE used_at IS NOT NULL")
         with db:
             yield db
     finally:
@@ -77,21 +91,28 @@ def _clean(db, now: int) -> None:
     db.execute("DELETE FROM proposal WHERE expires_at < ?", (now,))
 
 
-def issue_handoff(person_id: str, username: str, session_fingerprint: str,
-                  updated_at: str) -> dict:
-    """Ühekordne isikupõhine kood; editori sessiooni kontrollib router."""
-    if not valid_person_id(person_id) or not updated_at or not session_fingerprint:
+def issue_handoff(person_id: Optional[str], username: str, session_fingerprint: str,
+                  updated_at: str = "") -> dict:
+    """Esituskood ühele isikule (`person_id`) või kõigile isikutele (`None`).
+
+    Editori rolli kontrollib router. Kood on seotud kasutajaga: ettepanekud näeb ja
+    kinnitab sama kasutaja igas oma seansis (#492).
+    """
+    scope = "person" if person_id is not None else "any"
+    if (scope == "person" and not valid_person_id(person_id)) or not session_fingerprint:
         raise ProposalError("invalid_person_or_version")
+    max_uses = PERSON_MAX_USES if scope == "person" else ANY_MAX_USES
     code = secrets.token_urlsafe(32)
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
         db.execute(
-            "INSERT INTO handoff VALUES (?, ?, ?, ?, ?, ?, NULL)",
-            (hashlib.sha256(code.encode()).hexdigest(), person_id,
-             username, session_fingerprint, updated_at, now + CODE_TTL),
+            "INSERT INTO handoff (code_hash, person_id, username, session_fingerprint, base_updated_at,"
+            " expires_at, used_at, scope, max_uses, uses) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, 0)",
+            (hashlib.sha256(code.encode()).hexdigest(), person_id or "*",
+             username, session_fingerprint, updated_at or "", now + CODE_TTL, scope, max_uses),
         )
-    return {"code": code, "expires_at": now + CODE_TTL,
+    return {"code": code, "expires_at": now + CODE_TTL, "scope": scope, "max_uses": max_uses,
             "person_id": person_id, "base_updated_at": updated_at}
 
 
@@ -177,6 +198,13 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     payload = json.dumps(items, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")
+    # Ettepanek peab põhinema elaval kaardiversioonil (enne koodi kasutust, et viga seda ei kulutaks).
+    from .person_crud import get_person
+    person = get_person(person_id)
+    if person is None or person.get("record_status") == "tombstone" or person.get("merged_into"):
+        raise ProposalError("person_not_found")
+    if person.get("updated_at") != base_updated_at:
+        raise ProposalError("stale_person")
 
     now = int(time.time())
     digest = hashlib.sha256(code.encode()).hexdigest()
@@ -184,17 +212,16 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     with _db() as db:
         _clean(db, now)
         row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (digest,)).fetchone()
-        if (row is None or row["used_at"] is not None or row["expires_at"] <= now
-                or row["person_id"] != person_id
-                or row["base_updated_at"] != base_updated_at):
+        if (row is None or row["expires_at"] <= now
+                or (row["scope"] == "person" and row["person_id"] != person_id)):
             raise ProposalError("invalid_or_expired_handoff")
-        # UPDATE tingimus välistab koodi korduskasutuse ka teise protsessi võidujooksus.
+        # Tingimuslik UPDATE hoiab lae ka samaaegsete esituste korral.
         changed = db.execute(
-            "UPDATE handoff SET used_at=? WHERE code_hash=? AND used_at IS NULL",
+            "UPDATE handoff SET uses = uses + 1, used_at=? WHERE code_hash=? AND uses < max_uses",
             (now, digest),
         ).rowcount
         if changed != 1:
-            raise ProposalError("handoff_already_used")
+            raise ProposalError("handoff_used_up")
         db.execute(
             "INSERT INTO proposal VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
             (proposal_id, person_id, row["username"], row["session_fingerprint"], base_updated_at,
@@ -204,14 +231,14 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
             "status": "pending", "expires_at": now + PROPOSAL_TTL}
 
 
-def list_pending(person_id: str, username: str, session_fingerprint: str) -> list[dict]:
-    """Toimetaja näeb ainult enda algatatud üleandmisi."""
+def list_pending(person_id: str, username: str, session_fingerprint: str = "") -> list[dict]:
+    """Toimetaja näeb ainult enda algatatud ettepanekuid — igas oma seansis (#492)."""
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
         rows = db.execute(
-            "SELECT * FROM proposal WHERE person_id=? AND username=? AND session_fingerprint=? AND applied_at IS NULL ORDER BY created_at DESC",
-            (person_id, username, session_fingerprint),
+            "SELECT * FROM proposal WHERE person_id=? AND username=? AND applied_at IS NULL ORDER BY created_at DESC",
+            (person_id, username),
         ).fetchall()
         result = []
         for row in rows:
@@ -391,8 +418,8 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
         raise ProposalError("invalid_corrections")
     with _db() as db:
         row = db.execute(
-            "SELECT * FROM proposal WHERE id=? AND person_id=? AND username=? AND session_fingerprint=? AND applied_at IS NULL AND expires_at>?",
-            (proposal_id, person_id, username, session_fingerprint, int(time.time())),
+            "SELECT * FROM proposal WHERE id=? AND person_id=? AND username=? AND applied_at IS NULL AND expires_at>?",
+            (proposal_id, person_id, username, int(time.time())),
         ).fetchone()
         if row is None:
             raise ProposalError("proposal_not_found")
