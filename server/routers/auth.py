@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from ..auth import create_session, delete_session, get_session, load_users, require_token, verify_user
+from ..auth import create_session, delete_session, require_token, verify_user
 from ..config import SESSION_DURATION, get_logger
+from ..deps import get_user
 from ..rate_limit import (
     check_account_lockout,
     check_rate_limit,
@@ -106,16 +107,11 @@ async def public_meili_token():
 async def refresh_meili_token(request: Request):
     """Uuendab autentitud kasutaja Meilisearchi tokeni."""
     from ..meilisearch_ops import generate_meili_token
-    token_str = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-    session = get_session(token_str)
-    if not session:
-        raise HTTPException(status_code=401, detail="Sessioon aegunud")
-    user = session["user"]
-    users = load_users()
-    full_user = users.get(user["username"], user)
-    user_with_collections = {**user, "allowed_collections": full_user.get("allowed_collections", [])}
+    # Sama aegumine ja õiguste hetktõmmis nagu muul API-l (ADR 0046).
+    # Pelk get_session jätaks aegunud sessiooni taustapuhastuseni kehtima.
+    user = await get_user(request)
     try:
-        new_token = generate_meili_token(user=user_with_collections, ttl_seconds=USER_MEILI_TOKEN_TTL_SECONDS)
+        new_token = generate_meili_token(user=user, ttl_seconds=USER_MEILI_TOKEN_TTL_SECONDS)
         return {"token": new_token}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Token refresh ebaõnnestus: {e}")
