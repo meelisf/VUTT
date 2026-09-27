@@ -137,10 +137,12 @@ def test_generate_meili_token_admin(monkeypatch):
     assert payload["searchRules"] == {"teosed": {}}
 
 
-def test_auth_meili_token_ttl_matches_session_duration():
-    from server.config import SESSION_DURATION
+def test_auth_meili_token_ttl_on_luhike():
+    """S27-03: tenant-tokenit ei saa tühistada — väljalogimise või õiguste vähendamise
+    järel kehtib juba antud token oma aegumiseni. Lühike eluiga piirab seda akent;
+    klient uuendab tokenit `exp` järgi 5 min ette (meiliTokenRefresh.ts)."""
     from server.routers.auth import USER_MEILI_TOKEN_TTL_SECONDS
-    assert USER_MEILI_TOKEN_TTL_SECONDS == int(SESSION_DURATION.total_seconds())
+    assert 10 * 60 <= USER_MEILI_TOKEN_TTL_SECONDS <= 15 * 60
 
 
 def test_generate_meili_token_with_collection(monkeypatch):

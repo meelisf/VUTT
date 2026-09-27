@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from ..auth import create_session, delete_session, require_token, verify_user
-from ..config import SESSION_DURATION, get_logger
+from ..config import get_logger
 from ..deps import get_user
 from ..rate_limit import (
     check_account_lockout,
@@ -26,10 +26,13 @@ from ..password_reset import complete_password_reset, validate_reset_token
 logger = get_logger(__name__)
 router = APIRouter()
 
-# Autenditud Meilisearch tenant-token peab kestma sama kaua kui VUTT sessioon.
-# Muidu võib kasutajal 24h sessiooni sees Meili token varem aeguda ja otsingud
-# hakata andma 403 / anon-degradeerumist. Anon-token jääb allpool lühikeseks.
-USER_MEILI_TOKEN_TTL_SECONDS = int(SESSION_DURATION.total_seconds())
+# Autenditud Meilisearchi tenant-token on LÜHIAJALINE (S27-03): üksikut tokenit ei
+# saa tühistada, seega väljalogimise, konto kustutamise või õiguste vähendamise järel
+# kehtib juba antud token oma aegumiseni. 15 min piirab seda akent. Klient uuendab
+# tokenit JWT `exp` järgi 5 min ette ja fookusesse tulekul (meiliTokenRefresh.ts);
+# uuendus kontrollib sessiooni (S27-04). Varasem 24 h (juuli) oli vana kliendi
+# 55-minutilise kontrolli vea ümbertöötamine — see viga on ammu parandatud.
+USER_MEILI_TOKEN_TTL_SECONDS = 15 * 60
 ANON_MEILI_TOKEN_TTL_SECONDS = 3600
 
 
