@@ -19,6 +19,8 @@ services:
     image: vutt-backend:latest
     container_name: vutt-backend
     restart: always
+    security_opt:
+      - no-new-privileges:true
     # tini PID 1-ks: edastab SIGTERM-i ja korjab orvud (`docker stop` on puhas).
     init: true
     logging: *default-logging
@@ -86,8 +88,11 @@ services:
       - ./state:/app/state
       # Upload staging kaust
       - ./uploads:/app/uploads
-      # SSH võti OCR serverisse ühendumiseks (read-only)
-      - ~/.ssh:/root/.ssh:ro
+      # OCR-serveri SSH: AINULT võti ja usaldatud hostivõtmed (S27-05, S27-06) — mitte
+      # kogu ~/.ssh (authorized_keys, config). Failimount seob inode'i: kui known_hosts
+      # asendatakse uue failiga (ssh-keygen -R), taaskäivita backend.
+      - ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+      - ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro
       # Album Academicum referentsandmed (read-only)
       - ./reference_data:/app/reference_data:ro
     # Pordid suletud välismaailmale (ainult sisevõrk või nginx kasutab)
@@ -109,8 +114,12 @@ services:
     environment:
       - VUTT_ENV=${VUTT_ENV:-dev}
       - VUTT_DATA_DIR=/data
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
+      # Meilisearchi peavõtit EI OLE (S27-05): pildiserver otsingut ei kasuta;
+      # käivituskontroll ei nõua seda VUTT_SERVICE=images korral.
+      - VUTT_SERVICE=images
       - IMAGE_TOKEN_SECRET=${IMAGE_TOKEN_SECRET:-dev-image-secret-change-in-production}
+    security_opt:
+      - no-new-privileges:true
     # `data/` kirjutatav: pisipildid tekivad teose kausta. `state/` (users.json,
     # paroolide räsid) on teadlikult mountimata — pildiserver ei autendi kedagi;
     # `auth` import logib puuduva faili kohta hoiatuse ja jätkab tühjalt.

@@ -389,10 +389,12 @@ def check_production_secrets(exit_on_fail=True):
         return []
 
     problems = []
-    checks = [
-        ("MEILI_MASTER_KEY", MEILI_KEY),
-        ("IMAGE_TOKEN_SECRET", IMAGE_TOKEN_SECRET),
-    ]
+    checks = [("IMAGE_TOKEN_SECRET", IMAGE_TOKEN_SECRET)]
+    # Pildiserver (VUTT_SERVICE=images) ei kasuta Meilisearchi: peavõti on sealt
+    # teadlikult eemaldatud (S27-05), et pildiserveri kompromiteerimine ei annaks
+    # otsinguindeksile täisõigust.
+    if os.getenv("VUTT_SERVICE", "backend").lower() != "images":
+        checks.insert(0, ("MEILI_MASTER_KEY", MEILI_KEY))
     for name, val in checks:
         if not val:
             problems.append(f"  - {name}: puudub")

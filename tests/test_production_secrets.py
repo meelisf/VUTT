@@ -57,3 +57,16 @@ def test_env_value_is_case_insensitive(monkeypatch):
     _setup(monkeypatch, "PRODUCTION", "vutt_master_key", "ok-secret")
     problems = cfg.check_production_secrets(exit_on_fail=False)
     assert len(problems) == 1
+
+
+def test_pildiserver_ei_vaja_meili_votit(monkeypatch):
+    """S27-05: pildiserver (VUTT_SERVICE=images) ei kasuta Meilisearchi — peavõti on sealt
+    eemaldatud. Pildi-HMAC on endiselt kohustuslik; backendile Meili nõue jääb."""
+    _setup(monkeypatch, "production", "", "a-real-strong-image-secret")
+    monkeypatch.setenv("VUTT_SERVICE", "images")
+    assert cfg.check_production_secrets(exit_on_fail=False) == []
+    _setup(monkeypatch, "production", "", "dev-image-secret-change-in-production")
+    assert any("IMAGE_TOKEN_SECRET" in p for p in cfg.check_production_secrets(exit_on_fail=False))
+    monkeypatch.setenv("VUTT_SERVICE", "backend")
+    _setup(monkeypatch, "production", "", "a-real-strong-image-secret")
+    assert any("MEILI_MASTER_KEY" in p for p in cfg.check_production_secrets(exit_on_fail=False))
