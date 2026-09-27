@@ -7,6 +7,7 @@ import './testI18n';
 // Mock tavafunktsioonidega (vitest 4 vi.fn käsitleb tagasi lükatud lubadust testi veana).
 const { api } = vi.hoisted(() => ({ api: {
   parts: [] as any[], calls: [] as string[], fail: null as null | { status: number; message: string },
+  proposals: [] as any[],
 } }));
 vi.mock('../../../../services/workPartsApi', async (orig) => ({
   ...(await orig<typeof import('../../../../services/workPartsApi')>()),
@@ -20,12 +21,22 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
     api.calls.push('delete');
     if (api.fail) { const e: any = new Error(api.fail.message); e.status = api.fail.status; throw e; }
   },
+  listPartProposals: async () => api.proposals,
+  decidePartProposal: async (_w: string, pid: string, i: number, action: string, _t: unknown, part?: any) => {
+    api.calls.push(`decide:${pid}:${i}:${action}:${part ? part.title ?? '' : ''}`);
+    const np = { ...(part ?? api.proposals[0].items[i].part), id: 'p9', needs_review: false };
+    api.parts = [...api.parts, np];
+    api.proposals = [];
+    return { status: 'accepted', part: np };
+  },
   changePartPages: async (_w: string, id: string, add: string[], remove: string[]) => {
     api.calls.push(`pages:${id}:+${add.join(',')}:-${remove.join(',')}`);
     return api.parts.find(p => p.id === id);
   },
 }));
 vi.mock('../../PageThumb', () => ({ default: () => <div /> }));
+const role = vi.hoisted(() => ({ value: 'superadmin' }));
+vi.mock('../../../../contexts/UserContext', () => ({ useUser: () => ({ user: { role: role.value } }) }));
 vi.mock('../../../../components/EntityPicker', () => ({ default: () => <input aria-label="entity" /> }));
 vi.mock('../../../../components/WorkDatingInput', () => ({ default: () => <input aria-label="dating" /> }));
 
@@ -41,7 +52,7 @@ const renderTab = () => render(
   </MemoryRouter>,
 );
 
-beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; dirty.length = 0; });
+beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; api.proposals = []; dirty.length = 0; role.value = 'superadmin'; });
 
 describe('PartsTab', () => {
   it('tühi olek + osa loomine valitud lehtedest (Shift-vahemik)', async () => {
@@ -53,6 +64,38 @@ describe('PartsTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Loo osa valitud lehtedest' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Salvesta osa' }));
     await waitFor(() => expect(api.calls).toContain('create:s1,s2,s3'));
+  });
+
+  it('agendi ettepanek (#492): näidatakse lehtedega; lisa ja muuda-ja-lisa kinnitavad ettepaneku', async () => {
+    const item = { part: { kind: 'letter', title: 'Kiri Fischerile', pages: ['s2', 's3'], attached_to: null,
+      creators: [{ name: 'Spener', role: 'auctor' }] }, attached_to: null, evidence: [{ page: 2, quote: 'Hochwürdiger' }],
+      status: 'pending', page_numbers: [2, 3], missing_pages: [] };
+    api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: false, items: [item] }];
+    renderTab();
+    expect(await screen.findByText(/Kiri: Kiri Fischerile/)).toBeTruthy();
+    expect(screen.getByText('lk 2–3')).toBeTruthy();
+    expect(screen.getByText('Spener (Autor)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Muuda ja lisa' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Salvesta osa' }));
+    await waitFor(() => expect(api.calls).toContain('decide:pp:0:accept:Kiri Fischerile'));
+    expect(api.calls.some(c => c.startsWith('create:'))).toBe(false);   // mitte eraldi create
+  });
+
+  it('agendi ettepanekud ainult superadminile', async () => {
+    role.value = 'admin';
+    renderTab();
+    expect(await screen.findByText(/Osi pole veel märgitud/)).toBeTruthy();
+    expect(screen.queryByText('Agendi ettepanekud')).toBeNull();
+  });
+
+  it('agendi ettepaneku otse lisamine ja tagasilükkamine', async () => {
+    const item = { part: { kind: 'poem', pages: ['s1'], creators: [], attached_to: null }, attached_to: null,
+      evidence: [], status: 'pending', page_numbers: [1], missing_pages: [] };
+    api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: true, items: [item] }];
+    renderTab();
+    expect(await screen.findByText(/lehti on pärast ettepanekut muudetud/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Lisa' }));
+    await waitFor(() => expect(api.calls).toContain('decide:pp:0:accept:'));
   });
 
   it('needs_review osa on esile tõstetud', async () => {

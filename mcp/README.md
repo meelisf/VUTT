@@ -88,14 +88,18 @@ Kolm asja, mis üllatavad:
 | `get_person` | Isikukaart + seotud teosed (kuni 50) |
 | `get_person_enrichment_context` | Ühe isiku ametite ja hariduse täielikud JSON-kirjed + `updated_at` ettepaneku koostamiseks |
 | `search_enrichment_registry` | Ametite või asutuste registrikandidaadid püsivõtme, Q-koodi ja nimevariandi järgi; eristab puuduva registri tühjast tulemusest |
-| `submit_person_enrichment_proposal` | Ühekordse isikupõhise koodiga ootel ettepanek VUTT-i ülevaatuseks; kaarti ei muuda |
+| `submit_person_enrichment_proposal` | Toimetaja koodiga (8 h; üks isik või kõik isikud) ootel ettepanek VUTT-i ülevaatuseks; kaarti ei muuda |
+| `get_work_parts` | Teose olemasolevad osad leheküljenumbritega, lehtede arv ja `pages_version` |
+| `submit_work_parts_proposal` | Teose osade (kirjad, istungid jm) ootel ettepanek toimetaja koodiga; teost ei muuda |
 | `list_filter_values` | Legaalsed filtriväärtused |
 
 `get_person_enrichment_context` ei kärbi ameti- ega hariduskirjeid vaikselt:
 väga suure või vigase kaardi korral annab vea. `submit_person_enrichment_proposal`
-kasutab toimetaja autentitud `POST /api/files/prosopography/enrichment-handoff/{person_id}`
-kaudu loodud ühekordset koodi; ta talletab ainult ajutise ettepaneku. Ootel
-kirjed saab sama sessiooniga `GET /api/files/prosopography/enrichment-proposals/{person_id}`.
+kasutab toimetaja autentitud `POST /api/files/prosopography/enrichment-handoff[/{person_id}]`
+kaudu loodud koodi (8 h, mitu esitust; ADR 0058 täiendus #492); ta talletab ainult ajutise
+ettepaneku. Ootel kirjed näeb sama kasutaja `GET /api/files/prosopography/enrichment-proposals/{person_id}`.
+`submit_work_parts_proposal` kasutab teose koodi (`POST /api/files/works/{id}/parts/handoff`);
+toimetaja otsustab osa kaupa teose halduse „Osad" vahekaardil.
 Koodi ei panda MCP seadistusse. Toimetaja loob koodi isikuvormi „Ametid ja
 haridus” jaotises, värskendab seal ootel ettepanekuid, valib vajadusel teise
 registrivaste, parandab aja või allikakoha ning kinnitab valitud kirjed või

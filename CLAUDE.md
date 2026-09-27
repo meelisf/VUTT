@@ -163,7 +163,8 @@ Funktsiooni eemaldamisel kontrolli ka `server/__init__.py` re-eksporte.
 ### MCP-server (`mcp/`)
 
 Eraldi pakett `vutt_mcp` — agentide (Claude Code, Codex, Gemini, Antigravity) read-only
-ligipääs korpusele üle avaliku API. Seitse tööriista, stdio-transport. Vt `mcp/README.md`
+ligipääs korpusele üle avaliku API; ainus kirjutus on ootel ettepanek toimetaja koodiga
+(ADR 0058). Stdio-transport. Vt `mcp/README.md`
 ja spekk `docs/_archive/superpowers/specs/done/2026-08-15-vutt-mcp-server-design.md`.
 
 Neli asja, mis on juba korra katki läinud:

@@ -237,7 +237,9 @@ def test_get_annab_osade_lehtede_numbrid(client):
 
 
 def test_get_ilma_osadeta_tuhi_numbrikaart(client):
-    assert client.get("/works/w1/parts").json() == {"parts": [], "page_numbers": {}}
+    body = client.get("/works/w1/parts").json()
+    assert body["parts"] == [] and body["page_numbers"] == {}
+    assert body["page_count"] == 4 and len(body["pages_version"]) == 16   # agendi ettepanekuteks (#492)
 
 
 def test_endpointide_vead(client):

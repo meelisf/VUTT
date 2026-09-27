@@ -59,3 +59,18 @@ seansiga sidumine peitis ootel ettepaneku pärast uut sisselogimist. Muudetud:
 
 Piir jääb: MCP ei kirjuta isikukaarti ega registreid.
 
+## Täiendus 2026-09-27 (#492 samm 2): teose osade ettepanekud
+
+Sama piir kehtib teose osadele (ADR 0057). Toimetaja annab teose halduses koodi
+(`POST /works/{id}/parts/handoff`, `can_write_work`; 8 h, 20 esitust, ainult sellele
+teosele). MCP `submit_work_parts_proposal` talletab osad `state/work_part_proposals.sqlite3`-s:
+agent annab lehed **numbritena**, server teisendab need esitusel **tüvedeks** ja nõuab
+`pages_version` (tüvede järjekorra räsi) kokkulangevust (`stale_pages`). Toimetaja otsustab
+osa kaupa; vastuvõtt käib `work_parts.create_part` kaudu, nii et valideerimine, lukk, git ja
+indeksid on samad mis käsitsi lisamisel. Lisa `attached_to` võib viidata sama ettepaneku
+osale (indeks) — see lahendub alles siis, kui sihtosa on vastu võetud.
+
+Esialgu (2026-09-27) on teose osade ettepanekute kood, loetelu ja otsused ainult
+**superadminil** (`require_role("superadmin")` + UI) — teised toimetajad seda ei kasuta.
+Laiendamine = rolli langetamine kolmes otspunktis ja `PartsTab`-is.
+

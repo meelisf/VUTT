@@ -303,6 +303,22 @@
     },
     "tabParts": "Osad",
     "parts": {
+      "proposals": {
+        "title": "Agendi ettepanekud",
+        "createCode": "Kood agendile",
+        "refresh": "Värskenda",
+        "codeHelp": "Anna see kood MCP-vestluses agendile koos juhisega, nt „Tee teose {{workId}} osade sisukord”. Kood kehtib 8 tundi ja ainult sellele teosele, kuni {{max}} esitust.",
+        "copy": "Kopeeri",
+        "expires": "Aegub",
+        "pagesChanged": "Teose lehti on pärast ettepanekut muudetud — kontrolli lehti enne vastuvõttu.",
+        "pages": "lk {{pages}}",
+        "missingPages_one": "{{count}} leht on vahepeal kustutatud",
+        "missingPages_other": "{{count}} lehte on vahepeal kustutatud",
+        "accept": "Lisa",
+        "edit": "Muuda ja lisa",
+        "reject": "Lükka tagasi",
+        "empty": "Ootel ettepanekuid pole. Loo kood ja anna see agendile, et ta pakuks osad (kirjad, istungid jm) välja."
+      },
       "kinds": {
         "letter": "Kiri",
         "poem": "Luuletus",
