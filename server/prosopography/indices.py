@@ -27,14 +27,39 @@ def page_person_ids(page_data: Optional[dict]) -> set[str]:
     }
 
 
-def collect_page_person_mentions(work_dir: str) -> dict[str, list[int]]:
-    """Kogub teose leheküljefailidest isiku-tägid: { person_id: [leheküljenumbrid] }.
+def mention_entries(work_id: str, work_dir: str, parts: Optional[list] = None) -> dict[str, dict]:
+    """{person_id: 'mentioned' kirje} — ÜKS ehitaja uuendusele ja rebuildile (ADR 0007).
+
+    Osadega teosel (#464) saab kirje `part_ids` (osad, kuhu mõni mainimise leht kuulub)
+    ja `part_only: True`, kui ükski mainimise leht ei jää osadest välja. Seoste ehitaja
+    paaritab mainimise siis ainult nende osade isikutega.
+    """
+    stem_parts: dict[str, list[str]] = {}
+    for p in parts or []:
+        if isinstance(p, dict) and p.get('id'):
+            for stem in p.get('pages') or []:
+                stem_parts.setdefault(stem, []).append(p['id'])
+    out: dict[str, dict] = {}
+    for pid, found in _scan_page_mentions(work_dir).items():
+        entry: dict = {'work_id': work_id, 'role': 'mentioned', 'pages': found['pages']}
+        if stem_parts:
+            part_ids = sorted({x for s in found['stems'] for x in stem_parts.get(s, [])})
+            if part_ids:
+                entry['part_ids'] = part_ids
+                if all(s in stem_parts for s in found['stems']):
+                    entry['part_only'] = True
+        out[pid] = entry
+    return out
+
+
+def _scan_page_mentions(work_dir: str) -> dict[str, dict]:
+    """{person_id: {'pages': [nr], 'stems': [tüvi]}} teose leheküljefailide isikutägidest.
 
     Leheküljenumber on 1-põhine positsioon `enumerate_page_images` järjekorras —
     sama numeratsioon, mida kasutavad vaade /work/{id}/{nr} ja Meilisearch.
     Ilma pildita .json (orb) loeb isiku ikka mainituks, aga numbrita.
     """
-    mentions: dict[str, list[int]] = {}
+    mentions: dict[str, dict] = {}
     try:
         page_nums = {
             os.path.splitext(img)[0]: idx
@@ -56,14 +81,16 @@ def collect_page_person_mentions(work_dir: str) -> dict[str, list[int]]:
                 page_data = json.load(f)
         except Exception:
             continue
-        page_num = page_nums.get(os.path.splitext(page_fname)[0])
+        stem = os.path.splitext(page_fname)[0]
+        page_num = page_nums.get(stem)
         for pid in page_person_ids(page_data):
-            pages = mentions.setdefault(pid, [])
-            if page_num is not None and page_num not in pages:
-                pages.append(page_num)
+            found = mentions.setdefault(pid, {'pages': [], 'stems': []})
+            found['stems'].append(stem)
+            if page_num is not None and page_num not in found['pages']:
+                found['pages'].append(page_num)
 
-    for pages in mentions.values():
-        pages.sort()
+    for found in mentions.values():
+        found['pages'].sort()
     return mentions
 
 
@@ -269,6 +296,39 @@ def _update_aliases_entry(person: dict):
         state.atomic_write_json(state.PERSON_ALIASES_FILE, data)
 
 
+def metadata_entries(work_id: str, meta: dict) -> dict[str, list[dict]]:
+    """{person_id: [kirje]} teose metaandmetest — ÜKS ehitaja uuendusele ja rebuildile.
+
+    Teose rollid: `creators[]`, isikutägid (`subject`), `publisher`. Osa isikud (#464)
+    saavad `part_id`: sama isik võib olla nii teose kui mitme osa tasandil.
+    """
+    out: dict[str, list[dict]] = {}
+
+    def add(pid, role, part_id=None):
+        if not isinstance(pid, str) or not pid.startswith("vutt:P"):
+            return
+        entry = {"work_id": work_id, "role": role}
+        if part_id:
+            entry["part_id"] = part_id
+        if entry not in out.setdefault(pid, []):
+            out[pid].append(entry)
+
+    for creator in meta.get("creators") or []:
+        add(creator.get("id"), creator.get("role") or "creator")
+    for tag in meta.get("tags") or []:
+        if isinstance(tag, dict) and tag.get("entity_type") == "person":
+            add(tag.get("id"), "subject")
+    publisher = meta.get("publisher")
+    if isinstance(publisher, dict):
+        add(publisher.get("id"), "publisher")
+    for part in meta.get("parts") or []:
+        if isinstance(part, dict) and part.get("id"):
+            for creator in part.get("creators") or []:
+                if isinstance(creator, dict):
+                    add(creator.get("id"), creator.get("role") or "creator", part["id"])
+    return out
+
+
 def update_person_to_works(
     work_id: str,
     creators: list,
@@ -276,27 +336,13 @@ def update_person_to_works(
     publisher=None,
     title: str = "",
     year: Optional[int] = None,
+    parts: Optional[list] = None,
 ):
     """Uuendab person_to_works.json pöördindeksit ühe teose salvestamisel."""
     sync_from_facade()
-    new_entries: dict[str, set[str]] = {}
-
-    for creator in (creators or []):
-        pid = creator.get("id") or ""
-        if pid.startswith("vutt:P"):
-            role = creator.get("role") or "creator"
-            new_entries.setdefault(pid, set()).add(role)
-
-    for tag in (tags or []):
-        if isinstance(tag, dict) and tag.get("entity_type") == "person":
-            pid = tag.get("id") or ""
-            if pid.startswith("vutt:P"):
-                new_entries.setdefault(pid, set()).add("subject")
-
-    if publisher and isinstance(publisher, dict):
-        pid = publisher.get("id") or ""
-        if pid.startswith("vutt:P"):
-            new_entries.setdefault(pid, set()).add("publisher")
+    new_by_pid = metadata_entries(work_id, {
+        "creators": creators, "tags": tags, "publisher": publisher, "parts": parts,
+    })
 
     with state._works_lock:
         data = _load_person_to_works()
@@ -311,11 +357,8 @@ def update_person_to_works(
             ]
 
         # Lisa uued.
-        for pid, roles in new_entries.items():
-            if pid not in data:
-                data[pid] = []
-            for role in roles:
-                data[pid].append({"work_id": work_id, "role": role})
+        for pid, entries in new_by_pid.items():
+            data.setdefault(pid, []).extend(entries)
 
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, data)
 
@@ -362,27 +405,10 @@ def rebuild_indices():
             cols = meta.get("collections") or []
             if cols:
                 wc[work_id] = list(cols)
-            for creator in meta.get("creators") or []:
-                pid = creator.get("id") or ""
-                if pid.startswith("vutt:P"):
-                    role = creator.get("role") or "creator"
-                    ptw.setdefault(pid, []).append({"work_id": work_id, "role": role})
-            tags_list = meta.get("tags") or []
-            for tag in tags_list:
-                if isinstance(tag, dict) and tag.get("entity_type") == "person":
-                    pid = tag.get("id") or ""
-                    if pid.startswith("vutt:P"):
-                        ptw.setdefault(pid, []).append({"work_id": work_id, "role": "subject"})
-            pub = meta.get("publisher")
-            if pub and isinstance(pub, dict):
-                pid = pub.get("id") or ""
-                if pid.startswith("vutt:P"):
-                    ptw.setdefault(pid, []).append({"work_id": work_id, "role": "publisher"})
-
-            for pid, pages in collect_page_person_mentions(entry.path).items():
-                ptw.setdefault(pid, []).append(
-                    {'work_id': work_id, 'role': 'mentioned', 'pages': pages}
-                )
+            for pid, entries in metadata_entries(work_id, meta).items():
+                ptw.setdefault(pid, []).extend(entries)
+            for pid, mention in mention_entries(work_id, entry.path, meta.get("parts")).items():
+                ptw.setdefault(pid, []).append(mention)
 
     with state._works_lock:
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, ptw)

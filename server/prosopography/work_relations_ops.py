@@ -3,12 +3,17 @@ Teostest tuletatud isiku-isiku seosed.
 
 Indeks: data/config/works_creators_index.json — kirje IGALE teosele (#461)
   { work_id: { "title": str, "year": int|None, "creators": [{ "person_id": str, "roles": [str] }],
-               "location": {"id": str|None, "label": str}|None, "genres": [str] } }
+               "location": {"id": str|None, "label": str}|None, "genres": [str],
+               "parts": { part_id: { "kind", "title", "year", "place", "first_page", "pages": [int] } } } }
+  `parts` ainult osadega teosel (#464). Leheküljenumbrid arvutatakse KIRJUTAMISEL teose
+  kausta järgi, et /network ei peaks kausta skannima; lehetoiming kutsub seepärast
+  update_work_facts'i ka siis, kui osad ise ei muutu (sync_work_parts).
   Kogud ja avalikkus EI OLE siin: need elavad work_collections_index.json-is (ADR 0056).
 
 Kutsumiskohad:
   build_works_creators_index()  — rebuild_indices() ja serveri start
-  update_work_facts(meta)       — save_work_metadata, bulk_update_works, import_work (tingimusteta)
+  update_work_facts(meta, dir)  — save_work_metadata, bulk_update_works, import_work (tingimusteta),
+                                  sync_work_parts (lehetoimingu järel)
   remove_work_facts(work_id)    — teose kustutus
   get_work_relations(...)       — GET /prosopography/work-relations/{person_id}
 """
@@ -63,19 +68,55 @@ def _genres_of(meta: dict) -> list:
     return out
 
 
-def _work_facts_entry(meta: dict) -> dict:
+def _part_year(part: dict) -> Optional[int]:
+    start = ((part.get("dating") or {}).get("start") or "").split("-")[0]
+    return int(start) if start.isdigit() else None
+
+
+def _parts_of(meta: dict, work_dir: Optional[str]) -> dict:
+    """Osade kokkuvõte; lehenumbrid 1-põhised `enumerate_page_images` järjekorras."""
+    numbers: dict = {}
+    if work_dir:
+        from ..work_parts import page_stems
+        try:
+            numbers = {s: i for i, s in enumerate(page_stems(work_dir), start=1)}
+        except OSError:
+            numbers = {}
+    out = {}
+    for p in meta.get("parts") or []:
+        if not isinstance(p, dict) or not p.get("id"):
+            continue
+        pages = sorted(numbers[s] for s in p.get("pages") or [] if s in numbers)
+        place = p.get("place")
+        out[p["id"]] = {
+            "kind": p.get("kind"),
+            "title": p.get("title") or "",
+            "year": _part_year(p),
+            "place": {"id": place.get("id"), "label": place.get("label") or ""} if isinstance(place, dict) else None,
+            "first_page": pages[0] if pages else None,
+            "pages": pages,
+        }
+    return out
+
+
+def _work_facts_entry(meta: dict, work_dir: Optional[str] = None) -> dict:
     """Ühe teose kirje — ÜKS ehitaja nii rebuildile kui uuendusele (ADR 0007).
 
     Kogusid ja avalikkust siia ei kopeerita: need elavad work_collections_index.json-is,
     mida uuendatakse tingimusteta ka call_ptw=False teedel (#461).
+    `work_dir` annab osade leheküljenumbrid; ilma selleta on need tühjad.
     """
-    return {
+    entry = {
         "title": meta.get("title") or "",
         "year": meta.get("year"),
         "creators": _creators_to_entries(meta.get("creators") or []),
         "location": _location_of(meta),
         "genres": _genres_of(meta),
     }
+    parts = _parts_of(meta, work_dir)
+    if parts:
+        entry["parts"] = parts
+    return entry
 
 
 def _write_entry(work_id: str, entry: Optional[dict]) -> None:
@@ -88,11 +129,11 @@ def _write_entry(work_id: str, entry: Optional[dict]) -> None:
         atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
 
 
-def update_work_facts(meta: dict) -> None:
+def update_work_facts(meta: dict, work_dir: Optional[str] = None) -> None:
     """Kirjutab teose faktid. Kutsutakse tingimusteta update_work_collections kõrval."""
     work_id = meta.get("id") or meta.get("work_id")
     if work_id:
-        _write_entry(work_id, _work_facts_entry(meta))
+        _write_entry(work_id, _work_facts_entry(meta, work_dir))
 
 
 def remove_work_facts(work_id: str) -> None:
@@ -115,7 +156,7 @@ def build_works_creators_index() -> None:
                 continue
             work_id = meta.get("id") or meta.get("work_id")
             if work_id:
-                index[work_id] = _work_facts_entry(meta)
+                index[work_id] = _work_facts_entry(meta, entry.path)
     with _creators_lock:
         atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
 

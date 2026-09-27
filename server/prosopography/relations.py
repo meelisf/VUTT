@@ -7,7 +7,7 @@ import time
 from typing import Optional
 
 from . import state
-from .indices import _load_index, _load_person_to_works, collect_page_person_mentions
+from .indices import _load_index, _load_person_to_works, mention_entries
 from ..config import get_logger
 from .person_crud import get_person
 from ._compat import sync_from_facade
@@ -115,9 +115,14 @@ def update_page_person_mentions(work_id: str, work_dir: str):
     sync_from_facade()
 
     try:
-        mentions = collect_page_person_mentions(work_dir)
-    except Exception as e:
-        print(f"update_page_person_mentions viga: {e}")
+        parts = []
+        meta_path = os.path.join(work_dir, '_metadata.json')
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                parts = (json.load(f) or {}).get('parts') or []
+        mentions = mention_entries(work_id, work_dir, parts)
+    except Exception:
+        logger.exception("update_page_person_mentions viga")
         return
 
     with state._works_lock:
@@ -129,10 +134,8 @@ def update_page_person_mentions(work_id: str, work_dir: str):
                 if not (e.get('work_id') == work_id and e.get('role') == 'mentioned')
             ]
         # Lisa uued.
-        for pid, pages in mentions.items():
-            if pid not in data:
-                data[pid] = []
-            data[pid].append({'work_id': work_id, 'role': 'mentioned', 'pages': pages})
+        for pid, entry in mentions.items():
+            data.setdefault(pid, []).append(entry)
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, data)
 
 

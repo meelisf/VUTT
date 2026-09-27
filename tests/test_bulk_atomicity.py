@@ -51,7 +51,7 @@ def spies(monkeypatch):
     )
     monkeypatch.setattr(
         metadata_ops, "update_person_to_works",
-        lambda *args: seen["ptw"].append(args[0]),
+        lambda *args, **kwargs: seen["ptw"].append(args[0]),
     )
     monkeypatch.setattr(
         metadata_ops, "sync_work_to_meilisearch",
@@ -389,7 +389,7 @@ def test_bulk_works_end_to_end_single_commit(tmp_path, monkeypatch):
     monkeypatch.setattr(git_ops, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(git_ops, "get_or_init_repo", lambda: repo)
     monkeypatch.setattr(metadata_ops, "update_work_collections", lambda *a: None)
-    monkeypatch.setattr(metadata_ops, "update_person_to_works", lambda *a: None)
+    monkeypatch.setattr(metadata_ops, "update_person_to_works", lambda *a, **k: None)
     monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch", lambda *a: None)
 
     items = [
