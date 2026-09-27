@@ -15,7 +15,7 @@
     "proposal": "Ettepanek", "stale": "Isikukaart on vahepeal muutunud. Palu agendil teha uus ettepanek.",
     "occupation": "Amet", "education": "Haridus", "institution": "Asutus", "eventType": "Õpingusündmus", "printedPage": "trükise lk", "part": "osa",
     "period": "Aeg", "noKey": "Registrivõti puudub", "existing": "Praegune kirje", "currentEntries": "Kaardil praegu", "none": "Kirjeid pole", "registryMissing": "Registriseost ei saa veel kinnitada", "originalWarning": "Agendi algse vaste probleem", "registryMatch": "Registrivaste", "matchedVariant": "Tabanud nimevariant", "institutionPlace": "Asutuse koht", "noMappedPlace": "koht sidumata",
-    "page": "lk", "applySelected": "Kinnita valitud kirjed", "saved": "Valitud kirjed salvestati.", "addEvidence": "Lisa tõend olemasolevale kirjele", "evidenceCount": "tõendit",
+    "page": "lk", "applySelected": "Kinnita valitud kirjed", "saved": "Valitud kirjed salvestati.", "addEvidence": "Lisa tõend olemasolevale kirjele", "linkExisting": "Seo olemasolev kirje registriga ja lisa tõend", "evidenceCount": "tõendit",
     "status": {"already_present": "Juba olemas; seda rida ei lisata.", "ambiguous": "Mitmetähenduslik vaste; lahenda enne kinnitamist.", "new_registry_candidate": "Registris puudub; loo registrikirje enne kinnitamist."}
   },
   "searchPlaceholder": "Otsi nime järgi…",
