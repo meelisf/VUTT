@@ -75,6 +75,14 @@ jääb tühjaks, kuni inimene otsustab.
    jääma eraldi väljadeks; ametil ja haridusel peab olema sama kirjetaseme
    tõendi kuju (allikas, lehekülg/kirjenumber, tekstikatke).
 
+8. **Isikuvormi asutuse ja ameti väli on kaheks jagatud.** Ülemine `EntityPicker`
+   (Wikidata + vaba tekst) ja alumine `RegistryCandidatePicker` (nupuga
+   registriotsing). Ülemises valimine nullib `institution_key`-i, Q-koodi kirjutavad
+   mõlemad. Plaan: üks liitväli — trükkides esmalt registri vasted (nimevariantide
+   järgi), siis Wikidata/vaba tekst; registrikirje valik salvestab võtme ja Q-koodi,
+   trükitud tekst jääb allika kujuks (ADR 0059). Kolm kohta: ameti nimetus, ameti
+   asutus, hariduse asutus (`PersonEditPage.tsx`).
+
 ## Järgmine samm
 
 Vaadata serveri `~/prosopo-review/` CSV-d üle, otsustada Academia Gustaviana /
