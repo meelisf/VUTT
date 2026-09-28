@@ -377,6 +377,31 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
     return "\n".join(lines)
 
 
+def _check_literature_evidence(items: list) -> None:
+    """`literature`-tõend peab olema kirjanduskogu päris doc_id (server kogu ei näe)."""
+    from .library.config import load_library_settings
+    from .library.tools import unknown_doc_ids
+
+    doc_ids = {source.get("source_id") for item in items if isinstance(item, dict)
+               for source in (item.get("evidence") or []) if isinstance(source, dict)
+               and source.get("source_kind") == "literature"}
+    if not doc_ids:
+        return
+    if any(not isinstance(doc_id, str) or not doc_id for doc_id in doc_ids):
+        raise VuttError("literature-tõendi source_id peab olema list_literature'i doc_id.")
+    unknown = unknown_doc_ids(load_library_settings(), doc_ids)
+    if unknown is None:
+        raise VuttError(
+            "Kirjanduskogu ei ole selles masinas saadaval, literature-tõendit ei saa "
+            "kontrollida. Kasuta vutt_page tõendit või jäta kirje esitamata.")
+    if unknown:
+        raise VuttError(
+            f"Tundmatu kirjanduskogu doc_id {sorted(unknown)}: source_id peab olema "
+            "list_literature'i doc_id, mitte pealkiri. Kui allikat kogus ei ole, ära "
+            "esita seda tõendina — ütle kasutajale, et allikas on väärt lisamist "
+            "(autor, pealkiri, aasta, URL), ta lisab selle kirjanduskogusse.")
+
+
 def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     @mcp.tool(structured_output=False)
     async def search_persons(
@@ -534,7 +559,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         - match_status: "already_present" | "matched" | "ambiguous" |
           "new_registry_candidate" (kohustuslik)
         - raw_occupation (occupation puhul kohustuslik) / raw_institution
-          (education puhul kohustuslik): allika sõnastus
+          (education puhul kohustuslik): allika sõnastus SÕNASÕNALT, allika
+          keeles — ära tõlgi ega normaliseeri ("Notarius publicus", mitte
+          "avalik notar"); normaliseerimine on registrivõtme töö
         - occupation_key, institution_key, place_key: registrivõtmed
           search_enrichment_registry'st; occupation_variant /
           institution_variant ainult koos vastava võtmega
@@ -546,9 +573,15 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           julian|gregorian, "is_circa": bool} — ainult "date" kohustuslik
         - evidence (kohustuslik, 1–5): [{"source_kind": "vutt_page",
           "work_id": ..., "page": int, "printed_page", "part_id", "quote"}]
-          või {"source_kind": "literature", "source_id", "locator", "quote"}
-          või {"source_kind": "external", "url", "quote"}
-        Veateade nimetab vigase kirje (items[i]) ja välja. See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
+          või {"source_kind": "literature", "source_id": <list_literature'i
+          doc_id>, "locator": "lk 64", "quote"}
+        Veateade nimetab vigase kirje (items[i]) ja välja.
+
+        TÕEND AINULT VUTT-IST: korpuse leht või kirjanduskogu dokument.
+        Veebiallikas (ka akadeemiline artikkel või leksikon) EI OLE tõend.
+        Kui leiad hea allika, mida VUTT-is ega kirjanduskogus pole, ära esita
+        sellel põhinevat kirjet — ütle kasutajale vestluses, et allikas on
+        väärt lisamist (autor, pealkiri, aasta, URL, mida see kinnitab). See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
         muutmata. Toimetaja otsustab VUTT-i vormis iga rea eraldi.
 
         Pärast võrguviga ära saada sama ettepanekut pimesi uuesti: server võis
@@ -556,6 +589,7 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         """
         if not isinstance(items, list) or not 1 <= len(items) <= 20:
             raise VuttError("Ettepanekus peab olema 1–20 kirjet.")
+        _check_literature_evidence(items)
         result = client.api_post_once(
             "/prosopography/enrichment-proposals/submit",
             {"code": handoff_code, "person_id": person_id,

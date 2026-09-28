@@ -33,6 +33,22 @@ def _parent_keys(conn, doc_ids):
     }
 
 
+def unknown_doc_ids(settings: LibrarySettings, doc_ids: set[str]) -> set[str] | None:
+    """Kirjanduskogust puuduvad doc_id-d; None = kogu pole selles masinas olemas.
+
+    Server ei näe kirjanduskogu (see elab agendi masinas), seega kontrollib
+    ettepaneku `literature`-tõendi siin enne saatmist."""
+    if not library_available(settings):
+        return None
+    if not doc_ids:
+        return set()
+    conn = _ava(settings)
+    try:
+        return set(doc_ids) - set(_parent_keys(conn, doc_ids))
+    finally:
+        conn.close()
+
+
 def register_library_tools(mcp, settings: LibrarySettings) -> bool:
     if not library_available(settings):
         return False

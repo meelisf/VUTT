@@ -44,3 +44,14 @@ ise kohta ei kanna — reegel „haridusel pole otsest `place_key`-d" kehtib eda
 Q-kood on valikuline ka siis, kui Wikidata kirje kaob: AGC kirje Q138710754 kustutati
 Wikidatast ja eemaldati registrist; identiteet on VUTT-i võti.
 
+
+## Täiendus 2026-09-28: registrikirje ettepaneku realt
+
+`new_registry_candidate` rida jäi lukku, kuni admin lõi registrilehel kirje ja
+toimetaja valis selle uuesti. Nüüd saab admin isikuvormi ettepanekupaneelis
+(`RegistryCandidatePicker` → `RegistryEntryForm`) kirje luua või muuta: sama
+`PUT /registries/{kind}/{key}` (`save_config_with_git`), eeltäidetud allika
+sõnastusega nimevariandiks, ja salvestatud võti läheb rea parandusse. Otsus
+jääb samaks: registrikirje on admini eraldi toiming, isikufakti kinnitamine
+seda ei loo. Nimi on normaliseeritud kuju („notar"), allika sõnastus jääb
+kaardile ja variandiks.

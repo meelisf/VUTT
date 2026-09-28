@@ -29,9 +29,10 @@ _ITEM_KEYS = {"kind", "raw_occupation", "raw_institution", "occupation_key",
               "institution_key", "place_key", "date_from", "date_to", "evidence",
               "match_status", "existing_index", "edu_type", "occupation_variant",
               "institution_variant"}
+_SOURCE_KINDS = {"vutt_page", "literature"}
 _DATE_KEYS = {"date", "precision", "bound", "calendar", "is_circa"}
 _EVIDENCE_KEYS = {"source_kind", "source_id", "locator", "work_id", "page",
-                  "printed_page", "part_id", "quote", "url"}
+                  "printed_page", "part_id", "quote"}
 
 
 class ProposalError(ValueError):
@@ -182,10 +183,14 @@ def _validate_item(item: dict) -> None:
         if unknown:
             raise ProposalError(
                 f"invalid_evidence: tundmatud võtmed {unknown}; lubatud {sorted(_EVIDENCE_KEYS)}")
-        if source.get("source_kind") not in {"vutt_page", "literature", "external"}:
-            raise ProposalError("invalid_evidence_kind: source_kind on vutt_page, literature või external")
-        if not any(source.get(k) for k in ("source_id", "work_id", "url")):
-            raise ProposalError("evidence_locator_required: viitel peab olema source_id, work_id või url")
+        # Tõend peab olema VUTT-is kontrollitav: korpuse leht või kirjanduskogu dokument.
+        # Veebiallikas (ka akadeemiline) ei kõlba — agent teatab selle kasutajale, kes
+        # lisab allika kirjanduskogusse; alles siis saab fakti viitega esitada.
+        if source.get("source_kind") not in _SOURCE_KINDS:
+            raise ProposalError(
+                "invalid_evidence_kind: source_kind on vutt_page või literature. Allikat, "
+                "mis ei ole VUTT-i korpuses ega kirjanduskogus, ei esitata tõendina — "
+                "teata see kasutajale, kes lisab ta kirjanduskogusse")
         if source["source_kind"] == "vutt_page" and (
                 not source.get("work_id") or not isinstance(source.get("page"), int)):
             raise ProposalError("vutt_page_requires_work_and_page: vutt_page vajab work_id-d ja täisarvulist page-i")
@@ -198,6 +203,29 @@ def _validate_item(item: dict) -> None:
                     raise ProposalError("invalid_page: page peab olema täisarv ≥ 1")
             elif value is not None and not _short_string(value, 1000 if key == "quote" else 500):
                 raise ProposalError(f"invalid_evidence_text: {key} peab olema string (quote ≤1000, muu ≤500 märki)")
+
+
+def _check_vutt_pages(items: list) -> None:
+    """Korpuse viide peab osutama olemasolevale teosele ja leheküljele (1-põhine, nagu
+    /work/{id}/{nr}). Kirjanduskogu doc_id-d kontrollib MCP — kogu elab agendi masinas."""
+    from ..utils import find_directory_by_id
+    from ..work_parts import page_stems
+    counts: dict = {}
+    for index, item in enumerate(items):
+        for source in item["evidence"]:
+            if source["source_kind"] != "vutt_page":
+                continue
+            work_id = source["work_id"]
+            if work_id not in counts:
+                work_dir = find_directory_by_id(work_id)
+                counts[work_id] = len(page_stems(work_dir)) if work_dir else None
+            if counts[work_id] is None:
+                raise ProposalError(
+                    f"items[{index}]: unknown_work: work_id {work_id!r} puudub VUTT-is")
+            if source["page"] > counts[work_id]:
+                raise ProposalError(
+                    f"items[{index}]: page_out_of_range: teoses {work_id} on "
+                    f"{counts[work_id]} lehekülge")
 
 
 def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict:
@@ -216,6 +244,7 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     payload = json.dumps(items, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")
+    _check_vutt_pages(items)
     # Ettepanek peab põhinema elaval kaardiversioonil (enne koodi kasutust, et viga seda ei kulutaks).
     from .person_crud import get_person
     person = get_person(person_id)
