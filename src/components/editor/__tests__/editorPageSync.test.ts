@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isPageSwap, selectionAfterSync } from '../editorPageSync';
+import { isPageSwap, keepEditorText, selectionAfterSync } from '../editorPageSync';
 
 describe('isPageSwap', () => {
   it('esmane laadimine on lehevahetus', () => {
@@ -40,5 +40,21 @@ describe('selectionAfterSync', () => {
   it('negatiivne või vigane ankur ei lähe alla nulli', () => {
     expect(selectionAfterSync({ isSwap: false, currentAnchor: -5, newDocLength: 900 })).toBe(0);
     expect(selectionAfterSync({ isSwap: false, currentAnchor: NaN, newDocLength: 900 })).toBe(0);
+  });
+});
+
+describe('keepEditorText', () => {
+  const base = { isSwap: false, incomingText: 'salvestatud', savedText: 'salvestatud' };
+  it('sama lehe kordus-laadimine ei kirjuta salvestamata tööd üle', () => {
+    expect(keepEditorText({ ...base, editorText: 'salvestatud + uus töö' })).toBe(true);
+  });
+  it('salvestuse vastus (uus normaliseeritud tekst) asendub', () => {
+    expect(keepEditorText({ ...base, incomingText: 'uus töö', editorText: 'uus töö<i></i>' })).toBe(false);
+  });
+  it('lehevahetus asendub alati', () => {
+    expect(keepEditorText({ ...base, isSwap: true, editorText: 'eelmise lehe tekst' })).toBe(false);
+  });
+  it('muutmata redaktor: pole midagi hoida', () => {
+    expect(keepEditorText({ ...base, editorText: 'salvestatud' })).toBe(false);
   });
 });

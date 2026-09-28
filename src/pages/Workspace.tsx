@@ -18,6 +18,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
+import { needsPageLoad, pageLoadKey } from './workspacePageLoad';
 import MetadataModal from '../components/MetadataModal';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogIn, Copy, Check } from 'lucide-react';
 import UserMenu from '../components/UserMenu';
@@ -49,6 +50,10 @@ const Workspace: React.FC = () => {
   // Viimati laetud teos. Eristab "teose vahetus" (spinner) ja "lehe vahetus
   // samas teoses" (raam jääb püsima).
   const loadedWorkIdRef = useRef<string | null>(null);
+  // Viimati edukalt laetud leht (`pageLoadKey`). Sama võtmega effecti kordus —
+  // Meili tokeni uuendus, sessiooni olek, uuesti sisselogimine — lehte EI lae:
+  // see kirjutaks redaktori salvestamata teksti üle (vt workspacePageLoad.ts).
+  const loadedPageKeyRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorRequiresLogin, setErrorRequiresLogin] = useState(false);
   const [page, setPage] = useState<Page | null>(null);
@@ -172,6 +177,7 @@ const Workspace: React.FC = () => {
     // sisse" vilkumine. `loading` jääb true (spinner). Effect jookseb uuesti kui
     // authInitializing → false (dep-listis).
     if (authInitializing) return;
+    if (workId && !needsPageLoad(loadedPageKeyRef.current, pageLoadKey(workId, currentPageNum, viewerToken))) return;
     const loadData = async () => {
       if (!workId) {
         setError(t('errors.workIdMissing'));
@@ -223,11 +229,13 @@ const Workspace: React.FC = () => {
         }
 
         if (!pageData) {
+          loadedPageKeyRef.current = null;
           setError(t('errors.pageNotFound', { defaultValue: "Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele." }));
         } else {
           setPage(pageData);
           setCurrentStatus(pageData.status);
           loadedWorkIdRef.current = workId;
+          loadedPageKeyRef.current = pageLoadKey(workId, pageData.page_number, viewerToken);
           // Redirect logic: If we asked for page 1, but got page 5 (because book starts there),
           // update the URL to reflect reality.
           if (pageData.page_number !== currentPageNum) {
@@ -235,6 +243,7 @@ const Workspace: React.FC = () => {
           }
         }
       } catch (e: any) {
+        loadedPageKeyRef.current = null;
         console.error("Failed to load page", e);
         setError(e.message || t('errors.loadFailed'));
       } finally {
