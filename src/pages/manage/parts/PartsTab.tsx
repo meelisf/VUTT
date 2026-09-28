@@ -325,6 +325,7 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
             workId={workId}
             authors={authors}
             peopleRegister={peopleRegister}
+            dirty={dirty}
             onSave={() => { void save(); }}
             onDelete={() => { void remove(); }}
           />

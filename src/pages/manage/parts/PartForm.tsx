@@ -27,6 +27,8 @@ interface Props {
   workId: string;
   authors: { label: string; id: string | null }[];
   peopleRegister: PeopleRegisterEntry[];
+  /** Salvestamata muudatused → salvestusnupp kollane nagu tekstiredaktoris. */
+  dirty: boolean;
   onSave: () => void;
   onDelete: () => void;
 }
@@ -36,7 +38,7 @@ const toEntity = (p: PartPlace | null): LinkedEntity | null =>
 const fromEntity = (e: LinkedEntity | null): PartPlace | null => (e ? { id: e.id, label: e.label } : null);
 
 const PartForm: React.FC<Props> = ({
-  isNew, draft, onDraft, otherParts, sharedStems, error, busy, token, workId, authors, peopleRegister, onSave, onDelete,
+  isNew, draft, onDraft, otherParts, sharedStems, error, busy, token, workId, authors, peopleRegister, dirty, onSave, onDelete,
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const lang = getLangCode(i18n.language);
@@ -128,7 +130,8 @@ const PartForm: React.FC<Props> = ({
 
       <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
         <button type="button" disabled={busy} onClick={onSave}
-          className="rounded bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700 disabled:bg-gray-300">
+          className={`rounded px-3 py-1.5 text-sm font-medium text-white disabled:bg-gray-300 ${dirty
+            ? 'bg-amber-500 hover:bg-amber-600' : 'bg-primary-600 hover:bg-primary-700'}`}>
           {t('manage.parts.save')}
         </button>
         {!isNew && (

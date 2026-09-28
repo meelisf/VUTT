@@ -110,8 +110,13 @@ describe('WorkPartsPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(2\)/ }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Näita osa andmeid' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Muuda osa' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Salvesta osa' }));
+    const saveBtn = await screen.findByRole('button', { name: 'Salvesta osa' });
+    expect(saveBtn.className).not.toContain('bg-amber-500');
+    fireEvent.change(screen.getByLabelText('Pealkiri'), { target: { value: 'Uus' } });
+    expect(saveBtn.className).toContain('bg-amber-500');       // salvestamata muudatus → kollane
+    fireEvent.click(saveBtn);
     await waitFor(() => expect(api.updates).toHaveLength(1));
+    await waitFor(() => expect(saveBtn.className).not.toContain('bg-amber-500'));
     expect(api.updates[0].id).toBe('a');
     expect(api.updates[0].part.pages).toEqual(['s2', 's3', 's5']);
   });
