@@ -437,8 +437,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     async def get_work_parts(work_id: str) -> str:
         """Teose olemasolevad osad (kirjad, luuletused, kõned, istungid, lisad).
 
-        Tagastab osad leheküljenumbritega, teose lehtede arvu (`page_count`) ja
-        `pages_version`-i — see seob osade ettepaneku nähtud lehtede järjekorraga.
+        Tagastab osad leheküljenumbritega (koos pealkirja, alguse, märkuste ja
+        keeltega), teose lehtede arvu (`page_count`) ja `pages_version`-i — see
+        seob osade ettepaneku nähtud lehtede järjekorraga.
         Kasuta enne submit_work_parts_proposal'it, et mitte pakkuda juba olemasolevat osa.
         """
         return work_parts_mod.work_parts(client, work_id)
