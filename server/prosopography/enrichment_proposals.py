@@ -29,6 +29,7 @@ _ITEM_KEYS = {"kind", "raw_occupation", "raw_institution", "occupation_key",
               "institution_key", "place_key", "date_from", "date_to", "evidence",
               "match_status", "existing_index", "edu_type", "occupation_variant",
               "institution_variant"}
+_DATE_KEYS = {"date", "precision", "bound", "calendar", "is_circa"}
 _EVIDENCE_KEYS = {"source_kind", "source_id", "locator", "work_id", "page",
                   "printed_page", "part_id", "quote", "url"}
 
@@ -121,68 +122,82 @@ def _short_string(value, limit: int = 500) -> bool:
 
 
 def _validate_item(item: dict) -> None:
-    if not isinstance(item, dict) or not set(item) <= _ITEM_KEYS:
-        raise ProposalError("invalid_item")
+    # Veateade on agendile juhis: kood ees (masinloetav), selgitus järel. Paljas
+    # „invalid_item" jättis agendi pimesi variante proovima.
+    if not isinstance(item, dict):
+        raise ProposalError("invalid_item: kirje peab olema objekt")
+    unknown = sorted(set(item) - _ITEM_KEYS)
+    if unknown:
+        raise ProposalError(
+            f"invalid_item: tundmatud võtmed {unknown}; lubatud {sorted(_ITEM_KEYS)}")
     if item.get("kind") not in _KINDS or item.get("match_status") not in _MATCHES:
-        raise ProposalError("invalid_kind_or_match")
+        raise ProposalError(
+            f"invalid_kind_or_match: kind peab olema üks {sorted(_KINDS)}, "
+            f"match_status üks {sorted(_MATCHES)}")
     if item["kind"] == "occupation" and (
             not _short_string(item.get("raw_occupation"))
             or not item["raw_occupation"].strip()):
-        raise ProposalError("raw_occupation_required")
+        raise ProposalError("raw_occupation_required: kind=occupation vajab mittetühja raw_occupation-i (allika sõnastus)")
     if item["kind"] == "education" and (
             not _short_string(item.get("raw_institution"))
             or not item["raw_institution"].strip()):
-        raise ProposalError("raw_institution_required")
+        raise ProposalError("raw_institution_required: kind=education vajab mittetühja raw_institution-i (allika sõnastus)")
     for key in ("raw_occupation", "raw_institution", "occupation_key",
                 "institution_key", "place_key", "edu_type", "occupation_variant",
                 "institution_variant"):
         if key in item and item[key] is not None and not _short_string(item[key]):
-            raise ProposalError("invalid_text_field")
+            raise ProposalError(f"invalid_text_field: {key} peab olema string (≤500 märki) või null")
     for key in ("date_from", "date_to"):
         if key in item and item[key] is not None:
             value = item[key]
-            if not isinstance(value, dict) or not set(value) <= {"date", "precision", "bound", "calendar", "is_circa"}:
-                raise ProposalError("invalid_date")
+            if not isinstance(value, dict) or not set(value) <= _DATE_KEYS:
+                raise ProposalError(
+                    f"invalid_date: {key} peab olema objekt võtmetega {sorted(_DATE_KEYS)}, "
+                    'nt {"date": "1650-03", "precision": "month"}')
             if not _short_string(value.get("date"), 32) or not value["date"].strip():
-                raise ProposalError("invalid_date")
+                raise ProposalError(f"invalid_date: {key}.date on kohustuslik (YYYY, YYYY-MM või YYYY-MM-DD)")
             match = _DATE_RE.fullmatch(value["date"])
             if (not match or (match.group(2) and not 1 <= int(match.group(2)) <= 12)
                     or (match.group(3) and not 1 <= int(match.group(3)) <= 31)):
-                raise ProposalError("invalid_date")
+                raise ProposalError(f"invalid_date: {key}.date peab olema YYYY, YYYY-MM või YYYY-MM-DD")
             if value.get("precision") not in (None, "day", "month", "year"):
-                raise ProposalError("invalid_date_precision")
+                raise ProposalError(f"invalid_date_precision: {key}.precision on day, month, year või null")
             if value.get("bound") not in (None, "before", "after"):
-                raise ProposalError("invalid_date_bound")
+                raise ProposalError(f"invalid_date_bound: {key}.bound on before, after või null")
             if value.get("calendar") not in (None, "julian", "gregorian"):
-                raise ProposalError("invalid_date_calendar")
+                raise ProposalError(f"invalid_date_calendar: {key}.calendar on julian, gregorian või null")
             if "is_circa" in value and not isinstance(value["is_circa"], bool):
-                raise ProposalError("invalid_date_circa")
+                raise ProposalError(f"invalid_date_circa: {key}.is_circa peab olema true/false")
     if "existing_index" in item and (not isinstance(item["existing_index"], int)
                                      or isinstance(item["existing_index"], bool)
                                      or item["existing_index"] < 0):
-        raise ProposalError("invalid_existing_index")
+        raise ProposalError("invalid_existing_index: existing_index peab olema täisarv ≥ 0")
     evidence = item.get("evidence")
     if not isinstance(evidence, list) or not 1 <= len(evidence) <= 5:
-        raise ProposalError("evidence_required")
+        raise ProposalError("evidence_required: evidence peab olema 1–5 viitega list")
     for source in evidence:
-        if not isinstance(source, dict) or not set(source) <= _EVIDENCE_KEYS:
-            raise ProposalError("invalid_evidence")
+        if not isinstance(source, dict):
+            raise ProposalError("invalid_evidence: iga viide peab olema objekt")
+        unknown = sorted(set(source) - _EVIDENCE_KEYS)
+        if unknown:
+            raise ProposalError(
+                f"invalid_evidence: tundmatud võtmed {unknown}; lubatud {sorted(_EVIDENCE_KEYS)}")
         if source.get("source_kind") not in {"vutt_page", "literature", "external"}:
-            raise ProposalError("invalid_evidence_kind")
+            raise ProposalError("invalid_evidence_kind: source_kind on vutt_page, literature või external")
         if not any(source.get(k) for k in ("source_id", "work_id", "url")):
-            raise ProposalError("evidence_locator_required")
+            raise ProposalError("evidence_locator_required: viitel peab olema source_id, work_id või url")
         if source["source_kind"] == "vutt_page" and (
                 not source.get("work_id") or not isinstance(source.get("page"), int)):
-            raise ProposalError("vutt_page_requires_work_and_page")
+            raise ProposalError("vutt_page_requires_work_and_page: vutt_page vajab work_id-d ja täisarvulist page-i")
         if source["source_kind"] == "literature" and (
                 not source.get("source_id") or not source.get("locator")):
-            raise ProposalError("literature_requires_source_and_locator")
+            raise ProposalError("literature_requires_source_and_locator: literature vajab source_id-d ja locator-it")
         for key, value in source.items():
             if key == "page":
                 if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-                    raise ProposalError("invalid_page")
+                    raise ProposalError("invalid_page: page peab olema täisarv ≥ 1")
             elif value is not None and not _short_string(value, 1000 if key == "quote" else 500):
-                raise ProposalError("invalid_evidence_text")
+                raise ProposalError(f"invalid_evidence_text: {key} peab olema string (quote ≤1000, muu ≤500 märki)")
 
 
 def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict:
@@ -192,9 +207,12 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     if not isinstance(base_updated_at, str) or not base_updated_at:
         raise ProposalError("invalid_version")
     if not isinstance(items, list) or not 1 <= len(items) <= MAX_ITEMS:
-        raise ProposalError("invalid_items")
-    for item in items:
-        _validate_item(item)
+        raise ProposalError(f"invalid_items: items peab olema 1–{MAX_ITEMS} kirjega list")
+    for index, item in enumerate(items):
+        try:
+            _validate_item(item)
+        except ProposalError as error:
+            raise ProposalError(f"items[{index}]: {error}") from None
     payload = json.dumps(items, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")
