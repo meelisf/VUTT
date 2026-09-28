@@ -16,11 +16,16 @@ import { normalizeExtId } from '../prosopography/utils/externalIds';
 import { useUser } from '../contexts/UserContext';
 import { isAtLeast } from '../utils/roleUtils';
 
-interface SuggestionItem {
+export interface SuggestionItem {
   label: string;
   id: string | null;
   labels?: Record<string, string> | null;
+  aliases?: string[];   // muud nimekujud (nt kohtade registri ajaloolised nimed), ainult sobitamiseks
 }
+
+// Kohalik soovitus sobib, kui sisend esineb sildis, mõnes keelesildis või nimekujus.
+const localNames = (s: SuggestionItem): string[] =>
+  [s.label, ...Object.values(s.labels ?? {}), ...(s.aliases ?? [])].map(n => n.toLowerCase());
 
 // Normaliseerib "Perenimi, Eesnimi" → "Eesnimi Perenimi" (GND/VIAF formaat)
 function normalizePersonName(name: string): string {
@@ -280,11 +285,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         const alreadyAddedIds = new Set(alreadyAddedMatches.filter(m => m.id && !m.id.startsWith('local-')).map(m => m.id));
 
         const localMatches: Suggestion[] = localSuggestionsRef.current
-          .filter(s => s.label.toLowerCase().includes(normalizedInput))
+          .filter(s => localNames(s).some(n => n.includes(normalizedInput)))
           .filter(s => !alreadyAddedIds.has(s.id || ''))
           .sort((a, b) => {
-            const aStarts = a.label.toLowerCase().startsWith(normalizedInput) ? 0 : 1;
-            const bStarts = b.label.toLowerCase().startsWith(normalizedInput) ? 0 : 1;
+            const aStarts = localNames(a).some(n => n.startsWith(normalizedInput)) ? 0 : 1;
+            const bStarts = localNames(b).some(n => n.startsWith(normalizedInput)) ? 0 : 1;
             return aStarts - bStarts;
           })
           .slice(0, 3)
