@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import EntityPicker from '../../../components/EntityPicker';
+import type { LinkedEntity } from '../../../types/LinkedEntity';
 import {
   saveRegistryEntry, type InstitutionRegistryEntry, type OccupationRegistryEntry,
 } from '../../services/prosopographyService';
@@ -30,7 +32,7 @@ export const registryKeyFrom = (label: string) => label.normalize('NFKD')
  * Isikufakti sõnastus jääb kaardile; siin määratakse normaliseeritud nimi.
  */
 export default function RegistryEntryForm({ kind, existing, sourceWording, takenKeys, token, onSaved, onCancel }: Props) {
-  const { t } = useTranslation('prosopography');
+  const { t, i18n } = useTranslation('prosopography');
   const tr = (key: string) => t(`agentEnrichment.registryForm.${key}`);
   const entry = existing?.entry;
   const [key, setKey] = useState(existing?.key ?? '');
@@ -48,6 +50,19 @@ export default function RegistryEntryForm({ kind, existing, sourceWording, taken
     setLabelEt(value);
     if (!keyTouched) setKey(registryKeyFrom(value));
   };
+
+  // Wikidata valik täidab Q-koodi ja sildid nagu teisteski lisamisvormides;
+  // käsitsi kirjutatud tekst (source 'manual') Q-koodi ei anna ja jäetakse kõrvale.
+  const onWikidata = (entity: LinkedEntity | null) => {
+    if (!entity) { setQid(''); return; }
+    if (entity.source !== 'wikidata' || !entity.id) return;
+    setQid(entity.id);
+    const et = entity.labels?.et?.trim(), en = entity.labels?.en?.trim();
+    if (et) setLabelEt(et);
+    if (en) setLabelEn(en);
+    if (!keyTouched && (et || en)) setKey(registryKeyFrom(et || en || ''));
+  };
+  const lang = i18n.language.slice(0, 2);
 
   const save = async () => {
     setBusy(true); setError('');
@@ -69,6 +84,12 @@ export default function RegistryEntryForm({ kind, existing, sourceWording, taken
   const input = 'mt-0.5 block w-full rounded border px-2 py-1';
   return <div className="space-y-2 rounded border border-green-200 bg-green-50/40 p-2 text-xs">
     <p className="text-gray-600">{tr('help')}</p>
+    <div>{tr('wikidata')}
+      <EntityPicker type="topic" lang={lang} placeholder={sourceWording}
+        value={qid ? { id: qid, label: labelEt || labelEn || qid, source: 'wikidata',
+          labels: { ...(labelEt ? { et: labelEt } : {}), ...(labelEn ? { en: labelEn } : {}) } } : null}
+        onChange={onWikidata} />
+    </div>
     <label className="block">{tr('labelEt')}
       <input value={labelEt} onChange={e => onLabelEt(e.target.value)} className={input} />
     </label>

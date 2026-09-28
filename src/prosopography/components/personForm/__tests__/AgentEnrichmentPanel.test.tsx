@@ -24,6 +24,11 @@ vi.mock('../DateField', () => ({
   default: ({ value, onChange }: { value: { year: string }; onChange: (value: { year: string }) => void }) =>
     <input placeholder="aasta" value={value.year} onChange={event => onChange({ ...value, year: event.target.value })} />,
 }));
+vi.mock('../../../../components/EntityPicker', () => ({
+  default: ({ onChange }: { onChange: (value: unknown) => void }) =>
+    <button type="button" onClick={() => onChange({ id: 'Q189010', label: 'notar', source: 'wikidata',
+      labels: { et: 'notar', en: 'notary' } })}>wikidata-valik</button>,
+}));
 import AgentEnrichmentPanel from '../AgentEnrichmentPanel';
 
 const person = {
@@ -142,5 +147,22 @@ describe('agendi ettepanekud isikuvormis', () => {
     render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
     await screen.findByRole('checkbox');
     expect(screen.queryByRole('button', { name: 'Uus registrikirje' })).toBeNull();
+  });
+
+  it('registrikirje Wikidata valik täidab Q-koodi, nimed ja võtme', async () => {
+    role.current = 'admin';
+    list.mockResolvedValue([{ ...proposal, items: [{
+      kind: 'occupation', match_status: 'new_registry_candidate', raw_occupation: 'Notarius publicus',
+      evidence: [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }] }] }]);
+    registry.mockResolvedValue({});
+    saveEntry.mockImplementation(async (_kind: string, _key: string, entry: unknown) => entry);
+    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Uus registrikirje' }));
+    fireEvent.click(screen.getByRole('button', { name: 'wikidata-valik' }));
+    expect((screen.getByLabelText(/^Võti/) as HTMLInputElement).value).toBe('notar');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvesta ja vali' }));
+    await waitFor(() => expect(saveEntry).toHaveBeenCalledWith('occupation', 'notar',
+      expect.objectContaining({ id: 'Q189010', labels: { et: 'notar', en: 'notary' },
+        variants: ['Notarius publicus'] }), 'admin-token'));
   });
 });
