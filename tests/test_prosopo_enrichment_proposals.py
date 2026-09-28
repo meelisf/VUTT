@@ -467,3 +467,17 @@ def test_kinnitamise_sisendil_on_mahupiir(client, login, prosopo_env):
                          headers=_headers(token), content='x' * 128_001)
     assert result.status_code == 413
     assert prosopo_env.read('abc') == card
+
+
+@pytest.mark.parametrize("item, expected", [
+    (_item(note="x"), "items[0]: invalid_item: tundmatud võtmed ['note']"),
+    (_item(evidence=[{"source_kind": "vutt_page", "work_id": "w1", "page": 1, "confidence": 1}]),
+     "items[0]: invalid_evidence: tundmatud võtmed ['confidence']"),
+    (_item(date_from={"date": "1650-13"}), "items[0]: invalid_date: date_from.date"),
+    (_item(kind="role"), "items[0]: invalid_kind_or_match: kind peab olema"),
+])
+def test_valideerimisviga_nimetab_kirje_ja_valja(item, expected):
+    """Paljas „invalid_item" jättis agendi variante pimesi proovima."""
+    with pytest.raises(proposals.ProposalError) as exc:
+        proposals.submit("c", "vutt:Pabc", "2026-01-01", [item])
+    assert str(exc.value).startswith(expected)

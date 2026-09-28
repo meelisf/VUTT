@@ -114,4 +114,12 @@ class VuttClient:
             raise VuttNotFound(f"Ressurssi ei leitud: {response.request.url.path}")
         if code in RETRY_STATUSES:
             raise VuttTemporaryError(f"VUTT vastas ajutise veaga (HTTP {code}).")
+        # FastAPI `detail` on agendile juhis (nt ettepaneku vale võti koos lubatud
+        # loendiga) — anna see terviklikult edasi, mitte 200 märgi toorkehana.
+        try:
+            detail = response.json().get("detail")
+        except (ValueError, AttributeError):
+            detail = None
+        if isinstance(detail, str) and detail:
+            raise VuttError(f"VUTT vastas veaga (HTTP {code}): {detail[:1000]}")
         raise VuttError(f"VUTT vastas veaga (HTTP {code}): {response.text[:200]}")

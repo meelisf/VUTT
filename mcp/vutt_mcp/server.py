@@ -526,12 +526,29 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         igale isikule, kuni esituste laeni. Ära kasuta selleks editori
         sessioonitokenit. `base_updated_at` tuleb iga isiku kohta värskest
         get_person_enrichment_context vastusest — aegunud versioon lükatakse
-        tagasi (stale_person) ega kuluta koodi. Iga item sisaldab `kind`
-        (occupation/education), `match_status` (already_present/matched/
-        ambiguous/new_registry_candidate), toorsõnastust, registrivõtmeid,
-        registriotsingus tabanud `occupation_variant`/`institution_variant`-i,
-        võimalikku aega ja 1–5 täpset `evidence` viidet. Üks kutse kuni 20
-        kirjet. See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
+        tagasi (stale_person) ega kuluta koodi. Üks kutse kuni 20 kirjet.
+
+        Item on RANGE kujuga — muu võti (nt note, confidence, label) lükkab
+        kogu ettepaneku tagasi. Lubatud võtmed:
+        - kind: "occupation" | "education" (kohustuslik)
+        - match_status: "already_present" | "matched" | "ambiguous" |
+          "new_registry_candidate" (kohustuslik)
+        - raw_occupation (occupation puhul kohustuslik) / raw_institution
+          (education puhul kohustuslik): allika sõnastus
+        - occupation_key, institution_key, place_key: registrivõtmed
+          search_enrichment_registry'st; occupation_variant /
+          institution_variant ainult koos vastava võtmega
+        - edu_type (education puhul hariduse liik)
+        - existing_index: already_present puhul kohustuslik — sama liigi
+          kirje indeks get_person_enrichment_context'i loendis (int ≥ 0)
+        - date_from, date_to: {"date": "YYYY[-MM[-DD]]", "precision":
+          day|month|year, "bound": before|after, "calendar":
+          julian|gregorian, "is_circa": bool} — ainult "date" kohustuslik
+        - evidence (kohustuslik, 1–5): [{"source_kind": "vutt_page",
+          "work_id": ..., "page": int, "printed_page", "part_id", "quote"}]
+          või {"source_kind": "literature", "source_id", "locator", "quote"}
+          või {"source_kind": "external", "url", "quote"}
+        Veateade nimetab vigase kirje (items[i]) ja välja. See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
         muutmata. Toimetaja otsustab VUTT-i vormis iga rea eraldi.
 
         Pärast võrguviga ära saada sama ettepanekut pimesi uuesti: server võis

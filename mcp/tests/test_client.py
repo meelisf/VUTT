@@ -94,6 +94,18 @@ def test_400_ei_proovita_uuesti():
     assert calls["n"] == 1
 
 
+def test_400_detail_jouab_agendini_terviklikult():
+    """Ettepaneku veateade loetleb lubatud võtmed — 200 märgi lõige peitis selle."""
+    detail = "items[0]: invalid_item: tundmatud võtmed ['note']; lubatud " + "x" * 400
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"detail": detail})
+
+    with pytest.raises(VuttError) as exc:
+        _client(handler).api_post_once("/prosopography/enrichment-proposals/submit", {})
+    assert str(exc.value) == f"VUTT vastas veaga (HTTP 400): {detail}"
+
+
 def test_ettepaneku_post_on_uhekordne_ja_ei_saada_otsinguvotit():
     seen = []
 
