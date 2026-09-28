@@ -222,6 +222,7 @@ const PartEditPanel: React.FC<{ workId: string; token: string | null; part: Work
           workId={workId}
           authors={authors}
           peopleRegister={peopleRegister}
+          dirty={dirty}
           onSave={() => { void save(); }}
           onDelete={() => { void remove(); }}
         />
