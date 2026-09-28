@@ -1,7 +1,7 @@
 // src/pages/manage/partsModel.ts
 /** Teose osade kasutajaliidese puhas mudel (#464). */
 import type { PartCreator, PartInput, PartKind, PartPlace, WorkPart } from '../../services/workPartsApi';
-import type { WorkDating } from '../../utils/workDating';
+import { parseDatingText, type WorkDating } from '../../utils/workDating';
 
 export interface Badge { partId: string; index: number; kind: PartKind; }
 
@@ -86,12 +86,28 @@ export function draftFromPart(p: WorkPart): PartDraft {
   };
 }
 
+/** Dateeringu tekst, millest ei saa kuupäeva: osal pole teksti-välja (erinevalt teose
+ *  `year_display`-st), seega ei tohi seda vaikselt maha visata — salvestus peatub. */
+export class PartDatingError extends Error {}
+
+/** Lihtsasse lahtrisse kirjutatud „1667" jääb mustandis tekstiks (`dating` = null);
+ *  enne saatmist tõlgendatakse see struktureeritud dateeringuks. */
+function draftDating(d: PartDraft): WorkDating | null {
+  if (d.dating) return d.dating;
+  const text = d.datingText.trim();
+  if (!text) return null;
+  const parsed = parseDatingText(text);
+  if (!parsed) throw new PartDatingError(text);
+  return parsed;
+}
+
 export function partFromDraft(d: PartDraft, pages: string[]): PartInput {
   const out: PartInput = { ...(d.extra ?? {}), kind: d.kind, pages, creators: d.creators.filter(c => c.id || c.name), attached_to: d.kind === 'attachment' ? d.attached_to : null };
   if (d.title.trim()) out.title = d.title.trim();
   if (d.incipit.trim()) out.incipit = d.incipit.trim();
   if (d.notes.trim()) out.notes = d.notes.trim();
-  if (d.dating) out.dating = d.dating;
+  const dating = draftDating(d);
+  if (dating) out.dating = dating;
   if (d.place) out.place = d.place;
   if (d.place_to && d.kind === 'letter') out.place_to = d.place_to;
   return out;

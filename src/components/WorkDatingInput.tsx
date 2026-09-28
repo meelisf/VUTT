@@ -14,6 +14,9 @@ export default function WorkDatingInput({ value, dating, onChange }: {
   const current = inferred ?? { start: '' };
   const set = (patch: Partial<WorkDating>) => {
     const next = { ...current, ...patch };
+    // Alguse tühjendamine ilma lõputa = dateeringu eemaldamine; muidu jääks alles
+    // vigane `{start: ''}`, mida server tagasi lükkab ja „Tühjenda" nuppu kasutaja ei leia.
+    if (!next.start && !next.end) { onChange('', null); return; }
     if (!dating && value.trim()) next.source_text = value;
     onChange(datingText(next), next);
   };

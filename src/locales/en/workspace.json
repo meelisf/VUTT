@@ -349,6 +349,7 @@
       "kind": "Kind",
       "title": "Title",
       "incipit": "Incipit",
+      "datingUnparsed": "No date can be read from “{{text}}” (e.g. 1667, 1667-08, 1667–1668). Correct or clear it; a part does not keep the date as text.",
       "dating": "Date",
       "place": "Place",
       "placeLetter": "Place of writing",
