@@ -4,7 +4,7 @@
  * teosel või lugemistõrke korral paneeli ei ole. Lehevahemikud on lingid lehele;
  * praegust lehte sisaldav osa on märgitud.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, ListOrdered, Pencil } from 'lucide-react';
@@ -85,6 +85,23 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
     [parts, nums],
   );
 
+  // Praegust lehte sisaldav (esimene) osa: avamisel ja uude osasse liikudes keritakse
+  // sisukorra kasti sees see keskele. Kerib ainult kasti, mitte lehte/paneeli —
+  // teose info jääb paigale ja mobiilis ei hüppa aken.
+  const listRef = useRef<HTMLOListElement>(null);
+  const hereId = sorted.find(p => p.pages.some(s => nums.get(s) === currentPage))?.id;
+  const scrolledOnce = useRef(false);
+  useEffect(() => {
+    if (!open) { scrolledOnce.current = false; return; }
+    const list = listRef.current;
+    const row = hereId ? list?.querySelector<HTMLElement>(`[data-part-id="${hereId}"]`) : null;
+    if (!list || !row) return;
+    // `relative` loend on rea offsetParent → offsetTop on juba loendi suhtes.
+    const top = row.offsetTop - (list.clientHeight - row.offsetHeight) / 2;
+    list.scrollTo?.({ top: Math.max(0, top), behavior: scrolledOnce.current ? 'smooth' : 'auto' });
+    scrolledOnce.current = true;
+  }, [open, hereId]);
+
   if (!workId || parts.length === 0) return null;
 
   const toggle = () => {
@@ -107,7 +124,7 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
         <h4 className="font-bold">{t('info.toc')} <span className="font-normal text-gray-500">({parts.length})</span></h4>
       </button>
       {open && (
-        <ol className="border-t border-gray-100 divide-y divide-gray-100">
+        <ol ref={listRef} className="relative max-h-[60vh] overflow-y-auto border-t border-gray-100 divide-y divide-gray-100">
           {sorted.map((p, i) => {
             const ranges = pageRangeList(p.pages, nums);
             const here = p.pages.some(s => nums.get(s) === currentPage);
@@ -119,6 +136,7 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
             return (
               <li
                 key={p.id}
+                data-part-id={p.id}
                 aria-current={here ? 'true' : undefined}
                 className={`px-5 py-2.5 text-sm ${here ? 'bg-primary-50' : ''}`}
               >

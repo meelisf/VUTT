@@ -80,6 +80,22 @@ describe('WorkPartsPanel', () => {
     expect(rows[1].getAttribute('aria-current')).toBeNull();
   });
 
+  it('lahti klappimisel kerib sisukorra kasti (mitte lehte) praegusele osale', async () => {
+    const calls: Element[] = [];
+    const orig = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = function (this: HTMLElement) { calls.push(this); } as typeof orig;
+    try {
+      renderPanel(5);
+      const toggle = await screen.findByRole('button', { name: /Sisukord/ });
+      expect(calls).toHaveLength(0);                     // kokku klapitud → ei keri
+      fireEvent.click(toggle);
+      await waitFor(() => expect(calls).toHaveLength(1));
+      expect(calls[0].tagName).toBe('OL');
+    } finally {
+      HTMLElement.prototype.scrollTo = orig;
+    }
+  });
+
   it('osa andmed lahti: märkused, koht, sihtkoht, isikud rollidega (lingiga), lisad', async () => {
     api.parts = [
       { ...LETTER, notes: 'Kiri on säilinud koopiana.', place: { id: 'Q1794', label: 'Frankfurt' },
