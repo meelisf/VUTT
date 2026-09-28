@@ -81,3 +81,22 @@ nimekujud, eluaastad, kontrollitud GND/Wikidata/VIAF, märkus, tõend); osa isik
 nimeks. Juba kasutusel väline ID → `person_exists:<id>` (409) ja sidumise pakkumine.
 MCP ei loo isikut ise.
 
+
+## Täiendus 2026-09-28: tõend ainult VUTT-ist
+
+Agent esitas tõendina veebiallikaid (`literature` + vabateksti pealkiri + PDF-URL),
+mida toimetaja ei saa VUTT-is kontrollida. Muudetud:
+
+- Tõendi liik on ainult `vutt_page` või `literature`; `external` ja `url` on
+  eemaldatud. `vutt_page` kontrollib server esitusel: teos on olemas ja leht jääb
+  teose lehtede arvu piiresse (`unknown_work`, `page_out_of_range`).
+- `literature.source_id` peab olema kirjanduskogu `doc_id`. Kogu elab agendi
+  masinas (ADR 0023) ja server teda ei näe, seega kontrollib seda **MCP** enne
+  saatmist; kogu puudumisel lükatakse `literature`-tõend tagasi.
+- Veebist leitud (ka akadeemilise) allika peale agent ettepanekut ei tee, vaid
+  ütleb vestluses, et allikas on väärt lisamist; inimene lisab selle
+  kirjanduskogusse. Eraldi „allika lisamise" ettepanekutüüpi ei tehta.
+- `raw_occupation`/`raw_institution` on allika sõnastus sõnasõnalt, allika
+  keeles; normaliseerimine on registrivõtme töö (ADR 0059).
+- Valideerimisviga nimetab kirje (`items[i]`) ja välja; MCP annab FastAPI
+  `detail`-i agendile terviklikult edasi.

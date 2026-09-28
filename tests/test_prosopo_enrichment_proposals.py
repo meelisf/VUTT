@@ -11,6 +11,17 @@ def proposal_db(tmp_path, monkeypatch):
     monkeypatch.setattr(proposals, "DB_PATH", str(tmp_path / "proposals.sqlite3"))
 
 
+@pytest.fixture(autouse=True)
+def korpuse_teos(monkeypatch):
+    """Korpuses on üks teos `w1` 50 leheküljega; muu work_id puudub."""
+    import server.utils
+    import server.work_parts
+    monkeypatch.setattr(server.utils, "find_directory_by_id",
+                        lambda work_id: "/data/w1" if work_id == "w1" else None)
+    monkeypatch.setattr(server.work_parts, "page_stems",
+                        lambda work_dir: [f"p{n:03d}" for n in range(50)])
+
+
 def _item(**extra):
     item = {
         "kind": "occupation", "match_status": "matched",
@@ -480,4 +491,21 @@ def test_valideerimisviga_nimetab_kirje_ja_valja(item, expected):
     """Paljas „invalid_item" jättis agendi variante pimesi proovima."""
     with pytest.raises(proposals.ProposalError) as exc:
         proposals.submit("c", "vutt:Pabc", "2026-01-01", [item])
+    assert str(exc.value).startswith(expected)
+
+
+@pytest.mark.parametrize("source, expected", [
+    ({"source_kind": "external", "url": "https://example.org/x.pdf", "quote": "q"},
+     "items[0]: invalid_evidence: tundmatud võtmed ['url']"),
+    ({"source_kind": "external", "source_id": "Raamat", "quote": "q"},
+     "items[0]: invalid_evidence_kind: source_kind on vutt_page või literature"),
+    ({"source_kind": "vutt_page", "work_id": "puudub", "page": 1},
+     "items[0]: unknown_work: work_id 'puudub'"),
+    ({"source_kind": "vutt_page", "work_id": "w1", "page": 51},
+     "items[0]: page_out_of_range: teoses w1 on 50 lehekülge"),
+])
+def test_toend_peab_olema_vuttis_kontrollitav(source, expected):
+    """Veebiallikas ei ole tõend; korpuse viide osutab päris teosele ja lehele."""
+    with pytest.raises(proposals.ProposalError) as exc:
+        proposals.submit("c", "vutt:Pabc", "2026-01-01", [_item(evidence=[source])])
     assert str(exc.value).startswith(expected)

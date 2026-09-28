@@ -31,6 +31,21 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     from server.prosopography import registry_candidates
     monkeypatch.setattr(registry_candidates, "DATA_CONFIG_DIR", str(registry))
 
+    # Tõend peab olema kontrollitav: korpuses teos w1 ja kirjanduskogus book1.
+    # Kogu tuleb testist, mitte jooksutaja masinast (~/.local/share/vutt-library).
+    import server.utils
+    import server.work_parts
+    monkeypatch.setattr(server.utils, "find_directory_by_id",
+                        lambda work_id: "/data/w1" if work_id == "w1" else None)
+    monkeypatch.setattr(server.work_parts, "page_stems", lambda work_dir: ["p"] * 50)
+    from vutt_mcp.library.schema import connect, create_schema
+    library = connect(tmp_path / "library.db")
+    create_schema(library)
+    library.execute("INSERT INTO documents (doc_id, parent_key, title) VALUES ('book1', 'P1', 'Raamat')")
+    library.commit()
+    library.close()
+    monkeypatch.setenv("VUTT_LIBRARY_DB", str(tmp_path / "library.db"))
+
     card = prosopo_env.write("abc", occupations=[], education=[])
     token = login("editor", "editorpass")
     other_token = login("admin", "adminpass")      # teine kasutaja

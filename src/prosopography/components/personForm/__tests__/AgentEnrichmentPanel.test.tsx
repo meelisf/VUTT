@@ -5,14 +5,20 @@ import { MemoryRouter } from 'react-router-dom';
 import '../../relations/__tests__/testI18n';
 import type { ProsopoRecord } from '../../../types';
 
-const { handoff, list, apply, search } = vi.hoisted(() => ({
+const { handoff, list, apply, search, registry, saveEntry, role } = vi.hoisted(() => ({
   handoff: vi.fn(), list: vi.fn(), apply: vi.fn(), search: vi.fn(),
+  registry: vi.fn(), saveEntry: vi.fn(), role: { current: 'editor' },
 }));
 vi.mock('../../../services/prosopographyService', () => ({
   createEnrichmentHandoff: handoff,
   listEnrichmentProposals: list,
   applyEnrichmentProposal: apply,
   searchEnrichmentRegistry: search,
+  fetchRegistry: registry,
+  saveRegistryEntry: saveEntry,
+}));
+vi.mock('../../../../contexts/UserContext', () => ({
+  useUser: () => ({ user: { role: role.current }, authToken: 'admin-token' }),
 }));
 vi.mock('../DateField', () => ({
   default: ({ value, onChange }: { value: { year: string }; onChange: (value: { year: string }) => void }) =>
@@ -34,6 +40,7 @@ const proposal = {
 
 beforeEach(() => {
   handoff.mockReset(); list.mockReset(); apply.mockReset(); search.mockReset();
+  registry.mockReset(); saveEntry.mockReset(); role.current = 'editor';
   list.mockResolvedValue([proposal]);
   handoff.mockResolvedValue({ code: 'one-time-code', expires_at: 9999999999 });
   apply.mockResolvedValue({ ...person, updated_at: 'version-2' });
@@ -102,5 +109,38 @@ describe('agendi ettepanekud isikuvormis', () => {
       0: { date_from: { date: '1641-01-01', precision: 'year', is_circa: false },
         evidence: [{ source_kind: 'literature', source_id: 'book1', locator: 'lk 14', quote: 'studiosus' }] },
     }));
+  });
+
+  it('admin loob puuduva registrikirje realt ja rida muutub kinnitatavaks', async () => {
+    role.current = 'admin';
+    list.mockResolvedValue([{ ...proposal, items: [{
+      kind: 'occupation', match_status: 'new_registry_candidate', raw_occupation: 'Notarius publicus',
+      evidence: [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }] }] }]);
+    registry.mockResolvedValue({});
+    saveEntry.mockImplementation(async (_kind: string, _key: string, entry: unknown) => entry);
+    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
+    const checkbox = await screen.findByRole('checkbox');
+    expect((checkbox as HTMLInputElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Uus registrikirje' }));
+    fireEvent.change(screen.getByLabelText('Nimi eesti keeles'), { target: { value: 'notar' } });
+    expect((screen.getByLabelText(/^Võti/) as HTMLInputElement).value).toBe('notar');
+    expect((screen.getByLabelText(/^Nimevariandid/) as HTMLTextAreaElement).value).toBe('Notarius publicus');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvesta ja vali' }));
+    await waitFor(() => expect(saveEntry).toHaveBeenCalledWith('occupation', 'notar',
+      expect.objectContaining({ labels: { et: 'notar' }, variants: ['Notarius publicus'] }), 'admin-token'));
+    await waitFor(() => expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Kinnita valitud kirjed (1)' }));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'proposal-1', [0], 'editor-token',
+      { 0: { occupation_key: 'notar', occupation_variant: 'Notarius publicus' } }));
+  });
+
+  it('toimetaja ei näe registrikirje loomise nuppu', async () => {
+    list.mockResolvedValue([{ ...proposal, items: [{
+      kind: 'occupation', match_status: 'new_registry_candidate', raw_occupation: 'Notarius publicus',
+      evidence: [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }] }] }]);
+    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
+    await screen.findByRole('checkbox');
+    expect(screen.queryByRole('button', { name: 'Uus registrikirje' })).toBeNull();
   });
 });

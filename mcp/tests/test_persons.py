@@ -270,6 +270,60 @@ async def test_mcp_ettepanek_esitatakse_ainult_ajutise_api_kaudu():
     })]
 
 
+def _kirjanduse_ettepanek(source_id):
+    return {"kind": "occupation", "match_status": "new_registry_candidate",
+            "raw_occupation": "Notarius publicus",
+            "evidence": [{"source_kind": "literature", "source_id": source_id,
+                          "locator": "lk 64", "quote": "Notarius publicus"}]}
+
+
+@pytest.mark.parametrize("source_id, oodatud", [
+    ("Early Modern German Shakespeare", "Tundmatu kirjanduskogu doc_id"),
+    ("DOC1", None),
+])
+async def test_kirjanduse_toend_peab_olema_kogu_doc_id(tmp_path, monkeypatch, source_id, oodatud):
+    """Server kirjanduskogu ei näe — pealkiri doc_id asemel peatatakse MCP-s."""
+    from mcp.server.mcpserver.exceptions import ToolError
+    from vutt_mcp.library.schema import connect, create_schema
+
+    db = tmp_path / "kogu.db"
+    conn = connect(db)
+    create_schema(conn)
+    conn.execute("INSERT INTO documents (doc_id, parent_key, title) VALUES ('DOC1', 'P1', 'Raamat')")
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("VUTT_LIBRARY_DB", str(db))
+
+    class ProposalClient(FakeClient):
+        def api_post_once(self, path, json_body):
+            self.posts.append((path, json_body))
+            return {"proposal_id": "prop1", "status": "pending"}
+
+    client = ProposalClient()
+    server = build_server(client=client, base_url=BASE)
+    args = {"handoff_code": "c", "person_id": "vutt:Pabc", "base_updated_at": "t",
+            "items": [_kirjanduse_ettepanek(source_id)]}
+    if oodatud:
+        with pytest.raises(ToolError, match=oodatud):
+            await server.call_tool("submit_person_enrichment_proposal", args)
+        assert client.posts == []
+    else:
+        await server.call_tool("submit_person_enrichment_proposal", args)
+        assert len(client.posts) == 1
+
+
+async def test_kirjanduse_toend_ilma_koguta_lukatakse_tagasi():
+    """Conftest suunab kogu olematusse faili: kontrollimatut viidet ei saadeta."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    client = FakeClient()
+    server = build_server(client=client, base_url=BASE)
+    with pytest.raises(ToolError, match="ei ole selles masinas saadaval"):
+        await server.call_tool("submit_person_enrichment_proposal", {
+            "handoff_code": "c", "person_id": "vutt:Pabc", "base_updated_at": "t",
+            "items": [_kirjanduse_ettepanek("DOC1")]})
+
+
 async def test_mcp_registrikandidaadid_ja_puuduv_register():
     class RegistryClient(FakeClient):
         def api_get(self, path, params=None):
