@@ -375,3 +375,26 @@ def test_liitmine_ei_tee_dateeringut_ebatapsemaks_ega_vaheta_kohta_keele_parast(
     assert more["dating"]["start"] == "1672-12-01"       # sama täpsus + selge parandus
     wd = wpp.merge_part(old, {**new, "place": {"id": "Q90", "label": "Pariis"}})
     assert wd["place"]["id"] == "Q90"                     # ID-ga koht täiendab
+
+
+def test_parandatud_nimi_asendab_vana_mitte_ei_lisandu():
+    """o17ekb: „Severin Walther Flüter" + parandus „Slüter" andis kaks autorit."""
+    fischer = {"id": "vutt:Pu837uz", "name": "Johann Fischer", "role": "addressee"}
+    old = {"id": "a", "kind": "letter", "pages": ["t-001"],
+           "creators": [{"name": "Severin Walther Flüter", "role": "auctor"}, fischer]}
+    for explicit in (False, True):
+        merged = wpp.merge_part(old, {"kind": "letter", "pages": ["t-001"], "creators": [
+            {"name": "Severin Walther Slüter", "role": "auctor"}, fischer]}, explicit=explicit)
+        assert [c["name"] for c in merged["creators"]] == ["Johann Fischer", "Severin Walther Slüter"]
+    # ID-ga parandus asendab ID-ta nime („Winkler" → „Winckler [P2o9k81]")
+    withid = wpp.merge_part({**old, "creators": [{"name": "Tobias Winkler", "role": "auctor"}]},
+                            {"creators": [{"id": "vutt:P2o9k81", "name": "Tobias Winckler", "role": "auctor"}]})
+    assert [(c.get("id"), c["name"]) for c in withid["creators"]] == [("vutt:P2o9k81", "Tobias Winckler")]
+
+
+def test_isikute_liitmine_ei_kaota_id_ga_ega_nimetamata_rolli_isikut():
+    old = {"id": "a", "kind": "letter", "pages": ["t-001"],
+           "creators": [{"id": "vutt:Paaaaa", "name": "Spener", "role": "auctor"},
+                        {"name": "Fischer", "role": "addressee"}]}
+    merged = wpp.merge_part(old, {"creators": [{"name": "Kaasautor", "role": "auctor"}]})
+    assert [c["name"] for c in merged["creators"]] == ["Spener", "Fischer", "Kaasautor"]

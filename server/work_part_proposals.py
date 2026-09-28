@@ -252,8 +252,15 @@ def merge_part(existing: dict, proposed: dict, explicit: bool = False) -> dict:
         out["languages"] = list(dict.fromkeys((out.get("languages") or []) + proposed["languages"]))
     if proposed.get("pages"):
         out["pages"] = proposed["pages"]
-    creators = [dict(c) for c in existing.get("creators") or []]
-    for c in proposed.get("creators") or []:
+    # Isikud: ettepanek on osa täisvaade. Rollis, mida ettepanek nimetab, asendub
+    # vastena leidmata ID-ta nimi (parandatud kirjapilt „Flüter" → „Slüter" ei jää
+    # vana kõrvale). ID-ga isikut ei eemaldata kunagi; nimetamata rolli ei puututa.
+    proposed_creators = proposed.get("creators") or []
+    named_roles = {c.get("role") for c in proposed_creators}
+    creators = [dict(c) for c in existing.get("creators") or []
+                if c.get("id") or c.get("role") not in named_roles
+                or any(_same_person(c, p) for p in proposed_creators)]
+    for c in proposed_creators:
         match = next((e for e in creators if _same_person(e, c)), None)
         if match is None:
             creators.append(dict(c))
