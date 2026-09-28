@@ -14,6 +14,7 @@ import type { LinkedEntity } from '../../../types/LinkedEntity';
 import { getLangCode } from '../../../utils/getLangCode';
 import { PART_KINDS, PART_ROLES, type PartKind, type PartPlace, type WorkPart } from '../../../services/workPartsApi';
 import type { PartDraft } from '../partsModel';
+import { usePlaceRegister } from './placeRegister';
 
 interface Props {
   isNew: boolean;
@@ -43,6 +44,7 @@ const PartForm: React.FC<Props> = ({
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const lang = getLangCode(i18n.language);
   const set = (patch: Partial<PartDraft>) => onDraft({ ...draft, ...patch });
+  const placeRegister = usePlaceRegister(lang);
   const input = 'w-full rounded border border-gray-300 px-2 py-1.5 text-sm';
   const label = 'block text-xs font-bold uppercase text-gray-500';
   const roles = PART_ROLES.map(r => ({ id: r, label: t(`metadata.roles.${r}`) }));
@@ -96,14 +98,14 @@ const PartForm: React.FC<Props> = ({
         <div className={label}>
           {t(draft.kind === 'letter' ? 'manage.parts.placeLetter' : 'manage.parts.place')}
           <div className="mt-1 font-normal normal-case">
-            <EntityPicker type="place" lang={lang} value={toEntity(draft.place)} onChange={e => set({ place: fromEntity(e) })} />
+            <EntityPicker type="place" lang={lang} value={toEntity(draft.place)} localSuggestions={placeRegister} onChange={e => set({ place: fromEntity(e) })} />
           </div>
         </div>
         {draft.kind === 'letter' && (
           <div className={`${label} sm:col-start-2`}>
             {t('manage.parts.placeTo')}
             <div className="mt-1 font-normal normal-case">
-              <EntityPicker type="place" lang={lang} value={toEntity(draft.place_to)} onChange={e => set({ place_to: fromEntity(e) })} />
+              <EntityPicker type="place" lang={lang} value={toEntity(draft.place_to)} localSuggestions={placeRegister} onChange={e => set({ place_to: fromEntity(e) })} />
             </div>
           </div>
         )}

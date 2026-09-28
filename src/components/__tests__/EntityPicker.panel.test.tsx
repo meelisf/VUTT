@@ -66,3 +66,17 @@ describe('EntityPicker — isikupaneel', () => {
     expect(screen.queryByTestId('panel')).toBeNull();
   });
 });
+
+describe('EntityPicker — kohalikud soovitused', () => {
+  it('kohtade register leitakse ka ajaloolise nime järgi ja valik kannab Q-koodi', async () => {
+    const wikidataService = await import('../../services/wikidataService');
+    (wikidataService.getEntityLabels as any).mockResolvedValue({ et: 'Tartu', de: 'Dorpat' });
+    const onChange = vi.fn();
+    render(<EntityPicker type="place" value="" onChange={onChange}
+      localSuggestions={[{ label: 'Tartu', id: 'Q13972', labels: { et: 'Tartu', de: 'Dorpat' }, aliases: ['Tarbatum'] }]} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'tarbat' } });
+    fireEvent.focus(screen.getByRole('textbox'));
+    fireEvent.click(await screen.findByText('Tartu'));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'Q13972', label: 'Tartu' })));
+  });
+});
