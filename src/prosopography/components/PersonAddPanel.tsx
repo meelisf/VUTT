@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, CheckCircle2 } from 'lucide-react';
 import { searchPersonSources } from '../panel/searchSources';
 import { groupCandidates } from '../panel/candidateGroups';
 import { chooseCardName } from '../panel/candidateNames';
@@ -83,16 +83,20 @@ const ExistingBlock: React.FC<{ entries: ExistingEntry[]; onSelect: (e: Existing
   if (entries.length === 0) return null;
   return (
     <section className="mb-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">{t('panel.existingTitle')}</h3>
+      {/* Roheline = „juba olemas, kasuta seda": olemasoleva valik väldib duplikaatkaarti. */}
+      <h3 className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-1.5">
+        <CheckCircle2 size={14} className="shrink-0" />
+        {t('panel.existingTitle')}
+      </h3>
       <ul className="space-y-1.5">
         {entries.map(e => (
-          <li key={e.id} className="flex items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2.5 py-1.5">
+          <li key={e.id} className="flex items-center justify-between gap-2 rounded border border-emerald-300 border-l-4 border-l-emerald-500 bg-emerald-50 px-2.5 py-1.5">
             <div className="min-w-0">
               <div className="text-sm font-medium text-gray-900 truncate">{e.label}</div>
-              <p className="text-xs text-gray-500"><LifeYears birth={e.birth} death={e.death} /></p>
+              <p className="text-xs text-gray-600"><LifeYears birth={e.birth} death={e.death} /></p>
             </div>
             <button type="button" onClick={() => onSelect(e)}
-              className="shrink-0 text-xs font-medium text-primary-700 hover:text-primary-900 hover:underline">
+              className="shrink-0 rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700">
               {t('panel.selectExisting')}
             </button>
           </li>
@@ -121,12 +125,12 @@ const CandidateRow: React.FC<{
 
   if (group.existingPersonIds.length > 0) {
     return (
-      <div data-testid="candidate-row" className="flex items-center justify-between gap-2 rounded border border-gray-200 px-2.5 py-1.5">
+      <div data-testid="candidate-row" className="flex items-center justify-between gap-2 rounded border border-emerald-200 bg-emerald-50/60 px-2.5 py-1.5">
         <span className="text-sm text-gray-700 truncate">
-          {fallback || chosen} — <em className="text-gray-400 not-italic">{t('panel.alreadyInVutt')}</em>
+          {fallback || chosen} — <em className="text-emerald-700 not-italic">{t('panel.alreadyInVutt')}</em>
         </span>
         <button type="button" onClick={onSelectExisting}
-          className="shrink-0 text-xs font-medium text-primary-700 hover:text-primary-900 hover:underline">
+          className="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900 hover:underline">
           {t('panel.selectExisting')}
         </button>
       </div>
