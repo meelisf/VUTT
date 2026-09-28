@@ -30,6 +30,16 @@ def test_osad_numbritega_ja_versiooniga():
     assert out["parts"][0]["pages"] == [2, 3]
 
 
+def test_osa_tekstivaljad_kaasas():
+    """Märkused, algus ja keeled on agendile (ja parandusele) vajalik kontekst."""
+    c = FakeClient()
+    c.data["parts"][0].update(notes="Kiri on dateerimata; aasta kaaskirjast.", incipit="Hochwürdiger Herr",
+                              languages=["ger"])
+    p = json.loads(parts.work_parts(c, "w1ab"))["parts"][0]
+    assert p["notes"] == "Kiri on dateerimata; aasta kaaskirjast."
+    assert p["incipit"] == "Hochwürdiger Herr" and p["languages"] == ["ger"]
+
+
 def test_esitus_saadab_ainult_ettepaneku():
     c = FakeClient()
     text = parts.submit_parts(c, "kood", "w1ab", "abc123", [{"kind": "letter", "pages": [4]}])
