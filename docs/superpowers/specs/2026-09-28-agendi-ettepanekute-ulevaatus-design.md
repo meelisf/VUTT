@@ -79,6 +79,11 @@ Ettepaneku rida võib kanda uut registrikirjet:
   olla mõlemad, näiteks uus amet uues asutuses.
 - Kui rida kannab `*_entry`-t, peab `match_status` olema `new_registry_candidate` ja
   vastav `*_key` kas puudub või võrdub `entry.key`-ga. Server täidab `*_key` ise.
+- `key` on lepingus kirje sees, sest agendile on nii lihtsam. Registri kirjekujus
+  võtit ei ole: `validate_entry(kind, key, data)` võtab võtme eraldi argumendina ja
+  lükkab `key` sisus tagasi (`unknown_fields`). Server **eraldab `key` kirjest** enne
+  valideerimist ja `ensure`-kutset (vt osa 4). Talletatud ettepanekus jääb kirje
+  lepingu kujule.
 - **Esitamisel** valideerib server kirje `registries.validate_entry`-ga (sama, mida
   kasutab registrileht). Rida lükatakse tagasi, kui:
   - võti on registris juba olemas: `registry_key_exists: <võti> — kasuta seda`;
@@ -117,21 +122,42 @@ kaob. Iga valitud rida hinnatakse kinnitamise hetkel elava kaardi vastu:
 versioonikontroll katab lugemise ja kirjutamise vahelise akna. Esitamisel jääb
 `base_updated_at` kontroll alles (`stale_person`): agent peab nägema värsket kaarti.
 
-**Registrikirje loomine kinnitamisel:**
+**Registrikirje loomine: uus atomaarne toiming `registries.ensure`.**
+`registries.put` kirjutab olemasoleva võtme üle, seega ei tohi „kas kirje on olemas" ja
+kirjutamine olla eri luku all: vahepeal võib teine kinnitus sama võtme luua ja esimene
+kirjutaks selle üle. Uus `ensure(kind, key, data, username) -> (entry, created)` teeb
+ühe `_LOCK`-i all lugemise, võrdluse ja vajadusel kirjutamise:
 
-- kirjet pole: `registries.put(kind, key, entry, username)`, commit `save_config_with_git`-iga;
-- sama võti ja sama Q-kood on vahepeal tekkinud (näiteks teise isiku ettepanekust):
-  rida seotakse olemasoleva kirjega ja uut kirjet ei looda;
-- sama võti ja erinev Q-kood (või üks on Q-koodita ja teine mitte): rida on blokeeritud,
-  `registry_conflict: <võti>`.
+- võtit pole: valideerib (`validate_entry` + dubleeriva Q-koodi kontroll nagu `put`-is),
+  kirjutab `save_config_with_git`-iga ja tagastab `created=True`;
+- võti on olemas ja see on **sama kirje**: tagastab olemasoleva, `created=False`, ja
+  midagi ei kirjutata. Sama kirje tähendab, et mõlemal on sama Q-kood; kui Q-koodi pole
+  kummalgi, siis sama eestikeelne nimi (tõstutundetult);
+- võti on olemas ja kirje on erinev (erinev Q-kood, või Q-kood on ainult ühel, või
+  Q-koodita kirjetel erinev nimi): `RegistryError("registry_conflict")`, midagi ei kirjutata.
 
-Registrikirje luuakse enne kaardi salvestamist. Kui kaardi salvestus ebaõnnestub, jääb
-registrikirje alles. See on ohutu, sest registrikirje on iseseisev ja järgmine
-kinnitus seob sellega.
+`put` jääb registrilehe jaoks muutmata (seal on ülekirjutus tahtlik).
 
-**„Kinnita kõik"** saadab kinnitatavate ridade indeksid. Kinnitus on kõik-või-mitte-midagi
-ühe kaardisalvestusega. Kui üks rida kukub, ei salvestata midagi ja viga nimetab rea
-(`items[i]: …`).
+**Kinnitamise järjekord** (ka „Kinnita kõik" korral, mis saadab kõigi kinnitatavate
+ridade indeksid):
+
+1. **Eelkontroll, midagi ei kirjutata.** Kõik valitud read kontrollitakse elava kaardi
+   ja registri hetkeseisu vastu: duplikaat, „juba kaardil" vaste ja registrikonflikt
+   (sama reegel mis `ensure`-is). Kui mõni rida kukub, ei looda ühtegi registrikirjet
+   ega muudeta kaarti. Viga nimetab rea (`items[i]: …`) ja paneel näitab seda real.
+2. **Registrikirjed** luuakse `ensure`-ga rea kaupa. Eelkontrolli ja `ensure`-i vahel võib
+   teine kinnitus sama võtme luua. Siis kas seotakse (sama kirje) või kukub rida
+   `registry_conflict`-iga. Viimasel juhul peatub kinnitus ja kaarti ei muudeta, aga
+   **selles sammus juba loodud registrikirjed jäävad alles**. See on ohutu, sest
+   registrikiri on iseseisev ja järgmine katse seob sellega.
+3. **Kaart** salvestatakse üks kord kõigi ridadega (`update_person`, elav `updated_at`).
+   Kukkumisel (näiteks versioonikonflikt) jäävad sammu 2 registrikirjed alles.
+
+Kinnitus on seega kõik-või-mitte-midagi **kaardi suhtes**, aga mitte registri suhtes.
+Kui samm 2 või 3 kukub pärast registrikirjete loomist, lisab server veale loodud võtmed:
+`created_registry_entries: [...]`. Paneel ütleb siis: „Registrikirjed X, Y loodi, kaarti ei
+muudetud. Proovi uuesti: kinnitus seob nüüd olemasolevate kirjetega." Kui eelkontroll
+kukub, pole registrisse midagi kirjutatud ja paneel ütleb seda.
 
 **Tagasilükkamine:** uus `POST /prosopography/enrichment-proposals/{person_id}/reject`
 kehaga `{proposal_id, indices: [...]}` (sama kuju mis `…/apply`) eemaldab read ettepanekust. Kui ridu ei jää, suletakse
@@ -167,7 +193,7 @@ juures on eemaldamise nupp. Viiteid vormis toimetada ei saa.
 
 | Kiht | Fail |
 |---|---|
-| Server | `server/prosopography/enrichment_proposals.py` (leping, esitus, kinnitus, reject, review_state), `router.py` (rollid, reject-otspunkt), `registries.py` (vajadusel abi „leia Q-koodi järgi") |
+| Server | `server/prosopography/enrichment_proposals.py` (leping, esitus, kinnitus, reject, review_state), `router.py` (rollid, reject-otspunkt), `registries.py` (uus `ensure`) |
 | MCP | `mcp/vutt_mcp/server.py` (juhis, `citation`), `library/tools.py` (citation päring) |
 | Frontend | `AgentEnrichmentPanel.tsx` (ümber kirjutatud), `prosopographyService.ts` (tüübid, reject), `PersonDetailPage.tsx` (joonealused viited), `PersonEditPage.tsx` (tõendite nimekiri, paneeli nähtavus), locale'id et+en |
 | Eemaldatav | `RegistryCandidatePicker.tsx`, `RegistryEntryForm.tsx` (kui mujal kasutust pole) |
@@ -177,6 +203,9 @@ juures on eemaldamise nupp. Viiteid vormis toimetada ei saa.
 
 - Server: `*_entry` valideerimine esitamisel (olemasolev võti, dubleeriv Q, puuduv `type`);
   kinnitus loob registrikirje ja fakti; sama võti + sama Q → seob; erinev Q → blokeeritud;
+  `ensure` luku all (samaaegne loomine ei kirjuta üle; Q-koodita kirjete nimevõrdlus);
+  eelkontrolli kukkumine ei loo ühtegi registrikirjet; sammu 3 kukkumine tagastab
+  `created_registry_entries`; kirje sisene `key` eraldatakse enne valideerimist;
   kaardi käsitsi muudatus vahepeal ei blokeeri teisi ridu; „juba kaardil" leitakse pärast
   kaardilt kustutamist (indeks nihkunud) sisu järgi; reject eemaldab rea ja sulgeb tühja
   ettepaneku; rollikaitse (editor → 403) kõigil viiel otspunktil.
