@@ -52,3 +52,26 @@ export function selectionAfterSync({
   if (!Number.isFinite(currentAnchor)) return 0;
   return Math.max(0, Math.min(currentAnchor, newDocLength));
 }
+
+interface KeepEditorTextParams {
+  isSwap: boolean;
+  /** Serverist tulnud lehe tekst. */
+  incomingText: string;
+  /** Viimati salvestatud tekst (`savedState.text`). */
+  savedText: string;
+  /** Redaktori praegune tekst. */
+  editorText: string;
+}
+
+/**
+ * Kas sama lehe värskendus peab redaktori teksti puutumata jätma.
+ *
+ * Kui serverist tuli sama tekst, mis viimati salvestati, pole serveril midagi
+ * uut — redaktori erinev sisu on kasutaja salvestamata töö ja üle kirjutamine
+ * kustutaks selle (kkrxpe, 2026-09-28: iga Meili tokeni uuendus laadis lehe
+ * uuesti). Salvestus ise tuleb teise tekstiga (normaliseeritud uus tekst,
+ * `savedState` on siis veel vana) ja asendub nagu enne.
+ */
+export function keepEditorText({ isSwap, incomingText, savedText, editorText }: KeepEditorTextParams): boolean {
+  return !isSwap && incomingText === savedText && editorText !== savedText;
+}

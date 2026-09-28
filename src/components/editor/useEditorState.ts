@@ -4,7 +4,7 @@ import type { Annotation, Page, TextAnnotation } from '../../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 import { closeAllMarginalia } from './MarginaliaExtension';
 import { pageSwapAnnotation } from './editorAnnotations';
-import { isPageSwap, selectionAfterSync } from './editorPageSync';
+import { isPageSwap, keepEditorText, selectionAfterSync } from './editorPageSync';
 import type { EditorSavedState } from './useEditorSave';
 
 interface UseEditorStateParams {
@@ -31,6 +31,10 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
     page_tags: page.page_tags || [],
     text_annotations: page.text_annotations || [],
   });
+
+  // `page`-effect loeb salvestatud teksti ilma deps'is olemata (vt keepEditorText).
+  const savedTextRef = useRef(savedState.text);
+  savedTextRef.current = savedState.text;
 
   // Arvutame kas on salvestamata muudatusi (shallow compare, mitte JSON.stringify)
   const hasUnsavedChanges = useMemo(() => {
@@ -86,7 +90,10 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
     const view = viewRef.current;
     if (view) {
       const currentText = view.state.doc.toString();
-      if (currentText !== page.text_content) {
+      const keep = keepEditorText({
+        isSwap, incomingText: page.text_content || '', savedText: savedTextRef.current, editorText: currentText,
+      });
+      if (!keep && currentText !== page.text_content) {
         const newText = page.text_content || '';
         view.dispatch({
           changes: { from: 0, to: currentText.length, insert: newText },
