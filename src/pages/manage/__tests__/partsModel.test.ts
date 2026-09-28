@@ -1,6 +1,6 @@
 // src/pages/manage/__tests__/partsModel.test.ts
 import { describe, it, expect } from 'vitest';
-import { compactNumbers, draftFromPart, emptyDraft, initialManageTab, pageBadges, pageRangeList, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
+import { compactNumbers, draftFromPart, emptyDraft, PartDatingError, initialManageTab, pageBadges, pageRangeList, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
 import type { WorkPart } from '../../../services/workPartsApi';
 
 const STEMS = ['s1', 's2', 's3', 's4'];
@@ -75,5 +75,27 @@ describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
   it('pageRangeList: vahemikud lingiks (from/to)', () => {
     const nums = new Map([['s1', 1], ['s2', 2], ['s4', 4]]);
     expect(pageRangeList(['s4', 's2', 's1'], nums)).toEqual([{ from: 1, to: 2 }, { from: 4, to: 4 }]);
+  });
+});
+
+describe('partsModel: dateering lihtsast lahtrist', () => {
+  it('kirjutatud aasta salvestub, mitte ei kao vaikselt (o17ekb)', () => {
+    const d = { ...emptyDraft('letter'), datingText: '1667', dating: null };
+    expect(partFromDraft(d, ['s1']).dating).toEqual({ start: '1667' });
+  });
+
+  it('vahemik tekstina saab alguse ja lõpu', () => {
+    const d = { ...emptyDraft('letter'), datingText: '1667–1668', dating: null };
+    expect(partFromDraft(d, ['s1']).dating).toEqual({ start: '1667', end: '1668' });
+  });
+
+  it('tõlgendamatu tekst ei kao vaikselt, vaid peatab salvestuse', () => {
+    const d = { ...emptyDraft('letter'), datingText: 'umbes suvel', dating: null };
+    expect(() => partFromDraft(d, ['s1'])).toThrow(PartDatingError);
+  });
+
+  it('tühi tekst = dateering puudub', () => {
+    const d = { ...emptyDraft('letter'), datingText: '  ', dating: null };
+    expect(partFromDraft(d, ['s1']).dating).toBeUndefined();
   });
 });

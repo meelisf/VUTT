@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, ListOrdered, Pencil } from 'lucide-react';
 import { deletePart, getPartsToc, updatePart, type WorkPart } from '../../services/workPartsApi';
-import { draftFromPart, partFromDraft, sharedStems as sharedStemsOf, type PartDraft } from '../../pages/manage/partsModel';
+import { draftFromPart, PartDatingError, partFromDraft, sharedStems as sharedStemsOf, type PartDraft } from '../../pages/manage/partsModel';
 import PartForm from '../../pages/manage/parts/PartForm';
 import PartPanel from '../../pages/manage/parts/PartPanel';
 import UnsavedChangesDialog from '../UnsavedChangesDialog';
@@ -207,7 +207,8 @@ const PartEditPanel: React.FC<{ workId: string; token: string | null; part: Work
       setCurrent(saved); setDraft(draftFromPart(saved)); setDirty(false);
       return true;
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof PartDatingError
+        ? t('manage.parts.datingUnparsed', { text: e.message }) : (e as Error).message);
       return false;
     } finally {
       setBusy(false);

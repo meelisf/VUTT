@@ -14,7 +14,7 @@ import {
   changePartPages, createPart, decidePartProposal, deletePart, listParts, updatePart, type WorkPart,
   type PartProposalItem,
 } from '../../../services/workPartsApi';
-import { draftFromPart, emptyDraft, pageBadges, partFromDraft, sharedStems, sortParts, type PartDraft } from '../partsModel';
+import { draftFromPart, emptyDraft, pageBadges, PartDatingError, partFromDraft, sharedStems, sortParts, type PartDraft } from '../partsModel';
 import PartsGrid from './PartsGrid';
 import PartsList from './PartsList';
 import PartForm from './PartForm';
@@ -147,7 +147,9 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
     try { localStorage.setItem(THUMB_KEY, String(n)); } catch { /* mugavus */ }
   };
 
-  const fail = (e: unknown) => setError((e as Error).message || String(e));
+  const fail = useCallback((e: unknown) => setError(e instanceof PartDatingError
+    ? t('manage.parts.datingUnparsed', { text: e.message })
+    : (e as Error).message || String(e)), [t]);
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!editing) return true;
@@ -176,7 +178,7 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
     } finally {
       setBusy(false);
     }
-  }, [editing, draft, active, workId, token, reload, stems, selected]);
+  }, [editing, draft, active, workId, token, reload, stems, selected, fail]);
 
   useEffect(() => { saveRef.current = save; }, [save, saveRef]);
 
