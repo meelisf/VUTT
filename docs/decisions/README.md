@@ -79,3 +79,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0057](0057-teose-osad.md) | Teose osad `_metadata.json` `parts[]` (lehetüvede hulk); muudetakse ainult `/works/{id}/parts` otspunktidega; `refresh_work_mentions` → `sync_work_parts` | kehtib |
 | [0058](0058-mcp-esitab-ainult-ootel-prosopo-ettepaneku.md) | MCP võib kirjutada ainult ajutise prosopo ettepaneku ühekordse isiku ja sessiooniga seotud koodiga | kehtib |
 | [0059](0059-ameti-ja-asutusregistri-voti.md) | Ameti ja asutuse VUTT-i registrivõti on identiteet; Q-kood on valikuline ühilduvusväli, allikasõnastus säilib | kehtib |
+| [0060](0060-perioodiline-soltuvus-ei-lae-lehte-uuesti.md) | Töölaua perioodiliselt muutuv sõltuvus (token, sessioon, kasutaja) ei lae juba laetud lehte uuesti; laadimisel on võti `pageLoadKey`, redaktor hoiab salvestamata teksti | kehtib |

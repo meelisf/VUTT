@@ -254,6 +254,9 @@ ja see **EI TOHI olla `Transaction.userEvent`** (muidu hakkavad sanitiseerijad k
 teksti muutma). Komponendisisene olek, mis varem lähtestus remountiga (`isDirty`, `saveError`,
 kerimispositsioon), tuleb lehevahetuse effectis **selgesõnaliselt** lähtestada. Üldisemalt:
 remount on vaikiv olekulähtestaja — early-returni eemaldamisel auditeeri kogu komponendi olek.
+Peegelpilt (ADR 0060): Workspace'i lehe-effecti perioodiliselt muutuv dep (Meili token,
+sessioon, kasutaja) EI TOHI juba laetud lehte uuesti laadida — laadimise võti on
+`pageLoadKey` (teos + leht + viewer-token); sama lehe uuendus käib otse `setPage`-iga.
 
 **Töökollektsioonid (ADR 0042)** — kureeritud teoste valik
 (`data/config/work_sets/<id>.json`), MITTE kollektsioon. Kolm reeglit:
