@@ -691,8 +691,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                   <>
                     {isExternalLoading && (
                       <div className="px-4 py-2 flex items-center gap-2 text-xs text-gray-400">
-                        <Loader2 size={11} className="animate-spin" />
-                        {lang === 'en' ? 'Searching...' : 'Otsib...'}
+                        <Loader2 size={11} className="animate-spin shrink-0" />
+                        {/* Välisallikad (eriti GND) vastavad vahel sekundeid — ütle, et ootamine on normaalne. */}
+                        {lang === 'en'
+                          ? 'Searching Wikidata, GND and VIAF… this can take a few seconds.'
+                          : 'Otsib Wikidatast, GND-st ja VIAF-ist… võib võtta mõne sekundi.'}
                       </div>
                     )}
                     {externalResults.map((result, idx) => {

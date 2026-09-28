@@ -253,6 +253,8 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
 
   const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
+  // Otsingu etapp ootekasti jaoks: välisallikate otsing (brauserist) → kandidaatide andmed (server).
+  const [phase, setPhase] = useState<'sources' | 'details'>('sources');
   const [results, setResults] = useState<CandidateResult[]>([]);
   const [similarPersons, setSimilarPersons] = useState<SimilarPerson[]>([]);
   const [failedSources, setFailedSources] = useState<SourceScheme[]>([]);
@@ -281,12 +283,14 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
       return;
     }
     setLoading(true);
+    setPhase('sources');
     setConflictIds(null);
     setCandidatesError(false);
     try {
       const { refs, failed } = await searchPersonSources(q, lang, focusRef);
       if (id !== searchIdRef.current) return;
       setFailedSources(failed);
+      setPhase('details');
       const { results: res, similar_persons } = await fetchCandidates(
         q, refs.map(r => ({ scheme: r.scheme, id: r.id })), token,
       );
@@ -445,7 +449,6 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
           <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
             placeholder={t('panel.searchPlaceholder')}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          {loading && <p className="mt-1 text-xs text-gray-400">{t('panel.searching')}</p>}
           {failedSources.map(s => (
             <p key={s} className="mt-1 text-xs text-amber-600">{t('panel.sourceSearchFailed', { source: SOURCE_LABEL[s] })}</p>
           ))}
@@ -458,6 +461,17 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">{t('panel.sourcesTitle')}</h3>
             {/* I2: laadimistõrge ja "kedagi ei leitud" on kaks eri olekut — tõrke korral
                 EI näidata noResults-teadet, mis jätaks mulje, et otsing lihtsalt käis läbi. */}
+            {/* Välisallikad (eriti lobid/GND) vastavad vahel sekundeid — nähtav ootekast,
+                et kannatamatu kasutaja ei loeks tühja plokki „vasteid pole" märgiks. */}
+            {loading && (
+              <div role="status" className="mb-2 flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin" />
+                <span>
+                  <span className="block font-medium">{t(phase === 'sources' ? 'panel.searchingSources' : 'panel.loadingDetails')}</span>
+                  <span className="block text-blue-700/80">{t('panel.slowHint')}</span>
+                </span>
+              </div>
+            )}
             {!loading && groups.length === 0 && (
               candidatesError
                 ? <p role="alert" className="text-xs text-red-600">{t('panel.candidatesFailed')}</p>

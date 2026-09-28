@@ -247,4 +247,20 @@ describe('PersonAddPanel', () => {
     resolveCreate({ id: 'vutt:Pnew', name: { label: 'X' } });
     await waitFor(() => expect(createBtn.disabled).toBe(false));
   });
+
+  it('ootamise ajal on nähtav etapiga ootekast, mitte „ei leitud"', async () => {
+    let doneSources!: (v: any) => void;
+    let doneCandidates!: (v: any) => void;
+    searchPersonSourcesMock.mockImplementationOnce(() => new Promise(r => { doneSources = r; }) as any);
+    fetchCandidatesMock.mockImplementationOnce(() => new Promise(r => { doneCandidates = r; }) as any);
+    render(<PersonAddPanel initialQuery="Ludenius" token="t" lang="et" onDone={vi.fn()} onClose={vi.fn()} />);
+    expect(await screen.findByText('panel.searchingSources')).toBeTruthy();
+    expect(screen.getByText('panel.slowHint')).toBeTruthy();
+    expect(screen.queryByText('panel.noResults')).toBeNull();
+    doneSources({ refs: [], failed: [] });
+    expect(await screen.findByText('panel.loadingDetails')).toBeTruthy();
+    doneCandidates({ results: [], similar_persons: [] });
+    expect(await screen.findByText('panel.noResults')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
 });
