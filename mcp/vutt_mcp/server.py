@@ -572,11 +572,20 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         - raw_occupation (occupation puhul kohustuslik) / raw_institution
           (education puhul kohustuslik): allika sõnastus SÕNASÕNALT, allika
           keeles — ära tõlgi ega normaliseeri ("Notarius publicus", mitte
-          "avalik notar"); normaliseerimine on registrivõtme töö
+          "avalik notar"); normaliseerimine on registrivõtme töö.
+          raw_occupation on ametinimetus, mitte lause — see saab kaardil
+          rea nimeks. Kasuta ajaloolist terminit, kui allikas seda tsiteerib
+          ("poeta laureatus caesareus"), muidu lühikest nimetust allika
+          keeles ("inspector", mitte "inspector at a copper mine in
+          Småland"); koht, asutus ja aeg lähevad oma väljadele
         - occupation_key, institution_key, place_key: registrivõtmed
           search_enrichment_registry'st; occupation_variant /
           institution_variant ainult koos vastava võtmega
-        - edu_type (education puhul hariduse liik)
+        - edu_type: rida ise tähendab, et isik õppis seal. Pane "imm."
+          ainult siis, kui allikas ütleb immatrikuleerimist; muidu jäta
+          välja. Akadeemilisele kraadile (magister, doktor) välja ei ole —
+          ära esita seda hariduse reana; anna kraad koos tõendiga
+          vestluses kasutajale, ta lisab selle vabatekstina elulukku
         - existing_index: valikuline vihje (sama liigi kirje indeks
           get_person_enrichment_context'is); server leiab kirje SISU järgi
         - occupation_entry / institution_entry: UUS registrikirje, ainult kui
@@ -596,6 +605,11 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           doc_id>, "locator": "lk 64", "quote"} — `citation` täidab MCP ise
           kirjanduskogust
         Veateade nimetab vigase kirje (items[i]) ja välja.
+
+        PRIMAARALLIKAS ENNE SEKUNDAARI: otsi fakti kõigepealt korpusest
+        (search_pages / get_pages — isiku enda teosed, tema kohta käivad
+        trükised) ja esita tõendiks korpuse leht. Kirjanduskogu on täiendus
+        või varuvariant, kui korpuses fakti ei leidu.
 
         TÕEND AINULT VUTT-IST: korpuse leht või kirjanduskogu dokument.
         Veebiallikas (ka akadeemiline artikkel või leksikon) EI OLE tõend.
