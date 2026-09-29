@@ -42,7 +42,7 @@ def _headers(token):
 def test_isikukood_lubab_mitu_esitust_ja_isikukaart_jaab_puutumata(client, login, prosopo_env):
     """#492: kood kehtib tööpäeva, lubab ulatuse piires mitu esitust kuni laeni."""
     before = prosopo_env.write("abc", occupations=[])
-    token = login("editor", "editorpass")
+    token = login("superadmin", "superpass")
     handoff = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
                           headers=_headers(token))
     assert handoff.status_code == 200
@@ -65,7 +65,7 @@ def test_isikukood_lubab_mitu_esitust_ja_isikukaart_jaab_puutumata(client, login
 def test_isikukood_ei_kehti_teisele_isikule(client, login, prosopo_env):
     prosopo_env.write("abc")
     other = prosopo_env.write("oth")
-    token = login("editor", "editorpass")
+    token = login("superadmin", "superpass")
     code = client.post("/prosopography/enrichment-handoff/vutt:Pabc", headers=_headers(token)).json()["code"]
     assert client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Poth", "base_updated_at": other["updated_at"],
@@ -75,7 +75,7 @@ def test_isikukood_ei_kehti_teisele_isikule(client, login, prosopo_env):
 def test_uldkood_kehtib_koigile_isikutele_ja_kasutuste_lagi(client, login, prosopo_env, monkeypatch):
     a = prosopo_env.write("abc")
     b = prosopo_env.write("oth")
-    token = login("editor", "editorpass")
+    token = login("superadmin", "superpass")
     assert client.post("/prosopography/enrichment-handoff").status_code == 401
     handoff = client.post("/prosopography/enrichment-handoff", headers=_headers(token))
     assert handoff.status_code == 200 and handoff.json()["scope"] == "any"
@@ -100,18 +100,19 @@ def test_ettepanek_on_kasutaja_oma_mitte_seansi(client, login, prosopo_env):
     contrib = login("contrib", "contribpass")
     assert client.post("/prosopography/enrichment-handoff/vutt:Pabc",
                        headers=_headers(contrib)).status_code == 401
-    token1 = login("editor", "editorpass")
-    token2 = login("editor", "editorpass")
-    other_user = login("admin", "adminpass")
+    token1 = login("superadmin", "superpass")
+    token2 = login("superadmin", "superpass")
     code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
                        headers=_headers(token1)).json()["code"]
     client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Pabc",
         "base_updated_at": "2026-01-01T00:00:00+00:00", "items": [_item()],
     })
-    for token, expected in ((token1, 1), (token2, 1), (other_user, 0)):
+    for token in (token1, token2):
         got = client.get("/prosopography/enrichment-proposals/vutt:Pabc", headers=_headers(token))
-        assert len(got.json()) == expected
+        assert len(got.json()) == 1
+    # Teine kasutaja ei näe (HTTP kaudu jõuab loeteluni ainult superadmin).
+    assert proposals.list_pending("vutt:Pabc", "admin") == []
 
 
 @pytest.mark.parametrize("change", [
@@ -127,7 +128,7 @@ def test_ettepanek_on_kasutaja_oma_mitte_seansi(client, login, prosopo_env):
 ])
 def test_vigane_ettepanek_ei_kuluta_koodi(client, login, prosopo_env, change):
     prosopo_env.write("abc")
-    token = login("editor", "editorpass")
+    token = login("superadmin", "superpass")
     code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
                        headers=_headers(token)).json()["code"]
     body = {"code": code, "person_id": "vutt:Pabc",
@@ -141,7 +142,7 @@ def test_vigane_ettepanek_ei_kuluta_koodi(client, login, prosopo_env, change):
 
 def test_aegunud_kood_keeldub(client, login, prosopo_env, monkeypatch):
     prosopo_env.write("abc")
-    token = login("editor", "editorpass")
+    token = login("superadmin", "superpass")
     monkeypatch.setattr(proposals.time, "time", lambda: 1000)
     code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
                        headers=_headers(token)).json()["code"]
@@ -160,7 +161,7 @@ def test_ajutine_andmebaas_on_ainult_serveri_kasutajale(tmp_path):
 
 def test_vigane_isiku_id_ja_suur_sisu_keelatakse(client, login, prosopo_env):
     prosopo_env.write("abc")
-    token = login("editor", "editorpass")
+    token = login("superadmin", "superpass")
     assert client.post("/prosopography/enrichment-handoff/%2E%2E",
                        headers=_headers(token)).status_code == 400
     code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
@@ -186,7 +187,7 @@ def _submit_for_review(client, token, card, items):
 
 def test_valitud_kirjed_salvestatakse_koos_toenditega(client, login, prosopo_env):
     card = prosopo_env.write('abc', occupations=[], education=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     items = [
         _item(occupation_key=None, institution_key=None),
         {"kind": "education", "match_status": "matched", "raw_institution": "Academia Gustaviana",
@@ -214,7 +215,7 @@ def test_valitud_kirjed_salvestatakse_koos_toenditega(client, login, prosopo_env
 
 def test_kinnitamine_keeldub_puuduvast_registrist_ja_vananenud_kaardist(client, login, prosopo_env):
     card = prosopo_env.write('abc', occupations=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     proposal_id = _submit_for_review(client, token, card, [_item()])
     url = f'/prosopography/enrichment-proposals/{card["id"]}/apply'
     result = client.post(url, headers=_headers(token),
@@ -231,14 +232,13 @@ def test_kinnitamine_keeldub_puuduvast_registrist_ja_vananenud_kaardist(client, 
 
 def test_kinnitamine_nouab_sama_kasutajat_ja_varsket_versiooni(client, login, prosopo_env):
     card = prosopo_env.write('abc', occupations=[])
-    token1 = login('editor', 'editorpass')
-    other_user = login('admin', 'adminpass')
+    token1 = login('superadmin', 'superpass')
     proposal_id = _submit_for_review(client, token1, card, [_item(occupation_key=None, institution_key=None)])
     url = f'/prosopography/enrichment-proposals/{card["id"]}/apply'
-    assert client.post(url, headers=_headers(other_user),
-                       json={"proposal_id": proposal_id, "selected": [0]}).status_code == 400
+    with pytest.raises(proposals.ProposalError, match="proposal_not_found"):
+        proposals.apply_selected(proposal_id, card["id"], "admin", "", [0])
     changed = prosopo_env.write('abc', occupations=[], updated_at='2026-02-01T00:00:00+00:00')
-    token2 = login('editor', 'editorpass')              # uus seanss, sama kasutaja
+    token2 = login('superadmin', 'superpass')              # uus seanss, sama kasutaja
     result = client.post(url, headers=_headers(token2),
                          json={"proposal_id": proposal_id, "selected": [0]})
     assert result.status_code == 409
@@ -255,7 +255,7 @@ def test_registrivoitmed_salvestuvad_ainult_olemasolevate_seostega(
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
     monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     proposal_id = _submit_for_review(client, token, card, [_item()])
     response = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
                            headers=_headers(token), json={"proposal_id": proposal_id, "selected": [0]})
@@ -276,7 +276,7 @@ def test_voltsitud_registrivariant_ei_joua_kinnitamiseni(
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
     monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     proposal_id = _submit_for_review(client, token, card, [
         _item(occupation_key='professor', institution_key=None,
               occupation_variant='Võltsitud variant')])
@@ -305,7 +305,7 @@ def test_olemasoleva_kirje_toend_lisataks_molemal_liigil(client, login, prosopo_
         'date_from': {'date': '1640', 'precision': 'year'},
         'evidence': [{'source_kind': 'literature', 'source_id': 'book0', 'locator': 'lk 2'}],
     }])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     items = [
         _item(raw_occupation='Professor', occupation_key='professor', institution_key='agc',
               match_status='already_present', existing_index=0,
@@ -342,7 +342,7 @@ def test_olemasolevale_agc_reale_lisatakse_registriseos_ilma_sonastust_muutmata(
         {'institution': 'Academia Gustaviana', 'date_from': {'date': '1691', 'precision': 'year'}},
         {'institution': 'AGC'},
     ])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     evidence = [{'source_kind': 'literature', 'source_id': 'album_academicum',
                  'locator': 'NR 1254', 'quote': 'AGC: juris stud.'}]
     item = {'kind': 'education', 'match_status': 'already_present',
@@ -370,7 +370,7 @@ def test_sama_voti_ja_kattuv_aeg_on_duplikaat_aga_eri_opingusundmus_mitte(
         'institution': 'AGC', 'institution_key': 'agc', 'type': 'immatriculation',
         'date_from': {'date': '1640', 'precision': 'year'},
     }])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     base = {'kind': 'education', 'match_status': 'matched', 'raw_institution': 'Academia Gustavo-Carolina',
             'institution_key': 'agc', 'date_from': {'date': '1640', 'precision': 'year'},
             'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}]}
@@ -396,7 +396,7 @@ def test_toimetaja_lahendab_mitmetahendusliku_vaste_registrivalikuga(
     monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
     monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
     card = prosopo_env.write('abc', occupations=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     proposal_id = _submit_for_review(client, token, card, [{
         'kind': 'occupation', 'match_status': 'ambiguous', 'raw_occupation': 'Pfarrer',
         'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}],
@@ -420,7 +420,7 @@ def test_toimetaja_lahendab_mitmetahendusliku_vaste_registrivalikuga(
 
 def test_parandus_ei_voimalda_valitud_reast_valjuda(client, login, prosopo_env):
     card = prosopo_env.write('abc', occupations=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     proposal_id = _submit_for_review(client, token, card, [
         _item(occupation_key=None, institution_key=None),
         _item(occupation_key=None, institution_key=None, raw_occupation='Õpetaja'),
@@ -436,7 +436,7 @@ def test_parandus_ei_voimalda_valitud_reast_valjuda(client, login, prosopo_env):
 
 def test_toimetaja_parandab_aja_ja_toendi_koos_kinnitamisega(client, login, prosopo_env):
     card = prosopo_env.write('abc', education=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     item = {'kind': 'education', 'match_status': 'matched', 'raw_institution': 'AGC',
             'date_from': {'date': '1640', 'precision': 'year'},
             'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}]}
@@ -457,7 +457,7 @@ def test_toimetaja_parandab_aja_ja_toendi_koos_kinnitamisega(client, login, pros
 
 def test_vigane_toimetaja_kuupaev_ei_muuda_kaarti(client, login, prosopo_env):
     card = prosopo_env.write('abc', education=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     proposal_id = _submit_for_review(client, token, card, [{
         'kind': 'education', 'match_status': 'matched', 'raw_institution': 'AGC',
         'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}],
@@ -473,7 +473,7 @@ def test_vigane_toimetaja_kuupaev_ei_muuda_kaarti(client, login, prosopo_env):
 
 def test_kinnitamise_sisendil_on_mahupiir(client, login, prosopo_env):
     card = prosopo_env.write('abc', occupations=[])
-    token = login('editor', 'editorpass')
+    token = login('superadmin', 'superpass')
     result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
                          headers=_headers(token), content='x' * 128_001)
     assert result.status_code == 413
@@ -609,3 +609,18 @@ def test_toend_lubab_citationi():
     proposals._validate_item(_item(evidence=[{
         "source_kind": "literature", "source_id": "DOC1", "locator": "lk 3",
         "citation": "Donecker 2012, An Itinerant Sheep"}]))
+
+
+@pytest.mark.parametrize("method, path", [
+    ("post", "/prosopography/enrichment-handoff"),
+    ("post", "/prosopography/enrichment-handoff/vutt:Pabc"),
+    ("get", "/prosopography/enrichment-proposals/vutt:Pabc"),
+    ("post", "/prosopography/enrichment-proposals/vutt:Pabc/apply"),
+])
+@pytest.mark.parametrize("user, password", [("editor", "editorpass"), ("admin", "adminpass")])
+def test_rikastuse_otspunktid_on_ainult_superadminile(client, login, prosopo_env, method, path, user, password):
+    prosopo_env.write("abc")
+    token = login(user, password)
+    response = getattr(client, method)(path, headers=_headers(token),
+                                       **({"json": {"proposal_id": "x", "selected": [0]}} if method == "post" else {}))
+    assert response.status_code == 401   # selle projekti rollikaitse (deps.get_user)

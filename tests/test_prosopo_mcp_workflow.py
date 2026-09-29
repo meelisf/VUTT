@@ -47,9 +47,8 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     monkeypatch.setenv("VUTT_LIBRARY_DB", str(tmp_path / "library.db"))
 
     card = prosopo_env.write("abc", occupations=[], education=[])
-    token = login("editor", "editorpass")
-    other_token = login("admin", "adminpass")      # teine kasutaja
-    new_session = login("editor", "editorpass")     # sama kasutaja uus seanss (#492)
+    token = login("superadmin", "superpass")
+    new_session = login("superadmin", "superpass")     # sama kasutaja uus seanss (#492)
 
     class TestApiAdapter:
         def api_get(self, path, params=None):
@@ -97,7 +96,7 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     assert prosopo_env.read("abc") == card
 
     url = f'/prosopography/enrichment-proposals/{card["id"]}'
-    assert client.get(url, headers={"Authorization": f"Bearer {other_token}"}).json() == []
+    assert proposals.list_pending(card["id"], "admin") == []   # teine kasutaja ei näe
     assert len(client.get(url, headers={"Authorization": f"Bearer {new_session}"}).json()) == 1
     own = client.get(url, headers={"Authorization": f"Bearer {token}"})
     assert own.status_code == 200

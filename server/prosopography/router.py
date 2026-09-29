@@ -401,9 +401,12 @@ def prosopography_candidates(data: dict = Body(...), user=Depends(require_role("
 _ALLOWED_CREATED_VIA = ("picker", "form")
 
 
+# Agendi rikastuse töövoog on ainult superadminil, kuni see on silutud (spekk
+# 2026-09-28). Rolli langetamine = need viis otspunkti (kaks koodi, loetelu,
+# apply, reject) + paneeli nähtavus PersonEditPage'is.
 @router.post("/enrichment-handoff")
 async def prosopography_enrichment_handoff_any(
-    request: Request, user=Depends(require_role("editor")),
+    request: Request, user=Depends(require_role("superadmin")),
 ):
     """Kood kõigi isikute ettepanekuteks (#492): tööpäev, piiratud esituste arv."""
     allowed, retry_after = check_rate_limit(
@@ -422,7 +425,7 @@ async def prosopography_enrichment_handoff_any(
 
 @router.post("/enrichment-handoff/{person_id}")
 async def prosopography_enrichment_handoff(
-    person_id: str, request: Request, user=Depends(require_role("editor")),
+    person_id: str, request: Request, user=Depends(require_role("superadmin")),
 ):
     """Ühe isiku esituskood (#492: tööpäev, mitu esitust, seotud kasutajaga)."""
     if not enrichment_proposals.valid_person_id(person_id):
@@ -446,7 +449,7 @@ async def prosopography_enrichment_handoff(
 
 @router.get("/enrichment-proposals/{person_id}")
 async def prosopography_enrichment_proposals(
-    person_id: str, request: Request, user=Depends(require_role("editor")),
+    person_id: str, request: Request, user=Depends(require_role("superadmin")),
 ):
     """Tagastab ainult sama isiku ja sama kasutaja ootel ettepanekud (igas seansis)."""
     if not enrichment_proposals.valid_person_id(person_id):
@@ -490,7 +493,7 @@ async def prosopography_put_registry(kind: str, key: str, request: Request,
 
 @router.post("/enrichment-proposals/{person_id}/apply")
 async def prosopography_apply_enrichment_proposal(
-    person_id: str, request: Request, user=Depends(require_role("editor")),
+    person_id: str, request: Request, user=Depends(require_role("superadmin")),
 ):
     """Toimetaja kinnitab valitud read oma sessioonis; MCP ei saa seda kutsuda."""
     if not enrichment_proposals.valid_person_id(person_id):
