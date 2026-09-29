@@ -151,6 +151,52 @@ def put(kind: str, key: str, data: dict, username: str) -> dict:
         return clean
 
 
+def same_entry(a: dict, b: dict) -> bool:
+    """Sama kirje: sama Q-kood; kui Q-koodi pole kummalgi, sama eestikeelne nimi."""
+    if a.get("id") or b.get("id"):
+        return a.get("id") == b.get("id")
+
+    def nimi(entry: dict) -> str:
+        return str((entry.get("labels") or {}).get("et") or "").strip().casefold()
+    return bool(nimi(a)) and nimi(a) == nimi(b)
+
+
+def _ensure_decision(entries: dict, kind: str, key: str, data: dict) -> tuple[dict, bool]:
+    """Ühine otsus kinnituse eelkontrollile ja `ensure`-ile: (kirje, kas luua)."""
+    clean = validate_entry(kind, key, data, places=_places() if kind == "institution" else None)
+    existing = entries.get(key)
+    if isinstance(existing, dict):
+        if same_entry(existing, clean):
+            return existing, False
+        raise RegistryError("registry_conflict")
+    if len(entries) >= _MAX_ENTRIES:
+        raise RegistryError("registry_full")
+    if clean["id"] and any(isinstance(v, dict) and v.get("id") == clean["id"]
+                           for v in entries.values()):
+        raise RegistryError("duplicate_id")
+    return clean, True
+
+
+def check_ensure(kind: str, key: str, data: dict) -> dict:
+    """`ensure`-i reegel ilma kirjutamata (agendi ettepaneku eelkontroll)."""
+    return _ensure_decision(load(kind), kind, key, data)[0]
+
+
+def ensure(kind: str, key: str, data: dict, username: str) -> tuple[dict, bool]:
+    """Loob kirje, kui võtit pole; sama kirje korral seob. Erinevalt `put`-ist ei
+    kirjuta kunagi olemasolevat üle: lugemine, võrdlus ja kirjutus on ühe luku all,
+    muidu võiks samaaegne kinnitus vahepeal loodud kirje üle kirjutada."""
+    with _LOCK:
+        entries = load(kind)
+        entry, create = _ensure_decision(entries, kind, key, data)
+        if not create:
+            return entry, False
+        entries[key] = entry
+        save_config_with_git(_path(kind), entries, username,
+                             message=f"Register {kind}: lisa {key} (agendi ettepanek)")
+        return entry, True
+
+
 def normalize_person_facts(data: dict) -> dict:
     """Püsivõti on tõde; ühilduvus-Q võetakse registrist, toorsilt säilib."""
     if not ("occupations" in data or "education" in data):
