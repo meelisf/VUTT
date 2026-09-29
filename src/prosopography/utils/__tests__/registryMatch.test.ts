@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchRegistry, sourceFormAfterPick } from '../registryMatch';
+import { matchRegistry, registrySuggestion, sourceFormAfterPick } from '../registryMatch';
 
 const REG = {
   'academia-gustavo-carolina': { id: 'Q138710754', labels: { et: 'Academia Gustavo-Carolina', en: 'Academia Gustavo-Carolina' }, variants: ['AGC'], place_key: 'Dorpat' },
@@ -37,5 +37,27 @@ describe('sourceFormAfterPick', () => {
   it('poolik päring ei saa allika kujuks: varasem kuju jääb, tühjal real registri silt', () => {
     expect(sourceFormAfterPick('Lyz. Upsal.', 'upps', upp)).toBe('Lyz. Upsal.');
     expect(sourceFormAfterPick('', 'upps', upp)).toBe('Uppsala ülikool');
+  });
+});
+
+describe('registrySuggestion', () => {
+  it('sama Q-kood → kirje (Rostock: faktil ainult Q, registris sama Q-ga kirje)', () => {
+    expect(registrySuggestion(REG, 'Q185246', 'Uppsala Universitet', 'et')?.key).toBe('uppsala-universitet');
+  });
+
+  it('Q-koodiga väli ei seo nime järgi — teine Q või Q-koodita kirje kaotaks fakti Q', () => {
+    expect(registrySuggestion(REG, 'Q20641850', 'Uppsala', 'et')).toBeNull();
+    expect(registrySuggestion(REG, 'Q999', 'Åbo', 'et')).toBeNull();
+  });
+
+  it('Q-koodita väli: ainult täpne silt või nimevariant, mitte osaline', () => {
+    expect(registrySuggestion(REG, null, 'univ. åbo', 'et')?.key).toBe('abo-akademi');
+    expect(registrySuggestion(REG, null, 'Univ.', 'et')).toBeNull();
+    expect(registrySuggestion(REG, null, '', 'et')).toBeNull();
+  });
+
+  it('mitu kandidaati → null, valib inimene', () => {
+    const two = { ...REG, 'abo-2': { id: null, labels: { et: 'Åbo' }, variants: [] } };
+    expect(registrySuggestion(two, null, 'Åbo', 'et')).toBeNull();
   });
 });

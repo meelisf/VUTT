@@ -19,10 +19,10 @@ import RegistryField from '../RegistryField';
 
 const REG = { 'academia-gustavo-carolina': { id: 'Q138710754', labels: { et: 'Academia Gustavo-Carolina' }, variants: ['AGC'], place_key: 'Dorpat' } };
 
-function setup(registryKey?: string) {
+function setup(registryKey?: string, value: any = null, extra: Record<string, unknown> = {}) {
   const onPick = vi.fn(); const onUnlink = vi.fn(); const onChange = vi.fn();
-  render(<MemoryRouter><RegistryField registry={REG} placeholder="p" lang="et" value={null} registryKey={registryKey}
-    onChange={onChange} onPick={onPick} onUnlink={onUnlink} /></MemoryRouter>);
+  render(<MemoryRouter><RegistryField registry={REG} placeholder="p" lang="et" value={value} registryKey={registryKey}
+    onChange={onChange} onPick={onPick} onUnlink={onUnlink} {...extra} /></MemoryRouter>);
   return { onPick, onUnlink, onChange };
 }
 
@@ -46,5 +46,40 @@ describe('RegistryField', () => {
     expect(screen.getByText(/Academia Gustavo-Carolina · Q138710754/)).toBeTruthy();
     fireEvent.click(screen.getByLabelText('form.registry.unlink'));
     expect(onUnlink).toHaveBeenCalled();
+  });
+
+  it('Q-kood ilma registrivõtmeta on nähtavalt sidumata; sama Q → „Seo"', () => {
+    // Rostock: faktil Q159895, registris sama Q-ga kirje, aga võtit pole — vormis nägi välja seotud.
+    const { onPick } = setup(undefined, { label: 'AGC Tartu', id: 'Q138710754', labels: null, source: 'wikidata' },
+      { unlinkedNote: 'kaardile ei jõua', createKind: 'institution' });
+    expect(screen.getByText('form.registry.unlinked — kaardile ei jõua')).toBeTruthy();
+    fireEvent.click(screen.getByText('form.registry.linkTo'));
+    expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ key: 'academia-gustavo-carolina' }), 'AGC Tartu');
+    expect(screen.queryByText('form.registry.create')).toBeNull();          // vaste olemas → loomist ei paku
+  });
+
+  it('vasteta sidumata väli: admin saab eeltäidetud loomise lingi', () => {
+    setup(undefined, { label: 'Tartu gümnaasium', id: 'Q20641850', labels: null, source: 'wikidata' },
+      { createKind: 'institution' });
+    const link = screen.getByText('form.registry.create').closest('a')!;
+    const url = new URL(link.getAttribute('href')!, 'https://x');
+    expect(url.pathname).toBe('/admin/prosopo-registries');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ kind: 'institution', label: 'Tartu gümnaasium', qid: 'Q20641850' });
+  });
+
+  it('seotud või tühi väli sidumata silti ei näita; ilma createKind-ita linki pole', () => {
+    setup('academia-gustavo-carolina', { label: 'AGC', id: 'Q138710754', labels: null, source: 'wikidata' });
+    expect(screen.queryByText(/form.registry.unlinked/)).toBeNull();
+  });
+
+  it('tühi väli ei ole „sidumata"', () => {
+    setup();
+    expect(screen.queryByText(/form.registry.unlinked/)).toBeNull();
+  });
+
+  it('mitte-admin näeb silti, aga mitte loomise linki', () => {
+    setup(undefined, { label: 'Tartu gümnaasium', id: null, labels: null, source: 'manual' });
+    expect(screen.getByText('form.registry.unlinked')).toBeTruthy();
+    expect(screen.queryByText('form.registry.create')).toBeNull();
   });
 });

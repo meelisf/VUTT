@@ -4,13 +4,15 @@
  * Väli ise = allika sõnastus („Lyz. Riga"); kiip selle all = registrikirje, mis see on.
  * Trükkides tulevad esimesena registri vasted (nimevariantide järgi), siis
  * Wikidata/vaba tekst nagu varem. Registrikirjeid lisab ainult admin.
+ * Sidumata väli on nähtavalt sidumata: Q-kood üksi näeb välja nagu seotud kirje,
+ * aga elukäigu kaart leiab asutuse koha ainult registrivõtme kaudu.
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Landmark, X } from 'lucide-react';
+import { ExternalLink, Landmark, Link2, X } from 'lucide-react';
 import EntityPicker from '../../../components/EntityPicker';
 import type { LinkedEntity } from '../../../types/LinkedEntity';
-import { matchRegistry, registryLabel, type RegistryEntryLike, type RegistryHit } from '../../utils/registryMatch';
+import { matchRegistry, registryLabel, registrySuggestion, type RegistryEntryLike, type RegistryHit } from '../../utils/registryMatch';
 
 interface Props {
   registry: Record<string, RegistryEntryLike>;
@@ -25,10 +27,14 @@ interface Props {
   onPick: (hit: RegistryHit, typed: string) => void;
   onUnlink: () => void;
   disabled?: boolean;
+  /** Admin: sidumata väljal link registrilehele, uus kirje eeltäidetud selle välja järgi. */
+  createKind?: 'occupation' | 'institution';
+  /** Sidumata sildi lisalause, nt asutusel „kaardile ei jõua". */
+  unlinkedNote?: string;
 }
 
 const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSuggestions, value, registryKey,
-  onChange, onPick, onUnlink, disabled }) => {
+  onChange, onPick, onUnlink, disabled, createKind, unlinkedNote }) => {
   const { t } = useTranslation('prosopography');
   const leading = (query: string) => matchRegistry(registry, query, lang).map(hit => {
     const extra = [hit.matched !== hit.label ? hit.matched : null, hit.entry.id, hit.entry.place_key].filter(Boolean).join(' · ');
@@ -36,6 +42,12 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
              description: `${t('form.registry.badge')}${extra ? ` · ${extra}` : ''}` };
   });
   const entry = registryKey ? registry[registryKey] : undefined;
+  const source = value?.label?.trim() || '';
+  const unlinked = !registryKey && !!(source || value?.id);
+  const suggestion = unlinked ? registrySuggestion(registry, value?.id, source, lang) : null;
+  const createHref = createKind && unlinked && !suggestion
+    ? `/admin/prosopo-registries?${new URLSearchParams({ kind: createKind, label: source,
+        ...(value?.id ? { qid: value.id } : {}) })}` : null;
   return (
     <div>
       <EntityPicker placeholder={placeholder} type="topic" value={value} onChange={onChange} lang={lang}
@@ -56,6 +68,27 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
               className="ml-0.5 rounded p-0.5 text-teal-600 hover:bg-teal-100">
               <X size={11} />
             </button>
+          )}
+        </div>
+      )}
+      {unlinked && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
+            {t('form.registry.unlinked')}{unlinkedNote ? ` — ${unlinkedNote}` : ''}
+          </span>
+          {suggestion && !disabled && (
+            <button type="button" onClick={() => onPick(suggestion, source)}
+              className="inline-flex items-center gap-1 rounded border border-teal-200 px-2 py-0.5 text-teal-800 hover:bg-teal-50">
+              <Link2 size={11} />
+              {t('form.registry.linkTo', { label: suggestion.label })}
+            </button>
+          )}
+          {createHref && !disabled && (
+            <a href={createHref} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary-700 hover:underline">
+              {t('form.registry.create')}
+              <ExternalLink size={11} />
+            </a>
           )}
         </div>
       )}

@@ -48,6 +48,29 @@ export function matchRegistry(registry: Record<string, RegistryEntryLike>, query
 }
 
 /**
+ * Sidumata välja kindel vaste registris: sama Q-kood või täpselt sama silt/nimevariant.
+ * Ainult kindel vaste — osaline sõnavaste pakuks valet asutust (Tartu gümnaasium
+ * 1630–1632 ≠ `gymn-dorpat` 1804–1890). Mitu kandidaati → null, valib inimene.
+ */
+export function registrySuggestion(registry: Record<string, RegistryEntryLike>, qid: string | null | undefined,
+  text: string | null | undefined, lang: string): RegistryHit | null {
+  const entries = Object.entries(registry);
+  const hit = (key: string, entry: RegistryEntryLike, matched: string): RegistryHit =>
+    ({ key, entry, label: registryLabel(entry, key, lang), matched });
+  if (qid) {
+    const byId = entries.filter(([, entry]) => entry.id === qid);
+    // Q-koodiga väli seotakse ainult Q järgi: nimevaste Q-koodita kirjega kaotaks
+    // sidumisel fakti Q-koodi (võtmega fakt võtab `id` registrist, ADR 0059).
+    return byId.length === 1 ? hit(byId[0][0], byId[0][1], text || qid) : null;
+  }
+  const q = text ? normRegistryText(text) : '';
+  if (!q) return null;
+  const byText = entries.filter(([, entry]) =>
+    [...Object.values(entry.labels), ...entry.variants].some(value => normRegistryText(value) === q));
+  return byText.length === 1 ? hit(byText[0][0], byText[0][1], text!) : null;
+}
+
+/**
  * Allika sõnastus pärast registrikirje valikut. Väli on korraga otsingukast ja
  * allika kuju, seega trükitud pooliku päringu („Upps") ei tohi saada allika kujuks.
  * - trükitud tekst on registri silt või nimevariant → see on päris allika kuju;

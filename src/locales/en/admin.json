@@ -2,14 +2,15 @@
   "title": "Administration",
   "prosopoRegistries": {
     "placePeriods": "Place over time (optional)",
-    "placePeriodsHelp": "One line per period: place key, colon, years. The life map picks the place by the year of the education or occupation entry; an undated entry gets the default place above.",
-    "placePeriodsInvalid": "Invalid period line:",
+    "placePeriodsHelp": "For an institution that was in different places at different times. Each line MUST have the form \"place key: start–end\", e.g. \"Dorpat: –1699\" and \"Pernau: 1699–1710\"; an open end may be left out. Years alone are not enough. This is NOT the period the institution existed — if it stayed in one place, leave this empty and pick the place above. The life map picks the place by the year of the education or occupation entry; an undated entry gets the default place above.",
+    "placePeriodsError": {"format": "Line {{line}}: \"{{value}}\" is not in the form \"place key: start–end\".", "years_only": "Line {{line}}: the place is missing — write e.g. \"Dorpat: {{value}}\". The period the institution existed does not belong here.", "unknown_place": "Line {{line}}: \"{{value}}\" is not in the place registry. Use the registry key (e.g. Dorpat, not Tartu)."},
+    "placeKeyValue": "Registry key:",
     "title": "Occupation and institution registries",
     "intro": "Approve a registry entry separately from a person fact. The source wording remains on the person record.",
     "institution": "Institutions", "occupation": "Occupations", "search": "Search registry",
     "new": "New registry entry", "key": "Stable VUTT key", "qid": "Wikidata Q identifier (optional)",
     "label": "Label", "variants": "Name variants, one per line", "type": "Institution type",
-    "placeKey": "Place registry key (optional)", "notes": "Notes", "save": "Save registry entry",
+    "placeKey": "Place (default, optional)", "notes": "Notes", "save": "Save registry entry",
     "saved": "Registry entry saved", "selectExisting": "This key already exists. Select the entry from the list."
   },
   "tabs": {

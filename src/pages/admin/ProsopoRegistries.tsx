@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { isAtLeast } from '../../utils/roleUtils';
-import { formatPlacePeriods, parsePlacePeriods } from './placePeriods';
-import { fetchRegistry, saveRegistryEntry,
+import { formatPlacePeriods, parsePlacePeriods, type PlacePeriodError } from './placePeriods';
+import PlacePicker from '../../prosopography/components/personForm/PlacePicker';
+import { fetchPlaces, fetchRegistry, saveRegistryEntry,
   type InstitutionRegistryEntry, type OccupationRegistryEntry } from '../../prosopography/services/prosopographyService';
 
 type Kind = 'occupation' | 'institution';
@@ -19,7 +20,11 @@ export default function ProsopoRegistries() {
   const lang = i18n.language.slice(0, 2);
   const { user, authToken, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
-  const [kind, setKind] = useState<Kind>('institution');
+  // Isikuvormi „Loo registrikirje" link: ?kind=…&label=…&qid=… eeltäidab uue kirje (ühekordne).
+  const [searchParams] = useSearchParams();
+  const prefill = useRef(searchParams.get('label') || searchParams.get('qid')
+    ? { label: searchParams.get('label') ?? '', qid: searchParams.get('qid') } : null);
+  const [kind, setKind] = useState<Kind>(searchParams.get('kind') === 'occupation' ? 'occupation' : 'institution');
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const [query, setQuery] = useState('');
   const [key, setKey] = useState('');
@@ -30,6 +35,7 @@ export default function ProsopoRegistries() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [placeKeys, setPlaceKeys] = useState<ReadonlySet<string> | undefined>();
 
   useEffect(() => {
     if (!userLoading && !isAtLeast(user?.role, 'admin')) navigate('/');
@@ -38,10 +44,21 @@ export default function ProsopoRegistries() {
     if (!authToken || !isAtLeast(user?.role, 'admin')) return;
     let live = true;
     setError(''); setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants(''); setPeriods('');
+    if (prefill.current) {
+      const { label, qid } = prefill.current;
+      prefill.current = null;
+      setDraft({ ...empty(kind), id: qid || null, labels: { et: label, en: '' } });
+      setVariants(label);
+    }
     fetchRegistry(kind).then(data => { if (live) setEntries(data); })
       .catch(e => { if (live) setError(String(e)); });
     return () => { live = false; };
   }, [kind, authToken, user?.role]);
+  useEffect(() => {
+    if (!isAtLeast(user?.role, 'admin')) return;
+    // Laadimata register = kontroll jääb serverile; vorm ei jää selle taha lukku.
+    fetchPlaces().then(places => setPlaceKeys(new Set(Object.keys(places)))).catch(() => {});
+  }, [user?.role]);
 
   const shown = useMemo(() => Object.entries(entries).filter(([id, entry]) =>
     [id, ...Object.values(entry.labels), ...entry.variants].some(value =>
@@ -58,8 +75,8 @@ export default function ProsopoRegistries() {
   const save = async () => {
     if (!authToken) return;
     if (!selectedExisting && entries[key]) { setError(tr('selectExisting')); return; }
-    const parsed = kind === 'institution' ? parsePlacePeriods(periods) : { periods: [] };
-    if ('errorLine' in parsed) { setError(`${tr('placePeriodsInvalid')} ${parsed.errorLine}`); return; }
+    const parsed = kind === 'institution' ? parsePlacePeriods(periods, placeKeys) : { periods: [] };
+    if ('errorLine' in parsed) { setError(periodError(parsed)); return; }
     setBusy(true); setError(''); setSaved(false);
     try {
       const value = { ...draft,
@@ -77,6 +94,8 @@ export default function ProsopoRegistries() {
     finally { setBusy(false); }
   };
   const institution = kind === 'institution' ? draft as InstitutionRegistryEntry : null;
+  const periodError = (e: PlacePeriodError) =>
+    t(`prosopoRegistries.placePeriodsError.${e.reason}`, { line: e.errorLine, value: e.value });
 
   if (!isAtLeast(user?.role, 'admin')) return null;
 
@@ -130,14 +149,18 @@ export default function ProsopoRegistries() {
               <input value={institution.type} onChange={e => setDraft(d => ({ ...d, type: e.target.value }))}
                 className="mt-1 block w-full rounded border px-2 py-1.5" />
             </label>
-            <label className="block text-sm">{tr('placeKey')}
-              <input value={institution.place_key ?? ''} onChange={e => setDraft(d => ({ ...d,
-                place_key: e.target.value || null }))} className="mt-1 block w-full rounded border px-2 py-1.5" />
-            </label>
+            <div className="text-sm">
+              {/* Valik kohtade registrist: vabatekstina läks „Tartu" serverisse ja tuli tagasi unknown_place_key. */}
+              <PlacePicker value={institution.place_key} token={authToken ?? ''} canEdit lang={lang}
+                label={tr('placeKey')} onChange={place_key => setDraft(d => ({ ...d, place_key }))} />
+              {institution.place_key && <span className="mt-1 block text-xs text-gray-500">
+                {tr('placeKeyValue')} <code className="font-mono">{institution.place_key}</code>
+              </span>}
+            </div>
             <label className="block text-sm">{tr('placePeriods')}
+              <span className="mt-1 block text-xs text-gray-600">{tr('placePeriodsHelp')}</span>
               <textarea value={periods} onChange={e => setPeriods(e.target.value)} rows={3}
                 placeholder="Dorpat: –1699&#10;Pernau: 1699–1710" className="mt-1 block w-full rounded border px-2 py-1.5 font-mono text-xs" />
-              <span className="mt-1 block text-xs text-gray-500">{tr('placePeriodsHelp')}</span>
             </label>
           </>}
           <label className="block text-sm">{tr('notes')}

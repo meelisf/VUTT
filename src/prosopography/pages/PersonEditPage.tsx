@@ -816,6 +816,7 @@ const PersonEditPage: React.FC = () => {
                       onPick={(hit, typed) => onChange({ ...item, occupation_key: hit.key, id: hit.entry.id,
                         labels: hit.entry.labels, label: sourceFormAfterPick(item.label ?? '', typed, hit) })}
                       onUnlink={() => onChange({ ...item, occupation_key: undefined, id: null, labels: undefined })}
+                      createKind={isAdmin ? 'occupation' : undefined}
                       lang={lang}
                       localSuggestions={entityLabels}
                       disabled={!canEdit}
@@ -833,6 +834,8 @@ const PersonEditPage: React.FC = () => {
                         institution_labels: hit.entry.labels, place_key: undefined,
                         institution: sourceFormAfterPick(item.institution ?? '', typed, hit) })}
                       onUnlink={() => onChange({ ...item, institution_key: undefined, institution_id: null, institution_labels: undefined })}
+                      createKind={isAdmin ? 'institution' : undefined}
+                      unlinkedNote={item.place_key ? undefined : t('form.registry.notOnMap')}
                       lang={lang}
                       localSuggestions={entityLabels}
                       disabled={!canEdit}
@@ -892,6 +895,8 @@ const PersonEditPage: React.FC = () => {
                         institution_labels: hit.entry.labels,
                         institution: sourceFormAfterPick(item.institution ?? '', typed, hit) })}
                       onUnlink={() => onChange({ ...item, institution_key: undefined, institution_id: null, institution_labels: undefined })}
+                      createKind={isAdmin ? 'institution' : undefined}
+                      unlinkedNote={t('form.registry.notOnMap')}
                       lang={lang}
                       localSuggestions={entityLabels}
                       disabled={!canEdit}

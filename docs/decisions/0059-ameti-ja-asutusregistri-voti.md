@@ -65,3 +65,20 @@ ALLES toimetaja kinnitusel, uue toiminguga `registries.ensure`: lugemine, võrdl
 kirjutus ühe luku all; sama kirje (sama Q, Q-koodita sama et-nimi) seotakse, erinev on
 `registry_conflict`. `put` jääb registrilehe ülekirjutuseks. Agendi juhis: vali lähim
 olemasolev kirje, uus on erand.
+
+## Täiendus 2026-09-29: seos nähtavaks, koht valikust
+
+Isikuvormis nägi Q-koodiga, aga registrivõtmeta asutus („Rostocki Ülikool",
+Q159895) välja sama moodi kui seotud kirje, kuigi elukäigu kaart leiab asutuse
+koha ainult võtme kaudu. Nüüd kannab sidumata väli silti „Registriga sidumata"
+(asutusel „— kaardile ei jõua"). Kindla vaste korral pakutakse „Seo: …":
+Q-koodiga väli seotakse AINULT sama Q järgi (nimevaste Q-koodita kirjega kaotaks
+fakti Q); Q-koodita väli täpse sildi või nimevariandi järgi; mitu kandidaati →
+ei pakuta (`registrySuggestion`). Vasteta väljal näeb admin linki registrilehele,
+kus uus kirje on eeltäidetud (`?kind=&label=&qid=`); register laetakse vormis
+akna fookusel uuesti. Otsus jääb samaks: kirje on admini eraldi toiming.
+
+Registrilehel valitakse vaikekoht kohtade registrist (`PlacePicker`), mitte
+vabatekstina, ja „Koht ajas" read kontrollitakse enne saatmist
+(`parsePlacePeriods`: kuju, ainult aastad, tundmatu võti). „Koht ajas" ei ole
+asutuse tegutsemisaeg; seda väljana ei ole.
