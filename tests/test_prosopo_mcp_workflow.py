@@ -134,6 +134,7 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     assert "valipreester" not in json.loads((registry / "occupations.json").read_text())
     pending = client.get(url, headers={"Authorization": f"Bearer {token}"}).json()[0]
     assert pending["items"][0]["review_state"] == {"state": "applicable"}
+    assert pending["items"][0]["evidence"][0]["citation"].endswith("Raamat")
     done = client.post(f"{url}/apply", headers={"Authorization": f"Bearer {token}"},
                        json={"proposal_id": pending["proposal_id"], "selected": [0]})
     assert done.status_code == 200, done.text

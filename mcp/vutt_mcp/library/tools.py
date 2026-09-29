@@ -3,6 +3,7 @@ from . import format as fmt
 from .config import LibrarySettings, library_available
 from .query import (
     PageRefError,
+    _doc_row,
     diagnose,
     fetch_pages,
     list_documents,
@@ -33,18 +34,24 @@ def _parent_keys(conn, doc_ids):
     }
 
 
-def unknown_doc_ids(settings: LibrarySettings, doc_ids: set[str]) -> set[str] | None:
-    """Kirjanduskogust puuduvad doc_id-d; None = kogu pole selles masinas olemas.
+def literature_citations(settings: LibrarySettings, doc_ids: set[str]) -> dict[str, str] | None:
+    """Kogus olevate doc_id-de loetav viide; puuduvaid vastuses pole. None = kogu
+    pole selles masinas olemas.
 
-    Server ei näe kirjanduskogu (see elab agendi masinas), seega kontrollib
-    ettepaneku `literature`-tõendi siin enne saatmist."""
+    Server ei näe kirjanduskogu (see elab agendi masinas), seega kontrollib ja
+    tsiteerib ettepaneku `literature`-tõendi siin enne saatmist."""
     if not library_available(settings):
         return None
     if not doc_ids:
-        return set()
+        return {}
     conn = _ava(settings)
     try:
-        return set(doc_ids) - set(_parent_keys(conn, doc_ids))
+        kohataited = ",".join("?" * len(doc_ids))
+        return {
+            r["doc_id"]: fmt.format_citation(_doc_row(r))
+            for r in conn.execute(
+                f"SELECT * FROM documents WHERE doc_id IN ({kohataited})", list(doc_ids))
+        }
     finally:
         conn.close()
 
