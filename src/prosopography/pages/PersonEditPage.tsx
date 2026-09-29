@@ -92,6 +92,7 @@ const PersonEditPage: React.FC = () => {
 
   const canEdit = isAtLeast(user?.role, 'editor');
   const isAdmin = isAtLeast(user?.role, 'admin');
+  const isSuperadmin = isAtLeast(user?.role, 'superadmin');
 
   // Isikutel juba kasutusel olevad märksõnad — soovitused TagsList'ile.
   const tagSuggestions = usePersonTagSuggestions(lang, canEdit, authToken ?? undefined);
@@ -782,7 +783,8 @@ const PersonEditPage: React.FC = () => {
           open={occupOpen}
           onToggle={() => setOccupOpen(v => !v)}
         >
-          {!isNew && original && <AgentEnrichmentPanel
+          {/* Agendi rikastus on ainult superadminil, kuni töövoog on silutud (spekk 2026-09-28). */}
+          {!isNew && original && isSuperadmin && <AgentEnrichmentPanel
             person={original} token={token} isDirty={isDirty}
             onApplied={person => {
               setOriginal(person);

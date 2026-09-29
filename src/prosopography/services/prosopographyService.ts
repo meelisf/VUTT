@@ -24,8 +24,7 @@ export interface EnrichmentDate {
 }
 export interface EnrichmentItem {
   kind: 'occupation' | 'education'; match_status: string; existing_index?: number;
-  review_error?: string;
-  review_state?: EnrichmentReviewState;
+  review_state: EnrichmentReviewState;
   registry_labels?: Record<string, string>;
   registry_ids?: Record<string, string>;
   occupation_entry?: EnrichmentRegistryEntry;
@@ -41,16 +40,6 @@ export interface EnrichmentItem {
 export interface EnrichmentProposal {
   proposal_id: string; person_id: string; base_updated_at: string;
   created_at: number; expires_at: number; items: EnrichmentItem[];
-}
-export interface EnrichmentRegistryCandidate {
-  key: string; id: string | null; labels: Record<string, string>;
-  match_kind: string; matched_text: string; matched_variant: string | null;
-  type?: string; place_key?: string | null;
-}
-export interface EnrichmentRegistrySearch {
-  kind: 'occupation' | 'institution'; query: string; registry_available: boolean;
-  results: EnrichmentRegistryCandidate[]; total_matches: number;
-  truncated: boolean; ambiguous: boolean;
 }
 export interface InstitutionRegistryEntry {
   id: string | null; labels: Record<string, string>; variants: string[];
@@ -79,10 +68,6 @@ export async function saveRegistryEntry(kind: 'occupation' | 'institution', key:
   });
   return enrichmentResponse(response);
 }
-export type EnrichmentCorrection = Partial<Pick<EnrichmentItem,
-  'occupation_key' | 'institution_key' | 'place_key' | 'occupation_variant' | 'institution_variant'
-  | 'date_from' | 'date_to' | 'edu_type' | 'evidence'>>;
-
 async function enrichmentResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let detail = String(response.status);
@@ -110,12 +95,6 @@ export async function listEnrichmentProposals(personId: string, token: string): 
   return enrichmentResponse(response);
 }
 
-export async function searchEnrichmentRegistry(kind: 'occupation' | 'institution', query: string): Promise<EnrichmentRegistrySearch> {
-  const params = new URLSearchParams({ kind, q: query, limit: '10' });
-  const response = await fetchWithTimeout(`${BASE}/enrichment-registry-search?${params}`, { timeout: 10000 });
-  return enrichmentResponse(response);
-}
-
 /** Kinnitus kukkus pärast registrikirjete loomist: kirjed jäid alles, kaart muutmata. */
 export class EnrichmentApplyError extends Error {
   created: string[];
@@ -123,7 +102,7 @@ export class EnrichmentApplyError extends Error {
 }
 
 export async function applyEnrichmentProposal(personId: string, proposalId: string,
-  selected: number[], token: string, _corrections?: unknown): Promise<ProsopoRecord> {
+  selected: number[], token: string): Promise<ProsopoRecord> {
   // Kinnitus võib teha mitu git-commitit (registrikirjed + kaart) — pikem ajalõpp.
   const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
