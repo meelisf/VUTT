@@ -566,101 +566,105 @@ def _review_state(item: dict, person: Optional[dict]) -> dict:
     return {"state": state}
 
 
+class ApplyError(ProposalError):
+    """Kinnitus kukkus pärast registrikirjete loomist. Kirjed jäävad alles — nad on
+    iseseisvad ja järgmine katse seob nendega (`ensure`)."""
+
+    def __init__(self, message: str, created: list[str]):
+        super().__init__(message)
+        self.created = created
+
+
+def _open_proposal(db, proposal_id: str, person_id: str, username: str):
+    row = db.execute(
+        "SELECT * FROM proposal WHERE id=? AND person_id=? AND username=? AND applied_at IS NULL AND expires_at>?",
+        (proposal_id, person_id, username, int(time.time())),
+    ).fetchone()
+    if row is None:
+        raise ProposalError("proposal_not_found")
+    return row
+
+
+def _check_selection(selected, count: int) -> None:
+    if (not isinstance(selected, list) or not selected or len(selected) > MAX_ITEMS
+            or any(not isinstance(i, int) or isinstance(i, bool) or not 0 <= i < count
+                   for i in selected)
+            or len(set(selected)) != len(selected)):
+        raise ProposalError("invalid_selection")
+
+
+def _close_rows(db, proposal_id: str, items: list, selected: list[int]) -> int:
+    """Eemaldab otsustatud read; tühi ettepanek suletakse."""
+    remaining = [item for index, item in enumerate(items) if index not in set(selected)]
+    if remaining:
+        db.execute("UPDATE proposal SET payload=? WHERE id=? AND applied_at IS NULL",
+                   (json.dumps(remaining, ensure_ascii=False), proposal_id))
+    else:
+        db.execute("UPDATE proposal SET applied_at=? WHERE id=? AND applied_at IS NULL",
+                   (int(time.time()), proposal_id))
+    return len(remaining)
+
+
 def apply_selected(proposal_id: str, person_id: str, username: str,
-                   session_fingerprint: str, selected: list[int],
-                   corrections: Optional[dict] = None) -> dict:
-    """Salvestab ainult toimetaja valitud uued read kaardi versioonikontrolliga."""
+                   session_fingerprint: str, selected: list[int]) -> dict:
+    """Kinnitus kolmes sammus: eelkontroll (ei kirjuta) → registrikirjed → kaart üks kord.
+    Kõik-või-mitte-midagi kaardi suhtes, mitte registri suhtes (vt `ApplyError`)."""
+    from . import registries
     from .person_crud import get_person, update_person
 
-    if not isinstance(selected, list) or not selected or len(selected) > MAX_ITEMS or any(
-        not isinstance(index, int) or isinstance(index, bool) for index in selected
-    ) or len(set(selected)) != len(selected):
-        raise ProposalError("invalid_selection")
-    corrections = {} if corrections is None else corrections
-    allowed = {"occupation_key", "institution_key", "place_key",
-               "occupation_variant", "institution_variant", "date_from", "date_to",
-               "edu_type", "evidence"}
-    if not isinstance(corrections, dict) or any(
-        not isinstance(index, str) or not index.isdecimal() or str(int(index)) != index
-        or int(index) not in selected
-        or not isinstance(patch, dict) or not set(patch) <= allowed
-        for index, patch in corrections.items()
-    ):
-        raise ProposalError("invalid_corrections")
     with _db() as db:
-        row = db.execute(
-            "SELECT * FROM proposal WHERE id=? AND person_id=? AND username=? AND applied_at IS NULL AND expires_at>?",
-            (proposal_id, person_id, username, int(time.time())),
-        ).fetchone()
-        if row is None:
-            raise ProposalError("proposal_not_found")
+        row = _open_proposal(db, proposal_id, person_id, username)
         items = json.loads(row["payload"])
-        if any(index < 0 or index >= len(items) for index in selected):
-            raise ProposalError("invalid_selection")
-        chosen = []
-        for index in selected:
-            item = items[index].copy()
-            patch = corrections.get(str(index), {})
-            if patch and item["match_status"] == "already_present" and set(patch) != {"evidence"}:
-                raise ProposalError("cannot_correct_existing_entry")
-            if "occupation_key" in patch and patch["occupation_key"] != item.get("occupation_key"):
-                item.pop("occupation_variant", None)
-            if "institution_key" in patch and patch["institution_key"] != item.get("institution_key"):
-                item.pop("institution_variant", None)
-            item.update(patch)
-            if item["match_status"] in {"ambiguous", "new_registry_candidate"}:
-                required_key = "occupation_key" if item["kind"] == "occupation" else "institution_key"
-                if required_key not in patch or not item.get(required_key):
-                    raise ProposalError("unresolved_match")
-                item["match_status"] = "matched"
-            _validate_item(item)
-            _check_links(item)
-            chosen.append(item)
-
+        _check_selection(selected, len(items))
         person = get_person(person_id)
-        if person is None:
+        if person is None or person.get("record_status") == "tombstone" or person.get("merged_into"):
             raise ProposalError("person_not_found")
-        if person.get("updated_at") != row["base_updated_at"]:
-            raise ProposalError("stale_person")
         occupations = list(person.get("occupations") or [])
         education = list(person.get("education") or [])
-        for item in chosen:
-            target = occupations if item["kind"] == "occupation" else education
-            candidate = _card_item(item)
-            matching = [index for index, existing in enumerate(target) if isinstance(existing, dict)
-                        and _same_fact(existing, candidate, item["kind"])]
-            if item["match_status"] == "already_present":
-                index = item.get("existing_index")
-                if index is None or index >= len(target) or not isinstance(target[index], dict):
-                    raise ProposalError("unresolved_existing_entry")
-                legacy = _same_legacy_fact(target[index], candidate, item["kind"])
-                if matching != [index] and not (legacy and not matching):
-                    raise ProposalError("unresolved_existing_entry")
-                evidence = target[index].get("evidence") or []
-                links = {}
-                if legacy:
-                    for key in ("occupation_key", "institution_key", "place_key", "id", "institution_id"):
-                        if candidate.get(key) and not target[index].get(key):
-                            links[key] = candidate[key]
-                target[index] = {**target[index], **links, "evidence": evidence + [
-                    source for source in item["evidence"] if source not in evidence
-                ]}
-                continue
-            if matching or any(isinstance(existing, dict)
-                               and _same_legacy_fact(existing, candidate, item["kind"])
-                               for existing in target):
-                raise ProposalError("duplicate_entry")
-            target.append(candidate)
-        # update_person teeb isikuluku all teise versioonikontrolli ja uuendab indeksi.
-        updated = update_person(person_id, {
-            "updated_at": row["base_updated_at"],
-            "occupations": occupations, "education": education,
-        }, username)
-        remaining = [item for index, item in enumerate(items) if index not in set(selected)]
-        if remaining:
-            db.execute("UPDATE proposal SET payload=?, base_updated_at=? WHERE id=? AND applied_at IS NULL",
-                       (json.dumps(remaining, ensure_ascii=False), updated["updated_at"], proposal_id))
-        else:
-            db.execute("UPDATE proposal SET applied_at=? WHERE id=? AND applied_at IS NULL",
-                       (int(time.time()), proposal_id))
+        # 1. Eelkontroll elava kaardi ja registri vastu; kaardi loendid ehitatakse koopiasse.
+        for index in selected:
+            try:
+                _merge_row(items[index], occupations, education)
+            except ProposalError as error:
+                raise ProposalError(f"items[{index}]: {error}") from None
+        created: list[str] = []
+        try:
+            # 2. Registrikirjed. Vahepeal loodud sama kirje seotakse, erinev kukub.
+            for index in selected:
+                for kind, field, _ in _ENTRY_FIELDS:
+                    if not items[index].get(field):
+                        continue
+                    key, data = _split_entry(items[index][field])
+                    try:
+                        _, was_created = registries.ensure(kind, key, data, username)
+                    except registries.RegistryError as error:
+                        raise ProposalError(f"items[{index}]: {error}: {key}") from None
+                    if was_created:
+                        created.append(key)
+            # 3. Kaart. update_person kontrollib versiooni isikuluku all teist korda.
+            try:
+                updated = update_person(person_id, {
+                    "updated_at": person["updated_at"],
+                    "occupations": occupations, "education": education,
+                }, username)
+            except ValueError as error:
+                if str(error).startswith("conflict:"):
+                    raise ProposalError("stale_person") from None
+                raise ProposalError(str(error)) from None
+        except ProposalError as error:
+            if created:
+                raise ApplyError(str(error), created) from None
+            raise
+        _close_rows(db, proposal_id, items, selected)
     return updated
+
+
+def reject_selected(proposal_id: str, person_id: str, username: str,
+                    selected: list[int]) -> dict:
+    """Toimetaja lükkab read tagasi; kaarti ega registrit ei puudutata."""
+    with _db() as db:
+        row = _open_proposal(db, proposal_id, person_id, username)
+        items = json.loads(row["payload"])
+        _check_selection(selected, len(items))
+        remaining = _close_rows(db, proposal_id, items, selected)
+    return {"proposal_id": proposal_id, "remaining": remaining}

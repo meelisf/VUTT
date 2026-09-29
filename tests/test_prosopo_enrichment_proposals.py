@@ -185,12 +185,16 @@ def _submit_for_review(client, token, card, items):
     return result.json()['proposal_id']
 
 
-def test_valitud_kirjed_salvestatakse_koos_toenditega(client, login, prosopo_env):
+def test_valitud_kirjed_salvestatakse_koos_toenditega(client, login, prosopo_env, registrid):
+    config, _ = registrid
+    (config / 'institutions.json').write_text(json.dumps({
+        'academia-gustaviana': {'labels': {'et': 'Academia Gustaviana'}, 'type': 'university'}}))
     card = prosopo_env.write('abc', occupations=[], education=[])
     token = login('superadmin', 'superpass')
     items = [
         _item(occupation_key=None, institution_key=None),
         {"kind": "education", "match_status": "matched", "raw_institution": "Academia Gustaviana",
+         "institution_key": "academia-gustaviana",
          "date_from": {"date": "1640", "precision": "year"},
          "evidence": [{"source_kind": "literature", "source_id": "book1", "locator": "lk 4"}]},
     ]
@@ -206,11 +210,11 @@ def test_valitud_kirjed_salvestatakse_koos_toenditega(client, login, prosopo_env
                          headers=_headers(token)).json()
     assert len(pending) == 1
     assert len(pending[0]['items']) == 1
-    assert pending[0]['base_updated_at'] == saved['updated_at']
-    assert client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
-                       headers=_headers(token), json={"proposal_id": proposal_id, "selected": [0]}).status_code == 200
-    assert client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
-                       headers=_headers(token), json={"proposal_id": proposal_id, "selected": [0]}).status_code == 400
+    # Võtmeta rida ei saa kinnitada: registriseose lahendab agent, mitte ülevaataja.
+    blocked = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
+                          headers=_headers(token), json={"proposal_id": proposal_id, "selected": [0]})
+    assert blocked.status_code == 400
+    assert blocked.json()['detail'] == 'items[0]: registry_key_missing'
 
 
 def test_kinnitamine_keeldub_puuduvast_registrist_ja_vananenud_kaardist(client, login, prosopo_env):
@@ -221,7 +225,7 @@ def test_kinnitamine_keeldub_puuduvast_registrist_ja_vananenud_kaardist(client, 
     result = client.post(url, headers=_headers(token),
                          json={"proposal_id": proposal_id, "selected": [0]})
     assert result.status_code == 400
-    assert result.json()['detail'] == 'unknown_occupation_key'
+    assert result.json()['detail'] == 'items[0]: unknown_occupation_key'
     assert prosopo_env.read('abc') == card
     card2 = prosopo_env.write('abc', occupations=[], updated_at='2026-02-01T00:00:00+00:00')
     result = client.post(url, headers=_headers(token),
@@ -241,8 +245,10 @@ def test_kinnitamine_nouab_sama_kasutajat_ja_varsket_versiooni(client, login, pr
     token2 = login('superadmin', 'superpass')              # uus seanss, sama kasutaja
     result = client.post(url, headers=_headers(token2),
                          json={"proposal_id": proposal_id, "selected": [0]})
-    assert result.status_code == 409
-    assert result.json()['detail'] == 'stale_person'
+    # Kaardi muutus vahepeal ei ole enam vananemine (rea tasemel hindamine); rida
+    # jääb blokeerituks oma põhjusel ja kaart muutmata.
+    assert result.status_code == 400
+    assert result.json()['detail'] == 'items[0]: registry_key_missing'
     assert prosopo_env.read('abc') == changed
 
 
@@ -378,97 +384,11 @@ def test_sama_voti_ja_kattuv_aeg_on_duplikaat_aga_eri_opingusundmus_mitte(
     url = f'/prosopography/enrichment-proposals/{card["id"]}/apply'
     result = client.post(url, headers=_headers(token), json={'proposal_id': proposal_id, 'selected': [0]})
     assert result.status_code == 409
-    assert result.json()['detail'] == 'duplicate_entry'
+    assert result.json()['detail'] == 'items[0]: duplicate_entry'
     second = _submit_for_review(client, token, card, [{**base, 'edu_type': 'degree'}])
     result = client.post(url, headers=_headers(token), json={'proposal_id': second, 'selected': [0]})
     assert result.status_code == 200, result.text
     assert len(prosopo_env.read('abc')['education']) == 2
-
-
-def test_toimetaja_lahendab_mitmetahendusliku_vaste_registrivalikuga(
-        client, login, prosopo_env, tmp_path, monkeypatch):
-    registry = tmp_path / 'config'
-    registry.mkdir(exist_ok=True)
-    (registry / 'occupations.json').write_text(json.dumps({
-        'pastor': {'id': 'Q1', 'variants': ['Pfarrer']},
-        'clergyman': {'id': 'Q2', 'variants': ['Pfarrer']},
-    }))
-    monkeypatch.setattr(proposals, 'DATA_CONFIG_DIR', str(registry))
-    monkeypatch.setattr(registries, 'DATA_CONFIG_DIR', str(registry))
-    card = prosopo_env.write('abc', occupations=[])
-    token = login('superadmin', 'superpass')
-    proposal_id = _submit_for_review(client, token, card, [{
-        'kind': 'occupation', 'match_status': 'ambiguous', 'raw_occupation': 'Pfarrer',
-        'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}],
-    }])
-    url = f'/prosopography/enrichment-proposals/{card["id"]}/apply'
-    base = {'proposal_id': proposal_id, 'selected': [0]}
-    assert client.post(url, headers=_headers(token), json=base).status_code == 409
-    assert client.post(url, headers=_headers(token), json={
-        **base, 'corrections': {'0': {'review': {'state': 'done'}}},
-    }).status_code == 400
-    result = client.post(url, headers=_headers(token), json={
-        **base, 'corrections': {'0': {'occupation_key': 'pastor',
-                                     'occupation_variant': 'Pfarrer'}},
-    })
-    assert result.status_code == 200, result.text
-    saved = prosopo_env.read('abc')['occupations'][0]
-    assert saved['label'] == 'Pfarrer'
-    assert saved['occupation_key'] == 'pastor'
-    assert 'review' not in saved
-
-
-def test_parandus_ei_voimalda_valitud_reast_valjuda(client, login, prosopo_env):
-    card = prosopo_env.write('abc', occupations=[])
-    token = login('superadmin', 'superpass')
-    proposal_id = _submit_for_review(client, token, card, [
-        _item(occupation_key=None, institution_key=None),
-        _item(occupation_key=None, institution_key=None, raw_occupation='Õpetaja'),
-    ])
-    result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
-                         headers=_headers(token), json={
-        'proposal_id': proposal_id, 'selected': [0],
-        'corrections': {'1': {'occupation_key': 'pastor'}},
-    })
-    assert result.status_code == 400
-    assert prosopo_env.read('abc') == card
-
-
-def test_toimetaja_parandab_aja_ja_toendi_koos_kinnitamisega(client, login, prosopo_env):
-    card = prosopo_env.write('abc', education=[])
-    token = login('superadmin', 'superpass')
-    item = {'kind': 'education', 'match_status': 'matched', 'raw_institution': 'AGC',
-            'date_from': {'date': '1640', 'precision': 'year'},
-            'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}]}
-    proposal_id = _submit_for_review(client, token, card, [item])
-    corrected = {**item['evidence'][0], 'locator': 'lk 14', 'quote': 'studiosus'}
-    response = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
-                           headers=_headers(token), json={
-        'proposal_id': proposal_id, 'selected': [0],
-        'corrections': {'0': {'date_from': {'date': '1641-01-01', 'precision': 'year'},
-                              'edu_type': 'immatriculation', 'evidence': [corrected]}},
-    })
-    assert response.status_code == 200, response.text
-    saved = prosopo_env.read('abc')['education'][0]
-    assert saved['date_from']['date'] == '1641-01-01'
-    assert saved['type'] == 'immatriculation'
-    assert saved['evidence'] == [corrected]
-
-
-def test_vigane_toimetaja_kuupaev_ei_muuda_kaarti(client, login, prosopo_env):
-    card = prosopo_env.write('abc', education=[])
-    token = login('superadmin', 'superpass')
-    proposal_id = _submit_for_review(client, token, card, [{
-        'kind': 'education', 'match_status': 'matched', 'raw_institution': 'AGC',
-        'evidence': [{'source_kind': 'literature', 'source_id': 'book1', 'locator': 'lk 4'}],
-    }])
-    result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
-                         headers=_headers(token), json={
-        'proposal_id': proposal_id, 'selected': [0],
-        'corrections': {'0': {'date_from': {'date': '1640-99-01', 'precision': 'day'}}},
-    })
-    assert result.status_code == 400
-    assert prosopo_env.read('abc') == card
 
 
 def test_kinnitamise_sisendil_on_mahupiir(client, login, prosopo_env):
@@ -703,3 +623,97 @@ def test_registrikonflikt_parast_esitust_blokeerib_rea(registrid):
     registries.put("occupation", "valipreester", {"id": "Q999", "labels": {"et": "muu"}}, "a")
     with pytest.raises(proposals.ProposalError, match="registry_conflict: valipreester"):
         proposals._merge_row({**_uus_amet(), "occupation_key": "valipreester"}, [], [])
+
+
+def _esitatud(client, login, prosopo_env, items, **card):
+    card = prosopo_env.write("abc", **{"occupations": [], "education": [], **card})
+    token = login("superadmin", "superpass")
+    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc", headers=_headers(token)).json()["code"]
+    submitted = client.post("/prosopography/enrichment-proposals/submit", json={
+        "code": code, "person_id": "vutt:Pabc", "base_updated_at": card["updated_at"],
+        "items": items})
+    assert submitted.status_code == 200, submitted.text
+    return token, _loetelu(client, token)[0]["proposal_id"]
+
+
+def _apply(client, token, proposal_id, selected):
+    return client.post("/prosopography/enrichment-proposals/vutt:Pabc/apply", headers=_headers(token),
+                       json={"proposal_id": proposal_id, "selected": selected})
+
+
+def test_kinnitus_loob_registrikirje_ja_fakti(client, login, prosopo_env, registrid):
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet()])
+    response = _apply(client, token, pid, [0])
+    assert response.status_code == 200, response.text
+    assert registries.load("occupation")["valipreester"]["id"] == "Q1368286"
+    saved = prosopo_env.read("abc")["occupations"][0]
+    assert saved["occupation_key"] == "valipreester" and saved["label"] == "Feldprediger"
+    assert _loetelu(client, token) == []
+
+
+def test_kinnitus_seob_vahepeal_loodud_sama_kirjega(client, login, prosopo_env, registrid):
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet()])
+    registries.put("occupation", "valipreester", {"id": "Q1368286", "labels": {"et": "välipreester"}}, "a")
+    assert _apply(client, token, pid, [0]).status_code == 200
+
+
+def test_eelkontrolli_kukkumine_ei_loo_registrikirjet(client, login, prosopo_env, registrid):
+    config, saved = registrid
+    dup = {"kind": "occupation", "match_status": "matched", "raw_occupation": "Feldprediger",
+           "occupation_key": "kaplan", "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 2}]}
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet(), dup, dict(dup)])
+    response = _apply(client, token, pid, [0, 1, 2])
+    assert response.status_code == 409
+    assert response.json()["detail"].startswith("items[2]: duplicate_entry")
+    assert "valipreester" not in registries.load("occupation") and saved == []
+    assert prosopo_env.read("abc")["occupations"] == []
+
+
+def test_kaardi_kukkumine_tagastab_loodud_registrikirjed(client, login, prosopo_env, registrid, monkeypatch):
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet()])
+    from server.prosopography import person_crud
+
+    def kukub(*args, **kwargs):
+        raise ValueError("conflict:uuem")
+    monkeypatch.setattr(person_crud, "update_person", kukub)
+    response = _apply(client, token, pid, [0])
+    assert response.status_code == 409
+    assert response.json()["detail"] == {"error": "stale_person",
+                                         "created_registry_entries": ["valipreester"]}
+    assert "valipreester" in registries.load("occupation")
+
+
+def test_kaardi_muutus_vahepeal_ei_blokeeri_teisi_ridu(client, login, prosopo_env, registrid):
+    ev = [{"source_kind": "vutt_page", "work_id": "w1", "page": 2}]
+    items = [{"kind": "occupation", "match_status": "matched", "raw_occupation": "Kaplan",
+              "occupation_key": "kaplan", "date_from": {"date": "1629"}, "evidence": ev}, _uus_amet()]
+    token, pid = _esitatud(client, login, prosopo_env, items)
+    prosopo_env.write("abc", occupations=[], education=[], notes="käsitsi muudetud",
+                      updated_at="2026-03-01T00:00:00+00:00")
+    assert _apply(client, token, pid, [0]).status_code == 200
+    assert _apply(client, token, pid, [0]).status_code == 200       # endine rida 1 on nüüd 0
+    assert len(prosopo_env.read("abc")["occupations"]) == 2
+
+
+def test_tagasilukkamine_eemaldab_rea_ja_sulgeb_tuhja(client, login, prosopo_env, registrid):
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet(), _uus_amet(date_from={"date": "1630"})])
+    url = "/prosopography/enrichment-proposals/vutt:Pabc/reject"
+    first = client.post(url, headers=_headers(token), json={"proposal_id": pid, "selected": [1]})
+    assert first.status_code == 200 and first.json()["remaining"] == 1
+    assert client.post(url, headers=_headers(token), json={"proposal_id": pid, "selected": [0]}).json()["remaining"] == 0
+    assert _loetelu(client, token) == []
+    assert prosopo_env.read("abc")["occupations"] == [] and "valipreester" not in registries.load("occupation")
+
+
+def test_tagasilukkamine_on_ainult_superadminile(client, login, prosopo_env):
+    prosopo_env.write("abc")
+    token = login("editor", "editorpass")
+    assert client.post("/prosopography/enrichment-proposals/vutt:Pabc/reject", headers=_headers(token),
+                       json={"proposal_id": "x", "selected": [0]}).status_code == 401
+
+
+def test_apply_ei_voota_enam_parandusi(client, login, prosopo_env, registrid):
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet()])
+    response = client.post("/prosopography/enrichment-proposals/vutt:Pabc/apply", headers=_headers(token),
+                           json={"proposal_id": pid, "selected": [0], "corrections": {}})
+    assert response.status_code == 400

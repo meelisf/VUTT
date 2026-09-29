@@ -112,3 +112,30 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     assert saved["education"][0]["institution"] == "AGC"
     assert saved["education"][0]["evidence"][0]["locator"] == "lk 4"
     assert client.get(url, headers={"Authorization": f"Bearer {token}"}).json() == []
+
+    # Uus registrikirje MCP-st kinnituseni (spekk 2026-09-28): kirje tekib alles kinnitusel.
+    def write(path, data, username, message=None):
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        return {"success": True}
+    monkeypatch.setattr(registries, "save_config_with_git", write)
+
+    fresh = json.loads((await mcp.call_tool("get_person_enrichment_context",
+                                            {"person_id": card["id"]})).content[0].text)["updated_at"]
+    new_item = {"kind": "occupation", "match_status": "new_registry_candidate",
+                "raw_occupation": "Feldprediger",
+                "occupation_entry": {"key": "valipreester",
+                                     "labels": {"et": "välipreester", "en": "military chaplain"},
+                                     "variants": ["Feldprediger"]},
+                "evidence": [{"source_kind": "literature", "source_id": "book1", "locator": "lk 9"}]}
+    await mcp.call_tool("submit_person_enrichment_proposal", {
+        "handoff_code": handoff.json()["code"], "person_id": card["id"],
+        "base_updated_at": fresh, "items": [new_item]})
+    assert "valipreester" not in json.loads((registry / "occupations.json").read_text())
+    pending = client.get(url, headers={"Authorization": f"Bearer {token}"}).json()[0]
+    assert pending["items"][0]["review_state"] == {"state": "applicable"}
+    done = client.post(f"{url}/apply", headers={"Authorization": f"Bearer {token}"},
+                       json={"proposal_id": pending["proposal_id"], "selected": [0]})
+    assert done.status_code == 200, done.text
+    assert json.loads((registry / "occupations.json").read_text())["valipreester"]["labels"]["et"] == "välipreester"
+    assert prosopo_env.read("abc")["occupations"][-1]["occupation_key"] == "valipreester"
