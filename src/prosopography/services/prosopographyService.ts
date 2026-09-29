@@ -48,6 +48,8 @@ export interface InstitutionRegistryEntry {
   type: string; place_key: string | null; notes?: string;
   /** Koht ajas (nt AGC: Tartu kuni 1699, Pärnu alates 1699); `place_key` on vaikekoht. */
   place_periods?: PlacePeriod[];
+  /** Tegutsemisaeg — eristab samanimelisi asutusi; ei ole koht ajas. */
+  active_from?: number; active_to?: number;
 }
 export interface PlacePeriod { place_key: string; from?: number; to?: number; }
 export async function fetchInstitutions(): Promise<Record<string, InstitutionRegistryEntry>> {
@@ -68,6 +70,24 @@ export async function saveRegistryEntry(kind: 'occupation' | 'institution', key:
     method: 'PUT', headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
     body: JSON.stringify(entry), timeout: 15000,
   });
+  return enrichmentResponse(response);
+}
+/** Sama Q-koodiga kirje on registris juba olemas — kutsuja pakub seda (`key`). */
+export class RegistryDuplicateError extends Error {
+  constructor(public key: string) { super('duplicate_id'); }
+}
+/** Uus registrikirje; võtme genereerib server. */
+export async function createRegistryEntry(kind: 'occupation' | 'institution',
+  entry: OccupationRegistryEntry | InstitutionRegistryEntry, token: string):
+  Promise<{ key: string; entry: OccupationRegistryEntry | InstitutionRegistryEntry }> {
+  const response = await fetchWithTimeout(`${BASE}/registries/${kind}`, {
+    method: 'POST', headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry), timeout: 15000,
+  });
+  if (response.status === 409) {
+    const detail = await response.json().then(body => body?.detail, () => null);
+    if (detail?.code === 'duplicate_id' && typeof detail.key === 'string') throw new RegistryDuplicateError(detail.key);
+  }
   return enrichmentResponse(response);
 }
 async function enrichmentResponse<T>(response: Response): Promise<T> {

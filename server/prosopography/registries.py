@@ -9,6 +9,7 @@ import json
 import os
 import re
 import threading
+import unicodedata
 from typing import Optional
 
 from ..config import DATA_CONFIG_DIR, PLACES_FILE
@@ -23,6 +24,14 @@ _MAX_ENTRIES = 5000
 
 class RegistryError(ValueError):
     pass
+
+
+class DuplicateIdError(RegistryError):
+    """Sama Q-kood on registris juba teisel kirjel; `key` = see kirje (klient pakub seda)."""
+
+    def __init__(self, key: str):
+        super().__init__("duplicate_id")
+        self.key = key
 
 
 def _path(kind: str) -> str:
@@ -61,7 +70,7 @@ def validate_entry(kind: str, key: str, data: dict, *, places: Optional[dict] = 
         raise RegistryError("invalid_entry")
     allowed = {"id", "labels", "variants", "notes"}
     if kind == "institution":
-        allowed |= {"type", "place_key", "place_periods"}
+        allowed |= {"type", "place_key", "place_periods", "active_from", "active_to"}
     if set(data) - allowed:
         raise RegistryError("unknown_fields")
     qid = _text(data.get("id"), "id")
@@ -99,6 +108,19 @@ def validate_entry(kind: str, key: str, data: dict, *, places: Optional[dict] = 
         periods = _place_periods(data.get("place_periods"), places)
         if periods:
             result["place_periods"] = periods
+        # Tegutsemisaeg eristab samanimelisi asutusi (Tartu gümnaasium 1630–1632 vs
+        # kubermangugümnaasium 1804–1890). See EI OLE koht ajas (`place_periods`).
+        years = {}
+        for field in ("active_from", "active_to"):
+            value = data.get(field)
+            if value is None:
+                continue
+            if type(value) is not int or not 1000 <= value <= 2100:
+                raise RegistryError("invalid_active_years")
+            years[field] = value
+        if len(years) == 2 and years["active_from"] > years["active_to"]:
+            raise RegistryError("invalid_active_years")
+        result.update(years)
     return result
 
 
@@ -149,6 +171,47 @@ def put(kind: str, key: str, data: dict, username: str) -> dict:
         entries[key] = clean
         save_config_with_git(_path(kind), entries, username, message=f"Register {kind}: uuenda {key}")
         return clean
+
+
+def _slug(text: str) -> str:
+    plain = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", plain.lower()).strip("-")[:60].strip("-")
+
+
+def generate_key(entries: dict, data: dict) -> str:
+    """Püsivõti nimest; kokkupõrkel algusaasta, siis järjekorranumber.
+    Kasutaja võtit ei vali: temale on oluline, et teine asutus ei saaks sama võtit."""
+    labels = data.get("labels") or {}
+    base = _slug(str(labels.get("et") or labels.get("en") or next(iter(labels.values()), ""))) or "kirje"
+    candidates = [base]
+    if isinstance(data.get("active_from"), int):
+        candidates.append(f"{base}-{data['active_from']}")
+    for candidate in candidates:
+        if candidate not in entries:
+            return candidate
+    n = 2
+    while f"{candidates[-1]}-{n}" in entries:
+        n += 1
+    return f"{candidates[-1]}-{n}"
+
+
+def create(kind: str, data: dict, username: str) -> tuple[str, dict]:
+    """Uus kirje serveri genereeritud võtmega. Võtme valik, Q-kontroll ja kirjutus
+    on ühe luku all — kaks samaaegset loomist ei saa sama võtit."""
+    with _LOCK:
+        entries = load(kind)
+        if len(entries) >= _MAX_ENTRIES:
+            raise RegistryError("registry_full")
+        qid = data.get("id") if isinstance(data, dict) else None
+        if qid:
+            for key, value in entries.items():
+                if isinstance(value, dict) and value.get("id") == qid:
+                    raise DuplicateIdError(key)
+        key = generate_key(entries, data if isinstance(data, dict) else {})
+        clean = validate_entry(kind, key, data, places=_places() if kind == "institution" else None)
+        entries[key] = clean
+        save_config_with_git(_path(kind), entries, username, message=f"Register {kind}: lisa {key}")
+        return key, clean
 
 
 def same_entry(a: dict, b: dict) -> bool:

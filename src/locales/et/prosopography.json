@@ -126,7 +126,7 @@
     "open": "Liida…"
   },
   "form": {
-    "registry": { "badge": "Register", "unlink": "Eemalda registriseos" },
+    "registry": { "badge": "Register", "unlink": "Eemalda registriseos", "unlinked": "Registriga sidumata", "notOnMap": "kaardile ei jõua", "linkTo": "Seo: {{label}}", "create": "Loo registrikirje" },
     "aaRecordHint": "Masinkopeeritud allikakirje saksakeelsete lühenditega. Reavahetused on sisulised. Ei ole elulugu ega Markdown.",
     "aaRecordLabel": "Album Academicumi kirje",
     "add": "Lisa",
@@ -480,5 +480,6 @@
     "openButton": "Lisa isik…",
     "manualForm": "Täida vorm käsitsi",
     "createWithoutSource": "Loo ilma allikata…"
-  }
+  },
+  "registryModal": {"title": {"institution": "Uus asutusekirje", "occupation": "Uus ametikirje"}, "close": "Sulge", "searchWikidata": "Otsi Wikidatast", "search": "Otsi", "loading": "Laen Wikidata andmeid…", "wikidataError": "Wikidata päring ebaõnnestus.", "noResults": "Wikidatast ei leitud. Proovi teist nimekuju või lisa ilma Wikidatata.", "manual": "Lisa ilma Wikidatata", "back": "Tagasi otsingusse", "noWikidata": "Ilma Q-koodita kohalik kirje. Kontroll käib nime ja aastate järgi.", "alreadyInRegistry": "Juba registris: {{label}} ({{key}}) — vali see", "sameId": "Sama Q-koodiga kirje on registris juba olemas: {{label}} ({{key}}). Uut ei looda.", "useExisting": "Kasuta olemasolevat", "label": "Nimi", "variants": "Nimevariandid, üks rea kohta", "type": "Asutuse liik", "place": "Koht", "years": "Tegutsemisaeg", "yearsHelp": "Nt 1630–1632 või 1632–. Eristab samanimelisi asutusi.", "notes": "Märkused", "similarTitle": "Registris on sarnase nimega kirje. Kas see on sama?", "useThis": "Kasuta seda", "confirmDifferent": "Ei, see on teine kirje", "keyPreview": "Võti (genereeritakse):", "missing": {"label": "Eestikeelne nimi on kohustuslik.", "type": "Asutuse liik on kohustuslik.", "years": "Tegutsemisaeg ei ole kujul 1630–1632."}, "cancel": "Loobu", "save": "Lisa registrisse", "duplicateId": "Sama Q-koodiga kirje lisati vahepeal registrisse ({{key}})."}
 }

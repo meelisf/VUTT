@@ -2,15 +2,16 @@
   "title": "Administration",
   "prosopoRegistries": {
     "placePeriods": "Place over time (optional)",
-    "placePeriodsHelp": "One line per period: place key, colon, years. The life map picks the place by the year of the education or occupation entry; an undated entry gets the default place above.",
-    "placePeriodsInvalid": "Invalid period line:",
+    "placePeriodsHelp": "For an institution that was in different places at different times. Each line MUST have the form \"place key: start–end\", e.g. \"Dorpat: –1699\" and \"Pernau: 1699–1710\"; an open end may be left out. Years alone are not enough. This is NOT the period the institution existed (that has its own field above) — if it stayed in one place, leave this empty. The life map picks the place by the year of the education or occupation entry; an undated entry gets the default place above.",
+    "placePeriodsError": {"format": "Line {{line}}: \"{{value}}\" is not in the form \"place key: start–end\".", "years_only": "Line {{line}}: the place is missing — write e.g. \"Dorpat: {{value}}\". Years active have their own field.", "unknown_place": "Line {{line}}: \"{{value}}\" is not in the place registry. Use the registry key (e.g. Dorpat, not Tartu)."},
+    "placeKeyValue": "Registry key:",
     "title": "Occupation and institution registries",
     "intro": "Approve a registry entry separately from a person fact. The source wording remains on the person record.",
     "institution": "Institutions", "occupation": "Occupations", "search": "Search registry",
     "new": "New registry entry", "key": "Stable VUTT key", "qid": "Wikidata Q identifier (optional)",
     "label": "Label", "variants": "Name variants, one per line", "type": "Institution type",
-    "placeKey": "Place registry key (optional)", "notes": "Notes", "save": "Save registry entry",
-    "saved": "Registry entry saved", "selectExisting": "This key already exists. Select the entry from the list."
+    "placeKey": "Place (default, optional)", "notes": "Notes", "save": "Save registry entry",
+    "saved": "Registry entry saved", "years": "Years active (optional)", "yearsHelp": "E.g. 1630–1632 or 1632–. Tells apart institutions with the same name; does not affect the map.", "yearsInvalid": "Years active are not in the form 1630–1632.", "chooseOrCreate": "Choose an entry from the list or add a new one."
   },
   "tabs": {
     "registrations": "Registrations",
