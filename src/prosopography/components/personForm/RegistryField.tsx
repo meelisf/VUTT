@@ -7,12 +7,15 @@
  * Sidumata väli on nähtavalt sidumata: Q-kood üksi näeb välja nagu seotud kirje,
  * aga elukäigu kaart leiab asutuse koha ainult registrivõtme kaudu.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, Landmark, Link2, X } from 'lucide-react';
+import { Landmark, Link2, Plus, X } from 'lucide-react';
 import EntityPicker from '../../../components/EntityPicker';
 import type { LinkedEntity } from '../../../types/LinkedEntity';
 import { matchRegistry, registryLabel, registrySuggestion, type RegistryEntryLike, type RegistryHit } from '../../utils/registryMatch';
+import { formatYears } from '../../utils/registryCreate';
+import { registryChanged } from '../../hooks/useRegistry';
+import RegistryEntryModal from '../RegistryEntryModal';
 
 interface Props {
   registry: Record<string, RegistryEntryLike>;
@@ -27,17 +30,19 @@ interface Props {
   onPick: (hit: RegistryHit, typed: string) => void;
   onUnlink: () => void;
   disabled?: boolean;
-  /** Admin: sidumata väljal link registrilehele, uus kirje eeltäidetud selle välja järgi. */
+  /** Admin: sidumata väljal „Lisa registrisse" (aken, otsing algab välja tekstist). */
   createKind?: 'occupation' | 'institution';
+  token?: string;
   /** Sidumata sildi lisalause, nt asutusel „kaardile ei jõua". */
   unlinkedNote?: string;
 }
 
 const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSuggestions, value, registryKey,
-  onChange, onPick, onUnlink, disabled, createKind, unlinkedNote }) => {
+  onChange, onPick, onUnlink, disabled, createKind, token, unlinkedNote }) => {
   const { t } = useTranslation('prosopography');
   const leading = (query: string) => matchRegistry(registry, query, lang).map(hit => {
-    const extra = [hit.matched !== hit.label ? hit.matched : null, hit.entry.id, hit.entry.place_key].filter(Boolean).join(' · ');
+    const extra = [hit.matched !== hit.label ? hit.matched : null, hit.entry.id,
+      formatYears(hit.entry.active_from, hit.entry.active_to), hit.entry.place_key].filter(Boolean).join(' · ');
     return { key: hit.key, label: hit.label, id: hit.entry.id,
              description: `${t('form.registry.badge')}${extra ? ` · ${extra}` : ''}` };
   });
@@ -45,9 +50,10 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
   const source = value?.label?.trim() || '';
   const unlinked = !registryKey && !!(source || value?.id);
   const suggestion = unlinked ? registrySuggestion(registry, value?.id, source, lang) : null;
-  const createHref = createKind && unlinked && !suggestion
-    ? `/admin/prosopo-registries?${new URLSearchParams({ kind: createKind, label: source,
-        ...(value?.id ? { qid: value.id } : {}) })}` : null;
+  const [creating, setCreating] = useState(false);
+  const canCreate = !!createKind && !!token && unlinked && !suggestion;
+  const pickKey = (key: string, picked: RegistryEntryLike) =>
+    onPick({ key, entry: picked, label: registryLabel(picked, key, lang), matched: source }, source);
   return (
     <div>
       <EntityPicker placeholder={placeholder} type="topic" value={value} onChange={onChange} lang={lang}
@@ -83,14 +89,20 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
               {t('form.registry.linkTo', { label: suggestion.label })}
             </button>
           )}
-          {createHref && !disabled && (
-            <a href={createHref} target="_blank" rel="noopener noreferrer"
+          {canCreate && !disabled && (
+            <button type="button" onClick={() => setCreating(true)}
               className="inline-flex items-center gap-1 text-primary-700 hover:underline">
+              <Plus size={11} />
               {t('form.registry.create')}
-              <ExternalLink size={11} />
-            </a>
+            </button>
           )}
         </div>
+      )}
+      {creating && createKind && token && (
+        <RegistryEntryModal kind={createKind} initialQuery={source} registry={registry} token={token} lang={lang}
+          onClose={() => setCreating(false)}
+          onCreated={(key, created) => { setCreating(false); registryChanged(createKind); pickKey(key, created); }}
+          onUseExisting={key => { setCreating(false); if (registry[key]) pickKey(key, registry[key]); }} />
       )}
     </div>
   );

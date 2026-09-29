@@ -16,6 +16,14 @@ vi.mock('../../../prosopography/services/prosopographyService', () => ({
   fetchPlaces: vi.fn(async () => ({ Dorpat: { labels: { et: 'Tartu' }, type: 'city' } })),
   fetchPlacesMeta: vi.fn(async () => ({ groups: {}, allowed_types: [] })),
 }));
+// Aken on eraldi testitud (RegistryEntryModal.test.tsx); siin ainult lehe ühendus.
+vi.mock('../../../prosopography/components/RegistryEntryModal', () => ({
+  default: (props: any) => <div>
+    <span>modal:{props.kind}</span>
+    <button onClick={() => props.onCreated('tartu-gumnaasium-1630', { id: 'Q20641850', labels: { et: 'Tartu gümnaasium' },
+      variants: [], type: 'school', place_key: 'Dorpat', active_from: 1630, active_to: 1632 })}>stub-create</button>
+  </div>,
+}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'et' } }),
 }));
@@ -44,33 +52,56 @@ it('sisselogimata külastaja ei näe adminivormi ega lae registrit', async () =>
   expect(fetchRegistry).not.toHaveBeenCalled();
 });
 
-it('admin näeb vormi ja laadib registri', async () => {
-  session.user = { role: 'admin' };
-  session.authToken = 'token';
-  open();
-  expect(screen.getByRole('button', { name: 'prosopoRegistries.save' })).toBeTruthy();
-  await waitFor(() => expect(fetchRegistry).toHaveBeenCalledWith('institution'));
-});
+const REG = { 'gymn-dorpat': { id: 'Q12376416', labels: { et: 'Tartu Gümnaasium' }, variants: ['Gymn. Dorpat'],
+  type: 'gymnasium', place_key: 'Dorpat' } };
 
-it('isikuvormi link eeltäidab uue kirje: silt, nimevariant, Q-kood', async () => {
-  session.user = { role: 'admin' };
-  session.authToken = 'token';
-  open('/admin/prosopo-registries?kind=institution&label=Tartu+g%C3%BCmnaasium&qid=Q20641850');
+const asAdmin = () => { session.user = { role: 'admin' }; session.authToken = 'token'; };
+
+it('admin laadib registri; vorm tuleb alles kirje valikul (vaba võtmesisestust pole)', async () => {
+  asAdmin();
+  fetchRegistry.mockResolvedValue(REG);
+  open();
   await waitFor(() => expect(fetchRegistry).toHaveBeenCalledWith('institution'));
-  expect(screen.getByDisplayValue('Q20641850')).toBeTruthy();
-  expect(screen.getAllByDisplayValue('Tartu gümnaasium')).toHaveLength(2);   // silt ET + nimevariant
+  expect(screen.getByText('prosopoRegistries.chooseOrCreate')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'prosopoRegistries.save' })).toBeNull();
+  fireEvent.click(await screen.findByText('Tartu Gümnaasium'));
+  expect(screen.getByRole('button', { name: 'prosopoRegistries.save' })).toBeTruthy();
 });
 
 it('„Koht ajas" ainult aastatega ei lähe serverisse, vaid annab rea ja põhjuse', async () => {
   // Enne: „1804–1890" läks kohavõtmena serverisse → paljas unknown_place_key.
-  session.user = { role: 'admin' };
-  session.authToken = 'token';
-  open('/admin/prosopo-registries?kind=institution&label=Tartu+g%C3%BCmnaasium');
-  await waitFor(() => expect(fetchRegistry).toHaveBeenCalled());
-  fireEvent.change(screen.getByLabelText('prosopoRegistries.key'), { target: { value: 'gymn-tartu-1630' } });
-  fireEvent.change(screen.getByLabelText('prosopoRegistries.type'), { target: { value: 'gymnasium' } });
+  asAdmin();
+  fetchRegistry.mockResolvedValue(REG);
+  open();
+  fireEvent.click(await screen.findByText('Tartu Gümnaasium'));
   fireEvent.change(screen.getByPlaceholderText(/Dorpat: –1699/), { target: { value: '1804–1890' } });
   fireEvent.click(screen.getByRole('button', { name: 'prosopoRegistries.save' }));
   expect((await screen.findByRole('alert')).textContent).toBe('prosopoRegistries.placePeriodsError.years_only');
   expect(saveRegistryEntry).not.toHaveBeenCalled();
+});
+
+it('tegutsemisaeg salvestub oma väljadena, mitte kohana ajas', async () => {
+  asAdmin();
+  fetchRegistry.mockResolvedValue(REG);
+  saveRegistryEntry.mockImplementation(async (_k: string, _key: string, value: unknown) => value);
+  open();
+  fireEvent.click(await screen.findByText('Tartu Gümnaasium'));
+  fireEvent.change(screen.getByPlaceholderText('1630–1632'), { target: { value: '1804–1890' } });
+  fireEvent.click(screen.getByRole('button', { name: 'prosopoRegistries.save' }));
+  await waitFor(() => expect(saveRegistryEntry).toHaveBeenCalled());
+  const [, key, value] = saveRegistryEntry.mock.calls[0];
+  expect(key).toBe('gymn-dorpat');
+  expect(value).toMatchObject({ active_from: 1804, active_to: 1890, place_periods: [] });
+});
+
+it('„Uus kirje" avab akna; loodud kirje valitakse redaktorisse', async () => {
+  asAdmin();
+  fetchRegistry.mockResolvedValue(REG);
+  open();
+  await waitFor(() => expect(fetchRegistry).toHaveBeenCalled());
+  fireEvent.click(screen.getByText('prosopoRegistries.new'));
+  expect(screen.getByText('modal:institution')).toBeTruthy();
+  fireEvent.click(screen.getByText('stub-create'));
+  expect(await screen.findByText('tartu-gumnaasium-1630')).toBeTruthy();
+  expect(screen.getByDisplayValue('1630–1632')).toBeTruthy();
 });

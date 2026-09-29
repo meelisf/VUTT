@@ -197,3 +197,64 @@ def test_ensure_samaaegne_loomine_ei_kirjuta_ule(files):
     for t in loimed:
         t.join()
     assert sorted(map(str, tulemused)) == ["True", "registry_conflict"]
+
+
+def test_create_genereerib_votme_ja_eristab_samanimelise_asutuse(files):
+    """Tartu gümnaasium 1630–1632 ei tohi saada kubermangugümnaasiumi võtit."""
+    tmp, saved = files
+    key1, old = registries.create("institution", {
+        "id": "Q12376416", "labels": {"et": "Tartu Gümnaasium"}, "type": "gymnasium",
+        "place_key": "tartu", "active_from": 1804, "active_to": 1890}, "admin")
+    key2, new = registries.create("institution", {
+        "id": "Q20641850", "labels": {"et": "Tartu gümnaasium"}, "type": "gymnasium",
+        "place_key": "tartu", "active_from": 1630, "active_to": 1632}, "admin")
+    key3, _ = registries.create("institution", {
+        "labels": {"et": "Tartu gümnaasium"}, "type": "gymnasium", "active_from": 1630}, "admin")
+    key4, _ = registries.create("institution", {"labels": {"et": "Tartu gümnaasium"}, "type": "school"}, "admin")
+    assert (key1, key2, key3, key4) == ("tartu-gumnaasium", "tartu-gumnaasium-1630",
+                                        "tartu-gumnaasium-1630-2", "tartu-gumnaasium-2")
+    assert (new["active_from"], new["active_to"]) == (1630, 1632)
+    assert set(registries.load("institution")) == {key1, key2, key3, key4}
+    assert saved[-1][2] == f"Register institution: lisa {key4}"
+
+
+def test_create_sama_q_kood_annab_olemasoleva_votme_ja_ei_kirjuta(files):
+    tmp, saved = files
+    key, _ = registries.create("occupation", {"id": "Q121594", "labels": {"et": "professor"}}, "admin")
+    with pytest.raises(registries.DuplicateIdError) as error:
+        registries.create("occupation", {"id": "Q121594", "labels": {"et": "õppejõud"}}, "admin")
+    assert error.value.key == key and str(error.value) == "duplicate_id"
+    assert len(saved) == 1
+
+
+@pytest.mark.parametrize("years", [
+    {"active_from": 1700, "active_to": 1690}, {"active_from": "1630"}, {"active_to": 99},
+])
+def test_vigane_tegutsemisaeg(files, years):
+    with pytest.raises(registries.RegistryError, match="invalid_active_years"):
+        registries.put("institution", "x", {"labels": {"et": "X"}, "type": "school", **years}, "admin")
+
+
+def test_tegutsemisaeg_ainult_asutusel(files):
+    with pytest.raises(registries.RegistryError, match="unknown_fields"):
+        registries.create("occupation", {"labels": {"et": "X"}, "active_from": 1630}, "admin")
+
+
+def test_votme_slug_diakriitikuteta_ja_varu(files):
+    assert registries.generate_key({}, {"labels": {"et": "Åbo Akademi / Turu"}}) == "abo-akademi-turu"
+    assert registries.generate_key({}, {"labels": {"et": "Õpetaja"}}) == "opetaja"
+    assert registries.generate_key({}, {"labels": {"en": "—"}}) == "kirje"
+
+
+def test_registrikirje_loomine_nouab_admini_ja_duplikaat_on_409(client, login, files):
+    body = {"id": "Q20641850", "labels": {"et": "Tartu gümnaasium"}, "type": "gymnasium"}
+    url = "/prosopography/registries/institution"
+    editor = login("editor", "editorpass")
+    assert client.post(url, json=body, headers={"Authorization": f"Bearer {editor}"}).status_code == 401
+    admin = {"Authorization": f"Bearer {login('admin', 'adminpass')}"}
+    created = client.post(url, json=body, headers=admin)
+    assert created.status_code == 200
+    assert created.json()["key"] == "tartu-gumnaasium"
+    again = client.post(url, json={**body, "labels": {"et": "Muu"}}, headers=admin)
+    assert again.status_code == 409
+    assert again.json()["detail"] == {"code": "duplicate_id", "key": "tartu-gumnaasium"}

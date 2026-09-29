@@ -15,6 +15,14 @@ vi.mock('../../../../services/gndService', () => ({ searchGnd: vi.fn(async () =>
 vi.mock('../../../../services/viafService', () => ({ searchViaf: vi.fn(async () => []) }));
 vi.mock('../../../../contexts/UserContext', () => ({ useUser: () => ({ user: { role: 'editor' } }) }));
 
+vi.mock('../../RegistryEntryModal', () => ({
+  default: (props: any) => <div>
+    <span>modal:{props.kind}:{props.initialQuery}</span>
+    <button onClick={() => props.onCreated('tartu-gumnaasium-1630', { id: 'Q20641850', labels: { et: 'Tartu gümnaasium' }, variants: [] })}>
+      stub-create</button>
+  </div>,
+}));
+
 import RegistryField from '../RegistryField';
 
 const REG = { 'academia-gustavo-carolina': { id: 'Q138710754', labels: { et: 'Academia Gustavo-Carolina' }, variants: ['AGC'], place_key: 'Dorpat' } };
@@ -58,13 +66,15 @@ describe('RegistryField', () => {
     expect(screen.queryByText('form.registry.create')).toBeNull();          // vaste olemas → loomist ei paku
   });
 
-  it('vasteta sidumata väli: admin saab eeltäidetud loomise lingi', () => {
-    setup(undefined, { label: 'Tartu gümnaasium', id: 'Q20641850', labels: null, source: 'wikidata' },
-      { createKind: 'institution' });
-    const link = screen.getByText('form.registry.create').closest('a')!;
-    const url = new URL(link.getAttribute('href')!, 'https://x');
-    expect(url.pathname).toBe('/admin/prosopo-registries');
-    expect(Object.fromEntries(url.searchParams)).toEqual({ kind: 'institution', label: 'Tartu gümnaasium', qid: 'Q20641850' });
+  it('vasteta sidumata väli: admin avab akna; loodud kirje seotakse väljaga', () => {
+    const { onPick } = setup(undefined, { label: 'Tartu gümnaasium', id: 'Q20641850', labels: null, source: 'wikidata' },
+      { createKind: 'institution', token: 't' });
+    fireEvent.click(screen.getByText('form.registry.create'));
+    expect(screen.getByText('modal:institution:Tartu gümnaasium')).toBeTruthy();   // otsing algab välja tekstist
+    fireEvent.click(screen.getByText('stub-create'));
+    expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ key: 'tartu-gumnaasium-1630', label: 'Tartu gümnaasium' }),
+      'Tartu gümnaasium');
+    expect(screen.queryByText(/modal:/)).toBeNull();
   });
 
   it('seotud või tühi väli sidumata silti ei näita; ilma createKind-ita linki pole', () => {
@@ -77,7 +87,7 @@ describe('RegistryField', () => {
     expect(screen.queryByText(/form.registry.unlinked/)).toBeNull();
   });
 
-  it('mitte-admin näeb silti, aga mitte loomise linki', () => {
+  it('mitte-admin näeb silti, aga mitte loomise nuppu', () => {
     setup(undefined, { label: 'Tartu gümnaasium', id: null, labels: null, source: 'manual' });
     expect(screen.getByText('form.registry.unlinked')).toBeTruthy();
     expect(screen.queryByText('form.registry.create')).toBeNull();

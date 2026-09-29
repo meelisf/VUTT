@@ -9,6 +9,8 @@ export interface RegistryEntryLike {
   labels: Record<string, string>;
   variants: string[];
   place_key?: string | null;
+  active_from?: number;
+  active_to?: number;
 }
 
 export interface RegistryHit {

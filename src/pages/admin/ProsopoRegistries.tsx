@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { isAtLeast } from '../../utils/roleUtils';
 import { formatPlacePeriods, parsePlacePeriods, type PlacePeriodError } from './placePeriods';
 import PlacePicker from '../../prosopography/components/personForm/PlacePicker';
+import RegistryEntryModal from '../../prosopography/components/RegistryEntryModal';
+import { formatYears, parseYears } from '../../prosopography/utils/registryCreate';
+import type { RegistryEntryLike } from '../../prosopography/utils/registryMatch';
 import { fetchPlaces, fetchRegistry, saveRegistryEntry,
   type InstitutionRegistryEntry, type OccupationRegistryEntry } from '../../prosopography/services/prosopographyService';
 
@@ -20,11 +23,7 @@ export default function ProsopoRegistries() {
   const lang = i18n.language.slice(0, 2);
   const { user, authToken, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
-  // Isikuvormi „Loo registrikirje" link: ?kind=…&label=…&qid=… eeltäidab uue kirje (ühekordne).
-  const [searchParams] = useSearchParams();
-  const prefill = useRef(searchParams.get('label') || searchParams.get('qid')
-    ? { label: searchParams.get('label') ?? '', qid: searchParams.get('qid') } : null);
-  const [kind, setKind] = useState<Kind>(searchParams.get('kind') === 'occupation' ? 'occupation' : 'institution');
+  const [kind, setKind] = useState<Kind>('institution');
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const [query, setQuery] = useState('');
   const [key, setKey] = useState('');
@@ -32,6 +31,8 @@ export default function ProsopoRegistries() {
   const [draft, setDraft] = useState<Entry>(empty('institution'));
   const [variants, setVariants] = useState('');
   const [periods, setPeriods] = useState('');
+  const [yearsText, setYearsText] = useState('');
+  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -43,13 +44,7 @@ export default function ProsopoRegistries() {
   useEffect(() => {
     if (!authToken || !isAtLeast(user?.role, 'admin')) return;
     let live = true;
-    setError(''); setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants(''); setPeriods('');
-    if (prefill.current) {
-      const { label, qid } = prefill.current;
-      prefill.current = null;
-      setDraft({ ...empty(kind), id: qid || null, labels: { et: label, en: '' } });
-      setVariants(label);
-    }
+    setError(''); setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants(''); setPeriods(''); setYearsText('');
     fetchRegistry(kind).then(data => { if (live) setEntries(data); })
       .catch(e => { if (live) setError(String(e)); });
     return () => { live = false; };
@@ -65,21 +60,24 @@ export default function ProsopoRegistries() {
       value.toLocaleLowerCase().includes(query.toLocaleLowerCase()))).sort(([a], [b]) => a.localeCompare(b)),
   [entries, query]);
 
-  const choose = (id: string) => {
-    const entry = entries[id];
+  const choose = (id: string, from: Record<string, Entry> = entries) => {
+    const entry = from[id];
     setKey(id); setSelectedExisting(true); setDraft({ ...entry, labels: { ...entry.labels }, variants: [...entry.variants] });
     setVariants(entry.variants.join('\n'));
-    setPeriods(formatPlacePeriods((entry as InstitutionRegistryEntry).place_periods)); setError(''); setSaved(false);
+    setPeriods(formatPlacePeriods((entry as InstitutionRegistryEntry).place_periods));
+    setYearsText(formatYears((entry as InstitutionRegistryEntry).active_from, (entry as InstitutionRegistryEntry).active_to));
+    setError(''); setSaved(false);
   };
-  const newEntry = () => { setKey(''); setSelectedExisting(false); setDraft(empty(kind)); setVariants(''); setPeriods(''); setError(''); setSaved(false); };
   const save = async () => {
-    if (!authToken) return;
-    if (!selectedExisting && entries[key]) { setError(tr('selectExisting')); return; }
+    if (!authToken || !selectedExisting) return;
+    const years = kind === 'institution' ? parseYears(yearsText) : {};
+    if (years === null) { setError(tr('yearsInvalid')); return; }
     const parsed = kind === 'institution' ? parsePlacePeriods(periods, placeKeys) : { periods: [] };
     if ('errorLine' in parsed) { setError(periodError(parsed)); return; }
     setBusy(true); setError(''); setSaved(false);
     try {
-      const value = { ...draft,
+      const { active_from: _from, active_to: _to, ...rest } = draft as InstitutionRegistryEntry;
+      const value = { ...rest, ...years,
         labels: Object.fromEntries(Object.entries(draft.labels).filter(([, label]) => label.trim())),
         variants: variants.split('\n').map(v => v.trim()).filter(Boolean),
         ...(kind === 'institution' ? { place_periods: parsed.periods } : {}) };
@@ -88,7 +86,7 @@ export default function ProsopoRegistries() {
       setDraft(stored);
       setVariants(stored.variants.join('\n'));
       setPeriods(formatPlacePeriods((stored as InstitutionRegistryEntry).place_periods));
-      setSelectedExisting(true);
+      setYearsText(formatYears((stored as InstitutionRegistryEntry).active_from, (stored as InstitutionRegistryEntry).active_to));
       setSaved(true);
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
@@ -115,22 +113,23 @@ export default function ProsopoRegistries() {
         <section className="rounded border bg-white p-3">
           <input aria-label={tr('search')} value={query} onChange={e => setQuery(e.target.value)}
             placeholder={tr('search')} className="mb-2 w-full rounded border px-2 py-1.5" />
-          <button type="button" onClick={newEntry} className="mb-2 w-full rounded border px-2 py-1.5 text-left text-primary-700">
+          <button type="button" onClick={() => setCreating(true)} className="mb-2 w-full rounded border px-2 py-1.5 text-left text-primary-700">
             {tr('new')}
           </button>
           <div className="max-h-[65vh] overflow-y-auto">
             {shown.map(([id, entry]) => <button key={id} type="button" onClick={() => choose(id)}
               className={`block w-full rounded px-2 py-1.5 text-left text-sm ${id === key ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
               {entry.labels[lang] || entry.labels.et || entry.labels.en || id}
-              <span className="block text-xs text-gray-500">{id}</span>
+              <span className="block text-xs text-gray-500">
+                {[id, formatYears((entry as InstitutionRegistryEntry).active_from, (entry as InstitutionRegistryEntry).active_to)]
+                  .filter(Boolean).join(' · ')}
+              </span>
             </button>)}
           </div>
         </section>
-        <section className="space-y-3 rounded border bg-white p-4">
-          <label className="block text-sm">{tr('key')}
-            <input value={key} onChange={e => setKey(e.target.value)} disabled={selectedExisting}
-              className="mt-1 block w-full rounded border px-2 py-1.5 disabled:bg-gray-100" />
-          </label>
+        {!selectedExisting ? <section className="rounded border bg-white p-4 text-sm text-gray-500">{tr('chooseOrCreate')}</section>
+        : <section className="space-y-3 rounded border bg-white p-4">
+          <p className="text-sm">{tr('key')} <code className="font-mono">{key}</code></p>
           <label className="block text-sm">{tr('qid')}
             <input value={draft.id ?? ''} onChange={e => setDraft(d => ({ ...d, id: e.target.value || null }))}
               className="mt-1 block w-full rounded border px-2 py-1.5" />
@@ -157,6 +156,11 @@ export default function ProsopoRegistries() {
                 {tr('placeKeyValue')} <code className="font-mono">{institution.place_key}</code>
               </span>}
             </div>
+            <label className="block text-sm">{tr('years')}
+              <input value={yearsText} onChange={e => setYearsText(e.target.value)} placeholder="1630–1632"
+                className="mt-1 block w-full rounded border px-2 py-1.5" />
+              <span className="mt-1 block text-xs text-gray-500">{tr('yearsHelp')}</span>
+            </label>
             <label className="block text-sm">{tr('placePeriods')}
               <span className="mt-1 block text-xs text-gray-600">{tr('placePeriodsHelp')}</span>
               <textarea value={periods} onChange={e => setPeriods(e.target.value)} rows={3}
@@ -173,8 +177,16 @@ export default function ProsopoRegistries() {
             onClick={() => void save()} className="rounded bg-primary-700 px-4 py-2 text-white disabled:opacity-50">
             {tr('save')}
           </button>
-        </section>
+        </section>}
       </div>
+      {creating && authToken && <RegistryEntryModal kind={kind} initialQuery={query} lang={lang} token={authToken}
+        registry={entries as Record<string, RegistryEntryLike>}
+        onClose={() => setCreating(false)}
+        onUseExisting={id => { setCreating(false); choose(id); }}
+        onCreated={(id, entry) => {
+          const next = { ...entries, [id]: entry as Entry };
+          setCreating(false); setEntries(next); choose(id, next); setSaved(true);
+        }} />}
     </main>
   </div>;
 }

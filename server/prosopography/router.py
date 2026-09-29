@@ -480,6 +480,20 @@ def prosopography_registry(kind: str):
                             detail=str(error))
 
 
+@router.post("/registries/{kind}")
+async def prosopography_create_registry(kind: str, request: Request,
+                                       user=Depends(require_role("admin"))):
+    """Uus registrikirje, võtme genereerib server. Sama Q-kood → 409 olemasoleva võtmega."""
+    data = await request.json()
+    try:
+        key, entry = await run_in_threadpool(registries.create, kind, data, user["username"])
+    except registries.DuplicateIdError as error:
+        raise HTTPException(status_code=409, detail={"code": "duplicate_id", "key": error.key})
+    except registries.RegistryError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    return {"key": key, "entry": entry}
+
+
 @router.put("/registries/{kind}/{key}")
 async def prosopography_put_registry(kind: str, key: str, request: Request,
                                     user=Depends(require_role("admin"))):

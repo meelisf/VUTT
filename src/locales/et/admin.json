@@ -2,8 +2,8 @@
   "title": "Haldus",
   "prosopoRegistries": {
     "placePeriods": "Koht ajas (valikuline)",
-    "placePeriodsHelp": "Kui asutus oli eri aegadel eri kohas. Iga rida PEAB olema kujul „koha võti: algus–lõpp\", nt „Dorpat: –1699\" ja „Pernau: 1699–1710\"; lahtise otsaga aasta võib ära jätta. Ainult aastatest ei piisa. See EI OLE asutuse tegutsemisaeg — kui asutus oli kogu aeg ühes kohas, jäta tühjaks ja vali ülal koht. Elukäigu kaart valib koha hariduse või ameti aasta järgi; aastata kirje saab ülemise vaikekoha.",
-    "placePeriodsError": {"format": "Rida {{line}}: „{{value}}\" ei ole kujul „koha võti: algus–lõpp\".", "years_only": "Rida {{line}}: koht puudub — kirjuta nt „Dorpat: {{value}}\". Asutuse tegutsemisaeg ei käi siia.", "unknown_place": "Rida {{line}}: kohta „{{value}}\" ei ole kohtade registris. Kasuta registrivõtit (nt Dorpat, mitte Tartu)."},
+    "placePeriodsHelp": "Kui asutus oli eri aegadel eri kohas. Iga rida PEAB olema kujul „koha võti: algus–lõpp\", nt „Dorpat: –1699\" ja „Pernau: 1699–1710\"; lahtise otsaga aasta võib ära jätta. Ainult aastatest ei piisa. See EI OLE asutuse tegutsemisaeg (selleks on ülal oma väli) — kui asutus oli kogu aeg ühes kohas, jäta tühjaks. Elukäigu kaart valib koha hariduse või ameti aasta järgi; aastata kirje saab ülemise vaikekoha.",
+    "placePeriodsError": {"format": "Rida {{line}}: „{{value}}\" ei ole kujul „koha võti: algus–lõpp\".", "years_only": "Rida {{line}}: koht puudub — kirjuta nt „Dorpat: {{value}}\". Tegutsemisaeg käib oma väljale.", "unknown_place": "Rida {{line}}: kohta „{{value}}\" ei ole kohtade registris. Kasuta registrivõtit (nt Dorpat, mitte Tartu)."},
     "placeKeyValue": "Registrivõti:",
     "title": "Ametite ja asutuste registrid",
     "intro": "Kinnita registrikirje eraldi isikufaktist. Allikast pärit sõnastus jääb isikukaardile alles.",
@@ -11,7 +11,7 @@
     "new": "Uus registrikirje", "key": "Püsiv VUTT-i võti", "qid": "Wikidata Q-kood (valikuline)",
     "label": "Nimetus", "variants": "Nimevariandid, üks real", "type": "Asutuse liik",
     "placeKey": "Koht (vaikekoht, valikuline)", "notes": "Märkused", "save": "Salvesta registrikirje",
-    "saved": "Registrikirje salvestati", "selectExisting": "See võti on juba olemas. Vali kirje loendist."
+    "saved": "Registrikirje salvestati", "years": "Tegutsemisaeg (valikuline)", "yearsHelp": "Nt 1630–1632 või 1632–. Eristab samanimelisi asutusi; ei mõjuta kaarti.", "yearsInvalid": "Tegutsemisaeg ei ole kujul 1630–1632.", "chooseOrCreate": "Vali kirje loendist või lisa uus."
   },
   "tabs": {
     "registrations": "Taotlused",

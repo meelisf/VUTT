@@ -125,6 +125,22 @@ export async function getEntityLabels(id: string): Promise<Record<string, string
 }
 
 /**
+ * Terve Wikidata kirje (sildid, aliased, kirjeldused, väited) registrikirje
+ * mustandiks (`registryCreate.entityToRegistryDraft`). Viga viskab edasi.
+ */
+export async function getWikidataEntity(id: string): Promise<any> {
+  const params = new URLSearchParams({
+    action: 'wbgetentities', ids: id, props: 'labels|aliases|descriptions|claims',
+    languages: 'et|en|de|la|sv', format: 'json', origin: '*',
+  });
+  const response = await fetchWithTimeout(`${WIKIDATA_API_URL}?${params.toString()}`, { timeout: 15000 });
+  if (!response.ok) throw new Error('Wikidata fetch failed');
+  const entity = (await response.json())?.entities?.[id];
+  if (!entity || entity.missing !== undefined) throw new Error('Wikidata entity missing');
+  return entity;
+}
+
+/**
  * Helper to determine Wikidata search context (e.g., restricted to cities, humans, etc.)
  * Note: wbsearchentities doesn't support complex SPARQL filtering easily,
  * but we can filter results in the UI or use specific properties if needed.
