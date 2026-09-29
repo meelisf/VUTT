@@ -92,4 +92,12 @@ describe('RegistryField', () => {
     expect(screen.getByText('form.registry.unlinked')).toBeTruthy();
     expect(screen.queryByText('form.registry.create')).toBeNull();
   });
+
+  it('seotud väljal on kastis allika sõnastus, mitte registri silt', () => {
+    // univ-rostock kandis silti „Rostock"; väli näitas pärast „Seo" linna, mitte „Rostocki Ülikool".
+    setup('academia-gustavo-carolina', { label: 'Acad. Dorpat.', id: 'Q138710754',
+      labels: { et: 'Academia Gustavo-Carolina', en: 'Academia Gustavo-Carolina' }, source: 'wikidata' });
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('Acad. Dorpat.');
+    expect(screen.getByText(/Academia Gustavo-Carolina · Q138710754/)).toBeTruthy();
+  });
 });

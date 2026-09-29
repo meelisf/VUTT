@@ -214,6 +214,29 @@ def create(kind: str, data: dict, username: str) -> tuple[str, dict]:
         return key, clean
 
 
+def put_many(kind: str, updates: dict, username: str, message: str) -> dict:
+    """Mitu olemasolevat kirjet ühe commitiga (hooldusskriptid). Kõik valideeritakse
+    enne kirjutamist — üks vigane kirje ei jäta faili poolikuks."""
+    with _LOCK:
+        entries = load(kind)
+        places = _places() if kind == "institution" else None
+        clean = {}
+        for key, data in updates.items():
+            if key not in entries:
+                raise RegistryError("unknown_key")
+            clean[key] = validate_entry(kind, key, data, places=places)
+        merged = {**entries, **clean}
+        for key, entry in clean.items():
+            if entry["id"] and any(k != key and isinstance(v, dict) and v.get("id") == entry["id"]
+                                   for k, v in merged.items()):
+                raise RegistryError("duplicate_id")
+        if not clean:
+            return {}
+        entries.update(clean)
+        save_config_with_git(_path(kind), entries, username, message=message)
+        return clean
+
+
 def same_entry(a: dict, b: dict) -> bool:
     """Sama kirje: sama Q-kood; kui Q-koodi pole kummalgi, sama eestikeelne nimi."""
     if a.get("id") or b.get("id"):

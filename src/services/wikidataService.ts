@@ -141,6 +141,34 @@ export async function getWikidataEntity(id: string): Promise<any> {
 }
 
 /**
+ * Mitme kirje kirjeldused ühe päringuga (registri sarnaste kirjete eristamiseks:
+ * „endine gümnaasium Tartus 1804-1890"). Viga → tühi objekt, see on ainult abiinfo.
+ */
+export async function getEntityDescriptions(ids: string[], lang: string): Promise<Record<string, string>> {
+  const unique = [...new Set(ids.filter(id => /^Q\d+$/.test(id)))].slice(0, 50);
+  if (!unique.length) return {};
+  const languages = [...new Set([lang, 'et', 'en', 'de'])].join('|');
+  const params = new URLSearchParams({
+    action: 'wbgetentities', ids: unique.join('|'), props: 'descriptions',
+    languages, format: 'json', origin: '*',
+  });
+  try {
+    const response = await fetchWithTimeout(`${WIKIDATA_API_URL}?${params.toString()}`, { timeout: 15000 });
+    if (!response.ok) return {};
+    const entities = (await response.json())?.entities ?? {};
+    const out: Record<string, string> = {};
+    for (const id of unique) {
+      const d = entities[id]?.descriptions;
+      const value = d?.[lang]?.value ?? d?.et?.value ?? d?.en?.value ?? d?.de?.value;
+      if (value) out[id] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Helper to determine Wikidata search context (e.g., restricted to cities, humans, etc.)
  * Note: wbsearchentities doesn't support complex SPARQL filtering easily,
  * but we can filter results in the UI or use specific properties if needed.
