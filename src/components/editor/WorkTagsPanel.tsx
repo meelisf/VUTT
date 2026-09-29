@@ -60,7 +60,7 @@ const WorkTagsPanel: React.FC<WorkTagsPanelProps> = ({ work, lang }) => {
               <button
                 onClick={() => navigate(`/search?teoseTags=${encodeURIComponent(label)}`)}
                 className="px-2.5 py-1 text-sm text-green-800 hover:bg-green-100 transition-colors flex items-center gap-1"
-                title={`Otsi žanrit: ${label}`}
+                title={t('dashboard:workCard.searchTag', { tag: label })}
               >
                 {label}
                 <Search size={12} className="opacity-50" />
