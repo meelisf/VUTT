@@ -55,3 +55,13 @@ sõnastusega nimevariandiks, ja salvestatud võti läheb rea parandusse. Otsus
 jääb samaks: registrikirje on admini eraldi toiming, isikufakti kinnitamine
 seda ei loo. Nimi on normaliseeritud kuju („notar"), allika sõnastus jääb
 kaardile ja variandiks.
+
+## Täiendus 2026-09-29: agent pakub registrikirje, see tekib kinnitusel
+
+Ettepaneku rida võib kanda uut kirjet (`occupation_entry`, `institution_entry`;
+`key` kirje sees). Esitusel kontrollitakse `validate_entry`-ga ja lükatakse tagasi, kui
+võti või Q-kood on registris juba olemas (agent kasutab olemasolevat). Kirje luuakse
+ALLES toimetaja kinnitusel, uue toiminguga `registries.ensure`: lugemine, võrdlus ja
+kirjutus ühe luku all; sama kirje (sama Q, Q-koodita sama et-nimi) seotakse, erinev on
+`registry_conflict`. `put` jääb registrilehe ülekirjutuseks. Agendi juhis: vali lähim
+olemasolev kirje, uus on erand.

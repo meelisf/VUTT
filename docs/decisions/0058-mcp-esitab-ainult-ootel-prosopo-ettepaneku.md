@@ -100,3 +100,22 @@ mida toimetaja ei saa VUTT-is kontrollida. Muudetud:
   keeles; normaliseerimine on registrivõtme töö (ADR 0059).
 - Valideerimisviga nimetab kirje (`items[i]`) ja välja; MCP annab FastAPI
   `detail`-i agendile terviklikult edasi.
+
+## Täiendus 2026-09-29: ülevaatus on otsus, vananemine rea tasemel
+
+- Ülevaatus = **Kinnita** või **Lükka tagasi** (rea kaupa või „Kinnita kõik");
+  paranduste mehhanism (`corrections`) on eemaldatud. Toimetamine käib pärast
+  kinnitamist tavalises isikuvormis.
+- Kogu töövoog (kaks koodi, loetelu, apply, reject) on `require_role("superadmin")`
+  ja paneel nähtav ainult superadminile, kuni töövoog on silutud.
+- Ettepaneku tasemel `base_updated_at` kontroll kinnitamisel kaob. Iga rida hinnatakse
+  kinnitamise hetkel elava kaardi vastu (`_merge_row`): uus fakt, mis on kaardil →
+  `duplicate_entry`; „juba kaardil" sihtkirje leitakse SISU järgi (`existing_index`
+  on vihje). Registrivõtmeta või `ambiguous` rida on blokeeritud — registriseose
+  lahendab agent, mitte ülevaataja. Esitamisel jääb `stale_person` alles. Server
+  arvutab loetelus iga rea `review_state`-i; klient olekut ise ei arvuta.
+- Kinnitus: eelkontroll (ei kirjuta) → registrikirjed (`registries.ensure`) → kaart üks
+  kord. Kõik-või-mitte-midagi kaardi suhtes, mitte registri suhtes: pärast kirjete
+  loomist kukkunud kinnitus tagastab `created_registry_entries` ja kordus seob nendega.
+- `literature`-tõend kannab loetavat `citation`-i; selle kirjutab MCP kirjanduskogu
+  reast (agendi oma asendatakse). Tõendid on isikulehel joonealuste viidetena näha.
