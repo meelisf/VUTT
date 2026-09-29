@@ -58,7 +58,7 @@ def test_isikukood_lubab_mitu_esitust_ja_isikukaart_jaab_puutumata(client, login
                          headers=_headers(token))
     assert pending.status_code == 200 and len(pending.json()) == 2
     assert pending.json()[0]["items"][0]["occupation_key"] == "theology-professor"
-    assert pending.json()[0]["items"][0]["review_error"] == "unknown_occupation_key"
+    assert pending.json()[0]["items"][0]["review_state"] == {"state": "blocked", "reason": "unknown_occupation_key"}
     assert prosopo_env.read("abc") == before
 
 
@@ -282,7 +282,7 @@ def test_voltsitud_registrivariant_ei_joua_kinnitamiseni(
               occupation_variant='Võltsitud variant')])
     pending = client.get(f'/prosopography/enrichment-proposals/{card["id"]}',
                          headers=_headers(token)).json()
-    assert pending[0]['items'][0]['review_error'] == 'unknown_occupation_variant'
+    assert pending[0]['items'][0]['review_state'] == {'state': 'blocked', 'reason': 'unknown_occupation_variant'}
     result = client.post(f'/prosopography/enrichment-proposals/{card["id"]}/apply',
                          headers=_headers(token), json={'proposal_id': proposal_id, 'selected': [0]})
     assert result.status_code == 400
@@ -624,3 +624,82 @@ def test_rikastuse_otspunktid_on_ainult_superadminile(client, login, prosopo_env
     response = getattr(client, method)(path, headers=_headers(token),
                                        **({"json": {"proposal_id": "x", "selected": [0]}} if method == "post" else {}))
     assert response.status_code == 401   # selle projekti rollikaitse (deps.get_user)
+
+
+def _loetelu(client, token):
+    return client.get("/prosopography/enrichment-proposals/vutt:Pabc", headers=_headers(token)).json()
+
+
+def test_review_state_kolm_olekut(client, login, prosopo_env, registrid):
+    card = prosopo_env.write("abc", occupations=[
+        {"label": "Feldprediger", "occupation_key": "kaplan", "id": "Q208762"}], education=[])
+    token = login("superadmin", "superpass")
+    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc", headers=_headers(token)).json()["code"]
+    ev = [{"source_kind": "vutt_page", "work_id": "w1", "page": 3}]
+    items = [
+        {"kind": "occupation", "match_status": "already_present", "raw_occupation": "Feldprediger",
+         "occupation_key": "kaplan", "evidence": ev},
+        _uus_amet(),
+        {"kind": "occupation", "match_status": "ambiguous", "raw_occupation": "Pastor", "evidence": ev},
+    ]
+    assert client.post("/prosopography/enrichment-proposals/submit", json={
+        "code": code, "person_id": "vutt:Pabc", "base_updated_at": card["updated_at"],
+        "items": items}).status_code == 200
+    rows = _loetelu(client, token)[0]["items"]
+    assert rows[0]["review_state"] == {"state": "already_present"}
+    assert rows[1]["review_state"] == {"state": "applicable"}
+    assert rows[1]["registry_labels"]["occupation_key"] == "välipreester"
+    assert rows[1]["registry_ids"]["occupation_key"] == "Q1368286"
+    assert rows[2]["review_state"]["state"] == "blocked"
+    assert rows[2]["review_state"]["reason"] == "ambiguous_match"
+
+
+def test_vana_ettepanek_ilma_votmeta_on_blokeeritud(client, login, prosopo_env, registrid):
+    """Enne muudatust talletatud rida: new_registry_candidate ilma võtme ja kirjeta."""
+    prosopo_env.write("abc", occupations=[], education=[])
+    token = login("superadmin", "superpass")
+    with proposals._db() as db:
+        db.execute("INSERT INTO proposal VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+                   ("old", "vutt:Pabc", "superadmin", "fp", "v", 1, 9999999999, json.dumps([
+                       {"kind": "occupation", "match_status": "new_registry_candidate",
+                        "raw_occupation": "Notarius", "evidence": [
+                            {"source_kind": "vutt_page", "work_id": "w1", "page": 1}]}])))
+    row = _loetelu(client, token)[0]["items"][0]
+    assert row["review_state"] == {"state": "blocked", "reason": "registry_key_missing"}
+
+
+def test_ambiguous_votmega_on_blokeeritud():
+    with pytest.raises(proposals.ProposalError, match="ambiguous_match"):
+        proposals._merge_row(_item(match_status="ambiguous"), [], [])
+
+
+def test_juba_kaardil_leitakse_sisu_jargi_kui_indeks_nihkus(registrid):
+    """Agent nägi kaplanit indeksil 1; toimetaja kustutas vahepeal indeksi 0."""
+    occupations = [{"label": "Feldprediger", "occupation_key": "kaplan", "id": "Q208762"}]
+    item = {"kind": "occupation", "match_status": "already_present", "existing_index": 1,
+            "raw_occupation": "Feldprediger", "occupation_key": "kaplan",
+            "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 7}]}
+    assert proposals._merge_row(item, occupations, []) == "already_present"
+    assert occupations[0]["evidence"] == item["evidence"]
+
+
+def test_juba_kaardil_mitu_vastet_on_blokeeritud(registrid):
+    occupations = [{"label": "a", "occupation_key": "kaplan"}, {"label": "b", "occupation_key": "kaplan"}]
+    item = {"kind": "occupation", "match_status": "already_present", "raw_occupation": "a",
+            "occupation_key": "kaplan", "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 7}]}
+    with pytest.raises(proposals.ProposalError, match="unresolved_existing_entry"):
+        proposals._merge_row(item, occupations, [])
+
+
+def test_uus_fakt_mis_on_kaardil_on_duplikaat(registrid):
+    occupations = [{"label": "Feldprediger", "occupation_key": "kaplan"}]
+    item = {"kind": "occupation", "match_status": "matched", "raw_occupation": "Feldprediger",
+            "occupation_key": "kaplan", "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 7}]}
+    with pytest.raises(proposals.ProposalError, match="duplicate_entry"):
+        proposals._merge_row(item, occupations, [])
+
+
+def test_registrikonflikt_parast_esitust_blokeerib_rea(registrid):
+    registries.put("occupation", "valipreester", {"id": "Q999", "labels": {"et": "muu"}}, "a")
+    with pytest.raises(proposals.ProposalError, match="registry_conflict: valipreester"):
+        proposals._merge_row({**_uus_amet(), "occupation_key": "valipreester"}, [], [])

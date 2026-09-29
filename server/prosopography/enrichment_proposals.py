@@ -340,6 +340,10 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
 
 def list_pending(person_id: str, username: str, session_fingerprint: str = "") -> list[dict]:
     """Toimetaja näeb ainult enda algatatud ettepanekuid — igas oma seansis (#492)."""
+    from .person_crud import get_person
+    person = get_person(person_id)
+    if person is not None and (person.get("record_status") == "tombstone" or person.get("merged_into")):
+        person = None
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
@@ -347,36 +351,41 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
             "SELECT * FROM proposal WHERE person_id=? AND username=? AND applied_at IS NULL ORDER BY created_at DESC",
             (person_id, username),
         ).fetchall()
-        result = []
-        for row in rows:
-            items = json.loads(row["payload"])
-            for item in items:
-                try:
-                    _check_links(item)
-                except ProposalError as error:
-                    item["review_error"] = str(error)
-                labels = {}
-                for key, filename in (
-                    ("occupation_key", os.path.join(DATA_CONFIG_DIR, "occupations.json")),
-                    ("institution_key", os.path.join(DATA_CONFIG_DIR, "institutions.json")),
-                    ("place_key", PLACES_FILE),
-                ):
-                    if item.get(key):
-                        label = _registry_label(filename, item[key])
-                        if label:
-                            labels[key] = label
-                item["registry_labels"] = labels
-                if item.get("institution_key"):
-                    institution = _registry_entry(
-                        os.path.join(DATA_CONFIG_DIR, "institutions.json"),
-                        item["institution_key"],
-                    )
-                    item["institution_place_key"] = institution.get("place_key") if institution else None
-            result.append({"proposal_id": row["id"], "person_id": person_id,
-                           "base_updated_at": row["base_updated_at"],
-                           "created_at": row["created_at"], "expires_at": row["expires_at"],
-                           "items": items})
-        return result
+    result = []
+    for row in rows:
+        items = json.loads(row["payload"])
+        for item in items:
+            item["review_state"] = _review_state(item, person)
+            labels, ids = {}, {}
+            for key, filename in (
+                ("occupation_key", os.path.join(DATA_CONFIG_DIR, "occupations.json")),
+                ("institution_key", os.path.join(DATA_CONFIG_DIR, "institutions.json")),
+                ("place_key", PLACES_FILE),
+            ):
+                if not item.get(key):
+                    continue
+                # Uue kirje sildid tulevad ettepanekust — registris teda veel pole.
+                new = next((item[f] for _, f, k in _ENTRY_FIELDS if k == key and item.get(f)), None)
+                entry = new or _registry_entry(filename, item[key])
+                if entry:
+                    names = entry.get("labels") or {}
+                    label = (names.get("et") or names.get("en") if isinstance(names, dict) else None) \
+                        or entry.get("label")
+                    if label:
+                        labels[key] = label
+                    if entry.get("id"):
+                        ids[key] = entry["id"]
+            item["registry_labels"] = labels
+            item["registry_ids"] = ids
+            if item.get("institution_key"):
+                institution = item.get("institution_entry") or _registry_entry(
+                    os.path.join(DATA_CONFIG_DIR, "institutions.json"), item["institution_key"])
+                item["institution_place_key"] = institution.get("place_key") if institution else None
+        result.append({"proposal_id": row["id"], "person_id": person_id,
+                       "base_updated_at": row["base_updated_at"],
+                       "created_at": row["created_at"], "expires_at": row["expires_at"],
+                       "items": items})
+    return result
 
 
 def _registry_entry(filename: str, key: str) -> Optional[dict]:
@@ -395,17 +404,7 @@ def _registry_entry(filename: str, key: str) -> Optional[dict]:
     return None
 
 
-def _registry_label(filename: str, key: str) -> Optional[str]:
-    entry = _registry_entry(filename, key)
-    if entry is None:
-        return None
-    labels = entry.get("labels") or {}
-    if isinstance(labels, dict):
-        return labels.get("et") or labels.get("en") or entry.get("label")
-    return entry.get("label")
-
-
-def _card_item(item: dict) -> dict:
+def _card_item(item: dict, planned: Optional[dict] = None) -> dict:
     kind = item["kind"]
     if kind == "occupation":
         result = {"label": item["raw_occupation"].strip()}
@@ -421,20 +420,22 @@ def _card_item(item: dict) -> dict:
     # Q-koodid jäävad vana andmelepingu ühilduvusväljadeks. Püsiv identiteet on
     # registrivõti; Q-koodita kirje puhul neid välju ei fabritseerita (#462/#471).
     if item.get("occupation_key"):
-        occupation = _registry_entry(os.path.join(DATA_CONFIG_DIR, "occupations.json"),
-                                     item["occupation_key"])
+        occupation = (planned or {}).get("occupation_key") or _registry_entry(
+            os.path.join(DATA_CONFIG_DIR, "occupations.json"), item["occupation_key"])
         if occupation and occupation.get("id"):
             result["id"] = occupation["id"]
     if item.get("institution_key"):
-        institution = _registry_entry(os.path.join(DATA_CONFIG_DIR, "institutions.json"),
-                                      item["institution_key"])
+        institution = (planned or {}).get("institution_key") or _registry_entry(
+            os.path.join(DATA_CONFIG_DIR, "institutions.json"), item["institution_key"])
         if institution and institution.get("id"):
             result["institution_id"] = institution["id"]
     result["evidence"] = item["evidence"]
     return result
 
 
-def _check_links(item: dict) -> None:
+def _check_links(item: dict, planned: Optional[dict] = None) -> None:
+    """Seosed peavad osutama olemasolevale kirjele; `planned` = kinnitusel loodavad."""
+    planned = planned or {}
     if item.get("institution_key") and item.get("place_key"):
         raise ProposalError("institution_and_place_are_exclusive")
     if item["kind"] == "education" and (item.get("occupation_key") or item.get("place_key")):
@@ -445,7 +446,7 @@ def _check_links(item: dict) -> None:
         ("place_key", PLACES_FILE),
     ):
         if item.get(key):
-            entry = _registry_entry(filename, item[key])
+            entry = planned.get(key) or _registry_entry(filename, item[key])
             if entry is None:
                 raise ProposalError(f"unknown_{key}")
             variant_key = key.removesuffix("_key") + "_variant"
@@ -500,6 +501,69 @@ def _same_legacy_fact(existing: dict, candidate: dict, kind: str) -> bool:
     b_from, b_to = _year(candidate.get("date_from")), _year(candidate.get("date_to"))
     return not ((a_to is not None and b_from is not None and a_to < b_from)
                 or (b_to is not None and a_from is not None and b_to < a_from))
+
+
+def _planned_entries(item: dict) -> dict:
+    """Rea uued registrikirjed kujul võtmeväli → kirje, mida kinnitus kasutaks."""
+    from . import registries
+    planned = {}
+    for kind, field, key_field in _ENTRY_FIELDS:
+        if item.get(field):
+            key, data = _split_entry(item[field])
+            try:
+                planned[key_field] = registries.check_ensure(kind, key, data)
+            except registries.RegistryError as error:
+                raise ProposalError(f"{error}: {key}") from None
+    return planned
+
+
+def _merge_row(item: dict, occupations: list, education: list) -> str:
+    """Kannab rea kaardi loendite KOOPIASSE. Sihtkirje leitakse sisu järgi —
+    `existing_index` on agendi vihje ja nihkub, kui kaardilt midagi kustutatakse."""
+    if item["match_status"] == "ambiguous":
+        raise ProposalError("ambiguous_match")
+    key_field = "occupation_key" if item["kind"] == "occupation" else "institution_key"
+    if not item.get(key_field):
+        raise ProposalError("registry_key_missing")
+    planned = _planned_entries(item)
+    _check_links(item, planned)
+    target = occupations if item["kind"] == "occupation" else education
+    candidate = _card_item(item, planned)
+    matching = [i for i, e in enumerate(target)
+                if isinstance(e, dict) and _same_fact(e, candidate, item["kind"])]
+    legacy = [i for i, e in enumerate(target)
+              if isinstance(e, dict) and _same_legacy_fact(e, candidate, item["kind"])]
+    if item["match_status"] != "already_present":
+        if matching or legacy:
+            raise ProposalError("duplicate_entry")
+        target.append(candidate)
+        return "applicable"
+    hits = matching or legacy
+    if len(hits) != 1:
+        raise ProposalError("unresolved_existing_entry")
+    existing = target[hits[0]]
+    links = {}
+    if not matching:
+        # Pärandrida (sõnastus ilma registriseoseta) saab seose, sõnastus jääb.
+        for key in ("occupation_key", "institution_key", "place_key", "id", "institution_id"):
+            if candidate.get(key) and not existing.get(key):
+                links[key] = candidate[key]
+    evidence = existing.get("evidence") or []
+    target[hits[0]] = {**existing, **links, "evidence": evidence + [
+        source for source in item["evidence"] if source not in evidence]}
+    return "already_present"
+
+
+def _review_state(item: dict, person: Optional[dict]) -> dict:
+    """Serveri otsus paneelile — klient olekut ise ei arvuta."""
+    if person is None:
+        return {"state": "blocked", "reason": "person_not_found"}
+    try:
+        state = _merge_row(item, list(person.get("occupations") or []),
+                           list(person.get("education") or []))
+    except ProposalError as error:
+        return {"state": "blocked", "reason": str(error)}
+    return {"state": state}
 
 
 def apply_selected(proposal_id: str, person_id: str, username: str,
