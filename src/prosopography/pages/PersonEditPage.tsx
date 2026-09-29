@@ -34,6 +34,7 @@ import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
 import AgentEnrichmentPanel from '../components/personForm/AgentEnrichmentPanel';
 import EvidenceList from '../components/EvidenceList';
+import { EvidenceSourceList } from '../components/PersonSourcesCard';
 import { useWorkTitles } from '../hooks/useWorkTitles';
 import { evidenceWorkIds } from '../utils/evidenceRef';
 import type { EnrichmentEvidence } from '../services/prosopographyService';
@@ -1049,6 +1050,10 @@ const PersonEditPage: React.FC = () => {
             onAdd={() => set({ sources: [...draft.sources, { text: '', note: '' }] })}
             onChange={items => set({ sources: items })}
           />
+          {/* Tõendid toimetatakse faktireal; siin ainult nende allikate kokkuvõte. */}
+          <div className="mt-3">
+            <EvidenceSourceList entries={[...draft.occupations, ...draft.education]} titleOf={id => evidenceTitles[id]} />
+          </div>
         </CollapsibleSection>
 
         {/* Alumine salvesta nupp */}

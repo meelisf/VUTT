@@ -26,6 +26,7 @@ import { mergedRedirectTarget } from '../utils/mergedRedirect';
 import { personImageProps } from '../utils/personImage';
 import { groupPersonWorks, type PersonWorkEntry } from '../utils/personWorks';
 import PersonWorkParts from '../components/PersonWorkParts';
+import PersonSourcesCard from '../components/PersonSourcesCard';
 import { evidenceRef, evidenceWorkIds, type EvidenceRef } from '../utils/evidenceRef';
 import type { EnrichmentEvidence } from '../services/prosopographyService';
 import { useWorkTitles } from '../hooks/useWorkTitles';
@@ -860,6 +861,9 @@ const PersonDetailPage: React.FC = () => {
             <MarkdownView content={person.notes} className="text-sm text-gray-700" />
           </div>
         )}
+
+        {/* ── Allikad ja bibliograafia: käsitsi loend + tõendites kasutatud ── */}
+        <PersonSourcesCard person={person} workTitles={evidenceTitles} />
 
         {/* ── Ajalugu (ainult admin) ── */}
         {isAdmin && id && (

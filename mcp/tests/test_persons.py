@@ -376,3 +376,13 @@ async def test_mcp_registrikandidaadid_ja_puuduv_register():
         "kind": "occupation", "query": "Pfarrer",
     })
     assert "Ära järelda" in result.content[0].text
+
+
+async def test_ettepaneku_juhis_primaarallikas_haridus_ja_nimetus():
+    """Kasutaja otsused 2026-09-29: primaarallikas enne sekundaari, edu_type ainult
+    immatrikuleerimisel, kraad elulukku (vestluses), raw_occupation on nimetus."""
+    server = build_server(client=FakeClient(), base_url=BASE)
+    tools = {tool.name: tool.description for tool in await server.list_tools()}
+    juhis = tools["submit_person_enrichment_proposal"]
+    for fraas in ("PRIMAARALLIKAS", '"imm."', "kraad", "ametinimetus, mitte lause"):
+        assert fraas in juhis, fraas
