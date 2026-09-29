@@ -126,3 +126,74 @@ def test_vigane_perioodikoht(files, periods, code):
 def test_perioodikoht_ainult_asutusel(files):
     with pytest.raises(registries.RegistryError, match="unknown_fields"):
         registries.put("occupation", "x", {"labels": {"et": "X"}, "place_periods": []}, "admin")
+
+
+def test_ensure_loob_puuduva_kirje(files):
+    tmp, saved = files
+    entry, created = registries.ensure("occupation", "valipreester", {
+        "id": "Q1368286", "labels": {"et": "välipreester", "en": "military chaplain"},
+        "variants": ["Feldprediger"]}, "super")
+    assert created is True and entry["labels"]["et"] == "välipreester"
+    assert registries.load("occupation")["valipreester"]["id"] == "Q1368286"
+    assert len(saved) == 1
+
+
+def test_ensure_sama_q_kood_seob_ilma_kirjutamata(files):
+    tmp, saved = files
+    registries.put("occupation", "kaplan", {"id": "Q208762", "labels": {"et": "kaplan"}}, "a")
+    entry, created = registries.ensure("occupation", "kaplan", {
+        "id": "Q208762", "labels": {"et": "Kaplan (muu nimi)"}}, "super")
+    assert created is False and entry["labels"] == {"et": "kaplan"}
+    assert len(saved) == 1          # ainult put
+
+
+@pytest.mark.parametrize("olemas, uus", [
+    ({"id": "Q1", "labels": {"et": "kaplan"}}, {"id": "Q2", "labels": {"et": "kaplan"}}),
+    ({"id": "Q1", "labels": {"et": "kaplan"}}, {"labels": {"et": "kaplan"}}),
+    ({"labels": {"et": "kaplan"}}, {"labels": {"et": "välipreester"}}),
+])
+def test_ensure_erinev_kirje_samal_votmel_on_konflikt(files, olemas, uus):
+    tmp, saved = files
+    registries.put("occupation", "kaplan", olemas, "a")
+    with pytest.raises(registries.RegistryError, match="registry_conflict"):
+        registries.ensure("occupation", "kaplan", uus, "super")
+    assert len(saved) == 1
+
+
+def test_ensure_q_koodita_kirjed_vorreldakse_nime_jargi_tostutundetult(files):
+    registries.put("occupation", "kaplan", {"labels": {"et": "Kaplan"}}, "a")
+    entry, created = registries.ensure("occupation", "kaplan", {"labels": {"et": "kaplan "}}, "s")
+    assert created is False
+
+
+def test_ensure_q_kood_teisel_votmel_on_duplikaat(files):
+    registries.put("occupation", "kaplan", {"id": "Q208762", "labels": {"et": "kaplan"}}, "a")
+    with pytest.raises(registries.RegistryError, match="duplicate_id"):
+        registries.ensure("occupation", "valipreester", {"id": "Q208762", "labels": {"et": "x"}}, "s")
+
+
+def test_check_ensure_ei_kirjuta(files):
+    tmp, saved = files
+    clean = registries.check_ensure("occupation", "notar", {"labels": {"et": "notar"}})
+    assert clean["labels"] == {"et": "notar"} and saved == []
+    assert "notar" not in registries.load("occupation")
+
+
+def test_ensure_samaaegne_loomine_ei_kirjuta_ule(files):
+    """Kaks lõime loovad sama võtme eri Q-koodiga: üks võidab, teine saab konflikti."""
+    import threading
+    tulemused = []
+
+    def loo(qid):
+        try:
+            tulemused.append(registries.ensure("occupation", "kaplan",
+                                               {"id": qid, "labels": {"et": "kaplan"}}, "s")[1])
+        except registries.RegistryError as error:
+            tulemused.append(str(error))
+
+    loimed = [threading.Thread(target=loo, args=(q,)) for q in ("Q10", "Q20")]
+    for t in loimed:
+        t.start()
+    for t in loimed:
+        t.join()
+    assert sorted(map(str, tulemused)) == ["True", "registry_conflict"]

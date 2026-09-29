@@ -26,6 +26,9 @@ import { mergedRedirectTarget } from '../utils/mergedRedirect';
 import { personImageProps } from '../utils/personImage';
 import { groupPersonWorks, type PersonWorkEntry } from '../utils/personWorks';
 import PersonWorkParts from '../components/PersonWorkParts';
+import { evidenceRef, evidenceWorkIds, type EvidenceRef } from '../utils/evidenceRef';
+import type { EnrichmentEvidence } from '../services/prosopographyService';
+import { useWorkTitles } from '../hooks/useWorkTitles';
 
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
 const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
@@ -105,7 +108,7 @@ const useEntityLabel = () => {
   };
 };
 
-const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => {
+export const StructuredInfoCard: React.FC<{ person: ProsopoRecord; workTitles: Record<string, string> }> = ({ person, workTitles }) => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const getLabel = useEntityLabel();
@@ -140,6 +143,18 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
       value: (person.confessions ?? []).map(c => getLabel(c) || c.label).filter(Boolean).join(', '),
     });
   }
+  // Joonealused viited (spekk 2026-09-28, variant B): iga tõend saab läbiva numbri
+  // üle ametite JA hariduse; viited on ploki all.
+  const notes: EvidenceRef[] = [];
+  const marks = (entry: any): React.ReactNode => {
+    const evidence: EnrichmentEvidence[] = Array.isArray(entry?.evidence) ? entry.evidence : [];
+    if (!evidence.length) return null;
+    const numbers = evidence.map(source => {
+      notes.push(evidenceRef(source, id => workTitles[id], t('agentEnrichment.page')));
+      return notes.length;
+    });
+    return <sup className="ml-0.5 text-blue-700">{numbers.join(',')}</sup>;
+  };
   // Amet ja haridus: iga kirje omal real koos asutuse ja ajavahemikuga —
   // „millal keegi Tartus professor oli" on sisuline info, mitte lisadetail.
   if (person.occupations?.length > 0) {
@@ -157,6 +172,7 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
                 {name}
                 {inst ? `, ${inst}` : ''}
                 {period ? ` (${period})` : ''}
+                {marks(o)}
               </span>
             );
           })}
@@ -179,9 +195,32 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
               <span key={i} className="block">
                 {name}
                 {period ? ` (${period})` : ''}
+                {marks(e)}
               </span>
             );
           })}
+        </span>
+      ),
+    });
+  }
+  if (notes.length > 0) {
+    rows.push({
+      label: t('evidenceSources'),
+      wide: true,
+      value: (
+        <span className="block space-y-0.5 text-xs text-gray-600">
+          {notes.map((ref, i) => (
+            <span key={i} className="block">
+              <span className="text-blue-700 mr-1">{i + 1}</span>
+              {ref.href && !ref.external
+                ? <Link to={ref.href} className="underline hover:text-gray-800">{ref.title}</Link>
+                : ref.href
+                  ? <a href={ref.href} target="_blank" rel="noopener noreferrer" className="underline">{ref.title}</a>
+                  : ref.title}
+              {ref.locator && `, ${ref.locator}`}
+              {ref.quote && <> — <q className="italic">{ref.quote}</q></>}
+            </span>
+          ))}
         </span>
       ),
     });
@@ -272,6 +311,9 @@ const PersonDetailPage: React.FC = () => {
   const [tagsSaving, setTagsSaving] = useState(false);
 
   const token = authToken ?? '';
+  // Tõendiviidete teoste pealkirjad (joonealused viited ametite ja hariduse all).
+  const evidenceTitles = useWorkTitles(
+    evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? [])]), token);
   const canEdit = isAtLeast(user?.role, 'editor');
   const isAdmin = isAtLeast(user?.role, 'admin');
 
@@ -809,7 +851,7 @@ const PersonDetailPage: React.FC = () => {
         )}
 
         {/* ── Struktureeritud info (klapitav) ── */}
-        <StructuredInfoCard person={person} />
+        <StructuredInfoCard person={person} workTitles={evidenceTitles} />
 
         {/* ── Märkmed ── */}
         {person.notes && (

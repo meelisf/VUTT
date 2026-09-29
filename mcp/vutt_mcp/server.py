@@ -378,28 +378,34 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
 
 
 def _check_literature_evidence(items: list) -> None:
-    """`literature`-tõend peab olema kirjanduskogu päris doc_id (server kogu ei näe)."""
+    """`literature`-tõend peab olema kirjanduskogu päris doc_id (server kogu ei näe).
+    Igale tõendile kirjutatakse loetav `citation` kogu reast — doc_id (Zotero võti)
+    on toimetajale loetamatu; agendi oma viide asendatakse."""
     from .library.config import load_library_settings
-    from .library.tools import unknown_doc_ids
+    from .library.tools import literature_citations
 
-    doc_ids = {source.get("source_id") for item in items if isinstance(item, dict)
+    sources = [source for item in items if isinstance(item, dict)
                for source in (item.get("evidence") or []) if isinstance(source, dict)
-               and source.get("source_kind") == "literature"}
-    if not doc_ids:
+               and source.get("source_kind") == "literature"]
+    if not sources:
         return
+    doc_ids = {source.get("source_id") for source in sources}
     if any(not isinstance(doc_id, str) or not doc_id for doc_id in doc_ids):
         raise VuttError("literature-tõendi source_id peab olema list_literature'i doc_id.")
-    unknown = unknown_doc_ids(load_library_settings(), doc_ids)
-    if unknown is None:
+    citations = literature_citations(load_library_settings(), doc_ids)
+    if citations is None:
         raise VuttError(
             "Kirjanduskogu ei ole selles masinas saadaval, literature-tõendit ei saa "
             "kontrollida. Kasuta vutt_page tõendit või jäta kirje esitamata.")
+    unknown = doc_ids - set(citations)
     if unknown:
         raise VuttError(
             f"Tundmatu kirjanduskogu doc_id {sorted(unknown)}: source_id peab olema "
             "list_literature'i doc_id, mitte pealkiri. Kui allikat kogus ei ole, ära "
             "esita seda tõendina — ütle kasutajale, et allikas on väärt lisamist "
             "(autor, pealkiri, aasta, URL), ta lisab selle kirjanduskogusse.")
+    for source in sources:
+        source["citation"] = citations[source["source_id"]][:500]
 
 
 def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
@@ -533,9 +539,14 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
 
         kind on occupation või institution. Vastuses on VUTT-i püsivõti,
         valikuline Q-kood, sildid, tabanud nimevariant ning asutuse kinnitatud
-        place_key. Variant või osaline tabamus on ainult kandidaat: mitme vaste
-        korral ära vali automaatselt. Kui registry_available=false, pole
-        register veel kasutusel ja tühi loend EI tähenda uut kirjet.
+        place_key.
+
+        VALI LÄHIM OLEMASOLEV KIRJE: kõige täpsem, mis veel sobib
+        („Feldprediger" → kaplan). Kui täpsemat pole, sobib laiem (vaimulik);
+        detail jääb raw_occupation'i allika sõnastuses. Mitme võrdse vaste korral
+        ära vali pimesi. Uus registrikirje on erand (vt
+        submit_person_enrichment_proposal). Kui registry_available=false, pole
+        register kasutusel ja tühi loend EI tähenda uut kirjet.
         """
         return persons.enrichment_registry_candidates(client, kind, query)
 
@@ -566,15 +577,24 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           search_enrichment_registry'st; occupation_variant /
           institution_variant ainult koos vastava võtmega
         - edu_type (education puhul hariduse liik)
-        - existing_index: already_present puhul kohustuslik — sama liigi
-          kirje indeks get_person_enrichment_context'i loendis (int ≥ 0)
+        - existing_index: valikuline vihje (sama liigi kirje indeks
+          get_person_enrichment_context'is); server leiab kirje SISU järgi
+        - occupation_entry / institution_entry: UUS registrikirje, ainult kui
+          ükski olemasolev ei sobi ka laiemalt. {"key": "valipreester",
+          "labels": {"et": ..., "en": ...}, "id": "Q…" (kui Wikidatas on),
+          "variants": [allika sõnastus]}; institution_entry lisaks "type" ja
+          valikuline "place_key". Nõuab match_status="new_registry_candidate";
+          vastav *_key puudub või võrdub key-ga. Liiga detailne amet ei ole
+          registrikirje põhjus — vali lähim olemasolev.
+        - ambiguous rida toimetaja kinnitada ei saa — lahenda vaste ise.
         - date_from, date_to: {"date": "YYYY[-MM[-DD]]", "precision":
           day|month|year, "bound": before|after, "calendar":
           julian|gregorian, "is_circa": bool} — ainult "date" kohustuslik
         - evidence (kohustuslik, 1–5): [{"source_kind": "vutt_page",
           "work_id": ..., "page": int, "printed_page", "part_id", "quote"}]
           või {"source_kind": "literature", "source_id": <list_literature'i
-          doc_id>, "locator": "lk 64", "quote"}
+          doc_id>, "locator": "lk 64", "quote"} — `citation` täidab MCP ise
+          kirjanduskogust
         Veateade nimetab vigase kirje (items[i]) ja välja.
 
         TÕEND AINULT VUTT-IST: korpuse leht või kirjanduskogu dokument.
@@ -582,7 +602,8 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         Kui leiad hea allika, mida VUTT-is ega kirjanduskogus pole, ära esita
         sellel põhinevat kirjet — ütle kasutajale vestluses, et allikas on
         väärt lisamist (autor, pealkiri, aasta, URL, mida see kinnitab). See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
-        muutmata. Toimetaja otsustab VUTT-i vormis iga rea eraldi.
+        muutmata. Toimetaja ainult kinnitab või lükkab rea tagasi; parandused teeb ta
+        hiljem kaardil — esita seega kohe õige võti ja aeg.
 
         Pärast võrguviga ära saada sama ettepanekut pimesi uuesti: server võis
         selle juba vastu võtta ja tekiks topelt ettepanek. Vaata tulemust vormis.

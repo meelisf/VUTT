@@ -401,9 +401,12 @@ def prosopography_candidates(data: dict = Body(...), user=Depends(require_role("
 _ALLOWED_CREATED_VIA = ("picker", "form")
 
 
+# Agendi rikastuse töövoog on ainult superadminil, kuni see on silutud (spekk
+# 2026-09-28). Rolli langetamine = need viis otspunkti (kaks koodi, loetelu,
+# apply, reject) + paneeli nähtavus PersonEditPage'is.
 @router.post("/enrichment-handoff")
 async def prosopography_enrichment_handoff_any(
-    request: Request, user=Depends(require_role("editor")),
+    request: Request, user=Depends(require_role("superadmin")),
 ):
     """Kood kõigi isikute ettepanekuteks (#492): tööpäev, piiratud esituste arv."""
     allowed, retry_after = check_rate_limit(
@@ -422,7 +425,7 @@ async def prosopography_enrichment_handoff_any(
 
 @router.post("/enrichment-handoff/{person_id}")
 async def prosopography_enrichment_handoff(
-    person_id: str, request: Request, user=Depends(require_role("editor")),
+    person_id: str, request: Request, user=Depends(require_role("superadmin")),
 ):
     """Ühe isiku esituskood (#492: tööpäev, mitu esitust, seotud kasutajaga)."""
     if not enrichment_proposals.valid_person_id(person_id):
@@ -446,7 +449,7 @@ async def prosopography_enrichment_handoff(
 
 @router.get("/enrichment-proposals/{person_id}")
 async def prosopography_enrichment_proposals(
-    person_id: str, request: Request, user=Depends(require_role("editor")),
+    person_id: str, request: Request, user=Depends(require_role("superadmin")),
 ):
     """Tagastab ainult sama isiku ja sama kasutaja ootel ettepanekud (igas seansis)."""
     if not enrichment_proposals.valid_person_id(person_id):
@@ -488,13 +491,9 @@ async def prosopography_put_registry(kind: str, key: str, request: Request,
         raise HTTPException(status_code=400, detail=str(error))
 
 
-@router.post("/enrichment-proposals/{person_id}/apply")
-async def prosopography_apply_enrichment_proposal(
-    person_id: str, request: Request, user=Depends(require_role("editor")),
-):
-    """Toimetaja kinnitab valitud read oma sessioonis; MCP ei saa seda kutsuda."""
-    if not enrichment_proposals.valid_person_id(person_id):
-        raise HTTPException(status_code=400, detail="invalid_person_id")
+async def _decision_body(request: Request) -> dict:
+    """Kinnituse ja tagasilükkamise ühine keha {proposal_id, selected, revision?}.
+    `revision` (loetelust) seob indeksid vaatega, mida toimetaja nägi."""
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
@@ -504,23 +503,54 @@ async def prosopography_apply_enrichment_proposal(
         data = json.loads(body)
     except (ValueError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="invalid_apply_request")
-    if (not isinstance(data, dict) or not {"proposal_id", "selected"} <= set(data)
-            or not set(data) <= {"proposal_id", "selected", "corrections"}
-            or not isinstance(data["proposal_id"], str)):
+    if (not isinstance(data, dict) or set(data) - {"revision"} != {"proposal_id", "selected"}
+            or not isinstance(data["proposal_id"], str)
+            or not isinstance(data.get("revision", ""), str)):
         raise HTTPException(status_code=400, detail="invalid_apply_request")
+    return data
+
+
+_APPLY_CONFLICTS = ("stale_proposal", "stale_person", "duplicate_entry", "unresolved_existing_entry",
+                    "registry_conflict", "duplicate_id")
+
+
+@router.post("/enrichment-proposals/{person_id}/apply")
+async def prosopography_apply_enrichment_proposal(
+    person_id: str, request: Request, user=Depends(require_role("superadmin")),
+):
+    """Toimetaja kinnitab valitud read oma sessioonis; MCP ei saa seda kutsuda."""
+    if not enrichment_proposals.valid_person_id(person_id):
+        raise HTTPException(status_code=400, detail="invalid_person_id")
+    data = await _decision_body(request)
     try:
         return await run_in_threadpool(
             enrichment_proposals.apply_selected, data["proposal_id"], person_id,
             user["username"], request.state.session_fingerprint, data["selected"],
-            data.get("corrections"),
+            data.get("revision"),
+        )
+    except enrichment_proposals.ApplyError as e:
+        raise HTTPException(status_code=409, detail={
+            "error": str(e), "created_registry_entries": e.created})
+    except enrichment_proposals.ProposalError as e:
+        status = 409 if any(code in str(e) for code in _APPLY_CONFLICTS) else 400
+        raise HTTPException(status_code=status, detail=str(e))
+
+
+@router.post("/enrichment-proposals/{person_id}/reject")
+async def prosopography_reject_enrichment_proposal(
+    person_id: str, request: Request, user=Depends(require_role("superadmin")),
+):
+    """Eemaldab read ettepanekust; kaart ja register jäävad puutumata."""
+    if not enrichment_proposals.valid_person_id(person_id):
+        raise HTTPException(status_code=400, detail="invalid_person_id")
+    data = await _decision_body(request)
+    try:
+        return await run_in_threadpool(
+            enrichment_proposals.reject_selected, data["proposal_id"], person_id,
+            user["username"], data["selected"], data.get("revision"),
         )
     except enrichment_proposals.ProposalError as e:
-        status = 409 if str(e) in {"stale_person", "duplicate_entry", "unresolved_match"} else 400
-        raise HTTPException(status_code=status, detail=str(e))
-    except ValueError as e:
-        if str(e).startswith("conflict:"):
-            raise HTTPException(status_code=409, detail="stale_person")
-        raise
+        raise HTTPException(status_code=409 if str(e) == "stale_proposal" else 400, detail=str(e))
 
 
 @router.post("/enrichment-proposals/submit")

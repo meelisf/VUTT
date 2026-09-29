@@ -312,6 +312,35 @@ async def test_kirjanduse_toend_peab_olema_kogu_doc_id(tmp_path, monkeypatch, so
         assert len(client.posts) == 1
 
 
+async def test_kirjanduse_toendile_lisatakse_kogu_viide(tmp_path, monkeypatch):
+    """Agendi oma `citation` kirjutatakse üle kogu rea põhjal."""
+    from vutt_mcp.library.schema import connect, create_schema
+
+    db = tmp_path / "kogu.db"
+    conn = connect(db)
+    create_schema(conn)
+    conn.execute("INSERT INTO documents (doc_id, parent_key, title, year, creators_json) "
+                 "VALUES ('DOC1', 'P1', 'An Itinerant Sheep', '2012', ?)",
+                 (json.dumps([["Stefan Donecker", "author"]]),))
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("VUTT_LIBRARY_DB", str(db))
+
+    class ProposalClient(FakeClient):
+        def api_post_once(self, path, json_body):
+            self.posts.append((path, json_body))
+            return {"proposal_id": "prop1", "status": "pending"}
+
+    client = ProposalClient()
+    server = build_server(client=client, base_url=BASE)
+    item = _kirjanduse_ettepanek("DOC1")
+    item["evidence"][0]["citation"] = "agendi oma"
+    await server.call_tool("submit_person_enrichment_proposal", {
+        "handoff_code": "c", "person_id": "vutt:Pabc", "base_updated_at": "t", "items": [item]})
+    sent = client.posts[0][1]["items"][0]["evidence"][0]
+    assert sent["citation"] == "Donecker 2012, An Itinerant Sheep"
+
+
 async def test_kirjanduse_toend_ilma_koguta_lukatakse_tagasi():
     """Conftest suunab kogu olematusse faili: kontrollimatut viidet ei saadeta."""
     from mcp.server.mcpserver.exceptions import ToolError

@@ -5,164 +5,117 @@ import { MemoryRouter } from 'react-router-dom';
 import '../../relations/__tests__/testI18n';
 import type { ProsopoRecord } from '../../../types';
 
-const { handoff, list, apply, search, registry, saveEntry, role } = vi.hoisted(() => ({
-  handoff: vi.fn(), list: vi.fn(), apply: vi.fn(), search: vi.fn(),
-  registry: vi.fn(), saveEntry: vi.fn(), role: { current: 'editor' },
+const { handoff, list, apply, reject, titles } = vi.hoisted(() => ({
+  handoff: vi.fn(), list: vi.fn(), apply: vi.fn(), reject: vi.fn(), titles: vi.fn(),
 }));
-vi.mock('../../../services/prosopographyService', () => ({
-  createEnrichmentHandoff: handoff,
-  listEnrichmentProposals: list,
-  applyEnrichmentProposal: apply,
-  searchEnrichmentRegistry: search,
-  fetchRegistry: registry,
-  saveRegistryEntry: saveEntry,
-}));
-vi.mock('../../../../contexts/UserContext', () => ({
-  useUser: () => ({ user: { role: role.current }, authToken: 'admin-token' }),
-}));
-vi.mock('../DateField', () => ({
-  default: ({ value, onChange }: { value: { year: string }; onChange: (value: { year: string }) => void }) =>
-    <input placeholder="aasta" value={value.year} onChange={event => onChange({ ...value, year: event.target.value })} />,
-}));
-vi.mock('../../../../components/EntityPicker', () => ({
-  default: ({ onChange }: { onChange: (value: unknown) => void }) =>
-    <button type="button" onClick={() => onChange({ id: 'Q189010', label: 'notar', source: 'wikidata',
-      labels: { et: 'notar', en: 'notary' } })}>wikidata-valik</button>,
-}));
+vi.mock('../../../services/prosopographyService', async () => {
+  const actual = await vi.importActual<typeof import('../../../services/prosopographyService')>(
+    '../../../services/prosopographyService');
+  return {
+    EnrichmentApplyError: actual.EnrichmentApplyError,
+    createEnrichmentHandoff: handoff, listEnrichmentProposals: list,
+    applyEnrichmentProposal: apply, rejectEnrichmentProposal: reject, getWorkTitles: titles,
+  };
+});
 import AgentEnrichmentPanel from '../AgentEnrichmentPanel';
+import { EnrichmentApplyError } from '../../../services/prosopographyService';
 
-const person = {
-  id: 'vutt:Pabc', updated_at: 'version-1',
-  occupations: [{ label: 'Õpetaja', id: null }], education: [],
-} as unknown as ProsopoRecord;
+const person = { id: 'vutt:Pabc', updated_at: 'v1', occupations: [], education: [] } as unknown as ProsopoRecord;
+const ev = (quote: string) => [{ source_kind: 'vutt_page', work_id: 'w1', page: 5, printed_page: '3', quote }];
 const proposal = {
-  proposal_id: 'proposal-1', person_id: person.id, base_updated_at: person.updated_at,
-  created_at: 1, expires_at: 9999999999,
-  items: [{ kind: 'education', match_status: 'matched', raw_institution: 'Academia Gustavo-Carolina',
-    institution_variant: 'AGC',
-    evidence: [{ source_kind: 'literature', source_id: 'book1', locator: 'lk 4', quote: 'studiosus' }] }],
+  proposal_id: 'p1', person_id: person.id, revision: 'rev1', base_updated_at: 'v0', created_at: 1, expires_at: 9999999999,
+  items: [
+    { kind: 'occupation', match_status: 'matched', raw_occupation: 'Notarius publicus',
+      occupation_key: 'notar', registry_labels: { occupation_key: 'notar' }, registry_ids: { occupation_key: 'Q189010' },
+      review_state: { state: 'applicable' }, evidence: ev('Notarius publicus Wolgastensis') },
+    { kind: 'occupation', match_status: 'new_registry_candidate', raw_occupation: 'Feldprediger',
+      occupation_key: 'valipreester', occupation_entry: { key: 'valipreester', labels: { et: 'välipreester', en: 'military chaplain' }, variants: ['Feldprediger'] },
+      registry_labels: { occupation_key: 'välipreester' }, review_state: { state: 'applicable' }, evidence: ev('Feldprediger') },
+    { kind: 'education', match_status: 'already_present', raw_institution: 'Rostock', institution_key: 'rostock',
+      registry_labels: { institution_key: 'Rostocki ülikool' }, review_state: { state: 'already_present' }, evidence: ev('Rostochii') },
+    { kind: 'occupation', match_status: 'matched', raw_occupation: 'Pastor', occupation_key: 'pastor',
+      registry_labels: {}, review_state: { state: 'blocked', reason: 'duplicate_entry' }, evidence: ev('Pastor') },
+  ],
 };
 
+const renderPanel = (onApplied = vi.fn(), isDirty = false) => render(<MemoryRouter>
+  <AgentEnrichmentPanel person={person} token="tok" isDirty={isDirty} onApplied={onApplied} /></MemoryRouter>);
+
 beforeEach(() => {
-  handoff.mockReset(); list.mockReset(); apply.mockReset(); search.mockReset();
-  registry.mockReset(); saveEntry.mockReset(); role.current = 'editor';
+  for (const fn of [handoff, list, apply, reject, titles]) fn.mockReset();
   list.mockResolvedValue([proposal]);
-  handoff.mockResolvedValue({ code: 'one-time-code', expires_at: 9999999999 });
-  apply.mockResolvedValue({ ...person, updated_at: 'version-2' });
-  search.mockResolvedValue({ kind: 'institution', query: 'AGC', registry_available: true,
-    ambiguous: false, truncated: false, total_matches: 1,
-    results: [{ key: 'agc', id: null, labels: { et: 'Academia Gustavo-Carolina' },
-      match_kind: 'variant', matched_text: 'AGC', matched_variant: 'AGC', place_key: 'tartu' }] });
+  titles.mockResolvedValue({ w1: { title: 'Consuetudines', year: 1632, restricted: false } });
+  apply.mockResolvedValue({ ...person, updated_at: 'v2' });
+  reject.mockResolvedValue({ proposal_id: 'p1', remaining: 3 });
+  handoff.mockResolvedValue({ code: 'code-1', expires_at: 9999999999 });
 });
 
-describe('agendi ettepanekud isikuvormis', () => {
-  it('näitab koodi, tõendit ja kinnitab ainult märgitud rea', async () => {
+describe('agendi ettepanekute ülevaatus', () => {
+  it('näitab kolme olekut, registrikirjet, tõendit ja blokeeritud rea põhjust', async () => {
+    renderPanel();
+    expect(await screen.findAllByText('registris')).toHaveLength(2);   // read 0 ja 3
+    expect(screen.getByText('uus registrisse')).toBeTruthy();
+    expect(screen.getByText('juba kaardil')).toBeTruthy();
+    expect(screen.getByText('Q189010')).toBeTruthy();
+    expect(screen.getByText(/military chaplain/)).toBeTruthy();
+    expect(await screen.findAllByText('Consuetudines')).toHaveLength(4);
+    expect(screen.getByText(/Sama fakt on kaardil juba olemas/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Lisa tõend' })).toBeTruthy();
+    const confirms = screen.getAllByRole('button', { name: 'Kinnita' });
+    expect(confirms).toHaveLength(3);
+    expect((confirms[2] as HTMLButtonElement).disabled).toBe(true);   // blokeeritud rida
+  });
+
+  it('Kinnita kutsub apply ühe reaga ja annab kaardi tagasi', async () => {
     const onApplied = vi.fn();
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={onApplied} /></MemoryRouter>);
-    expect(await screen.findByText('studiosus')).toBeTruthy();
-    expect(screen.getByText('Tabanud nimevariant: AGC')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Loo üleandmiskood' }));
-    expect(await screen.findByText('one-time-code')).toBeTruthy();
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Kinnita valitud kirjed (1)' }));
-    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'proposal-1', [0], 'editor-token', {}));
-    expect(onApplied).toHaveBeenCalledWith(expect.objectContaining({ updated_at: 'version-2' }));
+    renderPanel(onApplied);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Kinnita' }))[0]);
+    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0], 'tok', 'rev1'));
+    await waitFor(() => expect(onApplied).toHaveBeenCalledWith(expect.objectContaining({ updated_at: 'v2' })));
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
   });
 
-  it('üldkood kõigile isikutele (#492): kutsub ilma isikuta ja ütleb ulatuse', async () => {
+  it('Kinnita kõik saadab kõik mitte-blokeeritud read', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Kinnita kõik (3)' }));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0, 1, 2], 'tok', 'rev1'));
+  });
+
+  it('Lükka tagasi kutsub reject-i', async () => {
+    renderPanel();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Lükka tagasi' }))[3]);
+    await waitFor(() => expect(reject).toHaveBeenCalledWith(person.id, 'p1', [3], 'tok', 'rev1'));
+  });
+
+  it('loodud registrikirjete teade', async () => {
+    apply.mockRejectedValue(new EnrichmentApplyError('stale_person', ['valipreester']));
+    renderPanel();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Kinnita' }))[1]);
+    expect(await screen.findByText(/Registrikirjed valipreester loodi, kaarti ei muudetud/)).toBeTruthy();
+  });
+
+  it('eelkontrolli viga näidatakse real ja öeldakse, et midagi ei salvestatud', async () => {
+    apply.mockRejectedValue(new Error('items[1]: duplicate_entry'));
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Kinnita kõik (3)' }));
+    expect(await screen.findByText(/Midagi ei salvestatud/)).toBeTruthy();
+    // Rida 3 on serverist blokeeritud; rida 1 saab sama põhjuse eelkontrollist.
+    await waitFor(() => expect(screen.getAllByText('Sama fakt on kaardil juba olemas.')).toHaveLength(2));
+    expect(screen.queryByText(/items\[1\]/)).toBeNull();
+  });
+
+  it('salvestamata vorm lukustab otsused', async () => {
+    renderPanel(vi.fn(), true);
+    const confirms = await screen.findAllByRole('button', { name: 'Kinnita' });
+    expect(confirms.every(button => (button as HTMLButtonElement).disabled)).toBe(true);
+    expect((screen.getByRole('button', { name: 'Kinnita kõik (3)' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('kood kõigile isikutele', async () => {
     handoff.mockResolvedValue({ code: 'any-code', expires_at: 9999999999, scope: 'any', max_uses: 200 });
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
+    renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: 'Kood kõigile isikutele' }));
+    await waitFor(() => expect(handoff).toHaveBeenCalledWith(null, 'tok'));
     expect(await screen.findByText('any-code')).toBeTruthy();
-    expect(handoff).toHaveBeenCalledWith(null, 'editor-token');
-    expect(screen.getByText(/kõigile isikutele.*200/)).toBeTruthy();
-  });
-
-  it('ei luba salvestamata vormi ega puuduva registriseosega rida kinnitada', async () => {
-    list.mockResolvedValue([{ ...proposal, items: [{ ...proposal.items[0], review_error: 'unknown_institution_key' }] }]);
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={true} onApplied={vi.fn()} /></MemoryRouter>);
-    expect(await screen.findByText(/unknown_institution_key/)).toBeTruthy();
-    expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Loo üleandmiskood' }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('lubab mitmetähendusliku asutuse vaste toimetajal registrist valida', async () => {
-    list.mockResolvedValue([{ ...proposal, items: [{ ...proposal.items[0],
-      match_status: 'ambiguous', raw_institution: 'AGC', institution_variant: undefined }] }]);
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
-    expect(await screen.findByText(/Mitu võimalikku vastet|Mitmetähenduslik vaste/)).toBeTruthy();
-    expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Otsi asutuste registrist' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Academia Gustavo-Carolina \(agc\)/ }));
-    expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(false);
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Kinnita valitud kirjed (1)' }));
-    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'proposal-1', [0], 'editor-token', {
-      0: { institution_key: 'agc', institution_variant: 'AGC', place_key: null },
-    }));
-  });
-
-  it('saadab kuupäeva ja allikakoha paranduse ainult valitud reale', async () => {
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
-    expect(await screen.findByText('studiosus')).toBeTruthy();
-    fireEvent.click(screen.getByText('Paranda aeg või tõend'));
-    fireEvent.change(screen.getAllByPlaceholderText('aasta')[0], { target: { value: '1641' } });
-    fireEvent.change(screen.getByLabelText('Allikakoht'), { target: { value: 'lk 14' } });
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Kinnita valitud kirjed (1)' }));
-    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'proposal-1', [0], 'editor-token', {
-      0: { date_from: { date: '1641-01-01', precision: 'year', is_circa: false },
-        evidence: [{ source_kind: 'literature', source_id: 'book1', locator: 'lk 14', quote: 'studiosus' }] },
-    }));
-  });
-
-  it('admin loob puuduva registrikirje realt ja rida muutub kinnitatavaks', async () => {
-    role.current = 'admin';
-    list.mockResolvedValue([{ ...proposal, items: [{
-      kind: 'occupation', match_status: 'new_registry_candidate', raw_occupation: 'Notarius publicus',
-      evidence: [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }] }] }]);
-    registry.mockResolvedValue({});
-    saveEntry.mockImplementation(async (_kind: string, _key: string, entry: unknown) => entry);
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
-    const checkbox = await screen.findByRole('checkbox');
-    expect((checkbox as HTMLInputElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Uus registrikirje' }));
-    fireEvent.change(screen.getByLabelText('Nimi eesti keeles'), { target: { value: 'notar' } });
-    expect((screen.getByLabelText(/^Võti/) as HTMLInputElement).value).toBe('notar');
-    expect((screen.getByLabelText(/^Nimevariandid/) as HTMLTextAreaElement).value).toBe('Notarius publicus');
-    fireEvent.click(screen.getByRole('button', { name: 'Salvesta ja vali' }));
-    await waitFor(() => expect(saveEntry).toHaveBeenCalledWith('occupation', 'notar',
-      expect.objectContaining({ labels: { et: 'notar' }, variants: ['Notarius publicus'] }), 'admin-token'));
-    await waitFor(() => expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Kinnita valitud kirjed (1)' }));
-    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'proposal-1', [0], 'editor-token',
-      { 0: { occupation_key: 'notar', occupation_variant: 'Notarius publicus' } }));
-  });
-
-  it('toimetaja ei näe registrikirje loomise nuppu', async () => {
-    list.mockResolvedValue([{ ...proposal, items: [{
-      kind: 'occupation', match_status: 'new_registry_candidate', raw_occupation: 'Notarius publicus',
-      evidence: [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }] }] }]);
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
-    await screen.findByRole('checkbox');
-    expect(screen.queryByRole('button', { name: 'Uus registrikirje' })).toBeNull();
-  });
-
-  it('registrikirje Wikidata valik täidab Q-koodi, nimed ja võtme', async () => {
-    role.current = 'admin';
-    list.mockResolvedValue([{ ...proposal, items: [{
-      kind: 'occupation', match_status: 'new_registry_candidate', raw_occupation: 'Notarius publicus',
-      evidence: [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }] }] }]);
-    registry.mockResolvedValue({});
-    saveEntry.mockImplementation(async (_kind: string, _key: string, entry: unknown) => entry);
-    render(<MemoryRouter><AgentEnrichmentPanel person={person} token="editor-token" isDirty={false} onApplied={vi.fn()} /></MemoryRouter>);
-    fireEvent.click(await screen.findByRole('button', { name: 'Uus registrikirje' }));
-    fireEvent.click(screen.getByRole('button', { name: 'wikidata-valik' }));
-    expect((screen.getByLabelText(/^Võti/) as HTMLInputElement).value).toBe('notar');
-    fireEvent.click(screen.getByRole('button', { name: 'Salvesta ja vali' }));
-    await waitFor(() => expect(saveEntry).toHaveBeenCalledWith('occupation', 'notar',
-      expect.objectContaining({ id: 'Q189010', labels: { et: 'notar', en: 'notary' },
-        variants: ['Notarius publicus'] }), 'admin-token'));
   });
 });

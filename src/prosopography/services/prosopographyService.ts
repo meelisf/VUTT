@@ -8,14 +8,27 @@ const BASE = `${FILE_API_URL}/prosopography`;
 export interface EnrichmentEvidence {
   source_kind: string; source_id?: string; locator?: string; work_id?: string;
   page?: number; printed_page?: string; part_id?: string; quote?: string; url?: string;
+  /** Kirjanduse loetav viide; MCP täidab kirjanduskogust. */
+  citation?: string;
+}
+/** Agendi pakutud uus registrikirje (`key` kirje sees). */
+export interface EnrichmentRegistryEntry {
+  key: string; id?: string | null; labels: Record<string, string>; variants?: string[];
+  type?: string; place_key?: string | null;
+}
+export interface EnrichmentReviewState {
+  state: 'applicable' | 'already_present' | 'blocked'; reason?: string;
 }
 export interface EnrichmentDate {
   date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean;
 }
 export interface EnrichmentItem {
   kind: 'occupation' | 'education'; match_status: string; existing_index?: number;
-  review_error?: string;
+  review_state: EnrichmentReviewState;
   registry_labels?: Record<string, string>;
+  registry_ids?: Record<string, string>;
+  occupation_entry?: EnrichmentRegistryEntry;
+  institution_entry?: EnrichmentRegistryEntry;
   institution_place_key?: string | null;
   raw_occupation?: string; raw_institution?: string; occupation_key?: string;
   institution_key?: string; place_key?: string | null; edu_type?: string;
@@ -26,17 +39,9 @@ export interface EnrichmentItem {
 }
 export interface EnrichmentProposal {
   proposal_id: string; person_id: string; base_updated_at: string;
+  /** Ridade versioon: otsus saadab selle kaasa, et vana vaade ei otsustaks nihkunud rida. */
+  revision: string;
   created_at: number; expires_at: number; items: EnrichmentItem[];
-}
-export interface EnrichmentRegistryCandidate {
-  key: string; id: string | null; labels: Record<string, string>;
-  match_kind: string; matched_text: string; matched_variant: string | null;
-  type?: string; place_key?: string | null;
-}
-export interface EnrichmentRegistrySearch {
-  kind: 'occupation' | 'institution'; query: string; registry_available: boolean;
-  results: EnrichmentRegistryCandidate[]; total_matches: number;
-  truncated: boolean; ambiguous: boolean;
 }
 export interface InstitutionRegistryEntry {
   id: string | null; labels: Record<string, string>; variants: string[];
@@ -65,10 +70,6 @@ export async function saveRegistryEntry(kind: 'occupation' | 'institution', key:
   });
   return enrichmentResponse(response);
 }
-export type EnrichmentCorrection = Partial<Pick<EnrichmentItem,
-  'occupation_key' | 'institution_key' | 'place_key' | 'occupation_variant' | 'institution_variant'
-  | 'date_from' | 'date_to' | 'edu_type' | 'evidence'>>;
-
 async function enrichmentResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let detail = String(response.status);
@@ -96,17 +97,33 @@ export async function listEnrichmentProposals(personId: string, token: string): 
   return enrichmentResponse(response);
 }
 
-export async function searchEnrichmentRegistry(kind: 'occupation' | 'institution', query: string): Promise<EnrichmentRegistrySearch> {
-  const params = new URLSearchParams({ kind, q: query, limit: '10' });
-  const response = await fetchWithTimeout(`${BASE}/enrichment-registry-search?${params}`, { timeout: 10000 });
-  return enrichmentResponse(response);
+/** Kinnitus kukkus pärast registrikirjete loomist: kirjed jäid alles, kaart muutmata. */
+export class EnrichmentApplyError extends Error {
+  created: string[];
+  constructor(message: string, created: string[]) { super(message); this.created = created; }
 }
 
 export async function applyEnrichmentProposal(personId: string, proposalId: string,
-  selected: number[], token: string, corrections: Record<number, EnrichmentCorrection> = {}): Promise<ProsopoRecord> {
+  selected: number[], token: string, revision: string): Promise<ProsopoRecord> {
+  // Kinnitus võib teha mitu git-commitit (registrikirjed + kaart) — pikem ajalõpp.
   const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ proposal_id: proposalId, selected, corrections }), timeout: 15000,
+    body: JSON.stringify({ proposal_id: proposalId, selected, revision }), timeout: 30000,
+  });
+  if (!response.ok) {
+    const detail = await response.clone().json().then(body => body?.detail).catch(() => null);
+    if (detail && typeof detail === 'object' && Array.isArray(detail.created_registry_entries)) {
+      throw new EnrichmentApplyError(String(detail.error), detail.created_registry_entries);
+    }
+  }
+  return enrichmentResponse(response);
+}
+
+export async function rejectEnrichmentProposal(personId: string, proposalId: string,
+  selected: number[], token: string, revision: string): Promise<{ proposal_id: string; remaining: number }> {
+  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/reject`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify({ proposal_id: proposalId, selected, revision }), timeout: 15000,
   });
   return enrichmentResponse(response);
 }
