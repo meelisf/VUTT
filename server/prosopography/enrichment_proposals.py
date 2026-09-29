@@ -28,11 +28,14 @@ _MATCHES = {"already_present", "matched", "ambiguous", "new_registry_candidate"}
 _ITEM_KEYS = {"kind", "raw_occupation", "raw_institution", "occupation_key",
               "institution_key", "place_key", "date_from", "date_to", "evidence",
               "match_status", "existing_index", "edu_type", "occupation_variant",
-              "institution_variant"}
+              "institution_variant", "occupation_entry", "institution_entry"}
 _SOURCE_KINDS = {"vutt_page", "literature"}
 _DATE_KEYS = {"date", "precision", "bound", "calendar", "is_circa"}
 _EVIDENCE_KEYS = {"source_kind", "source_id", "locator", "work_id", "page",
-                  "printed_page", "part_id", "quote"}
+                  "printed_page", "part_id", "quote", "citation"}
+# Rea uus registrikirje: (registri liik, kirje väli, võtmeväli).
+_ENTRY_FIELDS = (("occupation", "occupation_entry", "occupation_key"),
+                 ("institution", "institution_entry", "institution_key"))
 
 
 class ProposalError(ValueError):
@@ -203,6 +206,22 @@ def _validate_item(item: dict) -> None:
                     raise ProposalError("invalid_page: page peab olema täisarv ≥ 1")
             elif value is not None and not _short_string(value, 1000 if key == "quote" else 500):
                 raise ProposalError(f"invalid_evidence_text: {key} peab olema string (quote ≤1000, muu ≤500 märki)")
+    for _, field, key_field in _ENTRY_FIELDS:
+        entry = item.get(field)
+        if entry is None:
+            continue
+        if field == "occupation_entry" and item["kind"] != "occupation":
+            raise ProposalError("invalid_registry_entry: occupation_entry ainult kind=occupation real")
+        if (not isinstance(entry, dict) or not isinstance(entry.get("key"), str)
+                or not entry["key"]):
+            raise ProposalError(f"invalid_registry_entry: {field} peab olema objekt mittetühja key-ga")
+        if item["match_status"] != "new_registry_candidate":
+            raise ProposalError(
+                f"registry_entry_requires_new_candidate: {field} nõuab "
+                "match_status=new_registry_candidate")
+        if item.get(key_field) not in (None, entry["key"]):
+            raise ProposalError(
+                f"registry_entry_key_mismatch: {key_field} peab puuduma või võrduma {field}.key-ga")
 
 
 def _check_vutt_pages(items: list) -> None:
@@ -228,6 +247,42 @@ def _check_vutt_pages(items: list) -> None:
                     f"{counts[work_id]} lehekülge")
 
 
+def _split_entry(entry: dict) -> tuple[str, dict]:
+    """Lepingus on `key` kirje sees (agendile lihtsam); registri kirjekujus võtit ei
+    ole ja `validate_entry` lükkaks selle tagasi (`unknown_fields`)."""
+    return entry["key"], {k: v for k, v in entry.items() if k != "key"}
+
+
+def _check_registry_entries(items: list) -> None:
+    """Uus registrikirje peab olema kehtiv ja registris veel puuduma. Viga suunab
+    agenti olemasolevat kirjet kasutama; sama võti ühes ettepanekus = sama sisu."""
+    from . import registries
+    seen: dict = {}
+    for index, item in enumerate(items):
+        for kind, field, _ in _ENTRY_FIELDS:
+            if not item.get(field):
+                continue
+            key, data = _split_entry(item[field])
+            try:
+                clean = registries.validate_entry(
+                    kind, key, data,
+                    places=registries._places() if kind == "institution" else None)
+                entries = registries.load(kind)
+            except registries.RegistryError as error:
+                raise ProposalError(
+                    f"items[{index}]: invalid_registry_entry: {field}: {error}") from None
+            if key in entries:
+                raise ProposalError(f"items[{index}]: registry_key_exists: {key} — kasuta seda")
+            owner = next((k for k, v in entries.items() if clean["id"]
+                          and isinstance(v, dict) and v.get("id") == clean["id"]), None)
+            if owner:
+                raise ProposalError(
+                    f"items[{index}]: registry_id_exists: {clean['id']} on kirjel {owner}")
+            if seen.setdefault((kind, key), clean) != clean:
+                raise ProposalError(
+                    f"items[{index}]: registry_entry_mismatch: {key} on ettepanekus eri sisuga")
+
+
 def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict:
     """Kulutab koodi ja talletab ainult ajutise ettepaneku ühe transaktsiooniga."""
     if not isinstance(code, str) or len(code) > 100 or not valid_person_id(person_id):
@@ -241,6 +296,11 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
             _validate_item(item)
         except ProposalError as error:
             raise ProposalError(f"items[{index}]: {error}") from None
+    _check_registry_entries(items)
+    for item in items:
+        for _, field, key_field in _ENTRY_FIELDS:
+            if item.get(field):
+                item[key_field] = item[field]["key"]
     payload = json.dumps(items, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")

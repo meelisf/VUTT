@@ -509,3 +509,103 @@ def test_toend_peab_olema_vuttis_kontrollitav(source, expected):
     with pytest.raises(proposals.ProposalError) as exc:
         proposals.submit("c", "vutt:Pabc", "2026-01-01", [_item(evidence=[source])])
     assert str(exc.value).startswith(expected)
+
+
+@pytest.fixture
+def registrid(tmp_path, monkeypatch):
+    config = tmp_path / "config"
+    config.mkdir(exist_ok=True)
+    (config / "occupations.json").write_text(json.dumps({
+        "kaplan": {"id": "Q208762", "labels": {"et": "kaplan"}, "variants": []}}))
+    (config / "institutions.json").write_text(json.dumps({}))
+    (config / "places.json").write_text(json.dumps({"tartu": {"id": "Q13972"}}))
+    monkeypatch.setattr(proposals, "DATA_CONFIG_DIR", str(config))
+    monkeypatch.setattr(registries, "DATA_CONFIG_DIR", str(config))
+    monkeypatch.setattr(registries, "PLACES_FILE", str(config / "places.json"))
+    monkeypatch.setattr(proposals, "PLACES_FILE", str(config / "places.json"))
+    saved = []
+
+    def write(path, data, username, message=None):
+        saved.append(path)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        return {"success": True}
+
+    monkeypatch.setattr(registries, "save_config_with_git", write)
+    return config, saved
+
+
+def _uus_amet(**extra):
+    item = {"kind": "occupation", "match_status": "new_registry_candidate",
+            "raw_occupation": "Feldprediger",
+            "occupation_entry": {"key": "valipreester", "id": "Q1368286",
+                                 "labels": {"et": "välipreester", "en": "military chaplain"},
+                                 "variants": ["Feldprediger"]},
+            "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 3}]}
+    item.update(extra)
+    return item
+
+
+def _esita(client, login, prosopo_env, items):
+    card = prosopo_env.write("abc", occupations=[], education=[])
+    token = login("superadmin", "superpass")
+    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
+                       headers=_headers(token)).json()["code"]
+    return client.post("/prosopography/enrichment-proposals/submit", json={
+        "code": code, "person_id": "vutt:Pabc", "base_updated_at": card["updated_at"],
+        "items": items}), token
+
+
+def test_uus_registrikirje_talletatakse_ja_voti_taidetakse(client, login, prosopo_env, registrid):
+    response, token = _esita(client, login, prosopo_env, [_uus_amet()])
+    assert response.status_code == 200, response.text
+    item = client.get("/prosopography/enrichment-proposals/vutt:Pabc",
+                      headers=_headers(token)).json()[0]["items"][0]
+    assert item["occupation_key"] == "valipreester"
+    assert item["occupation_entry"]["key"] == "valipreester"
+    assert "valipreester" not in registries.load("occupation")
+
+
+@pytest.mark.parametrize("muudatus, viga", [
+    ({"match_status": "matched"}, "registry_entry_requires_new_candidate"),
+    ({"occupation_key": "muu"}, "registry_entry_key_mismatch"),
+    ({"occupation_entry": {"key": "kaplan", "labels": {"et": "kaplan"}}}, "registry_key_exists: kaplan"),
+    ({"occupation_entry": {"key": "uus", "id": "Q208762", "labels": {"et": "x"}}},
+     "registry_id_exists: Q208762 on kirjel kaplan"),
+    ({"occupation_entry": {"key": "Vale Võti", "labels": {"et": "x"}}}, "invalid_registry_entry"),
+    ({"occupation_entry": {"key": "uus", "labels": {}}}, "invalid_registry_entry"),
+    ({"kind": "education", "raw_institution": "AGC"}, "invalid_registry_entry"),
+])
+def test_vigane_registrikirje_lukatakse_esitusel_tagasi(
+        client, login, prosopo_env, registrid, muudatus, viga):
+    response, _ = _esita(client, login, prosopo_env, [_uus_amet(**muudatus)])
+    assert response.status_code == 400
+    assert viga in response.json()["detail"]
+    assert response.json()["detail"].startswith("items[0]")
+
+
+def test_asutusekirje_vajab_liiki(client, login, prosopo_env, registrid):
+    item = {"kind": "education", "match_status": "new_registry_candidate",
+            "raw_institution": "Academia Rostochiensis",
+            "institution_entry": {"key": "rostocki-ulikool", "labels": {"et": "Rostocki ülikool"}},
+            "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 3}]}
+    response, _ = _esita(client, login, prosopo_env, [item])
+    assert response.status_code == 400 and "invalid_type" in response.json()["detail"]
+
+
+def test_sama_uus_voti_kahel_real_eri_sisuga(client, login, prosopo_env, registrid):
+    teine = _uus_amet(occupation_entry={"key": "valipreester", "labels": {"et": "välipreester"}})
+    response, _ = _esita(client, login, prosopo_env, [_uus_amet(), teine])
+    assert response.status_code == 400
+    assert response.json()["detail"].startswith("items[1]: registry_entry_mismatch")
+
+
+def test_sama_uus_voti_kahel_real_sama_sisuga_lubatud(client, login, prosopo_env, registrid):
+    response, _ = _esita(client, login, prosopo_env, [_uus_amet(), _uus_amet(date_from={"date": "1629"})])
+    assert response.status_code == 200, response.text
+
+
+def test_toend_lubab_citationi():
+    proposals._validate_item(_item(evidence=[{
+        "source_kind": "literature", "source_id": "DOC1", "locator": "lk 3",
+        "citation": "Donecker 2012, An Itinerant Sheep"}]))
