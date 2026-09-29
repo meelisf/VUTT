@@ -44,3 +44,38 @@ export function evidenceWorkIds(entries: Array<{ evidence?: unknown }>): string[
   }
   return [...ids];
 }
+
+export interface EvidenceSource {
+  key: string;
+  href: string | null;
+  external: boolean;
+  title: string;
+}
+
+/** Tõendites kasutatud allikad kordusteta (teos, kirjanduskogu dokument, vana URL) —
+ *  bibliograafia loetav kokkuvõte. Lehekülg ja katke jäävad joonealustesse viidetesse. */
+export function evidenceSources(entries: Array<{ evidence?: unknown }>,
+  titleOf: (workId: string) => string | undefined): EvidenceSource[] {
+  const found = new Map<string, EvidenceSource>();
+  for (const entry of entries) {
+    if (!Array.isArray(entry?.evidence)) continue;
+    for (const source of entry.evidence as EnrichmentEvidence[]) {
+      if (!source) continue;
+      if (source.source_kind === 'vutt_page' && source.work_id) {
+        found.set(`vutt:${source.work_id}`, {
+          key: `vutt:${source.work_id}`, href: `/work/${encodeURIComponent(source.work_id)}`,
+          external: false, title: titleOf(source.work_id) || source.work_id,
+        });
+        continue;
+      }
+      const key = source.source_id ? `lit:${source.source_id}` : source.url ? `url:${source.url}` : null;
+      if (!key) continue;
+      const ref = evidenceRef(source, titleOf, '');
+      // Esimene loetav viide võidab; vanem citation-ita kirje ei kirjuta seda üle.
+      if (!found.has(key) || (source.citation && found.get(key)!.title === source.source_id)) {
+        found.set(key, { key, href: ref.href, external: ref.external, title: ref.title });
+      }
+    }
+  }
+  return [...found.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
