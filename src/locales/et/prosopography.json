@@ -33,6 +33,7 @@
     "createdButNotSaved": "Registrikirjed {{keys}} loodi, kaarti ei muudetud. Proovi uuesti: kinnitus seob nüüd olemasolevate kirjetega.",
     "reason": {"duplicate_entry": "Sama fakt on kaardil juba olemas.", "unresolved_existing_entry": "Kaardilt ei leitud üheselt kirjet, millele tõend lisada.", "registry_key_missing": "Registrivõti puudub; palu agendil valida registrikirje.", "ambiguous_match": "Agent ei valinud registrikirjet; palu tal vaste lahendada.", "registry_conflict": "Registris on sama võtmega teine kirje.", "duplicate_id": "See Q-kood on registris teisel kirjel.", "unknown_occupation_key": "Ametiregistris sellist kirjet pole.", "unknown_institution_key": "Asutuste registris sellist kirjet pole.", "unknown_place_key": "Kohtade registris sellist kirjet pole.", "person_not_found": "Isikut ei leitud.", "other": "Rida ei saa kinnitada."}
   },
+  "evidenceSources": "Allikad",
   "evidenceRemove": "Eemalda tõend",
   "searchPlaceholder": "Otsi nime järgi…",
   "addPerson": "Lisa isik",

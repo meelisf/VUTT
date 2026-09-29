@@ -33,6 +33,10 @@ import type { VocabularySeisusItem } from '../../services/collectionService';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
 import AgentEnrichmentPanel from '../components/personForm/AgentEnrichmentPanel';
+import EvidenceList from '../components/EvidenceList';
+import { useWorkTitles } from '../hooks/useWorkTitles';
+import { evidenceWorkIds } from '../utils/evidenceRef';
+import type { EnrichmentEvidence } from '../services/prosopographyService';
 import RegistryField from '../components/personForm/RegistryField';
 import { useRegistry } from '../hooks/useRegistry';
 import { sourceFormAfterPick } from '../utils/registryMatch';
@@ -64,6 +68,8 @@ const PersonEditPage: React.FC = () => {
   const [manualMode, setManualMode] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
   const [occupOpen, setOccupOpen] = useState(false);
+  // Tõendiviidete teoste pealkirjad (ametite ja hariduse tõendite loend).
+  const evidenceTitles = useWorkTitles(evidenceWorkIds([...draft.occupations, ...draft.education]), token);
   const [relOpen, setRelOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
 
@@ -835,8 +841,14 @@ const PersonEditPage: React.FC = () => {
                     <X size={14} />
                   </button>
                 </div>
-                {!!item.evidence?.length &&
-                  <p className="text-xs text-gray-500">{item.evidence.length} {t('agentEnrichment.evidenceCount')}</p>}
+                {!!item.evidence?.length && <details className="text-xs">
+                  <summary className="cursor-pointer text-gray-500">{item.evidence.length} {t('agentEnrichment.evidenceCount')}</summary>
+                  <div className="mt-1">
+                    <EvidenceList evidence={item.evidence as unknown as EnrichmentEvidence[]} titleOf={id => evidenceTitles[id]}
+                      onRemove={canEdit ? sourceIndex => onChange({ ...item,
+                        evidence: item.evidence!.filter((_, i) => i !== sourceIndex) }) : undefined} />
+                  </div>
+                </details>}
                 {!item.institution_key && <PlacePicker value={item.place_key ?? null} token={token}
                   canEdit={canEdit} lang={lang} label={t('form.occupationArea')}
                   onChange={key => onChange({ ...item, place_key: key ?? undefined,
@@ -888,8 +900,14 @@ const PersonEditPage: React.FC = () => {
                     <X size={14} />
                   </button>
                 </div>
-                {!!item.evidence?.length &&
-                  <p className="text-xs text-gray-500">{item.evidence.length} {t('agentEnrichment.evidenceCount')}</p>}
+                {!!item.evidence?.length && <details className="text-xs">
+                  <summary className="cursor-pointer text-gray-500">{item.evidence.length} {t('agentEnrichment.evidenceCount')}</summary>
+                  <div className="mt-1">
+                    <EvidenceList evidence={item.evidence as unknown as EnrichmentEvidence[]} titleOf={id => evidenceTitles[id]}
+                      onRemove={canEdit ? sourceIndex => onChange({ ...item,
+                        evidence: item.evidence!.filter((_, i) => i !== sourceIndex) }) : undefined} />
+                  </div>
+                </details>}
                 <div className="grid grid-cols-2 gap-2">
                   <DateField
                     label={t('form.from')}
