@@ -21,6 +21,7 @@
     "registryForm": {"wikidata": "Otsi Wikidatast (täidab Q-koodi ja nimed)", "new": "Uus registrikirje", "edit": "Muuda", "key": "Võti (püsiv, ladina väiketähed ja sidekriips)", "qid": "Wikidata Q-kood (valikuline)", "labelEt": "Nimi eesti keeles", "labelEn": "Nimi inglise keeles", "variants": "Nimevariandid (üks rea kohta; allika sõnastus)", "type": "Asutuse liik", "placeKey": "Koha võti (valikuline)", "save": "Salvesta ja vali", "cancel": "Loobu", "keyExists": "Selle võtmega kirje on juba olemas; vali see otsingust või muuda seda.", "help": "Nimi on normaliseeritud kuju (nt „notar”); allika sõnastus jääb isikukaardile ja nimevariandiks."},
     "status": {"already_present": "Juba olemas; seda rida ei lisata.", "ambiguous": "Mitmetähenduslik vaste; lahenda enne kinnitamist.", "new_registry_candidate": "Registris puudub; loo registrikirje enne kinnitamist."}
   },
+  "evidenceRemove": "Eemalda tõend",
   "searchPlaceholder": "Otsi nime järgi…",
   "addPerson": "Lisa isik",
   "edit": "Muuda",

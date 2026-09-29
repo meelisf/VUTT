@@ -21,6 +21,7 @@
     "registryForm": {"wikidata": "Search Wikidata (fills Q-code and names)", "new": "New registry entry", "edit": "Edit", "key": "Key (permanent, lowercase Latin letters and hyphens)", "qid": "Wikidata Q-code (optional)", "labelEt": "Name in Estonian", "labelEn": "Name in English", "variants": "Name variants (one per line; source wording)", "type": "Institution type", "placeKey": "Place key (optional)", "save": "Save and select", "cancel": "Cancel", "keyExists": "An entry with this key already exists; select it from search or edit it.", "help": "The name is the normalised form (e.g. \"notary\"); the source wording stays on the person record and as a name variant."},
     "status": {"already_present": "Already present; this row cannot be added.", "ambiguous": "Ambiguous match; resolve before approval.", "new_registry_candidate": "Missing from registry; create a registry entry before approval."}
   },
+  "evidenceRemove": "Remove evidence",
   "searchPlaceholder": "Search by name…",
   "addPerson": "Add person",
   "edit": "Edit",
