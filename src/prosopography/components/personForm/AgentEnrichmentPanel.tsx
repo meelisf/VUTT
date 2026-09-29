@@ -39,6 +39,8 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  // Eelkontrolli viga („items[i]: kood") näidatakse real, kuni järgmine otsus õnnestub.
+  const [rowErrors, setRowErrors] = useState<Record<string, Record<number, string>>>({});
   const titles = useWorkTitles(evidenceWorkIds(proposals.flatMap(p => p.items)), token);
   const titleOf = (id: string) => titles[id];
 
@@ -64,16 +66,24 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
     setBusy(true); setError(''); setMessage('');
     try {
       if (confirm) {
-        onApplied(await applyEnrichmentProposal(person.id, proposal.proposal_id, indices, token));
+        onApplied(await applyEnrichmentProposal(person.id, proposal.proposal_id, indices, token, proposal.revision));
         setMessage(tr('saved'));
       } else {
-        await rejectEnrichmentProposal(person.id, proposal.proposal_id, indices, token);
+        await rejectEnrichmentProposal(person.id, proposal.proposal_id, indices, token, proposal.revision);
         setMessage(tr('rejected'));
       }
+      setRowErrors({});
     } catch (err) {
-      setError(err instanceof EnrichmentApplyError
-        ? tr('createdButNotSaved', { keys: err.created.join(', ') })
-        : (err as Error).message);
+      const rowError = (err as Error).message.match(/^items\[(\d+)\]: (.+)$/);
+      if (err instanceof EnrichmentApplyError) {
+        setError(tr('createdButNotSaved', { keys: err.created.join(', ') }));
+      } else if (rowError) {
+        // Eelkontroll kukkus: registrisse ega kaardile ei kirjutatud midagi.
+        setRowErrors({ [proposal.proposal_id]: { [Number(rowError[1])]: rowError[2] } });
+        setError(tr('nothingSaved'));
+      } else {
+        setError((err as Error).message === 'stale_proposal' ? tr('staleProposal') : (err as Error).message);
+      }
     } finally {
       // Ka vea järel: rea olek (nt vahepeal tekkinud duplikaat) tuleb serverist.
       await refresh();
@@ -133,6 +143,7 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
             const name = item.registry_labels?.[keyField] || raw || '';
             const state = item.review_state?.state ?? 'blocked';
             const blocked = state === 'blocked';
+            const rowError = rowErrors[proposal.proposal_id]?.[index];
             const badge = state === 'already_present' ? tr('badgePresent') : entry ? tr('badgeNew') : tr('badgeRegistry');
             const qid = item.registry_ids?.[keyField] ?? entry?.id;
             const institution = item.kind === 'occupation'
@@ -156,6 +167,7 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
                 </p>}
                 <EvidenceList evidence={item.evidence} titleOf={titleOf} />
                 {blocked && <p className="text-xs text-amber-800">{reasonText(item.review_state?.reason)}</p>}
+                {rowError && !blocked && <p className="text-xs text-red-700">{reasonText(rowError)}</p>}
               </div>
               <div className="flex gap-2 shrink-0">
                 <button type="button" disabled={busy || isDirty || blocked}

@@ -29,6 +29,8 @@
     "variants": "variants",
     "rowCount": "{{count}} rows",
     "expiresShort": "expires",
+    "nothingSaved": "Nothing was saved: one row failed the check (see the row).",
+    "staleProposal": "The proposal changed meanwhile (e.g. in another window). Refreshed — review the rows again.",
     "rejected": "Row rejected.",
     "createdButNotSaved": "Registry entries {{keys}} were created; the card was not changed. Try again: confirming now links to the existing entries.",
     "reason": {"duplicate_entry": "The same fact is already on the card.", "unresolved_existing_entry": "No single matching card entry to add the evidence to.", "registry_key_missing": "No registry key; ask the agent to choose a registry entry.", "ambiguous_match": "The agent did not choose a registry entry; ask it to resolve the match.", "registry_conflict": "The registry has a different entry under the same key.", "duplicate_id": "This Q-code belongs to another registry entry.", "unknown_occupation_key": "No such entry in the occupation registry.", "unknown_institution_key": "No such entry in the institution registry.", "unknown_place_key": "No such entry in the place registry.", "person_not_found": "Person not found.", "other": "This row cannot be confirmed."}

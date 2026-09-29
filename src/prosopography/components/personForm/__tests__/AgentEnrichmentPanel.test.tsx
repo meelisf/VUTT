@@ -23,7 +23,7 @@ import { EnrichmentApplyError } from '../../../services/prosopographyService';
 const person = { id: 'vutt:Pabc', updated_at: 'v1', occupations: [], education: [] } as unknown as ProsopoRecord;
 const ev = (quote: string) => [{ source_kind: 'vutt_page', work_id: 'w1', page: 5, printed_page: '3', quote }];
 const proposal = {
-  proposal_id: 'p1', person_id: person.id, base_updated_at: 'v0', created_at: 1, expires_at: 9999999999,
+  proposal_id: 'p1', person_id: person.id, revision: 'rev1', base_updated_at: 'v0', created_at: 1, expires_at: 9999999999,
   items: [
     { kind: 'occupation', match_status: 'matched', raw_occupation: 'Notarius publicus',
       occupation_key: 'notar', registry_labels: { occupation_key: 'notar' }, registry_ids: { occupation_key: 'Q189010' },
@@ -70,7 +70,7 @@ describe('agendi ettepanekute ülevaatus', () => {
     const onApplied = vi.fn();
     renderPanel(onApplied);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Kinnita' }))[0]);
-    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0], 'tok'));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0], 'tok', 'rev1'));
     await waitFor(() => expect(onApplied).toHaveBeenCalledWith(expect.objectContaining({ updated_at: 'v2' })));
     await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
   });
@@ -78,13 +78,13 @@ describe('agendi ettepanekute ülevaatus', () => {
   it('Kinnita kõik saadab kõik mitte-blokeeritud read', async () => {
     renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: 'Kinnita kõik (3)' }));
-    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0, 1, 2], 'tok'));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0, 1, 2], 'tok', 'rev1'));
   });
 
   it('Lükka tagasi kutsub reject-i', async () => {
     renderPanel();
     fireEvent.click((await screen.findAllByRole('button', { name: 'Lükka tagasi' }))[3]);
-    await waitFor(() => expect(reject).toHaveBeenCalledWith(person.id, 'p1', [3], 'tok'));
+    await waitFor(() => expect(reject).toHaveBeenCalledWith(person.id, 'p1', [3], 'tok', 'rev1'));
   });
 
   it('loodud registrikirjete teade', async () => {
@@ -92,6 +92,16 @@ describe('agendi ettepanekute ülevaatus', () => {
     renderPanel();
     fireEvent.click((await screen.findAllByRole('button', { name: 'Kinnita' }))[1]);
     expect(await screen.findByText(/Registrikirjed valipreester loodi, kaarti ei muudetud/)).toBeTruthy();
+  });
+
+  it('eelkontrolli viga näidatakse real ja öeldakse, et midagi ei salvestatud', async () => {
+    apply.mockRejectedValue(new Error('items[1]: duplicate_entry'));
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Kinnita kõik (3)' }));
+    expect(await screen.findByText(/Midagi ei salvestatud/)).toBeTruthy();
+    // Rida 3 on serverist blokeeritud; rida 1 saab sama põhjuse eelkontrollist.
+    await waitFor(() => expect(screen.getAllByText('Sama fakt on kaardil juba olemas.')).toHaveLength(2));
+    expect(screen.queryByText(/items\[1\]/)).toBeNull();
   });
 
   it('salvestamata vorm lukustab otsused', async () => {

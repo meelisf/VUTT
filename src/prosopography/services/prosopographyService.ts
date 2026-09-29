@@ -39,6 +39,8 @@ export interface EnrichmentItem {
 }
 export interface EnrichmentProposal {
   proposal_id: string; person_id: string; base_updated_at: string;
+  /** Ridade versioon: otsus saadab selle kaasa, et vana vaade ei otsustaks nihkunud rida. */
+  revision: string;
   created_at: number; expires_at: number; items: EnrichmentItem[];
 }
 export interface InstitutionRegistryEntry {
@@ -102,11 +104,11 @@ export class EnrichmentApplyError extends Error {
 }
 
 export async function applyEnrichmentProposal(personId: string, proposalId: string,
-  selected: number[], token: string): Promise<ProsopoRecord> {
+  selected: number[], token: string, revision: string): Promise<ProsopoRecord> {
   // Kinnitus võib teha mitu git-commitit (registrikirjed + kaart) — pikem ajalõpp.
   const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ proposal_id: proposalId, selected }), timeout: 30000,
+    body: JSON.stringify({ proposal_id: proposalId, selected, revision }), timeout: 30000,
   });
   if (!response.ok) {
     const detail = await response.clone().json().then(body => body?.detail).catch(() => null);
@@ -118,10 +120,10 @@ export async function applyEnrichmentProposal(personId: string, proposalId: stri
 }
 
 export async function rejectEnrichmentProposal(personId: string, proposalId: string,
-  selected: number[], token: string): Promise<{ proposal_id: string; remaining: number }> {
+  selected: number[], token: string, revision: string): Promise<{ proposal_id: string; remaining: number }> {
   const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/reject`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ proposal_id: proposalId, selected }), timeout: 15000,
+    body: JSON.stringify({ proposal_id: proposalId, selected, revision }), timeout: 15000,
   });
   return enrichmentResponse(response);
 }

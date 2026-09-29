@@ -354,8 +354,12 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
     result = []
     for row in rows:
         items = json.loads(row["payload"])
+        # Read hinnatakse järjest samade loendite vastu: teine sama uus fakt on
+        # duplikaat juba loetelus, mitte alles „Kinnita kõik" eelkontrollis.
+        occupations = list(person.get("occupations") or []) if person else []
+        education = list(person.get("education") or []) if person else []
         for item in items:
-            item["review_state"] = _review_state(item, person)
+            item["review_state"] = _review_state(item, person, occupations, education)
             labels, ids = {}, {}
             for key, filename in (
                 ("occupation_key", os.path.join(DATA_CONFIG_DIR, "occupations.json")),
@@ -382,6 +386,7 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
                     os.path.join(DATA_CONFIG_DIR, "institutions.json"), item["institution_key"])
                 item["institution_place_key"] = institution.get("place_key") if institution else None
         result.append({"proposal_id": row["id"], "person_id": person_id,
+                       "revision": _revision(row["payload"]),
                        "base_updated_at": row["base_updated_at"],
                        "created_at": row["created_at"], "expires_at": row["expires_at"],
                        "items": items})
@@ -554,13 +559,13 @@ def _merge_row(item: dict, occupations: list, education: list) -> str:
     return "already_present"
 
 
-def _review_state(item: dict, person: Optional[dict]) -> dict:
-    """Serveri otsus paneelile — klient olekut ise ei arvuta."""
+def _review_state(item: dict, person: Optional[dict], occupations: list, education: list) -> dict:
+    """Serveri otsus paneelile — klient olekut ise ei arvuta. Loendid on kaardi koopiad,
+    kuhu eelmised read on juba kantud."""
     if person is None:
         return {"state": "blocked", "reason": "person_not_found"}
     try:
-        state = _merge_row(item, list(person.get("occupations") or []),
-                           list(person.get("education") or []))
+        state = _merge_row(item, occupations, education)
     except ProposalError as error:
         return {"state": "blocked", "reason": str(error)}
     return {"state": state}
@@ -593,20 +598,41 @@ def _check_selection(selected, count: int) -> None:
         raise ProposalError("invalid_selection")
 
 
-def _close_rows(db, proposal_id: str, items: list, selected: list[int]) -> int:
-    """Eemaldab otsustatud read; tühi ettepanek suletakse."""
-    remaining = [item for index, item in enumerate(items) if index not in set(selected)]
+def _revision(payload: str) -> str:
+    """Ettepaneku ridade versioon: iga otsus muudab payloadi ja nihutab indekseid."""
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _check_revision(row, revision: Optional[str]) -> None:
+    """Vaade, mis nägi teist ridade loendit (teine sakk), ei tohi otsustada nihkunud rida."""
+    if revision is not None and revision != _revision(row["payload"]):
+        raise ProposalError("stale_proposal")
+
+
+def _close_rows(db, proposal_id: str, decided: list[dict]) -> int:
+    """Eemaldab otsustatud read SISU järgi värskest payloadist ühe kirjutuslukuga —
+    paralleelne otsus võis vahepeal teise rea eemaldada ja vana loendi tagasikirjutus
+    taastaks selle. Tühi ettepanek suletakse."""
+    db.execute("BEGIN IMMEDIATE")
+    fresh = db.execute("SELECT payload FROM proposal WHERE id=? AND applied_at IS NULL",
+                       (proposal_id,)).fetchone()
+    if fresh is None:
+        return 0
+    remaining = json.loads(fresh["payload"])
+    for item in decided:
+        if item in remaining:
+            remaining.remove(item)
     if remaining:
-        db.execute("UPDATE proposal SET payload=? WHERE id=? AND applied_at IS NULL",
+        db.execute("UPDATE proposal SET payload=? WHERE id=?",
                    (json.dumps(remaining, ensure_ascii=False), proposal_id))
     else:
-        db.execute("UPDATE proposal SET applied_at=? WHERE id=? AND applied_at IS NULL",
-                   (int(time.time()), proposal_id))
+        db.execute("UPDATE proposal SET applied_at=? WHERE id=?", (int(time.time()), proposal_id))
     return len(remaining)
 
 
 def apply_selected(proposal_id: str, person_id: str, username: str,
-                   session_fingerprint: str, selected: list[int]) -> dict:
+                   session_fingerprint: str, selected: list[int],
+                   revision: Optional[str] = None) -> dict:
     """Kinnitus kolmes sammus: eelkontroll (ei kirjuta) → registrikirjed → kaart üks kord.
     Kõik-või-mitte-midagi kaardi suhtes, mitte registri suhtes (vt `ApplyError`)."""
     from . import registries
@@ -614,6 +640,7 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
 
     with _db() as db:
         row = _open_proposal(db, proposal_id, person_id, username)
+        _check_revision(row, revision)
         items = json.loads(row["payload"])
         _check_selection(selected, len(items))
         person = get_person(person_id)
@@ -655,16 +682,17 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
             if created:
                 raise ApplyError(str(error), created) from None
             raise
-        _close_rows(db, proposal_id, items, selected)
+        _close_rows(db, proposal_id, [items[index] for index in selected])
     return updated
 
 
 def reject_selected(proposal_id: str, person_id: str, username: str,
-                    selected: list[int]) -> dict:
+                    selected: list[int], revision: Optional[str] = None) -> dict:
     """Toimetaja lükkab read tagasi; kaarti ega registrit ei puudutata."""
     with _db() as db:
         row = _open_proposal(db, proposal_id, person_id, username)
+        _check_revision(row, revision)
         items = json.loads(row["payload"])
         _check_selection(selected, len(items))
-        remaining = _close_rows(db, proposal_id, items, selected)
+        remaining = _close_rows(db, proposal_id, [items[index] for index in selected])
     return {"proposal_id": proposal_id, "remaining": remaining}

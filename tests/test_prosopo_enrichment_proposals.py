@@ -717,3 +717,45 @@ def test_apply_ei_voota_enam_parandusi(client, login, prosopo_env, registrid):
     response = client.post("/prosopography/enrichment-proposals/vutt:Pabc/apply", headers=_headers(token),
                            json={"proposal_id": pid, "selected": [0], "corrections": {}})
     assert response.status_code == 400
+
+
+def _teine_amet():
+    return {"kind": "occupation", "match_status": "matched", "raw_occupation": "Kaplan",
+            "occupation_key": "kaplan", "date_from": {"date": "1640"},
+            "evidence": [{"source_kind": "vutt_page", "work_id": "w1", "page": 4}]}
+
+
+def test_vananenud_vaade_ei_otsusta_vale_rida(client, login, prosopo_env, registrid):
+    """Teine vaade (vana revision) saadab vana indeksi: server keeldub, mitte ei otsusta nihkunud rida."""
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet(), _teine_amet()])
+    revision = _loetelu(client, token)[0]["revision"]
+    base = "/prosopography/enrichment-proposals/vutt:Pabc"
+    assert client.post(f"{base}/reject", headers=_headers(token),
+                       json={"proposal_id": pid, "selected": [0], "revision": revision}).status_code == 200
+    stale = client.post(f"{base}/apply", headers=_headers(token),
+                        json={"proposal_id": pid, "selected": [0], "revision": revision})
+    assert stale.status_code == 409 and stale.json()["detail"] == "stale_proposal"
+    assert prosopo_env.read("abc")["occupations"] == []
+    fresh = _loetelu(client, token)[0]["revision"]
+    assert client.post(f"{base}/apply", headers=_headers(token),
+                       json={"proposal_id": pid, "selected": [0], "revision": fresh}).status_code == 200
+
+
+def test_samaaegne_sulgemine_ei_taasta_teise_otsuse_rida(prosopo_env, registrid, client, login):
+    """Kinnitus luges payloadi enne, kui paralleelne tagasilükkamine rea B eemaldas:
+    sulgemine eemaldab ridu SISU järgi värskest payloadist, B ei tule tagasi."""
+    token, pid = _esitatud(client, login, prosopo_env, [_uus_amet(), _teine_amet()])
+    with proposals._db() as db:
+        vana = json.loads(db.execute("SELECT payload FROM proposal WHERE id=?", (pid,)).fetchone()[0])
+    proposals.reject_selected(pid, "vutt:Pabc", "superadmin", [1])
+    with proposals._db() as db:
+        assert proposals._close_rows(db, pid, [vana[0]]) == 0
+    assert _loetelu(client, token) == []
+
+
+def test_sama_uus_fakt_teisel_real_on_loetelus_blokeeritud(client, login, prosopo_env, registrid):
+    """Read hinnatakse järjest: teine sama fakt on duplikaat juba enne „Kinnita kõik"."""
+    token, _ = _esitatud(client, login, prosopo_env, [_teine_amet(), _teine_amet()])
+    rows = _loetelu(client, token)[0]["items"]
+    assert rows[0]["review_state"] == {"state": "applicable"}
+    assert rows[1]["review_state"] == {"state": "blocked", "reason": "duplicate_entry"}

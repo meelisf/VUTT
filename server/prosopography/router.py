@@ -492,7 +492,8 @@ async def prosopography_put_registry(kind: str, key: str, request: Request,
 
 
 async def _decision_body(request: Request) -> dict:
-    """Kinnituse ja tagasilükkamise ühine keha {proposal_id, selected}."""
+    """Kinnituse ja tagasilükkamise ühine keha {proposal_id, selected, revision?}.
+    `revision` (loetelust) seob indeksid vaatega, mida toimetaja nägi."""
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
@@ -502,13 +503,14 @@ async def _decision_body(request: Request) -> dict:
         data = json.loads(body)
     except (ValueError, UnicodeDecodeError):
         raise HTTPException(status_code=400, detail="invalid_apply_request")
-    if (not isinstance(data, dict) or set(data) != {"proposal_id", "selected"}
-            or not isinstance(data["proposal_id"], str)):
+    if (not isinstance(data, dict) or set(data) - {"revision"} != {"proposal_id", "selected"}
+            or not isinstance(data["proposal_id"], str)
+            or not isinstance(data.get("revision", ""), str)):
         raise HTTPException(status_code=400, detail="invalid_apply_request")
     return data
 
 
-_APPLY_CONFLICTS = ("stale_person", "duplicate_entry", "unresolved_existing_entry",
+_APPLY_CONFLICTS = ("stale_proposal", "stale_person", "duplicate_entry", "unresolved_existing_entry",
                     "registry_conflict", "duplicate_id")
 
 
@@ -524,6 +526,7 @@ async def prosopography_apply_enrichment_proposal(
         return await run_in_threadpool(
             enrichment_proposals.apply_selected, data["proposal_id"], person_id,
             user["username"], request.state.session_fingerprint, data["selected"],
+            data.get("revision"),
         )
     except enrichment_proposals.ApplyError as e:
         raise HTTPException(status_code=409, detail={
@@ -544,10 +547,10 @@ async def prosopography_reject_enrichment_proposal(
     try:
         return await run_in_threadpool(
             enrichment_proposals.reject_selected, data["proposal_id"], person_id,
-            user["username"], data["selected"],
+            user["username"], data["selected"], data.get("revision"),
         )
     except enrichment_proposals.ProposalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=409 if str(e) == "stale_proposal" else 400, detail=str(e))
 
 
 @router.post("/enrichment-proposals/submit")
