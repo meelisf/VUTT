@@ -32,7 +32,7 @@ LABELS = {
     "univ-abo": ("Turu Akadeemia", "Royal Academy of Turku", ["Academia Aboensis"]),
     "univ-altdorf": ("Altdorfi ülikool", "University of Altdorf", []),
     "univ-erfurt": ("Erfurdi ülikool", "University of Erfurt", []),
-    "univ-franeker": ("Franekeri ülikool", "University of Franeker", []),
+    "univ-franeker": ("Franekeri ülikool", "University of Franeker", []),  # + Q1293929 (QIDS)
     "univ-frankfurt-oder": ("Frankfurdi (Oderi) ülikool", "University of Frankfurt (Oder)", ["Alma Mater Viadrina", "Viadrina"]),
     "univ-giessen": ("Gießeni ülikool", "University of Giessen", []),
     "univ-greifswald": ("Greifswaldi ülikool", "University of Greifswald", []),
@@ -42,7 +42,7 @@ LABELS = {
     "univ-jena": ("Jena ülikool", "University of Jena", []),
     "univ-kiel": ("Kieli ülikool", "Kiel University", []),
     "univ-konigsberg": ("Königsbergi ülikool", "University of Königsberg", ["Albertina"]),
-    "univ-kopenhagen": ("Kopenhaageni ülikool", "University of Copenhagen", []),
+    "univ-kopenhagen": ("Kopenhaageni ülikool", "University of Copenhagen", []),  # + Q186285 (QIDS)
     "univ-leiden": ("Leideni ülikool", "Leiden University", []),
     "univ-leipzig": ("Leipzigi ülikool", "Leipzig University", []),
     "univ-lund": ("Lundi ülikool", "Lund University", []),
@@ -51,6 +51,9 @@ LABELS = {
     "univ-uppsala": ("Uppsala ülikool", "Uppsala University", []),
     "univ-wittenberg": ("Wittenbergi ülikool", "University of Wittenberg", []),
 }
+
+# Q-koodita kirjed, mille Wikidata vaste on kinnitatud (2026-09-29).
+QIDS = {"univ-kopenhagen": "Q186285", "univ-franeker": "Q1293929"}
 
 
 def plan(entries: dict) -> dict:
@@ -61,14 +64,15 @@ def plan(entries: dict) -> dict:
         if not isinstance(entry, dict):
             continue
         old = entry.get("labels") or {}
-        if old.get("et") == et:
+        qid = entry.get("id") or QIDS.get(key)
+        if old.get("et") == et and entry.get("id") == qid:
             continue
         variants, seen = [], {et.casefold(), en.casefold()}
         for value in [*old.values(), *extra, *(entry.get("variants") or [])]:
             if value and value.casefold() not in seen:
                 variants.append(value)
                 seen.add(value.casefold())
-        out[key] = {**entry, "labels": {**old, "et": et, "en": en}, "variants": variants}
+        out[key] = {**entry, "id": qid, "labels": {**old, "et": et, "en": en}, "variants": variants}
     return out
 
 
@@ -80,7 +84,8 @@ def main() -> int:
     todo = plan(entries)
     for key, new in sorted(todo.items()):
         old = entries[key]["labels"].get("et")
-        print(f"{key:22} {old!s:18} → {new['labels']['et']:28} | {new['labels']['en']:32} | {', '.join(new['variants'])}")
+        added = f" +{new['id']}" if new["id"] != entries[key].get("id") else ""
+        print(f"{key:22} {old!s:18} → {new['labels']['et']:28} | {new['labels']['en']:32}{added} | {', '.join(new['variants'])}")
     print(f"\nMuuta {len(todo)} / {len(LABELS)}")
     if not args.apply:
         print("Kuivkäivitus — kirjutamiseks lisa --apply")

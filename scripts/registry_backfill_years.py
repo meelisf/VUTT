@@ -95,7 +95,10 @@ def plan(entries: dict, entities: dict) -> list:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--apply", action="store_true", help="kirjuta (vaikimisi kuivkäivitus)")
+    parser.add_argument("--skip", default="", help="komaga eraldatud võtmed, mida mitte täita "
+                        "(Wikidata aastad kahtlased, nt teise asutuse Q-kood)")
     args = parser.parse_args()
+    skip = {key.strip() for key in args.skip.split(",") if key.strip()}
 
     entries = registries.load("institution")
     ids = sorted({entry["id"] for entry in entries.values() if entry.get("id")})
@@ -105,7 +108,9 @@ def main() -> int:
         print(f"{key:32} {qid:11} {years:11} {status:18} {label}")
     todo = {key: {**entries[key], **({"active_from": start} if start is not None else {}),
                   **({"active_to": end} if end is not None else {})}
-            for key, _q, _l, start, end, status in rows if status == "täida"}
+            for key, _q, _l, start, end, status in rows if status == "täida" and key not in skip}
+    if skip:
+        print(f"Vahele jäetud (--skip): {', '.join(sorted(skip))}")
     print(f"\nQ-koodiga {len(rows)}, täita {len(todo)}, Q-koodita {len(entries) - len(rows)}")
     if not args.apply:
         print("Kuivkäivitus — kirjutamiseks lisa --apply")

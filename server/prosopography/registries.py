@@ -225,6 +225,11 @@ def put_many(kind: str, updates: dict, username: str, message: str) -> dict:
             if key not in entries:
                 raise RegistryError("unknown_key")
             clean[key] = validate_entry(kind, key, data, places=places)
+        merged = {**entries, **clean}
+        for key, entry in clean.items():
+            if entry["id"] and any(k != key and isinstance(v, dict) and v.get("id") == entry["id"]
+                                   for k, v in merged.items()):
+                raise RegistryError("duplicate_id")
         if not clean:
             return {}
         entries.update(clean)

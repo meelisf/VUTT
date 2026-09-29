@@ -334,3 +334,24 @@ def test_ulikoolide_nimed_linn_jaab_variandiks_ja_parandatut_ei_puututa():
     assert todo["univ-rostock"]["labels"] == {"et": "Rostocki ülikool", "en": "University of Rostock"}
     assert todo["univ-rostock"]["variants"] == ["Rostock", "Univ. Rostock"]
     assert todo["univ-rostock"]["place_key"] == "Rostock"
+
+
+def test_put_many_ei_luba_q_koodi_duplikaati(files):
+    registries.put("institution", "a", {"id": "Q1", "labels": {"et": "A"}, "type": "school"}, "admin")
+    registries.put("institution", "b", {"labels": {"et": "B"}, "type": "school"}, "admin")
+    with pytest.raises(registries.RegistryError, match="duplicate_id"):
+        registries.put_many("institution", {"b": {"id": "Q1", "labels": {"et": "B"}, "type": "school"}},
+                            "Automaatne", "m")
+
+
+def test_ulikoolide_skript_lisab_kinnitatud_q_koodi():
+    import importlib.util
+    import os
+    spec = importlib.util.spec_from_file_location("labels2", os.path.join(
+        os.path.dirname(__file__), "..", "scripts", "registry_university_labels.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    entries = {"univ-kopenhagen": {"id": None, "labels": {"et": "Kopenhaageni ülikool", "en": "University of Copenhagen"},
+                                   "variants": ["Kopenhagen"], "type": "university"}}
+    # Nimi juba õige, aga Q puudub → kirje tuleb ikkagi plaani.
+    assert module.plan(entries)["univ-kopenhagen"]["id"] == "Q186285"
