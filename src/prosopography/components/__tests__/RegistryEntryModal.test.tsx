@@ -2,13 +2,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { searchWikidata, getWikidataEntity, createRegistryEntry } = vi.hoisted(() => ({
-  searchWikidata: vi.fn(), getWikidataEntity: vi.fn(), createRegistryEntry: vi.fn(),
+const { searchWikidata, getWikidataEntity, getEntityDescriptions, createRegistryEntry } = vi.hoisted(() => ({
+  searchWikidata: vi.fn(), getWikidataEntity: vi.fn(), getEntityDescriptions: vi.fn(), createRegistryEntry: vi.fn(),
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, o?: any) => (o?.key ? `${k}:${o.key}` : k), i18n: { language: 'et' } }),
 }));
-vi.mock('../../../services/wikidataService', () => ({ searchWikidata, getWikidataEntity }));
+vi.mock('../../../services/wikidataService', () => ({ searchWikidata, getWikidataEntity, getEntityDescriptions }));
 vi.mock('../../services/prosopographyService', async () => {
   class RegistryDuplicateError extends Error { constructor(public key: string) { super('duplicate_id'); } }
   return {
@@ -45,6 +45,7 @@ beforeEach(() => {
     { id: 'Q159895', label: 'Rostocki Ülikool', description: 'ülikool', url: '' },
   ]);
   getWikidataEntity.mockReset().mockResolvedValue(TARTU_1630);
+  getEntityDescriptions.mockReset().mockResolvedValue({ Q12376416: 'endine gümnaasium Tartus 1804-1890' });
   createRegistryEntry.mockReset();
 });
 
@@ -65,6 +66,9 @@ describe('RegistryEntryModal', () => {
     expect(screen.getByText('registryModal.similarTitle')).toBeTruthy();
     expect(screen.getByText('gymn-dorpat')).toBeTruthy();
     expect(screen.getByText('Q12376416 · 1804–1890 · Dorpat')).toBeTruthy();
+    // Wikidata kirjeldus tuuakse sarnase kirje Q järgi — aitab ka aastateta kirjel.
+    expect(await screen.findByText('endine gümnaasium Tartus 1804-1890')).toBeTruthy();
+    expect(getEntityDescriptions).toHaveBeenCalledWith(['Q12376416'], 'et');
     const save = screen.getByRole('button', { name: 'registryModal.save' }) as HTMLButtonElement;
     expect(save.disabled).toBe(true);
     expect(screen.getByText('tartu-gumnaasium').tagName).toBe('CODE');   // kokkupõrget pole → aastata

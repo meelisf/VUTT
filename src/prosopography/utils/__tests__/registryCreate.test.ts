@@ -37,6 +37,19 @@ describe('entityToRegistryDraft', () => {
   });
 });
 
+describe('Wikidata aasta', () => {
+  const at = (time: string, precision: number, rank = 'normal') =>
+    ({ rank, mainsnak: { datavalue: { value: { time, precision } } } });
+  const draft = (p571: unknown[]) => entityToRegistryDraft({ id: 'Q1', labels: {}, claims: { P571: p571 } }, 'institution', {});
+  it('sajand ei ole aasta; aegunud väide jääb välja; mitu eri aastat → tühi', () => {
+    expect(draft([at('+1600-00-00T00:00:00Z', 7)]).active_from).toBeUndefined();
+    expect(draft([at('+1630-00-00T00:00:00Z', 9)]).active_from).toBe(1630);
+    expect(draft([at('+1630-05-01T00:00:00Z', 11)]).active_from).toBe(1630);
+    expect(draft([at('+1620-00-00T00:00:00Z', 9, 'deprecated'), at('+1630-00-00T00:00:00Z', 9)]).active_from).toBe(1630);
+    expect(draft([at('+1630-00-00T00:00:00Z', 9), at('+1632-00-00T00:00:00Z', 9)]).active_from).toBeUndefined();
+  });
+});
+
 describe('aastad', () => {
   it('parse ja format', () => {
     expect(parseYears('1630–1632')).toEqual({ active_from: 1630, active_to: 1632 });

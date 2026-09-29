@@ -47,6 +47,10 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
              description: `${t('form.registry.badge')}${extra ? ` · ${extra}` : ''}` };
   });
   const entry = registryKey ? registry[registryKey] : undefined;
+  // Seotud väljal näitab kast allika sõnastust, registri nimi on kiibis. `labels` tuleb
+  // registrist ja EntityPicker eelistaks seda — „Rostocki Ülikool" muutus „Rostock"-iks.
+  const shown = registryKey && value?.label
+    ? { ...value, labels: { ...(value.labels ?? {}), [lang.split('-')[0]]: value.label } } : value;
   const source = value?.label?.trim() || '';
   const unlinked = !registryKey && !!(source || value?.id);
   const suggestion = unlinked ? registrySuggestion(registry, value?.id, source, lang) : null;
@@ -56,7 +60,7 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
     onPick({ key, entry: picked, label: registryLabel(picked, key, lang), matched: source }, source);
   return (
     <div>
-      <EntityPicker placeholder={placeholder} type="topic" value={value} onChange={onChange} lang={lang}
+      <EntityPicker placeholder={placeholder} type="topic" value={shown} onChange={onChange} lang={lang}
         localSuggestions={localSuggestions} leadingSuggestions={leading}
         onLeadingSelect={(item, typed) => {
           const picked = registry[item.key];

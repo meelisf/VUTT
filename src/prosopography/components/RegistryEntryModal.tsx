@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Loader2, Search, X } from 'lucide-react';
-import { getWikidataEntity, searchWikidata, type WikidataSearchResult } from '../../services/wikidataService';
+import { getEntityDescriptions, getWikidataEntity, searchWikidata, type WikidataSearchResult } from '../../services/wikidataService';
 import { createRegistryEntry, fetchPlaces, RegistryDuplicateError,
   type InstitutionRegistryEntry, type OccupationRegistryEntry } from '../services/prosopographyService';
 import { entityToRegistryDraft, formatYears, parseYears, previewKey, sameIdEntry, similarEntries,
@@ -45,6 +45,7 @@ const RegistryEntryModal: React.FC<Props> = ({ kind, initialQuery, registry, tok
   const [confirmedDifferent, setConfirmedDifferent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const searchSeq = useRef(0);
 
   useEffect(() => { if (kind === 'institution') fetchPlaces().then(setPlaces).catch(() => {}); }, [kind]);
@@ -102,6 +103,15 @@ const RegistryEntryModal: React.FC<Props> = ({ kind, initialQuery, registry, tok
   };
   const existingKey = current ? sameIdEntry(registry, current.id) : null;
   const similar = current ? similarEntries(registry, current, lang) : [];
+  // Sarnase kirje Wikidata kirjeldus („endine gümnaasium Tartus 1804-1890") aitab ka siis,
+  // kui registrikirjel tegutsemisaega pole. Registrisse seda ei salvestata.
+  const similarIds = similar.map(s => s.entry.id).filter((id): id is string => !!id).join('|');
+  useEffect(() => {
+    if (!similarIds) return;
+    let live = true;
+    getEntityDescriptions(similarIds.split('|'), lang).then(found => { if (live) setDescriptions(d => ({ ...d, ...found })); });
+    return () => { live = false; };
+  }, [similarIds, lang]);
   const types = useMemo(() => [...new Set([...DEFAULT_TYPES,
     ...Object.values(registry).map(e => (e as { type?: string }).type).filter((v): v is string => !!v)])].sort(), [registry]);
 
@@ -235,7 +245,8 @@ const RegistryEntryModal: React.FC<Props> = ({ kind, initialQuery, registry, tok
                   {similar.map(s => (
                     <li key={s.key} className="flex items-baseline justify-between gap-2">
                       <span>{s.label} <span className="font-mono text-amber-700">{s.key}</span>
-                        {describe(s.entry) && <span className="block text-amber-700">{describe(s.entry)}</span>}</span>
+                        {describe(s.entry) && <span className="block text-amber-700">{describe(s.entry)}</span>}
+                        {s.entry.id && descriptions[s.entry.id] && <span className="block italic text-amber-700">{descriptions[s.entry.id]}</span>}</span>
                       <button type="button" onClick={() => onUseExisting(s.key)}
                         className="shrink-0 rounded border border-amber-300 px-1.5 py-0.5 hover:bg-amber-100">{tr('useThis')}</button>
                     </li>

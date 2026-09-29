@@ -94,3 +94,13 @@ ajas (`place_periods`) ega mõjuta kaarti.
 Registrilehel valitakse vaikekoht kohtade registrist (`PlacePicker`) ja „Koht
 ajas" read kontrollitakse enne saatmist (`parsePlacePeriods`: kuju, ainult
 aastad, tundmatu võti). Vaba võtmesisestust enam pole.
+
+Seotud väljal näitab kast **allika sõnastust**, registri nimi on kiibis all
+(`RegistryField` annab EntityPickerile allika kuju jooksva keele sildina). Enne
+eelistas EntityPicker registrist kopeeritud `institution_labels`-it ja „Rostocki
+Ülikool" muutus pärast „Seo" väljal „Rostock"-iks. Registri nimi on asutuse nimi,
+mitte linna nimi: migratsioonist pärit 21 ülikooli linnanime parandab
+`scripts/registry_university_labels.py` (linn jääb nimevariandiks, AA kuju leitakse
+edasi). Tegutsemisaja täidab Q-koodiga kirjetele `scripts/registry_backfill_years.py`
+(P571/P576, ainult aastatäpsus, mitu aastat → vahele). Mõlemad kuivkäivitusega,
+kirjutus üks commit (`registries.put_many`).

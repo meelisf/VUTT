@@ -258,3 +258,79 @@ def test_registrikirje_loomine_nouab_admini_ja_duplikaat_on_409(client, login, f
     again = client.post(url, json={**body, "labels": {"et": "Muu"}}, headers=admin)
     assert again.status_code == 409
     assert again.json()["detail"] == {"code": "duplicate_id", "key": "tartu-gumnaasium"}
+
+
+def test_put_many_uks_commit_ja_vigane_ei_kirjuta_midagi(files):
+    tmp, saved = files
+    registries.put("institution", "a", {"labels": {"et": "A"}, "type": "school"}, "admin")
+    registries.put("institution", "b", {"labels": {"et": "B"}, "type": "school"}, "admin")
+    before = len(saved)
+    with pytest.raises(registries.RegistryError, match="invalid_active_years"):
+        registries.put_many("institution", {
+            "a": {"labels": {"et": "A"}, "type": "school", "active_from": 1600},
+            "b": {"labels": {"et": "B"}, "type": "school", "active_from": 1700, "active_to": 1600},
+        }, "Automaatne", "m")
+    assert len(saved) == before and "active_from" not in registries.load("institution")["a"]
+    registries.put_many("institution", {"a": {"labels": {"et": "A"}, "type": "school", "active_from": 1600}},
+                        "Automaatne", "tegutsemisaeg")
+    assert len(saved) == before + 1 and saved[-1][1:] == ("Automaatne", "tegutsemisaeg")
+    assert registries.load("institution")["a"]["active_from"] == 1600
+    with pytest.raises(registries.RegistryError, match="unknown_key"):
+        registries.put_many("institution", {"x": {"labels": {"et": "X"}, "type": "school"}}, "Automaatne", "m")
+
+
+def test_backfill_skripti_plaan():
+    import importlib.util
+    import os
+    spec = importlib.util.spec_from_file_location("backfill", os.path.join(
+        os.path.dirname(__file__), "..", "scripts", "registry_backfill_years.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def at(year, precision=9, rank="normal"):
+        return {"rank": rank, "mainsnak": {"datavalue": {"value": {"time": f"+{year}-00-00T00:00:00Z",
+                                                                    "precision": precision}}}}
+    entries = {
+        "ok": {"id": "Q1", "labels": {"et": "Ok"}},
+        "olemas": {"id": "Q2", "labels": {"et": "O"}, "active_from": 1500},
+        "sajand": {"id": "Q3", "labels": {"et": "S"}},
+        "mitu": {"id": "Q4", "labels": {"et": "M"}},
+        "tagurpidi": {"id": "Q5", "labels": {"et": "T"}},
+        "puudub": {"id": "Q6", "labels": {"et": "P"}},
+        "q-koodita": {"id": None, "labels": {"et": "K"}},
+    }
+    entities = {
+        "Q1": {"claims": {"P571": [at(1630), at(1620, rank="deprecated")], "P576": [at(1632)]}},
+        "Q3": {"claims": {"P571": [at(1600, precision=7)]}},
+        "Q4": {"claims": {"P571": [at(1632), at(1665)]}},
+        "Q5": {"claims": {"P571": [at(1700)], "P576": [at(1600)]}},
+        "Q6": {"missing": ""},
+    }
+    rows = {row[0]: row[3:] for row in module.plan(entries, entities)}
+    assert rows["ok"] == (1630, 1632, "täida")
+    assert rows["olemas"][2] == "olemas"
+    assert rows["sajand"] == (None, None, "aastaid pole")
+    assert rows["mitu"][2].startswith("vahele: P571: mitu aastat")
+    assert rows["tagurpidi"][2] == "vahele: algus 1700 > lõpp 1600"
+    assert rows["puudub"][2] == "Wikidatas puudub"
+    assert "q-koodita" not in rows
+
+
+def test_ulikoolide_nimed_linn_jaab_variandiks_ja_parandatut_ei_puututa():
+    import importlib.util
+    import os
+    spec = importlib.util.spec_from_file_location("labels", os.path.join(
+        os.path.dirname(__file__), "..", "scripts", "registry_university_labels.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    entries = {
+        "univ-rostock": {"id": "Q159895", "labels": {"et": "Rostock", "en": "Rostock"}, "variants": ["Univ. Rostock"],
+                         "type": "university", "place_key": "Rostock"},
+        "univ-jena": {"id": "Q154561", "labels": {"et": "Jena ülikool", "en": "University of Jena"}, "variants": [],
+                      "type": "university"},
+    }
+    todo = module.plan(entries)
+    assert list(todo) == ["univ-rostock"]
+    assert todo["univ-rostock"]["labels"] == {"et": "Rostocki ülikool", "en": "University of Rostock"}
+    assert todo["univ-rostock"]["variants"] == ["Rostock", "Univ. Rostock"]
+    assert todo["univ-rostock"]["place_key"] == "Rostock"

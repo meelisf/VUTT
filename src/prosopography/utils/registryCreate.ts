@@ -37,14 +37,21 @@ function claimIds(entity: any, prop: string): string[] {
     .filter((id: unknown): id is string => typeof id === 'string');
 }
 
-/** Wikidata ajaväärtus „+1630-00-00T00:00:00Z" → 1630; eKr ja täpsuseta → undefined. */
+/**
+ * Wikidata ajaväärtus „+1630-00-00T00:00:00Z" → 1630. Ainult aasta- või täpsem
+ * väärtus (precision ≥ 9): sajand „+1600" ei ole aasta 1600. Aegunud (deprecated)
+ * väide jääb välja; mitu erinevat aastat → undefined, valib inimene.
+ * Sama reegel on `scripts/registry_backfill_years.py`-s.
+ */
 function claimYear(entity: any, prop: string): number | undefined {
+  const years = new Set<number>();
   for (const claim of entity?.claims?.[prop] ?? []) {
-    const time = claim?.mainsnak?.datavalue?.value?.time;
-    const m = typeof time === 'string' ? /^\+(\d{4})-/.exec(time) : null;
-    if (m) return Number(m[1]);
+    if (claim?.rank === 'deprecated') continue;
+    const value = claim?.mainsnak?.datavalue?.value;
+    const m = typeof value?.time === 'string' ? /^\+(\d{4})-/.exec(value.time) : null;
+    if (m && (value.precision ?? 9) >= 9) years.add(Number(m[1]));
   }
-  return undefined;
+  return years.size === 1 ? [...years][0] : undefined;
 }
 
 /**
