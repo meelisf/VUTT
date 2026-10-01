@@ -154,9 +154,17 @@ def test_aegunud_kood_keeldub(client, login, prosopo_env, monkeypatch):
     assert response.status_code == 400
 
 
-def test_ajutine_andmebaas_on_ainult_serveri_kasutajale(tmp_path):
-    proposals.issue_handoff("vutt:Pabc", "editor", "session", "t")
-    assert os.stat(proposals.DB_PATH).st_mode & 0o077 == 0
+def test_ajutine_andmebaas_on_varundusele_loetav(tmp_path):
+    # Backend kirjutab root'ina, varundus loeb teise kasutajana — 0600 fail
+    # katkestas öise varunduse (#131). Kaitse on `state/` kataloogi 700-s.
+    old_umask = os.umask(0o022)
+    try:
+        proposals.issue_handoff("vutt:Pabc", "editor", "session", "t")
+    finally:
+        os.umask(old_umask)
+    mode = os.stat(proposals.DB_PATH).st_mode
+    assert mode & 0o044 == 0o044
+    assert mode & 0o022 == 0
 
 
 def test_vigane_isiku_id_ja_suur_sisu_keelatakse(client, login, prosopo_env):
