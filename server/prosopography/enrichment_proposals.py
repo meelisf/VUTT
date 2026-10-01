@@ -49,8 +49,12 @@ def valid_person_id(person_id: str) -> bool:
 @contextmanager
 def _db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    # 0644, mitte 0600: varundus (loss, `meelisf`) peab faili lugeda saama, backend
+    # kirjutab Dockeris root'ina. 0600 murdis öise varunduse (#131, 2026-09-28).
+    # Kõrvaliste eest kaitseb `state/` kataloog ise (700, S27-01); failis on
+    # ainult koodiräsid, mitte koodid.
     try:
-        fd = os.open(DB_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        fd = os.open(DB_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
     except FileExistsError:
         pass
     else:
