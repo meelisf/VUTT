@@ -24,7 +24,8 @@ Veel lahtiseks jäänud read tõsta enne `tegemata_tood.md`-sse, et need ei kaok
 | [reviews/](reviews/) | Ülevaated, millele mujal viidatakse (skaleerimine 2026-07-09 ← ADR 0006) | Skaleerimisküsimuste taustaks |
 | [reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md](reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md) | Andmelekkeriskid: kood, tootmise saladuste ja failide õigused, teenuste eraldatus | Turvaparanduste planeerimisel ja tootmise järelkontrollil |
 | [reviews/2026-09-15-koodibaasi-ulevaade.md](reviews/2026-09-15-koodibaasi-ulevaade.md) | Koodibaasi ülevaatus: saladuste kontroll, turva, hallatavus, pikaealisus (P0–P2) | Enne suuremat refaktorit või uue töö planeerimist |
-| [superpowers/plans/](superpowers/plans/) | **Teostamata** plaanid — praegu ainult GlitchTip-deploy (#133) | Enne selle töö alustamist |
+| [superpowers/specs/](superpowers/specs/) | **Lahtised** disainid: teose osad (PR 4 CMIF, #464/#526), isiku lisamise voog (ülevaatusjärjekord), contributor-ulatuse B osa, Gemini re-OCR superadmin | Enne selle töö jätkamist |
+| [superpowers/plans/](superpowers/plans/) | **Teostamata** plaanid — praegu tühi (2026-10-01) | Enne selle töö alustamist |
 
 ## Arhiiv
 

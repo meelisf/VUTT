@@ -3,7 +3,7 @@
 **Kuupäev:** 2026-09-14
 **Staatus:** kehtib (teostatud 2026-09-14/15, #318)
 **Seotud:** ADR 0031, 0038, 0042; #318, #354
-**Spekk:** [Kasutajad ja kogude ligipääs](../superpowers/specs/2026-09-14-kasutajad-ja-kogude-ligipaas-design.md)
+**Spekk:** [Kasutajad ja kogude ligipääs](../_archive/superpowers/specs/done/2026-09-14-kasutajad-ja-kogude-ligipaas-design.md)
 
 ## Kontekst
 

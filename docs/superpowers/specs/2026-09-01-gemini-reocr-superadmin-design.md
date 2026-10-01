@@ -3,7 +3,7 @@
 **Kuupäev:** 2026-09-01
 **Seotud:** ADR 0015 (hulgi-vastuvõtt), ADR 0017/0028 (LOSS ainult OCR-ib), ADR 0018
 (katkestamine), ADR 0021 (env-nimed), ADR 0025 (`.err` vea-märgend)
-**Staatus:** disain ülevaatamiseks, teostamata
+**Staatus:** faas A teostatud ja tootmises (PR #285, 2026-09-01); few-shot ehitatud, aga ühendamata
 
 ## Probleem
 

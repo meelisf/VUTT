@@ -2,7 +2,7 @@
 
 **Kuupäev:** 2026-09-26
 **Staatus:** vastu võetud
-**Issue:** #455 · **Disain:** `docs/superpowers/specs/2026-09-26-lehe-kolmesuunaline-liitmine-design.md`
+**Issue:** #455 · **Disain:** `docs/_archive/superpowers/specs/done/2026-09-26-lehe-kolmesuunaline-liitmine-design.md`
 
 ## Kontekst
 

@@ -2,7 +2,7 @@
 
 **Kuupäev:** 2026-09-26 · **Issue:** #464 · **Seotud:** #461 (seoste vaade, ADR 0056),
 #465 (toimumiskoht), #462/#471 (registrid, teise agendi töö: tõendi väljanimed on
-kooskõlastatud plaanis `2026-09-26-prosopo-ametite-hariduse-rikastus.md` §10)
+kooskõlastatud plaanis `docs/_archive/superpowers/plans/done/2026-09-26-prosopo-ametite-hariduse-rikastus.md` §10)
 
 ## Probleem
 

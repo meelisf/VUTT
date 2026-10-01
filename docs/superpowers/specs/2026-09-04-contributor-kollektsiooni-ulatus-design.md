@@ -5,7 +5,7 @@
 säilitustähtaeg); ADR 0007 (tuletatud indeksid on read-modelid), ADR 0011 (i18n
 pariteet); uus ADR 0031 (kirjutamisõigus = lugemisõigus JA ulatus; õigusotsust ei tehta
 tuletatud indeksi põhjal)
-**Staatus:** disain ülevaatamiseks, teostamata
+**Staatus:** A osa (kirjutusulatus) teostatud — PR #301, ADR 0031, tootmises 2026-09-05; B osa (kollektsioonipõhine järelevalve) teadlikult tegemata
 **Muudetud 2026-09-04 pärast ülevaatust:** parandatud vale eeldus, nagu puuduks
 kirjutustee-poolne ligipääsukontroll — `server/access_ops.py` on olemas ja contributori
 reegel läheb sinna, mitte uude funktsiooni.
