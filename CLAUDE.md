@@ -90,10 +90,11 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/` | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`) | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
-`labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`work_sets/{id}.json`**, **`prosopography/{nanoid}.json`**
+`labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`occupations.json`**, **`institutions.json`**
+(ameti- ja asutuseregister, ADR 0059), **`work_sets/{id}.json`**, **`prosopography/{nanoid}.json`**
 (~2350 isikukaarti; **kaardid JA pildid (`prosopography/images/`) on siin** — pildid ei ole gitis,
 `data/.gitignore` ignoreerib `*.jpg`; `images/variants/` = laisad suurusvariandid, #424) ning tuletatud indeksid
 `prosopography_index.json`, `person_to_works.json`, `works_creators_index.json`, `work_collections_index.json`.
@@ -108,7 +109,8 @@ from server.config import DATA_CONFIG_DIR, STATE_DIR   # ← ainuõige allikas
 ```
 
 **Jälgitav fail on autoriteetne fail (ADR 0040).** Autoriteetne konfiguratsioon
-(`collections.json`, `archives.json`, `places.json`, `origin_groups.json`, `vocabularies.json`)
+(`collections.json`, `archives.json`, `places.json`, `origin_groups.json`, `vocabularies.json`,
+`occupations.json`, `institutions.json`)
 kirjutatakse AINULT `save_config_with_git`-iga (`git_ops.py`) — autor tuleb toimingust,
 taustateel `"Automaatne"`. Tuletatud read-modelid, `person_aliases.json` ja `labels.json`
 ei ole gitis ja kasutavad `atomic_write_json`-i. Valvur: `tests/test_config_git_commit.py`.
@@ -130,9 +132,10 @@ Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json
 | Asukoht | Sisu |
 |---|---|
 | `routers/` | `auth`, `admin`, `pages`, `editing`, `public`, `public_registries`, `collections`, `work_sets`, `notifications`, `upload`, `reocr`, `ocr_jobs`, `user_settings` |
-| `prosopography/` | Oma alampakett + `router.py`: `person_crud`, `person_search`, `merge_ops`, `relations`, `reciprocal_ops`, `work_relations_ops`, `indices`, `places_ops`, `enrichment`, `git_history`, `locks` |
+| `prosopography/` | Oma alampakett + `router.py`: `person_crud`, `person_search`, `merge_ops`, `relations`, `reciprocal_ops`, `work_relations_ops`, `indices`, `places_ops`, `enrichment`, `git_history`, `locks`, `registries` (ameti-/asutuseregister), `network` + `network_rules` (seosed, ADR 0056), `enrichment_proposals` + `registry_candidates` (MCP ettepanekud, ADR 0058) |
 | `config.py` | Kõik teed, pordid, rate-limitid, CORS, saladuste stardikontroll |
 | `deps.py` | `get_user`, `require_role`, `get_json_data`, `optional_user` — üks tõene allikas |
+| `work_parts.py`, `work_part_proposals.py` | Teose osad (ADR 0057) ja nende MCP-ettepanekud (ADR 0058) |
 | `work_sets_ops.py`, `work_sets_access.py` | Töökollektsioonid (#354, ADR 0042): salvestus + `revision`-lukk; õiguste predikaadid |
 | `metadata_ops.py` | `save_work_metadata()` — **KÕIK `_metadata.json` uuendused** käivad siit (`sync_meili`, `call_ptw`, `background_tasks`) |
 | `meili_doc.py` | Puhas `_metadata.json` → Meili-dokument kaardistus (side-effect-vaba) |
@@ -167,7 +170,7 @@ ligipääs korpusele üle avaliku API; ainus kirjutus on ootel ettepanek toimeta
 (ADR 0058). Stdio-transport. Vt `mcp/README.md`
 ja spekk `docs/_archive/superpowers/specs/done/2026-08-15-vutt-mcp-server-design.md`.
 
-Neli asja, mis on juba korra katki läinud:
+Viis asja, mis on juba korra katki läinud:
 - **Ei tohi importida `server`-it runtime'is** — pipx-venv on isoleeritud. Testid tohivad.
 - **`mcp/tests/` ilma `__init__.py`-ta** — pakett `mcp.tests` varjutab repo `tests` paketi.
 - **`mcp` sõltuvus AINULT `requirements-dev.txt`-is** — backend-konteiner ei vaja teda ja
@@ -319,6 +322,19 @@ otspunktidega (`server/work_parts.py`, `metadata_lock`); `/update-work-metadata`
 lükkab `parts` tagasi. `refresh_work_mentions` kutsub `sync_work_parts`-i — uus
 lehenumbreid/faile muutev tee saab osade sünkroni kaasa, kui ta kutsub
 `refresh_work_mentions`-it (ADR 0055); poolitus annab `renamed`-i.
+
+**Ameti- ja asutuseregister (ADR 0059)** — identiteet on VUTT-i võti (`occupation_key`,
+`institution_key`), Q-kood on valikuline ühilduvusväli. Allika sõnastus (`label`,
+`institution`) jääb kaardile alles — registrivaste ei kirjuta seda üle. Ametil on kas
+`institution_key` VÕI `place_key`, haridusel ainult `institution_key`; koht ajas elab
+registrikirje `place_periods`-is, mitte isikufaktis. Registrikirje on admini eraldi
+toiming (`save_config_with_git`); isikufakti kinnitamine EI loo kirjet, v.a agendi
+ettepaneku kinnitus `registries.ensure` kaudu (luku all, sama Q → seotakse).
+
+**MCP ettepanekud (ADR 0058)** — MCP kirjutab AINULT ootel ettepaneku (isik, teose osad);
+kinnitus käib olemasolevate valideeritud kirjutusteede kaudu (`create_part`,
+isikukaardi salvestus). Üleandmiskood on ulatusega (8 h, piiratud esitused) ja seotud
+KASUTAJAGA, mitte sessiooniga. Osade ettepanekud on esialgu ainult superadmin.
 
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
@@ -532,7 +548,6 @@ Sihtkoormus ~300 samaaegset kasutajat. Peamised valikud:
 
 | Ülesanne | Prioriteet |
 |---|---|
-| Varunduse kontroll (varundamise teeb ülikool, #131) | kesk |
 | `tags`-fallbacki eemaldamine (35 lk kasutab veel vana välja) | madal |
 | JSON-i koristus (`page_number` eemaldamine) | madal |
 

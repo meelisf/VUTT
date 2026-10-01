@@ -3,12 +3,9 @@
 Teadaolevad parandused, mis on teadlikult edasi lükatud. **Iga kirje on koodi vastu üle
 kontrollitud 2026-08-04** — valmis saanud kirjed on siit eemaldatud (ajalugu: `git log`).
 
-Suuremad tööd elavad GitHub Issues'is (`gh issue list`), mitte siin. Praegu avatud:
-**#131** varundus (pildid + `state/` off-site), **#132** OCR job-state → SQLite,
-**#133** vea-agregatsioon serveripool, **#134** andmete eksport (TEI / dump),
-**#386** P0 järelmõjud, **#387** Python 3.9/3.12 + sõltuvuste lock,
-**#388** `image_server` surm on nähtamatu, **#389** käivitustaaste võistlus,
-**#390** `strictNullChecks`.
+Suuremad tööd elavad GitHub Issues'is (`gh issue list`), mitte siin. Avatud issue'de
+loendit siia ei kirjutata — see vananes kiiresti (2026-10-01 olid kõik siin loetletud
+peale #132 ja #134 juba suletud).
 
 ---
 

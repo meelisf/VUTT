@@ -1,7 +1,7 @@
 // src/prosopography/services/networkService.ts
 /**
  * Isiku seoste võrgustik (#461): GET /prosopography/{id}/network.
- * Andmeleping: docs/superpowers/specs/2026-09-26-isiku-seoste-vaade-design.md.
+ * Andmeleping: docs/_archive/superpowers/specs/done/2026-09-26-isiku-seoste-vaade-design.md.
  */
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
