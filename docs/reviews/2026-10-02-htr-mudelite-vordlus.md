@@ -132,19 +132,32 @@ andmestike viimane muudatus on 2026-04 ja Riksarkiveti oma 2024-08.
 | Zenodo [21257417](https://zenodo.org/records/21257417), [21360877](https://zenodo.org/records/21360877) Gottfried Semper | väike (66 + 87 MB) | XIX saj keskpaik | XIX saj, ei aita augule |
 | Riksarkivet `goteborgs_poliskammare_fore_1900`, `frihetstidens_utskottshandlingar` (mitte-`_seg`) | ? | XVIII–XIX saj rootsi | Laadimisskriptiga andmestikud, mahtu ei saanud API-st; `_seg` variant oli varem tühjade transkriptsioonidega — tasub kontrollida, kas mitte-`_seg` kannab teksti |
 
-**Järeldus:** 18. sajandi saksa Kurrenti avalikke lehetasemel GT-andmeid ei ole
-endiselt. Lähim samm on `hanse-kurrent-xvii` (+1 298 lk, ~+8 %).
-
 **Mitmekesisus, mitte maht.** 47 % treeningkorpusest on üks Zürichi
 kantseleisari (puhtand). See sobib kokku tähelepanekuga, et mudel loeb selget
 kätt hästi, aga isiklikke ja õpetlaste käsi (Morgenstern, XIX saj algus)
-kehvalt, samal ajal kui Gemini on seal palju parem. Järgmisel treeningul tasub
-Zürichi osakaalu vähendada ja võtta kurrent-xix-i mitte-Zürichi projektid
-(pärast dateerimist ja dedup'i) ning hanse-xvii. Detailid ja pisteliste
-kontrollide tabel: LOSS `docs/kurrent-andmestikud.md`, jaotis „Ülevaatus
-2026-10-02". Tuntavam
-paranemine 18. sajandi materjalil tuleb tõenäoliselt **oma andmetest**: VUTT-i
-„Valmis" käsikirjalehed (Herrnhuti diaariumid, aruanded) on täpselt see
-domeen, mida avalikult ei ole. Transkribuse avalik mudel
-„German Kurrent 17th–18th century" (Greifswaldi ülikooli protokollid, Wismari
-ülemkohus) näitab, et selline GT on olemas, aga see ei ole avalik.
+kehvalt, samal ajal kui Gemini on seal palju parem.
+
+**kurrent-xix-i mitte-Zürichi audit (LOSS, 2026-10-02).** Kõik 121 projekti
+(73 GB) laaditi alla, dateeriti ja dedup'iti (teksti- ja pildiräsi +
+Transkribuse pageId). Tulemus: 30 676 rida → **11 249 unikaalset
+transkribeeritud lehte**:
+
+| periood | lk | peamised |
+|---|---|---|
+| **1750–99** | **2 566** | Greifswaldi ülikooli konsiiliumi protokollid 1775–1811, Schwartz 1755–86 |
+| 1800–49 | 2 545 | Todesurteile, OEAW 1847–49, Hoftheater 1806, Pyl, Humboldti „Kosmose" konspekt (Parthey, ladina kiri) |
+| 1850–99 | 4 606 | Alfred Escheri kirjad 3 819, Semper, Bassermann |
+| 1900+ | 1 429 | Roland 1941, Nekrolog, Eestimaa rüütelkond 1905–15 jt |
+
+**Varasem väide „18. sajandi saksa Kurrenti avalikku GT-d ei ole" oli vale.**
+~2 500 lehte ülikooli konsiiliumi protokolle on olemas — täpselt Tartu
+ülikooli materjali žanr — aga meie ehitusskript ei jõudnud nendeni, sest
+voogedastas andmestikku järjekorras ja täitis 8 000 lehe kvoodi Zürichiga.
+
+Soovitus järgmiseks Kurrendi treeninguks: Zürich ja Escher piirata (nt
+500–1000 lk projekti kohta), lisada 1750–1899 unikaalsed lehed ja
+`hanse-kurrent-xvii`; 1900+ hoida väikesena. Ehitus peab lugema LOSSi
+`data/kurrent_xix_audit/unique_pages.csv`-d, mitte voogedastama. VUTT-i oma
+„Valmis" käsikirjalehed (Herrnhuti diaariumid, aruanded) jäävad ainsaks
+Baltikumi-spetsiifiliseks allikaks. Detailid: LOSS `docs/kurrent-andmestikud.md`,
+jaotis „Ülevaatus 2026-10-02".
