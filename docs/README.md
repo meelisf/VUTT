@@ -22,6 +22,7 @@ Veel lahtiseks jäänud read tõsta enne `tegemata_tood.md`-sse, et need ei kaok
 | [ocr-ssh-key.md](ocr-ssh-key.md) | Eraldi OCR-võti, piirangud ja tagasipööramine | OCR-ühenduse või võtme muutmisel |
 | [monitoring-bot-traffic.md](monitoring-bot-traffic.md) | Bot/scraper-liikluse jälgimise plaan (D1–D4, **veel rakendamata**) | Kui pildikraapimine muutub probleemiks |
 | [reviews/](reviews/) | Ülevaated, millele mujal viidatakse (skaleerimine 2026-07-09 ← ADR 0006) | Skaleerimisküsimuste taustaks |
+| [reviews/2026-10-02-htr-mudelite-vordlus.md](reviews/2026-10-02-htr-mudelite-vordlus.md) | Käsikirja-OCR: 20 üldmudelit + meie Qwen 3.5 9B ühel Kurrendi lehel (CER/WER/hind); uued treeningandmestikud | OCR-mudeli vahetuse või järgmise Kurrendi treeningu eel |
 | [reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md](reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md) | Andmelekkeriskid: kood, tootmise saladuste ja failide õigused, teenuste eraldatus | Turvaparanduste planeerimisel ja tootmise järelkontrollil |
 | [reviews/2026-09-15-koodibaasi-ulevaade.md](reviews/2026-09-15-koodibaasi-ulevaade.md) | Koodibaasi ülevaatus: saladuste kontroll, turva, hallatavus, pikaealisus (P0–P2) | Enne suuremat refaktorit või uue töö planeerimist |
 | [superpowers/specs/](superpowers/specs/) | **Lahtised** disainid: teose osad (PR 4 CMIF, #464/#526), isiku lisamise voog (ülevaatusjärjekord), contributor-ulatuse B osa, Gemini re-OCR superadmin | Enne selle töö jätkamist |
