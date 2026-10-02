@@ -151,3 +151,43 @@ def test_malformed_metadata_is_fail_closed(
 
     assert response.status_code == 503, response.text
     assert (restricted_work_env["work_dir"] / "page1.txt").read_text(encoding="utf-8") == "salajane tekst"
+
+
+# --- Allalaadimise pilet: <a href> ei kanna Authorization-päist ---
+
+def test_lubatud_kasutaja_laeb_piletiga_alla_ilma_paiseta(client, login, restricted_work_env):
+    """Brauseri allalaadimine on tavaline navigeerimine — päist ei ole, pilet on URL-is."""
+    # Tekstifail koostatakse piltide järjekorras — ilma pildita oleks see tühi.
+    (restricted_work_env["work_dir"] / "page1.jpg").write_bytes(b"\xff\xd8\xff")
+    token = login("admin", "adminpass")
+    pilet = client.get("/download/secret1/ticket", headers=_auth(token))
+    assert pilet.status_code == 200, pilet.text
+    p = pilet.json()
+
+    response = client.get(f"/download/secret1?content=text&exp={p['exp']}&sig={p['sig']}")
+    assert response.status_code == 200, response.text
+    assert "salajane tekst" in response.text
+
+
+def test_anonuumne_ei_saa_piiratud_teose_piletit(client, restricted_work_env):
+    response = client.get("/download/secret1/ticket")
+    assert response.status_code == 403, response.text
+
+
+@pytest.mark.parametrize("muuda", ["vale_allkiri", "aegunud", "teine_teos"])
+def test_vigane_pilet_ei_ava_piiratud_teost(client, restricted_work_env, muuda):
+    import time
+    import server.routers.public as public
+
+    exp = int(time.time()) + 60
+    sig = public._download_sig("secret1", exp)
+    if muuda == "vale_allkiri":
+        sig = "0" * len(sig)
+    elif muuda == "aegunud":
+        exp = int(time.time()) - 1
+        sig = public._download_sig("secret1", exp)
+    else:
+        sig = public._download_sig("muuteos", exp)
+
+    response = client.get(f"/download/secret1?content=text&exp={exp}&sig={sig}")
+    assert response.status_code == 403, response.text

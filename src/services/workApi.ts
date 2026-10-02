@@ -158,6 +158,16 @@ export function getViewerToken(workId: string, token: string): Promise<ViewerTok
   return apiGet<ViewerTokenResponse>(`/work/${workId}/viewer-token`, auth(token, { timeout: 10000 }));
 }
 
+export interface DownloadTicketResponse {
+  exp: number;
+  sig: string;
+}
+
+/** Lühiajaline allalaadimisallkiri: <a href> ei kanna Authorization-päist. */
+export function getDownloadTicket(workId: string, token: string | null): Promise<DownloadTicketResponse> {
+  return apiGet<DownloadTicketResponse>(`/download/${workId}/ticket`, auth(token, { timeout: 10000 }));
+}
+
 export function getReocrStatus<T>(workId: string, token: string): Promise<T> {
   return apiGet<T>(`/admin/work/${workId}/reocr-status`, auth(token, { timeout: 8000 }));
 }

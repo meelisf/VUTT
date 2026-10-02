@@ -449,7 +449,8 @@
     "optionImages": "Pildid (.zip)",
     "optionImagesDesc": "Kõik skaneeringud ZIP-arhiivis",
     "optionBoth": "Tekst ja pildid (.zip)",
-    "optionBothDesc": "Eraldi tekstifailid + skaneeringud ZIP-arhiivis"
+    "optionBothDesc": "Eraldi tekstifailid + skaneeringud ZIP-arhiivis",
+    "error": "Allalaadimine ebaõnnestus. Kontrolli, kas oled sisse logitud, ja proovi uuesti."
   },
   "info": {
     "workInfo": "Teose info",
