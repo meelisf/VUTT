@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
@@ -85,8 +86,55 @@ def get_viewer_token(work_id: str, request: Request):
     return {"token": meili_token, "image_exp": image_exp, "image_sig": image_sig}
 
 
+# Allalaadimine on brauseri navigeerimine (<a href>), mis ei kanna
+# Authorization-päist — piiratud teose puhul oleks kutsuja alati anonüümne.
+# Seepärast annab /ticket sessiooni järgi lühiajalise, teosega seotud
+# HMAC-allkirja (sama muster mis pildiserveri `image:`-allkiri, eri prefiks).
+# Sessioonitokenit URL-i EI panda: see jääks nginx-i logidesse.
+DOWNLOAD_TICKET_TTL = 120
+
+
+def _download_sig(work_id: str, exp: int) -> str:
+    import hashlib as _hashlib
+    import hmac as _hmac
+    from ..config import IMAGE_TOKEN_SECRET
+    return _hmac.new(
+        IMAGE_TOKEN_SECRET.encode(),
+        f"download:{work_id}:{exp}".encode(),
+        _hashlib.sha256,
+    ).hexdigest()
+
+
+def _valid_download_ticket(work_id: str, exp: Optional[str], sig: Optional[str]) -> bool:
+    import hmac as _hmac
+    import time as _time
+    if not exp or not sig:
+        return False
+    try:
+        exp_int = int(exp)
+    except ValueError:
+        return False
+    if exp_int < int(_time.time()):
+        return False
+    return _hmac.compare_digest(_download_sig(work_id, exp_int), sig)
+
+
+@router.get("/download/{work_id}/ticket")
+def download_ticket(request: Request, work_id: str):
+    """Annab lugemisõigusega kutsujale lühiajalise allalaadimisallkirja."""
+    import time as _time
+    meta = _load_work_metadata(work_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    if not can_read_work(meta, _get_optional_user(request)):
+        raise HTTPException(status_code=403, detail="Ligipääs keelatud")
+    exp = int(_time.time()) + DOWNLOAD_TICKET_TTL
+    return {"exp": exp, "sig": _download_sig(work_id, exp)}
+
+
 @router.get("/download/{work_id}")
-def download_work(request: Request, work_id: str, content: str = "both"):
+def download_work(request: Request, work_id: str, content: str = "both",
+                  exp: Optional[str] = None, sig: Optional[str] = None):
     """Laeb alla teose failid.
     content:
       'text'   → üks kokku liidetud .txt fail (sequence järjekorras)
@@ -108,9 +156,10 @@ def download_work(request: Request, work_id: str, content: str = "both"):
     meta_for_access = _load_work_metadata(work_id)
     if meta_for_access is None:
         raise HTTPException(status_code=503, detail="Teose metaandmeid ei saa praegu lugeda")
-    user = _get_optional_user(request)
-    if not can_read_work(meta_for_access, user):
-        raise HTTPException(status_code=403, detail="Ligipääs keelatud")
+    if not _valid_download_ticket(work_id, exp, sig):
+        user = _get_optional_user(request)
+        if not can_read_work(meta_for_access, user):
+            raise HTTPException(status_code=403, detail="Ligipääs keelatud")
 
     slug = os.path.basename(folder)
 

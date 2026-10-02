@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, FileText, Image, Package, X } from 'lucide-react';
 import { FILE_API_URL } from '../config';
+import { useUser } from '../contexts/UserContext';
+import { getDownloadTicket } from '../services/workApi';
 
 interface DownloadModalProps {
   isOpen: boolean;
@@ -17,8 +19,26 @@ const OPTIONS = [
 
 const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, workId, onClose }) => {
   const { t } = useTranslation('workspace');
+  const { authToken } = useUser();
+  const [error, setError] = useState(false);
 
   if (!isOpen) return null;
+
+  // Piiratud teose allalaadimine vajab kutsuja õigusi, aga brauseri
+  // navigeerimine ei saada Authorization-päist. Küsime enne serverilt
+  // teosega seotud lühiajalise allkirja ja paneme selle URL-i.
+  const startDownload = async (key: string) => {
+    setError(false);
+    try {
+      const { exp, sig } = await getDownloadTicket(workId, authToken);
+      window.location.assign(
+        `${FILE_API_URL}/download/${workId}?content=${key}&exp=${exp}&sig=${encodeURIComponent(sig)}`
+      );
+      onClose();
+    } catch {
+      setError(true);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
@@ -36,20 +56,20 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, workId, onClose }
 
         <div className="p-4 space-y-2">
           {OPTIONS.map(({ key, icon: Icon, labelKey, descKey }) => (
-            <a
+            <button
               key={key}
-              href={`${FILE_API_URL}/download/${workId}?content=${key}`}
-              download
-              onClick={onClose}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors group"
+              type="button"
+              onClick={() => startDownload(key)}
+              className="w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors group"
             >
               <Icon size={18} className="text-gray-400 group-hover:text-primary-600 transition-colors shrink-0" />
               <div>
                 <div className="text-sm font-medium text-gray-800">{t(labelKey)}</div>
                 <div className="text-xs text-gray-500">{t(descKey)}</div>
               </div>
-            </a>
+            </button>
           ))}
+          {error && <p className="text-sm text-red-600 px-1">{t('download.error')}</p>}
         </div>
 
       </div>

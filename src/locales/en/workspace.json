@@ -449,7 +449,8 @@
     "optionImages": "Images (.zip)",
     "optionImagesDesc": "All scans in a ZIP archive",
     "optionBoth": "Text and images (.zip)",
-    "optionBothDesc": "Individual text files + scans in a ZIP archive"
+    "optionBothDesc": "Individual text files + scans in a ZIP archive",
+    "error": "Download failed. Check that you are logged in and try again."
   },
   "info": {
     "workInfo": "Work info",
