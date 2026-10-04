@@ -38,3 +38,21 @@ describe('PageCard ootel toimingud', () => {
     expect(screen.getByTestId('pending-op-badge').textContent).toContain('90°');
   });
 });
+
+describe('PageCard kärbe (ADR 0061)', () => {
+  it('kärpimine ja poolitamine on eraldi nähtavad nupud', () => {
+    const onEdit = vi.fn();
+    render(<PageCard {...base} onEdit={onEdit} />);
+    screen.getByTestId('card-open-crop').click();
+    screen.getByTestId('card-open-split').click();
+    expect(onEdit.mock.calls).toEqual([['edit'], ['split']]);
+  });
+
+  it('ootel kärbe: märk ja serveri eelvaade (CSS-pööret pole)', () => {
+    const { container } = render(<PageCard {...base} pendingOp={{ rotate: 90, split: false, adjust: { angle: 0, crop: { x: 0, y: 0, w: 1, h: 0.5 }, quad: null } }} />);
+    expect(screen.getByTestId('pending-op-badge').textContent).toContain('manage.pageOps.badgeCrop');
+    const img = container.querySelector('img')!;
+    expect(img.getAttribute('src')).toContain('/page-image/a.jpg/preview?');
+    expect(img.style.transform).toBe('');
+  });
+});

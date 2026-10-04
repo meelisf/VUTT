@@ -1,5 +1,8 @@
 import { LinkedEntity } from '../types/LinkedEntity';
 import { ApiRequestOptions, apiDelete, apiGet, apiPost } from './apiClient';
+import { FILE_API_URL } from '../config';
+import type { PageOpRequest } from '../pages/manage/pageOpsPlan';
+import type { PageAdjust } from '../pages/upload/types';
 
 // Teoste ja haldusvaate backend API abifunktsioonid. Komponendid peaksid siin
 // kasutama domeenimeetodeid, mitte otse URL-e kokku panema.
@@ -246,6 +249,7 @@ export function reorderWorkPages(workId: string, token: string, order: string[])
 
 export interface PageOpsResult {
   rotated?: number;
+  adjusted?: number;
   split?: number;
   new_page_count?: number;
 }
@@ -259,13 +263,29 @@ export interface PageOpsStatus {
   error?: string;
 }
 
-/** Käivitab ootel pöörded ja poolitused taustatööna; edenemine `getWorkPageOpsStatus`-ist. */
+/** Käivitab ootel pöörded, kärped ja poolitused taustatööna; edenemine `getWorkPageOpsStatus`-ist. */
 export function startWorkPageOps(
   workId: string,
   token: string,
-  ops: { filename: string; rotate: number; split_x: number | null }[],
+  ops: PageOpRequest[],
 ): Promise<{ status: string; total: number }> {
   return apiPost(`/admin/work/${workId}/page-ops`, { ops }, authJson(token, { timeout: 30000 }));
+}
+
+/**
+ * Ootel pöörde + kärpe eelvaade `<img src>`-ile (ADR 0061). Teisendus käib
+ * URL-is: pilt on deterministlik ja vale pilti brauseri vahemällu ei jää.
+ * `thumb` = ruudustiku pisipilt, `view` = pildiredaktori lava.
+ */
+export function workPagePreviewUrl(
+  workId: string, filename: string, token: string | null,
+  rotate: number, adjust: PageAdjust | null, size: 'thumb' | 'view', cacheBust = 0,
+): string {
+  const params = new URLSearchParams({ token: token ?? '', size });
+  if (rotate) params.set('rot', String(rotate));
+  if (adjust) params.set('adj', JSON.stringify(adjust));
+  if (cacheBust) params.set('v', String(cacheBust));
+  return `${FILE_API_URL}/admin/work/${workId}/page-image/${encodeURIComponent(filename)}/preview?${params}`;
 }
 
 export function getWorkPageOpsStatus(workId: string, token: string): Promise<PageOpsStatus> {

@@ -1,7 +1,7 @@
-"""Teose halduse ootel pöörded ja poolitused ühe pakina (#431 etapp 3, ADR 0050).
+"""Teose halduse ootel pöörded, kärped ja poolitused ühe pakina (#431, ADR 0050, 0061).
 
-Leping: valideerimine ENNE ühegi faili puudutamist; lehe sees pööre → poolitus
-(joon pööratud laiuses); poolitus kasutab värsket lehenumbrit; Meili üks kord.
+Leping: valideerimine ENNE ühegi faili puudutamist; lehe sees pööre → adjust →
+poolitus (joon kohandatud laiuses); poolitus kasutab värsket lehenumbrit; Meili üks kord.
 """
 import json
 import sys
@@ -128,6 +128,61 @@ def test_tyhjad_kirjed_on_no_op(work):
     assert r["changed"] is False
 
 
+def test_karbe_ilma_poordeta(work):
+    """Ootel kärbe (ADR 0061): 200×100 lehe parem pool → 100×100; Meilit ei puututa."""
+    r = work["aps"].apply_page_ops("w1", [{"filename": work["names"][0], "adjust": {
+        "angle": 0, "crop": {"x": 0.5, "y": 0, "w": 0.5, "h": 1}, "quad": None}}], "admin")
+    assert r["adjusted"] == 1 and r["rotated"] == 0
+    assert _sizes(work)[0] == (100, 100)
+    assert work["syncs"] == []
+
+
+def test_poore_karbe_poolitus_jarjekord(work):
+    """Kärbe on pööratud lehe raamis, joon kärbitud lehe laiuses:
+    200×100 → 90° → 100×200 → ülemine pool (100×100) → poolitus → 2 × 50×100."""
+    aps = work["aps"]
+    r = aps.apply_page_ops("w1", [{"filename": work["names"][0], "rotate": 90, "split_x": 0.5,
+                                   "adjust": {"angle": 0, "crop": {"x": 0, "y": 0, "w": 1, "h": 0.5}}}],
+                           "admin")
+    assert (r["rotated"], r["adjusted"], r["split"]) == (1, 1, 1)
+    assert _sizes(work)[:2] == [(50, 100), (50, 100)]
+
+
+def test_poore_ja_karbe_on_uks_kodeering(work, monkeypatch):
+    """Pööre + adjust = ÜKS _transform_locked kutse (üks JPEG-i ümberkodeerimine)."""
+    aps = work["aps"]
+    calls = []
+    real = aps._transform_locked
+    monkeypatch.setattr(aps, "_transform_locked", lambda *a, **kw: calls.append(a) or real(*a, **kw))
+    aps.apply_page_ops("w1", [{"filename": work["names"][0], "rotate": 90,
+                               "adjust": {"angle": 0, "crop": {"x": 0, "y": 0, "w": 1, "h": 0.5}}}], "admin")
+    assert len(calls) == 1 and calls[0][3] == 90.0
+    assert _sizes(work)[0] == (100, 100)
+
+
+def test_vigane_adjust_lukkab_tagasi(work):
+    with pytest.raises(ValueError):
+        work["aps"].apply_page_ops("w1", [{"filename": work["names"][0],
+                                           "adjust": {"crop": {"x": 0, "y": 0, "w": 0, "h": 1}}}], "admin")
+    assert _sizes(work)[0] == (200, 100)
+
+
+def test_eelvaade_ei_muuda_ketast(work):
+    """Eelvaade: pööre + kärbe renderdatakse, fail jääb puutumata."""
+    from io import BytesIO
+    from PIL import Image
+    aps = work["aps"]
+    fn = work["names"][0]
+    before = (work["folder"] / fn).read_bytes()
+    data = aps.render_page_preview("w1", fn, 90, {"angle": 0, "crop": {"x": 0, "y": 0, "w": 1, "h": 0.5}}, "view")
+    with Image.open(BytesIO(data)) as im:
+        assert im.size == (100, 100)
+    assert (work["folder"] / fn).read_bytes() == before
+    assert aps.render_page_preview("w1", "pole.jpg") is None
+    with pytest.raises(ValueError):
+        aps.render_page_preview("w1", fn, 45)
+
+
 # --- Endpoint ---
 
 def test_endpoint_nouab_admini(backend_env, login):
@@ -135,6 +190,18 @@ def test_endpoint_nouab_admini(backend_env, login):
     r = backend_env["client"].post("/admin/work/w1/page-ops", json={"ops": []},
                                    headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 401
+
+
+def test_eelvaate_endpoint_nouab_admini_ja_lubab_query_tokenit(backend_env, login, monkeypatch):
+    """`<img src>` saadab tokeni `?token=`-iga; editor ei saa eelvaadet."""
+    from server.routers import pages as pages_router
+    monkeypatch.setattr(pages_router, "render_page_preview", lambda *a, **kw: b"jpg")
+    c = backend_env["client"]
+    url = "/admin/work/w1/page-image/a.jpg/preview"
+    assert c.get(f"{url}?token={login('editor', 'editorpass')}").status_code == 401
+    r = c.get(f"{url}?rot=90&token={login('admin', 'adminpass')}")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+    assert c.get(f"{url}?adj=%7Bkatki&token={login('admin', 'adminpass')}").status_code == 400
 
 
 def test_endpoint_kontroll_ja_start(backend_env, login, monkeypatch):
