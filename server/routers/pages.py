@@ -2,8 +2,10 @@ import json
 import os
 import shutil
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
 from ..admin_page_ops import (
@@ -17,6 +19,7 @@ from ..admin_page_ops import (
     restore_original_page_image,
     split_page,
     precheck_page_ops,
+    render_page_preview,
     transform_page_image,
     work_lock,
     write_new_page,
@@ -349,7 +352,8 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
 async def admin_apply_page_ops(work_id: str, request: Request, user=Depends(require_role("admin"))):
     """Käivitab ootel pöörded ja poolitused TAUSTATÖÖNA (#431, ADR 0050).
 
-    Body: {"ops": [{"filename", "rotate": 0|90|180|270, "split_x": float|null}]}.
+    Body: {"ops": [{"filename", "rotate": 0|90|180|270, "adjust": {angle, crop|quad}|null,
+    "split_x": float|null}]}.
     Vigane sisend või puuduv leht → 400 kohe; sama teose töö juba käib → 409.
     Edenemine: GET …/page-ops/status.
     """
@@ -370,6 +374,24 @@ async def admin_apply_page_ops(work_id: str, request: Request, user=Depends(requ
 def admin_page_ops_status(work_id: str, user=Depends(require_role("admin"))):
     """Taustatöö olek: {state: idle|running|done|error, done, total, result?, error?}."""
     return page_ops_jobs.get_status(work_id)
+
+
+@router.get("/admin/work/{work_id}/page-image/{filename}/preview")
+def admin_page_preview(work_id: str, filename: str, rot: int = 0, adj: Optional[str] = None,
+                       size: str = "thumb", user=Depends(require_role("admin"))):
+    """Ootel pöörde/kärpe eelvaade (`?rot=90&adj=<JSON>&size=thumb|view`, ADR 0061).
+
+    `<img src>` jaoks: token tuleb `?token=`-ist (deps.get_user). Kettal midagi ei muutu.
+    """
+    try:
+        data = render_page_preview(work_id, filename, rot, json.loads(adj) if adj else None, size)
+    except (ValueError, TypeError) as e:   # json.JSONDecodeError on ValueError
+        raise HTTPException(status_code=400, detail=str(e))
+    if data is None:
+        raise HTTPException(status_code=404, detail="Teost või lehte ei leitud")
+    # URL on deterministlik (parameetrid päringus) → lühike privaatne vahemälu on ohutu.
+    return Response(content=data, media_type="image/jpeg",
+                    headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.post("/admin/work/{work_id}/page-image/{filename}/transform")

@@ -54,8 +54,10 @@ import PartsTab from './manage/parts/PartsTab';
 import { initialManageTab, tabSwitch, type ManageTab } from './manage/partsModel';
 import PageActionBar from './manage/PageActionBar';
 import {
-  PendingPageOps, pendingCount, pruneMissing, rotatePending, setPendingSplit, setPendingSplitX, toRequest,
+  PendingPageOps, clearPendingAdjust, pendingCount, pruneMissing, rotatePending, setPendingEdit,
+  setPendingSplit, setPendingSplitX, toRequest,
 } from './manage/pageOpsPlan';
+import type { PageAdjust } from './upload/types';
 import { clampSplitX } from '../components/pagePrep/geometry';
 import { mapReocrState, selectableNoTextFiles, applicableReocrPages, ReocrStatusResponse } from '../utils/reocrStatus';
 import { ruhmita } from './manage/trashGrouping';
@@ -323,6 +325,15 @@ const WorkManage: React.FC = () => {
     },
     [],
   );
+  const handleEditorEditChange = useCallback(
+    (filename: string, rotate: number, adjust: PageAdjust | null) => {
+      setPendingOps((o) => setPendingEdit(o, filename, rotate, adjust));
+    },
+    [],
+  );
+  const handleEditorAdjustClear = useCallback((filename: string) => {
+    setPendingOps((o) => clearPendingAdjust(o, [filename]));
+  }, []);
   // Üldjoon protsendina tekstiväljas (type="text", vt CLAUDE.md); kehtetu → 50 %.
   const splitX = (() => {
     const v = Number(splitPercent.replace(',', '.'));
@@ -586,7 +597,7 @@ const WorkManage: React.FC = () => {
         }
         if (st.state === 'done') {
           const r = st.result ?? {};
-          setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, split: r.split ?? 0 }));
+          setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, adjusted: r.adjusted ?? 0, split: r.split ?? 0 }));
           ok = true;
         } else if (st.state === 'error') {
           setPageOpsError(st.error || t('manage.pageOps.error'));
@@ -858,16 +869,6 @@ const WorkManage: React.FC = () => {
         {/* Tabid */}
         <div className="flex gap-1 mb-6 border-b border-gray-200">
           <button
-            onClick={() => switchTab('parts')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'parts'
-                ? 'border-primary-600 text-primary-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t('manage.tabParts')}
-          </button>
-          <button
             onClick={() => switchTab('pages')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'pages'
@@ -881,6 +882,16 @@ const WorkManage: React.FC = () => {
                 {pages.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => switchTab('parts')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'parts'
+                ? 'border-primary-600 text-primary-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t('manage.tabParts')}
           </button>
           <button
             onClick={() => switchTab('replace')}
@@ -1135,7 +1146,7 @@ const WorkManage: React.FC = () => {
                         thumbCacheBust={thumbCacheBust}
                         imageToken={imageToken}
                         onToggle={handleToggle}
-                        onEdit={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
+                        onEdit={(tab) => setEditorTarget({ index: page.page_num - 1, tab })}
                         pendingOp={pendingOps[page.filename]}
                         splitX={splitX}
                       />
@@ -1455,6 +1466,8 @@ const WorkManage: React.FC = () => {
           pendingOps={pendingOps}
           globalSplitX={splitX}
           onSplitChange={handleEditorSplitChange}
+          onEditChange={handleEditorEditChange}
+          onAdjustClear={handleEditorAdjustClear}
         />
       )}
 

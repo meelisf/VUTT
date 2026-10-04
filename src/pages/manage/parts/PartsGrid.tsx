@@ -1,7 +1,8 @@
 /**
  * Osade vahekaardi lehtede ruudustik (#464): valik (klikk, Shift-vahemik) ja iga lehe
- * osa märgid (klikk avab osa). Veeru laius tuleb suuruse liugurist; kaart järgib
- * pildi kõrgust (h-auto), et raami ja pildi vahele ei jääks tühja valget.
+ * osa märgid (klikk avab osa). Veeru laius tuleb suuruse liugurist; kaart on sama
+ * 3/4 kast `object-contain`-iga nagu lehtede vahekaardi PageCard — pildi enda kõrgus
+ * ei tohi kaarti mõõta, muidu venib piklik leht ruudustikus mitmekordseks.
  * Leht avaneb töölaual uues vahekaardis, et töö siin ei katkeks.
  */
 import React from 'react';
@@ -50,17 +51,20 @@ const PartsGrid: React.FC<Props> = ({ workId, pages, badges, selected, activeSte
             aria-pressed={isSel}
             onClick={e => onToggle(stem, e.shiftKey)}
             onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggle(stem, e.shiftKey); } }}
-            className={`relative cursor-pointer select-none overflow-hidden rounded-md border bg-white transition-shadow ${
+            className={`relative cursor-pointer select-none overflow-hidden rounded-lg border bg-white transition-shadow ${
               isSel ? 'border-primary-500 ring-2 ring-primary-400' : isActive ? 'border-amber-400 ring-2 ring-amber-300' : 'border-gray-200 hover:border-gray-300'
             }`}
           >
-            <PageThumb
-              workId={workId}
-              src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${imageName}?v=${thumbCacheBust}${tokenQuery}`}
-              className="block h-auto min-h-16 w-full bg-gray-50"
-            />
-            <div className="flex items-center justify-between gap-1 border-t border-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
-              <span className="tabular-nums">{page.page_num}</span>
+            <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
+              <PageThumb
+                workId={workId}
+                src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${imageName}?v=${thumbCacheBust}${tokenQuery}`}
+                className="h-full w-full object-contain"
+              />
+              {/* Number all vasakul, töölaua link all paremal — nagu PageCard'il. */}
+              <span className="absolute bottom-1 left-1 rounded bg-white/90 px-1 py-0.5 text-xs leading-tight tabular-nums text-gray-600 shadow-sm">
+                {page.page_num}
+              </span>
               <a
                 href={`/work/${workId}/${page.page_num}`}
                 target="_blank"
@@ -69,13 +73,13 @@ const PartsGrid: React.FC<Props> = ({ workId, pages, badges, selected, activeSte
                 onKeyDown={e => e.stopPropagation()}
                 title={t('manage.parts.openPage')}
                 aria-label={t('manage.parts.openPage')}
-                className="text-gray-400 hover:text-primary-600"
+                className="absolute bottom-1 right-1 rounded border border-gray-600 bg-white/90 p-1 text-gray-600 shadow-sm hover:bg-gray-100 hover:text-primary-600"
               >
-                <ExternalLink size={12} />
+                <ExternalLink size={14} />
               </a>
             </div>
             {(badges.get(stem) ?? []).length > 0 && (
-              <div className="absolute left-1 top-1 flex flex-wrap gap-1">
+              <div className="absolute left-1 top-1 z-10 flex flex-wrap gap-1">
                 {badges.get(stem)!.map(b => (
                   <button
                     type="button"

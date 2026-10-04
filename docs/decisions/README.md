@@ -69,7 +69,7 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0047](0047-jatkatav-uleslaadimine.md) | Üksikfail laetakse üles tükkidena; jätkamise tõde on kettal olev baitide arv, uut upload'i staatust ei ole | kehtib |
 | [0048](0048-ulevaatusmarge-on-serveri-vali.md) | Ülevaatusmärge on serveri väli; automaatrikastus täidab ainult tühja; väline ID ühel kaardil | kehtib |
 | [0049](0049-lehe-teisendus-on-uks-tee.md) | Lehe teisendus on üks tee (`image_transform` + `components/pagePrep`); upload'is pööre → kärbe → poolitus | kehtib |
-| [0050](0050-teose-halduse-ootel-lehetoimingud.md) | Teose halduse pöörded ja poolitused on ootel plaan; rakendus ühe pakina (`/page-ops`), pööre → poolitus | kehtib |
+| [0050](0050-teose-halduse-ootel-lehetoimingud.md) | Teose halduse pöörded ja poolitused on ootel plaan; rakendus ühe pakina (`/page-ops`), pööre → poolitus | kehtib (kärbe: vt 0061) |
 | [0051](0051-lehekirjutus-ainult-lehe-failipaarile.md) | Lehekirjutus ainult olemasoleva lehe `.txt`/`.json` paarile; nimeleping `server/page_paths.py` | kehtib |
 | [0052](0052-kohtade-register-on-ajalooline.md) | Kohtade register on ajalooline; grupi kriteeriumid (Saksamaal Benrathi joon); tänapäevane halduskuuluvus → grupp ankrute kaudu | kehtib |
 | [0053](0053-lehe-kirjutus-lehe-luku-all.md) | Lehe JSON-i lugemine–muutmine–kirjutamine käib lehe luku all (`page_locks.page_lock`); kommentaaritoimingud kirjutavad ainult `.json`-i | kehtib |
@@ -80,3 +80,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0058](0058-mcp-esitab-ainult-ootel-prosopo-ettepaneku.md) | MCP võib kirjutada ainult ootel ettepaneku (isik, teose osad); üleandmiskood on ulatusega ja seotud kasutajaga (täiendus 2026-09-27, #492) | kehtib |
 | [0059](0059-ameti-ja-asutusregistri-voti.md) | Ameti ja asutuse VUTT-i registrivõti on identiteet; Q-kood on valikuline ühilduvusväli, allikasõnastus säilib | kehtib |
 | [0060](0060-perioodiline-soltuvus-ei-lae-lehte-uuesti.md) | Töölaua perioodiliselt muutuv sõltuvus (token, sessioon, kasutaja) ei lae juba laetud lehte uuesti; laadimisel on võti `pageLoadKey`, redaktor hoiab salvestamata teksti | kehtib |
+| [0061](0061-teose-halduse-karbe-on-ootel-toiming.md) | Teose halduse pööre ja kärbe on ootel toiming (`adjust` pööratud raamis, pööre → adjust → poolitus, üks kodeering); eelvaade serveri renderdus; kaardil eraldi kärpe- ja poolitusnupp (asendab osaliselt 0050) | kehtib |

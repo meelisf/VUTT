@@ -401,8 +401,8 @@ selle omanik (`_reset_status_if_prepping`), muidu lubaks ta teise apply CAS-i si
 `src/components/pagePrep/`. Upload'i apply järjekord: **pööre → `adjust` → poolitus**;
 pööre eemaldab `adjust`-i (`withRotation`). Plaani salvestuses puuduv `adjust` võti =
 ära puutu, ainult `null` eemaldab. Eelvaade saab `adjust`-i URL-ist (`?adj=`), mitte plaanist.
-Teose halduse hulgipööre/-poolitus (ADR 0050) on **ootel plaan** (`manage/pageOpsPlan.ts`,
-võti = failinimi) ja rakendub **taustatööna** (`POST /admin/work/{id}/page-ops` +
+Teose halduse pööre/kärbe/poolitus (ADR 0050, 0061) on **ootel plaan** (`manage/pageOpsPlan.ts`,
+võti = failinimi; kärbe = `adjust` pööratud raamis, pöörde muutus eemaldab selle) ja rakendub **taustatööna** (`POST /admin/work/{id}/page-ops` +
 `…/status`, `server/page_ops_jobs.py`): valideerimine enne muutmist, üks `work_lock`, Meili
 sünk üks kord. Poolitus = ÜKS native commit (`commit_add_and_remove`) — GitPythoni
 `index.commit` on /data repos ~2 s. Välistab järjekorra mustandi ja vastupidi.

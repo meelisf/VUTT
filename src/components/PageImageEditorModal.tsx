@@ -3,9 +3,11 @@ import { X, Crop, Columns2, Loader2, AlertTriangle, ChevronLeft, ChevronRight, C
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
-import { transformPageImage, restoreOriginalPageImage } from '../services/pageService';
+import { restoreOriginalPageImage } from '../services/pageService';
+import { workPagePreviewUrl } from '../services/workApi';
+import { adjustFromParams } from '../pages/upload/prepressPlan';
+import type { PageAdjust } from '../pages/upload/types';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
-import { computeNextAnchor, resolveIndexAfter } from '../utils/pageNavAnchor';
 import { addRotation, clampSplitX } from './pagePrep/geometry';
 import { useSplitDrag } from './pagePrep/useSplitDrag';
 import SplitLine from './pagePrep/SplitLine';
@@ -39,6 +41,14 @@ interface Props {
   globalSplitX: number;
   /** split=false → ära poolita; split_x=null → üldjoon. */
   onSplitChange: (filename: string, change: { split: boolean; split_x: number | null }) => void;
+  /**
+   * Pööre + kärbe/kalle/perspektiiv on samuti OOTEL plaan (ADR 0061): „Märgi"
+   * kirjutab plaani, kettale jõuab see riba „Rakenda" nupust. adjust=null →
+   * ainult pööre (kärbe kuulus eelmisse raami ja kaob).
+   */
+  onEditChange: (filename: string, rotate: number, adjust: PageAdjust | null) => void;
+  /** „Eemalda kärbe" — pööre ja poolitus jäävad. */
+  onAdjustClear: (filename: string) => void;
 }
 
 // Eelvaate vaikimisi mõõdud (px) — kasutatakse ainult esimese paindeni, enne kui
@@ -48,7 +58,7 @@ const DEFAULT_STAGE_H = 540;
 
 const PageImageEditorModal: React.FC<Props> = ({
   workId, pages, initialIndex, initialTab, imageToken, onClose, onPagesChanged, onReplaceImage, cacheBust,
-  pendingOps, globalSplitX, onSplitChange,
+  pendingOps, globalSplitX, onSplitChange, onEditChange, onAdjustClear,
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
@@ -58,12 +68,11 @@ const PageImageEditorModal: React.FC<Props> = ({
   const [grossAngle, setGrossAngle] = useState(0);   // jäme orientatsioon (90/180 nupud)
 
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
-  const [saving, setSaving] = useState(false);
+  // Poolitusvahekaardi kärbitud eelvaate mõõdud (serveri renderdus, ADR 0061).
+  const [previewNatural, setPreviewNatural] = useState<{ w: number; h: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [skipConfirm, setSkipConfirm] = useState(false);
   const [replacing, setReplacing] = useState(false);          // pildi asendamine käib
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
@@ -90,6 +99,11 @@ const PageImageEditorModal: React.FC<Props> = ({
   // Ootel pööre rakendub ENNE poolitust → joon kehtib pööratud lehele, seega
   // näitab poolitusvahekaart pilti juba pööratuna.
   const pendingRotate = pendingOp?.rotate ?? 0;
+  const pendingAdjust = pendingOp?.adjust ?? null;
+  // Lehe vahetusel algab jäme pööre ootel pöördest (ref: lähtestus-effect ei tohi
+  // pöörde muutusel uuesti joosta — see pühiks pildi mõõdud ja kärpekasti).
+  const pendingRotateRef = useRef(pendingRotate);
+  pendingRotateRef.current = pendingRotate;
 
   // Mõõda lava tegelik suurus (uueneb akna/modaali muutudes ja tabi vahetusel).
   // Korraga on mountitud ainult ühe tabi lava → re-attach [tab] muutudes.
@@ -130,8 +144,16 @@ const PageImageEditorModal: React.FC<Props> = ({
   // et edit-tabiga kokku langeda. grossAngle=0 korral identne imgDispW/H-ga.
   // Poolitusvahekaart: kast on OOTEL pöörde järgi pööratud lehe mõõtu (90°/270°
   // vahetavad laiuse ja kõrguse), pilt pööratakse CSS-iga selle sisse.
-  const splitRot90 = pendingRotate === 90 || pendingRotate === 270;
-  const splitNat = splitRot90 ? { w: natural.h, h: natural.w } : natural;
+  // Ootel kärpe korral näitab poolitusvahekaart serveri eelvaadet, milles pööre
+  // ja kärbe on juba sees — joon asetub täpselt nagu apply lõikab.
+  const splitPreviewUrl = current && pendingAdjust
+    ? workPagePreviewUrl(workId, current.filename, authToken, pendingRotate, pendingAdjust, 'view', cacheBust)
+    : null;
+  useEffect(() => { setPreviewNatural(null); }, [splitPreviewUrl]);
+  const splitRot90 = !splitPreviewUrl && (pendingRotate === 90 || pendingRotate === 270);
+  const splitNat = splitPreviewUrl
+    ? (previewNatural ?? natural)
+    : splitRot90 ? { w: natural.h, h: natural.w } : natural;
   const splitFit = Math.min(stage.w / splitNat.w, stage.h / splitNat.h, 1);
   const splitBoxW = splitNat.w * splitFit;
   const splitBoxH = splitNat.h * splitFit;
@@ -145,7 +167,7 @@ const PageImageEditorModal: React.FC<Props> = ({
   // crop.reset taastab "kleepuva" kärpe-suuruse tsentreeritud kastina (kui mõni
   // varem oli) — samas efektis, et kasti kalle jääks garanteeritult 0.
   useEffect(() => {
-    setGrossAngle(0);
+    setGrossAngle(pendingRotateRef.current);
     setImgNatural(null);
     setError(null);
     resetCrop();
@@ -202,7 +224,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   // --- Navigeerimine ---
   const goTo = useCallback((idx: number) => {
     setCurrentIndex(Math.max(0, Math.min(pages.length - 1, idx)));
-    setShowConfirm(false);
     setToast(null);
   }, [pages.length]);
 
@@ -219,48 +240,23 @@ const PageImageEditorModal: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [currentIndex, goTo, onClose]);
 
-  // --- Rakenda ---
-  const doApply = async () => {
-    if (!authToken || !current) return;
-    setShowConfirm(false);
-    setSaving(true);
+  // --- Märgi ja järgmine (ootel plaan, ADR 0061) ---
+  // Üks nupp: muudatus läheb plaani JA redaktor liigub edasi; muutmata leht = „Järgmine".
+  // Tagasi saab nooleklahvide / navigatsiooninuppudega.
+  const noEditChange = grossAngle === pendingRotate && !crop.hasEdit;
+  const isLast = safeIndex >= pages.length - 1;
+  const markPending = () => {
+    if (!current) return;
+    // Lehel pole midagi muudetud → lihtsalt edasi; ootel plaan (ka varasem kärbe) jääb puutumata.
+    if (noEditChange) { if (!isLast) goTo(safeIndex + 1); return; }
+    // Kärpekast joonistati jämeda pöörde raamis → adjust käib selle pöörde juurde.
+    // Ainult pööre (kasti pole) → kärbe kaob, see kuulus eelmisse raami.
+    const adjust = crop.hasEdit ? adjustFromParams(crop.toServerParams(0)) : null;
+    onEditChange(current.filename, grossAngle, adjust);
     setError(null);
-    setToast(null);
-
-    const before = pages.map((p) => p.filename);
-    const anchor = computeNextAnchor(before, current.filename);
-    const currentFilename = current.filename;
-
-    try {
-      let thumbWarn = false;
-      // Jäme pööre + kasti-kalle/perspektiiv → serveri (angle, crop | quad).
-      // Poolitus EI käi siit — see on ootel plaan (vt Props.pendingOps).
-      const p = crop.toServerParams(grossAngle);
-      const r = await transformPageImage(workId, currentFilename, p.angle, p.crop, authToken, p.quad ?? undefined);
-      thumbWarn = !!r.thumbnail_warning;
-
-      const after = await onPagesChanged();
-      const { index, done } = resolveIndexAfter(after, anchor, currentFilename);
-      setCurrentIndex(index);
-      setSaving(false);
-
-      if (done) {
-        setToast({ text: t('manage.editor.allDone') });
-      } else if (thumbWarn) {
-        setToast({ text: t('manage.editor.thumbWarning') });
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t('manage.editor.applyError'));
-      setSaving(false);
-    }
-  };
-
-  const onApplyClick = () => {
-    if (skipConfirm) {
-      doApply();
-    } else {
-      setShowConfirm(true);
-    }
+    // Järgmisele lehele, nagu varem kohese rakenduse järel — kärpimine käib lehthaaval.
+    if (!isLast) goTo(safeIndex + 1);
+    else { resetCrop(); setToast({ text: t('manage.editor.allDone') }); }
   };
 
   // Taasta lehe ._originals pristine pilt (destruktiivne: kõik pildimuudatused kaovad).
@@ -277,6 +273,8 @@ const PageImageEditorModal: React.FC<Props> = ({
         setToast({ text: t('manage.editor.noOriginal') });
         return;
       }
+      // Ootel kärbe oli vana pildi raamis.
+      onAdjustClear(current.filename);
       await onPagesChanged();
       setToast({ text: t('manage.editor.restoreDone') });
     } catch (e: unknown) {
@@ -294,6 +292,7 @@ const PageImageEditorModal: React.FC<Props> = ({
     setError(null);
     try {
       await onReplaceImage(file, current.page_num);
+      onAdjustClear(current.filename);  // ootel kärbe oli vana pildi raamis
       // cacheBust uueneb parent'is (thumbCacheBust) → reset-effekt mõõdab pildi uuesti ja lähtestab teisendused
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t('manage.replaceError'));
@@ -303,8 +302,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   };
 
   if (!current) return null;
-
-  const noEditChange = tab === 'edit' && grossAngle === 0 && !crop.hasEdit;
 
   // Laadija täidab lava — kuvame kuni naturaalmõõdud teada (väldib aspect-venitust).
   const loadingBox = (
@@ -331,7 +328,7 @@ const PageImageEditorModal: React.FC<Props> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowRestoreConfirm(true)}
-              disabled={restoring || saving || replacing}
+              disabled={restoring || replacing}
               title={t('manage.editor.restoreOriginal')}
               className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
             >
@@ -352,7 +349,7 @@ const PageImageEditorModal: React.FC<Props> = ({
             />
             <button
               onClick={() => replaceInputRef.current?.click()}
-              disabled={replacing || saving}
+              disabled={replacing}
               title={t('manage.replaceImage')}
               className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
             >
@@ -398,6 +395,23 @@ const PageImageEditorModal: React.FC<Props> = ({
               <p className="text-xs text-gray-400 flex-shrink-0">
                 {crop.perspective ? t('common:pagePrep.perspectiveHint') : t('common:pagePrep.cropHint')}
               </p>
+              {(pendingAdjust || pendingRotate !== 0) && (
+                <p data-testid="editor-edit-pending" className="flex items-center gap-2 text-sm text-amber-700 flex-shrink-0">
+                  {pendingRotate !== 0 && <span>{t('manage.editor.rotatePending', { deg: pendingRotate })}</span>}
+                  {pendingAdjust && (
+                    <>
+                      <span>{t('manage.editor.cropPending')}</span>
+                      <button
+                        data-testid="editor-crop-remove"
+                        onClick={() => onAdjustClear(current.filename)}
+                        className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
+                      >
+                        {t('manage.editor.cropRemove')}
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
 
               {/* Lava: mõõdetav paindlik ala, kuhu eelvaade mahutatakse. Pööramisnupud
                   hõljuvad pildi peal (absolute) → ei söö ei kõrgust ega laiust, pilt saab
@@ -492,6 +506,17 @@ const PageImageEditorModal: React.FC<Props> = ({
                 style={{ width: splitBoxW, height: splitBoxH }}
                 onPointerDown={(e) => { if (willSplit) splitAtClientX(e.clientX); }}
               >
+                {splitPreviewUrl ? (
+                  <img
+                    data-testid="editor-split-preview"
+                    src={splitPreviewUrl}
+                    alt={current.filename}
+                    className="absolute inset-0 pointer-events-none max-w-none"
+                    draggable={false}
+                    style={{ width: splitBoxW, height: splitBoxH }}
+                    onLoad={(e) => setPreviewNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                  />
+                ) : (
                 <img
                   src={imageUrl}
                   alt={current.filename}
@@ -504,6 +529,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                     transform: `translate(-50%, -50%) rotate(${pendingRotate}deg)`,
                   }}
                 />
+                )}
                 {willSplit ? (
                   <SplitLine
                     x={splitX}
@@ -543,16 +569,6 @@ const PageImageEditorModal: React.FC<Props> = ({
             </div>
           )}
 
-          {showConfirm && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded space-y-2">
-              <p className="text-sm text-amber-800">{t('manage.editor.confirmBody')}</p>
-              <label className="flex items-center gap-2 text-sm text-amber-700">
-                <input type="checkbox" checked={skipConfirm} onChange={(e) => setSkipConfirm(e.target.checked)} />
-                {t('manage.editor.dontAskAgain')}
-              </label>
-            </div>
-          )}
-
           {showRestoreConfirm && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded space-y-2">
               <p className="text-sm text-amber-800">{t('manage.editor.restoreConfirmBody')}</p>
@@ -578,7 +594,7 @@ const PageImageEditorModal: React.FC<Props> = ({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => goTo(currentIndex - 1)}
-                disabled={safeIndex <= 0 || saving}
+                disabled={safeIndex <= 0}
                 title={t('manage.editor.prev')}
                 className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40"
               >
@@ -586,7 +602,7 @@ const PageImageEditorModal: React.FC<Props> = ({
               </button>
               <button
                 onClick={() => goTo(currentIndex + 1)}
-                disabled={safeIndex >= pages.length - 1 || saving}
+                disabled={safeIndex >= pages.length - 1}
                 title={t('manage.editor.next')}
                 className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40"
               >
@@ -620,18 +636,21 @@ const PageImageEditorModal: React.FC<Props> = ({
               </div>
             ) : (
             <button
-              onClick={showConfirm ? doApply : onApplyClick}
-              disabled={saving || noEditChange}
+              data-testid="editor-mark"
+              onClick={markPending}
+              disabled={noEditChange && isLast}
               className="flex items-center gap-2 px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded transition-colors"
             >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              {t('manage.editor.apply')}
+              {noEditChange
+                ? t('manage.editor.next')
+                : isLast ? <><Check size={14} />{t('manage.editor.markPending')}</> : t('manage.editor.markAndNext')}
+              {!isLast && <ChevronRight size={14} />}
             </button>
             )}
           </div>
-          {tab === 'split' && (
-            <p className="text-xs text-gray-500">{t('manage.editor.splitPendingHint')}</p>
-          )}
+          <p className="text-xs text-gray-500">
+            {tab === 'split' ? t('manage.editor.splitPendingHint') : t('manage.editor.editPendingHint')}
+          </p>
         </div>
       </div>
     </div>

@@ -45,9 +45,9 @@ describe('partsModel: tundmatud väljad ei kao (arvustuse I1)', () => {
 });
 
 describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
-  it('?focus=N avab lehtede vahekaardi (töölaua sügavlink), muidu osad', () => {
+  it('avaneb alati lehtede vahekaardil — osad on teisel kohal', () => {
     expect(initialManageTab(7)).toBe('pages');
-    expect(initialManageTab(null)).toBe('parts');
+    expect(initialManageTab(null)).toBe('pages');
   });
   it('vahekaardi vahetust kaitstakse ainult osade mustandi korral', () => {
     const guarded: string[] = [];

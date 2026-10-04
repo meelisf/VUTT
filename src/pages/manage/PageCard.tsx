@@ -1,11 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Scissors, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
+import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
 import PageThumb from './PageThumb';
 import { IMAGE_BASE_URL } from '../../config';
+import { useUser } from '../../contexts/UserContext';
 import { ReocrState } from '../../utils/reocrStatus';
 import { cardLineLeftPercent } from '../../components/pagePrep/geometry';
-import { PendingPageOp, effectiveSplitX, showsCardLine } from './pageOpsPlan';
+import { workPagePreviewUrl } from '../../services/workApi';
+import { PendingPageOp, effectiveSplitX, needsServerPreview, showsCardLine } from './pageOpsPlan';
 
 interface PageCardProps {
   workId: string;
@@ -20,9 +22,10 @@ interface PageCardProps {
   thumbCacheBust: number;
   imageToken?: { exp: number; sig: string } | null;
   onToggle: (filename: string, shiftKey: boolean) => void;
-  onEdit: (visiblePageNum: number) => void;
+  /** Avab pildiredaktori: 'edit' = kärbe/kalle/pööre, 'split' = poolitusjoon. */
+  onEdit: (tab: 'edit' | 'split') => void;
   isFocused?: boolean;
-  /** Ootel pööre/poolitus (#431) — kaart näitab eelvaadet, fail ei ole veel muutunud. */
+  /** Ootel pööre/kärbe/poolitus (#431, ADR 0061) — kaart näitab eelvaadet, fail ei ole veel muutunud. */
   pendingOp?: PendingPageOp;
   /** Üldjoon (0..1) ootel poolitusele. */
   splitX: number;
@@ -46,11 +49,17 @@ const statusColor = (status: string) => {
 
 const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const { t } = useTranslation(['workspace', 'common']);
+  const { authToken } = useUser();
   const imageTokenQuery = p.imageToken ? `&exp=${p.imageToken.exp}&sig=${p.imageToken.sig}` : '';
   const [aspect, setAspect] = React.useState<number | undefined>(undefined);
   const op = p.pendingOp;
   // 180° ei muuda kuvatud pildi mõõte → joon käib sama valemi järgi.
   const lineLeft = showsCardLine(op) ? cardLineLeftPercent(aspect, effectiveSplitX(op, p.splitX)) : null;
+  // Kärbet/kallet CSS ei näita → server renderdab pisipildist eelvaate (pööre sees).
+  const serverPreview = needsServerPreview(op);
+  const thumbSrc = serverPreview
+    ? workPagePreviewUrl(p.workId, p.filename, authToken, op!.rotate, op!.adjust ?? null, 'thumb', p.thumbCacheBust)
+    : `${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}${imageTokenQuery}`;
   return (
     <div
       ref={ref}
@@ -109,14 +118,14 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         )}
         <PageThumb
           workId={p.workId}
-          src={`${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}${imageTokenQuery}`}
+          src={thumbSrc}
           /* `object-contain`, MITTE `cover` (sama kuju nagu upload'i kontaktlehel
              ja UploadStepReview'l): rõhtne leht ON lapiti ja peab ka ruudustikus
              lapiti välja nägema. `cover` lõikas küljed 3/4 portreeks ja peitis
              just selle — lehe tegelikku formaati polnud kaardilt näha. */
           className="w-full h-full object-contain"
           onAspect={setAspect}
-          imgStyle={rotateStyle(op?.rotate ?? 0)}
+          imgStyle={serverPreview ? undefined : rotateStyle(op?.rotate ?? 0)}
         />
         {/* Ootel poolituse joon — sama värv ja kuju nagu upload'i kontaktlehel. */}
         {lineLeft !== null && (
@@ -133,6 +142,7 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
             className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-1 py-0.5 rounded text-[10px] leading-none bg-amber-100 text-amber-800 border border-amber-300 shadow-sm"
           >
             {op.rotate !== 0 && (<><RotateCw size={11} />{op.rotate}°</>)}
+            {op.adjust && (<><Crop size={11} />{t('manage.pageOps.badgeCrop')}</>)}
             {op.split && (<><Columns2 size={11} />{t('manage.pageOps.badgeSplit')}</>)}
           </span>
         )}
@@ -140,14 +150,28 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         <span className={`absolute bottom-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(p.status)}`}>
           {p.visiblePageNum}
         </span>
-        {/* Redaktor — all paremal */}
-        <button
-          onClick={(e) => { e.stopPropagation(); p.onEdit(p.visiblePageNum); }}
-          className="absolute bottom-1 right-1 p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
-          title={t('manage.editor.title')}
-        >
-          <Scissors size={14} />
-        </button>
+        {/* Redaktor — all paremal: kaks eraldi nuppu, et kärpimine oleks leitav
+            (varem üks käärid-ikoon, mida loeti poolitamiseks, ADR 0061). */}
+        <div className="absolute bottom-1 right-1 flex gap-1">
+          <button
+            data-testid="card-open-crop"
+            onClick={(e) => { e.stopPropagation(); p.onEdit('edit'); }}
+            className="p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
+            title={t('manage.editor.openCrop')}
+            aria-label={t('manage.editor.openCrop')}
+          >
+            <Crop size={14} />
+          </button>
+          <button
+            data-testid="card-open-split"
+            onClick={(e) => { e.stopPropagation(); p.onEdit('split'); }}
+            className="p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
+            title={t('manage.editor.openSplit')}
+            aria-label={t('manage.editor.openSplit')}
+          >
+            <Columns2 size={14} />
+          </button>
+        </div>
       </div>
     </div>
   );

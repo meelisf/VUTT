@@ -1,5 +1,5 @@
 /**
- * Teose halduse ootel pöörded ja poolitused (#431 etapp 3, ADR 0050).
+ * Teose halduse ootel pöörded, kärped ja poolitused (#431 etapp 3, ADR 0050, ADR 0061).
  *
  * Sama mudel nagu upload'i ülevaatuses: valitud lehtedele märgitakse toiming,
  * ruudustik näitab eelvaadet ja „Rakenda" saadab kõik ühe päringuga
@@ -7,10 +7,14 @@
  * iga poolitusega. Puhas moodul: ainult andmed, ei tea Reactist.
  */
 import { addRotation } from '../../components/pagePrep/geometry';
+import type { PageAdjust } from '../upload/types';
 
 export interface PendingPageOp {
   /** Pööre päripäeva: 0 | 90 | 180 | 270. Rakendub ENNE poolitust. */
   rotate: number;
+  /** Kalle/kärbe/perspektiiv PÖÖRATUD lehe raamis (ADR 0049): pööre → adjust → poolitus.
+   *  Puudub = teisendust ei ole. Pöörde muutus eemaldab selle (raam muutub). */
+  adjust?: PageAdjust;
   split: boolean;
   /** Lehekohane joon (0..1) pildiredaktorist; puudub/null = üldjoon.
    *  Sama tähendus nagu upload'i `mode: "custom"` + `split_x`. */
@@ -22,13 +26,14 @@ export type PendingPageOps = Record<string, PendingPageOp>;
 export interface PageOpRequest {
   filename: string;
   rotate: number;
+  adjust: PageAdjust | null;
   split_x: number | null;
 }
 
 /** Tühja kirjet ei hoita — nii tähendab võtme olemasolu alati „midagi ootel". */
 function put(ops: PendingPageOps, filename: string, op: PendingPageOp): PendingPageOps {
   const next = { ...ops };
-  if (op.rotate === 0 && !op.split) delete next[filename];
+  if (op.rotate === 0 && !op.split && !op.adjust) delete next[filename];
   else next[filename] = op;
   return next;
 }
@@ -36,12 +41,45 @@ function put(ops: PendingPageOps, filename: string, op: PendingPageOp): PendingP
 const current = (ops: PendingPageOps, fn: string): PendingPageOp =>
   ops[fn] ?? { rotate: 0, split: false };
 
+/**
+ * Uus pööre lehele. Kärbe (`adjust`) on EELMISE pöörde raamis ja muutuks uues
+ * raamis valeks — pöörde muutus eemaldab selle (sama mis upload'i `withRotation`).
+ */
+function withRotation(op: PendingPageOp, rotate: number): PendingPageOp {
+  if (op.adjust && rotate !== op.rotate) {
+    const { adjust: _drop, ...rest } = op;
+    return { ...rest, rotate };
+  }
+  return { ...op, rotate };
+}
+
 /** Koguv pööre, nagu upload'is: kaks klõpsu paremale = 180°. */
 export function rotatePending(ops: PendingPageOps, filenames: Iterable<string>, delta: number): PendingPageOps {
   let next = ops;
   for (const fn of filenames) {
     const op = current(next, fn);
-    next = put(next, fn, { ...op, rotate: addRotation(op.rotate, delta) });
+    next = put(next, fn, withRotation(op, addRotation(op.rotate, delta)));
+  }
+  return next;
+}
+
+/**
+ * Pildiredaktori „Märgi": pööre JA kärbe korraga — kärpekast joonistati selle
+ * pöörde raamis. `adjust` null = ainult pööre (olemasolev kärbe kaob).
+ */
+export function setPendingEdit(ops: PendingPageOps, filename: string, rotate: number, adjust: PageAdjust | null): PendingPageOps {
+  const { adjust: _old, ...rest } = current(ops, filename);
+  return put(ops, filename, adjust ? { ...rest, rotate, adjust } : { ...rest, rotate });
+}
+
+/** „Eemalda kärbe": pööre ja poolitus jäävad. */
+export function clearPendingAdjust(ops: PendingPageOps, filenames: Iterable<string>): PendingPageOps {
+  let next = ops;
+  for (const fn of filenames) {
+    const op = next[fn];
+    if (!op?.adjust) continue;
+    const { adjust: _drop, ...rest } = op;
+    next = put(next, fn, rest);
   }
   return next;
 }
@@ -92,6 +130,7 @@ export function toRequest(ops: PendingPageOps, splitX: number): PageOpRequest[] 
   return Object.entries(ops).map(([filename, op]) => ({
     filename,
     rotate: op.rotate,
+    adjust: op.adjust ?? null,
     split_x: op.split ? effectiveSplitX(op, splitX) : null,
   }));
 }
@@ -103,5 +142,13 @@ export function toRequest(ops: PendingPageOps, splitX: number): PageOpRequest[] 
  * samad, joon käib kuvatud (pööratud) pildi laiuse järgi.
  */
 export function showsCardLine(op: PendingPageOp | undefined): boolean {
-  return Boolean(op?.split) && (op!.rotate === 0 || op!.rotate === 180);
+  if (!op?.split) return false;
+  // Kärpega leht näidatakse serveri eelvaatena (pööre + kärbe juba sees) →
+  // joon käib eelvaate laiuse järgi igal pöördel.
+  return Boolean(op.adjust) || op.rotate === 0 || op.rotate === 180;
+}
+
+/** Kas kaart vajab serveri eelvaadet (CSS ei oska kärbet/kallet näidata). */
+export function needsServerPreview(op: PendingPageOp | undefined): boolean {
+  return Boolean(op?.adjust);
 }

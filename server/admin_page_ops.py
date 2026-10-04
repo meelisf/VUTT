@@ -495,7 +495,7 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
 from .image_transform import (  # noqa: E402,F401
     ANGLE_EPS, MIN_CROP_PX, QUAD_MIN_EDGE, QUAD_MIN_OUT_PX, dist,
     validate_quad as _validate_quad, compute_crop_box as _compute_crop_box,
-    apply_transform,
+    apply_transform, apply_adjust, normalize_adjust, rgb_or_gray,
 )
 
 
@@ -605,8 +605,9 @@ VALID_PAGE_ROTATIONS = (0, 90, 180, 270)
 def _normalize_page_ops(ops) -> list:
     """Valideerib pakk-toimingute nimekirja ENNE ühegi faili puudutamist.
 
-    Kirje: {"filename": str, "rotate": 0|90|180|270, "split_x": float|None}.
-    Tühi kirje (pööre 0, poolitust ei ole) visatakse vaikselt ära.
+    Kirje: {"filename": str, "rotate": 0|90|180|270, "adjust": {angle, crop|quad}|None,
+    "split_x": float|None}. `adjust` on pööratud lehe raamis (ADR 0049, 0061).
+    Tühi kirje (pööre 0, adjust puudub, poolitust ei ole) visatakse vaikselt ära.
     """
     if not isinstance(ops, list):
         raise ValueError("ops peab olema list")
@@ -622,19 +623,24 @@ def _normalize_page_ops(ops) -> list:
         if fn in seen:
             raise ValueError(f"Leht kordub: {fn}")
         seen.add(fn)
-        rotate = op.get("rotate", 0) or 0
-        if isinstance(rotate, bool) or not isinstance(rotate, int) or rotate % 360 not in VALID_PAGE_ROTATIONS:
-            raise ValueError("Pööre peab olema 90° kordne")
-        rotate %= 360
+        rotate = _normalize_rotate(op.get("rotate", 0))
+        adjust = normalize_adjust(op.get("adjust"))
         split_x = op.get("split_x")
         if split_x is not None:
             split_x = float(split_x)
             if not (0.05 <= split_x <= 0.95):
                 raise ValueError(f"split_x peab olema vahemikus [0.05, 0.95], sain {split_x}")
-        if rotate == 0 and split_x is None:
+        if rotate == 0 and adjust is None and split_x is None:
             continue
-        clean.append({"filename": fn, "rotate": rotate, "split_x": split_x})
+        clean.append({"filename": fn, "rotate": rotate, "adjust": adjust, "split_x": split_x})
     return clean
+
+
+def _normalize_rotate(rotate) -> int:
+    rotate = rotate or 0
+    if isinstance(rotate, bool) or not isinstance(rotate, int) or rotate % 360 not in VALID_PAGE_ROTATIONS:
+        raise ValueError("Pööre peab olema 90° kordne")
+    return rotate % 360
 
 
 def precheck_page_ops(work_id: str, ops) -> dict:
@@ -655,10 +661,13 @@ def precheck_page_ops(work_id: str, ops) -> dict:
 
 
 def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
-    """Rakendab teose halduse ootel pöörded ja poolitused ÜHE luku all (#431, ADR 0050).
+    """Rakendab teose halduse ootel pöörded, kärped ja poolitused ÜHE luku all
+    (#431, ADR 0050, ADR 0061).
 
-    Järjekord lehe sees on sama mis upload'is: pööre → poolitus (joon on
-    pööratud lehe laiuses). Lehed töödeldakse lehejärjekorras; poolitus
+    Järjekord lehe sees on sama mis upload'is: pööre → adjust → poolitus (joon
+    on kohandatud lehe laiuses). Pööre ja adjust on ÜKS teisendus ja üks
+    JPEG-kodeering: 90° kordne pööre `expand`-iga annab telgjoondatud
+    ristküliku, seega pööre(r) + pööre(a) = pööre(r + a) samas raamis. Lehed töödeldakse lehejärjekorras; poolitus
     kasutab iga kord VÄRSKET lehenumbrit, sest eelmised poolitused nihutavad
     numbreid. Iga poolitus teeb oma git-commitid (prügikasti rühmitus loeb
     SPLIT_COMMIT_PREFIX-it), Meili sünk on üks kord lõpus.
@@ -671,14 +680,14 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
     """
     clean = _normalize_page_ops(ops)
     if not clean:
-        return {"success": True, "rotated": 0, "split": 0, "changed": False}
+        return {"success": True, "rotated": 0, "adjusted": 0, "split": 0, "changed": False}
 
     path = find_directory_by_id(work_id)
     if not path:
         return {"found": False}
 
     folder_name = os.path.basename(path)
-    rotated = split = 0
+    rotated = adjusted = split = 0
     with work_lock(folder_name, path):
         images = get_sorted_images(path)
         missing = [op["filename"] for op in clean if op["filename"] not in images]
@@ -693,10 +702,16 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
         try:
             for op in clean:
                 fn = op["filename"]
-                if op["rotate"]:
-                    _transform_locked(path, work_id, fn, float(op["rotate"]),
-                                      None, None, None, username)
-                    rotated += 1
+                adj = op["adjust"]
+                if op["rotate"] or adj:
+                    quad = adj["quad"] if adj else None
+                    _transform_locked(path, work_id, fn,
+                                      float(op["rotate"]) + (adj["angle"] if adj else 0.0),
+                                      adj["crop"] if adj else None,
+                                      [tuple(p) for p in quad] if quad else None,
+                                      quad, username)
+                    rotated += 1 if op["rotate"] else 0
+                    adjusted += 1 if adj else 0
                 if op["split_x"] is not None:
                     images = get_sorted_images(path)
                     halves = _split_page_locked(path, work_id, images.index(fn) + 1,
@@ -707,9 +722,11 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
                 if progress:
                     progress(clean.index(op) + 1, len(clean))
         except Exception as e:
-            logger.error(f"PAGE-OPS {folder_name}: katkes pärast {rotated} pööret / {split} poolitust: {e}")
+            logger.error(f"PAGE-OPS {folder_name}: katkes pärast {rotated} pööret / "
+                         f"{adjusted} kärbet / {split} poolitust: {e}")
             raise RuntimeError(
-                f"Katkes: tehtud {rotated} pööret ja {split} poolitust {len(clean)} lehest. Viga: {e}"
+                f"Katkes: tehtud {rotated} pööret, {adjusted} kärbet ja {split} poolitust "
+                f"{len(clean)} lehest. Viga: {e}"
             )
         finally:
             if split:
@@ -717,9 +734,54 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
                 refresh_work_mentions(path, work_id, renamed=renamed)
 
         new_page_count = len(get_sorted_images(path))
-    logger.info(f"PAGE-OPS {folder_name}: {rotated} pööret, {split} poolitust ({username})")
-    return {"success": True, "changed": True, "rotated": rotated, "split": split,
-            "new_page_count": new_page_count}
+    logger.info(f"PAGE-OPS {folder_name}: {rotated} pööret, {adjusted} kärbet, "
+                f"{split} poolitust ({username})")
+    return {"success": True, "changed": True, "rotated": rotated, "adjusted": adjusted,
+            "split": split, "new_page_count": new_page_count}
+
+
+PREVIEW_VIEW_MAX = 1600     # redaktori eelvaate pikem külg (px)
+
+
+def render_page_preview(work_id: str, filename: str, rotate=0, adjust=None,
+                        size: str = "thumb"):
+    """Ootel pöörde + kärpe eelvaade JPEG-baitidena (ADR 0061). Kettal midagi ei muutu.
+
+    Sama põhimõte nagu upload'i `adjusted_preview_path`-il: teisendus on
+    RENDERDUSPARAMEETER, brauser saab valmis pildi ja poolitusjoon asetub
+    kohandatud pildi laiuse järgi, täpselt nagu `apply_page_ops` lõikab.
+    Koordinaadid on 0..1, seega pisipildist (`thumb`) ja täispildist (`view`)
+    tuleb sama lõige. Vahemälu ei ole: pisipilt on väike, `view` on üks leht.
+    Tagastab baidid või None (teost/lehte ei leitud); vigane sisend → ValueError.
+    """
+    if os.path.basename(filename) != filename or "/" in filename or "\\" in filename:
+        raise ValueError("vigane failinimi")
+    if size not in ("thumb", "view"):
+        raise ValueError("size peab olema thumb või view")
+    rotate = _normalize_rotate(rotate)
+    adjust = normalize_adjust(adjust)
+    path = find_directory_by_id(work_id)
+    if not path or filename not in get_sorted_images(path):
+        return None
+    src = os.path.join(path, filename)
+    thumb = os.path.join(path, '_thumbs', f"_thumb_{filename}")
+    if size == "thumb" and os.path.isfile(thumb):
+        src = thumb
+
+    import io
+    from PIL import Image as PILImage, ImageOps
+    with PILImage.open(src) as raw:
+        if src != thumb:
+            # draft: suure JPEG-i dekodeerimine kohe vähendatult (kiire)
+            raw.draft('RGB', (PREVIEW_VIEW_MAX, PREVIEW_VIEW_MAX))
+        img = rgb_or_gray(ImageOps.exif_transpose(raw))
+        img.thumbnail((PREVIEW_VIEW_MAX, PREVIEW_VIEW_MAX))
+        if rotate:
+            img = img.rotate(-rotate, expand=True)
+        img = apply_adjust(img, adjust)
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=82)
+    return buf.getvalue()
 
 
 def clear_original_backup(work_id, filename):
