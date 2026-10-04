@@ -281,7 +281,8 @@
       "editPendingHint": "Rotation and crop stay pending and are applied with the other changes from the “Apply” button in the page bar.",
       "openCrop": "Crop, deskew or rotate",
       "openSplit": "Split",
-      "markAndNext": "Mark and next"
+      "markAndNext": "Mark and next",
+      "backToOverview": "Back to overview"
     },
     "replaceHint": "Upload a new scan. Metadata is preserved automatically.",
     "replaceWarning": "Replacing deletes all current pages and replaces them with newly OCR-processed pages.",

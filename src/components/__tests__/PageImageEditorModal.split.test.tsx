@@ -94,3 +94,19 @@ describe('PageImageEditorModal pööre ja kärbe on ootel plaan (ADR 0061)', () 
     expect(src).toContain('size=view');
   });
 });
+
+describe('PageImageEditorModal tagasi ülevaatesse', () => {
+  it.each(['edit', 'split'] as const)('%s-vahekaardil sulgeb modaali', (tab) => {
+    const onClose = vi.fn();
+    render(
+      <PageImageEditorModal
+        workId="w1" pages={[{ filename: 'a.jpg', page_num: 1 }]} initialIndex={0} initialTab={tab}
+        imageToken={null} onClose={onClose} onPagesChanged={vi.fn(async () => ['a.jpg'])}
+        onReplaceImage={vi.fn()} cacheBust={0} pendingOps={{}} globalSplitX={0.5}
+        onSplitChange={vi.fn()} onEditChange={vi.fn()} onAdjustClear={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('back-to-overview'));
+    expect(onClose).toHaveBeenCalled();
+  });
+});

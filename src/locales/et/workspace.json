@@ -281,7 +281,8 @@
       "editPendingHint": "Pööre ja kärbe jäävad ootele ja rakenduvad koos teiste muudatustega lehtede riba nupust „Rakenda”.",
       "openCrop": "Kärbi, sirgesta või pööra",
       "openSplit": "Poolita",
-      "markAndNext": "Märgi ja järgmine"
+      "markAndNext": "Märgi ja järgmine",
+      "backToOverview": "Tagasi ülevaatesse"
     },
     "replaceHint": "Lae üles uus skänn. Metaandmed säilitatakse automaatselt.",
     "replaceWarning": "Asendamine kustutab kõik praegused leheküljed ja asendab need uute OCR-itud lehekülgedega.",
