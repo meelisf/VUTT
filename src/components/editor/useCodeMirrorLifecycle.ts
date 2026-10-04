@@ -10,6 +10,7 @@ import type { MarginaliaMode } from './MarginaliaExtension';
 import { vuttTheme } from './VuttTheme';
 import { createVuttSearchPanel } from './VuttSearchPanel';
 import { isPageSwapUpdate } from './editorAnnotations';
+import { applyMacron } from './macronCommand';
 
 interface UseCodeMirrorLifecycleParams {
   page: Page;
@@ -80,6 +81,7 @@ export function useCodeMirrorLifecycle({
             { key: 'Mod-b', run: () => { wrapWithTagRef.current('b'); return true; } },
             { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
             { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
+            { key: 'Alt-m', run: applyMacron },
           ]),
           editableCompartmentRef.current.of(
             EditorView.editable.of(!readOnly)

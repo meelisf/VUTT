@@ -535,6 +535,8 @@
     "openGuide": "Open transcription guide",
     "guideTitle": "Transcription guide",
     "editChars": "Customize character set",
+    "macron": "◌̄",
+    "macronHint": "Macron (abbreviation mark) on the letter before the cursor: Alt+M (Mac: ⌥M). Press again to remove; a tilde is replaced by a macron.",
     "pasteChar": "Paste symbol...",
     "addChar": "Add",
     "resetChars": "Reset to defaults",
