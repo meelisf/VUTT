@@ -538,9 +538,9 @@
     "editChars": "Kohanda märgikomplekti",
     "combiningMarks": {
       "macronHint": "Makron (lühendusmärk) kursori ees olevale tähele: Alt+M (Mac: ⌥M). Teine vajutus eemaldab, tilde asendub makroniga.",
-      "circumflexHint": "Tsirkumfleks kursori ees olevale tähele (â; kreeka tähel ᾶ). Teine vajutus eemaldab.",
-      "lenisHint": "Spiritus lenis (ἀ) kursori ees olevale kreeka tähele. Teine vajutus eemaldab; asper vahetub lenise vastu.",
-      "asperHint": "Spiritus asper (ἁ) kursori ees olevale kreeka tähele. Teine vajutus eemaldab; lenis vahetub asperi vastu."
+      "circumflexHint": "Tsirkumfleks kursori ees olevale tähele (â; kreeka tähel ᾶ). Teine vajutus eemaldab; asendab akuudi/graavise.",
+      "acuteHint": "Akuut kursori ees olevale tähele (á; kreeka ά, hõngusmärgiga ἄ). Teine vajutus eemaldab; asendab teise aktsendi.",
+      "graveHint": "Graavis kursori ees olevale tähele (à; kreeka ὰ, hõngusmärgiga ἂ). Teine vajutus eemaldab; asendab teise aktsendi."
     },
     "pasteChar": "Kleebi sümbol...",
     "addChar": "Lisa",

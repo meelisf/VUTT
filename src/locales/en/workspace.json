@@ -538,9 +538,9 @@
     "editChars": "Customize character set",
     "combiningMarks": {
       "macronHint": "Macron (abbreviation mark) on the letter before the cursor: Alt+M (Mac: ⌥M). Press again to remove; a tilde is replaced by a macron.",
-      "circumflexHint": "Circumflex on the letter before the cursor (â; on a Greek letter ᾶ). Press again to remove.",
-      "lenisHint": "Spiritus lenis (ἀ) on the Greek letter before the cursor. Press again to remove; replaces asper.",
-      "asperHint": "Spiritus asper (ἁ) on the Greek letter before the cursor. Press again to remove; replaces lenis."
+      "circumflexHint": "Circumflex on the letter before the cursor (â; on a Greek letter ᾶ). Press again to remove; replaces an acute/grave.",
+      "acuteHint": "Acute on the letter before the cursor (á; Greek ά, with breathing ἄ). Press again to remove; replaces another accent.",
+      "graveHint": "Grave on the letter before the cursor (à; Greek ὰ, with breathing ἂ). Press again to remove; replaces another accent."
     },
     "pasteChar": "Paste symbol...",
     "addChar": "Add",

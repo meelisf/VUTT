@@ -5,13 +5,15 @@
 // Makron = lühendusmärk (ADR 0062): ainult ladina tähel; olemasolev tilde või
 // ülakriips (U+0303/U+0305) asendatakse — `ũ`/`m̃` saab ühe vajutusega parandada.
 // Kaart kattub `server/macron.py`-ga.
-// Tsirkumfleks: ladina tähel U+0302 (â), kreeka tähel perispomeni U+0342 (ᾶ).
-// Hõngusmärgid (spiritus lenis U+0313, asper U+0314): ainult kreeka tähel,
-// teineteist välistavad. Hõngusmärk käib ENNE aktsenti (ἄ = α + U+0313 + U+0301):
-// kõik need on kanoonilises klassis 230, NFC ei järjesta neid ümber, ja vales
+// Aktsendid — tsirkumfleks, akuut, graavis — välistavad üksteist (ühel tähel üks
+// aktsent). Tsirkumfleks kreeka tähel on perispomeni U+0342 (ᾶ), akuut/graavis
+// U+0301/U+0300 mõlemas kirjasüsteemis. Hõngusmärke (spiritus) nupuga ei panda —
+// kreeka sisestajad teevad seda klaviatuurilt.
+// Järjekord tähe kohal: hõngusmärk/täpid → makron → aktsent (ἄ, ΐ, ǘ, ǖ, ḗ).
+// Kõik need on kanoonilises klassis 230 — NFC ei järjesta neid ümber, ja vales
 // järjekorras ei moodustu precomposed täht.
 
-export type CombiningMark = 'macron' | 'circumflex' | 'lenis' | 'asper';
+export type CombiningMark = 'macron' | 'circumflex' | 'acute' | 'grave';
 
 export interface MarkChange {
   from: number;
@@ -26,19 +28,19 @@ interface MarkSpec {
   insert: Partial<Record<Script, string>>;
   /** Märgirühm, mis enne lisamist eemaldatakse (üks märk rühmast korraga). */
   group: RegExp;
-  /** Hõngusmärk läheb vahetult alustähe järele, aktsent hõngusmärgi järele. */
-  breathing?: boolean;
 }
+
+const ACCENTS = /[\u0300\u0301\u0302\u0342]/g;
 
 const SPECS: Record<CombiningMark, MarkSpec> = {
   macron: { insert: { latin: '\u0304' }, group: /[\u0303\u0304\u0305]/g },
-  circumflex: { insert: { latin: '\u0302', greek: '\u0342' }, group: /[\u0302\u0342]/g },
-  lenis: { insert: { greek: '\u0313' }, group: /[\u0313\u0314]/g, breathing: true },
-  asper: { insert: { greek: '\u0314' }, group: /[\u0313\u0314]/g, breathing: true },
+  circumflex: { insert: { latin: '\u0302', greek: '\u0342' }, group: ACCENTS },
+  acute: { insert: { latin: '\u0301', greek: '\u0301' }, group: ACCENTS },
+  grave: { insert: { latin: '\u0300', greek: '\u0300' }, group: ACCENTS },
 };
 
 const COMBINING = /\p{M}/u;
-const LEADING_BREATHINGS = /^[\u0313\u0314]*/;
+const TRAILING_ACCENTS = /[\u0300\u0301\u0302\u0342]*$/;
 
 function scriptOf(ch: string): Script | null {
   if (!/\p{L}/u.test(ch)) return null;
@@ -69,16 +71,18 @@ export function markChangeAt(text: string, pos: number, kind: CombiningMark): Ma
   const marks = decomposed.slice(1);
   const stripped = marks.replace(spec.group, '');
   // Lülitus: rühmast on olemas AINULT sama märk → eemalda. Muidu (märki pole,
-  // või on rühma teine märk: tilde makroni asemel, lenis asperi asemel) → sea.
+  // või on rühma teine märk: tilde makroni asemel, akuut graavise asemel) → sea.
   const groupCount = marks.length - stripped.length;
   let nextMarks: string;
   if (groupCount === 1 && marks.includes(mark)) {
     nextMarks = stripped;
-  } else if (spec.breathing) {
-    nextMarks = mark + stripped;
+  } else if (kind === 'macron') {
+    // Makron olemasolevate märkide (täpid) järele, aga aktsendi ette: ǖ, ḗ.
+    const accents = stripped.match(TRAILING_ACCENTS)?.[0] ?? '';
+    nextMarks = stripped.slice(0, stripped.length - accents.length) + mark + accents;
   } else {
-    const lead = stripped.match(LEADING_BREATHINGS)?.[0] ?? '';
-    nextMarks = lead + mark + stripped.slice(lead.length);
+    // Aktsent viimaseks: hõngusmärgi ja täppide järele (ἄ, ΐ, ǘ).
+    nextMarks = stripped + mark;
   }
   const insert = (decomposed[0] + nextMarks).normalize('NFC');
   if (insert === cluster) return null;

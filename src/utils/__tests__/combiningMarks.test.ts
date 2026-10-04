@@ -38,11 +38,6 @@ describe('makron (ADR 0062)', () => {
     expect(m('cum laude', 2)).toBe('cūm laude');
   });
 
-  it('säilitab muud märgid (ü + makron)', () => {
-    const out = m('ü').normalize('NFD');
-    expect(out).toContain('\u0308');
-    expect(out).toContain('\u0304');
-  });
 
   it('no-op: kreeka täht, number, tühik, algus, privaatala', () => {
     expect(markChangeAt('υ', 1, 'macron')).toBeNull();
@@ -59,41 +54,43 @@ describe('makron (ADR 0062)', () => {
   });
 });
 
-describe('tsirkumfleks', () => {
-  it('ladina täht → U+0302 (â), teine vajutus eemaldab', () => {
+describe('aktsendid: tsirkumfleks, akuut, graavis', () => {
+  it('ladina: â á à, teine vajutus eemaldab', () => {
     expect(apply('a', 'circumflex')).toBe('â');
-    expect(apply('â', 'circumflex')).toBe('a');
+    expect(apply('a', 'acute')).toBe('á');
+    expect(apply('a', 'grave')).toBe('à');
+    expect(apply('á', 'acute')).toBe('a');
   });
 
-  it('kreeka täht → perispomeni U+0342 (ᾶ)', () => {
+  it('aktsendid välistavad üksteist (â → á → à)', () => {
+    expect(apply('â', 'acute')).toBe('á');
+    expect(apply('á', 'grave')).toBe('à');
+    expect(apply('à', 'circumflex')).toBe('â');
+  });
+
+  it('kreeka: ά ὰ ᾶ (tsirkumfleks = perispomeni U+0342)', () => {
+    expect(apply('α', 'acute')).toBe('ά');
+    expect(apply('α', 'grave')).toBe('ὰ');
     expect(apply('α', 'circumflex')).toBe('ᾶ');
   });
 
-  it('kreeka: perispomeni läheb hõngusmärgi järele (ἆ, mitte ᾶ + lenis)', () => {
-    expect(apply('ἀ', 'circumflex')).toBe('ἆ'); // ἀ → ἆ
+  it('kreeka: aktsent läheb klaviatuurilt trükitud hõngusmärgi järele (ἄ ἂ ἆ ἅ)', () => {
+    expect(apply('ἀ', 'acute')).toBe('ἄ');
+    expect(apply('ἀ', 'grave')).toBe('ἂ');
+    expect(apply('ἀ', 'circumflex')).toBe('ἆ');
+    expect(apply('ἁ', 'acute')).toBe('ἅ');
+  });
+
+  it('aktsent täppide järele, iota subscriptum jääb (ΐ ǘ ᾴ)', () => {
+    expect(apply('ϊ', 'acute')).toBe('ΐ');
+    expect(apply('ü', 'acute')).toBe('ǘ');
+    expect(apply('ᾳ', 'acute')).toBe('ᾴ');
   });
 });
 
-describe('hõngusmärgid', () => {
-  it('lenis ja asper ainult kreeka tähel', () => {
-    expect(apply('α', 'lenis')).toBe('ἀ');  // ἀ
-    expect(apply('α', 'asper')).toBe('ἁ');  // ἁ
-    expect(apply('ρ', 'asper')).toBe('ῥ');  // ῥ
-    expect(markChangeAt('a', 1, 'lenis')).toBeNull();
-  });
-
-  it('asper vahetab lenise välja ja vastupidi; sama märk teist korda eemaldab', () => {
-    expect(apply('ἀ', 'asper')).toBe('ἁ');
-    expect(apply('ἁ', 'lenis')).toBe('ἀ');
-    expect(apply('ἀ', 'lenis')).toBe('α');
-  });
-
-  it('hõngusmärk läheb aktsendi ette (ά → ἄ)', () => {
-    expect(apply('ά', 'lenis')).toBe('ἄ');
-  });
-
-  it('suurtäht (Ἀ) ja iota subscriptum (ᾳ → ᾀ)', () => {
-    expect(apply('Α', 'lenis')).toBe('Ἀ');
-    expect(apply('ᾳ', 'lenis')).toBe('ᾀ');
+describe('makroni järjekord teiste märkidega', () => {
+  it('makron täppide järele (ǖ), aktsendi ette (ḗ)', () => {
+    expect(m('ü')).toBe('ǖ');
+    expect(m('é')).toBe('ḗ');
   });
 });
