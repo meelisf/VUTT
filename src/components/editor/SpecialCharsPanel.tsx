@@ -8,13 +8,14 @@ import type { CombiningMark } from '../../utils/combiningMarks';
 
 // Kombineerivate märkide rühm paneeli ees, kasutaja märgikomplektist sõltumatu.
 // Märk läheb kursori ees olevale tähele (makron ADR 0062; makronil ka Alt-M).
-const COMBINING_MARK_BUTTONS: CombiningMark[] = ['macron', 'circumflex', 'lenis', 'asper'];
+// Hõngusmärke siin ei ole — kreeka sisestajad kasutavad oma klaviatuuri.
+const COMBINING_MARK_BUTTONS: CombiningMark[] = ['macron', 'circumflex', 'acute', 'grave'];
 // Nupu kujutis: märk punktiirringi (U+25CC) peal — keeleülene, ei vaja tõlget.
 const MARK_GLYPHS: Record<CombiningMark, string> = {
   macron: '\u25cc\u0304',
   circumflex: '\u25cc\u0302',
-  lenis: '\u25cc\u0313',
-  asper: '\u25cc\u0314',
+  acute: '\u25cc\u0301',
+  grave: '\u25cc\u0300',
 };
 
 interface SpecialCharsPanelProps {
@@ -61,8 +62,8 @@ export default function SpecialCharsPanel({
   const markHints: Record<CombiningMark, string> = {
     macron: t('editor.combiningMarks.macronHint'),
     circumflex: t('editor.combiningMarks.circumflexHint'),
-    lenis: t('editor.combiningMarks.lenisHint'),
-    asper: t('editor.combiningMarks.asperHint'),
+    acute: t('editor.combiningMarks.acuteHint'),
+    grave: t('editor.combiningMarks.graveHint'),
   };
 
   return (

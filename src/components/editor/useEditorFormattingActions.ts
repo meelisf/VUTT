@@ -100,7 +100,7 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
   }, [insertAtCursor]);
 
   // Kombineeriv märk kursori ees olevale tähele (makron ADR 0062, tsirkumfleks,
-  // hõngusmärgid) — makron on sama käsk mis Alt-M.
+  // akuut, graavis) — makron on sama käsk mis Alt-M.
   const insertCombiningMark = useCallback((kind: CombiningMark, e?: MouseEvent) => {
     if (e) e.preventDefault();
     const view = viewRef.current;
