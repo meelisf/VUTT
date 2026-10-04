@@ -10,15 +10,15 @@ NFC = lambda s: ud.normalize("NFC", s)  # noqa: E731
 
 
 @pytest.mark.parametrize("sisend, oodatud", [
-    ("Camm̃erherr", "Camm̄erherr"),
+    ("Camm\u0303erherr", "Camm\u0304erherr"),
     ("cũ nõ dẽ", "cū nō dē"),
-    ("vñ weñ", "vn̄ wen̄"),
-    ("q̃", "q̄"),
-    ("m̅", "m̄"),                 # ülakriips → makron
-    ("8̅", "8̅"),           # numbri vinculum jääb
-    ("ῖ υ̃", "ῖ υ̃"),       # kreeka jääb
+    ("vñ weñ", "vn\u0304 wen\u0304"),
+    ("q\u0303", "q\u0304"),
+    ("m\u0305", "m\u0304"),                 # ülakriips → makron
+    ("8\u0305", "8\u0305"),           # numbri vinculum jääb
+    ("ῖ υ\u0303", "ῖ υ\u0303"),       # kreeka jääb
     ("a ~ b", "a ~ b"),               # eraldiseisev kordusmärk jääb
-    ("ā̄", "ā"),                 # topeltmakron → üks
+    ("ā\u0304", "ā"),                 # topeltmakron → üks
     ("Õ", "Ō"),
 ])
 def test_to_macron_kaart(sisend, oodatud):
@@ -27,13 +27,13 @@ def test_to_macron_kaart(sisend, oodatud):
 
 
 def test_to_macron_loendab_ja_annab_nfc():
-    tul, n = to_macron("cũ m̃ ā̄")
+    tul, n = to_macron("cũ m\u0303 ā\u0304")
     assert n == 3
     assert tul == NFC(tul)
 
 
 def test_to_macron_muutuseta_tekst_on_nfc_ja_null():
-    lahutatud = "ē"                  # juba makron, aga NFD-kujul
+    lahutatud = "e\u0304"                  # juba makron, aga NFD-kujul
     tul, n = to_macron(lahutatud)
     assert n == 0 and tul == "ē"
 
@@ -47,8 +47,8 @@ def test_keelevalvur(keeled, oodatud):
 
 
 def test_tilde_words_leiab_lahutatud_ja_precomposed():
-    assert tilde_words("Jõgi nõ m̃ea cum") == ["Jõgi", "nõ", NFC("m̃ea")]
-    assert tilde_words("ῖ υ̃ 8̅") == []
+    assert tilde_words("Jõgi nõ m\u0303ea cum") == ["Jõgi", "nõ", NFC("m\u0303ea")]
+    assert tilde_words("ῖ υ\u0303 8\u0305") == []
 
 
 def test_convert_text_valvuriga_keel_ei_muuda_vaid_raporteerib():

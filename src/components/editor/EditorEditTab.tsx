@@ -2,6 +2,7 @@ import type { MouseEvent, MutableRefObject } from 'react';
 import { PageStatus } from '../../types';
 import type { SpecialCharacter } from './useSpecialChars';
 import type { MarginaliaMode } from './MarginaliaExtension';
+import type { CombiningMark } from '../../utils/combiningMarks';
 import type { ReocrStatus } from './useReOcr';
 import EditorToolbar from './EditorToolbar';
 import EditorStatusBar from './EditorStatusBar';
@@ -47,7 +48,7 @@ interface EditorEditTabProps {
   setSpecialCharacters: (chars: SpecialCharacter[]) => void;
   setIsCustomChars: (custom: boolean) => void;
   insertSpecialChar: (char: string, event?: MouseEvent) => void;
-  insertMacron: (event?: MouseEvent) => void;
+  insertCombiningMark: (kind: CombiningMark, event?: MouseEvent) => void;
 }
 
 // Redaktori põhivahekaart: toolbar, CodeMirror konteiner, Re-OCR ja erimärgid.
@@ -87,7 +88,7 @@ export default function EditorEditTab({
   setSpecialCharacters,
   setIsCustomChars,
   insertSpecialChar,
-  insertMacron,
+  insertCombiningMark,
 }: EditorEditTabProps) {
   return (
     <div className={`flex-1 flex flex-col overflow-hidden ${active ? '' : 'hidden'}`}>
@@ -150,7 +151,7 @@ export default function EditorEditTab({
         setSpecialCharacters={setSpecialCharacters}
         setIsCustomChars={setIsCustomChars}
         insertSpecialChar={insertSpecialChar}
-        insertMacron={insertMacron}
+        insertCombiningMark={insertCombiningMark}
       />
     </div>
   );
