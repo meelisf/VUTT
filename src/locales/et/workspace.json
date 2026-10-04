@@ -536,6 +536,8 @@
     "openGuide": "Ava transkribeerimise juhend",
     "guideTitle": "Transkribeerimise juhend",
     "editChars": "Kohanda märgikomplekti",
+    "macron": "◌̄",
+    "macronHint": "Makron (lühendusmärk) kursori ees olevale tähele: Alt+M (Mac: ⌥M). Teine vajutus eemaldab, tilde asendub makroniga.",
     "pasteChar": "Kleebi sümbol...",
     "addChar": "Lisa",
     "resetChars": "Lähtesta vaikimisi",

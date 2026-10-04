@@ -47,6 +47,7 @@ interface EditorEditTabProps {
   setSpecialCharacters: (chars: SpecialCharacter[]) => void;
   setIsCustomChars: (custom: boolean) => void;
   insertSpecialChar: (char: string, event?: MouseEvent) => void;
+  insertMacron: (event?: MouseEvent) => void;
 }
 
 // Redaktori põhivahekaart: toolbar, CodeMirror konteiner, Re-OCR ja erimärgid.
@@ -86,6 +87,7 @@ export default function EditorEditTab({
   setSpecialCharacters,
   setIsCustomChars,
   insertSpecialChar,
+  insertMacron,
 }: EditorEditTabProps) {
   return (
     <div className={`flex-1 flex flex-col overflow-hidden ${active ? '' : 'hidden'}`}>
@@ -148,6 +150,7 @@ export default function EditorEditTab({
         setSpecialCharacters={setSpecialCharacters}
         setIsCustomChars={setIsCustomChars}
         insertSpecialChar={insertSpecialChar}
+        insertMacron={insertMacron}
       />
     </div>
   );
