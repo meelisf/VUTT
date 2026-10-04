@@ -115,9 +115,10 @@ export function partFromDraft(d: PartDraft, pages: string[]): PartInput {
 
 export type ManageTab = 'parts' | 'pages' | 'trash' | 'replace';
 
-/** Töölaua sügavlink `?focus=N` (utils/manageDeeplink) vajab lehtede vahekaarti; muidu „Osad". */
-export function initialManageTab(focus: number | null): ManageTab {
-  return focus != null ? 'pages' : 'parts';
+/** Vaikimisi „Leheküljed": osi läheb harvem vaja, ja töölaua sügavlink `?focus=N`
+ *  (utils/manageDeeplink) vajab niikuinii lehtede vahekaarti. */
+export function initialManageTab(_focus: number | null): ManageTab {
+  return 'pages';
 }
 
 /** Vahekaardi vahetust kaitstakse ainult osade mustandi korral: järjekorra ja lehetoimingute
