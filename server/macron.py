@@ -18,13 +18,13 @@ automaatselt — `convert_text` tagastab siis tildega sõnad aruande jaoks.
 import re
 import unicodedata as ud
 
-TILDE, MACRON, OVERLINE = "̃", "̄", "̅"
+TILDE, MACRON, OVERLINE = "\u0303", "\u0304", "\u0305"
 
 # ADR 0019: `languages` kannab nii 2- kui 3-tähelisi koode (la/lat, de/ger)
 GUARDED_LANGUAGES = frozenset({"est", "et", "spa", "es", "por", "pt"})
 
 # \w ei sobitu kombineerivate märkidega — NFD sõnas peavad need olema kaasas
-_WORD = re.compile(r"[\ẁ-ͯ]+")
+_WORD = re.compile(r"[\w\u0300-\u036f]+")
 
 
 def _is_latin_letter(ch):

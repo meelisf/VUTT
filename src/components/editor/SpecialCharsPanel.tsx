@@ -4,6 +4,18 @@ import { useTranslation } from 'react-i18next';
 import SafeHtml from '../SafeHtml';
 import CharSetEditor from './CharSetEditor';
 import type { SpecialCharacter } from './useSpecialChars';
+import type { CombiningMark } from '../../utils/combiningMarks';
+
+// Kombineerivate märkide rühm paneeli ees, kasutaja märgikomplektist sõltumatu.
+// Märk läheb kursori ees olevale tähele (makron ADR 0062; makronil ka Alt-M).
+const COMBINING_MARK_BUTTONS: CombiningMark[] = ['macron', 'circumflex', 'lenis', 'asper'];
+// Nupu kujutis: märk punktiirringi (U+25CC) peal — keeleülene, ei vaja tõlget.
+const MARK_GLYPHS: Record<CombiningMark, string> = {
+  macron: '\u25cc\u0304',
+  circumflex: '\u25cc\u0302',
+  lenis: '\u25cc\u0313',
+  asper: '\u25cc\u0314',
+};
 
 interface SpecialCharsPanelProps {
   authToken: string | null;
@@ -21,7 +33,7 @@ interface SpecialCharsPanelProps {
   setSpecialCharacters: (chars: SpecialCharacter[]) => void;
   setIsCustomChars: (custom: boolean) => void;
   insertSpecialChar: (char: string, event: MouseEvent<HTMLButtonElement>) => void;
-  insertMacron: (event: MouseEvent<HTMLButtonElement>) => void;
+  insertCombiningMark: (kind: CombiningMark, event: MouseEvent<HTMLButtonElement>) => void;
 }
 
 // Erimärkide paneel koos kasutaja märgikomplekti redaktori ja transkriptsioonijuhendi modaali avamisega.
@@ -41,10 +53,17 @@ export default function SpecialCharsPanel({
   setSpecialCharacters,
   setIsCustomChars,
   insertSpecialChar,
-  insertMacron,
+  insertCombiningMark,
 }: SpecialCharsPanelProps) {
   const { t } = useTranslation(['workspace', 'common']);
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
+  // Staatilised võtmed, et translationKeysResolve valvur neid kontrolliks.
+  const markHints: Record<CombiningMark, string> = {
+    macron: t('editor.combiningMarks.macronHint'),
+    circumflex: t('editor.combiningMarks.circumflexHint'),
+    lenis: t('editor.combiningMarks.lenisHint'),
+    asper: t('editor.combiningMarks.asperHint'),
+  };
 
   return (
     <>
@@ -76,18 +95,20 @@ export default function SpecialCharsPanel({
 
             <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap gap-1">
-                {/* Makron (ADR 0062) on kasutaja märgikomplektist sõltumatu: lisab
-                    kursori ees olevale tähele lühendusmärgi, Alt+M teeb sama. */}
-                <button
-                  type="button"
-                  onClick={(e) => insertMacron(e)}
-                  disabled={readOnly}
-                  title={t('editor.macronHint')}
-                  aria-label={t('editor.macronHint')}
-                  className="h-[22px] px-1.5 flex items-center justify-center text-xs font-serif bg-primary-50 border border-primary-200 text-primary-800 rounded hover:bg-primary-100 hover:border-primary-300 transition-colors shadow-sm"
-                >
-                  {t('editor.macron')}
-                </button>
+                {COMBINING_MARK_BUTTONS.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={(e) => insertCombiningMark(kind, e)}
+                    disabled={readOnly}
+                    title={markHints[kind]}
+                    aria-label={markHints[kind]}
+                    className="w-[22px] h-[22px] flex items-center justify-center text-sm font-serif bg-primary-50 border border-primary-200 text-primary-800 rounded hover:bg-primary-100 hover:border-primary-300 transition-colors shadow-sm"
+                  >
+                    {MARK_GLYPHS[kind]}
+                  </button>
+                ))}
+                <span className="w-px h-[22px] bg-gray-200 mx-0.5" aria-hidden="true" />
                 {specialCharacters.map((char, idx) => (
                   <button
                     key={idx}

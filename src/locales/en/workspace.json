@@ -536,8 +536,12 @@
     "openGuide": "Open transcription guide",
     "guideTitle": "Transcription guide",
     "editChars": "Customize character set",
-    "macron": "◌̄",
-    "macronHint": "Macron (abbreviation mark) on the letter before the cursor: Alt+M (Mac: ⌥M). Press again to remove; a tilde is replaced by a macron.",
+    "combiningMarks": {
+      "macronHint": "Macron (abbreviation mark) on the letter before the cursor: Alt+M (Mac: ⌥M). Press again to remove; a tilde is replaced by a macron.",
+      "circumflexHint": "Circumflex on the letter before the cursor (â; on a Greek letter ᾶ). Press again to remove.",
+      "lenisHint": "Spiritus lenis (ἀ) on the Greek letter before the cursor. Press again to remove; replaces asper.",
+      "asperHint": "Spiritus asper (ἁ) on the Greek letter before the cursor. Press again to remove; replaces lenis."
+    },
     "pasteChar": "Paste symbol...",
     "addChar": "Add",
     "resetChars": "Reset to defaults",

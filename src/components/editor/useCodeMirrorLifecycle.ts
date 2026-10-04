@@ -10,7 +10,7 @@ import type { MarginaliaMode } from './MarginaliaExtension';
 import { vuttTheme } from './VuttTheme';
 import { createVuttSearchPanel } from './VuttSearchPanel';
 import { isPageSwapUpdate } from './editorAnnotations';
-import { applyMacron } from './macronCommand';
+import { applyMacron } from './combiningMarkCommand';
 
 interface UseCodeMirrorLifecycleParams {
   page: Page;

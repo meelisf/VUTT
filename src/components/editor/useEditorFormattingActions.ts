@@ -4,7 +4,8 @@ import { EditorSelection, Transaction } from '@codemirror/state';
 import { vuttMarkupField } from './VuttMarkupExtension';
 import { hiddenBlockRanges, marginaliaField, openMarginalia } from './MarginaliaExtension';
 import { findContainer, selectionWrapChanges } from './wrapTagUtils';
-import { applyMacron } from './macronCommand';
+import { applyCombiningMark } from './combiningMarkCommand';
+import type { CombiningMark } from '../../utils/combiningMarks';
 import { cleanMarkupSpecs, marginaliaFromSelection, openGroupAt, rangeTouchesOpenMarginalia, toggleGroupStyle } from '../../utils/marginaliaUtils';
 
 interface UseEditorFormattingActionsParams {
@@ -98,12 +99,13 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     insertAtCursor(char);
   }, [insertAtCursor]);
 
-  // Makron kursori ees olevale tähele (ADR 0062) — sama käsk mis Alt-M.
-  const insertMacron = useCallback((e?: MouseEvent) => {
+  // Kombineeriv märk kursori ees olevale tähele (makron ADR 0062, tsirkumfleks,
+  // hõngusmärgid) — makron on sama käsk mis Alt-M.
+  const insertCombiningMark = useCallback((kind: CombiningMark, e?: MouseEvent) => {
     if (e) e.preventDefault();
     const view = viewRef.current;
     if (!view || readOnly) return;
-    applyMacron(view);
+    applyCombiningMark(view, kind);
     view.focus();
   }, [readOnly, viewRef]);
 
@@ -210,7 +212,7 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     wrapWithTag,
     insertAtCursor,
     insertSpecialChar,
-    insertMacron,
+    insertCombiningMark,
     insertMarginalia,
     cleanMarkup,
   };

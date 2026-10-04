@@ -536,8 +536,12 @@
     "openGuide": "Ava transkribeerimise juhend",
     "guideTitle": "Transkribeerimise juhend",
     "editChars": "Kohanda märgikomplekti",
-    "macron": "◌̄",
-    "macronHint": "Makron (lühendusmärk) kursori ees olevale tähele: Alt+M (Mac: ⌥M). Teine vajutus eemaldab, tilde asendub makroniga.",
+    "combiningMarks": {
+      "macronHint": "Makron (lühendusmärk) kursori ees olevale tähele: Alt+M (Mac: ⌥M). Teine vajutus eemaldab, tilde asendub makroniga.",
+      "circumflexHint": "Tsirkumfleks kursori ees olevale tähele (â; kreeka tähel ᾶ). Teine vajutus eemaldab.",
+      "lenisHint": "Spiritus lenis (ἀ) kursori ees olevale kreeka tähele. Teine vajutus eemaldab; asper vahetub lenise vastu.",
+      "asperHint": "Spiritus asper (ἁ) kursori ees olevale kreeka tähele. Teine vajutus eemaldab; lenis vahetub asperi vastu."
+    },
     "pasteChar": "Kleebi sümbol...",
     "addChar": "Lisa",
     "resetChars": "Lähtesta vaikimisi",
