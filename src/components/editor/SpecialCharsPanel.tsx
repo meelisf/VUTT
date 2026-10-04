@@ -21,7 +21,6 @@ interface SpecialCharsPanelProps {
   setSpecialCharacters: (chars: SpecialCharacter[]) => void;
   setIsCustomChars: (custom: boolean) => void;
   insertSpecialChar: (char: string, event: MouseEvent<HTMLButtonElement>) => void;
-  insertMacron: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
 // Erimärkide paneel koos kasutaja märgikomplekti redaktori ja transkriptsioonijuhendi modaali avamisega.
@@ -41,7 +40,6 @@ export default function SpecialCharsPanel({
   setSpecialCharacters,
   setIsCustomChars,
   insertSpecialChar,
-  insertMacron,
 }: SpecialCharsPanelProps) {
   const { t } = useTranslation(['workspace', 'common']);
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
@@ -76,18 +74,6 @@ export default function SpecialCharsPanel({
 
             <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap gap-1">
-                {/* Makron (ADR 0062) on kasutaja märgikomplektist sõltumatu: lisab
-                    kursori ees olevale tähele lühendusmärgi, Alt+M teeb sama. */}
-                <button
-                  type="button"
-                  onClick={(e) => insertMacron(e)}
-                  disabled={readOnly}
-                  title={t('editor.macronHint')}
-                  aria-label={t('editor.macronHint')}
-                  className="h-[22px] px-1.5 flex items-center justify-center text-xs font-serif bg-primary-50 border border-primary-200 text-primary-800 rounded hover:bg-primary-100 hover:border-primary-300 transition-colors shadow-sm"
-                >
-                  {t('editor.macron')}
-                </button>
                 {specialCharacters.map((char, idx) => (
                   <button
                     key={idx}

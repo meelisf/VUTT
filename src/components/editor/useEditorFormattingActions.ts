@@ -4,7 +4,6 @@ import { EditorSelection, Transaction } from '@codemirror/state';
 import { vuttMarkupField } from './VuttMarkupExtension';
 import { hiddenBlockRanges, marginaliaField, openMarginalia } from './MarginaliaExtension';
 import { findContainer, selectionWrapChanges } from './wrapTagUtils';
-import { applyMacron } from './macronCommand';
 import { cleanMarkupSpecs, marginaliaFromSelection, openGroupAt, rangeTouchesOpenMarginalia, toggleGroupStyle } from '../../utils/marginaliaUtils';
 
 interface UseEditorFormattingActionsParams {
@@ -97,15 +96,6 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     if (e) e.preventDefault();
     insertAtCursor(char);
   }, [insertAtCursor]);
-
-  // Makron kursori ees olevale tähele (ADR 0062) — sama käsk mis Alt-M.
-  const insertMacron = useCallback((e?: MouseEvent) => {
-    if (e) e.preventDefault();
-    const view = viewRef.current;
-    if (!view || readOnly) return;
-    applyMacron(view);
-    view.focus();
-  }, [readOnly, viewRef]);
 
   // Uus marginaalia: valik tõstetakse <m> plokki valiku algusrea kohale;
   // ilma valikuta tühi <m></m> kursori rea kohale. Mõlemal juhul kohe avatuna.
@@ -210,7 +200,6 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     wrapWithTag,
     insertAtCursor,
     insertSpecialChar,
-    insertMacron,
     insertMarginalia,
     cleanMarkup,
   };

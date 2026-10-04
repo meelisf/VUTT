@@ -227,7 +227,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     wrapWithTag,
     insertAtCursor,
     insertSpecialChar,
-    insertMacron,
     insertMarginalia,
     cleanMarkup,
   } = useEditorFormattingActions({ viewRef, readOnly });
@@ -306,7 +305,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           setSpecialCharacters={setSpecialCharacters}
           setIsCustomChars={setIsCustomChars}
           insertSpecialChar={insertSpecialChar}
-          insertMacron={insertMacron}
         />
 
         <EditorInfoHistoryTabs
