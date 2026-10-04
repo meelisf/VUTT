@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Crop, Columns2, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
+import { X, Crop, Columns2, LayoutGrid, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -256,7 +256,13 @@ const PageImageEditorModal: React.FC<Props> = ({
     setError(null);
     // Järgmisele lehele, nagu varem kohese rakenduse järel — kärpimine käib lehthaaval.
     if (!isLast) goTo(safeIndex + 1);
-    else { resetCrop(); setToast({ text: t('manage.editor.allDone') }); }
+    else {
+      // Viimane leht: kasti ei jäeta ette — tsentreeritud „kleepuv" kast paistaks
+      // nagu kehtiv kärbe, kuigi märgitud kärbe on juba plaanis (rida „Ootel kärbe").
+      resetCrop();
+      crop.clearCrop();
+      setToast({ text: t('manage.editor.allDone') });
+    }
   };
 
   // Taasta lehe ._originals pristine pilt (destruktiivne: kõik pildimuudatused kaovad).
@@ -592,6 +598,15 @@ const PageImageEditorModal: React.FC<Props> = ({
           <div className="flex items-center justify-between">
             {/* Navigeerimine */}
             <div className="flex items-center gap-1">
+              {/* Sama nupp nagu upload'i detailvaates: Escape üksi ei ütle, kuhu ta viib. */}
+              <button
+                data-testid="back-to-overview"
+                onClick={onClose}
+                className="mr-2 flex items-center gap-1.5 px-3 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-gray-100"
+              >
+                <LayoutGrid size={15} />
+                {t('manage.editor.backToOverview')}
+              </button>
               <button
                 onClick={() => goTo(currentIndex - 1)}
                 disabled={safeIndex <= 0}
