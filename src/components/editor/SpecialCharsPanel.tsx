@@ -82,6 +82,16 @@ export default function SpecialCharsPanel({
               {isCustomChars && (
                 <span className="text-[10px] text-primary-500 font-normal">✦</span>
               )}
+              {/* Juhendi link päiserea sees (mitte märgirea all): ei jäta lehe alla
+                  tühja rida ja on nähtav ka kokkupandud paneeliga. Klõps ei tohi
+                  paneeli lülitada — sama muster mis seadete nupul. */}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowTranscriptionGuide(true); }}
+                className="text-[11px] font-normal text-primary-600 hover:text-primary-800 hover:underline transition-colors"
+              >
+                {t('editor.openGuide')}
+              </button>
               {Boolean(user) && (
                 <button
                   type="button"
@@ -94,7 +104,7 @@ export default function SpecialCharsPanel({
               )}
             </summary>
 
-            <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="px-3 py-1.5">
               <div className="flex flex-wrap gap-1">
                 {COMBINING_MARK_BUTTONS.map((kind) => (
                   <button
@@ -124,12 +134,6 @@ export default function SpecialCharsPanel({
                 ))}
               </div>
 
-              <button
-                onClick={() => setShowTranscriptionGuide(true)}
-                className="text-[11px] text-primary-600 hover:text-primary-800 hover:underline py-1 transition-colors"
-              >
-                {t('editor.openGuide')}
-              </button>
             </div>
           </details>
         </div>
