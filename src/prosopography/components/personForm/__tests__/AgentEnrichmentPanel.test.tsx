@@ -81,6 +81,16 @@ describe('agendi ettepanekute ülevaatus', () => {
     await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0, 1, 2], 'tok', 'rev1'));
   });
 
+  it('kinnituse ajal on näha, et salvestus käib', async () => {
+    let finish!: (v: unknown) => void;
+    apply.mockReturnValue(new Promise(r => { finish = r; }));
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Kinnita kõik (3)' }));
+    expect(await screen.findByText(/Salvestan 3 kirjet/)).toBeTruthy();
+    finish({ ...person, updated_at: 'v2' });
+    await waitFor(() => expect(screen.queryByText(/Salvestan 3 kirjet/)).toBeNull());
+  });
+
   it('Lükka tagasi kutsub reject-i', async () => {
     renderPanel();
     fireEvent.click((await screen.findAllByRole('button', { name: 'Lükka tagasi' }))[3]);

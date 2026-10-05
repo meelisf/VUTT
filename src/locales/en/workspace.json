@@ -333,7 +333,10 @@
         "accept": "Add",
         "edit": "Edit and add",
         "reject": "Reject",
-        "empty": "No pending proposals. Create a code and give it to the agent to propose parts (letters, sessions etc.)."
+        "empty": "No pending proposals. Create a code and give it to the agent to propose parts (letters, sessions etc.).",
+        "working": "Saving…",
+        "accepting": "Adding parts",
+        "progress": "{{done}} / {{total}}"
       },
       "kinds": {
         "letter": "Letter",

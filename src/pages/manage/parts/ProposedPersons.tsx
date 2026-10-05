@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { UserPlus, Link2, Type } from 'lucide-react';
 import PersonAddPanel from '../../../prosopography/components/PersonAddPanel';
 import { resolveProposedPerson, type ProposedPerson } from '../../../services/workPartsApi';
+import BusyNote from '../../../components/BusyNote';
 
 const ID_URL: Record<string, (id: string) => string> = {
   gnd: id => `https://d-nb.info/gnd/${id}`,
@@ -57,6 +58,7 @@ const ProposedPersons: React.FC<Props> = ({ workId, token, lang, entries, onReso
     <div className="mt-2 rounded border border-violet-100 bg-white p-2">
       <h4 className="text-xs font-semibold uppercase tracking-wide text-violet-900">{tp('persons', { count: pending.length })}</h4>
       <p className="text-xs text-gray-500">{tp('personsHelp')}</p>
+      {busy && <BusyNote className="mt-1">{tp('working')}</BusyNote>}
       {error && <p role="alert" className="mt-1 text-xs text-red-700">{error}</p>}
       <ul className="mt-1.5 space-y-1.5">
         {pending.map(({ proposalId, person: p }) => {

@@ -12,6 +12,8 @@ import {
 } from '../../../services/workPartsApi';
 import { compactNumbers } from '../partsModel';
 import ProposedPersons from './ProposedPersons';
+import ProgressBar from '../../../components/ProgressBar';
+import BusyNote from '../../../components/BusyNote';
 
 interface Props {
   workId: string;
@@ -31,6 +33,8 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
   const [proposals, setProposals] = useState<PartProposal[]>([]);
   const [handoff, setHandoff] = useState<PartsHandoff | null>(null);
   const [busy, setBusy] = useState(false);
+  // „Lisa kõik" käib osa kaupa järjest → päris edenemine.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -69,9 +73,14 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
   const acceptAll = () => run(async () => {
     const order = [...pending].sort((a, b) =>
       Number(a.item.part.kind === 'attachment') - Number(b.item.part.kind === 'attachment'));
+    setProgress({ done: 0, total: order.length });
     try {
-      for (const { p, index } of order) await decidePartProposal(workId, p.proposal_id, index, 'accept', token);
+      for (const [i, { p, index }] of order.entries()) {
+        await decidePartProposal(workId, p.proposal_id, index, 'accept', token);
+        setProgress({ done: i + 1, total: order.length });
+      }
     } finally {
+      setProgress(null);
       await load();
       onChanged();
     }
@@ -114,6 +123,12 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
         </div>
       )}
 
+      {progress ? (
+        <div className="mt-2">
+          <ProgressBar percent={(progress.done / progress.total) * 100} label={tp('accepting')}
+            detail={tp('progress', progress)} barClassName="bg-violet-600" />
+        </div>
+      ) : busy && <BusyNote className="mt-2">{tp('working')}</BusyNote>}
       {error && <p role="alert" className="mt-2 text-red-700">{error}</p>}
       {proposals.some(p => p.pages_changed) && <p className="mt-2 text-amber-800">{tp('pagesChanged')}</p>}
 
