@@ -124,7 +124,13 @@
     "sendError": "Failed to send notification.",
     "recipientsLoadError": "Failed to load recipients.",
     "commentReply": "{{actor}} replied to your comment",
-    "commentReplyFallback": "replied to your comment"
+    "commentReplyFallback": "replied to your comment",
+    "groups": "Groups:",
+    "group": {
+      "admins": "Administrators",
+      "editors": "Editors",
+      "contributors": "Contributors"
+    }
   },
   "form": {
     "clearSearch": "Clear search"

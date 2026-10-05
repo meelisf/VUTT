@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Bell, Check, ChevronLeft, Loader2, Reply, Send } from 'lucide-react';
 import Header from '../components/Header';
+import Pagination from '../components/Pagination';
 import { useUser } from '../contexts/UserContext';
 import { UserNotification } from '../types';
 import {
@@ -14,6 +15,10 @@ import {
   sendNotification,
 } from '../services/notificationService';
 import { isSentNotification, notificationTitle } from '../utils/notificationText';
+import { isGroupSelected, RECIPIENT_GROUPS, shortenNames, toggleGroup } from '../utils/notificationGroups';
+
+// Teavitusi on kasutaja kohta kuni 200 (server kärbib), seega lehitsus käib kliendis.
+const NOTIFICATIONS_PER_PAGE = 20;
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -49,7 +54,7 @@ const sentRecipientsLabel = (notification: UserNotification, allLabel: string) =
     return typeof count === 'number' ? `${allLabel} (${count})` : allLabel;
   }
   if (Array.isArray(names) && names.length > 0) {
-    return names.filter(item => typeof item === 'string').join(', ');
+    return shortenNames(names.filter((item): item is string => typeof item === 'string'));
   }
   return '';
 };
@@ -102,6 +107,7 @@ const Notifications: React.FC = () => {
   const [linkError, setLinkError] = useState('');
   const [replyingTo, setReplyingTo] = useState<UserNotification | null>(null);
   const [sending, setSending] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const canSend = isAtLeast(user?.role, 'editor');
   const canSendAll = isAtLeast(user?.role, 'admin');
@@ -116,6 +122,13 @@ const Notifications: React.FC = () => {
       || recipient.role.toLowerCase().includes(query)
     ));
   }, [recipients, recipientFilter]);
+  const totalPages = Math.max(1, Math.ceil(notifications.length / NOTIFICATIONS_PER_PAGE));
+  // Klammerdus: kui loend lüheneb (uus laadimine), ei jää leht tühjaks.
+  const safePage = Math.min(currentPage, totalPages);
+  const pageNotifications = useMemo(
+    () => notifications.slice((safePage - 1) * NOTIFICATIONS_PER_PAGE, safePage * NOTIFICATIONS_PER_PAGE),
+    [notifications, safePage],
+  );
 
   useEffect(() => {
     if (!authToken || !user) return;
@@ -284,7 +297,7 @@ const Notifications: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {notifications.map(notification => {
+                {pageNotifications.map(notification => {
                   const target = notificationLink(notification);
                   return (
                     <article
@@ -362,6 +375,15 @@ const Notifications: React.FC = () => {
                     </article>
                   );
                 })}
+                <Pagination
+                  currentPage={safePage}
+                  totalPages={totalPages}
+                  onPageChange={(page) => {
+                    setCurrentPage(page);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="pt-4"
+                />
               </div>
             )}
           </section>
@@ -401,6 +423,27 @@ const Notifications: React.FC = () => {
                 )}
                 {!sendToAll && (
                   <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-gray-500">{t('notifications.groups')}</span>
+                      {RECIPIENT_GROUPS.map(group => {
+                        const active = isGroupSelected(recipients, group, selectedUsernames);
+                        return (
+                          <button
+                            key={group}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setSelectedUsernames(prev => toggleGroup(recipients, group, prev))}
+                            className={`px-2.5 py-1 rounded-full border text-xs font-medium ${
+                              active
+                                ? 'bg-primary-600 border-primary-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {t(`notifications.group.${group}`)}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <input
                       value={recipientFilter}
                       onChange={(event) => setRecipientFilter(event.target.value)}
