@@ -79,6 +79,10 @@ export const decidePartProposal = (workId: string, proposalId: string, index: nu
   apiPost<{ status: string; part: WorkPart | null }>(
     `${base(workId)}/proposals/${encodeURIComponent(proposalId)}/items/${index}/${action}`,
     { ...(part ? { part } : {}), ...(mode ? { mode } : {}) }, opts(token));
+/** „Lisa kõik": nähtud read ühe päringuga — üks commit ja üks Meili sünk. Atomaarne. */
+export const acceptPartProposals = (workId: string, items: { proposal_id: string; index: number }[],
+  token: string | null) =>
+  apiPost<{ accepted: number; parts: WorkPart[] }>(`${base(workId)}/proposals/accept`, { items }, opts(token));
 /** Pakutud isik: loo kaart, seo olemasolevaga (`personId`) või jäta nimeks. 409 `person_exists:<id>`. */
 export const resolveProposedPerson = (workId: string, proposalId: string, ref: string,
   action: 'create' | 'link' | 'name', token: string | null, personId?: string) =>

@@ -81,6 +81,17 @@ nimekujud, eluaastad, kontrollitud GND/Wikidata/VIAF, märkus, tõend); osa isik
 nimeks. Juba kasutusel väline ID → `person_exists:<id>` (409) ja sidumise pakkumine.
 MCP ei loo isikut ise.
 
+**Hulgikinnitus (2026-10-05):** „Lisa kõik" on üks päring
+`POST /works/{id}/parts/proposals/accept` (`items: [{proposal_id, index}]`) →
+`work_part_proposals.decide_many` → `work_parts.apply_parts`: sama `_write` (lukk,
+`validate_parts` iga osa järel, git), aga ÜKS commit ja ÜKS Meili sünk. Enne tegi klient
+rea kaupa päringu: 16 osa = 18 s, sest iga rida indekseeris kogu teose uuesti (~0,7 s 57
+lehe juures). Klient saadab NÄHTUD read — vahepeal saabunud ettepanekut ei võeta nägemata
+vastu. Kogum on atomaarne: vigane rida → midagi ei kirjutata, viga nimetab rea
+(`items[i]`). Lisa võib viidata samas kogumis loodavale kirjale; server järjestab lisad
+viimaseks. Osade otspunktid annavad `background_tasks`-i, seega Meili sünk ja
+`person_to_works` käivad taustal (ADR 0013 koondab ja kordab).
+
 
 ## Täiendus 2026-09-28: tõend ainult VUTT-ist
 

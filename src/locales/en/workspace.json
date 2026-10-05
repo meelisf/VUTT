@@ -335,8 +335,8 @@
         "reject": "Reject",
         "empty": "No pending proposals. Create a code and give it to the agent to propose parts (letters, sessions etc.).",
         "working": "Saving…",
-        "accepting": "Adding parts",
-        "progress": "{{done}} / {{total}}"
+        "accepting_one": "Adding {{count}} part…",
+        "accepting_other": "Adding {{count}} parts…"
       },
       "kinds": {
         "letter": "Letter",

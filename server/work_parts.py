@@ -132,9 +132,12 @@ def _ordered(pages: list[str], order: list[str]) -> list[str]:
     return sorted(dict.fromkeys(pages), key=lambda s: pos.get(s, len(pos)))
 
 
-def _write(work_dir: str, username: str, message: str, mutate) -> object:
+def _write(work_dir: str, username: str, message: str, mutate, background_tasks=None) -> object:
     """Loe–muuda–kirjuta metadata_lock'i all. `mutate(parts, stems)` tagastab
-    (uued_osad, tulemus) või viskab PartError'i."""
+    (uued_osad, tulemus) või viskab PartError'i.
+
+    `background_tasks` (FastAPI) viib Meili sünk'i ja person_to_works'i taustale:
+    57-leheline teos indekseerus sünkroonselt ~0,7 s osa kohta (mõõdetud 2026-10-05)."""
     from .metadata_ops import bulk_update_works
     from . import admin_page_ops
     box: dict = {}
@@ -160,7 +163,7 @@ def _write(work_dir: str, username: str, message: str, mutate) -> object:
         stems = page_stems(work_dir)
         # call_ptw: osa isikud person_to_works'i `part_id`-ga (#464 PR 3).
         res = bulk_update_works([(os.path.join(work_dir, "_metadata.json"), transform)], username, message,
-                                call_ptw=True)
+                                call_ptw=True, background_tasks=background_tasks)
     if "error" in box:
         raise box["error"]
     if res.get("failed"):
@@ -194,34 +197,77 @@ def _find(parts: list, part_id: str) -> int:
     raise PartError(f"Osa puudub: {part_id}", 404)
 
 
-def create_part(work_dir: str, data: dict, username: str) -> dict:
+def create_part(work_dir: str, data: dict, username: str, background_tasks=None) -> dict:
     def mutate(parts, _stems):
         part = new_part(data, {p.get("id") for p in parts})
         return parts + [part], part["id"]
-    pid = _write(work_dir, username, f"Osa: lisa ({(data or {}).get('kind')})", mutate)
+    pid = _write(work_dir, username, f"Osa: lisa ({(data or {}).get('kind')})", mutate, background_tasks)
     return _read_part(work_dir, pid)
 
 
-def update_part(work_dir: str, part_id: str, data: dict, username: str) -> dict:
+def _replace_part(parts: list, part_id: str, data: dict) -> list:
+    i = _find(parts, part_id)
+    keep = {"id": part_id, "needs_review": parts[i].get("needs_review", False)}
+    parts[i] = {**{k: v for k, v in (data or {}).items() if k not in ("id", "needs_review")}, **keep}
+    return parts
+
+
+def update_part(work_dir: str, part_id: str, data: dict, username: str, background_tasks=None) -> dict:
     def mutate(parts, _stems):
-        i = _find(parts, part_id)
-        keep = {"id": part_id, "needs_review": parts[i].get("needs_review", False)}
-        parts[i] = {**{k: v for k, v in (data or {}).items() if k not in ("id", "needs_review")}, **keep}
-        return parts, part_id
-    _write(work_dir, username, f"Osa: muuda [{part_id}]", mutate)
+        return _replace_part(parts, part_id, data), part_id
+    _write(work_dir, username, f"Osa: muuda [{part_id}]", mutate, background_tasks)
     return _read_part(work_dir, part_id)
 
 
-def delete_part(work_dir: str, part_id: str, username: str) -> None:
+def apply_parts(work_dir: str, ops: list, username: str, message: str, background_tasks=None) -> list:
+    """Mitu loomist/parandust ÜHE kirjutusega: üks lukk, üks commit, üks Meili sünk.
+
+    `ops`: `{"op": "create"|"update", "data", "part_id"?, "key"?, "attach_key"?, "label"?}`.
+    `attach_key` viitab sama kogumi varasema op'i `key`-le (lisa oma kirjale, mis luuakse
+    samas kogumis). Kogum on atomaarne: üks vigane osa → midagi ei kirjutata ja viga
+    kannab selle op'i `label`-it. Tagastab osad `ops` järjekorras.
+    """
+    def mutate(parts, stems):
+        ids, by_key = [], {}
+        for op in ops:
+            data = dict(op.get("data") or {})
+            try:
+                if op.get("attach_key") is not None:
+                    if op["attach_key"] not in by_key:
+                        raise PartError("Lisa viitab osale, mida pole")
+                    data["attached_to"] = by_key[op["attach_key"]]
+                if op.get("op") == "update":
+                    parts = _replace_part(parts, op["part_id"], data)
+                    pid = op["part_id"]
+                else:
+                    part = new_part(data, {p.get("id") for p in parts})
+                    parts, pid = parts + [part], part["id"]
+                # Valideerimine op'i kaupa: viga nimetab rea, mitte ainult kogu loendi.
+                validate_parts(parts, set(stems))
+            except PartError as e:
+                raise PartError(f"{op.get('label') or op.get('op')}: {e}", e.status)
+            if op.get("key") is not None:
+                by_key[op["key"]] = pid
+            ids.append(pid)
+        return parts, ids
+    ids = _write(work_dir, username, message, mutate, background_tasks)
+    import json
+    with open(os.path.join(work_dir, "_metadata.json"), "r", encoding="utf-8") as f:
+        parts = (json.load(f) or {}).get("parts") or []
+    return [parts[_find(parts, pid)] for pid in ids]
+
+
+def delete_part(work_dir: str, part_id: str, username: str, background_tasks=None) -> None:
     def mutate(parts, _stems):
         _find(parts, part_id)
         if any(p.get("attached_to") == part_id for p in parts):
             raise PartError("Osale viitavad lisad; kustuta või sea need enne ümber", 409)
         return [p for p in parts if p.get("id") != part_id], None
-    _write(work_dir, username, f"Osa: kustuta [{part_id}]", mutate)
+    _write(work_dir, username, f"Osa: kustuta [{part_id}]", mutate, background_tasks)
 
 
-def change_part_pages(work_dir: str, part_id: str, add: list[str], remove: list[str], username: str) -> dict:
+def change_part_pages(work_dir: str, part_id: str, add: list[str], remove: list[str], username: str,
+                      background_tasks=None) -> dict:
     def mutate(parts, _stems):
         i = _find(parts, part_id)
         pages = [s for s in parts[i].get("pages") or [] if s not in set(remove or [])] + list(add or [])
@@ -229,7 +275,7 @@ def change_part_pages(work_dir: str, part_id: str, add: list[str], remove: list[
             raise PartError("Osal peab jääma vähemalt üks leht; kustuta osa", 400)
         parts[i] = {**parts[i], "pages": pages, "needs_review": False}
         return parts, part_id
-    _write(work_dir, username, f"Osa: lehed [{part_id}]", mutate)
+    _write(work_dir, username, f"Osa: lehed [{part_id}]", mutate, background_tasks)
     return _read_part(work_dir, part_id)
 
 

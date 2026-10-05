@@ -9,6 +9,9 @@ from server import work_parts as wp
 from server import work_part_proposals as wpp
 
 
+CALLS: list = []   # commitid ja Meili sünk'id — hulgikinnituse mõõdupuu
+
+
 @pytest.fixture
 def work(tmp_path, monkeypatch):
     from server import metadata_ops
@@ -22,10 +25,14 @@ def work(tmp_path, monkeypatch):
     def fake_save(path, content, *a, additional_files=None, **k):
         from server.utils import atomic_write_text
         atomic_write_text(path, content)
+        CALLS.append("commit")
         return {"success": True}
+    CALLS.clear()
     monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
-    for name in ("sync_work_to_meilisearch", "update_person_to_works", "update_work_collections", "update_work_facts"):
+    for name in ("update_person_to_works", "update_work_collections", "update_work_facts"):
         monkeypatch.setattr(metadata_ops, name, lambda *a, **k: None)
+    monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch", lambda *a, **k: CALLS.append("meili"))
+    monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch_async", lambda *a, **k: CALLS.append("meili-taust"))
     from server.prosopography import relations
     monkeypatch.setattr(relations, "update_page_person_mentions", lambda *a, **k: None)
     return str(d)
@@ -121,6 +128,52 @@ def test_lisa_viitab_sama_ettepaneku_kirjale(work):
     assert lisa["attached_to"] == letter["id"]
 
 
+POEM = {"kind": "poem", "title": "Carmen", "pages": [4], "creators": []}
+
+
+def _picks(p, *indices):
+    return [(p["proposal_id"], i) for i in indices]
+
+
+def test_hulgikinnitus_uks_kirjutus_ja_lisa_oma_kirjale(work):
+    attach = {"kind": "attachment", "pages": [5], "attached_to": 0}
+    _submit(work, [LETTER, attach, POEM])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    # Lisa on loendis esimene: server peab ta ise viimaseks järjestama.
+    created = wpp.decide_many("w1", work, "ed", _picks(p, 1, 0, 2))
+    assert CALLS == ["commit", "meili"]                          # 3 osa = 1 commit + 1 sünk
+    parts = _meta(work)["parts"]
+    assert len(parts) == 3 and len(created) == 3
+    letter = next(x for x in parts if x["kind"] == "letter")
+    assert next(x for x in parts if x["kind"] == "attachment")["attached_to"] == letter["id"]
+    assert wpp.list_pending("w1", work, "ed") == []
+
+
+def test_hulgikinnitus_on_atomaarne(work):
+    import os
+    _submit(work, [LETTER, POEM])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    os.remove(f"{work}/t-004.jpg")                                 # luuletuse leht kadus
+    with pytest.raises(wpp.ProposalError, match=r"invalid_part: items\[1\]"):
+        wpp.decide_many("w1", work, "ed", _picks(p, 0, 1))
+    assert "parts" not in _meta(work) and CALLS == []
+    assert [i["status"] for i in wpp.list_pending("w1", work, "ed")[0]["items"]] == ["pending", "pending"]
+
+
+@pytest.mark.parametrize("picks", [
+    lambda p: _picks(p, 1),                                      # lisa ilma oma kirjata
+    lambda p: _picks(p, 0, 0),                                   # kordus
+    lambda p: [("muu", 0)],                                      # võõras ettepanek
+    lambda p: [],
+])
+def test_hulgikinnituse_piirid(work, picks):
+    _submit(work, [LETTER, {"kind": "attachment", "pages": [5], "attached_to": 0}])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    with pytest.raises(wpp.ProposalError):
+        wpp.decide_many("w1", work, "ed", picks(p))
+    assert "parts" not in _meta(work)
+
+
 def test_teine_kasutaja_ei_nae_ega_otsusta(work):
     _submit(work, [LETTER])
     (p,) = wpp.list_pending("w1", work, "ed")
@@ -179,6 +232,20 @@ def test_otspunktide_voog(client, work):
     d = client.post(f"/works/w1/parts/proposals/{p['proposal_id']}/items/0/accept", json={})
     assert d.status_code == 200 and d.json()["status"] == "accepted"
     assert _meta(work)["parts"][0]["title"] == "Kiri Fischerile"
+
+
+def test_otspunkt_hulgikinnitus_meili_taustal(client, work):
+    h = client.post("/works/w1/parts/handoff").json()
+    client.post("/works/parts-proposals/submit", json={
+        "code": h["code"], "work_id": "w1", "pages_version": h["pages_version"], "parts": [LETTER, POEM]})
+    (p,) = client.get("/works/w1/parts/proposals").json()
+    CALLS.clear()
+    r = client.post("/works/w1/parts/proposals/accept",
+                    json={"items": [{"proposal_id": p["proposal_id"], "index": i} for i in (0, 1)]})
+    assert r.status_code == 200 and r.json()["accepted"] == 2
+    assert CALLS == ["commit", "meili-taust"]                     # sünk ei blokeeri vastust
+    bad = client.post("/works/w1/parts/proposals/accept", json={"items": [{"proposal_id": p["proposal_id"], "index": 0}]})
+    assert bad.status_code == 400                                  # juba otsustatud
 
 
 def test_otspunktide_piirid(client, work):

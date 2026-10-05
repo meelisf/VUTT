@@ -36,6 +36,12 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
     api.proposals[0].items[i].status = 'accepted';
     return { status: 'accepted', part: np };
   },
+  acceptPartProposals: async (_w: string, items: { proposal_id: string; index: number }[]) => {
+    api.calls.push(`accept:${items.map(i => `${i.proposal_id}:${i.index}`).join(',')}`);
+    if (api.hold) await api.hold;
+    for (const { index } of items) api.proposals[0].items[index].status = 'accepted';
+    return { accepted: items.length, parts: [] };
+  },
   changePartPages: async (_w: string, id: string, add: string[], remove: string[]) => {
     api.calls.push(`pages:${id}:+${add.join(',')}:-${remove.join(',')}`);
     return api.parts.find(p => p.id === id);
@@ -88,7 +94,7 @@ describe('PartsTab', () => {
     expect(api.calls.some(c => c.startsWith('create:'))).toBe(false);   // mitte eraldi create
   });
 
-  it('„Lisa kõik": kõik ootel osad, lisa pärast oma kirja', async () => {
+  it('„Lisa kõik": kõik nähtud ootel read ühe päringuga (järjestus on serveri töö)', async () => {
     const mk = (kind: string, pages: string[], attached_to: number | null = null) => ({
       part: { kind, pages, creators: [], attached_to: null }, attached_to, evidence: [], status: 'pending',
       page_numbers: [1], missing_pages: [] });
@@ -96,12 +102,11 @@ describe('PartsTab', () => {
       items: [mk('attachment', ['s3'], 1), mk('letter', ['s1', 's2']), mk('poem', ['s3'])] }];
     renderTab();
     fireEvent.click(await screen.findByRole('button', { name: 'Lisa kõik (3)' }));
-    await waitFor(() => expect(api.calls.filter(c => c.startsWith('decide:'))).toEqual([
-      'decide:pp:1:accept:', 'decide:pp:2:accept:', 'decide:pp:0:accept:',
-    ]));
+    await waitFor(() => expect(api.calls).toContain('accept:pp:0,pp:1,pp:2'));
+    expect(api.calls.some(c => c.startsWith('decide:'))).toBe(false);
   });
 
-  it('„Lisa kõik" näitab edenemist, kuni osad on lisatud', async () => {
+  it('„Lisa kõik" näitab, et töö käib, kuni osad on lisatud', async () => {
     const mk = (kind: string) => ({ part: { kind, pages: ['s1'], creators: [], attached_to: null }, attached_to: null,
       evidence: [], status: 'pending', page_numbers: [1], missing_pages: [] });
     api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: false,
@@ -110,11 +115,10 @@ describe('PartsTab', () => {
     api.hold = new Promise(r => { release = r; });
     renderTab();
     fireEvent.click(await screen.findByRole('button', { name: 'Lisa kõik (3)' }));
-    expect(await screen.findByRole('progressbar')).toBeTruthy();
-    expect(screen.getByText('0 / 3')).toBeTruthy();
+    expect(await screen.findByText('Lisan 3 osa…')).toBeTruthy();
     release();
-    await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull());
-    expect(api.calls.filter(c => c.startsWith('decide:'))).toHaveLength(3);
+    await waitFor(() => expect(screen.queryByText('Lisan 3 osa…')).toBeNull());
+    expect(api.calls.filter(c => c.startsWith('accept:'))).toHaveLength(1);
   });
 
   it('pakutud isik: loo, olemasolev väline ID pakub sidumist', async () => {

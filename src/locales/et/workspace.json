@@ -335,8 +335,8 @@
         "reject": "Lükka tagasi",
         "empty": "Ootel ettepanekuid pole. Loo kood ja anna see agendile, et ta pakuks osad (kirjad, istungid jm) välja.",
         "working": "Salvestan…",
-        "accepting": "Lisan osi",
-        "progress": "{{done}} / {{total}}"
+        "accepting_one": "Lisan {{count}} osa…",
+        "accepting_other": "Lisan {{count}} osa…"
       },
       "kinds": {
         "letter": "Kiri",
