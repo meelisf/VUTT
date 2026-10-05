@@ -17,7 +17,9 @@ from .work_dating import clean_dating
 
 logger = get_logger(__name__)
 
-KINDS = frozenset({"letter", "poem", "speech", "session", "attachment"})
+# Liik on teksti VORM, mitte ülesanne: gratulatsioon, leinaluuletus ja pühendus
+# tulevad rollipaarist (auctor → subject), ADR 0057.
+KINDS = frozenset({"letter", "poem", "prose", "speech", "session", "attachment"})
 ROLES = frozenset({"auctor", "addressee", "praeses", "participant", "subject"})
 _TEXT_FIELDS = ("title", "incipit", "notes")
 

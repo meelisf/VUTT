@@ -338,6 +338,7 @@
       "kinds": {
         "letter": "Letter",
         "poem": "Poem",
+        "prose": "Prose",
         "speech": "Speech",
         "session": "Session",
         "attachment": "Attachment"
@@ -420,7 +421,7 @@
       "praeses": "Praeses",
       "respondens": "Respondent",
       "auctor": "Author",
-      "gratulator": "Gratulator",
+      "gratulator": "Contributing author",
       "dedicator": "Dedicator",
       "editor": "Editor",
       "aui": "Author of preface/afterword",

@@ -14,8 +14,16 @@ järjekorras ning lehetoimingud (järjestus, poolitus, kustutus) nihutavad seda.
 - Osad on `_metadata.json` väljal `parts[]`. Osa lehed on **lehefailide tüvede hulk**:
   see võib olla katkendlik (vahelehed kirja sees) ja üks leht võib kuuluda mitmesse
   osasse (üks kiri lõpeb, teine algab samal lehel).
-- Liigid: `letter | poem | speech | session | attachment`. Rollid: `auctor |
-  addressee | praeses | participant | subject`. Mainitud isikud tulevad lehekülje
+- Liigid: `letter | poem | prose | speech | session | attachment`. Rollid: `auctor |
+  addressee | praeses | participant | subject`.
+- **Liik on teksti VORM, mitte ülesanne** (täiendus 2026-10-05). Gratulatsioon,
+  pulma- ja leinaluuletus, pühendus ning hinnang on sama funktsiooni variandid ja
+  tulevad rollipaarist: `auctor` → `subject` (õnnitletav / lahkunu), pöördumise saaja
+  `addressee`. Uut liiki `gratulation` ei lisata: värsis gratulatsioonil poleks siis
+  üht õiget liiki. `prose` katab vormilt proosatekstid (eessõna, järelsõna, tellitud
+  tutvustus või hinnang, proosas pühendus). Teose tasandi rolli `gratulator` kood jääb
+  (seoste reeglid ja Meili sõltuvad sellest), silt on „Kaasteksti autor", sest ta
+  kehtib ka leinatrükistes. Mainitud isikud tulevad lehekülje
   märksõnadest, mitte rollist. Lisa viitab teisele osale (`attached_to`).
 - Osi muudetakse **ainult** `/works/{id}/parts` otspunktidega (`server/work_parts.py`).
   Lugemine, muutmine ja kirjutamine käivad `metadata_lock`-i all (`bulk_update_works`)
