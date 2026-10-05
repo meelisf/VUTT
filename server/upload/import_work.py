@@ -11,6 +11,7 @@ import shutil
 import time
 
 from ..config import BASE_DIR, OCR_SERVER_PATH, get_logger
+from ..macron import convert_ocr_text
 from ..marginalia_normalize import normalize_marginalia_tags
 from ..utils import generate_nanoid, derive_year_fields
 from .file_detection import extract_page_num, page_base_name
@@ -20,13 +21,15 @@ from . import page_status
 logger = get_logger(__name__)
 
 
-def normalize_txt_file(path: str):
+def normalize_txt_file(path: str, languages=None):
     """Normaliseerib alla laetud OCR .txt marginaalia-tägid kanoonilisele kujule.
-    OCR-mudel toodab ristuvaid <i><m>...</i></m> — vt server/marginalia_normalize.py."""
+    OCR-mudel toodab ristuvaid <i><m>...</i></m> — vt server/marginalia_normalize.py.
+    Lühendi tilde → makron teose keelte järgi (ADR 0062); `None` = keel teadmata."""
     try:
         with open(path, 'r', encoding='utf-8') as f:
             raw = f.read()
-        fixed = normalize_marginalia_tags(raw)
+        fixed = convert_ocr_text(normalize_marginalia_tags(raw), languages,
+                                 os.path.basename(path))
         if fixed != raw:
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(fixed)
@@ -362,7 +365,7 @@ def _teosta_import(
             else:
                 try:
                     sftp.get(f"{remote_work}/{txt_name}", local_txt)
-                    normalize_txt_file_func(local_txt)
+                    normalize_txt_file_func(local_txt, languages)
                 except FileNotFoundError:
                     raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); import katkestati")
             os.chmod(local_txt, 0o644)

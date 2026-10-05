@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Optional
 
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
+from .macron import work_languages
 from .upload import file_detection as _file_detection
 from .upload import state as _upload_state
 from .upload import ocr_client as _ocr_client
@@ -25,9 +26,9 @@ from . import ocr_reaper
 from .upload import page_status
 
 
-def _normalize_txt_file(path: str):
-    """Normaliseerib alla laetud OCR .txt marginaalia-tägid kanoonilisele kujule."""
-    return _import_work.normalize_txt_file(path)
+def _normalize_txt_file(path: str, languages=None):
+    """Normaliseerib alla laetud OCR .txt marginaalia-tägid ja lühendi (ADR 0062)."""
+    return _import_work.normalize_txt_file(path, languages)
 
 logger = get_logger(__name__)
 
@@ -577,6 +578,8 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
     # 3. Slug kaustnimest
     slug = os.path.basename(work_dir)
+    # Lühendi teisenduse keelevalvur (ADR 0062) — asendus säilitab teose metaandmed
+    languages = work_languages(work_dir)
 
     # 4. Loe _metadata.json et saada originaalne work_id
     meta_path = os.path.join(work_dir, '_metadata.json')
@@ -695,7 +698,7 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
             try:
                 sftp.get(f"{remote_work}/{txt_name}", local_txt)
-                _normalize_txt_file(local_txt)
+                _normalize_txt_file(local_txt, languages)
             except FileNotFoundError:
                 raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); asendus katkestati")
             os.chmod(local_txt, 0o644)
