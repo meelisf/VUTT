@@ -334,9 +334,11 @@ def test_olemasoleva_kirje_toend_lisataks_molemal_liigil(client, login, prosopo_
                            headers=_headers(token), json={'proposal_id': proposal_id, 'selected': [0, 1]})
     assert response.status_code == 200, response.text
     saved = prosopo_env.read('abc')
-    assert saved['occupations'][0]['label'] == 'Prof.'
+    # Registrile tundmatu sõnastus → registri nimi, sõnastus märkusesse (ADR 0059 täiendus).
+    assert saved['occupations'][0]['label'] == 'professor'
+    assert saved['occupations'][0]['notes'] == 'Allikas: „Prof.“'
     assert len(saved['occupations'][0]['evidence']) == 2
-    assert saved['education'][0]['institution'] == 'AGC'
+    assert saved['education'][0]['institution'] == 'AGC'          # asutuse sõnastus jääb
     assert len(saved['education'][0]['evidence']) == 2
 
 

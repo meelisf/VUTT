@@ -1,7 +1,10 @@
 // src/prosopography/components/personForm/RegistryField.tsx
 /**
  * Ameti või asutuse väli isikuvormis (ADR 0059): üks väli kahe asja jaoks.
- * Väli ise = allika sõnastus („Lyz. Riga"); kiip selle all = registrikirje, mis see on.
+ * Seotud väljal on kastis REGISTRI NIMI toimetaja keeles — sama, mida isikuleht
+ * näitab; kaardil olev erinev sõnastus („Pfarrer") on väike rida all (täiendus
+ * 2026-10-05: kastis „Pfarrer", kiibis „pastor" ajas toimetaja segadusse).
+ * Sidumata väljal on kastis kaardi sõnastus („Lyz. Riga").
  * Trükkides tulevad esimesena registri vasted (nimevariantide järgi), siis
  * Wikidata/vaba tekst nagu varem. Registrikirjeid lisab ainult admin.
  * Sidumata väli on nähtavalt sidumata: Q-kood üksi näeb välja nagu seotud kirje,
@@ -47,11 +50,15 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
              description: `${t('form.registry.badge')}${extra ? ` · ${extra}` : ''}` };
   });
   const entry = registryKey ? registry[registryKey] : undefined;
-  // Seotud väljal näitab kast allika sõnastust, registri nimi on kiibis. `labels` tuleb
-  // registrist ja EntityPicker eelistaks seda — „Rostocki Ülikool" muutus „Rostock"-iks.
-  const shown = registryKey && value?.label
-    ? { ...value, labels: { ...(value.labels ?? {}), [lang.split('-')[0]]: value.label } } : value;
   const source = value?.label?.trim() || '';
+  // Seotud väljal on kastis registri nimi. EntityPicker eelistab `labels`-it, seega
+  // pannakse nimi mõlemasse — muidu näitaks ta faktile kopeeritud vana silti.
+  const registryName = registryKey && entry ? registryLabel(entry, registryKey, lang) : '';
+  const shown = registryName
+    ? { ...(value ?? { id: entry?.id ?? null }), label: registryName,
+        labels: { ...(value?.labels ?? {}), [lang.split('-')[0]]: registryName } } as LinkedEntity
+    : value;
+  const wording = registryName && source && source.toLocaleLowerCase() !== registryName.toLocaleLowerCase() ? source : '';
   const unlinked = !registryKey && !!(source || value?.id);
   const suggestion = unlinked ? registrySuggestion(registry, value?.id, source, lang) : null;
   const [creating, setCreating] = useState(false);
@@ -70,7 +77,7 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
         <div className="mt-1 inline-flex max-w-full items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs text-teal-800">
           <Landmark size={11} className="shrink-0" />
           <span className="truncate" title={registryKey}>
-            {entry ? registryLabel(entry, registryKey, lang) : registryKey}
+            {entry ? t('form.registry.badge') : registryKey}
             {entry?.id ? ` · ${entry.id}` : ''}
           </span>
           {!disabled && (
@@ -80,6 +87,9 @@ const RegistryField: React.FC<Props> = ({ registry, placeholder, lang, localSugg
             </button>
           )}
         </div>
+      )}
+      {wording && (
+        <p className="mt-0.5 text-xs text-gray-500">{t('form.registry.wording', { text: wording })}</p>
       )}
       {unlinked && (
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">

@@ -873,6 +873,11 @@ const PersonEditPage: React.FC = () => {
                     showPlace={false}
                   />
                 </div>
+                {/* Fakti märkus: AA lühendid, „Allikas: …" (ADR 0059 täiendus). Varem vormis puudu → kustus salvestusel. */}
+                <input type="text" aria-label={t('form.factNote')} placeholder={t('form.factNote')}
+                  value={item.notes ?? ''} disabled={!canEdit}
+                  onChange={e => onChange({ ...item, notes: e.target.value })}
+                  className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600" />
               </div>
             )}
             onAdd={() => set({ occupations: [...draft.occupations, { label: '', date_from: emptyDateDraft(), date_to: emptyDateDraft() }] })}
@@ -931,6 +936,11 @@ const PersonEditPage: React.FC = () => {
                     showPlace={false}
                   />
                 </div>
+                {/* Fakti märkus: AA lühendid, „Allikas: …" (ADR 0059 täiendus). Varem vormis puudu → kustus salvestusel. */}
+                <input type="text" aria-label={t('form.factNote')} placeholder={t('form.factNote')}
+                  value={item.notes ?? ''} disabled={!canEdit}
+                  onChange={e => onChange({ ...item, notes: e.target.value })}
+                  className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600" />
               </div>
             )}
             onAdd={() => set({ education: [...draft.education, { institution: '', date_from: emptyDateDraft(), date_to: emptyDateDraft() }] })}

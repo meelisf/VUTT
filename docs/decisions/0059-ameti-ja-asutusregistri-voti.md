@@ -104,3 +104,26 @@ mitte linna nimi: migratsioonist pärit 21 ülikooli linnanime parandab
 edasi). Tegutsemisaja täidab Q-koodiga kirjetele `scripts/registry_backfill_years.py`
 (P571/P576, ainult aastatäpsus, mitu aastat → vahele). Mõlemad kuivkäivitusega,
 kirjutus üks commit (`registries.put_many`).
+
+## Täiendus 2026-10-05: seotud ameti silt on registrile tuntud nimi
+
+Vormis oli kastis allika sõnastus („Pfarrer", „SS. Theol. … Professore Ordinario") ja
+kiibis registri nimi („pastor") — toimetaja ei teadnud, kumb kehtib; isikuleht näitab
+niikuinii registri silti. Agent pani sildiks allika käändes fraasi.
+
+- **Salvestus** (`registries.normalize_person_facts`, igal kirjutusel): registrivõtmega
+  AMETI `label` peab olema registri nimi või variant. Muu sõnastus → `label` = registri
+  nimi (`registry_name`: et → en → esimene → võti), sõnastus fakti `notes`-i kujul
+  „Allikas: „…"" (idempotentne). Variant („Pfarrer") jääb — ta on ameti nimi teises
+  keeles ja register teab teda. Sidumata fakt jääb puutumata.
+- **Asutuse sõnastust salvestus EI muuda.** Mõõtmisel (621 fakti) oli asutuse erinev
+  sõnastus peamiselt rikastuse vaiketekst („Academia Gustaviana" AGC võtmega, 594
+  tõendita fakti) — „Allikas" märge väidaks seal midagi, mida allikas ei ütle. Need
+  parandati ühekordselt (`scripts/migrate_registry_wording.py`: tõendita fakt →
+  registri nimi, ilma märketa).
+- **Vorm** (`RegistryField`): seotud väljal on kastis registri nimi toimetaja keeles
+  (registrist, mitte faktile kopeeritud `labels`-ist); kiip = „Register · Q", erinev
+  allika sõnastus on all eraldi real („Allika sõnastus: …"). Algne „Rostock"-viga (registri silt oli linn)
+  on registris parandatud, seega pole põhjust kastis allika kuju hoida.
+- **Fakti `notes`** on vormis toimetatav. Varem jäi ta mustandist välja ja server asendab
+  loendi tervikuna — iga vormisalvestus kustutas ameti-/hariduskirjete märkused.

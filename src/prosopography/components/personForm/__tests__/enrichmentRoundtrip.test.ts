@@ -22,4 +22,16 @@ describe('kinnitatud ametite ja hariduse vormi ümarreis', () => {
       institution_key: 'academia-gustaviana', evidence: [{ source_id: 'book1', locator: 'lk 4' }],
     });
   });
+
+  it('fakti märkus elab vormisalvestuse üle (enne kustutas iga salvestus selle)', () => {
+    const card = {
+      id: 'vutt:Pabc', updated_at: '2026-10-05T00:00:00+00:00',
+      name: { label: 'Test', aliases: [] }, identifiers: [],
+      occupations: [{ label: 'professor', occupation_key: 'professor', notes: 'Allikas: „Professore Ordinario“' }],
+      education: [{ institution: 'Academia Gustaviana', notes: 'verreist' }],
+    } as unknown as ProsopoRecord;
+    const saved = draftToPayload(recordToDraft(card), card);
+    expect(saved.occupations?.[0]).toMatchObject({ notes: 'Allikas: „Professore Ordinario“' });
+    expect(saved.education?.[0]).toMatchObject({ notes: 'verreist' });
+  });
 });

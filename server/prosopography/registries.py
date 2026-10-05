@@ -283,8 +283,42 @@ def ensure(kind: str, key: str, data: dict, username: str) -> tuple[dict, bool]:
         return entry, True
 
 
+def registry_name(entry: dict, key: str) -> str:
+    """Registrikirje nimi: eesti → inglise → esimene silt → võti."""
+    labels = entry.get("labels") or {}
+    return labels.get("et") or labels.get("en") or next(iter(labels.values()), None) or key
+
+
+def _known_names(entry: dict) -> set:
+    names = list((entry.get("labels") or {}).values()) + list(entry.get("variants") or [])
+    return {str(n).strip().casefold() for n in names if str(n).strip()}
+
+
+def _keep_known_wording(fact: dict, field: str, entry: dict, key: str) -> None:
+    """Seotud fakti sõnastus peab olema registrile tuntud nimi (nimi või variant).
+
+    Muu sõnastus („Professore Ordinario", „Lutherischer Theologe") liigub fakti
+    `notes`-i ja välja saab registri nimi — muidu näitas vorm kastis sõna, mida
+    lugeja kunagi ei näe (ADR 0059 täiendus 2026-10-05). Variant („Pfarrer") jääb:
+    ta on ameti nimi teises keeles ja register teab teda juba.
+
+    AINULT ameti `label`-ile. Asutuse sõnastus oli mõõtmisel peamiselt rikastuse
+    vaiketekst („Academia Gustaviana" AGC võtmega, 594 tõendita fakti) — „Allikas"
+    märge väidaks seal midagi, mida ükski allikas ei ütle.
+    """
+    text = str(fact.get(field) or "").strip()
+    if not text or text.casefold() in _known_names(entry):
+        return
+    fact[field] = registry_name(entry, key)
+    note = f"Allikas: „{text}“"
+    notes = str(fact.get("notes") or "").strip()
+    if note not in notes:
+        fact["notes"] = f"{notes}; {note}" if notes else note
+
+
 def normalize_person_facts(data: dict) -> dict:
-    """Püsivõti on tõde; ühilduvus-Q võetakse registrist, toorsilt säilib."""
+    """Püsivõti on tõde; ühilduvus-Q võetakse registrist. Seotud ameti sõnastus on
+    registrile tuntud nimi; muu sõnastus säilib `notes`-is (`_keep_known_wording`)."""
     if not ("occupations" in data or "education" in data):
         return data
     occupations = load("occupation")
@@ -320,6 +354,7 @@ def normalize_person_facts(data: dict) -> dict:
                     fact["id"] = entry["id"]
                 else:
                     fact.pop("id", None)
+                _keep_known_wording(fact, "label", entry, occupation_key)
             if institution_key:
                 entry = institutions.get(institution_key)
                 if not isinstance(entry, dict):

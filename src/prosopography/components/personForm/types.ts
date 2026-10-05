@@ -17,6 +17,9 @@ export interface OccupationDraft {
   institution?: string; institution_id?: string | null; institution_labels?: Record<string, string>;
   occupation_key?: string; institution_key?: string; place_key?: string; evidence?: Record<string, unknown>[];
   date_from?: DateDraft; date_to?: DateDraft;
+  /** Fakti märkus (nt „Allikas: „Professore Ordinario""). Server asendab loendi tervikuna —
+   *  mustandist välja jäänud väli kustuks igal vormi salvestusel. */
+  notes?: string;
 }
 
 export interface EducationDraft {
@@ -24,6 +27,8 @@ export interface EducationDraft {
   institution_key?: string; evidence?: Record<string, unknown>[];
   date_from?: DateDraft; date_to?: DateDraft;
   edu_type?: string; source?: string;
+  /** Fakti märkus (AA lühendid nt „verreist"); vt OccupationDraft.notes. */
+  notes?: string;
 }
 
 export interface TagDraft { label: string; id?: string | null; labels?: Record<string, string> }

@@ -580,8 +580,10 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           (education puhul kohustuslik): allika sõnastus SÕNASÕNALT, allika
           keeles — ära tõlgi ega normaliseeri ("Notarius publicus", mitte
           "avalik notar"); normaliseerimine on registrivõtme töö.
-          raw_occupation on ametinimetus, mitte lause — see saab kaardil
-          rea nimeks. Kasuta ajaloolist terminit, kui allikas seda tsiteerib
+          raw_occupation on ametinimetus, mitte lause. Registriga seotud rea
+          nimeks saab registri nimi; kui raw_occupation pole registri nimi
+          ega variant, läheb ta rea märkusesse („Allikas: …"). Kasuta
+          ajaloolist terminit, kui allikas seda tsiteerib
           ("poeta laureatus caesareus"), muidu lühikest nimetust allika
           keeles ("inspector", mitte "inspector at a copper mine in
           Småland"); koht, asutus ja aeg lähevad oma väljadele
