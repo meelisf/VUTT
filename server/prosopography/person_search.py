@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import unicodedata
+from functools import lru_cache
 from typing import Optional
 
 from . import state
@@ -22,6 +25,53 @@ def _load_person_aliases() -> dict:
         except Exception:
             pass
     return {}
+
+
+# Ligatuurid ja tähed, mida NFKD ei lahuta.
+_FOLD_CHARS = str.maketrans({"ß": "ss", "ø": "o", "Ø": "o", "æ": "ae", "Æ": "ae", "œ": "oe",
+                             "Œ": "oe", "ſ": "s", "ł": "l", "Ł": "l", "đ": "d", "ı": "i"})
+_UMLAUT_DIGRAPH = re.compile(r"(?<=[a-z])([uoa])e")
+
+
+@lru_cache(maxsize=65536)
+def fold_name(text: str) -> str:
+    """Nimevõrdluse kuju: täpitähed ja ligatuurid maha, saksa digraaf ühte.
+
+    „Müller" = „Mueller" = „Muller"; „Möller" = „Møller" = „Moeller". Mõlemale
+    poolele sama reegel, seega „Samuel" → „samul" ei tee vale vastet — ainult
+    võrdleb. Mõõdetud 2026-10-05: „Christian Müller" ei leidnud kaarti, kus olid
+    „Christian Muller", „Christian Møller" ja „Christianus Müller".
+    """
+    s = unicodedata.normalize("NFKD", (text or "").translate(_FOLD_CHARS))
+    s = "".join(c for c in s if not unicodedata.combining(c)).casefold()
+    return _UMLAUT_DIGRAPH.sub(r"\1", s)
+
+
+def _name_tokens(folded: str) -> list[str]:
+    return re.findall(r"\w+", folded)
+
+
+@lru_cache(maxsize=65536)
+def _folded_name(name: str) -> tuple[str, tuple[str, ...]]:
+    """(kuju, sõnad) nime kohta — sama nimi kordub igal klahvivajutusel."""
+    folded = fold_name(name)
+    return folded, tuple(_name_tokens(folded))
+
+
+def name_matches(query: str, name: str) -> bool:
+    """Päring vastab nimele: alamstring VÕI iga päringusõna on mõne nimesõna algus.
+
+    Sõnade kaupa vaste leiab „Christian Müller" → „Christianus Müller" ja
+    „Müller, Christian" (järjekord ei loe). Kõik päringusõnad peavad vastama SAMAS
+    nimes (sildis või ühes aliases), mitte eri aliaste peale laiali.
+    """
+    fq, query_words = _folded_name(query)
+    if not fq:
+        return False
+    fn, words = _folded_name(name or "")
+    if fq in fn:
+        return True
+    return bool(query_words) and all(any(w.startswith(t) for w in words) for t in query_words)
 
 
 def _extract_occupation_entries(person: dict) -> list[dict]:
@@ -227,12 +277,14 @@ def _relevance_key(entry: dict, q_lower: str, aliases_data: Optional[dict] = Non
         result.extend(a for a in extern if isinstance(a, str))
         return result
 
+    folded_words = _folded_name(label)[1]
+    query_words = _folded_name(q_lower)[1]
     if not q_lower:
         tier = 2
-    elif any(word.casefold().startswith(q_lower) for word in label.split()):
+    elif query_words and all(any(w.startswith(t) for w in folded_words) for t in query_words):
         tier = 0
-    elif (q_lower in label_cf or q_lower in sort_cf
-          or any(q_lower in a.casefold() for a in _aliases())):
+    elif (name_matches(q_lower, label) or name_matches(q_lower, sort_name)
+          or any(name_matches(q_lower, a) for a in _aliases())):
         tier = 1
     else:
         # Vaste tuli sildist või mujalt — nimes päringut ei ole.
@@ -291,10 +343,11 @@ def _filter_index_entries(
 
         results = [
             e for e in results
-            if q_lower in (e.get("label") or "").casefold()
-            or q_lower in (e.get("sort_name") or "").casefold()
-            or any(q_lower in a.casefold() for a in (e.get("aliases") or []))
-            or any(q_lower in a.casefold() for a in (aliases_data.get(e.get("id"), {}).get("aliases") or []))
+            if name_matches(q, e.get("label") or "")
+            or name_matches(q, e.get("sort_name") or "")
+            or any(name_matches(q, a) for a in (e.get("aliases") or []) if isinstance(a, str))
+            or any(name_matches(q, a) for a in (aliases_data.get(e.get("id"), {}).get("aliases") or [])
+                   if isinstance(a, str))
             or _matches_tags(e)
         ]
     if gender:

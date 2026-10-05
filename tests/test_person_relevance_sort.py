@@ -196,3 +196,40 @@ def test_umberpooratud_kuju_ei_tee_eesnimest_tapset_vastet(ps):
         kirje("Petrus Andreae", "Andreae", work_count=7),
     ]
     assert jarjesta(ps, entries, "petrus")[0] == "Petrus Andreae"
+
+
+# ---- normaliseeritud nimeotsing (2026-10-05) ----
+
+@pytest.mark.parametrize("query,name", [
+    ("Christian Müller", "Christian Muller"),         # ü = u
+    ("Christian Müller", "Christianus Müller"),       # ladina eesnimi: sõna algus
+    ("christian muller", "Müller, Christian"),        # pööratud järjekord
+    ("Mueller", "Müller"),                            # saksa digraaf
+    ("Moller", "Christian Møller"),                   # ø
+    ("ſtrauß", "Strauss"),                            # pikk s, ß
+    ("ller", "Müller"),                               # vana alamstringi-vaste jääb
+])
+def test_nimi_leitakse_kirjapildi_varieerumisel(ps, query, name):
+    assert ps.name_matches(query, name)
+
+
+@pytest.mark.parametrize("query,name", [
+    ("Christian Müller", "Christian Schmidt"),        # kõik sõnad peavad vastama
+    ("Peter", "Christian Muller"),
+    ("", "Christian Muller"),
+])
+def test_vale_nimi_ei_vasta(ps, query, name):
+    assert not ps.name_matches(query, name)
+
+
+def test_valija_leiab_kaardi_lahedase_nimekuju_jargi(ps, monkeypatch):
+    """Tootmise juhtum: tekstis „Christian Müller", kaardil ainult lähedased kujud."""
+    card = kirje("Christianus Muller", "Muller", aliases=[
+        "Christian Muller", "Christian Møller", "Christianus Müller", "Christ. Möller"], pid="vutt:Pfolxea3")
+    other = kirje("Christian Schmidt", "Schmidt", pid="vutt:Pother")
+    monkeypatch.setattr(ps, "_load_index", lambda: {"entries": [card, other]})
+    monkeypatch.setattr(ps, "sync_from_facade", lambda: None)
+    found = ps._filter_index_entries(q="Christian Müller", aliases_data={})
+    assert [e["id"] for e in found] == ["vutt:Pfolxea3"]
+    # Aste: sõnade kaupa vaste sildis → 0 (sama mis täpne nimesõna).
+    assert ps._relevance_key(card, "christian müller", {})[0] == 0
