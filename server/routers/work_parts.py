@@ -6,7 +6,7 @@ import os
 
 import json
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, Response
 from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import can_read_work, can_write_work
@@ -61,25 +61,28 @@ def list_parts(work_id: str, user=Depends(optional_user)):
 
 
 @router.post("/works/{work_id}/parts", status_code=201)
-def create(work_id: str, body: dict = Body(...), user=Depends(require_role("editor"))):
-    return _call(wp.create_part, _writable(work_id, user), body, user["username"])
+def create(work_id: str, background_tasks: BackgroundTasks, body: dict = Body(...),
+           user=Depends(require_role("editor"))):
+    return _call(wp.create_part, _writable(work_id, user), body, user["username"], background_tasks)
 
 
 @router.put("/works/{work_id}/parts/{part_id}")
-def update(work_id: str, part_id: str, body: dict = Body(...), user=Depends(require_role("editor"))):
-    return _call(wp.update_part, _writable(work_id, user), part_id, body, user["username"])
+def update(work_id: str, part_id: str, background_tasks: BackgroundTasks, body: dict = Body(...),
+           user=Depends(require_role("editor"))):
+    return _call(wp.update_part, _writable(work_id, user), part_id, body, user["username"], background_tasks)
 
 
 @router.delete("/works/{work_id}/parts/{part_id}", status_code=204)
-def delete(work_id: str, part_id: str, user=Depends(require_role("editor"))):
-    _call(wp.delete_part, _writable(work_id, user), part_id, user["username"])
+def delete(work_id: str, part_id: str, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
+    _call(wp.delete_part, _writable(work_id, user), part_id, user["username"], background_tasks)
     return Response(status_code=204)
 
 
 @router.post("/works/{work_id}/parts/{part_id}/pages")
-def change_pages(work_id: str, part_id: str, body: dict = Body(...), user=Depends(require_role("editor"))):
+def change_pages(work_id: str, part_id: str, background_tasks: BackgroundTasks, body: dict = Body(...),
+                 user=Depends(require_role("editor"))):
     return _call(wp.change_part_pages, _writable(work_id, user), part_id,
-                 body.get("add") or [], body.get("remove") or [], user["username"])
+                 body.get("add") or [], body.get("remove") or [], user["username"], background_tasks)
 
 
 # ── Agendi ettepanekud (#492 samm 2) ─────────────────────────────────────────
@@ -109,12 +112,26 @@ def parts_proposals(work_id: str, user=Depends(require_role("superadmin"))):
 
 @router.post("/works/{work_id}/parts/proposals/{proposal_id}/items/{index}/{action}")
 def parts_proposal_decide(work_id: str, proposal_id: str, index: int, action: str,
+                          background_tasks: BackgroundTasks,
                           body: dict = Body(default={}), user=Depends(require_role("superadmin"))):
     """Toimetaja otsus ühe osa kohta: accept (soovi korral parandatud `part`) või reject."""
     path = _writable(work_id, user)
     created = _wpp(wpp.decide, proposal_id, work_id, path, user["username"], index, action,
-                   override=(body or {}).get("part"), mode=(body or {}).get("mode"))
+                   override=(body or {}).get("part"), mode=(body or {}).get("mode"),
+                   background_tasks=background_tasks)
     return {"status": "accepted" if created else "rejected", "part": created}
+
+
+@router.post("/works/{work_id}/parts/proposals/accept")
+def parts_proposals_accept(work_id: str, background_tasks: BackgroundTasks,
+                           body: dict = Body(...), user=Depends(require_role("superadmin"))):
+    """„Lisa kõik": `items: [{proposal_id, index}]` ühe commiti ja ühe Meili sünk'iga."""
+    path = _writable(work_id, user)
+    picks = [(i.get("proposal_id"), i.get("index")) if isinstance(i, dict) else None
+             for i in (body or {}).get("items") or []]
+    parts = _wpp(wpp.decide_many, work_id, path, user["username"], picks,
+                 background_tasks=background_tasks)
+    return {"accepted": len(parts), "parts": parts}
 
 
 @router.post("/works/parts-proposals/submit")

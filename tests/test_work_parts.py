@@ -97,6 +97,8 @@ def work(tmp_path, monkeypatch):
         return {"success": True}
     monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
     monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch", lambda *a, **k: None)
+    # Router annab background_tasks-i → sünk käib taustal; ka see ei tohi testis Meilisse minna.
+    monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch_async", lambda *a, **k: None)
     monkeypatch.setattr(metadata_ops, "update_person_to_works", lambda *a, **k: None)
     monkeypatch.setattr(metadata_ops, "update_work_collections", lambda *a, **k: None)
     monkeypatch.setattr(metadata_ops, "update_work_facts", lambda *a, **k: None)

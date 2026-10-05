@@ -362,7 +362,8 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
 
 
 def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: int,
-           action: str, override: Optional[dict] = None, mode: Optional[str] = None) -> Optional[dict]:
+           action: str, override: Optional[dict] = None, mode: Optional[str] = None,
+           background_tasks=None) -> Optional[dict]:
     """Toimetaja otsus ühe osa kohta. Vastuvõtt: kui ettepanek parandab olemasolevat osa
     (`part_id` või samad lehed), siis update_part liidetud kujuga; muidu create_part.
     `mode="create"` sunnib uue osa (toimetaja otsus: tegemist on eri tekstiga)."""
@@ -399,15 +400,94 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
                     data = dict(override) if isinstance(override, dict) else \
                         merge_part(existing, data, explicit=bool(item.get("explicit_target")))
                     data.pop("id", None); data.pop("needs_review", None)
-                    created = wp.update_part(work_dir, target, data, username)
+                    created = wp.update_part(work_dir, target, data, username, background_tasks)
                 else:
-                    created = wp.create_part(work_dir, data, username)
+                    created = wp.create_part(work_dir, data, username, background_tasks)
             except wp.PartError as e:
                 raise ProposalError(f"invalid_part: {e}")
             item["status"], item["created_part_id"] = "accepted", created["id"]
         else:
             item["status"] = "rejected"
         db.execute("UPDATE proposal SET payload=? WHERE id=?", (_dump(items, persons), proposal_id))
+    return created
+
+
+MAX_BATCH = 500
+
+
+def decide_many(work_id: str, work_dir: str, username: str, picks: list,
+                background_tasks=None) -> list[dict]:
+    """„Lisa kõik": valitud read (`[(proposal_id, index)]`) vastu ÜHE kirjutusega.
+
+    Varem tegi klient iga rea kohta eraldi päringu: commit + kogu teose Meili sünk
+    rea kohta, 16 osa = 18 s (mõõdetud 2026-10-05, jlctu4). Klient saadab need read,
+    mida kasutaja nägi — vahepeal saabunud ettepanekut ei võeta nägemata vastu.
+    Atomaarne: üks vigane rida → midagi ei kirjutata, read jäävad ootele.
+    """
+    if not isinstance(picks, list) or not 0 < len(picks) <= MAX_BATCH:
+        raise ProposalError("invalid_decision")
+    keys = []
+    for pick in picks:
+        pid, index = pick if isinstance(pick, (list, tuple)) and len(pick) == 2 else (None, None)
+        if not isinstance(pid, str) or not isinstance(index, int) or isinstance(index, bool):
+            raise ProposalError("invalid_decision")
+        keys.append((pid, index))
+    if len(set(keys)) != len(keys):
+        raise ProposalError("invalid_decision")
+    picked = set(keys)
+    with _db() as db:
+        rows: dict = {}
+        for pid, index in keys:
+            if pid not in rows:
+                row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND username=? AND expires_at>?",
+                                 (pid, work_id, username, int(time.time()))).fetchone()
+                if row is None:
+                    raise ProposalError("proposal_not_found")
+                rows[pid] = _load(row["payload"])
+            items = rows[pid][0]
+            if not 0 <= index < len(items) or items[index]["status"] != "pending":
+                raise ProposalError("invalid_decision")
+        current = _current_parts(work_dir)
+        # Lisa viitab oma kirjale, mis peab olema enne loodud → lisad viimasena.
+        order = sorted(keys, key=lambda k: rows[k[0]][0][k[1]]["part"].get("kind") == "attachment")
+        ops = []
+        for pid, index in order:
+            items, persons = rows[pid]
+            item = items[index]
+            data = _with_resolved(item["part"], item.get("creator_refs"), persons)
+            data.pop("id", None); data.pop("needs_review", None)
+            op = {"key": (pid, index), "label": f"items[{index}]"}
+            target = item.get("attached_to")
+            if isinstance(target, int):
+                ref = items[target] if 0 <= target < len(items) else None
+                if ref is not None and ref["status"] == "accepted":
+                    data["attached_to"] = ref["created_part_id"]
+                elif (pid, target) in picked:
+                    op["attach_key"] = (pid, target)
+                else:
+                    raise ProposalError("attach_target_not_accepted")
+            elif isinstance(target, str):
+                data["attached_to"] = target
+            existing_id = _target(item, current)
+            if existing_id:
+                existing = next(p for p in current if p.get("id") == existing_id)
+                data = merge_part(existing, data, explicit=bool(item.get("explicit_target")))
+                data.pop("id", None); data.pop("needs_review", None)
+                op.update(op="update", part_id=existing_id)
+            else:
+                op["op"] = "create"
+            op["data"] = data
+            ops.append(op)
+        try:
+            created = wp.apply_parts(work_dir, ops, username, f"Osa: {len(ops)} ettepanekut vastu võetud",
+                                     background_tasks)
+        except wp.PartError as e:
+            raise ProposalError(f"invalid_part: {e}")
+        for (pid, index), part in zip(order, created):
+            item = rows[pid][0][index]
+            item["status"], item["created_part_id"] = "accepted", part["id"]
+        for pid, (items, persons) in rows.items():
+            db.execute("UPDATE proposal SET payload=? WHERE id=?", (_dump(items, persons), pid))
     return created
 
 
