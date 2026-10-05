@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { MapContainer, Marker, Polyline, Popup } from 'react-leaflet';
 import HistoricalMapLayer from '../HistoricalMapLayer';
 import { FitToPoints, spreadOverlapping, type LatLon } from '../map/mapBase';
-import { fetchInstitutions, fetchPlaces, type InstitutionRegistryEntry } from '../../services/prosopographyService';
+import { fetchInstitutions, fetchPlaces, fetchRegistry, type InstitutionRegistryEntry, type OccupationRegistryEntry } from '../../services/prosopographyService';
 import type { PlaceEntry, ProsopoRecord } from '../../types';
 import type { VisibleNetwork } from '../../utils/network';
 import { dimOpacity, layerPoints, LIFE_COLOR, lifeSegments, lifeView, mapYearOf, originCoverage, originGroups, originPrintLinks, printPlaces, type MapLayer, type RegistryState } from '../../utils/relationsMap';
@@ -25,6 +25,10 @@ let institutionsPromise: Promise<Record<string, InstitutionRegistryEntry>> | nul
 // Viga EI muutu tühjaks registriks — siis väidaks elukäik iga jaama kohta „registris puudub".
 const loadPlaces = () => (placesPromise ??= fetchPlaces().catch(err => { placesPromise = null; throw err; }));
 const loadInstitutions = () => (institutionsPromise ??= fetchInstitutions().catch(err => { institutionsPromise = null; throw err; }));
+let occupationsPromise: Promise<Record<string, OccupationRegistryEntry>> | null = null;
+// Ametite register annab ainult nime: tõrge → kaardi sõnastus (mitte viga kogu elukäigule).
+const loadOccupations = () => (occupationsPromise ??= (fetchRegistry('occupation') as Promise<Record<string, OccupationRegistryEntry>>)
+  .catch(() => { occupationsPromise = null; return {}; }));
 
 const RelationsMap: React.FC<{
   net: VisibleNetwork; card: ProsopoRecord | null;
@@ -37,10 +41,13 @@ const RelationsMap: React.FC<{
   const [layer, setLayer] = useState<Layer>(layers[0]);
   const [registry, setRegistry] = useState<RegistryState>('loading');
   const [institutions, setInstitutions] = useState<Record<string, InstitutionRegistryEntry>>({});
+  const [occupations, setOccupations] = useState<Record<string, OccupationRegistryEntry>>({});
   useEffect(() => {
     let alive = true;
-    Promise.all([loadPlaces(), loadInstitutions()])
-      .then(([places, institutions]) => { if (alive) { setInstitutions(institutions); setRegistry(places); } })
+    Promise.all([loadPlaces(), loadInstitutions(), loadOccupations()])
+      .then(([places, institutions, occupations]) => {
+        if (alive) { setInstitutions(institutions); setOccupations(occupations); setRegistry(places); }
+      })
       .catch(() => { if (alive) setRegistry('error'); });
     return () => { alive = false; };
   }, []);
@@ -49,7 +56,8 @@ const RelationsMap: React.FC<{
   const prints = useMemo(() => printPlaces(net), [net]);
   const links = useMemo(() => originPrintLinks(net), [net]);
   const coverage = useMemo(() => originCoverage(net), [net]);
-  const life = useMemo(() => lifeView(card, registry, institutions), [card, registry, institutions]);
+  const life = useMemo(() => lifeView(card, registry, institutions, occupations, lang),
+    [card, registry, institutions, occupations, lang]);
   const lifeArcs = useMemo(() => lifeSegments(life.mapped), [life]);
   const year = useMemo(() => mapYearOf(net, card?.birth?.date ? Number(card.birth.date.slice(0, 4)) + 30 : 1650), [net, card]);
   const focusCoords = net.focus.origin?.coordinates ?? null;

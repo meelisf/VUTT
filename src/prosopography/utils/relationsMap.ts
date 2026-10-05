@@ -112,6 +112,20 @@ function resolve(place: PlaceRef, registry: Record<string, PlaceEntry>) {
   return { placeLabel: place.label ?? place.id ?? null, coords: { lat: c.lat, lon: c.lon }, reason: null };
 }
 
+type NamedEntry = { labels?: Record<string, string> | null };
+
+/**
+ * Fakti nimi lugejale: seotud faktil registri nimi lugeja keeles (sama mis isikulehe
+ * ametite plokis ja vormi kastis, ADR 0059 täiendus); sidumata faktil kaardi sõnastus.
+ * Enne näitas elukäik „Adjunkt (Church of Sweden)" ja „Kiel", kui ülal oli „adjunkt".
+ */
+export function factName(raw: string | null | undefined, key: string | null | undefined,
+  registry: Record<string, NamedEntry>, lang: string, inline?: Record<string, string> | null): string | null {
+  const labels = key ? registry[key]?.labels : null;
+  if (labels) return labels[lang] || labels.et || labels.en || key || raw || null;
+  return inline?.[lang] || raw || null;
+}
+
 /** Asutuse koht fakti aastal: esimene sobiv periood, muidu vaikekoht (`place_key`). */
 export function institutionPlaceKey(entry: InstitutionRegistryEntry | undefined, year: number | null): string | null {
   if (!entry) return null;
@@ -151,7 +165,8 @@ function resolveFactPlace(item: any, places: Record<string, PlaceEntry>,
  * Päritolu = sünnikoht → üks jaam.
  */
 export function lifeStations(card: ProsopoRecord, registry: Record<string, PlaceEntry>,
-  institutions: Record<string, InstitutionRegistryEntry> = {}) {
+  institutions: Record<string, InstitutionRegistryEntry> = {},
+  occupations: Record<string, NamedEntry> = {}, lang = 'et') {
   const first: LifeStation[] = [];
   const middle: LifeStation[] = [];
   const last: LifeStation[] = [];
@@ -165,11 +180,13 @@ export function lifeStations(card: ProsopoRecord, registry: Record<string, Place
     first.unshift({ kind: 'origin', label: null, year: null, ...resolve(originRef, registry) });
   }
   for (const e of card.education ?? []) {
-    middle.push({ kind: 'education', label: e?.institution ?? null, year: entryYear(e),
+    middle.push({ kind: 'education', label: factName(e?.institution, e?.institution_key, institutions, lang),
+      year: entryYear(e),
       ...resolveFactPlace(e, registry, institutions) });
   }
   for (const o of card.occupations ?? []) {
-    middle.push({ kind: 'occupation', label: o?.label ?? null, year: entryYear(o),
+    middle.push({ kind: 'occupation', label: factName(o?.label, o?.occupation_key, occupations, lang, o?.labels),
+      year: entryYear(o),
       ...resolveFactPlace(o, registry, institutions) });
   }
   middle.sort((a, b) => (a.year ?? Infinity) - (b.year ?? Infinity));
@@ -194,11 +211,12 @@ export type RegistryState = Record<string, PlaceEntry> | 'loading' | 'error';
  * registris puudub (see oleks vale väide andmete kohta).
  */
 export function lifeView(card: ProsopoRecord | null, registry: RegistryState,
-  institutions: Record<string, InstitutionRegistryEntry> = {}) {
+  institutions: Record<string, InstitutionRegistryEntry> = {},
+  occupations: Record<string, NamedEntry> = {}, lang = 'et') {
   if (registry === 'loading') return { status: 'loading' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
   if (registry === 'error') return { status: 'error' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
   if (!card) return { status: 'ready' as const, mapped: [] as LifeStation[], unmapped: [] as LifeStation[] };
-  return { status: 'ready' as const, ...lifeStations(card, registry, institutions) };
+  return { status: 'ready' as const, ...lifeStations(card, registry, institutions, occupations, lang) };
 }
 
 export type MapLayer = 'origin' | 'originPrint' | 'print' | 'life';

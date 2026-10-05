@@ -117,6 +117,18 @@ describe('asutuse ja territooriumi registriviited (#462)', () => {
     expect(result.unmapped.find(s => s.kind === 'education')?.reason).toBe('not_in_registry');
   });
 
+  it('jaama nimi: seotud faktil registri nimi lugeja keeles, sidumata faktil kaardi sõnastus (ADR 0059 täiendus)', () => {
+    const card = { ...CARD,
+      occupations: [{ label: 'Adjunkt (Church of Sweden)', occupation_key: 'adjunkt' }, { label: 'Notarius' }],
+      education: [{ institution: 'Kiel', institution_key: 'kiel' }] } as unknown as ProsopoRecord;
+    const institutions = { kiel: { id: null, labels: { et: 'Kieli ülikool', en: 'University of Kiel' }, variants: ['Kiel'],
+      type: 'university', place_key: null } };
+    const occupations = { adjunkt: { labels: { et: 'adjunkt', en: 'Adjunkt (Church of Sweden)' } } };
+    const all = (lang: string) => { const r = lifeStations(card, REG, institutions, occupations, lang); return [...r.mapped, ...r.unmapped]; };
+    expect(all('et').map(s => s.label)).toEqual(expect.arrayContaining(['adjunkt', 'Notarius', 'Kieli ülikool']));
+    expect(all('en').map(s => s.label)).toEqual(expect.arrayContaining(['Adjunkt (Church of Sweden)', 'University of Kiel']));
+  });
+
   it('asutuse koht perioodi järgi: AGC Tartus kuni 1699, siis Pärnus; aastata fakt saab vaikekoha', () => {
     const card = { ...CARD, occupations: [], education: [
       { institution: 'AGC', institution_key: 'agc', date_start: '1695' },
