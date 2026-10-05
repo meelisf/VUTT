@@ -118,6 +118,24 @@ def test_loo_muuda_kustuta(work):
     assert _meta(work)["parts"] == []
 
 
+def test_kokkuvote_kahes_keeles_ja_ankur_ainult_kinnitusest(work):
+    from server.prosopo_biography_fields import text_hash
+    base = {"kind": "letter", "pages": ["t-001"], "abstract_et": "Kiri isale.", "abstract_en": "Letter to father.",
+            "notes": "Indeks F004", "abstract_en_src": "aaaaaaaaaaaa"}       # kliendi ankur → ära
+    p = wp.create_part(work, base, "ed")
+    assert p["abstract_et"] == "Kiri isale." and p["notes"] == "Indeks F004"
+    assert "abstract_en_src" not in p
+    p = wp.update_part(work, p["id"], {**base, "confirm_abstract_translation": True}, "ed")
+    assert p["abstract_en_src"] == text_hash("Kiri isale.")
+    assert "confirm_abstract_translation" not in p
+    # ET muutub, EN-i kirjaviga parandatakse ilma kinnituseta → ankur jääb vanaks (hoiatus).
+    p = wp.update_part(work, p["id"], {**base, "abstract_et": "Kiri isale 1684.", "abstract_en": "Letter to the father."}, "ed")
+    assert p["abstract_en_src"] == text_hash("Kiri isale.") != text_hash(p["abstract_et"])
+    # EN tühjaks → ankur kaob.
+    p = wp.update_part(work, p["id"], {**base, "abstract_en": ""}, "ed")
+    assert "abstract_en" not in p and "abstract_en_src" not in p
+
+
 def test_tundmatu_osa_404(work):
     with pytest.raises(wp.PartError) as e:
         wp.update_part(work, "nope", {"kind": "letter", "pages": ["t-001"]}, "ed")

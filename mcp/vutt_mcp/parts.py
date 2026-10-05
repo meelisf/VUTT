@@ -35,7 +35,8 @@ def work_parts(client, work_id: str) -> str:
     for p in data.get("parts") or []:
         parts.append({
             "id": p.get("id"), "kind": p.get("kind"), "title": p.get("title"),
-            "incipit": p.get("incipit"), "notes": p.get("notes"), "languages": p.get("languages"),
+            "incipit": p.get("incipit"), "abstract_et": p.get("abstract_et"),
+            "abstract_en": p.get("abstract_en"), "notes": p.get("notes"), "languages": p.get("languages"),
             "pages": sorted(numbers[s] for s in p.get("pages") or [] if s in numbers),
             "creators": p.get("creators") or [], "dating": p.get("dating"),
             "place": p.get("place"), "place_to": p.get("place_to"),

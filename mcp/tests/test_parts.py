@@ -34,9 +34,11 @@ def test_osa_tekstivaljad_kaasas():
     """Märkused, algus ja keeled on agendile (ja parandusele) vajalik kontekst."""
     c = FakeClient()
     c.data["parts"][0].update(notes="Kiri on dateerimata; aasta kaaskirjast.", incipit="Hochwürdiger Herr",
+                              abstract_et="Kiri Fischerile.", abstract_en="Letter to Fischer.",
                               languages=["ger"])
     p = json.loads(parts.work_parts(c, "w1ab"))["parts"][0]
     assert p["notes"] == "Kiri on dateerimata; aasta kaaskirjast."
+    assert (p["abstract_et"], p["abstract_en"]) == ("Kiri Fischerile.", "Letter to Fischer.")
     assert p["incipit"] == "Hochwürdiger Herr" and p["languages"] == ["ger"]
 
 

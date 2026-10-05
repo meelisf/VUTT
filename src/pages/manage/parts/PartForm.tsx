@@ -15,6 +15,7 @@ import { getLangCode } from '../../../utils/getLangCode';
 import { PART_KINDS, PART_ROLES, type PartKind, type PartPlace, type WorkPart } from '../../../services/workPartsApi';
 import type { PartDraft } from '../partsModel';
 import { usePlaceRegister } from './placeRegister';
+import PartAbstractSection from './PartAbstractSection';
 
 interface Props {
   isNew: boolean;
@@ -123,8 +124,11 @@ const PartForm: React.FC<Props> = ({
         </label>
       )}
 
+      <PartAbstractSection draft={draft} set={set} token={token} />
+
       <label className={label}>
         {t('manage.parts.notes')}
+        <span className="block font-normal normal-case text-gray-400">{t('manage.parts.notesHelp')}</span>
         <textarea className={`${input} mt-1 font-normal normal-case`} rows={2} value={draft.notes} onChange={e => set({ notes: e.target.value })} />
       </label>
 

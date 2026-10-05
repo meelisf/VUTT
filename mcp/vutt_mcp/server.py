@@ -492,7 +492,11 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         pühendus). Gratulatsioon või leinaluuletus EI OLE liik — see on auctor +
         subject (õnnitletav / lahkunu), pöördumise saaja addressee. pages =
         LEHEKÜLJENUMBRID nagu get_pages'is (1-põhised, võivad olla katkendlikud;
-        leht võib kuuluda mitmesse osasse), valikuliselt title, incipit, notes,
+        leht võib kuuluda mitmesse osasse), valikuliselt title, incipit,
+        abstract_et / abstract_en (AVALIK sisukokkuvõte; keel väljanimes, kirjuta
+        eesti keeles ja võimalusel ka inglise keeles), notes (TOIMETAJA märkus:
+        indeksinumber, lehtede/aadressi kirjeldus, kahtlused samastamisel — avalikus
+        vaates ei näidata; ära pane sinna sisukokkuvõtet),
         creators [{id?, name, role}] (role: auctor | addressee | praeses |
         participant | subject; id = search_persons'i vutt:P… kui isik on
         registris), dating {start: "1684-03-02", end?}, place {id?: Q-kood, label},

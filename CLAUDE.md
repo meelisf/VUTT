@@ -322,6 +322,9 @@ otspunktidega (`server/work_parts.py`, `metadata_lock`); `/update-work-metadata`
 lükkab `parts` tagasi. `refresh_work_mentions` kutsub `sync_work_parts`-i — uus
 lehenumbreid/faile muutev tee saab osade sünkroni kaasa, kui ta kutsub
 `refresh_work_mentions`-it (ADR 0055); poolitus annab `renamed`-i.
+Osa avalik kokkuvõte on `abstract_et`/`abstract_en`, `notes` on toimetaja märkus
+(API-s avalik, vaates ainult toimetajale); `abstract_en_src` ankru kirjutab AINULT server
+kinnituse peale (ADR 0063).
 
 **Ameti- ja asutuseregister (ADR 0059)** — identiteet on VUTT-i võti (`occupation_key`,
 `institution_key`), Q-kood on valikuline ühilduvusväli. Allika sõnastus (`label`,

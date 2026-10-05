@@ -16,14 +16,15 @@ import UnsavedChangesDialog from '../UnsavedChangesDialog';
 import { usePersonSources } from '../../hooks/usePersonSources';
 import { getLangCode } from '../../utils/getLangCode';
 import { datingText } from '../../utils/workDating';
-import { pageRangeList, sortParts } from '../../pages/manage/partsModel';
+import { pageRangeList, partAbstract, sortParts } from '../../pages/manage/partsModel';
 import { KIND_STYLE } from '../../pages/manage/parts/kindStyle';
 
 const OPEN_KEY = 'vutt_parts_toc_open';
 
 /** Kas osal on midagi rohkemat kui sisukorra rida (pealkiri, isikud nimedena, aasta). */
-function hasDetails(p: WorkPart, attachments: WorkPart[]): boolean {
-  return !!(p.notes || p.place || p.place_to || p.creators.some(c => c.name || c.id) || p.dating
+function hasDetails(p: WorkPart, attachments: WorkPart[], canEdit: boolean): boolean {
+  // Toimetaja märkus on lisaandmed ainult toimetajale — lugeja ei näe seda (ADR 0063).
+  return !!(p.abstract_et || p.abstract_en || (canEdit && p.notes) || p.place || p.place_to || p.creators.some(c => c.name || c.id) || p.dating
     || p.languages?.length || attachments.length || p.attached_to);
 }
 
@@ -131,7 +132,7 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
             const who = whoLine(p);
             const year = p.dating?.start?.slice(0, 4);
             const attachments = parts.filter(a => a.attached_to === p.id);
-            const detail = hasDetails(p, attachments);
+            const detail = hasDetails(p, attachments, canEdit);
             const isOpen = expanded.has(p.id);
             return (
               <li
@@ -260,7 +261,8 @@ const PartEditPanel: React.FC<{ workId: string; token: string | null; part: Work
 
 /** Osa andmed lahtikeeratuna: liik, dateering, kohad, isikud rollidega, keeled, märkused, lisad. */
 const PartDetails: React.FC<{ part: WorkPart; attachments: WorkPart[]; parts: WorkPart[]; onEdit?: () => void }> = ({ part: p, attachments, parts, onEdit }) => {
-  const { t } = useTranslation(['workspace']);
+  const { t, i18n } = useTranslation(['workspace']);
+  const summary = partAbstract(p, getLangCode(i18n.language));
   const row = (label: string, value: React.ReactNode) => (
     <div className="flex gap-2"><dt className="w-24 shrink-0 text-gray-500">{label}</dt><dd className="min-w-0 flex-1">{value}</dd></div>
   );
@@ -286,7 +288,14 @@ const PartDetails: React.FC<{ part: WorkPart; attachments: WorkPart[]; parts: Wo
       {!!p.languages?.length && row(t('metadata.languages'), p.languages.join(', '))}
       {parent && row(t('manage.parts.attachedTo'), parent.title || t(`manage.parts.kinds.${parent.kind}`))}
       {attachments.length > 0 && row(t('info.tocAttachments'), attachments.map(a => a.title || t(`manage.parts.kinds.${a.kind}`)).join('; '))}
-      {p.notes && row(t('manage.parts.notes'), <span className="whitespace-pre-wrap">{p.notes}</span>)}
+      {summary && row(t('manage.parts.abstract'), (
+        <span className="whitespace-pre-wrap">
+          {summary.text}
+          {summary.otherLang && <span className="ml-1 text-gray-400">({t(`manage.parts.${summary.otherLang === 'et' ? 'abstractInEt' : 'abstractInEn'}`)})</span>}
+        </span>
+      ))}
+      {/* Toimetaja märkus: ainult toimetajale (avalik vaade ei näita, ADR 0063). */}
+      {onEdit && p.notes && row(t('manage.parts.notes'), <span className="whitespace-pre-wrap text-gray-500">{p.notes}</span>)}
       {onEdit && (
         <div className="pt-1">
           <button type="button" onClick={onEdit}

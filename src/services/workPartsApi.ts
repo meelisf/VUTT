@@ -13,9 +13,19 @@ export interface PartPlace { id: string | null; label: string; }
 export interface WorkPart {
   id: string; kind: PartKind; pages: string[]; title?: string; incipit?: string;
   dating?: WorkDating; place?: PartPlace; place_to?: PartPlace; creators: PartCreator[];
-  attached_to: string | null; languages?: string[]; notes?: string; needs_review: boolean;
+  attached_to: string | null; languages?: string[];
+  /** Avalik sisukokkuvõte, keel väljanimes (ADR 0063). */
+  abstract_et?: string; abstract_en?: string;
+  /** Eestikeelse kokkuvõtte räsi, mille pealt ingliskeelne kinnitati. Kirjutab AINULT server. */
+  abstract_en_src?: string;
+  /** Toimetaja märkus: API annab kõigile, avalik vaade ei näita. */
+  notes?: string;
+  needs_review: boolean;
 }
-export type PartInput = Omit<WorkPart, 'id' | 'needs_review'>;
+export type PartInput = Omit<WorkPart, 'id' | 'needs_review' | 'abstract_en_src'> & {
+  /** Toimetaja kinnitab, et ingliskeelne kokkuvõte vastab eestikeelsele → server seab ankru. */
+  confirm_abstract_translation?: boolean;
+};
 
 const opts = (token: string | null): ApiRequestOptions => ({ token, timeout: 20000 });
 const base = (workId: string) => `/works/${encodeURIComponent(workId)}/parts`;

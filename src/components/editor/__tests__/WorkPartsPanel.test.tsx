@@ -29,8 +29,8 @@ const LETTER = { id: 'a', kind: 'letter', pages: ['s2', 's3', 's5'], attached_to
   creators: [{ name: 'Luden', role: 'auctor' }, { name: 'Virginius', role: 'addressee' }], dating: { start: '1652-03-01' } };
 const POEM = { id: 'b', kind: 'poem', title: 'Carmen', pages: ['s7'], creators: [], attached_to: null, needs_review: false };
 
-const renderPanel = (page = 1) => render(
-  <MemoryRouter><WorkPartsPanel workId="w1" token={null} currentPage={page} /></MemoryRouter>,
+const renderPanel = (page = 1, canEdit = false) => render(
+  <MemoryRouter><WorkPartsPanel workId="w1" token={null} currentPage={page} canEdit={canEdit} /></MemoryRouter>,
 );
 
 beforeEach(() => {
@@ -96,9 +96,9 @@ describe('WorkPartsPanel', () => {
     }
   });
 
-  it('osa andmed lahti: märkused, koht, sihtkoht, isikud rollidega (lingiga), lisad', async () => {
+  it('osa andmed lahti: kokkuvõte, koht, sihtkoht, isikud rollidega (lingiga), lisad', async () => {
     api.parts = [
-      { ...LETTER, notes: 'Kiri on säilinud koopiana.', place: { id: 'Q1794', label: 'Frankfurt' },
+      { ...LETTER, abstract_et: 'Kiri on säilinud koopiana.', notes: 'Indeks F004', place: { id: 'Q1794', label: 'Frankfurt' },
         place_to: { id: null, label: 'Tartu' }, languages: ['lat'],
         creators: [{ id: 'vutt:Pluden', name: 'Luden', role: 'auctor' }, { name: 'Virginius', role: 'addressee' }] },
       { id: 'c', kind: 'attachment', title: 'Luuletus kirja juures', pages: ['s5'], creators: [], attached_to: 'a', needs_review: false },
@@ -112,6 +112,22 @@ describe('WorkPartsPanel', () => {
     expect(screen.getByRole('link', { name: 'Luden' }).getAttribute('href')).toBe('/persons/vutt:Pluden');
     expect(screen.getByText('Virginius')).toBeTruthy();
     expect(screen.getAllByText(/Luuletus kirja juures/)).toHaveLength(2);   // oma rida + kirja lisad
+    expect(screen.queryByText('Indeks F004')).toBeNull();                 // toimetaja märkus: lugejale ei näidata
+  });
+
+  it('toimetaja märkus on nähtav ainult toimetajale (ADR 0063)', async () => {
+    api.parts = [{ ...LETTER, notes: 'Indeks F004' }];
+    renderPanel(1, true);
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Näita osa andmeid' }));
+    expect(screen.getByText('Indeks F004')).toBeTruthy();
+  });
+
+  it('ainult märkusega osal pole lugejale lahtikeeramise nuppu', async () => {
+    api.parts = [{ ...POEM, notes: 'Indeks F004' }];
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
+    expect(screen.queryByRole('button', { name: 'Näita osa andmeid' })).toBeNull();
   });
 
   it('ilma lisaandmeteta osal lahtikeeramise nuppu ei ole', async () => {

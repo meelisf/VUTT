@@ -63,17 +63,21 @@ export function sharedStems(part: WorkPart, parts: WorkPart[]): Map<string, stri
 export interface PartDraft {
   kind: PartKind; title: string; incipit: string; datingText: string; dating: WorkDating | null;
   place: PartPlace | null; place_to: PartPlace | null; creators: PartCreator[]; attached_to: string | null; notes: string;
+  abstract_et: string; abstract_en: string;
+  /** Serveri ankur (loetav, mitte saadetav) ja selle salvestuse kinnitus. */
+  abstractAnchor: string | null; confirmEn: boolean;
   /** Väljad, mida vorm ei tunne (nt languages, tulevased väljad). Server asendab PUT-il
    *  terve osa — ilma selleta kaoksid need vaikselt. */
   extra: Record<string, unknown>;
 }
 
 const FORM_FIELDS = new Set(['id', 'kind', 'pages', 'title', 'incipit', 'dating', 'place', 'place_to',
-  'creators', 'attached_to', 'notes', 'needs_review']);
+  'creators', 'attached_to', 'notes', 'needs_review', 'abstract_et', 'abstract_en', 'abstract_en_src']);
 
 export const emptyDraft = (kind: PartKind = 'letter'): PartDraft => ({
   kind, title: '', incipit: '', datingText: '', dating: null, place: null, place_to: null,
-  creators: [], attached_to: null, notes: '', extra: {},
+  creators: [], attached_to: null, notes: '', abstract_et: '', abstract_en: '', abstractAnchor: null, confirmEn: false,
+  extra: {},
 });
 
 export function draftFromPart(p: WorkPart): PartDraft {
@@ -82,6 +86,8 @@ export function draftFromPart(p: WorkPart): PartDraft {
     datingText: p.dating?.source_text ?? p.dating?.start ?? '', dating: p.dating ?? null,
     place: p.place ?? null, place_to: p.place_to ?? null, creators: p.creators ?? [],
     attached_to: p.attached_to ?? null, notes: p.notes ?? '',
+    abstract_et: p.abstract_et ?? '', abstract_en: p.abstract_en ?? '',
+    abstractAnchor: p.abstract_en_src ?? null, confirmEn: false,
     extra: Object.fromEntries(Object.entries(p).filter(([k]) => !FORM_FIELDS.has(k))),
   };
 }
@@ -106,6 +112,9 @@ export function partFromDraft(d: PartDraft, pages: string[]): PartInput {
   if (d.title.trim()) out.title = d.title.trim();
   if (d.incipit.trim()) out.incipit = d.incipit.trim();
   if (d.notes.trim()) out.notes = d.notes.trim();
+  if (d.abstract_et.trim()) out.abstract_et = d.abstract_et.trim();
+  if (d.abstract_en.trim()) out.abstract_en = d.abstract_en.trim();
+  if (d.confirmEn && d.abstract_en.trim()) out.confirm_abstract_translation = true;
   const dating = draftDating(d);
   if (dating) out.dating = dating;
   if (d.place) out.place = d.place;
@@ -126,4 +135,14 @@ export function initialManageTab(_focus: number | null): ManageTab {
 export function tabSwitch(partsDirty: boolean, runGuarded: (fn: () => void) => void, fn: () => void): void {
   if (partsDirty) runGuarded(fn);
   else fn();
+}
+
+/** Avalik kokkuvõte lugeja keeles; puudumisel teises keeles koos keelemärgiga (ADR 0063). */
+export function partAbstract(p: Pick<WorkPart, 'abstract_et' | 'abstract_en'>, lang: string):
+  { text: string; otherLang: 'et' | 'en' | null } | null {
+  const own = lang === 'en' ? p.abstract_en : p.abstract_et;
+  if (own?.trim()) return { text: own, otherLang: null };
+  const otherLang = lang === 'en' ? 'et' : 'en';
+  const other = otherLang === 'en' ? p.abstract_en : p.abstract_et;
+  return other?.trim() ? { text: other, otherLang } : null;
 }
