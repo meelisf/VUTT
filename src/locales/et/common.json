@@ -124,7 +124,13 @@
     "sendError": "Teavituse saatmine ebaõnnestus.",
     "recipientsLoadError": "Saajate laadimine ebaõnnestus.",
     "commentReply": "{{actor}} vastas sinu kommentaarile",
-    "commentReplyFallback": "vastas sinu kommentaarile"
+    "commentReplyFallback": "vastas sinu kommentaarile",
+    "groups": "Rühmad:",
+    "group": {
+      "admins": "Administraatorid",
+      "editors": "Toimetajad",
+      "contributors": "Kaastöölised"
+    }
   },
   "form": {
     "clearSearch": "Tühjenda otsing"

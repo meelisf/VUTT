@@ -5,7 +5,7 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 export interface NotificationRecipient {
   username: string;
   name: string;
-  role: 'contributor' | 'editor' | 'admin';
+  role: 'contributor' | 'editor' | 'admin' | 'superadmin';
 }
 
 export interface SendNotificationPayload {
