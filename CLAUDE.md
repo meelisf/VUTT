@@ -327,8 +327,10 @@ Osa avalik kokkuvõte on `abstract_et`/`abstract_en`, `notes` on toimetaja märk
 kinnituse peale (ADR 0063).
 
 **Ameti- ja asutuseregister (ADR 0059)** — identiteet on VUTT-i võti (`occupation_key`,
-`institution_key`), Q-kood on valikuline ühilduvusväli. Allika sõnastus (`label`,
-`institution`) jääb kaardile alles — registrivaste ei kirjuta seda üle. Ametil on kas
+`institution_key`), Q-kood on valikuline ühilduvusväli. Seotud AMETI `label` on registrile tuntud nimi
+(nimi või variant); muu sõnastus läheb salvestusel fakti `notes`-i („Allikas: …"), asutuse
+sõnastust salvestus ei puutu. Fakti `notes` PEAB vormi mustandis olema — server asendab
+loendi tervikuna (täiendus 2026-10-05). Ametil on kas
 `institution_key` VÕI `place_key`, haridusel ainult `institution_key`; koht ajas elab
 registrikirje `place_periods`-is, mitte isikufaktis. Registrikirje on admini eraldi
 toiming (`save_config_with_git`); isikufakti kinnitamine EI loo kirjet, v.a agendi

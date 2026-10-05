@@ -76,6 +76,28 @@ def test_isikufakt_sailitab_toorsildi_ja_kooskolastab_q_koodi(files):
     assert original["occupations"][0]["id"] == "Qwrong"
 
 
+def test_registrile_tundmatu_sonastus_liigub_markusesse(files):
+    """ADR 0059 täiendus: seotud fakti silt on registrile tuntud nimi; muu sõnastus → notes."""
+    registries.put("occupation", "professor", {"labels": {"et": "professor", "en": "professor"}}, "admin")
+    registries.put("institution", "agc", {
+        "labels": {"et": "Academia Gustavo-Carolina"}, "variants": ["AGC"],
+        "type": "university", "place_key": "tartu"}, "admin")
+    original = {"occupations": [{"label": "SS. Theol. Professore Ordinario", "occupation_key": "professor",
+                                 "notes": "Teoloogiaprofessor", "institution": "Acad. Dorp.", "institution_key": "agc"}],
+                "education": [{"institution": "AGC", "institution_key": "agc"}]}
+    occ = registries.normalize_person_facts(original)["occupations"][0]
+    assert occ["label"] == "professor"
+    assert occ["notes"] == "Teoloogiaprofessor; Allikas: „SS. Theol. Professore Ordinario“"
+    assert occ["institution"] == "Acad. Dorp."                   # asutuse sõnastust reegel ei puutu
+    # Idempotentne: teine salvestus ei lisa märkust uuesti.
+    again = registries.normalize_person_facts({"occupations": [occ]})["occupations"][0]
+    assert again == occ
+    # Variant ja sidumata fakt jäävad puutumata.
+    assert registries.normalize_person_facts(original)["education"][0] == {"institution": "AGC", "institution_key": "agc"}
+    loose = {"label": "Professore Ordinario"}
+    assert registries.normalize_person_facts({"occupations": [loose]})["occupations"][0] == loose
+
+
 def test_territoorium_ja_asutus_ei_ole_sama_link(files):
     with pytest.raises(registries.RegistryError, match="institution_and_place_are_exclusive"):
         registries.normalize_person_facts({"occupations": [

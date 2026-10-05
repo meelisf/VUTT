@@ -49,11 +49,17 @@ describe('RegistryField', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('seotud kirje kiip ja lahtisidumine', () => {
+  it('seotud kirje: kastis registri nimi, kiibis register + Q, lahtisidumine', () => {
     const { onUnlink } = setup('academia-gustavo-carolina');
-    expect(screen.getByText(/Academia Gustavo-Carolina · Q138710754/)).toBeTruthy();
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('Academia Gustavo-Carolina');
+    expect(screen.getByText(/form.registry.badge · Q138710754/)).toBeTruthy();
     fireEvent.click(screen.getByLabelText('form.registry.unlink'));
     expect(onUnlink).toHaveBeenCalled();
+  });
+
+  it('sama nimi (tõstutundetult) lisarida ei tekita', () => {
+    setup('academia-gustavo-carolina', { label: 'academia gustavo-carolina', id: null, labels: null, source: 'manual' });
+    expect(screen.queryByText('form.registry.wording')).toBeNull();
   });
 
   it('Q-kood ilma registrivõtmeta on nähtavalt sidumata; sama Q → „Seo"', () => {
@@ -93,11 +99,12 @@ describe('RegistryField', () => {
     expect(screen.queryByText('form.registry.create')).toBeNull();
   });
 
-  it('seotud väljal on kastis allika sõnastus, mitte registri silt', () => {
-    // univ-rostock kandis silti „Rostock"; väli näitas pärast „Seo" linna, mitte „Rostocki Ülikool".
+  it('seotud väljal on kastis registri nimi; kaardi sõnastus on all eraldi real (ADR 0059 täiendus)', () => {
+    // Enne näitas kast „Acad. Dorpat." ja kiip „Academia Gustavo-Carolina" — toimetaja ei teadnud, kumb kehtib.
+    // Registri nimi tuleb REGISTRIST, mitte faktile kopeeritud `labels`-ist (seal võis olla linn: „Rostock").
     setup('academia-gustavo-carolina', { label: 'Acad. Dorpat.', id: 'Q138710754',
-      labels: { et: 'Academia Gustavo-Carolina', en: 'Academia Gustavo-Carolina' }, source: 'wikidata' });
-    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('Acad. Dorpat.');
-    expect(screen.getByText(/Academia Gustavo-Carolina · Q138710754/)).toBeTruthy();
+      labels: { et: 'Rostock' }, source: 'wikidata' });
+    expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('Academia Gustavo-Carolina');
+    expect(screen.getByText('form.registry.wording')).toBeTruthy();
   });
 });

@@ -175,6 +175,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined,
       institution: o.institution ?? '', institution_id: o.institution_id ?? null, institution_labels: o.institution_labels ?? undefined,
       occupation_key: o.occupation_key, institution_key: o.institution_key, place_key: o.place_key, evidence: o.evidence,
+      notes: o.notes ?? undefined,
       date_from: o.date_from ? historicalDateToDraft(o.date_from)
         : (o.year_from ? { ...emptyDateDraft(), year: String(o.year_from) }
         : (o.year ? { ...emptyDateDraft(), year: String(o.year) } : emptyDateDraft())),
@@ -194,6 +195,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
         : (e.year_to ? { ...emptyDateDraft(), year: String(e.year_to) } : emptyDateDraft())),
       edu_type: e.type ?? undefined,
       source: e.source ?? undefined,
+      notes: e.notes ?? undefined,
     })),
     tags: (p.tags ?? []).map((t: any) => ({ label: t.label ?? String(t), id: t.id ?? null, labels: t.labels ?? undefined })),
     relations: (p.relations ?? []).map((r: any) => ({
@@ -317,6 +319,7 @@ export function draftToPayload(
       ...(o.evidence ? { evidence: o.evidence } : {}),
       ...(o.date_from?.year?.trim() ? { date_from: buildDatePayload(o.date_from) } : {}),
       ...(o.date_to?.year?.trim() ? { date_to: buildDatePayload(o.date_to) } : {}),
+      ...(o.notes?.trim() ? { notes: o.notes.trim() } : {}),
     })),
     education: draft.education.filter(e => e.institution.trim()).map(e => ({
       institution: e.institution.trim(),
@@ -328,6 +331,7 @@ export function draftToPayload(
       ...(e.date_to?.year?.trim() ? { date_to: buildDatePayload(e.date_to) } : {}),
       ...(e.edu_type ? { type: e.edu_type } : {}),
       ...(e.source ? { source: e.source } : {}),
+      ...(e.notes?.trim() ? { notes: e.notes.trim() } : {}),
     })),
     tags: draft.tags.filter(t => t.label.trim()).map(t => ({
       label: t.label.trim(),

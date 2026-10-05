@@ -129,7 +129,7 @@
     "open": "Merge…"
   },
   "form": {
-    "registry": { "badge": "Registry", "unlink": "Remove registry link", "unlinked": "Not linked to the registry", "notOnMap": "will not reach the map", "linkTo": "Link: {{label}}", "create": "Create registry entry" },
+    "registry": { "badge": "Registry", "unlink": "Remove registry link", "unlinked": "Not linked to the registry", "notOnMap": "will not reach the map", "linkTo": "Link: {{label}}", "create": "Create registry entry", "wording": "Wording on the card: {{text}}" },
     "aaRecordHint": "Machine-copied source record with German abbreviations. Line breaks are meaningful. Not a biography and not Markdown.",
     "aaRecordLabel": "Album Academicum record",
     "add": "Add",
@@ -141,6 +141,7 @@
     "confirmMatchesEnglish": "Matches the English text",
     "confirmMatchesEstonian": "Matches the Estonian text",
     "conflictError": "Data has been modified. Reload the page and try again.",
+    "factNote": "Note",
     "educationInstitution": "Institution",
     "educationInstitutionPlaceholder": "Type the name as in the source, e.g. AGC or Lyz. Riga",
     "floruit": "Active period",
