@@ -338,6 +338,7 @@
       "kinds": {
         "letter": "Kiri",
         "poem": "Luuletus",
+        "prose": "Proosatekst",
         "speech": "Kõne",
         "session": "Istung",
         "attachment": "Lisa"
@@ -420,7 +421,7 @@
       "praeses": "Eesistuja",
       "respondens": "Respondens",
       "auctor": "Autor",
-      "gratulator": "Õnnitleja",
+      "gratulator": "Kaasteksti autor",
       "dedicator": "Pühendaja",
       "editor": "Toimetaja",
       "aui": "Eessõna/järelsõna autor",

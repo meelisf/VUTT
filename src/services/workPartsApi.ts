@@ -3,9 +3,9 @@
 import { ApiRequestOptions, apiDelete, apiGet, apiPost, apiPut } from './apiClient';
 import type { WorkDating } from '../utils/workDating';
 
-export type PartKind = 'letter' | 'poem' | 'speech' | 'session' | 'attachment';
+export type PartKind = 'letter' | 'poem' | 'prose' | 'speech' | 'session' | 'attachment';
 export type PartRole = 'auctor' | 'addressee' | 'praeses' | 'participant' | 'subject';
-export const PART_KINDS: PartKind[] = ['letter', 'poem', 'speech', 'session', 'attachment'];
+export const PART_KINDS: PartKind[] = ['letter', 'poem', 'prose', 'speech', 'session', 'attachment'];
 export const PART_ROLES: PartRole[] = ['auctor', 'addressee', 'praeses', 'participant', 'subject'];
 
 export interface PartCreator { id?: string | null; name?: string; role: PartRole; source?: string; }

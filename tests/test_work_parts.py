@@ -35,6 +35,16 @@ def test_vigane_osa_400(bad):
     assert e.value.status == 400
 
 
+def test_proosatekst_on_liik_ja_gratulatsioon_tuleb_rollidest():
+    # Liik on vorm: proosas gratulatsioon/hinnang = prose + auctor → subject.
+    out = wp.validate_parts([_p(kind="prose", creators=[
+        {"id": "vutt:Pa", "name": "A", "role": "auctor"},
+        {"id": "vutt:Pb", "name": "B", "role": "subject"}])], STEMS)
+    assert out[0]["kind"] == "prose"
+    with pytest.raises(wp.PartError):
+        wp.validate_parts([_p(kind="gratulation")], STEMS)
+
+
 def test_tuhi_osa_lubatud_needs_reviewga():
     assert wp.validate_parts([_p(pages=[], needs_review=True)], STEMS)[0]["pages"] == []
 
