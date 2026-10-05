@@ -129,7 +129,7 @@
     "open": "Liida…"
   },
   "form": {
-    "registry": { "badge": "Register", "unlink": "Eemalda registriseos", "unlinked": "Registriga sidumata", "notOnMap": "kaardile ei jõua", "linkTo": "Seo: {{label}}", "create": "Loo registrikirje", "wording": "Sõnastus kaardil: {{text}}" },
+    "registry": { "badge": "Register", "unlink": "Eemalda registriseos", "unlinked": "Registriga sidumata", "notOnMap": "kaardile ei jõua", "linkTo": "Seo: {{label}}", "create": "Loo registrikirje", "wording": "Allika sõnastus: {{text}}" },
     "aaRecordHint": "Masinkopeeritud allikakirje saksakeelsete lühenditega. Reavahetused on sisulised. Ei ole elulugu ega Markdown.",
     "aaRecordLabel": "Album Academicumi kirje",
     "add": "Lisa",

@@ -123,7 +123,7 @@ niikuinii registri silti. Agent pani sildiks allika käändes fraasi.
   registri nimi, ilma märketa).
 - **Vorm** (`RegistryField`): seotud väljal on kastis registri nimi toimetaja keeles
   (registrist, mitte faktile kopeeritud `labels`-ist); kiip = „Register · Q", erinev
-  kaardi sõnastus on all eraldi real. Algne „Rostock"-viga (registri silt oli linn)
+  allika sõnastus on all eraldi real („Allika sõnastus: …"). Algne „Rostock"-viga (registri silt oli linn)
   on registris parandatud, seega pole põhjust kastis allika kuju hoida.
 - **Fakti `notes`** on vormis toimetatav. Varem jäi ta mustandist välja ja server asendab
   loendi tervikuna — iga vormisalvestus kustutas ameti-/hariduskirjete märkused.
