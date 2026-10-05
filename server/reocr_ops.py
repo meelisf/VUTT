@@ -13,6 +13,7 @@ from .config import (
     BASE_DIR, GEMINI_MAX_INFLIGHT_REQUESTS, OCR_SERVER_PATH, REOCR_BACKUPS_DIR,
     REOCR_LOG_FILE, UPLOAD_ENABLED, gemini_enabled, get_logger,
 )
+from .macron import convert_ocr_text, work_languages
 from .ocr_prompts import instruction_for
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
@@ -81,8 +82,16 @@ def _backup_dir(job_id: str) -> str:
     return os.path.join(REOCR_BACKUPS_DIR, job_id)
 
 
+def _ocr_postprocess(slug: str, text: str) -> str:
+    """Lühendi tilde → makron teose keelte järgi (ADR 0062). Idempotentne —
+    üksiktöö kutsub seda enne kliendile andmist JA `_write_ocr_file` uuesti."""
+    return convert_ocr_text(text, work_languages(os.path.join(BASE_DIR, slug)), slug)
+
+
 def _write_ocr_file(slug: str, page_filename: str, text: str, job_id: str) -> str:
     """Kirjutab OCR-tulemuse {BASE_DIR}/{slug}/{stem}.ocr failina (püsiv staging).
+
+    Iga .ocr kirjutus (batch, Gemini, recovery) läbib `_ocr_postprocess`-i.
 
     Kui sihtkohas on juba ootel tulemus, varundatakse see ENNE ülekirjutamist.
     Katkestamine taastab varukoopia — muidu hävitaks katkestatud töö varasema
@@ -102,7 +111,7 @@ def _write_ocr_file(slug: str, page_filename: str, text: str, job_id: str) -> st
             reocr_state.add_backup_target(job_id, stem + ".ocr", ocr_path)
 
     with open(ocr_path, "w", encoding="utf-8") as f:
-        f.write(text)
+        f.write(_ocr_postprocess(slug, text))
     return ocr_path
 
 
@@ -1215,6 +1224,7 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
                                            lambda: _cancel_event(job_id).is_set())
             if text is None or _cancel_event(job_id).is_set():
                 return
+            text = _ocr_postprocess(slug, text)
             if _gemini_commit_page(_reocr_jobs, _reocr_jobs_lock, job_id, slug,
                                    page_filename, text):
                 log_job = None
@@ -1363,7 +1373,8 @@ def poll_reocr_job(job_id: str) -> dict:
         # TXT on valmis — laadi sisu alla
         buf = io.BytesIO()
         sftp.getfo(txt_abs, buf)
-        text = buf.getvalue().decode("utf-8", errors="replace")
+        text = _ocr_postprocess(snapshot.get("slug") or "",
+                                buf.getvalue().decode("utf-8", errors="replace"))
         sftp.close()
 
         # Puhasta OCR serveri kataloog taustal

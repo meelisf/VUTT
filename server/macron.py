@@ -15,8 +15,14 @@ Keelevalvur (ADR 0062 p 3): eesti, hispaania ja portugali keeles on tilde päris
 täht (õ, ñ, ã). Teost, mille `languages` sisaldab mõnda neist, ei teisendata
 automaatselt — `convert_text` tagastab siis tildega sõnad aruande jaoks.
 """
+import json
+import os
 import re
 import unicodedata as ud
+
+from .config import get_logger
+
+logger = get_logger(__name__)
 
 TILDE, MACRON, OVERLINE = "\u0303", "\u0304", "\u0305"
 
@@ -81,3 +87,32 @@ def convert_text(text, languages):
         return text, 0, tilde_words(text)
     new, n = to_macron(text)
     return new, n, []
+
+
+def work_languages(work_dir):
+    """Teose `languages` tema `_metadata.json`-ist; lugemata metaandmed → None.
+    None EI OLE tühi loend: keelt teadmata ei tohi valvurit vahele jätta."""
+    try:
+        with open(os.path.join(work_dir, "_metadata.json"), encoding="utf-8") as f:
+            langs = json.load(f).get("languages")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return langs if isinstance(langs, list) else []
+
+
+def convert_ocr_text(text, languages, context=""):
+    """OCR-väljundi järeltöötlus (ADR 0062 samm b): kuni uue mudelini kirjutab
+    OCR tildet, see ei tohi korpusesse uut kuju tuua. Valvuriga keele tildega
+    sõnad logitakse — korpuse migratsiooni aruanne (samm 5) leiab nad uuesti.
+
+    `languages is None` (keel teadmata) → tekst muutumata: tilde jääb migratsioonile,
+    vale teisendus (eesti õ → ō) oleks hullem."""
+    if languages is None:
+        logger.warning("Makron: teose keeled teadmata, OCR-tekst teisendamata (%s)", context)
+        return text
+    new, _, report = convert_text(text, languages)
+    if report:
+        logger.info(
+            "Makron: valvuriga keel, %d tildega sõna jäi teisendamata (%s): %s",
+            len(report), context, ", ".join(report[:10]))
+    return new
