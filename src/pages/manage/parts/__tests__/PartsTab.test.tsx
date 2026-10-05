@@ -7,7 +7,7 @@ import './testI18n';
 // Mock tavafunktsioonidega (vitest 4 vi.fn käsitleb tagasi lükatud lubadust testi veana).
 const { api } = vi.hoisted(() => ({ api: {
   parts: [] as any[], calls: [] as string[], fail: null as null | { status: number; message: string },
-  proposals: [] as any[], personExists: false,
+  proposals: [] as any[], personExists: false, hold: null as null | Promise<void>,
 } }));
 vi.mock('../../../../services/workPartsApi', async (orig) => ({
   ...(await orig<typeof import('../../../../services/workPartsApi')>()),
@@ -30,6 +30,7 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
   },
   decidePartProposal: async (_w: string, pid: string, i: number, action: string, _t: unknown, part?: any, mode?: string) => {
     api.calls.push(`decide:${pid}:${i}:${action}:${part ? part.title ?? '' : ''}${mode ? `:${mode}` : ''}`);
+    if (api.hold) await api.hold;
     const np = { ...(part ?? api.proposals[0].items[i].part), id: 'p9', needs_review: false };
     api.parts = [...api.parts, np];
     api.proposals[0].items[i].status = 'accepted';
@@ -58,7 +59,7 @@ const renderTab = () => render(
   </MemoryRouter>,
 );
 
-beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; api.proposals = []; api.personExists = false; dirty.length = 0; role.value = 'superadmin'; });
+beforeEach(() => { api.parts = []; api.calls = []; api.fail = null; api.proposals = []; api.personExists = false; api.hold = null; dirty.length = 0; role.value = 'superadmin'; });
 
 describe('PartsTab', () => {
   it('tühi olek + osa loomine valitud lehtedest (Shift-vahemik)', async () => {
@@ -98,6 +99,22 @@ describe('PartsTab', () => {
     await waitFor(() => expect(api.calls.filter(c => c.startsWith('decide:'))).toEqual([
       'decide:pp:1:accept:', 'decide:pp:2:accept:', 'decide:pp:0:accept:',
     ]));
+  });
+
+  it('„Lisa kõik" näitab edenemist, kuni osad on lisatud', async () => {
+    const mk = (kind: string) => ({ part: { kind, pages: ['s1'], creators: [], attached_to: null }, attached_to: null,
+      evidence: [], status: 'pending', page_numbers: [1], missing_pages: [] });
+    api.proposals = [{ proposal_id: 'pp', created_at: 1, expires_at: 9, pages_changed: false,
+      items: [mk('letter'), mk('poem'), mk('prose')] }];
+    let release!: () => void;
+    api.hold = new Promise(r => { release = r; });
+    renderTab();
+    fireEvent.click(await screen.findByRole('button', { name: 'Lisa kõik (3)' }));
+    expect(await screen.findByRole('progressbar')).toBeTruthy();
+    expect(screen.getByText('0 / 3')).toBeTruthy();
+    release();
+    await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull());
+    expect(api.calls.filter(c => c.startsWith('decide:'))).toHaveLength(3);
   });
 
   it('pakutud isik: loo, olemasolev väline ID pakub sidumist', async () => {

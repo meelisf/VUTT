@@ -333,7 +333,10 @@
         "accept": "Lisa",
         "edit": "Muuda ja lisa",
         "reject": "Lükka tagasi",
-        "empty": "Ootel ettepanekuid pole. Loo kood ja anna see agendile, et ta pakuks osad (kirjad, istungid jm) välja."
+        "empty": "Ootel ettepanekuid pole. Loo kood ja anna see agendile, et ta pakuks osad (kirjad, istungid jm) välja.",
+        "working": "Salvestan…",
+        "accepting": "Lisan osi",
+        "progress": "{{done}} / {{total}}"
       },
       "kinds": {
         "letter": "Kiri",

@@ -6,6 +6,7 @@ import {
   rejectEnrichmentProposal, type EnrichmentDate, type EnrichmentItem, type EnrichmentProposal,
 } from '../../services/prosopographyService';
 import EvidenceList from '../EvidenceList';
+import BusyNote from '../../../components/BusyNote';
 import { useWorkTitles } from '../../hooks/useWorkTitles';
 import { evidenceWorkIds } from '../../utils/evidenceRef';
 
@@ -37,6 +38,8 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
   const [codeExpiry, setCodeExpiry] = useState(0);
   const [codeScope, setCodeScope] = useState<{ any: boolean; max: number }>({ any: false, max: 0 });
   const [busy, setBusy] = useState(false);
+  // Käimasolev otsus: näitab, millise ettepaneku juures töö käib (kinnitus võtab sekundeid).
+  const [working, setWorking] = useState<{ proposalId: string; count: number; confirm: boolean } | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   // Eelkontrolli viga („items[i]: kood") näidatakse real, kuni järgmine otsus õnnestub.
@@ -64,6 +67,7 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
   const decide = async (proposal: EnrichmentProposal, indices: number[], confirm: boolean) => {
     if (busy || isDirty || !indices.length) return;
     setBusy(true); setError(''); setMessage('');
+    setWorking({ proposalId: proposal.proposal_id, count: indices.length, confirm });
     try {
       if (confirm) {
         onApplied(await applyEnrichmentProposal(person.id, proposal.proposal_id, indices, token, proposal.revision));
@@ -87,6 +91,7 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
     } finally {
       // Ka vea järel: rea olek (nt vahepeal tekkinud duplikaat) tuleb serverist.
       await refresh();
+      setWorking(null);
       setBusy(false);
     }
   };
@@ -136,6 +141,9 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
               {tr('confirmAll', { count: open.length })}
             </button>
           </div>
+          {working?.proposalId === proposal.proposal_id && (
+            <BusyNote>{working.confirm ? tr('working', { count: working.count }) : tr('rejecting')}</BusyNote>
+          )}
           {proposal.items.map((item, index) => {
             const keyField = item.kind === 'occupation' ? 'occupation_key' : 'institution_key';
             const entry = item.kind === 'occupation' ? item.occupation_entry : item.institution_entry;
