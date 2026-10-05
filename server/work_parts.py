@@ -9,6 +9,7 @@ salvestusega), et samaaegsed toimetajad ei kirjutaks teineteise osi üle.
 from __future__ import annotations
 
 import os
+import re
 from typing import Optional
 
 from .config import get_logger
@@ -21,7 +22,14 @@ logger = get_logger(__name__)
 # tulevad rollipaarist (auctor → subject), ADR 0057.
 KINDS = frozenset({"letter", "poem", "prose", "speech", "session", "attachment"})
 ROLES = frozenset({"auctor", "addressee", "praeses", "participant", "subject"})
-_TEXT_FIELDS = ("title", "incipit", "notes")
+# `abstract_*` = avalik sisukokkuvõte, keel väljanimes (ADR 0039 muster, ADR 0063).
+# `notes` = toimetaja märkus: API annab ta kõigile, avalik vaade teda ei näita.
+_TEXT_FIELDS = ("title", "incipit", "notes", "abstract_et", "abstract_en")
+# Ankur: eestikeelse kokkuvõtte räsi, mille pealt ingliskeelne kinnitati. Kirjutab AINULT
+# server ja ainult selgesõnalise kinnituse peale; kliendi saadetud ankur visatakse ära.
+ANCHOR = "abstract_en_src"
+CONFIRM = "confirm_abstract_translation"
+_ANCHOR_RE = re.compile(r"^[0-9a-f]{12}$")
 
 
 class PartError(ValueError):
@@ -83,6 +91,9 @@ def _normalize(p: dict, page_stems: set[str]) -> dict:
         v = p.get(f)
         if isinstance(v, str) and v.strip():
             out[f] = v.strip()
+    anchor = p.get(ANCHOR)
+    if out.get("abstract_en") and isinstance(anchor, str) and _ANCHOR_RE.fullmatch(anchor):
+        out[ANCHOR] = anchor
     if dating:
         out["dating"] = dating
     if _place(p.get("place")):
@@ -112,12 +123,27 @@ def validate_parts(parts: list, page_stems: set[str]) -> list[dict]:
     return out
 
 
+def _with_anchor(data: dict, previous: Optional[dict] = None) -> dict:
+    """Kliendi osa → salvestatav: ankur ainult kinnitusest, muidu jääb eelmine alles.
+
+    Ingliskeelse kirjavea parandus EI kustuta hoiatust (ADR 0039 p 2): ankur uueneb
+    ainult siis, kui toimetaja kinnitab, et tõlge vastab eestikeelsele tekstile.
+    """
+    from .prosopo_biography_fields import text_hash
+    out = {k: v for k, v in (data or {}).items() if k not in (ANCHOR, CONFIRM)}
+    if (data or {}).get(CONFIRM) and (out.get("abstract_en") or "").strip():
+        out[ANCHOR] = text_hash(out.get("abstract_et"))
+    elif previous and previous.get(ANCHOR):
+        out[ANCHOR] = previous[ANCHOR]
+    return out
+
+
 def new_part(data: dict, existing_ids: set[str]) -> dict:
     """Uus osa: server annab id; kliendi id ja needs_review ignoreeritakse."""
     pid = generate_nanoid(6)
     while pid in existing_ids:
         pid = generate_nanoid(6)
-    return {**{k: v for k, v in (data or {}).items() if k not in ("id", "needs_review")},
+    return {**{k: v for k, v in _with_anchor(data).items() if k not in ("id", "needs_review")},
             "id": pid, "needs_review": False}
 
 
@@ -208,7 +234,8 @@ def create_part(work_dir: str, data: dict, username: str, background_tasks=None)
 def _replace_part(parts: list, part_id: str, data: dict) -> list:
     i = _find(parts, part_id)
     keep = {"id": part_id, "needs_review": parts[i].get("needs_review", False)}
-    parts[i] = {**{k: v for k, v in (data or {}).items() if k not in ("id", "needs_review")}, **keep}
+    data = _with_anchor(data, parts[i])
+    parts[i] = {**{k: v for k, v in data.items() if k not in ("id", "needs_review")}, **keep}
     return parts
 
 

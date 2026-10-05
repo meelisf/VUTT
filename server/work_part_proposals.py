@@ -32,10 +32,10 @@ MAX_USES = 20
 PROPOSAL_TTL = 14 * 24 * 60 * 60
 MAX_PARTS = 50
 MAX_BODY_BYTES = 64_000
-_PART_KEYS = {"kind", "title", "incipit", "notes", "pages", "creators", "dating", "place",
+_PART_KEYS = {"kind", "title", "incipit", "notes", "abstract_et", "abstract_en", "pages", "creators", "dating", "place",
               "place_to", "languages", "attached_to", "evidence", "part_id"}
 # Liitmine olemasoleva osaga: inimese kirjutatud tekst jääb, kui on täidetud.
-_KEEP_EXISTING_TEXT = ("title", "incipit", "notes")
+_KEEP_EXISTING_TEXT = ("title", "incipit", "notes", "abstract_et", "abstract_en")
 _EVIDENCE_KEYS = {"page", "quote"}
 MAX_PERSONS = 50
 _PERSON_KEYS = {"ref", "name", "aliases", "birth_year", "death_year", "identifiers", "note", "evidence"}

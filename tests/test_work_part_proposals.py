@@ -174,6 +174,23 @@ def test_hulgikinnituse_piirid(work, picks):
     assert "parts" not in _meta(work)
 
 
+def test_agent_annab_kokkuvotte_kahes_keeles_aga_mitte_ankrut(work):
+    _submit(work, [{**POEM, "abstract_et": "Õnnitlus.", "abstract_en": "Congratulation.", "notes": "Indeks 3"}])
+    with pytest.raises(wpp.ProposalError):
+        _submit(work, [{**POEM, "abstract_en_src": "aaaaaaaaaaaa"}])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    part = wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept")
+    assert (part["abstract_et"], part["abstract_en"], part["notes"]) == ("Õnnitlus.", "Congratulation.", "Indeks 3")
+    assert "abstract_en_src" not in part
+
+
+def test_parandus_ei_kirjuta_toimetaja_kokkuvotet_ule(work):
+    existing = {"kind": "letter", "pages": ["t-001"], "abstract_et": "Inimese kokkuvõte."}
+    merged = wpp.merge_part(existing, {"kind": "letter", "pages": ["t-001"], "abstract_et": "Agendi oma.",
+                                       "abstract_en": "Agent's."})
+    assert merged["abstract_et"] == "Inimese kokkuvõte." and merged["abstract_en"] == "Agent's."
+
+
 def test_teine_kasutaja_ei_nae_ega_otsusta(work):
     _submit(work, [LETTER])
     (p,) = wpp.list_pending("w1", work, "ed")

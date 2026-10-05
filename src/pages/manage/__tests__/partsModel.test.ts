@@ -1,6 +1,6 @@
 // src/pages/manage/__tests__/partsModel.test.ts
 import { describe, it, expect } from 'vitest';
-import { compactNumbers, draftFromPart, emptyDraft, PartDatingError, initialManageTab, pageBadges, pageRangeList, pageRanges, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
+import { compactNumbers, draftFromPart, emptyDraft, PartDatingError, initialManageTab, pageBadges, pageRangeList, pageRanges, partAbstract, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
 import type { WorkPart } from '../../../services/workPartsApi';
 
 const STEMS = ['s1', 's2', 's3', 's4'];
@@ -97,5 +97,26 @@ describe('partsModel: dateering lihtsast lahtrist', () => {
   it('tühi tekst = dateering puudub', () => {
     const d = { ...emptyDraft('letter'), datingText: '  ', dating: null };
     expect(partFromDraft(d, ['s1']).dating).toBeUndefined();
+  });
+});
+
+describe('osa kokkuvõte kahes keeles (ADR 0063)', () => {
+  const base: WorkPart = { id: 'a', kind: 'letter', pages: ['s1'], creators: [], attached_to: null, needs_review: false };
+
+  it('lugeja keel, puudumisel teine keel koos märgiga', () => {
+    const both = { abstract_et: 'Kiri.', abstract_en: 'Letter.' };
+    expect(partAbstract(both, 'en')).toEqual({ text: 'Letter.', otherLang: null });
+    expect(partAbstract({ abstract_et: 'Kiri.' }, 'en')).toEqual({ text: 'Kiri.', otherLang: 'et' });
+    expect(partAbstract({ abstract_en: 'Letter.' }, 'et')).toEqual({ text: 'Letter.', otherLang: 'en' });
+    expect(partAbstract({}, 'et')).toBeNull();
+  });
+
+  it('ankrut ei saadeta; kinnitus läheb kaasa ainult ingliskeelse tekstiga', () => {
+    const d = draftFromPart({ ...base, abstract_et: 'Kiri.', abstract_en: 'Letter.', abstract_en_src: 'abcdefabcdef', notes: 'Indeks F1' });
+    expect(d.abstractAnchor).toBe('abcdefabcdef');
+    const out = partFromDraft({ ...d, confirmEn: true }, ['s1']);
+    expect(out).toMatchObject({ abstract_et: 'Kiri.', abstract_en: 'Letter.', notes: 'Indeks F1', confirm_abstract_translation: true });
+    expect('abstract_en_src' in out).toBe(false);
+    expect('confirm_abstract_translation' in partFromDraft({ ...d, abstract_en: ' ', confirmEn: true }, ['s1'])).toBe(false);
   });
 });
