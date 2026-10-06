@@ -63,3 +63,21 @@ def test_vigane_sisend_ei_joua_vorku(client, login, monkeypatch):
     r = client.post("/admin/ada/lookup", json={"handle": "mingi jama"},
                     headers=_peis(login))
     assert r.status_code == 400
+
+
+def test_ingliskeelne_pealkiri_on_oma_valjal(client, login, monkeypatch):
+    """ADR 0064: masintõlge tuleb `title_en_suggestion`-is, mitte „et / en" ühes
+    lahtris — sealt pärinesid kõik ` / `-pealkirjad."""
+    from server.ocr_providers import gemini
+
+    monkeypatch.setattr(ada_client, "lookup", lambda h: {
+        "handle": h, "item_uuid": "u", "meta": {"title": "Kiri Karl Morgensternile"},
+        "failid": [], "kogu_baite": 0, "vahele_jaetud": [],
+    })
+    monkeypatch.setattr(gemini, "translate_title", lambda t: "Letter to Karl Morgenstern")
+    r = client.post("/admin/ada/lookup", json={"handle": "10062/7822"}, headers=_peis(login))
+    assert r.status_code == 200, r.text
+    ada = r.json()["ada"]
+    assert ada["title_en_suggestion"] == "Letter to Karl Morgenstern"
+    assert ada["meta"]["title"] == "Kiri Karl Morgensternile"
+    assert "title_suggestion" not in ada

@@ -12,6 +12,7 @@ import { getEntityUrl } from '../../utils/entityUrl';
 import { getLabel } from '../../utils/metadataUtils';
 import { isQCode } from '../../utils/qcodeUtils';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
+import { workDisplayTitle, otherTitles } from '../../utils/workTitle';
 
 interface WorkInfoPanelProps {
   work?: Work;
@@ -56,7 +57,14 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
           <div className="space-y-3 text-sm">
             <div>
               <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.workTitle')}</span>
-              <p className="text-gray-900 font-medium">{work.title}</p>
+              <p className="text-gray-900 font-medium">{workDisplayTitle(work, lang).main}</p>
+              {/* Teised pealkirjakujud (ADR 0064): teose lehel on näha kõik */}
+              {otherTitles(work, lang).map(({ key, value }) => (
+                <p key={key} className="text-gray-600 text-xs mt-1">
+                  <span className="text-gray-400">{t(`metadata.${key}`)}: </span>
+                  <span className="italic">{value}</span>
+                </p>
+              ))}
             </div>
 
             {/* Isikud: v2 creators[] */}

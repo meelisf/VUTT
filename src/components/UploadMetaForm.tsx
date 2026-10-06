@@ -41,6 +41,9 @@ interface UploadMetaFormProps {
 
 interface MetaForm {
   title: string;
+  title_en: string;           // ADR 0064
+  title_original: string;
+  title_devised: boolean;
   dating?: WorkDating | null;
   yearInput: string;          // Üks tekstilahter: 1680 | ca. 1680 | 1670–1690 | 17. saj (vt deriveYearFields)
   type: string | LinkedEntity | null;
@@ -65,6 +68,9 @@ interface SuggestionItem {
 
 const EMPTY_FORM: MetaForm = {
   title: '',
+  title_en: '',
+  title_original: '',
+  title_devised: false,
   yearInput: '',
   type: null,
   genre: [],
@@ -147,6 +153,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           setMetaWorkId(typeof m.work_id === 'string' && m.work_id ? m.work_id : null);
           setForm({
             title: m.title || initialTitle,
+            title_en: m.title_en ?? '',
+            title_original: m.title_original ?? '',
+            title_devised: m.title_devised === true,
             yearInput,
             dating: m.dating ?? null,
             type: m.type ?? null,
@@ -227,6 +236,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
 
     const payload: Record<string, unknown> = {
       title: form.title.trim(),
+      title_en: form.title_en.trim() || null,
+      title_original: form.title_original.trim() || null,
+      title_devised: form.title_devised,
       year,
       year_display: year_display || null,
       dating: form.dating ?? null,
@@ -296,7 +308,47 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
+          {form.title.includes(' / ') && (
+            <p className="text-xs text-amber-700 mt-1">{t('workspace:metadata.titleSlashWarning')}</p>
+          )}
         </div>
+
+        {/* Pealkirja tõlge, originaal ja tekkeviis (ADR 0064) */}
+        <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+            {t('workspace:metadata.titleEn')}
+          </label>
+          <textarea
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
+            rows={2}
+            value={form.title_en}
+            onChange={(e) => setForm({ ...form, title_en: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+            {t('workspace:metadata.titleOriginal')}
+          </label>
+          <textarea
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
+            rows={2}
+            placeholder={t('workspace:metadata.titleOriginalHint')}
+            value={form.title_original}
+            onChange={(e) => setForm({ ...form, title_original: e.target.value })}
+          />
+        </div>
+        <label className="flex items-start gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={form.title_devised}
+            onChange={(e) => setForm({ ...form, title_devised: e.target.checked })}
+          />
+          <span>
+            {t('workspace:metadata.titleDevised')}
+            <span className="block text-xs text-gray-500">{t('workspace:metadata.titleDevisedHint')}</span>
+          </span>
+        </label>
 
         {/* Isikud (creators) */}
         <CreatorsEditor

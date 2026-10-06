@@ -404,14 +404,14 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
 
     const searchParams: any = {
       attributesToRetrieve: [
-        'id', 'work_id', 'title', 'year', 'year_display', 'dating', 'publisher_id',
+        'id', 'work_id', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'publisher_id',
         'publisher_object', 'location_object',
         'type_object', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url', 'archive_refs',
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
-      attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest
+      attributesToSearchOn: ['title', 'title_en', 'title_original', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjadest (ADR 0064), autoritest ja märksõnadest
       matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
       filter: filter,
       // Facetid arvutatakse kogu filtrile ka serveripoolse lehekülgjaotuse korral.
@@ -665,7 +665,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
         highlightPreTag: HIGHLIGHT_PRE_TAG,
@@ -714,7 +714,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
           sort: ['date_sort:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         }, requestConfig)
@@ -770,7 +770,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
@@ -862,7 +862,7 @@ export const searchWorkHits = async (index: Index, rawQuery: string, workId: str
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],

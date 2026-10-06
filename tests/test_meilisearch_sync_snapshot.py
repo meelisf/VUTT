@@ -184,6 +184,11 @@ def test_fikseeritud_väljad_igal_dokumendil(synced):
         assert d["lehekylje_pilt"].startswith(f"{SLUG}/{SLUG}-{WORK_ID}-")
         # NB: koodibaas kasutab vana õigekirja 'lehekylgede' (y, mitte 'l')
         assert d["teose_lehekylgede_arv"] == 2
+        # ADR 0064: pealkirja lisaväljad on igas dokumendis, ka tühjana —
+        # dashboardi attributesToSearchOn nimetab neid.
+        assert d["title_en"] == ""
+        assert d["title_original"] == ""
+        assert d["title_devised"] is False
 
 
 # =========================================================
@@ -362,6 +367,9 @@ def synced_eszett(tmp_path, monkeypatch):
         "id": WORK_ID,
         "slug": SLUG,
         "title": "In auspicatißimos natales",
+        "title_original": "Protocollum Schluß",
+        "title_en": "On the most auspicious birthday",
+        "title_devised": True,
         "year": 1690,
         "notes": "Vrd. Schluß lk 12",
         "creators": [{"name": "Andreas Koßkull sen.", "id": "Q123", "role": "auctor"}],
@@ -402,6 +410,9 @@ def test_eszett_normaliseeritud_lehe_tekstis(synced_eszett):
 def test_eszett_normaliseeritud_metaandmete_valjadel(synced_eszett):
     doc = synced_eszett["docs"][0]
     assert doc["title"] == "In auspicatissimos natales"
+    assert doc["title_original"] == "Protocollum Schluss"
+    assert doc["title_en"] == "On the most auspicious birthday"
+    assert doc["title_devised"] is True
     assert doc["notes"] == "Vrd. Schluss lk 12"
     assert "Andreas Kosskull sen." in doc["authors_text"]
     assert doc["comments"][0]["text"] == "kommentaaris on dass"

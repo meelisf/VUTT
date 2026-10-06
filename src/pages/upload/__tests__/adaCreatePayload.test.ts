@@ -51,3 +51,15 @@ describe('buildAdaCreateExtras', () => {
     expect(extras.external_url).toBe('https://dspace.ut.ee/handle/10062/7822');
   });
 });
+
+describe('buildAdaCreateExtras — ingliskeelne pealkiri (ADR 0064)', () => {
+  it('masintõlge läheb title_en-i, pealkiri ise jääb ADA omaks', () => {
+    const extras = buildAdaCreateExtras({ ...ADA_RESULT, title_en_suggestion: '65 letters to Karl Morgenstern' });
+    expect(extras.title_en).toBe('65 letters to Karl Morgenstern');
+    expect(extras).not.toHaveProperty('title');
+  });
+
+  it('tõlketa: title_en võtit ei ole', () => {
+    expect(buildAdaCreateExtras(ADA_RESULT)).not.toHaveProperty('title_en');
+  });
+});

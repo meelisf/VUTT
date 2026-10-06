@@ -189,8 +189,8 @@ export interface AdaLookupResult {
   failid: AdaFile[];
   kogu_baite: number;
   vahele_jaetud: string[];
-  /** Gemini pakutud „eesti / english" kuju. Puudub, kui tõlge ei õnnestunud. */
-  title_suggestion?: string;
+  /** Gemini ingliskeelne masintõlge → `title_en` (ADR 0064). Puudub, kui tõlge ei õnnestunud. */
+  title_en_suggestion?: string;
   /** Sama handle on juba imporditud (Task 12). HOIATUS, mitte blokeering. */
   olemasolev?: { work_id: string; title: string };
 }

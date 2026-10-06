@@ -237,6 +237,10 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
             "ester_id": meta.get('ester_id'),
             "archive_refs": meta.get('archive_refs', []),
             "external_url": meta.get('external_url'),
+            # Pealkirja tõlge, originaal, tekkeviis (ADR 0064)
+            "title_en": meta.get('title_en'),
+            "title_original": meta.get('title_original'),
+            "title_devised": meta.get('title_devised') is True,
             # Töökollektsioonide valik (ADR 0042): rakendub impordil kogu
             # failidesse, `_metadata.json`-i EI jõua (import ehitab selle
             # nimekirja järgi).
@@ -278,6 +282,7 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
         'publisher', 'tags',
         'ester_id', 'external_url',
         'archive_refs', 'work_sets',
+        'title_en', 'title_original', 'title_devised',  # ADR 0064
     }
     updates = dating_updates(updates)
     if 'work_sets' in updates:

@@ -104,6 +104,9 @@ export interface Work {
 
   // Teose põhiandmed
   title: string;            // Pealkiri
+  title_en?: string;        // Pealkirja ingliskeelne vaste (ADR 0064)
+  title_original?: string;  // Allikast transkribeeritud pealkiri (ADR 0064)
+  title_devised?: boolean;  // true = pealkiri on koostatud, mitte transkribeeritud
   year: number | null;      // Ilmumisaasta (number filtri/sortimise jaoks)
   dating?: WorkDating | null;
   year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
@@ -229,6 +232,9 @@ export interface Page {
   // V2 TEOSE ANDMED (denormaliseeritud) - KASUTA NEID
   // =========================================================
   title?: string;
+  title_en?: string;        // Pealkirja ingliskeelne vaste (ADR 0064)
+  title_original?: string;  // Allikast transkribeeritud pealkiri (ADR 0064)
+  title_devised?: boolean;  // true = pealkiri on koostatud, mitte transkribeeritud
   year?: number | null;
   dating?: WorkDating | null;
   year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
@@ -316,6 +322,9 @@ export interface ContentSearchHit {
 
   // V2 VÄLJAD - KASUTA NEID
   title?: string;
+  title_en?: string;        // Pealkirja ingliskeelne vaste (ADR 0064)
+  title_original?: string;  // Allikast transkribeeritud pealkiri (ADR 0064)
+  title_devised?: boolean;  // true = pealkiri on koostatud, mitte transkribeeritud
   year?: number | string | null;
   location?: LinkedEntity | null;
   publisher?: LinkedEntity | null;

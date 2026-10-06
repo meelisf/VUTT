@@ -357,3 +357,25 @@ describe('buildMetadataPayload — archive_refs', () => {
     expect(buildMetadataPayload(form, 'x').metadata.archive_refs).toEqual([{ archive_id: 'EAA', reference: '1.2.3' }]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pealkirja lisaväljad (ADR 0064)
+// ---------------------------------------------------------------------------
+describe('buildMetadataPayload — pealkirja lisaväljad', () => {
+  it('vorm, mis välju ei kanna, ei saada neid (server jätab puutumata)', () => {
+    const m = buildMetadataPayload(baseForm(), 'w1').metadata;
+    expect('title_en' in m).toBe(false);
+    expect('title_original' in m).toBe(false);
+    expect('title_devised' in m).toBe(false);
+  });
+
+  it('tühi väli → null (server eemaldab võtme), väärtus trimmitakse', () => {
+    const m = buildMetadataPayload(
+      { ...baseForm(), title_en: '  Minutes  ', title_original: ' ', title_devised: true },
+      'w1',
+    ).metadata;
+    expect(m.title_en).toBe('Minutes');
+    expect(m.title_original).toBeNull();
+    expect(m.title_devised).toBe(true);
+  });
+});

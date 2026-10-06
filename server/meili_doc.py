@@ -30,6 +30,12 @@ from .utils import (
 )
 from .marginalia_normalize import normalize_marginalia_tags
 
+# Pealkirja lisaväljad (ADR 0064) — tõlge(d) ja transkribeeritud originaal.
+# Uus keel = uus väli siia; ta jõuab metaandmete valge nimekirja
+# (`metadata_ops`) ja dokumenti automaatselt, aga otsingusse alles siis, kui ta
+# on ka `SEARCHABLE_ATTRIBUTES`-is JA dashboardi `attributesToSearchOn`-is.
+TITLE_TEXT_FIELDS = ("title_en", "title_original")
+
 
 # =========================================================
 # TEKSTI PUHASTUS (otsinguindeksi jaoks)
@@ -447,6 +453,9 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "id": page_id,
         "work_id": work_ctx['work_id'],  # Nanoid (püsiv lühikood)
         "title": normalize_eszett(work_ctx['title']),   # OTSING+KUVA: ß→ss (#228)
+        # OTSING+KUVA (ADR 0064): alati olemas, ka tühjana — attributesToSearchOn nõuab
+        **{key: normalize_eszett(work_ctx[key]) for key in TITLE_TEXT_FIELDS},
+        "title_devised": work_ctx['title_devised'],
         "autor": work_ctx['autor'],      # Filtreerimiseks (jääb)
         "respondens": work_ctx['respondens'],  # Filtreerimiseks (jääb)
         "aasta": work_ctx['year'],       # Filtreerimiseks ja sortimiseks (jääb)
@@ -609,6 +618,8 @@ def get_work_metadata(doc_path, dir_name, collections):
         'collections': [],
         'collections_hierarchy': [],
         'title': 'Pealkiri puudub',
+        **{key: '' for key in TITLE_TEXT_FIELDS},
+        'title_devised': False,
         'year': 0,
         'year_display': None,
         'year_start': 0,
@@ -655,6 +666,9 @@ def get_work_metadata(doc_path, dir_name, collections):
         result['collections_hierarchy'] = get_collection_hierarchy(collections, result['collections'])
 
     result['title'] = meta.get('title', 'Pealkiri puudub')
+    for key in TITLE_TEXT_FIELDS:
+        result[key] = meta.get(key) or ''
+    result['title_devised'] = meta.get('title_devised') is True
     year = meta.get('year', 0)
     result['year_display'] = meta.get('year_display') or None
     _yr = parse_year_range(year, result['year_display'])
@@ -726,6 +740,8 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         'dir_path': doc_path,
         'work_id': work_id_for_keys,
         'title': doc_metadata.get('title', ''),
+        **{key: doc_metadata.get(key) or '' for key in TITLE_TEXT_FIELDS},
+        'title_devised': doc_metadata.get('title_devised') is True,
         'autor': autor,
         'respondens': respondens,
         'year': doc_metadata.get('year') or 0,
