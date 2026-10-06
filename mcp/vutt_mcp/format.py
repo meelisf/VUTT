@@ -31,8 +31,9 @@ CREATOR_ROLE_ORDER = [
 CREATOR_ROLE_LEGEND = (
     "Rollid: auctor = autor; praeses = eesistuja (disputatsiooni juhataja, "
     "sageli tegelik autor); respondens = kaitsja; aui = eessõna või järelsõna "
-    "autor; dedicator = pühendaja; gratulator = õnnitleja (gratulatsiooniluuletuse "
-    "autor); editor = toimetaja."
+    "autor; dedicator = pühendaja (kirjutas teosele pühenduse, võib olla ka "
+    "autor ise); gratulator = kaasteksti autor (gratulatsioon, leinaluuletus vm "
+    "kaastekst — EI OLE pühendaja); editor = toimetaja."
 )
 
 
