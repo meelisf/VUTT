@@ -201,3 +201,15 @@ def test_rea_taane_m_ees_jaab():
 
 def test_ainult_tuhikuga_plokk_kaob():
     assert norm('<m> </m>') == ''
+
+
+def test_tuhik_tuhja_tagi_taga_eemaldatakse_uhe_kaiguga():
+    # Tühi <i></i> koristatakse alles pärast rea normaliseerimist — tühik selle
+    # taga paljastus ja jäi teise käigu teha (migratsioon 06.10: 1 fail jäi).
+    assert norm('<m><i></i> Ratio.</m>') == '<m>Ratio.</m>'
+
+
+def test_idempotentne_tuhja_tagiga():
+    for txt in ('<m><i></i> Ratio.</m>', '<m> <b></b> <i>x</i></m>', '<m><i>x</i><b></b> </m>'):
+        once = norm(txt)
+        assert norm(once) == once, txt
