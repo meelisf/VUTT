@@ -580,6 +580,7 @@
     "annotateTitle": "Lisa kommentaar",
     "annotateCommentPlaceholder": "Kommentaar...",
     "annotateOverlapError": "Valitud tekst sisaldab juba annotatsiooni — vali kattumatult",
+    "annotateCrossesTagError": "Valik ületab märgendi või marginaaliaploki piiri — vali tekst ühe ploki sees",
     "reocr": {
       "button": "Tee uus transkriptsioon",
       "hint": "Saada lehekülje pilt OCR serverisse ja asenda tekst uue automaatse transkriptsiooniga.",

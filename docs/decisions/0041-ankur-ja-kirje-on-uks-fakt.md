@@ -104,3 +104,22 @@ saatis. Uus orb pärast 2026-09-13 on seega **signaal, mitte müra**.
 Redaktoris ei ole ankruta kirje kuvamist muudetud: `TextAnnotationsPanel`
 näitab neid endiselt tühja ankrutekstiga. Pärast andmeparandust ei ole enam
 midagi näidata, ja lepitus hoiab uute tekke ära.
+
+## Täiendus 2026-10-06: ankur ei ristu `<m>`-iga, mitme tükiga ankur
+
+Märkuse lisamine pani `<annN>…</annN>` toore valiku ümber; avatud
+marginaaliakaardis rea lõpuni valimine haaras kaasa `</m>` + reavahetuse ja
+tekkis `<m><ann1><i>x</i></m>\n</ann1>…` (7r0ic2 lk 6). Nüüd kitsendab
+`annotationSegments` (`src/utils/annUtils.ts`) valiku tasakaalus lõiguks:
+servast kukuvad tühik, `<m>`/`</m>` ja paarita täg; sisse jääv paarita täg →
+viga, ankrut ei panda.
+
+`<m>`-ridu hõlmav mitmerealine valik saab **tüki igale reale SAMA ID-ga**
+(`<m><ann1>a</ann1></m>\n<m><ann1>b</ann1></m>`), kirje jääb üheks. Ankrut
+`<m>`-i ümber panna ei saa — `<m>` on rea välimine täg (ADR 0003) ja
+normaliseerija tõstaks avatägi sisse, ristumine tuleks tagasi. Seega:
+
+- ID esineb tekstis 1..n korda; lepitus (`annotation_ops`) on niikuinii hulgapõhine.
+- Eemaldamine eemaldab KÕIK tükid; `extractHighlightedText` liidab tükid.
+- MCP renderdab kommentaari ainult viimase tüki juurde (varasemad `⟦sisu⟧`).
+- Põhiteksti mitmerealine valik ilma `<m>`-ita jääb üheks ankruks.
