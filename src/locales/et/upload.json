@@ -191,7 +191,7 @@
       "2": "ainult aasta",
       "3": "dateerimata"
     },
-    "machineTranslation": "masintõlge, kontrolli",
+    "titleEnSuggestion": "Ingliskeelne pealkiri (masintõlge, kontrolli metaandmetes): {{title}}",
     "takeAda": "võta ADA oma",
     "downloading": "Laen ADA-st",
     "downloadProgress": "{{done}}/{{total}} faili · {{mbDone}}/{{mbTotal}} MB",

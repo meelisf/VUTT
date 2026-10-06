@@ -82,7 +82,13 @@ Kolm probleemi:
   `attributesToSearchOn`; puudub üks, ei leia dashboard teda.
 - ` / ` pealkirja sees ei ole enam lubatud keelte eraldajana; vorm võiks selle
   peale hoiatada.
-- ADA import (`server/ada/mapping.py`) võtab praegu ainult `[et]` `dc.title`-i;
-  kui ADA kirjel on `[en]` pealkiri, tuleb see `title_en`-i ja lipp `true`.
+- ` / `-pealkirjade allikas oli ADA lookup (`/admin/ada/lookup`): Gemini
+  ingliskeelne masintõlge liideti pealkirja `"{et} / {en}"` kujul. Nüüd tuleb
+  tõlge `title_en_suggestion`-is ja läheb upload'i `title_en`-i — ühte lahtrisse
+  kahte keelt EI liideta.
+- Upload kannab väljad loomisest (`create_upload`) ja sammu 3 vormist
+  (`update_upload_meta` allow-list) impordini. Käsikirja tüübiga upload saab
+  `title_devised: true` vaikimisi — see on salvestatud otsus, mitte kuvamisaegne
+  tuletus tüübist.
 - Segateose materjal (trükis/käsikiri osade kaupa) on eraldi küsimus — see
   ADR ei lahenda, kuidas `type` ja OCR-mudel osade lõikes käituvad.

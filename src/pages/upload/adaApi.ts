@@ -15,6 +15,7 @@ export interface AdaCreateExtras {
   ester_id?: string | null;
   archive_refs?: Array<{ archive_id: string; reference: string }>;
   external_url?: string | null;
+  title_en?: string;
 }
 
 /** Handle → ADA metaandmed + failiplaan. Ei loo uploadi.
@@ -59,6 +60,8 @@ export function buildAdaCreateExtras(adaResult: AdaLookupResult | null): AdaCrea
     ester_id: adaResult.meta.ester_id,
     archive_refs: adaResult.meta.archive_refs,
     external_url: adaResult.meta.external_url,
+    // Masintõlge OMA väljal (ADR 0064) — sammu 3 vormis kontrollitav
+    ...(adaResult.title_en_suggestion ? { title_en: adaResult.title_en_suggestion } : {}),
   };
 }
 

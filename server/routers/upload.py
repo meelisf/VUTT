@@ -101,15 +101,14 @@ async def admin_ada_lookup(request: Request, user=Depends(require_role("admin"))
     except ada_client.AdaViga as e:
         raise HTTPException(status_code=400, detail=e.kasutaja_sonum)
 
-    # Kakskeelne pealkiri ühes lahtris. Pakkumine, mitte otsus — UI märgistab
-    # selle masintõlkena kuni admin lahtrit puudutab.
+    # Ingliskeelne pealkiri on OMA väli (ADR 0064) — mitte „eesti / english"
+    # ühes lahtris, nagu varem: sealt tulid kõik ` / `-pealkirjad. Pakkumine,
+    # mitte otsus — UI märgistab selle masintõlkena.
     ingliskeelne = await run_in_threadpool(
         gemini.translate_title, tulemus["meta"].get("title", "")
     )
     if ingliskeelne:
-        tulemus["title_suggestion"] = "{} / {}".format(
-            tulemus["meta"]["title"], ingliskeelne
-        )
+        tulemus["title_en_suggestion"] = ingliskeelne
 
     # Duplikaadi HOIATUS, mitte blokeering — sama kirje kordusimport võib olla
     # tahtlik (nt parem skaneering). run_in_threadpool: Meili-päring on

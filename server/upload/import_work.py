@@ -419,6 +419,7 @@ def _teosta_import(
         "location", "publisher",
         "ester_id", "external_url", "year_display", "dating",
         "archive_refs",
+        "title_en", "title_original",  # ADR 0064
     ]
     metadata = {
         "id": work_id,
@@ -434,6 +435,9 @@ def _teosta_import(
     for field in optional_meta_fields:
         if field in meta and meta[field] not in (None, [], ""):
             metadata[field] = meta[field]
+    # Puudumine = false (ADR 0064) — `false`-i ei kirjutata.
+    if meta.get("title_devised") is True:
+        metadata["title_devised"] = True
     # tags ja creators peavad alati olemas olema (tühi list kui puudub)
     metadata.setdefault("tags", [])
     metadata.setdefault("creators", [])

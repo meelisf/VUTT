@@ -75,8 +75,6 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
   const [adaUlekirjutatavad, setAdaUlekirjutatavad] = useState<
     Array<{ vali: AdaVormiVali; adaVaartus: string }>
   >([]);
-  // Pealkiri on masintõlgitud (ADA `title_suggestion`) — kaob esimesel puudutusel.
-  const [titleOnMachineTranslated, setTitleOnMachineTranslated] = useState(false);
 
   const handleAdaFetch = async () => {
     setAdaError('');
@@ -84,18 +82,16 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
     try {
       const tulemus = await adaLookup(adaHandle.trim(), authToken);
       setAdaResult(tulemus);
-      // title_suggestion (kui olemas) on Gemini masintõlge ja eelistatakse
-      // originaalpealkirjale — aga see PEAB jääma nähtavalt märgituks.
-      const adaOnMasinTolge = Boolean(tulemus.title_suggestion);
+      // Pealkiri on ADA oma; ingliskeelne masintõlge läheb `title_en`-i
+      // (ADR 0064, buildAdaCreateExtras) ja on nähtav allpool märgistatult.
       const adaValjad: Partial<Record<AdaVormiVali, string>> = {
-        title: tulemus.title_suggestion || tulemus.meta.title,
+        title: tulemus.meta.title,
         year: tulemus.meta.year,
       };
       const praegune: Partial<Record<AdaVormiVali, string>> = { title, year };
       const { vaartused, ulekirjutatavad } = mergeAdaIntoForm(praegune, adaValjad);
       if (vaartused.title !== title) {
         setTitle(vaartused.title);
-        setTitleOnMachineTranslated(adaOnMasinTolge);
       }
       if (vaartused.year !== year) {
         setYear(vaartused.year);
@@ -114,9 +110,6 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
     if (!kirje) return;
     if (vali === 'title') {
       setTitle(kirje.adaVaartus);
-      setTitleOnMachineTranslated(
-        Boolean(adaResult?.title_suggestion) && kirje.adaVaartus === adaResult?.title_suggestion,
-      );
     } else if (vali === 'year') {
       setYear(kirje.adaVaartus);
     }
@@ -181,19 +174,14 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
           <input
             type="text"
             value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              // Esimene puudutus kustutab masintõlke-märke — see on nüüd
-              // admini enda kinnitatud tekst.
-              if (titleOnMachineTranslated) setTitleOnMachineTranslated(false);
-            }}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder={t('step1.titlePlaceholder')}
-            className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-              titleOnMachineTranslated ? 'bg-amber-50 border-amber-300' : 'border-gray-300'
-            }`}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
-          {titleOnMachineTranslated && (
-            <p className="text-xs text-amber-700 mt-1">{t('ada.machineTranslation')}</p>
+          {adaResult?.title_en_suggestion && (
+            <p className="text-xs text-amber-700 mt-1">
+              {t('ada.titleEnSuggestion', { title: adaResult.title_en_suggestion })}
+            </p>
           )}
         </div>
 

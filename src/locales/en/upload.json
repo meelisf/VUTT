@@ -191,7 +191,7 @@
       "2": "year only",
       "3": "undated"
     },
-    "machineTranslation": "machine translation, please check",
+    "titleEnSuggestion": "English title (machine translation, check in metadata): {{title}}",
     "takeAda": "use ADA's value",
     "downloading": "Downloading from ADA",
     "downloadProgress": "{{done}}/{{total}} files · {{mbDone}}/{{mbTotal}} MB",
