@@ -19,6 +19,11 @@ Funktsioon on idempotentne: (1) `<m>` tõstetakse rea välimiseks tägiks,
 (2) tühjad paaris-tagid eemaldatakse (`m, i, b, cs, hi`; EI puututa
 `ann\d*`, `fn`, `pb`).
 
+**Täiendus 2026-10-06:** (3) ploki-rea servatühik eemaldatakse (`<m> <i>x</i></m>`
+→ `<m><i>x</i></m>`, ka inline-tägide vahel ja `</m>` ees). Vana süntaksi teisendus
+jättis selle ~3 255 reale, trükimudel õppis ja kirjutas edasi. Rea-keskset inline-`<m>`-i
+ja rea taanet `<m>` ees see ei puuduta. Korpus migreeriti `migrate_marginalia_normalize.py`-ga.
+
 ## Tagajärjed
 
 - Redaktoris VÕIB ajutiselt olla „räpane" markup — see on normaalne;

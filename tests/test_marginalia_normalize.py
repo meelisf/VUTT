@@ -160,3 +160,44 @@ def test_normalize_strip_ka_ilma_m_ta():
 
 def test_normalize_tuhi_marginaalia_real():
     assert norm('enne\n<m></m>\npärast') == 'enne\n\npärast'
+
+
+# --- Tühik ploki serval (2026-10-06) ---
+# Vana süntaksi teisendus jättis `<m> <i>…` (3 255 rida), trükimudel õppis selle
+# ja kirjutab iga marginaaliagrupi esimese rea tühikuga. Ploki-rea servatühik
+# ei kanna sisu — renderduses on see nähtav taane kaardi alguses.
+
+def test_tuhik_m_jarel_eemaldatakse():
+    assert norm('<m> <i>Prop. 4.</i></m>') == '<m><i>Prop. 4.</i></m>'
+    assert norm('<m> 2.</m>') == '<m>2.</m>'
+
+
+def test_tuhik_inline_avatagi_jarel_eemaldatakse():
+    assert norm('<m><i> Typus.</i></m>') == '<m><i>Typus.</i></m>'
+
+
+def test_tuhik_ploki_lopus_eemaldatakse():
+    assert norm('<m><i>Typus.</i> </m>') == '<m><i>Typus.</i></m>'
+    assert norm('<m><i>Typus. </i></m>') == '<m><i>Typus.</i></m>'
+
+
+def test_tuhik_ja_ristuv_tag_koos():
+    assert norm('<i><m> Ratio 3.</i></m>') == '<m><i>Ratio 3.</i></m>'
+
+
+def test_sisemine_tuhik_jaab():
+    assert norm('<m><i>Prop.</i> <i>4.</i></m>') == '<m><i>Prop.</i> <i>4.</i></m>'
+
+
+def test_tuhik_ainult_ploki_reale_mitte_inline_m_ile():
+    # Rea keskel olev <m> ei ole plokk — tühik selle sees jääb
+    txt = 'tekst <m> inline</m> jätkub'
+    assert norm(txt) == txt
+
+
+def test_rea_taane_m_ees_jaab():
+    assert norm('  <m> <i>x</i></m>') == '  <m><i>x</i></m>'
+
+
+def test_ainult_tuhikuga_plokk_kaob():
+    assert norm('<m> </m>') == ''
