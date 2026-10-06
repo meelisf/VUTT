@@ -37,13 +37,22 @@ _LINE_RE = re.compile(
 )
 
 
+# Ploki-rea servatühik: <m> järel / </m> ees, ka inline-tägide vahel
+# (`<m> <i>x`, `<m><i> x`, `x </i></m>`). Sisu ei kanna, renderduses on taane.
+_EDGE_WS_START_RE = re.compile(r'^((?:<' + _INLINE + r'>)*)\s+')
+_EDGE_WS_END_RE = re.compile(r'\s+((?:</' + _INLINE + r'>)*)$')
+
+
 def _normalize_line(line: str) -> str:
     m = _LINE_RE.match(line)
     if not m:
         return line
     ws1, lead_opens, middle, trail_closes, ws2 = m.groups()
     # <m> välimiseks: avatägid liiguvad <m> SISSE (algusesse), sulgtägid </m> SISSE (lõppu)
-    return f'{ws1}<m>{lead_opens}{middle}{trail_closes}</m>{ws2}'
+    inner = f'{lead_opens}{middle}{trail_closes}'
+    inner = _EDGE_WS_START_RE.sub(r'\1', inner)
+    inner = _EDGE_WS_END_RE.sub(r'\1', inner)
+    return f'{ws1}<m>{inner}</m>{ws2}'
 
 
 # Tühje paaris-tage koristatakse komplektist (m + inline). EI sisalda 'ann\d*'
@@ -76,8 +85,9 @@ def strip_empty_tags(text: str) -> str:
 
 
 def normalize_marginalia_tags(text: str) -> str:
-    """Teeb `<m>` välimiseks tägiks igal real, mis on tervikuna marginaalia, ja
-    koristab tühjad tagid (`strip_empty_tags`).
+    """Teeb `<m>` välimiseks tägiks igal real, mis on tervikuna marginaalia,
+    eemaldab sellise rea servatühiku (`<m> <i>x</i></m>` → `<m><i>x</i></m>`)
+    ja koristab tühjad tagid (`strip_empty_tags`).
 
     Idempotentne. Puutumata jäävad: puhtad plokid, rea-kesksed inline-`<m>`,
     mitmerealised plokid (kus `<m>`/`</m>` on eri ridadel), tavaline tekst.
