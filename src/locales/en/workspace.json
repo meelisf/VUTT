@@ -439,6 +439,10 @@
     "saveSuccess": "Saved",
     "saveError": "Error",
     "creators": "Creators",
+    "roleHints": {
+      "gratulator": "Wrote an accompanying text in the work: a gratulation, funeral poem, etc. Not a dedicator.",
+      "dedicator": "Wrote the dedication of the work (e.g. to the king). May be the author too — then two entries: author and dedicator."
+    },
     "roles": {
       "praeses": "Praeses",
       "respondens": "Respondent",

@@ -23,7 +23,12 @@ järjekorras ning lehetoimingud (järjestus, poolitus, kustutus) nihutavad seda.
   üht õiget liiki. `prose` katab vormilt proosatekstid (eessõna, järelsõna, tellitud
   tutvustus või hinnang, proosas pühendus). Teose tasandi rolli `gratulator` kood jääb
   (seoste reeglid ja Meili sõltuvad sellest), silt on „Kaasteksti autor", sest ta
-  kehtib ka leinatrükistes. Mainitud isikud tulevad lehekülje
+  kehtib ka leinatrükistes. **`dedicator` ≠ `gratulator`** (täiendus 2026-10-06):
+  pühendaja kirjutab teosele pühenduse (võib olla ka autor ise → kaks kannet);
+  kaasteksti autor kirjutab teosesse oma teksti (gratulatsioon, leinaluuletus) —
+  pühenduslik funktsioon ei tee temast pühendajat. Segi läinud 36 kannet neljas
+  leinatrükises parandati (`scripts/migrate_dedicator_to_gratulator.py`); vormis on
+  rolli juures vihje. Mainitud isikud tulevad lehekülje
   märksõnadest, mitte rollist. Lisa viitab teisele osale (`attached_to`).
 - Osi muudetakse **ainult** `/works/{id}/parts` otspunktidega (`server/work_parts.py`).
   Lugemine, muutmine ja kirjutamine käivad `metadata_lock`-i all (`bulk_update_works`)

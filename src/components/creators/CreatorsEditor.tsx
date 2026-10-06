@@ -78,6 +78,10 @@ function CreatorsEditor<C extends CreatorLike>({
                   token={token ?? undefined}
                   personContext={workId ? { work_id: workId, role: creator.role } : undefined}
                 />
+                {/* Pühendaja vs kaasteksti autor läksid segi (leinatrükised) — vihje rolli juures */}
+                {t(`metadata.roleHints.${creator.role}`, { defaultValue: '' }) && (
+                  <p className="mt-1 text-xs text-gray-500">{t(`metadata.roleHints.${creator.role}`, { defaultValue: '' })}</p>
+                )}
                 {canLink && unlinked(creator) && (
                   <button type="button" onClick={() => setLinking(i)}
                     className="mt-1 inline-flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800 hover:underline">

@@ -439,6 +439,10 @@
     "saveSuccess": "Salvestatud",
     "saveError": "Viga",
     "creators": "Isikud",
+    "roleHints": {
+      "gratulator": "Kirjutas teosesse oma kaasteksti: gratulatsiooni, leinaluuletuse vms. Ei ole pühendaja.",
+      "dedicator": "Kirjutas teosele pühenduse (nt kuningale). Võib olla ka autor ise — siis kaks kannet: autor ja pühendaja."
+    },
     "roles": {
       "praeses": "Eesistuja",
       "respondens": "Respondens",
