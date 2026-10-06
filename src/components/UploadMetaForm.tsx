@@ -23,6 +23,7 @@ import { cleanCreators, cleanTags, cleanEsterId, cleanArchiveRefs } from '../uti
 import ArchiveSelect from './ArchiveSelect';
 import CreatorsEditor from './creators/CreatorsEditor';
 import { vocabularyRoleOptions } from './creators/roleOptions';
+import TitleVariantsFields from './TitleVariantsFields';
 
 interface UploadMetaFormProps {
   uploadId: string;
@@ -314,41 +315,13 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         </div>
 
         {/* Pealkirja tõlge, originaal ja tekkeviis (ADR 0064) */}
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-            {t('workspace:metadata.titleEn')}
-          </label>
-          <textarea
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
-            rows={2}
-            value={form.title_en}
-            onChange={(e) => setForm({ ...form, title_en: e.target.value })}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-            {t('workspace:metadata.titleOriginal')}
-          </label>
-          <textarea
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
-            rows={2}
-            placeholder={t('workspace:metadata.titleOriginalHint')}
-            value={form.title_original}
-            onChange={(e) => setForm({ ...form, title_original: e.target.value })}
-          />
-        </div>
-        <label className="flex items-start gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={form.title_devised}
-            onChange={(e) => setForm({ ...form, title_devised: e.target.checked })}
-          />
-          <span>
-            {t('workspace:metadata.titleDevised')}
-            <span className="block text-xs text-gray-500">{t('workspace:metadata.titleDevisedHint')}</span>
-          </span>
-        </label>
+        <TitleVariantsFields
+          titleEn={form.title_en}
+          titleOriginal={form.title_original}
+          titleDevised={form.title_devised}
+          onChange={patch => setForm(prev => ({ ...prev, ...patch }))}
+          textareaClassName="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
+        />
 
         {/* Isikud (creators) */}
         <CreatorsEditor

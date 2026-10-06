@@ -410,6 +410,7 @@
     "titleDevised": "Koostatud pealkiri",
     "titleDevisedHint": "Pealkiri on kataloogija sõnastatud, mitte allikast maha kirjutatud. Ingliskeelne liides näitab siis ingliskeelset pealkirja.",
     "titleOriginalHint": "Allikas endas olev pealkiri, kui see ei ole põhipealkiri",
+    "titleVariantsAdd": "Tõlge / originaalpealkiri",
     "titleSlashWarning": "„ / \" pealkirjas: tõlge kuulub ingliskeelse pealkirja lahtrisse.",
     "author": "Autor",
     "respondens": "Respondens",
