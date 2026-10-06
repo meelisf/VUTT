@@ -20,6 +20,7 @@ import ArchiveSelect from './ArchiveSelect';
 import { useDraggablePosition } from '../hooks/useDraggablePosition';
 import CreatorsEditor from './creators/CreatorsEditor';
 import { vocabularyRoleOptions } from './creators/roleOptions';
+import TitleVariantsFields from './TitleVariantsFields';
 
 interface MetadataModalProps {
   isOpen: boolean;
@@ -503,37 +504,13 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           </div>
 
           {/* Pealkirja tõlge, originaal ja tekkeviis (ADR 0064) */}
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('metadata.titleEn')}</label>
-            <textarea
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-              rows={2}
-              value={metaForm.title_en}
-              onChange={e => setMetaForm({ ...metaForm, title_en: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('metadata.titleOriginal')}</label>
-            <textarea
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-              rows={2}
-              placeholder={t('metadata.titleOriginalHint')}
-              value={metaForm.title_original}
-              onChange={e => setMetaForm({ ...metaForm, title_original: e.target.value })}
-            />
-          </div>
-          <label className="flex items-start gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={metaForm.title_devised}
-              onChange={e => setMetaForm({ ...metaForm, title_devised: e.target.checked })}
-            />
-            <span>
-              {t('metadata.titleDevised')}
-              <span className="block text-xs text-gray-500">{t('metadata.titleDevisedHint')}</span>
-            </span>
-          </label>
+          <TitleVariantsFields
+            titleEn={metaForm.title_en}
+            titleOriginal={metaForm.title_original}
+            titleDevised={metaForm.title_devised}
+            onChange={patch => setMetaForm(prev => ({ ...prev, ...patch }))}
+            textareaClassName="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+          />
 
           {/* Grupp 1: Isikud (creators) */}
           <CreatorsEditor
