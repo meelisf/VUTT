@@ -1,7 +1,7 @@
 # ADR 0062 — Lühendusmärk on makron, mitte tilde
 
 **Kuupäev:** 2026-10-04
-**Staatus:** ettepanek (teostus: #533)
+**Staatus:** kehtib (teostus: #533, valmis 2026-10-06; jääk: #558)
 
 ## Kontekst
 
@@ -56,3 +56,12 @@ Järjekord: (a) sisestus, (b) OCR-väljundi järeltöötlus kuni uue mudelini,
   (ainult valvuriga keeltes). `languages` loetleb sisuliselt esinevad keeled
   (ADR 0019), seega ühe eestikeelse lehega teos läheb tervikuna aruandesse —
   see on teadlikult ettevaatlik.
+
+## Teostus (2026-10-06)
+
+Kõik viis sammu tootmises: sisestus (PR #534, #536, #537), teisendusfunktsioon
+`server/macron.py` (PR #534), OCR-väljundi järeltöötlus (PR #539), treeningandmed
+ja trükimudel 20261006 (LOSS), korpuse migratsioon (PR #557,
+`scripts/migrate_macron_corpus.py`): 1040 teost, 6467 lehte, üks commit teose kohta.
+Meili ignoreerib tildet ja makronit ühtmoodi — otsing ei muutunud (kontrollitud).
+Jääk: 0cxkz3 (OCR-kordusloop, uus OCR) ja neli eesti keelega teost käsitsi (#558).
