@@ -10,6 +10,7 @@ import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { useUser } from '../../contexts/UserContext';
 import { getLabel } from '../../utils/metadataUtils';
 import { getLangCode } from '../../utils/getLangCode';
+import { workDisplayTitle } from '../../utils/workTitle';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
@@ -420,7 +421,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                         <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex justify-between items-start gap-4">
                                             <div className="flex-1 min-w-0">
                                                 <h2 className="text-lg font-bold text-gray-900 mb-1 leading-snug">
-                                                    {firstHit.title || t('status.titleMissing')}
+                                                    {(firstHit.title && workDisplayTitle(firstHit, lang).main) || t('status.titleMissing')}
                                                 </h2>
                                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
                                                     {/* Autor */}

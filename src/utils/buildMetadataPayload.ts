@@ -5,6 +5,10 @@ import { deriveYearFields } from './yearDisplayUtils';
 
 export interface MetadataFormData {
   title: string;
+  // Pealkirja lisaväljad (ADR 0064). Puuduv = vorm neid ei näita → ära puutu.
+  title_en?: string;
+  title_original?: string;
+  title_devised?: boolean;
   dating?: WorkDating | null;
   yearInput: string;          // Üks tekstilahter: puhas aasta, ca., vahemik või sajand (vt deriveYearFields)
   type: string | LinkedEntity | null;
@@ -32,6 +36,9 @@ export interface MetadataPayload {
   work_id: string;
   metadata: {
     title: string;
+    title_en?: string | null;
+    title_original?: string | null;
+    title_devised?: boolean;
     year: number;
     year_display: string | null;
     dating?: WorkDating | null;
@@ -107,6 +114,9 @@ export function buildMetadataPayload(
     work_id: workId,
     metadata: {
       title: form.title,
+      ...(form.title_en !== undefined ? { title_en: form.title_en.trim() || null } : {}),
+      ...(form.title_original !== undefined ? { title_original: form.title_original.trim() || null } : {}),
+      ...(form.title_devised !== undefined ? { title_devised: form.title_devised } : {}),
       year,
       year_display: year_display || null,
       ...(form.dating !== undefined ? { dating: form.dating } : {}),

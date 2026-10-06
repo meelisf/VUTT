@@ -10,6 +10,8 @@ Väljanimede ORTOGRAAFIA on legacy ('y'-kuju: lehekylje_tekst) — vt ADR 0006.
 
 SEARCHABLE_ATTRIBUTES = [
     "title",
+    "title_en",        # ADR 0064 — ka dashboardi attributesToSearchOn-is
+    "title_original",
     "authors_text",
     "year",
     "location_search",

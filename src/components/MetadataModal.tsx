@@ -35,6 +35,9 @@ interface MetadataModalProps {
 
 interface MetadataForm {
   title: string;
+  title_en: string;           // ADR 0064
+  title_original: string;
+  title_devised: boolean;
   dating?: WorkDating | null;
   yearInput: string;                  // Üks tekstilahter: 1680 | ca. 1680 | 1670–1690 | 17. saj (vt deriveYearFields)
   type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
@@ -195,6 +198,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const [metaForm, setMetaForm] = useState<MetadataForm>({
     title: '',
+    title_en: '',
+    title_original: '',
+    title_devised: false,
     yearInput: '',
     type: null,
     genre: [],
@@ -256,6 +262,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     existingYearRef.current = { year: initYear, year_display: initYearDisplay };
     setMetaForm({
       title: work?.title || page.title || '',
+      title_en: work?.title_en ?? page.title_en ?? '',
+      title_original: work?.title_original ?? page.title_original ?? '',
+      title_devised: (work?.title_devised ?? page.title_devised) === true,
       yearInput: initYearInput,
       dating: work?.dating ?? page.dating ?? null,
       type: work?.type || page.type || null,
@@ -363,6 +372,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
         setMetaForm({
           title: title,
+          title_en: m.title_en || '',
+          title_original: m.title_original || '',
+          title_devised: m.title_devised === true,
           yearInput: m.year_display || (year ? String(year) : ''),
           dating: m.dating ?? null,
           type: m.type || null,
@@ -410,6 +422,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         const { metadata: m } = payload;
         const successData = {
           title: m.title,
+          title_en: m.title_en ?? undefined,
+          title_original: m.title_original ?? undefined,
+          title_devised: m.title_devised === true,
           year: m.year,
           year_display: m.year_display,
           dating: m.dating,
@@ -482,7 +497,43 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               value={metaForm.title}
               onChange={e => setMetaForm({ ...metaForm, title: e.target.value })}
             />
+            {metaForm.title.includes(' / ') && (
+              <p className="text-xs text-amber-700 mt-1">{t('metadata.titleSlashWarning')}</p>
+            )}
           </div>
+
+          {/* Pealkirja tõlge, originaal ja tekkeviis (ADR 0064) */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('metadata.titleEn')}</label>
+            <textarea
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+              rows={2}
+              value={metaForm.title_en}
+              onChange={e => setMetaForm({ ...metaForm, title_en: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('metadata.titleOriginal')}</label>
+            <textarea
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+              rows={2}
+              placeholder={t('metadata.titleOriginalHint')}
+              value={metaForm.title_original}
+              onChange={e => setMetaForm({ ...metaForm, title_original: e.target.value })}
+            />
+          </div>
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={metaForm.title_devised}
+              onChange={e => setMetaForm({ ...metaForm, title_devised: e.target.checked })}
+            />
+            <span>
+              {t('metadata.titleDevised')}
+              <span className="block text-xs text-gray-500">{t('metadata.titleDevisedHint')}</span>
+            </span>
+          </label>
 
           {/* Grupp 1: Isikud (creators) */}
           <CreatorsEditor

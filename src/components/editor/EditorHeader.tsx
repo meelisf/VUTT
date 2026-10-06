@@ -2,6 +2,8 @@ import { Loader2, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Work } from '../../types';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
+import { workDisplayTitle } from '../../utils/workTitle';
+import { getLangCode } from '../../utils/getLangCode';
 import { ErrorBanner } from '../ErrorBanner';
 import type { EditorTab } from './types';
 
@@ -31,7 +33,7 @@ export default function EditorHeader({
   onSave,
   onClearSaveError,
 }: EditorHeaderProps) {
-  const { t } = useTranslation(['workspace', 'common']);
+  const { t, i18n } = useTranslation(['workspace', 'common']);
 
   return (
     <div className="bg-white border-b border-gray-200 shrink-0 z-20 shadow-sm">
@@ -41,7 +43,7 @@ export default function EditorHeader({
           <span className="text-gray-300">•</span>
           <span className="text-gray-400 min-w-0 max-w-[50%] leading-snug">{formatYearDisplay(work.year_display, work.year, t, work.dating)}</span>
           <span className="text-gray-300">•</span>
-          <span className="italic truncate flex-1">{work.title}</span>
+          <span className="italic truncate flex-1">{workDisplayTitle(work, getLangCode(i18n.language)).main}</span>
         </div>
       )}
 

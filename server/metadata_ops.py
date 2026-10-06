@@ -19,6 +19,7 @@ from .prosopography.indices import update_person_to_works, update_work_collectio
 from .prosopography.work_relations_ops import update_work_facts
 from .prosopography.person_crud import ensure_prosopo_stubs
 from .save_diff import metadata_unchanged
+from .meili_doc import TITLE_TEXT_FIELDS
 
 logger = get_logger(__name__)
 
@@ -27,6 +28,8 @@ ALLOWED_METADATA_FIELDS = {
     "title", "year", "year_display", "dating", "location", "publisher", "creators", "tags", "notes",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
     "series", "relations", "archive_refs", "shareable",
+    # Pealkirja tõlge, originaal ja tekkeviis (ADR 0064).
+    *TITLE_TEXT_FIELDS, "title_devised",
     # Osad (#464): muudetakse AINULT work_parts otspunktidega; üldine route lükkab tagasi.
     "parts",
 }
@@ -53,6 +56,24 @@ def clean_archive_refs(value):
             clean['url'] = url
         result.append(clean)
     return result if result else None
+
+def normalize_title_fields(meta: dict) -> None:
+    """Tühi pealkirja lisaväli ja `title_devised: false` eemaldatakse võtmena.
+
+    Puudumine = tühi / `false` (ADR 0064). Nii ei lisa iga vormisalvestus teosele
+    `null`-võtmeid ja muutusteta salvestus jääb no-op'iks (ADR 0012).
+    """
+    for field in TITLE_TEXT_FIELDS:
+        value = meta.get(field)
+        value = value.strip() if isinstance(value, str) else ""
+        if value:
+            meta[field] = value
+        else:
+            meta.pop(field, None)
+    if meta.get("title_devised") is True:
+        return
+    meta.pop("title_devised", None)
+
 
 # Vanad v1 väljad mis eemaldatakse kui leitakse
 _V1_FIELDS = ["pealkiri", "aasta", "koht", "trükkal", "autor", "respondens"]
@@ -130,6 +151,7 @@ def bulk_update_works(
                 updates = dating_updates(transform(meta))
                 clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
                 meta.update(clean)
+                normalize_title_fields(meta)
                 for field in _V1_FIELDS:
                     meta.pop(field, None)
             except Exception as e:
@@ -266,6 +288,7 @@ def save_work_metadata(
         previous = copy.deepcopy(meta)
         clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
         meta.update(clean)
+        normalize_title_fields(meta)
 
         for field in _V1_FIELDS:
             meta.pop(field, None)

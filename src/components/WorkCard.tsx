@@ -13,6 +13,7 @@ import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { parseYearDisplayRange, formatYearDisplay } from '../utils/yearDisplayUtils';
+import { workDisplayTitle } from '../utils/workTitle';
 
 interface WorkCardProps {
   work: Work;
@@ -40,6 +41,9 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
     thumbnailTokenTriedRef.current = false;
   }, [work.thumbnail_url]);
 
+  // Pealkiri liidese keeles (ADR 0064): koostatud pealkirja tõlge põhireale
+  const displayTitle = workDisplayTitle(work, getLangCode(i18n.language));
+
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
 
@@ -60,7 +64,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   const handleCopyInfo = (e: React.MouseEvent) => {
     e.stopPropagation();
     const lang = getLangCode(i18n.language) as 'et' | 'en';
-    const parts: string[] = [work.title];
+    const parts: string[] = [displayTitle.main];
     if (work.creators && work.creators.length > 0) {
       parts.push(work.creators.map(c => c.name).join(', '));
     }
@@ -237,7 +241,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
         )}
         <img
           src={thumbnailSrc}
-          alt={work.title}
+          alt={displayTitle.main}
           loading={isPriority ? 'eager' : 'lazy'}
           fetchPriority={isPriority ? 'high' : 'auto'}
           onError={handleThumbnailError}
@@ -333,9 +337,14 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             onClick={handleOpenWorkspace}
             className="hover:text-primary-600 transition-colors cursor-pointer"
           >
-            {work.title}
+            {displayTitle.main}
           </a>
         </h3>
+        {displayTitle.secondary && (
+          <p className="text-sm italic text-gray-500 leading-snug line-clamp-1 mb-1" title={displayTitle.secondary}>
+            {displayTitle.secondary}
+          </p>
+        )}
 
         <div className="mt-2 space-y-2 text-sm text-gray-600 flex-1">
           {renderAuthors()}
@@ -440,7 +449,10 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             onTouchStart={(e) => { e.stopPropagation(); setInfoVisible(false); }}
           >
             {/* Pealkiri */}
-            <p className="font-semibold text-[13px] text-white leading-[1.2]">{work.title}</p>
+            <p className="font-semibold text-[13px] text-white leading-[1.2]">{displayTitle.main}</p>
+            {displayTitle.secondary && (
+              <p className="text-[12px] italic text-white/80 leading-[1.2]">{displayTitle.secondary}</p>
+            )}
 
             {/* Isikud */}
             {work.creators && work.creators.length > 0 && (

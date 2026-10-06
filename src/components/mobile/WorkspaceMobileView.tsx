@@ -17,6 +17,7 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
 import { getLangCode } from '../../utils/getLangCode';
+import { workDisplayTitle } from '../../utils/workTitle';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import SafeHtml from '../SafeHtml';
 import WorkPartsPanel from '../editor/WorkPartsPanel';
@@ -315,7 +316,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                     {/* Pealkiri */}
                     <div>
                       <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.workTitle')}</span>
-                      <p className="text-gray-900 font-medium">{work.title}</p>
+                      <p className="text-gray-900 font-medium">{workDisplayTitle(work, lang).main}</p>
                     </div>
 
                     {/* Isikud */}
