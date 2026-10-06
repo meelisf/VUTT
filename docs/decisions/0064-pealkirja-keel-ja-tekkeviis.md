@@ -32,12 +32,26 @@ Kolm probleemi:
 ## Otsus
 
 1. **`title`** jääb põhipealkirjaks oma keeles — otsing, sortimine, Meili
-   `title`. Väljanimi ei muutu, täisreindeksit pole vaja (ADR 0006).
+   `title`. Väljanimi ei muutu (ADR 0006); täisreindeks on vaja ainult uute
+   väljade pärast (punkt 6), mitte ümbernimetuse.
 2. **`title_devised: true`** — pealkiri on koostatud, mitte transkribeeritud.
    Puudumine = `false`. Kuvamisotsus tuleneb sellest lipust, **MITTE `type`-ist**.
 3. **`title_en`** (hiljem vajadusel `title_de` jne) — pealkirja tõlge, keel
    väljanimes nagu ADR 0039/0063. Uus keel = uus väli; kuvamisreegel ei muutu.
-4. **Kuvamine** käib ühe abilise kaudu (`workDisplayTitle(work, lang)`), mitte
+4. **`title_original`** — allikast transkribeeritud pealkiri, kui see erineb
+   `title`-ist (käsikiri, mille enda pealkiri ei ole põhipealkiri). `title` EI
+   tähenda „originaal": enamikul käsikirjadel (kirjad, aruanded, dokumendikogud)
+   oma pealkirja pole, ja kui `title` kannaks kord originaali, kord koostatut,
+   oleks sortimise ja Meili `title`-i tähendus kõikuv. Näide `0ajcsn`:
+
+   | väli | väärtus |
+   |---|---|
+   | `title` | Tartu Ülikooli (Academia Gustaviana) senati protokollid : kontseptid |
+   | `title_en` | Minutes of the Senate of Tartu Ülikool (Academia Gustaviana) : drafts |
+   | `title_original` | Protocollum Sub Rectore Magnifico Andreae Virginio D. D. Theol. |
+   | `title_devised` | `true` |
+
+5. **Kuvamine** käib ühe abilise kaudu (`workDisplayTitle(work, lang)`), mitte
    igas komponendis eraldi:
 
    | | liidese keele tõlge olemas | tõlget pole |
@@ -45,20 +59,27 @@ Kolm probleemi:
    | koostatud | põhireal tõlge; teose lehel originaal väiksemalt all | `title` |
    | transkribeeritud | põhireal `title`; tõlge teise reana | `title` |
 
-5. **Otsing:** `title_*` väljad lähevad `meili_doc.py`-sse ja otsitavate väljade
-   hulka (`meili_settings.py`) — ingliskeelne päring leiab ingliskeelse pealkirja.
-6. **Migratsioon:** 24 ` / `-ga kirjet jagatakse **käsitsi kinnitatud nimekirja**
+   Koostatud pealkirjaga teose kaardil on `title_original` teine rida. Põhjus,
+   miks koostatud pealkiri on ees: lugeja otsib dashboardilt, MIS dokument see
+   on; samasarjalised originaalpealkirjad („Protocollum Sub Rectore …") ei erista
+   teoseid. Sama on arhiivikirjelduse tava (koostatud pealkiri põhiline,
+   originaal märkuses). Teose lehel on näha kõik väljad.
+
+6. **Otsing:** `title_en` ja `title_original` (ja iga hilisem `title_*`) lähevad
+   `meili_doc.py`-sse — igas dokumendis olemas, vajadusel tühja stringina —,
+   `SEARCHABLE_ATTRIBUTES`-isse (`meili_settings.py`) JA dashboardi
+   `attributesToSearchOn`-i (`searchService.ts`). Ainult indeksisse lisamine ei
+   piisa: dashboard otsib selgesõnalise väljaloendi järgi. Rakendub täisreindeksiga.
+7. **Migratsioon:** 24 ` / `-ga kirjet jagatakse **käsitsi kinnitatud nimekirja**
    järgi, mitte regexiga (vt punkt 2 kontekstis). Kõigile käsikirjadele, mille
    pealkiri on deskriptiivne, seatakse `title_devised: true` sama nimekirja alusel.
-
-Teadlikult EI tehta praegu: eraldi `title_original` välja (käsikirja enda
-pealkiri, nt *Protocollum Senatus*). Tühi väli segaks vormi; lisamine hiljem ei
-murra midagi.
 
 ## Tagajärjed
 
 - Uus pealkirja kuvamiskoht kasutab `workDisplayTitle`-it — paljas `work.title`
   näitaks ingliskeelsele lugejale eestikeelset deskriptiivset pealkirja.
+- Uus pealkirjaväli = `meili_doc.py` + `SEARCHABLE_ATTRIBUTES` + dashboardi
+  `attributesToSearchOn`; puudub üks, ei leia dashboard teda.
 - ` / ` pealkirja sees ei ole enam lubatud keelte eraldajana; vorm võiks selle
   peale hoiatada.
 - ADA import (`server/ada/mapping.py`) võtab praegu ainult `[et]` `dc.title`-i;
