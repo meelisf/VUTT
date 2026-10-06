@@ -526,3 +526,17 @@ def test_otsingutulemus_margib_lehe_millel_on_markusi():
 def test_otsingutulemus_ei_marki_markusteta_lehte():
     out = fmt.format_search_hits([HIT], total=1, base_url=BASE)
     assert "märkusi" not in out
+
+
+def test_mitme_tukiga_ankur_kommentaar_ainult_viimase_tuki_juures():
+    """Mitmerealine marginaaliakaart kannab sama ID-ga ankrut igal real
+    (`annotationSegments`); kommentaar on üks ja ei tohi korduda."""
+    out = fmt.format_pages(
+        [_lk(lehekylje_tekst_ann="<ann2>Jocoſer:</ann2>\n<ann2>[---]76.</ann2> laniaſſe",
+             text_annotations=[ANN])],
+        base_url=BASE, work_id="7r0ic2",
+    )
+    assert out.count("toimetaja:") == 1
+    assert "⟦Jocoſer:⟧" in out
+    assert "[---]76. ← toimetaja: kahtlane!" in out
+    assert "ann2" not in out

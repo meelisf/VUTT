@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { EditorView } from '@codemirror/view';
 import { Transaction } from '@codemirror/state';
 import type { TextAnnotation } from '../../types';
-import { containsAnnTag, nextAnnId } from '../../utils/annUtils';
+import { annotationSegments, containsAnnTag, nextAnnId } from '../../utils/annUtils';
 
 interface UseTextAnnotationActionsParams {
   viewRef: MutableRefObject<EditorView | null>;
@@ -31,7 +31,7 @@ export function useTextAnnotationActions({
   const [annPopoverEditText, setAnnPopoverEditText] = useState('');
   const [annPopoverPendingDelete, setAnnPopoverPendingDelete] = useState(false);
   const [annDialogError, setAnnDialogError] = useState('');
-  const [pendingAnnSelection, setPendingAnnSelection] = useState<{ from: number; to: number; text: string } | null>(null);
+  const [pendingAnnSelection, setPendingAnnSelection] = useState<{ segments: { from: number; to: number }[]; text: string } | null>(null);
 
   const closePopover = useCallback(() => {
     setAnnPopover(null);
@@ -42,17 +42,27 @@ export function useTextAnnotationActions({
   const handleAnnotateSelection = useCallback(() => {
     const view = viewRef.current;
     if (!view) return;
-    const { from, to } = view.state.selection.main;
-    if (from === to) return;
+    const sel = view.state.selection.main;
+    if (sel.from === sel.to) return;
     const docText = view.state.doc.toString();
-    if (containsAnnTag(docText, from, to)) {
+    // Ankur kitsendatakse tasakaalus lõiguks: `</annN>` peab jääma `</m>` ette,
+    // muidu ristub ta marginaaliaplokiga (`<m><ann1>x</m>\n</ann1>`).
+    // Mitmerealine marginaaliakaart saab tüki igale reale (sama ID).
+    const segments = annotationSegments(docText, sel.from, sel.to);
+    if (!segments) {
+      setAnnDialogError(t('editor.annotateCrossesTagError', 'Valik ületab märgendi või marginaaliaploki piiri — vali tekst ühe ploki sees'));
+      setAnnDialogOpen(true);
+      setPendingAnnSelection(null);
+      return;
+    }
+    if (segments.some(({ from, to }) => containsAnnTag(docText, from, to))) {
       setAnnDialogError(t('editor.annotateOverlapError', 'Valitud tekst sisaldab juba annotatsiooni'));
       setAnnDialogOpen(true);
       setPendingAnnSelection(null);
       return;
     }
-    const text = docText.slice(from, to);
-    setPendingAnnSelection({ from, to, text });
+    const text = segments.map(({ from, to }) => docText.slice(from, to)).join(' ');
+    setPendingAnnSelection({ segments, text });
     setAnnDialogComment('');
     setAnnDialogError('');
     setAnnDialogOpen(true);
@@ -93,12 +103,14 @@ export function useTextAnnotationActions({
     const view = viewRef.current;
     if (!view || !pendingAnnSelection || readOnly) return;
     const annId = nextAnnId(textAnnotations);
-    const { from, to, text } = pendingAnnSelection;
     const openTag = `<ann${annId}>`;
     const closeTag = `</ann${annId}>`;
 
     view.dispatch({
-      changes: { from, to, insert: openTag + text + closeTag },
+      changes: pendingAnnSelection.segments.flatMap(({ from, to }) => [
+        { from, insert: openTag },
+        { from: to, insert: closeTag },
+      ]),
       annotations: [Transaction.userEvent.of('input.format')],
     });
 
@@ -121,14 +133,15 @@ export function useTextAnnotationActions({
     const text = view.state.doc.toString();
     const openTag = `<ann${annId}>`;
     const closeTag = `</ann${annId}>`;
-    const openIdx = text.indexOf(openTag);
-    const closeIdx = text.indexOf(closeTag);
-    if (openIdx === -1 || closeIdx === -1) return;
-    // Eemalda sulgev täg enne avavat (positsioonid ei nihku)
-    const changes = [
-      { from: closeIdx, to: closeIdx + closeTag.length, insert: '' },
-      { from: openIdx, to: openIdx + openTag.length, insert: '' },
-    ].sort((a, b) => b.from - a.from);
+    // Kõik tükid (mitmerealisel marginaaliakaardil on ankur igal real).
+    // Muudatused on algdokumendi koordinaatides — CodeMirror nihutab ise.
+    const changes: { from: number; to: number }[] = [];
+    for (const tag of [openTag, closeTag]) {
+      for (let i = text.indexOf(tag); i !== -1; i = text.indexOf(tag, i + tag.length)) {
+        changes.push({ from: i, to: i + tag.length });
+      }
+    }
+    if (changes.length === 0) return;
     view.dispatch({ changes, annotations: [Transaction.userEvent.of('input.format')] });
   }, [viewRef]);
 

@@ -580,6 +580,7 @@
     "annotateTitle": "Add comment",
     "annotateCommentPlaceholder": "Comment...",
     "annotateOverlapError": "Selection contains an existing annotation — choose non-overlapping text",
+    "annotateCrossesTagError": "Selection crosses a tag or marginalia block boundary — select text within one block",
     "reocr": {
       "button": "Re-transcribe page",
       "hint": "Send the page image to the OCR server and replace the text with a new automatic transcription.",

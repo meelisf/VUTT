@@ -222,8 +222,15 @@ def render_annotated_text(text: str, notes: dict) -> tuple[str, set]:
     Kirjeta ankur (`<ann7>` ilma kirjeta) kaotab tägi ja jätab sisu alles:
     märgend, mille kohta märkust ei ole, oleks mudelile seletamatu müra.
     Indeks filtreerib need juba välja, aga renderdaja ei tohi seda eeldada.
+
+    Mitme tükiga ankur (mitmerealine marginaaliakaart: sama ID igal real)
+    saab kommentaari ainult VIIMASE tüki juurde, varasemad tükid on paljas
+    `⟦sisu⟧` — üks märkus ei tohi mudelile mitu korda paista.
     """
     kasutatud = set()
+    jaanud = {}
+    for m in _ANN_TAG_RE.finditer(text):
+        jaanud[int(m.group(1))] = jaanud.get(int(m.group(1)), 0) + 1
 
     def _asenda(match):
         ann_id = int(match.group(1))
@@ -232,6 +239,9 @@ def render_annotated_text(text: str, notes: dict) -> tuple[str, set]:
         if ann is None:
             return sisu
         kasutatud.add(ann_id)
+        jaanud[ann_id] -= 1
+        if jaanud[ann_id] > 0:
+            return f"{ANN_OPEN}{sisu}{ANN_CLOSE}"
         return f"{ANN_OPEN}{sisu} ← toimetaja: {_ann_label(ann)}{ANN_CLOSE}"
 
     return _ANN_TAG_RE.sub(_asenda, text), kasutatud
