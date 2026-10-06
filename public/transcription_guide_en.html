@@ -7,9 +7,9 @@
     h3 { font-size: 15px; font-weight: 600; margin: 1.25rem 0 0.5rem 0; color: #1f2937; }
     ul { margin: 0; padding-left: 1.25rem; }
     li { margin-bottom: 0.25rem; }
+    p { margin: 0 0 0.5rem 0; }
     code { background: #f3f4f6; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-family: monospace; }
     strong { font-weight: 600; }
-    .warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; color: #92400e; font-size: 13px; }
     .note { background: #f3f4f6; padding: 0.75rem; border-radius: 0.5rem; margin-top: 1.5rem; font-size: 12px; color: #6b7280; }
     table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
     th, td { border: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; }
@@ -18,10 +18,6 @@
   </style>
 </head>
 <body>
-
-<div class="warning">
-  ⚠️ This guide is a working vision. Detailed rules will be agreed upon with the working group.
-</div>
 
 <h3>Hyphenation</h3>
 <table>
@@ -67,6 +63,24 @@
 <ul>
   <li><strong>que</strong> abbreviation (<span class="char">ꝗ</span> etc.) – write as <code>q;</code></li>
   <li><strong>-us</strong> abbreviation (<span class="char">ꝰ</span>) – can be expanded</li>
+</ul>
+
+<h3>Formatting</h3>
+<p>Select the text and press the toolbar button (or shortcut). The same button on already formatted text removes the formatting; the <strong>Clean</strong> button removes all formatting from the selection.</p>
+<ul>
+  <li><strong>Italic</strong> – <strong><em>I</em></strong> button (Ctrl+I). If the <strong>whole page</strong> is in italics, still mark all of the text as italic – do not skip it because italic is the “normal” type on that page.</li>
+  <li><strong>Bold</strong> – <strong>B</strong> button (Ctrl+B). Early modern print practically never uses it – emphasis there is italic and change of typeface. Use it in later texts (e.g. 19th century) where bold type actually occurs.</li>
+  <li><strong>Code-switching</strong> = a change of <strong>typeface</strong> – <strong class="char">𝔉</strong> button (Ctrl+K); the marked text gets a grey background. Mark both a word set in Antiqua within Fraktur text (typically a Latin word in German text) and a word set in Fraktur within Antiqua text. Mark the typeface, not the language: a change of language within the same typeface is not marked. Antiqua italic within Antiqua text is italic, not code-switching.</li>
+  <li><strong>Type size is not marked.</strong> Large type on a title page or in a heading stays unformatted – do not make it bold. Italic and change of typeface are still marked there as elsewhere.</li>
+</ul>
+
+<h3>Marginalia</h3>
+<ul>
+  <li>Type the marginal note into the main text <strong>on its own line</strong>, above the main-text line next to which the note begins on the page. Each line of the note on the page is a separate line in the editor too.</li>
+  <li>Select the lines of the note and press <strong>Marginalia</strong>. The lines disappear from the main text and appear in the margin column beside it (on a narrow screen, as a small badge at the line).</li>
+  <li>With no selection, <strong>Marginalia</strong> creates an empty note above the cursor line that you can type into right away.</li>
+  <li>To correct a note, click it in the column – it opens in the text with a coloured background. <strong>Esc</strong> closes it.</li>
+  <li>Italic and other formatting inside a note use the same buttons as in the main text. With nothing selected and the cursor in an open note, the button formats the whole note.</li>
 </ul>
 
 <div class="note">
