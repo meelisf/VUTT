@@ -95,9 +95,15 @@ def normalize_marginalia_tags(text: str) -> str:
     """
     if not text:
         return text
-    if '<m>' in text:
-        # Rea-kaupa, et säilitada täpsed reavahetused (sh lõpu-reavahetus).
-        parts = text.split('\n')
-        text = '\n'.join(_normalize_line(p) for p in parts)
-    # Tühjade tagide koristus jookseb ALATI (ka inline-tühjad failides ilma <m>-ta).
-    return strip_empty_tags(text)
+    # Püsipunktini: tühja tagi koristus võib paljastada servatühiku
+    # (`<m><i></i> x</m>` → `<m> x</m>`), mille koristab alles järgmine käik.
+    prev = None
+    while prev != text:
+        prev = text
+        if '<m>' in text:
+            # Rea-kaupa, et säilitada täpsed reavahetused (sh lõpu-reavahetus).
+            parts = text.split('\n')
+            text = '\n'.join(_normalize_line(p) for p in parts)
+        # Tühjade tagide koristus jookseb ALATI (ka inline-tühjad failides ilma <m>-ta).
+        text = strip_empty_tags(text)
+    return text
