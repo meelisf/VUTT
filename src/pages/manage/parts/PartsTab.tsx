@@ -330,6 +330,7 @@ const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCach
             dirty={dirty}
             onSave={() => { void save(); }}
             onDelete={() => { void remove(); }}
+            onClose={closePanel}
           />
         </PartPanel>
       )}

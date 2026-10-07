@@ -4,9 +4,10 @@
  * kirjutamis- ja sihtkoht), lisa korral viide osale. Isikud käivad ühise
  * CreatorsEditori kaudu. Salvestamine ja kustutamine käivad PartsTab'is.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
+import ConfirmModal from '../../../components/ConfirmModal';
 import EntityPicker, { type PeopleRegisterEntry } from '../../../components/EntityPicker';
 import WorkDatingInput from '../../../components/WorkDatingInput';
 import CreatorsEditor from '../../../components/creators/CreatorsEditor';
@@ -33,6 +34,8 @@ interface Props {
   dirty: boolean;
   onSave: () => void;
   onDelete: () => void;
+  /** Vormist väljumine — sama tee mis paneeli X (salvestamata kaitse kutsujas). */
+  onClose: () => void;
 }
 
 const toEntity = (p: PartPlace | null): LinkedEntity | null =>
@@ -40,7 +43,7 @@ const toEntity = (p: PartPlace | null): LinkedEntity | null =>
 const fromEntity = (e: LinkedEntity | null): PartPlace | null => (e ? { id: e.id, label: e.label } : null);
 
 const PartForm: React.FC<Props> = ({
-  isNew, draft, onDraft, otherParts, sharedStems, error, busy, token, workId, authors, peopleRegister, dirty, onSave, onDelete,
+  isNew, draft, onDraft, otherParts, sharedStems, error, busy, token, workId, authors, peopleRegister, dirty, onSave, onDelete, onClose,
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const lang = getLangCode(i18n.language);
@@ -48,6 +51,7 @@ const PartForm: React.FC<Props> = ({
   const placeRegister = usePlaceRegister(lang);
   const input = 'w-full rounded border border-gray-300 px-2 py-1.5 text-sm';
   const label = 'block text-xs font-bold uppercase text-gray-500';
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const roles = PART_ROLES.map(r => ({ id: r, label: t(`metadata.roles.${r}`) }));
 
   return (
@@ -140,13 +144,28 @@ const PartForm: React.FC<Props> = ({
             ? 'bg-amber-500 hover:bg-amber-600' : 'bg-primary-600 hover:bg-primary-700'}`}>
           {t('manage.parts.save')}
         </button>
+        <button type="button" onClick={onClose}
+          className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+          {t('common:buttons.close')}
+        </button>
+        {/* Kustuta — destruktiivne, ainult ikoon (nagu teose halduse tegevusribal) */}
         {!isNew && (
-          <button type="button" disabled={busy} onClick={onDelete}
-            className="ml-auto rounded border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">
-            {t('manage.parts.delete')}
+          <button type="button" disabled={busy} onClick={() => setConfirmDelete(true)}
+            title={t('manage.parts.delete')} aria-label={t('manage.parts.delete')}
+            className="ml-auto rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">
+            <Trash2 size={16} />
           </button>
         )}
       </div>
+      <ConfirmModal
+        isOpen={confirmDelete}
+        title={t('manage.parts.deleteConfirmTitle')}
+        message={t('manage.parts.deleteConfirm', { title: draft.title || t(`manage.parts.kinds.${draft.kind}`) })}
+        confirmText={t('manage.parts.delete')}
+        onConfirm={() => { setConfirmDelete(false); onDelete(); }}
+        onCancel={() => setConfirmDelete(false)}
+        variant="danger"
+      />
     </div>
   );
 };
