@@ -126,6 +126,18 @@ describe('WorkPartsPanel', () => {
     expect(screen.getByText('3')).toBeTruthy();
   });
 
+  it('pealkirjale klõps keerab osa üksikasjad lahti ja kinni', async () => {
+    api.parts = [{ ...POEM, abstract_et: 'Pulmaluuletus.' }];
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
+    const title = screen.getByRole('button', { name: /Carmen/ });
+    fireEvent.click(title);
+    expect(screen.getByText('Pulmaluuletus.')).toBeTruthy();
+    expect(title.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(title);
+    expect(screen.queryByText('Pulmaluuletus.')).toBeNull();
+  });
+
   it('avatud olek jääb meelde', async () => {
     const r = renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: /Sisukord/ }));

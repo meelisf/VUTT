@@ -175,14 +175,16 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
                     {i + 1}
                   </span>
                 )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-gray-900">
+                {/* Pealkirjaplokk keerab üksikasjad lahti nagu nool — nool üksi oli liiga väike sihtmärk. */}
+                <button type="button" onClick={() => toggleRow(p.id)} aria-expanded={isOpen}
+                  className="min-w-0 flex-1 rounded text-left hover:bg-gray-50">
+                  <span className="block text-gray-900">
                     {p.title || who || t(`manage.parts.kinds.${p.kind}`)}
                     {year && <span className="ml-2 tabular-nums text-gray-500">{year}</span>}
-                  </div>
-                  {p.title && who && <div className="text-xs text-gray-500">{who}</div>}
-                  {p.incipit && <div className="truncate text-xs italic text-gray-400">{p.incipit}</div>}
-                </div>
+                  </span>
+                  {p.title && who && <span className="block text-xs text-gray-500">{who}</span>}
+                  {p.incipit && <span className="block truncate text-xs italic text-gray-400">{p.incipit}</span>}
+                </button>
                 <div className="shrink-0 text-xs tabular-nums text-gray-500">
                   {t('info.tocPages')}{' '}
                   {ranges.map((r, k) => (
