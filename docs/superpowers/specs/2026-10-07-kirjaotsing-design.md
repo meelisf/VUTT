@@ -172,8 +172,8 @@ ei saa neis lahku minna.
 - **Seaded jooksvale instantsile:** `_ensure_letters_index()` (stardil, nagu
   `_ensure_filterable_attributes`) loob indeksi, kui seda pole, ja rakendab seaded.
   Deploy ei vaja käsitsi Meili sammu.
-- **Esmane täitmine:** `scripts/sync_meilisearch.py --letters` (kõik osadega teosed) või
-  täis-seed.
+- **Esmane täitmine:** täis-seed (`server_seed_data.sh`: `1-1` kirjutab `kirjad.jsonl`,
+  `2-1` loob ja täidab `kirjad`-i). Eraldi skripti ei tehtud (plaani otsus).
 - **Paarsus:** `scripts/verify_meili_seed_live_parity.py` võrdleb ka kirjadokumente.
 
 ## 3. Ligipääs
@@ -308,7 +308,7 @@ korral `WorkPartsPanel`-is selle osa. Uut marsruuti ei tule.
    indeksid (§3), võtmesammu pole.
 2. Backend: `./scripts/server_update.sh --no-cache`. Stardil luuakse `kirjad` ja selle
    seaded.
-3. `scripts/sync_meilisearch.py --letters` (serveris host-venviga) täidab indeksi.
+3. `./scripts/server_seed_data.sh` täidab mõlemad indeksid.
 4. Frontend: `npm run build && rsync -avz --delete dist/ vutt:~/VUTT/dist/`.
 5. Kontroll tootmises:
    - anonüümne kasutaja näeb `o17ekb` kirju kirjade režiimis;

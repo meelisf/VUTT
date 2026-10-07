@@ -71,7 +71,7 @@ Eeldused hostis (ei ole `nginx.host.conf`-is): rate-limit tsoonid `nginx.conf` h
 
 ```
 Frontend (Vite/React 19)
-├── Meilisearch (7700) — otsing + metaandmed (indeks: teosed)
+├── Meilisearch (7700) — otsing + metaandmed (indeksid: teosed, kirjad)
 ├── Image Server (8001) — skaneeringud .jpg (konteiner `vutt-images`, ainult `data/` mount)
 └── File Server (8002) — FastAPI: toimetamine, auth, git, prosopograafia
     ↓
@@ -325,6 +325,13 @@ lehenumbreid/faile muutev tee saab osade sünkroni kaasa, kui ta kutsub
 Osa avalik kokkuvõte on `abstract_et`/`abstract_en`, `notes` on toimetaja märkus
 (API-s avalik, vaates ainult toimetajale); `abstract_en_src` ankru kirjutab AINULT server
 kinnituse peale (ADR 0063).
+
+**Kirjaindeks (ADR 0065)** — `kirjad`: üks dokument kirja-osa kohta, tuletatakse
+`meili_doc.build_letter_documents`-iga sama teose LEHEDOKUMENTIDEST (ligipääsuväljad ja
+tekst ühest allikast). Iga tee, mis kirjutab/kustutab `teosed`-i, võtab `kirjad`-i kaasa
+(sünk: upsert → aegunute kustutus alles pärast edukat taski; nähtavus = PUT indeksis
+olevatele kirjadele). Tenant-tokeni `searchRules` annab mõlemale SAMA reegli
+(`_access_rule`); teosele piiratud token `kirjad`-i ei saa. Väljanimed ingliskeelsed.
 
 **Ameti- ja asutuseregister (ADR 0059)** — identiteet on VUTT-i võti (`occupation_key`,
 `institution_key`), Q-kood on valikuline ühilduvusväli. Seotud AMETI `label` on registrile tuntud nimi
