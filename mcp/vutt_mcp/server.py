@@ -515,8 +515,11 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         OLEMASOLEVA OSA PARANDUS: kui osa on get_work_parts'is juba olemas (sama
         kiri), ÄRA paku seda uuena — lisa osale `part_id` (olemasoleva osa id) ja
         ainult parandatud/lisatud väljad. Toimetaja vastuvõtt uuendab siis seda
-        osa (tühi väli ei kustuta olemasolevat; isikud liidetakse). Samade
-        lehtedega ja sama liigiga osa tuvastatakse ka ise parandusena.
+        osa: `part_id`-ga saadetud title, incipit, abstract_et ja abstract_en
+        ASENDAVAD täidetud väärtuse, notes ainult TÄIENEB (lisatakse olemasoleva
+        järele); tühi väli ei kustuta olemasolevat; isikud liidetakse. Toimetaja
+        näeb vana ja uut teksti enne kinnitamist. Samade lehtedega ja sama liigiga
+        osa tuvastatakse ka ise parandusena, aga siis täidetud teksti ei asendata.
 
         Kirja piirid tunneb ära pöördumisest, dateeringust ja allkirjast;
         istungi protokolli kuupäevast ja osalejate loetelust. Ära paku juba
