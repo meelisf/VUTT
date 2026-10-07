@@ -214,7 +214,21 @@ describe('PartsTab', () => {
     renderTab();
     fireEvent.click(await screen.findByTestId('badge-s1-a'));
     fireEvent.click(screen.getByRole('button', { name: 'Kustuta osa' }));
+    // Prügikast avab kinnituse; dialoogi kinnitusnupp kannab sama nime.
+    const buttons = screen.getAllByRole('button', { name: 'Kustuta osa' });
+    fireEvent.click(buttons[buttons.length - 1]);
     expect(await screen.findByText(/Osale viitavad lisad/)).toBeTruthy();
+  });
+
+  it('kustutamine küsib kinnitust; loobumine ei kustuta', async () => {
+    api.parts = [{ id: 'a', kind: 'session', pages: ['s1'], creators: [], attached_to: null, needs_review: false }];
+    renderTab();
+    fireEvent.click(await screen.findByTestId('badge-s1-a'));
+    fireEvent.click(screen.getByRole('button', { name: 'Kustuta osa' }));
+    expect(screen.getByText('Kustuta osa?')).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByText('Kustuta osa?')).toBeNull();
+    expect(api.calls.some(c => c.startsWith('delete'))).toBe(false);
   });
 
   it('pealkirja muutmine teatab salvestamata muudatusest', async () => {
@@ -275,7 +289,10 @@ describe('PartsTab', () => {
     fireEvent.click(await screen.findByTestId('badge-s1-a'));
     await screen.findByRole('dialog');
     const before = guarded.length;
-    fireEvent.click(screen.getByRole('button', { name: 'Sulge' }));
+    // Kaks väljumisteed: päise X ja vormi „Sulge" — mõlemad käivad kaitse kaudu.
+    const closers = screen.getAllByRole('button', { name: 'Sulge' });
+    expect(closers).toHaveLength(2);
+    fireEvent.click(closers[1]);
     expect(guarded.length).toBe(before + 1);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
