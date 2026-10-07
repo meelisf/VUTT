@@ -307,3 +307,44 @@ def test_seed_ja_live_puuduv_metadata_json(tmp_path, monkeypatch):
     assert live[0]["work_id"] == seed_docs[0]["work_id"]
     live_clean = {k: v for k, v in live[0].items() if k != "teose_staatus"}
     assert seed_docs[0] == live_clean
+
+
+def test_seed_ja_live_annavad_identsed_kirjadokumendid(tmp_path, monkeypatch):
+    """Kirjaindeks (#526): seed kirjutab kirjad.jsonl, live saadab sync_letters-ile —
+    mõlemad sama build_letter_documents-iga, tulemus peab olema identne."""
+    parts = [{
+        "id": "p1", "kind": "letter", "pages": [f"{SLUG}-{WORK_ID}-002"],
+        "creators": [{"id": "Q123", "name": "Lorenz Luden", "role": "auctor"}],
+        "dating": {"start": "1690-05"},
+    }]
+    _build_fixture(tmp_path, parts=parts)
+
+    # Live
+    monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(ops, "ARCHIVES_FILE", str(tmp_path / "_archives.json"))
+    (tmp_path / "_archives.json").write_text(json.dumps(ARCHIVES), encoding="utf-8")
+    monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
+    monkeypatch.setattr(ops, "load_people_aliases", lambda: PEOPLE)
+    monkeypatch.setattr(ops, "load_labels_store", lambda: LABELS)
+    monkeypatch.setattr(ops, "send_to_meilisearch", lambda documents, wait=True: True)
+    monkeypatch.setattr(ops, "_delete_extra_pages", lambda work_id, new_count: True)
+    live = {}
+    monkeypatch.setattr(ops, "sync_letters", lambda work_id, docs: live.__setitem__("docs", docs) or True)
+    assert ops.sync_work_to_meilisearch(SLUG) is True
+
+    # Seed
+    out = tmp_path / "out" / "meilisearch_data_per_page.jsonl"
+    monkeypatch.setattr(seed, "DATA_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(seed, "OUTPUT_FILE", str(out))
+    monkeypatch.setattr(seed, "LABELS_FILE", str(tmp_path / "puudub.json"))
+    monkeypatch.setattr(seed, "load_collections", lambda: COLLECTIONS)
+    monkeypatch.setattr(seed, "load_people_aliases", lambda: PEOPLE)
+    monkeypatch.setattr(seed, "load_archives", lambda: ARCHIVES)
+    # LABELS on live-tees mockitud; seed loeb labels.json-i failist → anna sama sisu.
+    (tmp_path / "labels.json").write_text(json.dumps(LABELS), encoding="utf-8")
+    monkeypatch.setattr(seed, "LABELS_FILE", str(tmp_path / "labels.json"))
+    seed.create_meilisearch_data_per_page()
+
+    seed_letters = [json.loads(line) for line in (out.parent / "kirjad.jsonl").read_text().splitlines()]
+    assert [d["id"] for d in seed_letters] == [f"{WORK_ID}__p1"]
+    assert seed_letters == live["docs"]

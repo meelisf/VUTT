@@ -15,6 +15,10 @@ ENV_PATH = os.path.join(BASE_DIR, '.env')
 sys.path.insert(0, BASE_DIR)
 from server.meili_settings import (  # noqa: E402
     FILTERABLE_ATTRIBUTES,
+    LETTERS_FILTERABLE_ATTRIBUTES,
+    LETTERS_INDEX_NAME,
+    LETTERS_SEARCHABLE_ATTRIBUTES,
+    LETTERS_SORTABLE_ATTRIBUTES,
     MAX_VALUES_PER_FACET,
     SEARCHABLE_ATTRIBUTES,
     SORTABLE_ATTRIBUTES,
@@ -28,6 +32,8 @@ MEILI_URL = os.getenv("MEILI_URL") or "http://127.0.0.1:7700"
 MEILI_MASTER_KEY = os.getenv("MEILI_MASTER_KEY")
 JSONL_FILE_PATH = 'output/meilisearch_data_per_page.jsonl' 
 INDEX_NAME = 'teosed'
+# Kirjaindeks (#526): 1-1 kirjutab selle teosed-faili kõrvale
+LETTERS_JSONL_FILE_PATH = os.path.join(os.path.dirname(JSONL_FILE_PATH), 'kirjad.jsonl')
 # --- LÕPP ---
 
 def main():
@@ -120,6 +126,48 @@ def main():
         print(f"Faili ei leitud: {JSONL_FILE_PATH}")
     except Exception as e:
         print(f"Viga: {e}")
+
+    upload_letters(client)
+
+
+def upload_letters(client):
+    """Kirjade indeks (#526, ADR 0065): kustuta, seadista, lae kirjad.jsonl.
+
+    Seaded tulevad meili_settings.py-st — samad, mida runtime
+    (meilisearch_ops._ensure_letters_index) rakendab jooksvale instantsile.
+    """
+    print(f"\n--- Kirjade indeks '{LETTERS_INDEX_NAME}' ---")
+    try:
+        client.delete_index(LETTERS_INDEX_NAME)
+        time.sleep(1)
+    except Exception:
+        pass
+
+    task = client.index(LETTERS_INDEX_NAME).update_settings({
+        'searchableAttributes': LETTERS_SEARCHABLE_ATTRIBUTES,
+        'filterableAttributes': LETTERS_FILTERABLE_ATTRIBUTES,
+        'sortableAttributes': LETTERS_SORTABLE_ATTRIBUTES,
+        'faceting': {'maxValuesPerFacet': MAX_VALUES_PER_FACET},
+        'pagination': {'maxTotalHits': 10000},
+    })
+    client.wait_for_task(task.task_uid)
+
+    try:
+        with open(LETTERS_JSONL_FILE_PATH, 'r', encoding='utf-8') as f:
+            letters = [json.loads(line) for line in f]
+    except FileNotFoundError:
+        print(f"Faili ei leitud: {LETTERS_JSONL_FILE_PATH}")
+        return
+    if not letters:
+        print("Kirju ei ole.")
+        return
+    task = client.index(LETTERS_INDEX_NAME).add_documents(letters, primary_key='id')
+    status = client.wait_for_task(task.task_uid, timeout_in_ms=120000)
+    if status.status != 'succeeded':
+        print(f"Viga kirjade laadimisel: {status.error}")
+        return
+    stats = client.index(LETTERS_INDEX_NAME).get_stats()
+    print(f"Valmis! Kirjade indeksis on {stats.number_of_documents} dokumenti.")
 
 if __name__ == '__main__':
     main()
