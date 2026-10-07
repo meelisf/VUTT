@@ -20,6 +20,13 @@ export default function WorkDatingInput({ value, dating, onChange }: {
     if (!dating && value.trim()) next.source_text = value;
     onChange(datingText(next), next);
   };
+  // Algne dateering (allika kuju) on toimetatav: agent või varasem sisestus võis sinna
+  // jätta märkuse, mida muidu ei saanud parandada (#526). Tühi = välja eemaldamine.
+  const setSource = (text: string) => {
+    const { source_text: _old, ...rest } = current;
+    const next: WorkDating = text ? { ...rest, source_text: text } : rest;
+    onChange(datingText(next), next);
+  };
   return <div className="space-y-2">
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs font-medium text-gray-500">{t('dating.label')}</span>
@@ -33,7 +40,7 @@ export default function WorkDatingInput({ value, dating, onChange }: {
         <DatePartsInput label={t('dating.end')} value={current.end} onChange={end => set({ end })} detailed calendar={current.calendar} unknownMonth />
         <button type="button" className="text-xs text-primary-600" onClick={() => set({ end: undefined, kind: undefined })}>{t('dating.removeEnd')}</button>
       </div> : <button type="button" className="text-xs text-primary-600 hover:underline" onClick={() => set({ end: '' })}>{t('dating.addEnd')}</button>}
-      <details className="text-sm" open={current.calendar || current.approximate || current.note || current.kind ? true : undefined}>
+      <details className="text-sm" open={current.calendar || current.approximate || current.note || current.kind || current.source_text ? true : undefined}>
         <summary className="cursor-pointer text-xs text-gray-500">{t('dating.more')}</summary>
         <div className="space-y-2 mt-2">
           <label className="block">{t('dating.calendar')} <select className="border rounded p-1" value={current.calendar ?? ''} onChange={e => set({ calendar: (e.target.value || undefined) as WorkDating['calendar'] })}>
@@ -45,7 +52,7 @@ export default function WorkDatingInput({ value, dating, onChange }: {
             <option value="">{t('dating.unspecified')}</option><option value="span">{t('dating.span')}</option><option value="uncertain">{t('dating.uncertain')}</option>
           </select></label>}
           <label className="block">{t('dating.note')}<textarea className="w-full border rounded p-2" value={current.note ?? ''} onChange={e => set({ note: e.target.value })} /></label>
-          {current.source_text && <p className="text-xs text-gray-500">{t('dating.source')}: {current.source_text}</p>}
+          <label className="block">{t('dating.source')}<input className="w-full border rounded p-1 text-sm" value={current.source_text ?? ''} onChange={e => setSource(e.target.value)} /></label>
         </div>
       </details>
     </>}

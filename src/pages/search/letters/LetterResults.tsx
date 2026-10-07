@@ -32,7 +32,8 @@ const LetterResults: React.FC<Props> = ({ hits }) => {
             >
               <Mail size={16} className="mt-0.5 shrink-0 text-primary-500" />
               <div className="min-w-0">
-                <div className="font-semibold text-gray-900 group-hover:text-primary-700">{letterHeadline(hit, t)}</div>
+                <div className="font-semibold text-gray-900 group-hover:text-primary-700"
+                  title={hit.dating?.source_text || undefined}>{letterHeadline(hit, t)}</div>
                 <div className="text-xs text-gray-500">
                   {t('letters.inWork')} <span className="italic">{hit.work_title}</span>
                   {' · '}{t('letters.pages', { count: hit.page_count })}

@@ -14,8 +14,9 @@ describe('formatLetterDating', () => {
   it('vahemik jääb vahemikuks, mitte alguskuupäevaks', () => {
     expect(formatLetterDating({ start: '1684', end: '1686' })).toBe('1684–1686');
   });
-  it('allika kuju eelistatakse', () => {
-    expect(formatLetterDating({ start: '1812-04-14', source_text: '14. aprill 1812' })).toBe('14. aprill 1812');
+  it('allikakuju EI asenda kuupäeva (võib kanda toimetaja märkust, o17ekb)', () => {
+    expect(formatLetterDating({ start: '1703-03-03', source_text: 'Moskva, 03.03.1703 (pildilt kinnitatud …)' }))
+      .toBe('1703-03-03');
   });
   it('puudub → null', () => {
     expect(formatLetterDating(undefined)).toBeNull();

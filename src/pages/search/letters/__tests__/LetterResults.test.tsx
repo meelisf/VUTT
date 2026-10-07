@@ -40,4 +40,11 @@ describe('LetterResults', () => {
     const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
     expect(container.querySelector('p')).toBeNull();
   });
+
+  it('allikakuju on hõljuva vihjena, mitte reas', () => {
+    const hit = { ...base, dating: { start: '1703-03-03', source_text: 'Moskva, 03.03.1703 (märge)' } };
+    render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
+    const headline = screen.getByText('1703-03-03');
+    expect(headline.getAttribute('title')).toBe('Moskva, 03.03.1703 (märge)');
+  });
 });

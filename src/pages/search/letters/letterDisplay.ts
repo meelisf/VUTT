@@ -9,10 +9,11 @@ type T = (key: string, opts?: Record<string, unknown>) => string;
 
 const INCIPIT_MAX = 80;
 
-/** Allika kuju eelistatakse; vahemik jääb vahemikuks (alguskuupäev üksi annaks eksliku täpsuse). */
+/** Kuupäev; vahemik jääb vahemikuks (alguskuupäev üksi annaks eksliku täpsuse).
+ *  Allikakuju (`source_text`) EI asenda kuupäeva: see võib kanda toimetaja märkust —
+ *  ta on tulemusreal hõljuv vihje (LetterResults). */
 export function formatLetterDating(dating: WorkDating | undefined): string | null {
   if (!dating?.start) return null;
-  if (dating.source_text) return dating.source_text;
   return dating.end ? `${dating.start}–${dating.end}` : dating.start;
 }
 

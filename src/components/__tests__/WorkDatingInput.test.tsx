@@ -22,4 +22,23 @@ describe('WorkDatingInput', () => {
     fireEvent.change(year, { target: { value: '' } });
     expect(onChange.mock.lastCall?.[1]).toMatchObject({ start: '', end: '1668' });
   });
+
+  it('algne dateering on muudetav (o17ekb t9bqfn: toimetaja märge allikakujus)', () => {
+    const onChange = vi.fn();
+    const src = 'Moskva, 03.03.1703 (pildilt kinnitatud; „1705" on valelugemine)';
+    render(<WorkDatingInput value="1703-03-03" onChange={onChange}
+      dating={{ start: '1703-03-03', source_text: src }} />);
+    const field = screen.getAllByRole('textbox').find(el => (el as HTMLInputElement).value === src)!;
+    fireEvent.change(field, { target: { value: 'Moskva, 03.03.1703' } });
+    expect(onChange.mock.lastCall?.[1]).toEqual({ start: '1703-03-03', source_text: 'Moskva, 03.03.1703' });
+  });
+
+  it('algse dateeringu tühjendamine eemaldab välja, kuupäev jääb', () => {
+    const onChange = vi.fn();
+    render(<WorkDatingInput value="1703-03-03" onChange={onChange}
+      dating={{ start: '1703-03-03', source_text: 'x' }} />);
+    const field = screen.getAllByRole('textbox').find(el => (el as HTMLInputElement).value === 'x')!;
+    fireEvent.change(field, { target: { value: '' } });
+    expect(onChange.mock.lastCall?.[1]).toEqual({ start: '1703-03-03' });
+  });
 });
