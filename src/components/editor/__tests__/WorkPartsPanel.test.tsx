@@ -136,18 +136,25 @@ describe('WorkPartsPanel', () => {
     expect(screen.getByText('Indeks F004')).toBeTruthy();
   });
 
-  it('ainult märkusega osal pole lugejale lahtikeeramise nuppu', async () => {
+  it('ainult märkusega osa: lugeja näeb lahti keerates püsilinki, märkust mitte', async () => {
     api.parts = [{ ...POEM, notes: 'Indeks F004' }];
     renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
-    expect(screen.queryByRole('button', { name: 'Näita osa andmeid' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Näita osa andmeid' }));
+    expect(screen.getByRole('button', { name: 'Kopeeri link' })).toBeTruthy();
+    expect(screen.queryByText('Indeks F004')).toBeNull();
   });
 
-  it('ilma lisaandmeteta osal lahtikeeramise nuppu ei ole', async () => {
+  it('püsilink (#526): kopeerib lehenumbrita aadressi ja annab tagasiside', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     api.parts = [POEM];
     renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
-    expect(screen.queryByRole('button', { name: 'Näita osa andmeid' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Näita osa andmeid' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Kopeeri link' }));
+    await waitFor(() => expect(screen.getByText('Link kopeeritud')).toBeTruthy());
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/work/w1/part/${POEM.id}`);
   });
 
   it('muutmisõigusega: pliiats avab osa vormi ja salvestus uuendab osa', async () => {

@@ -16,17 +16,11 @@ import UnsavedChangesDialog from '../UnsavedChangesDialog';
 import { usePersonSources } from '../../hooks/usePersonSources';
 import { getLangCode } from '../../utils/getLangCode';
 import { datingText } from '../../utils/workDating';
-import { pageRangeList, partAbstract, sortParts } from '../../pages/manage/partsModel';
+import { pageRangeList, partAbstract, partPermalink, sortParts } from '../../pages/manage/partsModel';
+import CopyButton from '../CopyButton';
 import { KIND_STYLE } from '../../pages/manage/parts/kindStyle';
 
 const OPEN_KEY = 'vutt_parts_toc_open';
-
-/** Kas osal on midagi rohkemat kui sisukorra rida (pealkiri, isikud nimedena, aasta). */
-function hasDetails(p: WorkPart, attachments: WorkPart[], canEdit: boolean): boolean {
-  // Toimetaja märkus on lisaandmed ainult toimetajale — lugeja ei näe seda (ADR 0063).
-  return !!(p.abstract_et || p.abstract_en || (canEdit && p.notes) || p.place || p.place_to || p.creators.some(c => c.name || c.id) || p.dating
-    || p.languages?.length || attachments.length || p.attached_to);
-}
 
 function readOpen(): boolean {
   try { return localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; }
@@ -145,7 +139,6 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
             const who = whoLine(p);
             const year = p.dating?.start?.slice(0, 4);
             const attachments = parts.filter(a => a.attached_to === p.id);
-            const detail = hasDetails(p, attachments, canEdit);
             const isOpen = expanded.has(p.id);
             return (
               <li
@@ -178,15 +171,14 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
                     </React.Fragment>
                   ))}
                 </div>
-                {detail ? (
-                  <button type="button" onClick={() => toggleRow(p.id)} aria-expanded={isOpen}
-                    aria-label={t('info.tocDetails')} title={t('info.tocDetails')}
-                    className="-mr-2 shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
-                    {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  </button>
-                ) : <span className="-mr-2 w-[18px] shrink-0" />}
+                {/* Üksikasjad on alati avatavad: seal on vähemalt osa püsilink. */}
+                <button type="button" onClick={() => toggleRow(p.id)} aria-expanded={isOpen}
+                  aria-label={t('info.tocDetails')} title={t('info.tocDetails')}
+                  className="-mr-2 shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
                 </div>
-                {isOpen && <PartDetails part={p} attachments={attachments} parts={parts} onEdit={canEdit ? () => setEditing(p) : undefined} />}
+                {isOpen && workId && <PartDetails workId={workId} part={p} attachments={attachments} parts={parts} onEdit={canEdit ? () => setEditing(p) : undefined} />}
               </li>
             );
           })}
@@ -274,7 +266,7 @@ const PartEditPanel: React.FC<{ workId: string; token: string | null; part: Work
 };
 
 /** Osa andmed lahtikeeratuna: liik, dateering, kohad, isikud rollidega, keeled, märkused, lisad. */
-const PartDetails: React.FC<{ part: WorkPart; attachments: WorkPart[]; parts: WorkPart[]; onEdit?: () => void }> = ({ part: p, attachments, parts, onEdit }) => {
+const PartDetails: React.FC<{ workId: string; part: WorkPart; attachments: WorkPart[]; parts: WorkPart[]; onEdit?: () => void }> = ({ workId, part: p, attachments, parts, onEdit }) => {
   const { t, i18n } = useTranslation(['workspace']);
   const summary = partAbstract(p, getLangCode(i18n.language));
   const row = (label: string, value: React.ReactNode) => (
@@ -310,14 +302,18 @@ const PartDetails: React.FC<{ part: WorkPart; attachments: WorkPart[]; parts: Wo
       ))}
       {/* Toimetaja märkus: ainult toimetajale (avalik vaade ei näita, ADR 0063). */}
       {onEdit && p.notes && row(t('manage.parts.notes'), <span className="whitespace-pre-wrap text-gray-500">{p.notes}</span>)}
-      {onEdit && (
-        <div className="pt-1">
+      <div className="flex flex-wrap gap-2 pt-1">
+        {/* Püsilink ilma lehenumbrita (#526) — jagamiseks; lahendub esimesele lehele. */}
+        <CopyButton text={`${window.location.origin}${partPermalink(workId, p.id)}`}
+          label={t('info.tocCopyLink')} copiedLabel={t('info.tocLinkCopied')}
+          className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-0.5 text-gray-700 hover:border-primary-400 hover:text-primary-700" />
+        {onEdit && (
           <button type="button" onClick={onEdit}
             className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-0.5 text-gray-700 hover:border-primary-400 hover:text-primary-700">
             <Pencil size={12} /> {t('info.tocEdit')}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </dl>
   );
 };

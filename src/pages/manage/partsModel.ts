@@ -16,6 +16,17 @@ export function pageRangeList(pageStems: string[], pageNums: Map<string, number>
   return numberRangeList(pageStems.map(s => pageNums.get(s)).filter((n): n is number => n !== undefined));
 }
 
+/** Osa püsilink (#526): ei sisalda lehenumbrit, mis lehtede ümberjärjestusel nihkuks. */
+export const partPermalink = (workId: string, partId: string) =>
+  `/work/${encodeURIComponent(workId)}/part/${encodeURIComponent(partId)}`;
+
+/** Töölaua aadress, kuhu püsilink lahendub: osa esimene leht + `?part=`. Kadunud lehtedega osa → null. */
+export function partWorkspacePath(workId: string, part: WorkPart, pageNums: Map<string, number>): string | null {
+  const first = pageRangeList(part.pages, pageNums)[0]?.from;
+  if (first === undefined) return null;
+  return `/work/${encodeURIComponent(workId)}/${first}?part=${encodeURIComponent(part.id)}`;
+}
+
 function numberRangeList(values: number[]): { from: number; to: number }[] {
   const nums = [...new Set(values)].sort((a, b) => a - b);
   const out: { from: number; to: number }[] = [];

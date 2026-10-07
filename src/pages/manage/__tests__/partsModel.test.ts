@@ -1,6 +1,6 @@
 // src/pages/manage/__tests__/partsModel.test.ts
 import { describe, it, expect } from 'vitest';
-import { compactNumbers, draftFromPart, emptyDraft, PartDatingError, initialManageTab, pageBadges, pageRangeList, pageRanges, partAbstract, partFromDraft, sharedStems, sortParts, tabSwitch } from '../partsModel';
+import { compactNumbers, draftFromPart, emptyDraft, PartDatingError, initialManageTab, pageBadges, pageRangeList, pageRanges, partAbstract, partFromDraft, partPermalink, partWorkspacePath, sharedStems, sortParts, tabSwitch } from '../partsModel';
 import type { WorkPart } from '../../../services/workPartsApi';
 
 const STEMS = ['s1', 's2', 's3', 's4'];
@@ -118,5 +118,23 @@ describe('osa kokkuvõte kahes keeles (ADR 0063)', () => {
     expect(out).toMatchObject({ abstract_et: 'Kiri.', abstract_en: 'Letter.', notes: 'Indeks F1', confirm_abstract_translation: true });
     expect('abstract_en_src' in out).toBe(false);
     expect('confirm_abstract_translation' in partFromDraft({ ...d, abstract_en: ' ', confirmEn: true }, ['s1'])).toBe(false);
+  });
+});
+
+describe('partsModel: osa püsilink (#526)', () => {
+  it('püsilink ei sisalda lehenumbrit', () => {
+    expect(partPermalink('ms169i', 'dqap1p')).toBe('/work/ms169i/part/dqap1p');
+  });
+
+  it('lahendub osa esimesele lehele praeguses järjestuses, mitte tüvede järjekorras', () => {
+    const nums = new Map([['s1', 1], ['s2', 2], ['s3', 3], ['s4', 4]]);
+    expect(partWorkspacePath('w', P('a', ['s4', 's3']), nums)).toBe('/work/w/3?part=a');
+    // Lehed järjestati ümber: sama osa, uus esimene leht.
+    const moved = new Map([['s4', 1], ['s3', 2]]);
+    expect(partWorkspacePath('w', P('a', ['s4', 's3']), moved)).toBe('/work/w/1?part=a');
+  });
+
+  it('kõik lehed kadunud → null (mitte vaikne leht 1)', () => {
+    expect(partWorkspacePath('w', P('a', ['x9']), new Map([['s1', 1]]))).toBeNull();
   });
 });
