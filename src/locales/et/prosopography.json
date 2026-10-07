@@ -10,6 +10,7 @@
     "unsaved": "Salvesta või tühista esmalt vormi muudatused.",
     "codeHelp": "Kopeeri see kood agendi vestlusse. Kood kehtib 8 tundi ja lubab sellele isikule kuni {{max}} ettepanekut.",
     "copy": "Kopeeri",
+    "copied": "Kopeeritud",
     "expires": "Aegub",
     "empty": "Ootel ettepanekuid ei ole.",
     "proposal": "Ettepanek",

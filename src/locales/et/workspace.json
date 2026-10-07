@@ -314,6 +314,7 @@
         "refresh": "Värskenda",
         "codeHelp": "Anna see kood MCP-vestluses agendile koos juhisega, nt „Tee teose {{workId}} osade sisukord”. Kood kehtib 8 tundi ja ainult sellele teosele, kuni {{max}} esitust.",
         "copy": "Kopeeri",
+        "copied": "Kopeeritud",
         "expires": "Aegub",
         "pagesChanged": "Teose lehti on pärast ettepanekut muudetud — kontrolli lehti enne vastuvõttu.",
         "pages": "lk {{pages}}",

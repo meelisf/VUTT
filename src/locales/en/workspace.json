@@ -314,6 +314,7 @@
         "refresh": "Refresh",
         "codeHelp": "Give this code to the agent in the MCP conversation with an instruction, e.g. “Make the table of contents for work {{workId}}”. Valid for 8 hours, for this work only, up to {{max}} submissions.",
         "copy": "Copy",
+        "copied": "Copied",
         "expires": "Expires",
         "pagesChanged": "The work's pages changed after the proposal — check the pages before accepting.",
         "pages": "p. {{pages}}",

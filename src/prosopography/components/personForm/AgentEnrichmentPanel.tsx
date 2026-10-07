@@ -7,6 +7,7 @@ import {
 } from '../../services/prosopographyService';
 import EvidenceList from '../EvidenceList';
 import BusyNote from '../../../components/BusyNote';
+import CopyButton from '../../../components/CopyButton';
 import { useWorkTitles } from '../../hooks/useWorkTitles';
 import { evidenceWorkIds } from '../../utils/evidenceRef';
 
@@ -118,8 +119,8 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
         <p>{codeScope.any ? tr('codeHelpAny', { max: codeScope.max }) : tr('codeHelp', { max: codeScope.max })}</p>
         <div className="flex items-center gap-2 mt-2">
           <code className="break-all select-all">{code}</code>
-          <button type="button" onClick={() => void navigator.clipboard.writeText(code)}
-            className="shrink-0 px-2 py-1 rounded border text-xs">{tr('copy')}</button>
+          <CopyButton text={code} label={tr('copy')} copiedLabel={tr('copied')}
+            className="flex shrink-0 items-center gap-1 px-2 py-1 rounded border text-xs" />
         </div>
         <p className="text-xs text-gray-500 mt-1">{tr('expires')}: {new Date(codeExpiry * 1000).toLocaleString()}</p>
       </div>}
