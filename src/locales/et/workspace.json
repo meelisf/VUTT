@@ -535,6 +535,7 @@
     "tocAttachments": "Lisad",
     "tocEdit": "Muuda osa",
     "tocCopyLink": "Kopeeri link",
+    "tocGoToStart": "ava algus (lk {{page}})",
     "tocLinkCopied": "Link kopeeritud",
     "tocPages": "lk"
   },

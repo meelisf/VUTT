@@ -162,10 +162,19 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
                 className={`px-5 py-2.5 text-sm ${here ? 'bg-primary-50' : ''}`}
               >
                 <div className="flex gap-3">
-                <span className={`mt-0.5 h-fit rounded px-1.5 text-[11px] font-semibold ${KIND_STYLE[p.kind]}`}
-                  title={t(`manage.parts.kinds.${p.kind}`)}>
-                  {i + 1}
-                </span>
+                {/* Number on lisaks lehenumbritele link osa algusesse — suurem sihtmärk. */}
+                {ranges.length > 0 ? (
+                  <Link to={`/work/${workId}/${ranges[0].from}`}
+                    className={`mt-0.5 h-fit rounded px-1.5 text-[11px] font-semibold hover:ring-2 hover:ring-primary-300 ${KIND_STYLE[p.kind]}`}
+                    title={`${t(`manage.parts.kinds.${p.kind}`)} · ${t('info.tocGoToStart', { page: ranges[0].from })}`}>
+                    {i + 1}
+                  </Link>
+                ) : (
+                  <span className={`mt-0.5 h-fit rounded px-1.5 text-[11px] font-semibold ${KIND_STYLE[p.kind]}`}
+                    title={t(`manage.parts.kinds.${p.kind}`)}>
+                    {i + 1}
+                  </span>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="text-gray-900">
                     {p.title || who || t(`manage.parts.kinds.${p.kind}`)}

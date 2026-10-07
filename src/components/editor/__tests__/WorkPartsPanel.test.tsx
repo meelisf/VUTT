@@ -116,6 +116,16 @@ describe('WorkPartsPanel', () => {
     expect(screen.getByRole('link', { name: '5' }).getAttribute('href')).toBe('/work/w1/5');
   });
 
+  it('osa number on link osa alguslehele; lehtedeta osal mitte', async () => {
+    api.parts = [POEM, LETTER, { ...POEM, id: 'z', title: 'Orb', pages: ['kadunud'] }];
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(3\)/ }));
+    expect(screen.getByRole('link', { name: '1' }).getAttribute('href')).toBe('/work/w1/2');
+    expect(screen.getByRole('link', { name: '2' }).getAttribute('href')).toBe('/work/w1/7');
+    expect(screen.queryByRole('link', { name: '3' })).toBeNull();
+    expect(screen.getByText('3')).toBeTruthy();
+  });
+
   it('avatud olek jääb meelde', async () => {
     const r = renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: /Sisukord/ }));
