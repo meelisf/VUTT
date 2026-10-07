@@ -55,6 +55,8 @@ class _Resp:
 
 
 DOCS = "/indexes/kirjad/documents"
+# Primaarvõti selgesõnaliselt: dokumendis on `id` JA `part_id` → Meili ei oska ise valida.
+UPSERT = "/indexes/kirjad/documents?primaryKey=id"
 DELETE = "/indexes/kirjad/documents/delete"
 
 
@@ -69,24 +71,24 @@ def meili(monkeypatch):
 
 
 def test_upsert_siis_aegunute_kustutus(meili):
-    meili.routes[("POST", DOCS)] = lambda b: meili.task()
+    meili.routes[("POST", UPSERT)] = lambda b: meili.task()
     meili.routes[("POST", DELETE)] = lambda b: meili.task()
 
     assert ops.sync_letters("w1", [{"id": "w1__a", "work_id": "w1"}]) is True
 
-    assert [(m, p) for m, p, _ in meili.calls] == [("POST", DOCS), ("POST", DELETE)]
+    assert [(m, p) for m, p, _ in meili.calls] == [("POST", UPSERT), ("POST", DELETE)]
     assert meili.calls_to("POST", DELETE)[0] == {"filter": 'work_id = "w1" AND NOT id IN ["w1__a"]'}
 
 
 def test_upserti_torge_kustutust_ei_tee(meili):
-    meili.routes[("POST", DOCS)] = lambda b: meili.task("failed")
+    meili.routes[("POST", UPSERT)] = lambda b: meili.task("failed")
 
     assert ops.sync_letters("w1", [{"id": "w1__a"}]) is False
     assert meili.calls_to("POST", DELETE) == []
 
 
 def test_kustutuse_torge_on_ebaonnestunud_sunk(meili):
-    meili.routes[("POST", DOCS)] = lambda b: meili.task()
+    meili.routes[("POST", UPSERT)] = lambda b: meili.task()
     meili.routes[("POST", DELETE)] = lambda b: meili.task("failed")
 
     assert ops.sync_letters("w1", [{"id": "w1__a"}]) is False
@@ -97,7 +99,7 @@ def test_kirjadeta_teos_ainult_kustutus(meili):
 
     assert ops.sync_letters("w1", []) is True
     assert meili.calls_to("POST", DELETE) == [{"filter": 'work_id = "w1"'}]
-    assert meili.calls_to("POST", DOCS) == []
+    assert meili.calls_to("POST", UPSERT) == []
 
 
 def _work(tmp_path, parts, pages=2):
@@ -123,18 +125,18 @@ def work_env(monkeypatch, tmp_path, meili):
 
 def test_teose_sunk_kirjutab_kirjad(work_env, meili):
     _work(work_env, [{"id": "p1", "kind": "letter", "pages": ["a-002"]}])
-    meili.routes[("POST", DOCS)] = lambda b: meili.task()
+    meili.routes[("POST", UPSERT)] = lambda b: meili.task()
     meili.routes[("POST", DELETE)] = lambda b: meili.task()
 
     assert ops.sync_work_to_meilisearch("slug-w1") is True
-    sent = meili.calls_to("POST", DOCS)[0]
+    sent = meili.calls_to("POST", UPSERT)[0]
     assert [d["id"] for d in sent] == ["w1__p1"]
     assert sent[0]["letter_text"] == "tekst 2"
 
 
 def test_kirjade_torge_teeb_teose_sungi_ebaonnestunuks(work_env, meili):
     _work(work_env, [{"id": "p1", "kind": "letter", "pages": ["a-002"]}])
-    meili.routes[("POST", DOCS)] = lambda b: meili.task("failed")
+    meili.routes[("POST", UPSERT)] = lambda b: meili.task("failed")
 
     assert ops.sync_work_to_meilisearch("slug-w1") is False
 

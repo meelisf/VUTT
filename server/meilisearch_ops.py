@@ -291,7 +291,9 @@ def sync_letters(work_id, letter_docs):
         return False
     if not letter_docs:
         return delete_work_letters(work_id)
-    if not _meili_task('POST', f'/indexes/{LETTERS_INDEX_NAME}/documents', letter_docs):
+    # primaryKey selgesõnaliselt: dokumendis on `id` JA `part_id`, Meili ei oska ise
+    # valida ja seadetega loodud indeksil primaarvõtit veel pole.
+    if not _meili_task('POST', f'/indexes/{LETTERS_INDEX_NAME}/documents?primaryKey=id', letter_docs):
         return False
     ids = ', '.join(_filter_value(d['id']) for d in letter_docs)
     return _meili_task('POST', f'/indexes/{LETTERS_INDEX_NAME}/documents/delete',
