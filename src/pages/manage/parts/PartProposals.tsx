@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bot, Check, Copy, Pencil, RefreshCw, X } from 'lucide-react';
+import { Bot, Check, Pencil, RefreshCw, X } from 'lucide-react';
 import {
   acceptPartProposals, createPartsHandoff, decidePartProposal, listPartProposals,
   type PartProposal, type PartProposalItem, type PartsHandoff, type WorkPart,
@@ -13,6 +13,7 @@ import {
 import { compactNumbers } from '../partsModel';
 import ProposedPersons from './ProposedPersons';
 import BusyNote from '../../../components/BusyNote';
+import CopyButton from '../../../components/CopyButton';
 
 interface Props {
   workId: string;
@@ -110,8 +111,7 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
           <p className="text-xs text-gray-600">{tp('codeHelp', { workId, max: handoff.max_uses })}</p>
           <div className="mt-1 flex items-center gap-2">
             <code className="min-w-0 flex-1 break-all select-all text-xs">{handoff.code}</code>
-            <button type="button" onClick={() => { void navigator.clipboard?.writeText(handoff.code).catch(() => {}); }}
-              className="flex shrink-0 items-center gap-1 rounded border px-2 py-0.5 text-xs"><Copy size={12} /> {tp('copy')}</button>
+            <CopyButton text={handoff.code} label={tp('copy')} copiedLabel={tp('copied')} />
           </div>
           <p className="mt-1 text-xs text-gray-500">{tp('expires')}: {new Date(handoff.expires_at * 1000).toLocaleString()}</p>
         </div>

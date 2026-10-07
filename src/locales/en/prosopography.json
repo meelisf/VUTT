@@ -10,6 +10,7 @@
     "unsaved": "Save or discard form changes first.",
     "codeHelp": "Paste this code into the agent conversation. It is valid for 8 hours and allows up to {{max}} proposals for this person.",
     "copy": "Copy",
+    "copied": "Copied",
     "expires": "Expires",
     "empty": "No pending proposals.",
     "proposal": "Proposal",
