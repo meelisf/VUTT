@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, ListOrdered, Pencil } from 'lucide-react';
 import { deletePart, getPartsToc, updatePart, type WorkPart } from '../../services/workPartsApi';
 import { draftFromPart, PartDatingError, partFromDraft, sharedStems as sharedStemsOf, type PartDraft } from '../../pages/manage/partsModel';
@@ -77,6 +77,18 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
     return () => { cancelled = true; };
   }, [load]);
 
+  // `?part=` (kirjaotsingu link, #526): ava paneel ja selle osa üksikasjad, kui osa
+  // on teoses olemas. Ühekordne avamine — kasutaja võib paneeli pärast sulgeda.
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get('part');
+  const focusedOnce = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusId || focusedOnce.current === focusId || !parts.some(p => p.id === focusId)) return;
+    focusedOnce.current = focusId;
+    setOpen(true);
+    setExpanded(prev => new Set(prev).add(focusId));
+  }, [focusId, parts]);
+
   // Osa muutmine töölaualt: vorm (ja isikusoovituste päringud) laetakse alles pliiatsi peale.
   const [editing, setEditing] = useState<WorkPart | null>(null);
 
@@ -90,7 +102,8 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
   // sisukorra kasti sees see keskele. Kerib ainult kasti, mitte lehte/paneeli —
   // teose info jääb paigale ja mobiilis ei hüppa aken.
   const listRef = useRef<HTMLOListElement>(null);
-  const hereId = sorted.find(p => p.pages.some(s => nums.get(s) === currentPage))?.id;
+  const pageId = sorted.find(p => p.pages.some(s => nums.get(s) === currentPage))?.id;
+  const hereId = focusId && parts.some(p => p.id === focusId) ? focusId : pageId;
   const scrolledOnce = useRef(false);
   useEffect(() => {
     if (!open) { scrolledOnce.current = false; return; }

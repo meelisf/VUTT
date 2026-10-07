@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { useUser } from '../contexts/UserContext';
 import { isAtLeast } from '../utils/roleUtils';
 import EditorHeader from './editor/EditorHeader';
+import { initialEditorTab } from './editor/initialTab';
 import EditorEditTab from './editor/EditorEditTab';
 import EditorInfoHistoryTabs from './editor/EditorInfoHistoryTabs';
 import AnnotationDialog from './editor/AnnotationDialog';
@@ -57,16 +59,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setIsCustomChars,
   } = useSpecialChars(authToken);
   const copyPastePlainMarkup = useCopyPastePlainMarkup();
-  const [activeTab, setActiveTab] = useState<EditorTab>('edit');
+  const [searchParams] = useSearchParams();
+  const partParam = searchParams.get('part');
+  const [activeTab, setActiveTab] = useState<EditorTab>(() => initialEditorTab(partParam));
   const hasAppliedDefaultTab = useRef(false);
 
-  // Sünkrooni default_tab serverist (ainult esimesel laadimsel)
+  // Sünkrooni default_tab serverist (ainult esimesel laadimsel). `?part=` korral
+  // EI kirjutata üle — vt initialEditorTab.
   useEffect(() => {
     if (!hasAppliedDefaultTab.current && userSettings.default_tab) {
-      setActiveTab(userSettings.default_tab as EditorTab);
+      setActiveTab(initialEditorTab(partParam, userSettings.default_tab));
       hasAppliedDefaultTab.current = true;
     }
-  }, [userSettings.default_tab]);
+  }, [userSettings.default_tab, partParam]);
 
   const {
     lang,

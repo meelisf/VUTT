@@ -20,10 +20,14 @@ import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { useQCodeMaps } from './search/hooks/useQCodeMaps';
 import { useFilterDraft } from './search/hooks/useFilterDraft';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
+import SearchUnitToggle from './search/SearchUnitToggle';
+import LettersSearch from './search/letters/LettersSearch';
+import { readUnit } from './search/searchUnit';
 
 const RETURN_URL_KEY = 'vutt_return_url';
 
-const SearchPage: React.FC = () => {
+/** Täisteksti otsing (lehekülgede tasemel). */
+const FullTextSearch: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -149,6 +153,11 @@ const SearchPage: React.FC = () => {
                                 <Filter size={20} />
                             </button>
                         </form>
+
+                        {/* Otsingu ühik (#526): Täistekst | Kirjad */}
+                        <div className="mt-3">
+                            <SearchUnitToggle unit="text" />
+                        </div>
 
                         {/* Aktiivsed filtrid otsinguriba all */}
                         {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || selectedCollection || selection.kind === 'work_set' || urlParams.scope !== 'all' ||
@@ -452,6 +461,16 @@ const SearchPage: React.FC = () => {
             </div>
         </div>
     );
+};
+
+/**
+ * `/search`: täistekst või kirjad (`?unit=letters`, #526). Hargnemine on siin, et
+ * kumbki režiim oleks oma komponent oma hookidega — ainult üks on korraga
+ * monteeritud, seega ka ainult üks kogu URL-sünkroniseerija (ADR 0038).
+ */
+const SearchPage: React.FC = () => {
+    const [searchParams] = useSearchParams();
+    return readUnit(searchParams) === 'letters' ? <LettersSearch /> : <FullTextSearch />;
 };
 
 export default SearchPage;

@@ -145,7 +145,8 @@ def docs(tmp_path, monkeypatch):
         return True
 
     monkeypatch.setattr(ops, "send_to_meilisearch", _fake_send)
-    monkeypatch.setattr(ops, "_delete_extra_pages", lambda *a: None)
+    monkeypatch.setattr(ops, "_delete_extra_pages", lambda *a: True)
+    monkeypatch.setattr(ops, "sync_letters", lambda *a: True)  # kirjade indeks (#526) ei ole siin teema
 
     assert ops.sync_work_to_meilisearch(SLUG) is True
     return captured["docs"]

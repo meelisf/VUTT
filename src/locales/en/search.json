@@ -76,5 +76,32 @@
     "year": "Year:",
     "id": "ID:",
     "workId": "Work ID"
+  },
+  "unit": {
+    "label": "Search unit",
+    "text": "Full text",
+    "letters": "Letters"
+  },
+  "letters": {
+    "placeholder": "Search letters (text, names, places, title, abstract)...",
+    "author": "Author",
+    "addressee": "Addressee",
+    "placeFrom": "Place of writing",
+    "placeTo": "Destination",
+    "language": "Language",
+    "years": "Years",
+    "yearFrom": "From",
+    "yearTo": "To",
+    "sort": "Order",
+    "sortRelevance": "Relevance",
+    "sortDateAsc": "Oldest first",
+    "sortDateDesc": "Newest first",
+    "filterSearch": "Search...",
+    "noResults": "No letters found.",
+    "loading": "Loading letters...",
+    "pageFallback": "Letter, p. {{page}}",
+    "inWork": "In",
+    "count": "Letters: {{count}}",
+    "pages": "{{count}} p."
   }
 }

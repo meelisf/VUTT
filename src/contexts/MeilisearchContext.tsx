@@ -1,28 +1,34 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { MeiliSearch, Index } from 'meilisearch';
-import { MEILI_HOST, MEILI_INDEX } from '../config';
+import { MEILI_HOST, MEILI_INDEX, MEILI_LETTERS_INDEX } from '../config';
 import { CHECK_INTERVAL_MS, resolveTokenExpiresAt, shouldRefreshOrPromote } from '../utils/meiliTokenRefresh';
 
 const SESSION_TOKEN_KEY = 'vutt_token';
 
 interface MeilisearchContextValue {
   index: Index | null;
+  /** Kirjade indeks (#526) — sama tenant-token, mis `index`-il. */
+  lettersIndex: Index | null;
   setUserToken: (token: string) => void;
   clearUserToken: () => void;
 }
 
 const MeilisearchContext = createContext<MeilisearchContextValue>({
   index: null,
+  lettersIndex: null,
   setUserToken: () => {},
   clearUserToken: () => {},
 });
 
-function makeIndex(token: string): Index {
-  return new MeiliSearch({ host: MEILI_HOST, apiKey: token }).index(MEILI_INDEX);
+function makeIndexes(token: string): { index: Index; lettersIndex: Index } {
+  const client = new MeiliSearch({ host: MEILI_HOST, apiKey: token });
+  return { index: client.index(MEILI_INDEX), lettersIndex: client.index(MEILI_LETTERS_INDEX) };
 }
 
 export function MeilisearchProvider({ children }: { children: React.ReactNode }) {
-  const [index, setIndex] = useState<Index | null>(null);
+  // Mõlemad indeksid vahetuvad KORRAGA sama tokeniga: eri tokenitega indeksid
+  // annaksid kirjadele ja teostele eri ligipääsu.
+  const [indexes, setIndexes] = useState<{ index: Index; lettersIndex: Index } | null>(null);
   const tokenExpiresAt = useRef<number>(0);
   const isUserToken = useRef(false);
   const currentToken = useRef<string>('');
@@ -35,7 +41,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
     isUserToken.current = asUserToken;
     if (token === currentToken.current) return;
     currentToken.current = token;
-    setIndex(makeIndex(token));
+    setIndexes(makeIndexes(token));
   }, []);
 
   const fetchAnonToken = useCallback(async () => {
@@ -132,7 +138,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
   }, [refreshToken]);
 
   return (
-    <MeilisearchContext.Provider value={{ index, setUserToken, clearUserToken }}>
+    <MeilisearchContext.Provider value={{ index: indexes?.index ?? null, lettersIndex: indexes?.lettersIndex ?? null, setUserToken, clearUserToken }}>
       {children}
     </MeilisearchContext.Provider>
   );
@@ -140,6 +146,10 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
 
 export function useMeiliIndex(): Index | null {
   return useContext(MeilisearchContext).index;
+}
+
+export function useMeiliLettersIndex(): Index | null {
+  return useContext(MeilisearchContext).lettersIndex;
 }
 
 export function useMeilisearch(): MeilisearchContextValue {

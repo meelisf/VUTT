@@ -47,7 +47,7 @@ from server.utils import calculate_work_status
 # server/meili_doc.py-s. Seda kutsub nii see seed/reseed-tee kui live-tee
 # (server/meilisearch_ops.sync_work_to_meilisearch) — üks ainus tee, ei saa lahkneda.
 # get_collection_hierarchy re-eksporditud testidele (test_consolidate_data.py).
-from server.meili_doc import build_work_documents, get_collection_hierarchy
+from server.meili_doc import build_work_documents, build_letter_documents, get_collection_hierarchy
 
 
 def load_collections():
@@ -103,6 +103,7 @@ def create_meilisearch_data_per_page():
 
     # Kogu andmed teose kaupa
     works_data = {}
+    letters = []  # kirjaindeks (#526): sama build_letter_documents mis live-tees
 
     SKIP_DIRS = {'prosopography', 'config'}
     doc_dirs = sorted([d for d in os.listdir(DATA_ROOT_DIR)
@@ -115,6 +116,12 @@ def create_meilisearch_data_per_page():
         )
         if pages:
             works_data[teose_id] = pages
+            meta = {}
+            meta_path = os.path.join(doc_path, '_metadata.json')
+            if os.path.exists(meta_path):
+                with open(meta_path, 'r', encoding='utf-8') as mf:
+                    meta = json.load(mf)
+            letters.extend(build_letter_documents(meta, pages, people_data))
 
     # Kirjuta väljundfail teose staatustega
     print(f"\nArvutan teose staatused ja kirjutan väljundfaili...")
@@ -130,8 +137,13 @@ def create_meilisearch_data_per_page():
                 outfile.write(json.dumps(meili_doc, ensure_ascii=False) + '\n')
                 total_pages += 1
 
-    print(f"\nValmis! Loodud {total_pages} lehekülge {len(works_data)} teosest.")
-    print(f"Väljundfail: {OUTPUT_FILE}")
+    letters_file = os.path.join(os.path.dirname(OUTPUT_FILE), 'kirjad.jsonl')
+    with open(letters_file, 'w', encoding='utf-8') as outfile:
+        for letter in letters:
+            outfile.write(json.dumps(letter, ensure_ascii=False) + '\n')
+
+    print(f"\nValmis! Loodud {total_pages} lehekülge {len(works_data)} teosest, {len(letters)} kirja.")
+    print(f"Väljundfailid: {OUTPUT_FILE}, {letters_file}")
 
 
 if __name__ == '__main__':

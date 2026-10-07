@@ -2,10 +2,11 @@
 """
 Verifitseerib, et seed/reseed-tee (scripts/1-1_consolidate_data.py) ja live-tee
 (server/meilisearch_ops.sync_work_to_meilisearch) annavad PÄRIS serveri andmetel
-sama teose kohta IDENTSED Meilisearch dokumendid (issue #23).
+sama teose kohta IDENTSED Meilisearch dokumendid (issue #23) — lehed JA kirjad (#526).
 
 Ehitab iga teose dokumendid MÕLEMA uue koodi-tee kaudu mälus ja võrdleb need
-väli-väljalt. `send_to_meilisearch` on stub'itud → live INDEKSIT EI MUUDETA.
+väli-väljalt. `send_to_meilisearch`, `sync_letters` ja `delete_work_letters` on
+stub'itud → live INDEKSEID EI MUUDETA.
 Skript on seega TURVALINE jooksutada igal ajal (read-only otsinguindeksi suhtes;
 loeb ainult data/ failisüsteemi).
 
@@ -83,7 +84,10 @@ def main():
     ops.load_people_aliases = lambda: people
     ops.load_labels_store = lambda: labels
     ops.send_to_meilisearch = lambda documents, wait=True: (captured.__setitem__("docs", documents) or True)
-    ops._delete_extra_pages = lambda *a, **k: None
+    ops._delete_extra_pages = lambda *a, **k: True
+    # Kirjaindeks (#526): live sünk kirjutaks/kustutaks muidu PÄRIS `kirjad`-indeksis.
+    ops.sync_letters = lambda work_id, docs: (captured.__setitem__("letters", docs) or True)
+    ops.delete_work_letters = lambda work_id: True
 
     base = ops.BASE_DIR
     skip = {"prosopography", "config", "state"}
@@ -102,6 +106,7 @@ def main():
     checked = mismatches = errors = 0
     for d in dirs:
         captured["docs"] = None
+        captured["letters"] = None
         try:
             ops.sync_work_to_meilisearch(d)
         except Exception as e:  # noqa: BLE001 — raporteeri ja jätka
@@ -120,12 +125,22 @@ def main():
             st = calculate_work_status([p["status"] for p in seed_pages])
             for p in seed_pages:
                 p["teose_staatus"] = st
+            meta_path = os.path.join(base, d, "_metadata.json")
+            meta = {}
+            if os.path.exists(meta_path):
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+            seed_letters = seed.build_letter_documents(meta, seed_pages, people)
         except Exception as e:  # noqa: BLE001 — raporteeri ja jätka
             print(f"SEED ERROR  {d}: {e!r}")
             errors += 1
             continue
 
         checked += 1
+        if (captured["letters"] or []) != seed_letters:
+            print(f"LETTER DIFF {d}: live={len(captured['letters'] or [])} seed={len(seed_letters)}")
+            mismatches += 1
+            continue
         if len(live) != len(seed_pages):
             print(f"LEN DIFF    {d}: live={len(live)} seed={len(seed_pages)}")
             mismatches += 1

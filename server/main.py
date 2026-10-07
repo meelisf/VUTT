@@ -14,7 +14,7 @@ from .config import (
 from .utils import build_work_id_cache
 
 logger = get_logger(__name__)
-from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes, get_meilisearch_sync_status
+from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes, _ensure_letters_index, get_meilisearch_sync_status
 from .upload_ops import start_upload_sync_loop
 from .reocr_ops import start_reocr_background
 from .git_ops import run_git_fsck, start_git_commit_graph_loop, warm_git_index
@@ -105,6 +105,7 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=metadata_watcher_loop, daemon=True).start()
     threading.Thread(target=_keepwarm_loop, daemon=True).start()
     threading.Thread(target=_ensure_filterable_attributes, daemon=True).start()
+    threading.Thread(target=_ensure_letters_index, daemon=True).start()  # kirjade indeks (#526)
     start_historical_regions_warm_loop()
     start_upload_sync_loop()  # upload taustasünk — AINULT API-protsessis (mitte image_server import)
     start_reocr_background()  # re-OCR restardi-jätkamine (AINULT API-protsessis); orbude

@@ -152,9 +152,11 @@ def synced(tmp_path, monkeypatch):
 
     def fake_delete_extra(work_id, new_count):
         captured["deleted"] = (work_id, new_count)
+        return True
 
     monkeypatch.setattr(ops, "send_to_meilisearch", fake_send)
     monkeypatch.setattr(ops, "_delete_extra_pages", fake_delete_extra)
+    monkeypatch.setattr(ops, "sync_letters", lambda *a: True)  # kirjade indeks (#526) ei ole siin teema
 
     result = ops.sync_work_to_meilisearch(SLUG)
     assert result is True
@@ -395,7 +397,8 @@ def synced_eszett(tmp_path, monkeypatch):
     captured = {"docs": None}
     monkeypatch.setattr(ops, "send_to_meilisearch",
                         lambda documents, wait=True: captured.__setitem__("docs", documents) or True)
-    monkeypatch.setattr(ops, "_delete_extra_pages", lambda work_id, new_count: None)
+    monkeypatch.setattr(ops, "_delete_extra_pages", lambda work_id, new_count: True)
+    monkeypatch.setattr(ops, "sync_letters", lambda *a: True)  # kirjade indeks (#526) ei ole siin teema
 
     assert ops.sync_work_to_meilisearch(SLUG) is True
     return captured

@@ -37,6 +37,7 @@ def test_update_collection_visibility_updates_all_pages(tmp_path, monkeypatch):
     monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
     monkeypatch.setattr(ops, "_meilisearch_executor", SyncExecutor())
+    monkeypatch.setattr(ops, "_update_letters_is_public", lambda v: None)  # kirjad: test_meili_letters_sync
 
     sent_docs = []
 
@@ -77,6 +78,7 @@ def test_update_collection_visibility_correct_is_public_value(tmp_path, monkeypa
     monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
     monkeypatch.setattr(ops, "_meilisearch_executor", SyncExecutor())
+    monkeypatch.setattr(ops, "_update_letters_is_public", lambda v: None)  # kirjad: test_meili_letters_sync
 
     sent_docs = []
 
@@ -275,7 +277,7 @@ class TestUpsertWorkDocuments:
         """Segatud lehtede staatused → 'Töös' kantakse igale dokumendile."""
         sent = []
         monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: sent.extend(docs) or True)
-        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: True)
         docs = [{"id": "W1-1"}, {"id": "W1-2"}]
         result = _upsert_work_documents("W1", "slug", docs, ["Toores", "Valmis"])
         assert result is True
@@ -287,7 +289,7 @@ class TestUpsertWorkDocuments:
 
     def test_kõik_valmis_annab_valmis(self, monkeypatch):
         monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: True)
-        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: True)
         docs = [{"id": "W1-1"}]
         _upsert_work_documents("W1", "slug", docs, ["Valmis"])
         assert docs[0]["teose_staatus"] == "Valmis"
@@ -309,7 +311,7 @@ class TestUpsertWorkDocuments:
     def test_tagastab_send_tulemi(self, monkeypatch):
         """Tagastab send_to_meilisearch tulemi (edastus võib ebaõnnestuda)."""
         monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: False)
-        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: True)
         result = _upsert_work_documents("W1", "slug", [{"id": "W1-1"}], ["Toores"])
         assert result is False
 
@@ -415,3 +417,45 @@ class TestNormalizeEszett:
     def test_marginaalia_normaliseeritakse_samuti(self):
         main, marg = _clean_search_text("tekst\n<m>groß</m>")
         assert marg == "gross"
+
+
+# --- Kirjade indeks tokenis (#526, ADR 0065) ---
+
+def _token_rules(user):
+    from server.meilisearch_ops import generate_meili_token
+    import server.config as cfg
+    cfg.MEILI_SEARCH_KEY = "test-key-32-chars-long-padding-x"
+    cfg.MEILI_SEARCH_KEY_UID = "test-uid-1234"
+    token = generate_meili_token(user=user)
+    return jwt.decode(token, "test-key-32-chars-long-padding-x", algorithms=["HS256"])["searchRules"]
+
+
+@pytest.mark.parametrize("user", [
+    None,
+    {"role": "contributor", "allowed_collections": ["piiratud-kirjad"]},
+    {"role": "editor", "allowed_collections": []},
+    {"role": "admin"},
+])
+def test_kirjad_saavad_sama_reegli_mis_teosed(user):
+    """Võrreldakse TERVET reeglit: adminil on `{}` ilma `filter` võtmeta."""
+    rules = _token_rules(user)
+    assert set(rules) == {"teosed", "kirjad"}
+    assert rules["kirjad"] == rules["teosed"]
+
+
+def test_anonuumne_ei_nae_piiratud_kogu_kirju():
+    """Mock: piiratud kirjakogu tootmises veel ei ole — reegel peab ta välistama."""
+    rules = _token_rules(None)
+    assert rules["kirjad"] == {"filter": "is_public = true"}
+    rules = _token_rules({"role": "contributor", "allowed_collections": ["piiratud-kirjad"]})
+    assert 'collections_hierarchy IN ["piiratud-kirjad"]' in rules["kirjad"]["filter"]
+
+
+def test_teosele_piiratud_token_kirju_ei_nae():
+    from server.meilisearch_ops import generate_work_scoped_meili_token
+    import server.config as cfg
+    cfg.MEILI_SEARCH_KEY = "test-key-32-chars-long-padding-x"
+    cfg.MEILI_SEARCH_KEY_UID = "test-uid-1234"
+    payload = jwt.decode(generate_work_scoped_meili_token("abc123"),
+                         "test-key-32-chars-long-padding-x", algorithms=["HS256"])
+    assert set(payload["searchRules"]) == {"teosed"}
