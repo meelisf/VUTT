@@ -39,6 +39,19 @@ beforeEach(() => {
 });
 
 describe('WorkPartsPanel', () => {
+  it('?part= (kirjaotsingu link, #526) avab paneeli ja selle osa üksikasjad', async () => {
+    render(
+      <MemoryRouter initialEntries={['/work/w1/2?part=a']}>
+        <WorkPartsPanel workId="w1" token={null} currentPage={2} />
+      </MemoryRouter>,
+    );
+    const toggle = await screen.findByRole('button', { name: /Sisukord \(2\)/ });
+    await waitFor(() => expect(toggle.getAttribute('aria-expanded')).toBe('true'));
+    const row = document.querySelector('[data-part-id="a"]') as HTMLElement;
+    expect(row.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true');
+    expect(document.querySelector('[data-part-id="b"] button[aria-expanded="true"]')).toBeNull();
+  });
+
   it('osadeta teosel (või vea korral) paneeli pole', async () => {
     api.parts = [];
     const { container } = renderPanel();
