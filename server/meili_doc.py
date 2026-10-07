@@ -823,3 +823,89 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         ))
 
     return teose_id, pages
+
+
+def _page_stem(page_doc):
+    """Lehedokumendi failitüvi (osa `pages` viitab tüvedele, ADR 0057)."""
+    return os.path.splitext(os.path.basename(page_doc.get('lehekylje_pilt') or ''))[0]
+
+
+def build_letter_documents(meta, page_documents, people_data):
+    """Teose kirja-osad → `kirjad`-indeksi dokumendid (#526, ADR 0065).
+
+    Tuletatakse SAMA teose juba ehitatud lehedokumentidest: ligipääsuväljad
+    (`is_public`, `collections_hierarchy`) ja puhastatud tekst tulevad sealt,
+    kust teosed-is — kaks indeksit ei saa neis lahku minna. Leht, mis kuulub
+    kahte kirja, läheb mõlemasse (lehe sisest kirjapiiri VUTT ei tea).
+
+    Puuduv väli jäetakse dokumendist välja; otsitavad väljad on alati olemas
+    (attributesToSearchOn nõuab). Teose aasta kirja EI dateeri.
+    """
+    if not page_documents:
+        return []
+    by_stem = {_page_stem(d): d for d in page_documents}
+    first = page_documents[0]
+    work_id = first['work_id']
+
+    docs = []
+    for part in meta.get('parts') or []:
+        if not isinstance(part, dict) or part.get('kind') != 'letter' or not part.get('id'):
+            continue
+        # Puuduv tüvi (sünk hilineb lehetoimingust) jäetakse vahele, ei visata.
+        pages = sorted((by_stem[s] for s in part.get('pages') or [] if s in by_stem),
+                       key=lambda d: d['lehekylje_number'])
+        if not pages:
+            continue
+
+        creators = [c for c in part.get('creators') or [] if isinstance(c, dict)]
+
+        def names(role):
+            return [c.get('name') or c.get('id') for c in creators if c.get('role') == role]
+
+        def ids(role):
+            return [c['id'] for c in creators if c.get('role') == role and c.get('id')]
+
+        all_names = [c.get('name') or '' for c in creators]
+        aliases = get_creator_aliases(creators, people_data)
+        place_from = part.get('place') or {}
+        place_to = part.get('place_to') or {}
+
+        doc = {
+            'id': f"{work_id}__{part['id']}",
+            'work_id': work_id,
+            'part_id': part['id'],
+            'is_public': first.get('is_public'),
+            'collections_hierarchy': first.get('collections_hierarchy') or [],
+            'title': normalize_eszett(part.get('title') or ''),
+            'incipit': normalize_eszett(part.get('incipit') or ''),
+            'abstract': normalize_eszett(' '.join(
+                x for x in (part.get('abstract_et'), part.get('abstract_en')) if x)),
+            'authors': names('auctor'),
+            'addressees': names('addressee'),
+            'names_text': normalize_eszett(' '.join(n for n in all_names + aliases if n)),
+            'place_from': place_from.get('label') or '',
+            'place_to': place_to.get('label') or '',
+            'letter_text': '\n'.join(
+                t for d in pages for t in (d.get('lehekylje_tekst'), d.get('marginaalia_tekst')) if t),
+            'first_page': pages[0]['lehekylje_number'],
+            'page_count': len(pages),
+            'work_title': first.get('title') or '',
+            'archive_refs_text': first.get('archive_refs_text') or '',
+            'needs_review': bool(part.get('needs_review')),
+        }
+        for key, role in (('author_ids', 'auctor'), ('addressee_ids', 'addressee')):
+            found = ids(role)
+            if found:
+                doc[key] = found
+        for key, place in (('place_from_id', place_from), ('place_to_id', place_to)):
+            if place.get('id'):
+                doc[key] = place['id']
+        if part.get('languages'):
+            doc['languages'] = part['languages']
+        # Ainult kirja enda dateering: year_range=None, teose aasta ei ole varuvariant.
+        if part.get('dating'):
+            dating = index_dating({'dating': part['dating']}, None)
+            if dating['dating']:
+                doc.update(dating)
+        docs.append(doc)
+    return docs

@@ -104,3 +104,56 @@ RUNTIME_REQUIRED_FILTERABLE = {
     "year_end",
     "external_url",
 }
+
+
+# --- Kirjade indeks (#526, ADR 0065) ---
+# Üks dokument kirja-osa kohta. Väljanimed on ingliskeelsed: ADR 0006 legacy-nimed
+# kehtivad teosed-indeksis, uus indeks neid ei korda.
+LETTERS_INDEX_NAME = "kirjad"
+
+LETTERS_SEARCHABLE_ATTRIBUTES = [
+    "names_text",
+    "title",
+    "incipit",
+    "abstract",
+    "place_from",
+    "place_to",
+    "letter_text",
+    "archive_refs_text",
+    "work_title",
+]
+
+LETTERS_FILTERABLE_ATTRIBUTES = [
+    "id",                      # aegunud kirjade kustutus filtriga
+    "work_id",
+    "is_public",
+    "collections_hierarchy",
+    "authors",
+    "addressees",
+    "author_ids",
+    "addressee_ids",
+    "date_start",
+    "date_end",
+    "place_from",
+    "place_to",
+    "place_from_id",
+    "place_to_id",
+    "languages",
+]
+
+LETTERS_SORTABLE_ATTRIBUTES = [
+    "date_sort",
+]
+
+# Väljad, mis võivad dokumendist puududa — lünk andmetes, mitte viga.
+LETTERS_OPTIONAL_FIELDS = {
+    "author_ids",
+    "addressee_ids",
+    "place_from_id",
+    "place_to_id",
+    "dating",
+    "date_start",
+    "date_end",
+    "date_sort",
+    "languages",
+}
