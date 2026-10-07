@@ -467,9 +467,10 @@ def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
                 work_cols = meta.get('collections', [])
                 if collection_id not in work_cols:
                     continue
-                work_id = meta.get('work_id')
-                if not work_id:
-                    continue
+                # Teose nanoid on _metadata.json väljal `id` (mitte `work_id`), slugi
+                # varuvariant nagu meili_doc.build_work_documents-is — muidu ei leia
+                # uuendus ühtki lehedokumenti ja nähtavuse muutus jääb Meilisse jõudmata.
+                work_id = meta.get('id') or sanitize_id(folder)
                 new_is_public = any(
                     all_cols.get(c, {}).get("visibility", "public") == "public"
                     for c in work_cols
@@ -489,7 +490,9 @@ def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
             return
 
         url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents"
-        req = urllib.request.Request(url, data=json.dumps(docs_to_update).encode(), method='POST')
+        # PUT = add-or-update (osaline). POST = add-or-replace ja pühiks dokumendist
+        # kõik peale saadetud kolme välja (tekst, pealkiri, collections_hierarchy).
+        req = urllib.request.Request(url, data=json.dumps(docs_to_update).encode(), method='PUT')
         req.add_header('Authorization', f'Bearer {MEILI_KEY}')
         req.add_header('Content-Type', 'application/json')
         try:

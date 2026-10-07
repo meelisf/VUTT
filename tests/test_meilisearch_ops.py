@@ -28,7 +28,7 @@ def test_update_collection_visibility_updates_all_pages(tmp_path, monkeypatch):
     work_dir = tmp_path / "test-slug"
     work_dir.mkdir()
     (work_dir / "_metadata.json").write_text(json.dumps({
-        "work_id": work_id,
+        "id": work_id,
         "collections": ["col-restricted"],
     }))
     for i in range(1, 4):
@@ -69,7 +69,7 @@ def test_update_collection_visibility_correct_is_public_value(tmp_path, monkeypa
     work_dir = tmp_path / "test-slug2"
     work_dir.mkdir()
     (work_dir / "_metadata.json").write_text(json.dumps({
-        "work_id": work_id,
+        "id": work_id,
         "collections": ["col-restricted", "col-public"],
     }))
     (work_dir / "page_001.jpg").touch()
@@ -96,6 +96,45 @@ def test_update_collection_visibility_correct_is_public_value(tmp_path, monkeypa
 
     assert len(sent_docs) == 1
     assert sent_docs[0]["is_public"] is True
+
+
+def test_update_collection_visibility_kasutab_osalist_uuendust(tmp_path, monkeypatch):
+    """Nähtavuse uuendus PEAB olema PUT (add-or-update), mitte POST (add-or-replace).
+
+    Meili POST asendab kogu dokumendi: `{id, work_id, is_public}` pühiks lehe teksti,
+    pealkirja ja `collections_hierarchy`. Ainult meetod eristab need kaks.
+    """
+    import server.meilisearch_ops as ops
+
+    work_dir = tmp_path / "test-slug3"
+    work_dir.mkdir()
+    (work_dir / "_metadata.json").write_text(json.dumps({
+        "id": "test789",
+        "collections": ["col-restricted"],
+    }))
+    (work_dir / "page_001.jpg").touch()
+
+    monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
+    monkeypatch.setattr(ops, "_meilisearch_executor", SyncExecutor())
+
+    methods = []
+
+    class FakeResponse:
+        def read(self): return json.dumps({"taskUid": 1}).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake_urlopen(req, timeout=None):
+        methods.append(req.get_method())
+        return FakeResponse()
+
+    import urllib.request
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    ops.update_collection_is_public_async("col-restricted", False)
+
+    assert methods == ["PUT"]
 
 
 def test_generate_work_scoped_meili_token():
