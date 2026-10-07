@@ -18,4 +18,6 @@ export const IMAGE_BASE_URL = '/api/images';
 export const FILE_API_URL = '/api/files';
 
 export const MEILI_INDEX = 'teosed';
+// Kirjade indeks (#526, ADR 0065): üks dokument kirja kohta.
+export const MEILI_LETTERS_INDEX = 'kirjad';
 
