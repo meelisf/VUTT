@@ -30,6 +30,7 @@ const Upload = lazyRetry(() => import('./pages/upload/UploadPage'));
 const Review = lazyRetry(() => import('./pages/Review'));
 const Notifications = lazyRetry(() => import('./pages/Notifications'));
 const WorkManage = lazyRetry(() => import('./pages/WorkManage'));
+const PartRedirect = lazyRetry(() => import('./pages/PartRedirect'));
 const NotFound = lazyRetry(() => import('./pages/NotFound'));
 const Settings = lazyRetry(() => import('./pages/Settings'));
 const PersonsPage = lazyRetry(() => import('./prosopography/pages/PersonsPage'));
@@ -77,6 +78,12 @@ const router = createBrowserRouter([
   {
     path: "/work/:workId/manage",
     element: <Lazy><WorkManage /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Osa püsilink (#526) — lahendab esimese lehe ja suunab töölauale
+    path: "/work/:workId/part/:partId",
+    element: <Lazy><PartRedirect /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {

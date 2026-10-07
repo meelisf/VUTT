@@ -534,6 +534,8 @@
     "tocDetails": "Show part details",
     "tocAttachments": "Attachments",
     "tocEdit": "Edit part",
+    "tocCopyLink": "Copy link",
+    "tocLinkCopied": "Link copied",
     "tocPages": "p."
   },
   "zotero": {
