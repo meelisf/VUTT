@@ -26,6 +26,9 @@ interface HeaderProps {
   pageTitle?: string;
   /** Valikuline ikoon pealkirja ees */
   pageTitleIcon?: React.ReactNode;
+  /** Otsingulehe juhtnupud (Täistekst | Kirjad, #526) — täistekstotsingu nupu ja
+   *  kollektsioonivalija vahel. Ainult `md`-st laiemal; kitsamal on lüliti lehel. */
+  searchControls?: React.ReactNode;
   /** Lisa children sisu (nt otsinguväli) päise alla */
   children?: React.ReactNode;
 }
@@ -34,6 +37,7 @@ const Header: React.FC<HeaderProps> = ({
   showSearchButton = true,
   pageTitle,
   pageTitleIcon,
+  searchControls,
   children
 }) => {
   const { t } = useTranslation(['dashboard', 'common', 'auth']);
@@ -79,6 +83,13 @@ const Header: React.FC<HeaderProps> = ({
                 <Search size={16} />
                 {t('header.fullTextSearch')}
               </Link>
+            </>
+          )}
+
+          {searchControls && (
+            <>
+              <div className="h-6 w-px bg-gray-200 hidden md:block" />
+              <div className="hidden md:flex">{searchControls}</div>
             </>
           )}
 
