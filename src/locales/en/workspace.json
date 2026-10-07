@@ -535,6 +535,7 @@
     "tocAttachments": "Attachments",
     "tocEdit": "Edit part",
     "tocCopyLink": "Copy link",
+    "tocGoToStart": "go to start (p. {{page}})",
     "tocLinkCopied": "Link copied",
     "tocPages": "p."
   },

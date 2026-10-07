@@ -162,18 +162,29 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
                 className={`px-5 py-2.5 text-sm ${here ? 'bg-primary-50' : ''}`}
               >
                 <div className="flex gap-3">
-                <span className={`mt-0.5 h-fit rounded px-1.5 text-[11px] font-semibold ${KIND_STYLE[p.kind]}`}
-                  title={t(`manage.parts.kinds.${p.kind}`)}>
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-gray-900">
+                {/* Number on lisaks lehenumbritele link osa algusesse — suurem sihtmärk. */}
+                {ranges.length > 0 ? (
+                  <Link to={`/work/${workId}/${ranges[0].from}`}
+                    className={`mt-0.5 h-fit rounded px-1.5 text-[11px] font-semibold hover:ring-2 hover:ring-primary-300 ${KIND_STYLE[p.kind]}`}
+                    title={`${t(`manage.parts.kinds.${p.kind}`)} · ${t('info.tocGoToStart', { page: ranges[0].from })}`}>
+                    {i + 1}
+                  </Link>
+                ) : (
+                  <span className={`mt-0.5 h-fit rounded px-1.5 text-[11px] font-semibold ${KIND_STYLE[p.kind]}`}
+                    title={t(`manage.parts.kinds.${p.kind}`)}>
+                    {i + 1}
+                  </span>
+                )}
+                {/* Pealkirjaplokk keerab üksikasjad lahti nagu nool — nool üksi oli liiga väike sihtmärk. */}
+                <button type="button" onClick={() => toggleRow(p.id)} aria-expanded={isOpen}
+                  className="min-w-0 flex-1 rounded text-left hover:bg-gray-50">
+                  <span className="block text-gray-900">
                     {p.title || who || t(`manage.parts.kinds.${p.kind}`)}
                     {year && <span className="ml-2 tabular-nums text-gray-500">{year}</span>}
-                  </div>
-                  {p.title && who && <div className="text-xs text-gray-500">{who}</div>}
-                  {p.incipit && <div className="truncate text-xs italic text-gray-400">{p.incipit}</div>}
-                </div>
+                  </span>
+                  {p.title && who && <span className="block text-xs text-gray-500">{who}</span>}
+                  {p.incipit && <span className="block truncate text-xs italic text-gray-400">{p.incipit}</span>}
+                </button>
                 <div className="shrink-0 text-xs tabular-nums text-gray-500">
                   {t('info.tocPages')}{' '}
                   {ranges.map((r, k) => (

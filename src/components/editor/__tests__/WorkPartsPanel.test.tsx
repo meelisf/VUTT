@@ -116,6 +116,28 @@ describe('WorkPartsPanel', () => {
     expect(screen.getByRole('link', { name: '5' }).getAttribute('href')).toBe('/work/w1/5');
   });
 
+  it('osa number on link osa alguslehele; lehtedeta osal mitte', async () => {
+    api.parts = [POEM, LETTER, { ...POEM, id: 'z', title: 'Orb', pages: ['kadunud'] }];
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(3\)/ }));
+    expect(screen.getByRole('link', { name: '1' }).getAttribute('href')).toBe('/work/w1/2');
+    expect(screen.getByRole('link', { name: '2' }).getAttribute('href')).toBe('/work/w1/7');
+    expect(screen.queryByRole('link', { name: '3' })).toBeNull();
+    expect(screen.getByText('3')).toBeTruthy();
+  });
+
+  it('pealkirjale klõps keerab osa üksikasjad lahti ja kinni', async () => {
+    api.parts = [{ ...POEM, abstract_et: 'Pulmaluuletus.' }];
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(1\)/ }));
+    const title = screen.getByRole('button', { name: /Carmen/ });
+    fireEvent.click(title);
+    expect(screen.getByText('Pulmaluuletus.')).toBeTruthy();
+    expect(title.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(title);
+    expect(screen.queryByText('Pulmaluuletus.')).toBeNull();
+  });
+
   it('avatud olek jääb meelde', async () => {
     const r = renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: /Sisukord/ }));
