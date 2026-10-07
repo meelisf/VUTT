@@ -10,6 +10,11 @@ Kirju ei saa otsida kirjadena. Autori, adressaadi, aasta ega saatmis- või sihtk
 ei saa üle korpuse filtreerida. Teose osad (#464) andsid kirjadele registri teose sees,
 aga Meili otsing osade kaupa jäi v1-st välja.
 
+## Korpus (tootmine, 2026-10-07)
+
+132 kirja-osa (`kind == "letter"`); neist 27 dateeringuta ja 126 ilma koha ID-ta. Lisaks
+13 lisa, 24 luuletust, 7 proosat, 4 kõnet.
+
 ## Otsused arutelust
 
 1. **Kandja.** Rara digib **mapi kaupa**, ka siis, kui köide on konserveerimiseks lahti
@@ -145,11 +150,10 @@ ei saa neis lahku minna.
   tervisekontrollis (`mark_error`) ja logis; taaste = teose järgmine salvestus või
   `scripts/sync_meilisearch.py` (sh `--letters`). Aegunud kirjadokument, mis jäi
   kustutusvea tõttu alles, ei leki nähtavuse muutusel (vt allpool).
-- **Nähtavuse massuuendus** (`update_collection_is_public_async`). **Olemasolev viga:**
-  tee saadab `teosed`-isse POST-iga ainult `{id, work_id, is_public}`; Meili POST on
-  *add-or-replace* ja asendab kogu dokumendi, nii et nähtavuse vahetus pühib lehtede teksti
-  ja `collections_hierarchy` järgmise sünkini. Parandus (eraldi PR, enne seda spekki):
-  **PUT** (*add-or-update*, osaline uuendus). Kirjade jaoks:
+- **Nähtavuse massuuendus** (`update_collection_is_public_async`). Parandatud eraldi
+  PR-is #561: tee luges id-d valelt väljalt (`work_id`, tootmises 0/1422) ega jõudnud
+  kunagi Meilisse, ja kirjutus oli POST (*add-or-replace*). Nüüd `id` + **PUT**
+  (*add-or-update*). Kirjade jaoks:
   - sihtmärk on **kõik indeksis olevad** selle teose kirjadokumendid, mitte `_metadata.json`
     praegused osad — id-d küsitakse Meilist (`POST /indexes/kirjad/documents/fetch`,
     `filter: work_id = X`, `fields: ["id"]`), et kustutusvea tõttu alles jäänud vana kiri
@@ -181,11 +185,10 @@ ei saa neis lahku minna.
   mõlemal sama.
 - `generate_work_scoped_meili_token` (lingiga jagatud teos) `kirjad`-i **ei anna**.
   Jagatav teos on avatav, mitte otsitav (ADR 0042 `is_search_visible`).
-- **Otsinguvõti.** Meili võtme `indexes` loendit ei saa pärast loomist muuta. Deploy
-  esimene samm kontrollib serveris `GET /keys`. Kui `MEILI_SEARCH_KEY` on piiratud
-  `["teosed"]`-iga, luuakse uus otsinguvõti (`actions: ["search"]`,
-  `indexes: ["teosed", "kirjad"]`) ja vahetatakse env-is `MEILI_SEARCH_KEY` /
-  `MEILI_SEARCH_KEY_UID` (ADR 0021 nimed). Juba antud tokenid aeguvad ise (15 min / 1 h).
+- **Otsinguvõti** (kontrollitud 2026-10-07): `MEILI_SEARCH_KEY` = „Default Search API Key",
+  `indexes: ["*"]`. Uut võtit ega env-i muudatust ei ole vaja; indeksite piiramine käib
+  ainult tenant-tokeni `searchRules`-i kaudu — **indeks, mida `searchRules`-is pole, on
+  tokenile kättesaamatu**, seega `kirjad` peab sinna selgesõnaliselt minema.
 - **nginx:** `/meili/` proksi ei vali indeksit. Plaan kontrollib seda `nginx.host.conf`-is.
 
 ## 4. Kasutajaliides
@@ -301,10 +304,8 @@ korral `WorkPartsPanel`-is selle osa. Uut marsruuti ei tule.
 
 ## 7. Deploy
 
-0. **Eelnev PR:** `update_collection_is_public_async` POST → PUT (`teosed`), test +
-   tootmises ühekordne reindeks, kui mõne kogu nähtavust on pärast viimast seedi vahetatud.
-1. Serveris `GET /keys`: kas otsinguvõti katab `kirjad`-i? Vajadusel uus võti ja env-i
-   vahetus (§3).
+1. Eeldus: PR #561 (nähtavuse massuuendus) on main'is. Otsinguvõti katab juba kõik
+   indeksid (§3), võtmesammu pole.
 2. Backend: `./scripts/server_update.sh --no-cache`. Stardil luuakse `kirjad` ja selle
    seaded.
 3. `scripts/sync_meilisearch.py --letters` (serveris host-venviga) täidab indeksi.
