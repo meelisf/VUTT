@@ -17,6 +17,8 @@ import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
+import { getWorkSetWorkIds } from '../services/workSetService';
+import { collectionForWorkSearch } from '../utils/workSearchSelection';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { needsPageLoad, pageLoadKey } from './workspacePageLoad';
 import MetadataModal from '../components/MetadataModal';
@@ -33,7 +35,7 @@ const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired, isLoading: authInitializing } = useUser();
   const isAdmin = isAtLeast(user?.role, 'admin');
-  const { collections, selectedCollection, setSelectedCollection } = useCollection();
+  const { collections, selection, setSelectedCollection } = useCollection();
   const index = useMeiliIndex();
   const [viewerToken, setViewerToken] = useState<string | null>(null);
   const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
@@ -490,13 +492,15 @@ const Workspace: React.FC = () => {
   };
 
   // Navigeerimine otsingusse (selle teose piires)
-  const handleNavigateToSearch = () => {
+  const handleNavigateToSearch = async () => {
     const workCollections = work?.collections_hierarchy ?? work?.collections ?? [];
-    const workCollection = workCollections[0] ?? null;
-    // Ära kirjuta üle, kui praegune valik on juba teose hierarhias (nt virtuaalkollektsioon)
-    if (workCollection && !workCollections.includes(selectedCollection ?? '')) {
-      setSelectedCollection(workCollection);
+    // Valik, mis teost juba sisaldab, jääb — ka töökollektsioon (vt collectionForWorkSearch).
+    let workSetIds: string[] | null = null;
+    if (selection.kind === 'work_set') {
+      workSetIds = await getWorkSetWorkIds(selection.id).catch(() => null);
     }
+    const switchTo = collectionForWorkSearch(selection, workCollections, workId ?? '', workSetIds);
+    if (switchTo) setSelectedCollection(switchTo);
     runGuarded(() => navigate(`/search?work=${workId}`));
   };
 
