@@ -482,3 +482,42 @@ def test_isikute_liitmine_ei_kaota_id_ga_ega_nimetamata_rolli_isikut():
                         {"name": "Fischer", "role": "addressee"}]}
     merged = wpp.merge_part(old, {"creators": [{"name": "Kaasautor", "role": "auctor"}]})
     assert [c["name"] for c in merged["creators"]] == ["Spener", "Fischer", "Kaasautor"]
+
+
+# ── ADR 0066: part_id asendab täidetud teksti, märkus ainult täieneb ─────────
+
+def test_part_id_asendab_teksti_ja_markus_taieneb():
+    old = {"kind": "session", "pages": ["t-001"], "title": "Vana", "abstract_et": "Inimese kokkuvõte.",
+           "notes": "Käsitsi märkus"}
+    new = {"kind": "session", "pages": ["t-001"], "title": "Uus", "abstract_et": "Parem kokkuvõte.",
+           "notes": "Kuupäev OCR-ist."}
+    auto = wpp.merge_part(old, new)
+    assert (auto["title"], auto["abstract_et"], auto["notes"]) == ("Vana", "Inimese kokkuvõte.", "Käsitsi märkus")
+    explicit = wpp.merge_part(old, new, explicit=True)
+    assert (explicit["title"], explicit["abstract_et"]) == ("Uus", "Parem kokkuvõte.")
+    assert explicit["notes"] == "Käsitsi märkus\n\nKuupäev OCR-ist."
+    # Korduv sama märkus ei kordu; tühi väärtus ei kustuta.
+    again = wpp.merge_part(explicit, {**new, "title": ""}, explicit=True)
+    assert again["notes"] == explicit["notes"] and again["title"] == "Uus"
+
+
+def test_tekstimuutused_naitavad_vana_ja_pakutud_teksti():
+    old = {"title": "Vana", "notes": "Märkus", "abstract_et": "Sama."}
+    new = {"title": "Uus", "notes": "Lisa.", "abstract_et": "Sama.", "incipit": "Uus algus"}
+    explicit = wpp.text_changes(old, new, wpp.merge_part(old, new, explicit=True))
+    assert explicit == {"title": {"old": "Vana", "proposed": "Uus", "effect": "replace"},
+                        "notes": {"old": "Märkus", "proposed": "Lisa.", "effect": "append"}}
+    auto = wpp.text_changes(old, new, wpp.merge_part(old, new))
+    assert {k: v["effect"] for k, v in auto.items()} == {"title": "kept", "notes": "kept"}
+
+
+def test_asendus_ei_puutu_ankrut(work):
+    old = wp.create_part(work, {"kind": "letter", "pages": ["t-002", "t-003"], "abstract_et": "Kiri.",
+                                "abstract_en": "Letter.", wp.CONFIRM: True}, "ed")
+    assert old[wp.ANCHOR]
+    _submit(work, [{**LETTER, "part_id": old["id"], "abstract_en": "A letter."}])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    assert p["items"][0]["text_changes"]["abstract_en"]["effect"] == "replace"
+    wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept")
+    (part,) = _meta(work)["parts"]
+    assert part["abstract_en"] == "A letter." and part[wp.ANCHOR] == old[wp.ANCHOR]

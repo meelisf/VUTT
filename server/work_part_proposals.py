@@ -34,8 +34,11 @@ MAX_PARTS = 50
 MAX_BODY_BYTES = 64_000
 _PART_KEYS = {"kind", "title", "incipit", "notes", "abstract_et", "abstract_en", "pages", "creators", "dating", "place",
               "place_to", "languages", "attached_to", "evidence", "part_id"}
-# Liitmine olemasoleva osaga: inimese kirjutatud tekst jääb, kui on täidetud.
+# Liitmine olemasoleva osaga (ADR 0066): automaatselt tuvastatud osal jääb inimese tekst,
+# kui väli on täidetud. Agendi `part_id`-ga asendub tekst; `notes` (toimetaja märkus)
+# ainult täieneb. Toimetaja näeb mõlemal juhul vana ja pakutud teksti (`text_changes`).
 _KEEP_EXISTING_TEXT = ("title", "incipit", "notes", "abstract_et", "abstract_en")
+_APPEND_ONLY_TEXT = ("notes",)
 _EVIDENCE_KEYS = {"page", "quote"}
 MAX_PERSONS = 50
 _PERSON_KEYS = {"ref", "name", "aliases", "birth_year", "death_year", "identifiers", "note", "evidence"}
@@ -230,13 +233,22 @@ def _precision(dating) -> int:
 def merge_part(existing: dict, proposed: dict, explicit: bool = False) -> dict:
     """Olemasolev osa + agendi parandus (ilma id ja needs_review'ta, update_part'ile).
 
-    `explicit` = agent ütles `part_id`: parandus võidab ka täidetud väljal. Muidu
-    (automaatselt tuvastatud sama osa) on liitmine konservatiivne. Dateering ei muutu
-    kunagi ebatäpsemaks; koht ei vahetu ainult keele pärast („Paris" / „Pariis").
+    `explicit` = agent ütles `part_id`: parandus võidab ka täidetud väljal, märkus ainult
+    täieneb (ADR 0066). Muidu (automaatselt tuvastatud sama osa) on liitmine konservatiivne.
+    Dateering ei muutu kunagi ebatäpsemaks; koht ei vahetu ainult keele pärast
+    („Paris" / „Pariis"). Ankrut ei puututa — `update_part` hoiab eelmise (ADR 0039).
     """
     out = {k: v for k, v in existing.items() if k not in ("id", "needs_review")}
     for key in _KEEP_EXISTING_TEXT:
-        if not out.get(key) and proposed.get(key):
+        new, old = (proposed.get(key) or "").strip(), (out.get(key) or "").strip()
+        if not new or new == old:
+            continue
+        if not old:
+            out[key] = proposed[key]
+        elif explicit and key in _APPEND_ONLY_TEXT:
+            if new not in old:
+                out[key] = f"{out[key].rstrip()}\n\n{new}"
+        elif explicit:
             out[key] = proposed[key]
     if proposed.get("kind") and explicit:
         out["kind"] = proposed["kind"]
@@ -267,6 +279,21 @@ def merge_part(existing: dict, proposed: dict, explicit: bool = False) -> dict:
         elif c.get("id") and not match.get("id"):
             match.update({"id": c["id"], **({"source": c["source"]} if c.get("source") else {})})
     out["creators"] = creators
+    return out
+
+
+def text_changes(existing: dict, proposed: dict, merged: dict) -> dict:
+    """Täidetud tekstiväljad, millele ettepanek pakub teist teksti: vana, pakutud ja mis
+    vastuvõtul juhtub (`replace` | `append` | `kept`). Vorm näitab neid, et toimetaja näeks
+    asendust enne kinnitamist ja et pakutud tekst ei kaoks vaikselt (ADR 0066)."""
+    out = {}
+    for key in _KEEP_EXISTING_TEXT:
+        old, new = (existing.get(key) or "").strip(), (proposed.get(key) or "").strip()
+        if not old or not new or old == new:
+            continue
+        result = (merged.get(key) or "").strip()
+        effect = "kept" if result == old else ("append" if key in _APPEND_ONLY_TEXT else "replace")
+        out[key] = {"old": existing[key], "proposed": proposed[key], "effect": effect}
     return out
 
 
@@ -353,6 +380,7 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
                     # Sama liitmine, mida vastuvõtt teeb — „Muuda" vorm alustab sellest.
                     existing = next(x for x in parts_now if x.get("id") == it["target_part_id"])
                     it["merged"] = merge_part(existing, it["part"], explicit=bool(it.get("explicit_target")))
+                    it["text_changes"] = text_changes(existing, it["part"], it["merged"])
             it["page_numbers"] = [number[s] for s in it["part"]["pages"] if s in number]
             it["missing_pages"] = [s for s in it["part"]["pages"] if s not in number]
         out.append({"proposal_id": row["id"], "created_at": row["created_at"],

@@ -147,6 +147,16 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
                   const label = tgt ? (tgt.title || t(`manage.parts.kinds.${tgt.kind}`)) : item.target_part_id;
                   return <div className="text-xs font-medium text-violet-800">{tp('updatesExisting', { label })}</div>;
                 })()}
+                {item.text_changes && Object.entries(item.text_changes).map(([field, change]) => change && (
+                  <div key={field} className="mt-1 text-xs">
+                    <span className="font-medium text-gray-700">{tp(`changes.fields.${field}`)}</span>
+                    <span className={`ml-1 ${change.effect === 'kept' ? 'text-gray-500' : 'text-violet-800'}`}>
+                      ({tp(`changes.${change.effect}`)})
+                    </span>
+                    <div className={`text-gray-500 ${change.effect === 'replace' ? 'line-through' : ''}`}>{change.old}</div>
+                    <div className="text-gray-900">{change.effect === 'append' ? `+ ${change.proposed}` : change.proposed}</div>
+                  </div>
+                ))}
               </div>
               <div className="flex shrink-0 gap-1">
                 <button type="button" disabled={busy} onClick={() => void decide(p.proposal_id, index, 'accept')}

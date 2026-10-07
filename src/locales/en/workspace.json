@@ -328,6 +328,18 @@
         "linkExisting": "Link to existing",
         "keepName": "Keep as name",
         "update": "Update",
+        "changes": {
+          "replace": "replaces",
+          "append": "appended to the note",
+          "kept": "not applied: the filled field stays",
+          "fields": {
+            "title": "Title",
+            "incipit": "Incipit",
+            "notes": "Editorial note",
+            "abstract_et": "Summary in Estonian",
+            "abstract_en": "Summary in English"
+          }
+        },
         "addAsNew": "Add as new",
         "updatesExisting": "Corrects existing part: {{label}}",
         "acceptAll": "Add all ({{count}})",

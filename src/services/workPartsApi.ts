@@ -64,7 +64,12 @@ export interface PartProposalItem {
   target_part_id?: string | null;
   /** Olemasolev osa + parandus (sama liitmine, mida vastuvõtt teeb). */
   merged?: PartInput;
+  /** Täidetud tekstiväljad, millele agent pakub teist teksti (ADR 0066). */
+  text_changes?: Partial<Record<PartTextField, PartTextChange>>;
 }
+export type PartTextField = 'title' | 'incipit' | 'notes' | 'abstract_et' | 'abstract_en';
+/** `replace` = asendub, `append` = lisatakse märkusele, `kept` = jääb (agent ei andnud `part_id`-d). */
+export interface PartTextChange { old: string; proposed: string; effect: 'replace' | 'append' | 'kept'; }
 /** Agendi pakutud uus isik (#492): ootel, kuni toimetaja loob, seob või jätab nimeks. */
 export interface ProposedPerson {
   ref: string; name: string; aliases?: string[]; birth_year?: number; death_year?: number;

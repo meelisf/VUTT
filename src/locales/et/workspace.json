@@ -328,6 +328,18 @@
         "linkExisting": "Seo olemasolevaga",
         "keepName": "Jäta nimeks",
         "update": "Uuenda",
+        "changes": {
+          "replace": "asendub",
+          "append": "lisatakse märkusele",
+          "kept": "ei rakendu: täidetud väli jääb",
+          "fields": {
+            "title": "Pealkiri",
+            "incipit": "Algus",
+            "notes": "Toimetaja märkus",
+            "abstract_et": "Kokkuvõte eesti keeles",
+            "abstract_en": "Kokkuvõte inglise keeles"
+          }
+        },
         "addAsNew": "Lisa uuena",
         "updatesExisting": "Parandab olemasolevat osa: {{label}}",
         "acceptAll": "Lisa kõik ({{count}})",
