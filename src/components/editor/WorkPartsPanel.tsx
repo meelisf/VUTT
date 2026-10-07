@@ -76,9 +76,11 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
   const [searchParams] = useSearchParams();
   const focusId = searchParams.get('part');
   const focusedOnce = useRef<string | null>(null);
+  const pendingFocusScroll = useRef(false);
   useEffect(() => {
     if (!focusId || focusedOnce.current === focusId || !parts.some(p => p.id === focusId)) return;
     focusedOnce.current = focusId;
+    pendingFocusScroll.current = true;
     setOpen(true);
     setExpanded(prev => new Set(prev).add(focusId));
   }, [focusId, parts]);
@@ -109,6 +111,18 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
     list.scrollTo?.({ top: Math.max(0, top), behavior: scrolledOnce.current ? 'smooth' : 'auto' });
     scrolledOnce.current = true;
   }, [open, hereId]);
+
+  // Sügavlingi (`?part=`) erand ülaltoodud reeglile: teose info on paneeli kohal ja
+  // osa jääks muidu nähtavast alast välja. Ühekordselt kerime ka kõrvalpaneeli nii,
+  // et osa rida (koos lahtikeeratud üksikasjadega) on üleval. Peab jääma kasti
+  // keskendamise efekti JÄRELE, muidu keskendamine kirjutab selle üle.
+  useEffect(() => {
+    if (!pendingFocusScroll.current || !open || !focusId) return;
+    const row = listRef.current?.querySelector<HTMLElement>(`[data-part-id="${focusId}"]`);
+    if (!row) return;
+    pendingFocusScroll.current = false;
+    row.scrollIntoView?.({ block: 'start' });
+  }, [open, focusId, expanded]);
 
   if (!workId || parts.length === 0) return null;
 
