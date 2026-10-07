@@ -120,6 +120,8 @@ def test_update_collection_visibility_kasutab_osalist_uuendust(tmp_path, monkeyp
     monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
     monkeypatch.setattr(ops, "_meilisearch_executor", SyncExecutor())
 
+    # Kirjade nähtavus (#526) on oma test: test_meili_letters_sync.
+    monkeypatch.setattr(ops, "_update_letters_is_public", lambda v: None)
     methods = []
 
     class FakeResponse:
