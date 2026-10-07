@@ -76,5 +76,32 @@
     "year": "Aasta:",
     "id": "ID:",
     "workId": "Teose ID"
+  },
+  "unit": {
+    "label": "Otsingu ühik",
+    "text": "Täistekst",
+    "letters": "Kirjad"
+  },
+  "letters": {
+    "placeholder": "Otsi kirjadest (tekst, nimed, kohad, pealkiri, kokkuvõte)...",
+    "author": "Autor",
+    "addressee": "Adressaat",
+    "placeFrom": "Saatmiskoht",
+    "placeTo": "Sihtkoht",
+    "language": "Keel",
+    "years": "Aastad",
+    "yearFrom": "Alates",
+    "yearTo": "Kuni",
+    "sort": "Järjestus",
+    "sortRelevance": "Asjakohasus",
+    "sortDateAsc": "Vanemad ees",
+    "sortDateDesc": "Uuemad ees",
+    "filterSearch": "Otsi...",
+    "noResults": "Kirju ei leitud.",
+    "loading": "Laen kirju...",
+    "pageFallback": "Kiri, lk {{page}}",
+    "inWork": "Teoses",
+    "count": "Kirju: {{count}}",
+    "pages": "{{count}} lk"
   }
 }
