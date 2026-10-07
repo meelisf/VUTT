@@ -382,6 +382,8 @@
       "translateError": "Tõlkimine ebaõnnestus.",
       "save": "Salvesta osa",
       "delete": "Kustuta osa",
+      "deleteConfirmTitle": "Kustuta osa?",
+      "deleteConfirm": "Osa „{{title}}” kustutatakse. Lehed ja nende tekst jäävad alles.",
       "openPage": "Ava leht töölaual",
       "sharedWarning": "Leht {{stem}} kuulub ka teise osasse; sellel lehel mainitud isikud seotakse mõlemaga.",
       "error": "Salvestamine ebaõnnestus: {{message}}",

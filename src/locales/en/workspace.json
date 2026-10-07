@@ -382,6 +382,8 @@
       "translateError": "Translation failed.",
       "save": "Save part",
       "delete": "Delete part",
+      "deleteConfirmTitle": "Delete part?",
+      "deleteConfirm": "The part “{{title}}” will be deleted. The pages and their text are kept.",
       "openPage": "Open page in workspace",
       "sharedWarning": "Page {{stem}} also belongs to another part; persons mentioned on this page are linked to both.",
       "error": "Saving failed: {{message}}",

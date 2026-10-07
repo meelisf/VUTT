@@ -258,6 +258,7 @@ const PartEditPanel: React.FC<{ workId: string; token: string | null; part: Work
           dirty={dirty}
           onSave={() => { void save(); }}
           onDelete={() => { void remove(); }}
+          onClose={() => (dirty ? setConfirmClose(true) : onClose())}
         />
       </PartPanel>
       <UnsavedChangesDialog
