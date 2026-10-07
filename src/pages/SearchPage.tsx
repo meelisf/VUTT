@@ -115,7 +115,7 @@ const FullTextSearch: React.FC = () => {
 
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
-            <Header>
+            <Header searchControls={<SearchUnitToggle unit="text" />}>
                 {/* Otsingu vorm */}
                 <div className="bg-white border-b border-gray-200 px-6 py-4">
                     <div className="max-w-7xl mx-auto">
@@ -154,8 +154,8 @@ const FullTextSearch: React.FC = () => {
                             </button>
                         </form>
 
-                        {/* Otsingu ühik (#526): Täistekst | Kirjad */}
-                        <div className="mt-3">
+                        {/* Otsingu ühik (#526): laial ekraanil päises, kitsal siin */}
+                        <div className="mt-3 md:hidden">
                             <SearchUnitToggle unit="text" />
                         </div>
 

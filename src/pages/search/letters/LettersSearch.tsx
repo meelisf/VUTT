@@ -61,7 +61,7 @@ const LettersSearch: React.FC = () => {
 
   return (
     <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
-      <Header>
+      <Header searchControls={<SearchUnitToggle unit="letters" />}>
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="max-w-7xl mx-auto">
             <form onSubmit={submit} className="flex gap-2">
@@ -92,7 +92,8 @@ const LettersSearch: React.FC = () => {
               </button>
             </form>
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              <SearchUnitToggle unit="letters" />
+              {/* Otsingu ühik (#526): laial ekraanil päises, kitsal siin */}
+              <div className="md:hidden"><SearchUnitToggle unit="letters" /></div>
               {selection.kind !== 'all' && (
                 <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-800 rounded-full text-xs font-medium border border-primary-200">
                   <Library size={11} />
