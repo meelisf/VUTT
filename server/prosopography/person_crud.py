@@ -282,15 +282,16 @@ def _make_date_obj(year) -> dict:
 def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> None:
     """Uuendab teoste _metadata.json creator/tag/publisher labelid kui nimi muutus."""
     # Import siin säilitab vana testitava käitumise: patch("server.config.BASE_DIR")
-    # ja patch("server.git_ops.save_with_git") mõjutavad seda helperit.
+    # ja patch("server.git_ops.save_with_git") mõjutavad seda helperit (vt
+    # _commit_propagated_names).
     from ..config import BASE_DIR as data_dir
-    from ..git_ops import save_with_git
 
     sync_from_facade()
     if not os.path.exists(data_dir):
         return
 
     changed_files = []
+    parts_dirs = []  # teosed, mille OSADES isik esineb (#526) — kirjutatakse work_parts kaudu
     for work_entry in os.scandir(data_dir):
         if not work_entry.is_dir():
             continue
@@ -325,9 +326,26 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
                 changed = True
         if changed:
             changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
+        if any(isinstance(c, dict) and c.get("id") == person_id
+               for p in meta.get("parts") or [] if isinstance(p, dict)
+               for c in p.get("creators") or []):
+            parts_dirs.append(work_entry.path)
 
-    if not changed_files:
-        return
+    if changed_files:
+        _commit_propagated_names(person_id, new_label, username, changed_files)
+
+    # Osad muutuvad AINULT work_parts kaudu luku all (ADR 0057); see teeb ka
+    # oma commiti ja Meili sünki. Üks vigane teos ei peata teisi.
+    from .. import work_parts
+    for work_dir in parts_dirs:
+        try:
+            work_parts.relabel_person(work_dir, person_id, new_label, username)
+        except Exception as e:
+            state.logger.warning("Osade nimeuuendus ebaõnnestus (%s): %s", work_dir, e)
+
+
+def _commit_propagated_names(person_id: str, new_label: str, username: str, changed_files: list) -> None:
+    from ..git_ops import save_with_git
 
     commit_msg = f"Prosopo nime uuendus ({person_id}): {new_label}"
     primary_path, primary_content = changed_files[0]

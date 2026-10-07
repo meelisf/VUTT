@@ -8,6 +8,7 @@ salvestusega), et samaaegsed toimetajad ei kirjutaks teineteise osi üle.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Optional
@@ -197,6 +198,32 @@ def _write(work_dir: str, username: str, message: str, mutate, background_tasks=
     if res.get("updated"):
         _refresh_mention_parts(work_dir)
     return box.get("result")
+
+
+def relabel_person(work_dir: str, person_id: str, new_label: str, username: str) -> bool:
+    """Isikukaardi nimemuutus osade `creators`-isse (#526: nimi on kirjaindeksis).
+
+    Käib `_write` kaudu (work_lock + metadata_lock, ADR 0057), mitte otsekirjutusena.
+    Tagastab False, kui teose osades pole seda isikut vana nimega — siis ei kirjutata.
+    """
+    try:
+        with open(os.path.join(work_dir, "_metadata.json"), encoding="utf-8") as f:
+            parts = json.load(f).get("parts") or []
+    except (OSError, ValueError):
+        return False
+    if not any(c.get("id") == person_id and c.get("name") != new_label
+               for p in parts for c in p.get("creators") or []):
+        return False
+
+    def mutate(current: list, _stems: list) -> tuple[list, bool]:
+        for p in current:
+            for c in p.get("creators") or []:
+                if c.get("id") == person_id:
+                    c["name"] = new_label
+        return current, True
+
+    _write(work_dir, username, f"Prosopo nime uuendus osades ({person_id}): {new_label}", mutate)
+    return True
 
 
 def _refresh_mention_parts(work_dir: str) -> None:

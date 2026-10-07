@@ -172,3 +172,48 @@ def test_publisher_and_creator_both_updated(tmp_path):
     meta = _read_meta(meta_path)
     assert meta["creators"][0]["label"] == "Karl XII"
     assert meta["publisher"]["label"] == "Karl XII"
+
+
+# -- teose osad (#526: nimi denormaliseeritakse kirjaindeksisse) --
+
+def test_isik_ainult_osas_saab_osade_uuenduse(tmp_path):
+    """Isik ainult kirja osas (mitte teose creators-is) → osad uuendatakse
+    work_parts kaudu (ADR 0057: luku all), teisi teoseid ei puudutata."""
+    _write_meta(tmp_path / "teos1", {
+        "creators": [], "tags": [],
+        "parts": [{"id": "p1", "kind": "letter", "pages": [],
+                   "creators": [{"id": PERSON_ID, "name": "Vana", "role": "auctor"}]}],
+    })
+    _write_meta(tmp_path / "teos2", {"creators": [], "tags": [], "parts": []})
+    with patch("server.work_parts.relabel_person", return_value=True) as relabel:
+        _run(tmp_path)
+    relabel.assert_called_once_with(str(tmp_path / "teos1"), PERSON_ID, "Karl XII", "testuser")
+
+
+def test_relabel_person_muudab_ainult_seda_isikut(tmp_path):
+    from server import work_parts
+    meta_path = _write_meta(tmp_path / "teos1", {"parts": [
+        {"id": "p1", "creators": [{"id": PERSON_ID, "name": "Vana", "role": "auctor"},
+                                  {"id": OTHER_ID, "name": "Teine", "role": "addressee"}]},
+    ]})
+    captured = {}
+
+    def fake_write(work_dir, username, message, mutate, background_tasks=None):
+        parts = _read_meta(meta_path)["parts"]
+        captured["parts"], _ = mutate(parts, [])
+        captured["message"] = message
+
+    with patch.object(work_parts, "_write", side_effect=fake_write):
+        assert work_parts.relabel_person(str(tmp_path / "teos1"), PERSON_ID, "Uus", "u") is True
+    names = {c["id"]: c["name"] for c in captured["parts"][0]["creators"]}
+    assert names == {PERSON_ID: "Uus", OTHER_ID: "Teine"}
+
+
+def test_relabel_person_ei_kirjuta_kui_muuta_pole(tmp_path):
+    from server import work_parts
+    _write_meta(tmp_path / "teos1", {"parts": [
+        {"id": "p1", "creators": [{"id": PERSON_ID, "name": "Uus", "role": "auctor"}]},
+    ]})
+    with patch.object(work_parts, "_write") as write:
+        assert work_parts.relabel_person(str(tmp_path / "teos1"), PERSON_ID, "Uus", "u") is False
+    write.assert_not_called()
