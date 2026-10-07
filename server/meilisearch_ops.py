@@ -48,7 +48,10 @@ logger = get_logger(__name__)
 
 # Meilisearch päringu timeout sekundites
 MEILI_TIMEOUT = 10
-from .meili_settings import RUNTIME_REQUIRED_FILTERABLE
+from .meili_settings import (
+    RUNTIME_REQUIRED_FILTERABLE, MAX_VALUES_PER_FACET, LETTERS_INDEX_NAME,
+    LETTERS_SEARCHABLE_ATTRIBUTES, LETTERS_FILTERABLE_ATTRIBUTES, LETTERS_SORTABLE_ATTRIBUTES,
+)
 from .git_ops import commit_new_work_to_git
 from .heartbeat import mark_error, mark_success, register_job
 
@@ -61,6 +64,7 @@ from .meili_doc import (
     _clean_search_text, _invert_name, get_creator_aliases, normalize_creator,
     _compute_work_aliases, get_collection_hierarchy, _build_page_document,
     compute_autor_respondens, get_work_metadata, build_work_documents,
+    build_letter_documents,
 )
 
 
@@ -197,17 +201,139 @@ def sync_work_to_meilisearch(dir_name):
     people_data = load_people_aliases()
     labels_store = load_labels_store()
 
+    # Kirjade allikas on _metadata.json `parts` (#526). Loetamatu meta → kirju ei
+    # puudutata: tühi osade loend kustutaks indeksist kõik selle teose kirjad.
+    meta = _read_work_meta(dir_path)
+    if meta is None:
+        logger.warning(f"SÜNK: _metadata.json loetamatu: {dir_name}")
+        return False
+
     # Ehita kõik lehe-dokumendid jagatud teel.
     teose_id, documents = build_work_documents(
         dir_path, dir_name, collections, people_data, _archives, labels_store
     )
     if not documents:
+        # Lehti pole → kirju pole: kustuta enne väljumist, muidu jääks vana kiri otsingusse.
+        delete_work_letters(meta.get('id') or teose_id)
         logger.warning(f"SÜNK: Pilte/dokumente ei leitud kaustas: {dir_name}")
         return False
 
     work_id = documents[0]['work_id']
     page_statuses = [d['status'] for d in documents]
-    return _upsert_work_documents(work_id, teose_id, documents, page_statuses)
+    pages_ok = _upsert_work_documents(work_id, teose_id, documents, page_statuses)
+    # Kirjad jooksevad ka lehtede tõrke korral (ei blokeeri teineteist), aga sünk
+    # õnnestub ainult siis, kui mõlemad õnnestusid.
+    letters_ok = sync_letters(work_id, build_letter_documents(meta, documents, people_data))
+    return bool(pages_ok) and letters_ok
+
+
+def _read_work_meta(dir_path):
+    """Teose _metadata.json; puuduv fail = {} (osi pole), loetamatu = None."""
+    meta_path = os.path.join(dir_path, '_metadata.json')
+    if not os.path.exists(meta_path):
+        return {}
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        return meta if isinstance(meta, dict) else None
+    except Exception:
+        return None
+
+
+# =========================================================
+# KIRJADE INDEKS (#526, ADR 0065)
+# =========================================================
+
+def _meili_request(method, path, body=None):
+    """Üks Meili REST päring. Tagastab vastuse JSON-i või None (viga logitud)."""
+    data = json.dumps(body).encode('utf-8') if body is not None else None
+    req = urllib.request.Request(f"{MEILI_URL}{path}", data=data, method=method)
+    req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+    if data is not None:
+        req.add_header('Content-Type', 'application/json')
+    try:
+        with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as response:
+            raw = response.read()
+            return json.loads(raw) if raw else {}
+    except Exception as e:
+        logger.error(f"Meili päring ebaõnnestus ({method} {path}): {e}")
+        return None
+
+
+def _meili_task(method, path, body):
+    """Muutev päring + taski ootamine. True ainult `succeeded`-i korral."""
+    res = _meili_request(method, path, body)
+    task_uid = (res or {}).get('taskUid')
+    return task_uid is not None and wait_for_task(task_uid)
+
+
+def _filter_value(value):
+    """Meili filtri stringiliteraal (jutumärgid ja kurakaldkriips escape'itud)."""
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def delete_work_letters(work_id):
+    """Kustutab teose kõik kirjadokumendid."""
+    if not MEILI_KEY:
+        return False
+    return _meili_task('POST', f'/indexes/{LETTERS_INDEX_NAME}/documents/delete',
+                       {'filter': f'work_id = {_filter_value(work_id)}'})
+
+
+def sync_letters(work_id, letter_docs):
+    """Kirjutab teose kirjadokumendid ja eemaldab aegunud.
+
+    Järjekord on upsert → aegunute kustutus, mitte vastupidi: kahe töö vahel tehtud
+    otsing ei tohi näha teost ilma kirjadeta. Kustutus käib ALLES pärast upsert'i
+    `succeeded`-i; iga tõrge (ka kustutuse oma) → False.
+    """
+    if not MEILI_KEY:
+        return False
+    if not letter_docs:
+        return delete_work_letters(work_id)
+    if not _meili_task('POST', f'/indexes/{LETTERS_INDEX_NAME}/documents', letter_docs):
+        return False
+    ids = ', '.join(_filter_value(d['id']) for d in letter_docs)
+    return _meili_task('POST', f'/indexes/{LETTERS_INDEX_NAME}/documents/delete',
+                       {'filter': f'work_id = {_filter_value(work_id)} AND NOT id IN [{ids}]'})
+
+
+def _update_letters_is_public(visibility_by_work):
+    """Kogu nähtavuse muutus kirjadesse: `{work_id: is_public}`.
+
+    Sihtmärk on INDEKSIS olevad kirjad (id-d küsitakse Meilist), mitte
+    _metadata.json praegused osad — kustutusvea tõttu alles jäänud vana kiri ei
+    tohi jääda avalikuks. PUT = osaline uuendus (POST asendaks terve dokumendi).
+    """
+    updates = []
+    for work_id, is_public in visibility_by_work.items():
+        res = _meili_request('POST', f'/indexes/{LETTERS_INDEX_NAME}/documents/fetch', {
+            'filter': f'work_id = {_filter_value(work_id)}',
+            'fields': ['id'],
+            'limit': 1000,
+        })
+        if res is None:
+            logger.error(f"Kirjade nähtavust ei saanud uuendada (work_id={work_id})")
+            continue
+        updates.extend({'id': d['id'], 'is_public': is_public} for d in res.get('results', []))
+    if updates and not _meili_task('PUT', f'/indexes/{LETTERS_INDEX_NAME}/documents', updates):
+        logger.error(f"Kirjade nähtavuse uuendus ebaõnnestus ({len(updates)} kirja)")
+
+
+def _ensure_letters_index():
+    """Loob kirjade indeksi (settings-päring loob puuduva indeksi) ja rakendab seaded.
+
+    Jookseb stardil: deploy ei vaja käsitsi Meili sammu.
+    """
+    ok = _meili_task('PATCH', f'/indexes/{LETTERS_INDEX_NAME}/settings', {
+        'searchableAttributes': LETTERS_SEARCHABLE_ATTRIBUTES,
+        'filterableAttributes': LETTERS_FILTERABLE_ATTRIBUTES,
+        'sortableAttributes': LETTERS_SORTABLE_ATTRIBUTES,
+        'faceting': {'maxValuesPerFacet': MAX_VALUES_PER_FACET},
+        'pagination': {'maxTotalHits': 10000},
+    })
+    if not ok:
+        logger.warning("Kirjade indeksi seadistamine ebaõnnestus")
 
 
 def _delete_extra_pages(work_id, new_count):
@@ -217,7 +343,7 @@ def _delete_extra_pages(work_id, new_count):
     jäänused Meilisearchist. Ei loo downtime-akent.
     """
     if not MEILI_KEY:
-        return
+        return False
     check_url = f"{MEILI_URL}/indexes/{INDEX_NAME}/search"
     check_body = json.dumps({
         "filter": [f'work_id = "{work_id}"', f'lehekylje_number > {new_count}'],
@@ -231,9 +357,9 @@ def _delete_extra_pages(work_id, new_count):
         with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as resp:
             data = json.loads(resp.read().decode('utf-8'))
             if data.get('estimatedTotalHits', 0) == 0:
-                return
+                return True
     except Exception:
-        return
+        return False
 
     del_url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents/delete"
     del_body = json.dumps({
@@ -246,11 +372,12 @@ def _delete_extra_pages(work_id, new_count):
         with urllib.request.urlopen(del_req, timeout=MEILI_TIMEOUT) as resp:
             res_data = json.loads(resp.read().decode('utf-8'))
             task_uid = res_data.get('taskUid')
-            if task_uid:
-                wait_for_task(task_uid)
+            if task_uid and wait_for_task(task_uid):
                 logger.info(f"Kustutatud üleliigsed leheküljed (work_id={work_id}, new_count={new_count})")
+                return True
     except Exception as e:
         logger.error(f"Viga üleliigsete lehekülgede kustutamisel: {e}")
+    return False
 
 
 def _upsert_work_documents(work_id, slug, documents, page_statuses):
@@ -276,8 +403,9 @@ def _upsert_work_documents(work_id, slug, documents, page_statuses):
     new_count = len(documents)
     logger.info(f"AUTOMAATNE SÜNK: Teos {slug} ({new_count} lk), staatus: {teose_staatus}")
     result = send_to_meilisearch(documents)
-    _delete_extra_pages(work_id, new_count)
-    return result
+    # Kustutuse tõrge on ebaõnnestunud sünk: kustutatud leht jääks muidu otsingusse.
+    deleted = _delete_extra_pages(work_id, new_count) if result else False
+    return bool(result) and deleted
 
 
 def delete_work_from_meilisearch(work_id):
@@ -290,15 +418,17 @@ def delete_work_from_meilisearch(work_id):
     req = urllib.request.Request(url, data=data, method='POST')
     req.add_header('Content-Type', 'application/json')
     req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+    pages_ok = False
     try:
         with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             task_uid = res_data.get('taskUid')
             if task_uid:
-                return wait_for_task(task_uid)
+                pages_ok = wait_for_task(task_uid)
     except Exception as e:
         logger.error(f"Viga Meilisearchi kustutamisel: {e}")
-    return False
+    letters_ok = delete_work_letters(work_id)
+    return pages_ok and letters_ok
 
 
 def index_new_work(dir_name, metadata):
@@ -498,6 +628,9 @@ def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
                 logger.info(f"is_public massuuendus: task_uid={result.get('taskUid')}, {len(docs_to_update)} teost")
         except Exception as e:
             logger.error(f"is_public massuuendus ebaõnnestus: {e}")
+
+        # Kirjad (#526): sama nähtavus, sihtmärk indeksis olevad kirjad.
+        _update_letters_is_public({d['work_id']: d['is_public'] for d in docs_to_update})
 
     _meilisearch_executor.submit(_do_update)
 

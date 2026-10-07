@@ -37,6 +37,7 @@ def test_update_collection_visibility_updates_all_pages(tmp_path, monkeypatch):
     monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
     monkeypatch.setattr(ops, "_meilisearch_executor", SyncExecutor())
+    monkeypatch.setattr(ops, "_update_letters_is_public", lambda v: None)  # kirjad: test_meili_letters_sync
 
     sent_docs = []
 
@@ -77,6 +78,7 @@ def test_update_collection_visibility_correct_is_public_value(tmp_path, monkeypa
     monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
     monkeypatch.setattr(ops, "_meilisearch_executor", SyncExecutor())
+    monkeypatch.setattr(ops, "_update_letters_is_public", lambda v: None)  # kirjad: test_meili_letters_sync
 
     sent_docs = []
 
@@ -236,7 +238,7 @@ class TestUpsertWorkDocuments:
         """Segatud lehtede staatused → 'Töös' kantakse igale dokumendile."""
         sent = []
         monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: sent.extend(docs) or True)
-        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: True)
         docs = [{"id": "W1-1"}, {"id": "W1-2"}]
         result = _upsert_work_documents("W1", "slug", docs, ["Toores", "Valmis"])
         assert result is True
@@ -248,7 +250,7 @@ class TestUpsertWorkDocuments:
 
     def test_kõik_valmis_annab_valmis(self, monkeypatch):
         monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: True)
-        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: True)
         docs = [{"id": "W1-1"}]
         _upsert_work_documents("W1", "slug", docs, ["Valmis"])
         assert docs[0]["teose_staatus"] == "Valmis"
@@ -270,7 +272,7 @@ class TestUpsertWorkDocuments:
     def test_tagastab_send_tulemi(self, monkeypatch):
         """Tagastab send_to_meilisearch tulemi (edastus võib ebaõnnestuda)."""
         monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: False)
-        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: True)
         result = _upsert_work_documents("W1", "slug", [{"id": "W1-1"}], ["Toores"])
         assert result is False
 

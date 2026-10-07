@@ -156,7 +156,8 @@ def _live_docs(tmp_path, monkeypatch):
 
     captured = {"docs": None}
     monkeypatch.setattr(ops, "send_to_meilisearch", lambda documents, wait=True: captured.__setitem__("docs", documents) or True)
-    monkeypatch.setattr(ops, "_delete_extra_pages", lambda work_id, new_count: None)
+    monkeypatch.setattr(ops, "_delete_extra_pages", lambda work_id, new_count: True)
+    monkeypatch.setattr(ops, "sync_letters", lambda *a: True)  # kirjade indeks (#526) ei ole siin teema
 
     assert ops.sync_work_to_meilisearch(SLUG) is True
     return captured["docs"]
