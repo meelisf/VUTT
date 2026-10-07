@@ -52,6 +52,45 @@ describe('WorkPartsPanel', () => {
     expect(document.querySelector('[data-part-id="b"] button[aria-expanded="true"]')).toBeNull();
   });
 
+  it('?part= kerib osa rea ühe korra nähtavale (teose info on paneeli kohal)', async () => {
+    const calls: Element[] = [];
+    const orig = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) { calls.push(this); };
+    try {
+      const { rerender } = render(
+        <MemoryRouter initialEntries={['/work/w1/2?part=a']}>
+          <WorkPartsPanel workId="w1" token={null} currentPage={2} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(calls).toHaveLength(1));
+      expect((calls[0] as HTMLElement).dataset.partId).toBe('a');
+      // Lehepööre sama lingi peal ei keri paneeli uuesti.
+      rerender(
+        <MemoryRouter initialEntries={['/work/w1/2?part=a']}>
+          <WorkPartsPanel workId="w1" token={null} currentPage={3} />
+        </MemoryRouter>,
+      );
+      fireEvent.click(screen.getAllByRole('button', { name: 'Näita osa andmeid' })[1]);
+      expect(calls).toHaveLength(1);
+    } finally {
+      Element.prototype.scrollIntoView = orig;
+    }
+  });
+
+  it('ilma ?part=-ta paneeli ei kerita (teose info jääb paigale)', async () => {
+    const spy = vi.fn();
+    const orig = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = spy;
+    try {
+      renderPanel(2);
+      fireEvent.click(await screen.findByRole('button', { name: /Sisukord \(2\)/ }));
+      await new Promise(r => setTimeout(r, 0));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollIntoView = orig;
+    }
+  });
+
   it('osadeta teosel (või vea korral) paneeli pole', async () => {
     api.parts = [];
     const { container } = renderPanel();
