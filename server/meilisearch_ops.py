@@ -704,6 +704,19 @@ def _warm_dashboard_searches():
         )
 
 
+def _access_rule(user=None) -> dict:
+    """Kasutaja ligipääsureegel Meili tenant-tokenis: `{}` (admin, piiranguta) või `{"filter": ...}`."""
+    from .auth import is_at_least  # lokaalne: väldib import-järjekorra üllatusi suures moodulis
+    if user and is_at_least(user.get("role", "contributor"), "admin"):
+        return {}
+    base_filter = "is_public = true"
+    allowed = (user or {}).get("allowed_collections", [])
+    if allowed:
+        cols = ", ".join(f'"{c}"' for c in allowed)
+        return {"filter": f"{base_filter} OR collections_hierarchy IN [{cols}]"}
+    return {"filter": base_filter}
+
+
 def generate_meili_token(user=None, ttl_seconds: int = 3600) -> str:
     """Genereerib Meilisearch tenant tokeni kasutaja õiguste põhjal.
 
@@ -716,19 +729,11 @@ def generate_meili_token(user=None, ttl_seconds: int = 3600) -> str:
     if not MEILI_SEARCH_KEY or not MEILI_SEARCH_KEY_UID:
         raise RuntimeError("MEILI_SEARCH_KEY ja MEILI_SEARCH_KEY_UID peavad olema seadistatud")
 
-    base_filter = "is_public = true"
-
-    from .auth import is_at_least  # lokaalne: väldib import-järjekorra üllatusi suures moodulis
-    if user and is_at_least(user.get("role", "contributor"), "admin"):
-        search_rules = {"teosed": {}}
-    else:
-        allowed = (user or {}).get("allowed_collections", [])
-        if allowed:
-            cols = ", ".join(f'"{c}"' for c in allowed)
-            meili_filter = f"{base_filter} OR collections_hierarchy IN [{cols}]"
-        else:
-            meili_filter = base_filter
-        search_rules = {"teosed": {"filter": meili_filter}}
+    # ÜKS reegel kõigile otsitavatele indeksitele (#526, ADR 0065): kirjad pärivad
+    # ligipääsu teoselt, sama filter kahes kohas ei tohi lahku minna. Indeks, mida
+    # searchRules-is pole, on tokenile kättesaamatu.
+    rule = _access_rule(user)
+    search_rules = {"teosed": rule, LETTERS_INDEX_NAME: rule}
 
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
 

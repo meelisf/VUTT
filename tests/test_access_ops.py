@@ -120,7 +120,7 @@ def test_generate_meili_token_anonymous(monkeypatch):
 
     token = generate_meili_token(user=None)
     payload = jwt.decode(token, "test-key-32-chars-long-padding-x", algorithms=["HS256"])
-    assert payload["searchRules"] == {"teosed": {"filter": "is_public = true"}}
+    assert payload["searchRules"] == {"teosed": {"filter": "is_public = true"}, "kirjad": {"filter": "is_public = true"}}
     assert payload["apiKeyUid"] == "test-uid-1234"
     assert payload["exp"] > 0
 
@@ -134,7 +134,7 @@ def test_generate_meili_token_admin(monkeypatch):
 
     token = generate_meili_token(user={"role": "admin", "allowed_collections": []})
     payload = jwt.decode(token, "test-key-32-chars-long-padding-x", algorithms=["HS256"])
-    assert payload["searchRules"] == {"teosed": {}}
+    assert payload["searchRules"] == {"teosed": {}, "kirjad": {}}
 
 
 def test_auth_meili_token_ttl_on_luhike():

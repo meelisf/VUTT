@@ -378,3 +378,45 @@ class TestNormalizeEszett:
     def test_marginaalia_normaliseeritakse_samuti(self):
         main, marg = _clean_search_text("tekst\n<m>groß</m>")
         assert marg == "gross"
+
+
+# --- Kirjade indeks tokenis (#526, ADR 0065) ---
+
+def _token_rules(user):
+    from server.meilisearch_ops import generate_meili_token
+    import server.config as cfg
+    cfg.MEILI_SEARCH_KEY = "test-key-32-chars-long-padding-x"
+    cfg.MEILI_SEARCH_KEY_UID = "test-uid-1234"
+    token = generate_meili_token(user=user)
+    return jwt.decode(token, "test-key-32-chars-long-padding-x", algorithms=["HS256"])["searchRules"]
+
+
+@pytest.mark.parametrize("user", [
+    None,
+    {"role": "contributor", "allowed_collections": ["piiratud-kirjad"]},
+    {"role": "editor", "allowed_collections": []},
+    {"role": "admin"},
+])
+def test_kirjad_saavad_sama_reegli_mis_teosed(user):
+    """Võrreldakse TERVET reeglit: adminil on `{}` ilma `filter` võtmeta."""
+    rules = _token_rules(user)
+    assert set(rules) == {"teosed", "kirjad"}
+    assert rules["kirjad"] == rules["teosed"]
+
+
+def test_anonuumne_ei_nae_piiratud_kogu_kirju():
+    """Mock: piiratud kirjakogu tootmises veel ei ole — reegel peab ta välistama."""
+    rules = _token_rules(None)
+    assert rules["kirjad"] == {"filter": "is_public = true"}
+    rules = _token_rules({"role": "contributor", "allowed_collections": ["piiratud-kirjad"]})
+    assert 'collections_hierarchy IN ["piiratud-kirjad"]' in rules["kirjad"]["filter"]
+
+
+def test_teosele_piiratud_token_kirju_ei_nae():
+    from server.meilisearch_ops import generate_work_scoped_meili_token
+    import server.config as cfg
+    cfg.MEILI_SEARCH_KEY = "test-key-32-chars-long-padding-x"
+    cfg.MEILI_SEARCH_KEY_UID = "test-uid-1234"
+    payload = jwt.decode(generate_work_scoped_meili_token("abc123"),
+                         "test-key-32-chars-long-padding-x", algorithms=["HS256"])
+    assert set(payload["searchRules"]) == {"teosed"}
