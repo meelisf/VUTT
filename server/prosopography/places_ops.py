@@ -268,21 +268,25 @@ def _propagate_place_change(place_key: str) -> None:
     affected = _collect_descendants(place_key, places)
     affected.add(place_key)
 
-    index = _load_index()
-    changed = False
-    for entry in index.get("entries", []):
-        if entry.get("origin_place") not in affected:
-            continue
-        person = get_person(entry["id"])
-        if not person:
-            continue
-        new_entry = _index_entry_from_person(person, work_count=entry.get("work_count", 0))
-        entry.update(new_entry)
-        changed = True
+    # Indeksi luku all: lukuta kirjutus kaotaks samaaegse kaardisalvestuse
+    # kirje ja jääks taaste avaldamise vahele (#417).
+    from .state import _index_lock
+    with _index_lock:
+        index = _load_index()
+        changed = False
+        for entry in index.get("entries", []):
+            if entry.get("origin_place") not in affected:
+                continue
+            person = get_person(entry["id"])
+            if not person:
+                continue
+            new_entry = _index_entry_from_person(person, work_count=entry.get("work_count", 0))
+            entry.update(new_entry)
+            changed = True
 
-    if changed:
-        atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
-        logger.info("_propagate_place_change: uuendas indeksi place_key=%s", place_key)
+        if changed:
+            atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
+            logger.info("_propagate_place_change: uuendas indeksi place_key=%s", place_key)
 
 
 def _propagate_place_merge(source_key: str, target_key: str) -> None:
@@ -300,21 +304,25 @@ def _propagate_place_merge(source_key: str, target_key: str) -> None:
     affected.add(target_key)
     affected.add(source_key)  # redirectitud isikud on indeksis veel source_key all
 
-    index = _load_index()
-    changed = False
-    for entry in index.get("entries", []):
-        if entry.get("origin_place") not in affected:
-            continue
-        person = get_person(entry["id"])
-        if not person:
-            continue
-        new_entry = _index_entry_from_person(person, work_count=entry.get("work_count", 0))
-        entry.update(new_entry)
-        changed = True
+    # Indeksi luku all: lukuta kirjutus kaotaks samaaegse kaardisalvestuse
+    # kirje ja jääks taaste avaldamise vahele (#417).
+    from .state import _index_lock
+    with _index_lock:
+        index = _load_index()
+        changed = False
+        for entry in index.get("entries", []):
+            if entry.get("origin_place") not in affected:
+                continue
+            person = get_person(entry["id"])
+            if not person:
+                continue
+            new_entry = _index_entry_from_person(person, work_count=entry.get("work_count", 0))
+            entry.update(new_entry)
+            changed = True
 
-    if changed:
-        atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
-        logger.info("_propagate_place_merge: uuendas indeksi %s → %s", source_key, target_key)
+        if changed:
+            atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
+            logger.info("_propagate_place_merge: uuendas indeksi %s → %s", source_key, target_key)
 
 
 # ── Endpoint loogika ───────────────────────────────────────────────────────

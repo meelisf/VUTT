@@ -7,7 +7,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from . import state
+from . import fresh_merge, state
 from ._compat import sync_from_facade
 from ..meili_doc import enumerate_page_images
 
@@ -368,10 +368,21 @@ def update_person_to_works(
 
 
 def rebuild_indices():
-    """Taastab prosopograafia read-modelid nullist."""
+    """Taastab prosopograafia read-modelid nullist.
+
+    Jookseb taustal, kui API juba kirjutab (#417): baasseis loetakse ENNE
+    lähteandmeid ja avaldamine jätab vahepeal kirjutatud võtmed kettalt
+    (`fresh_merge`). Uus indeksi kirjutaja peab kirjutama oma indeksi luku all.
+    """
     sync_from_facade()
     if not os.path.exists(state.PROSOPOGRAPHY_DIR):
         return
+
+    from .person_search import _load_person_aliases
+    base_ptw = fresh_merge.ptw_groups(_load_person_to_works())
+    base_wc = _load_work_collections()
+    base_index = _index_by_id(_load_index())
+    base_aliases = _vutt_keys(_load_person_aliases())
 
     all_persons = []
     for fname in os.listdir(state.PROSOPOGRAPHY_DIR):
@@ -411,9 +422,13 @@ def rebuild_indices():
                 ptw.setdefault(pid, []).append(mention)
 
     with state._works_lock:
+        ptw = fresh_merge.ptw_from_groups(fresh_merge.merge_fresh(
+            fresh_merge.ptw_groups(ptw), base_ptw,
+            fresh_merge.ptw_groups(_load_person_to_works())))
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, ptw)
 
     with state._work_collections_lock:
+        wc = fresh_merge.merge_fresh(wc, base_wc, _load_work_collections())
         state.atomic_write_json(state.WORK_COLLECTIONS_INDEX_FILE, wc)
 
     try:
@@ -421,7 +436,7 @@ def rebuild_indices():
     except Exception:
         state.logger.exception("build_works_creators_index viga rebuild_indices sees")
 
-    entries = []
+    entries = {}
     aliases_data = {}
     for person in all_persons:
         if person.get("record_status") == "tombstone" or person.get("merged_into"):
@@ -430,7 +445,7 @@ def rebuild_indices():
         works_list = ptw.get(pid, [])
         work_count = len({w["work_id"] for w in works_list})
         from .person_search import _index_entry_from_person
-        entries.append(_index_entry_from_person(person, work_count))
+        entries[pid] = _index_entry_from_person(person, work_count)
 
         name_obj = person.get("name") or {}
         label = name_obj.get("label") or ""
@@ -442,12 +457,11 @@ def rebuild_indices():
             "ids": {},
         }
 
-    entries.sort(key=lambda e: (e.get("sort_name") or "").lower())
-
     with state._index_lock:
+        merged = fresh_merge.merge_fresh(entries, base_index, _index_by_id(_load_index()))
         state.atomic_write_json(state.PROSOPOGRAPHY_INDEX_FILE, {
             "rebuilt_at": datetime.now(timezone.utc).isoformat(),
-            "entries": entries,
+            "entries": sorted(merged.values(), key=lambda e: (e.get("sort_name") or "").lower()),
         })
 
     with state._aliases_lock:
@@ -457,8 +471,8 @@ def rebuild_indices():
         # võtmeid (`Q…`, GND-number). Tervikuna ülekirjutamine pühkis need iga
         # serveri stardi ajal minema ja Meili `authors_text` jäi ilma
         # nimevariantideta. Võõrad võtmed lähevad seetõttu muutmata edasi.
-        from .person_search import _load_person_aliases
         olemasolev = _load_person_aliases()
+        aliases_data = fresh_merge.merge_fresh(aliases_data, base_aliases, _vutt_keys(olemasolev))
         for key, value in olemasolev.items():
             if not _on_kaardi_voti(key):
                 aliases_data.setdefault(key, value)
@@ -475,20 +489,27 @@ def rebuild_indices():
         ext_id_index.invalidate()
 
 
-def _remove_aliases_entry(person_id: str):
-    """Eemaldab person_aliases.json-st kõik viited person_id-le."""
-    sync_from_facade()
-    aliases_file = state.PERSON_ALIASES_FILE
-    if not os.path.exists(aliases_file):
-        return
-    try:
-        with open(aliases_file, encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        return
-    if person_id in data:
-        del data[person_id]
-        state.atomic_write_json(aliases_file, data)
+def _index_by_id(index: dict) -> dict:
+    return {e["id"]: e for e in index.get("entries") or [] if isinstance(e, dict) and e.get("id")}
 
+
+def _vutt_keys(aliases: dict) -> dict:
+    """Kaardipoolsed (`vutt:P…`) võtmed — taaste omab ainult neid (#347)."""
+    return {k: v for k, v in aliases.items() if _on_kaardi_voti(k)}
+
+
+def _remove_aliases_entry(person_id: str):
+    """Eemaldab person_aliases.json-st kõik viited person_id-le.
+
+    Luku all: taaste avaldamine (#417) võrdleb kettaseisu baasseisuga ja
+    lukuta kirjutus võiks jääda avaldamise vahele.
+    """
+    sync_from_facade()
+    from .person_search import _load_person_aliases
+    with state._aliases_lock:
+        data = _load_person_aliases()
+        if person_id in data:
+            del data[person_id]
+            state.atomic_write_json(state.PERSON_ALIASES_FILE, data)
 
 __all__ = ['_load_index', '_load_person_to_works', '_load_work_collections', 'update_work_collections', '_collection_descendants', '_persons_in_collection', '_person_collections', '_update_index_entry', '_update_aliases_entry', 'update_person_to_works', 'rebuild_indices', '_remove_aliases_entry']

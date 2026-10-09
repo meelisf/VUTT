@@ -35,3 +35,20 @@ stardil taustalõimes). Sama põhimõte kehtib Meilisearchi indeksile
   Sama põhjendus mis ülal — nad on nullist taastatavad, ajaloos ei ole neist kasu.
 - Piir: täisfaili-ülekirjutus + mälus-filtreerimine kannab ~kümneid
   tuhandeid kirjeid; sealt edasi SQLite (vt ADR 0001, issue #132).
+
+## Täiendus 2026-10-09: taaste avaldamine jooksvate kirjutuste kõrval (#417)
+
+Taaste jookseb taustal, kui API juba kirjutab. Lõpliku kirjutuse lukk ei
+tõenda, et taaste hetktõmmis oli värske — ilma kaitseta asendas taaste
+vahepeal kirjutatud kirje (uus kaart, nimemuutus, teose looja/kogu) vanaga.
+
+Protokoll (`server/prosopography/fresh_merge.py`): taaste loeb iga indeksi
+**baasseisu ENNE lähteandmeid**; avaldamisel indeksi luku all jääb võti, mille
+kettaseis erineb baasseisust, kettalt — muud tulevad taastest. Võrdlusühik on
+kirjutaja ühik: isikuindeksis ja aliastes isik, `person_to_works`-is paar
+(isik, teos), kogude ja faktide indeksis teos. Kirjutajate külge märgistust ei
+lisata, seega uus kirjutaja on automaatselt kaetud, **kui ta kirjutab oma
+indeksi luku all** (`state._index_lock` jt, `_creators_lock`). Lukuta
+kirjutajad (`places_ops`, `_remove_aliases_entry`) viidi samal korral luku alla.
+Erand: `people_ops` kirjutab aliaste faili välised võtmed (`Q…`, GND) lukuta;
+taaste neid võtmeid ei ehita, vaid võtab kettalt (#347).
