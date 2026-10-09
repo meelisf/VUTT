@@ -308,34 +308,38 @@ def create_invite_token(email, name, created_by, username=None, role="contributo
     põhimõttest, ja vana klient, mis `role` võtit ei saada, peab saama
     kitsama, mitte laiema konto. Ulatuse annab admin kinnitamisel.
     """
-    data = load_invite_tokens()
+    # Lugemine kuni kirjutuseni ühe luku all: muidu kirjutaks vana hetktõmmis
+    # üle vahepeal tarbitud kutse `used`-märke (#412). Järjekord tokens_lock →
+    # users_lock (`_next_available_username`); vastupidist ei võeta kusagil.
+    with tokens_lock:
+        data = load_invite_tokens()
 
-    token = str(uuid.uuid4())
-    expires_at = datetime.now() + timedelta(hours=INVITE_EXPIRY_HOURS)
-    username = _next_available_username(email, data, preferred_username=username)
+        token = str(uuid.uuid4())
+        expires_at = datetime.now() + timedelta(hours=INVITE_EXPIRY_HOURS)
+        username = _next_available_username(email, data, preferred_username=username)
 
-    if role in ("contributor", "editor"):
-        resolved_role = role
-    else:
-        resolved_role = "contributor"
+        if role in ("contributor", "editor"):
+            resolved_role = role
+        else:
+            resolved_role = "contributor"
 
-    collections_config = get_cached_collections()
-    token_data = {
-        "token": token,
-        "email": email.lower(),
-        "username": username,
-        "name": name,
-        "created_at": datetime.now().isoformat(),
-        "expires_at": expires_at.isoformat(),
-        "created_by": created_by,
-        "used": False,
-        "role": resolved_role,
-        "edit_collections": sanitize_edit_collections(edit_collections or [], collections_config),
-        "language": normalize_language(language),
-    }
+        collections_config = get_cached_collections()
+        token_data = {
+            "token": token,
+            "email": email.lower(),
+            "username": username,
+            "name": name,
+            "created_at": datetime.now().isoformat(),
+            "expires_at": expires_at.isoformat(),
+            "created_by": created_by,
+            "used": False,
+            "role": resolved_role,
+            "edit_collections": sanitize_edit_collections(edit_collections or [], collections_config),
+            "language": normalize_language(language),
+        }
 
-    data["tokens"].append(token_data)
-    save_invite_tokens(data)
+        data["tokens"].append(token_data)
+        save_invite_tokens(data)
 
     logger.info(f"Loodud invite token kasutajale {name} ({email})")
     return token_data
