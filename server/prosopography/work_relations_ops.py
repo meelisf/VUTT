@@ -153,7 +153,13 @@ def remove_work_facts(work_id: str) -> None:
 
 
 def build_works_creators_index() -> None:
-    """Ehitab indeksi nullist: kirje IGALE teosele, millel on _metadata.json."""
+    """Ehitab indeksi nullist: kirje IGALE teosele, millel on _metadata.json.
+
+    Baasseis loetakse enne skanni ja vahepeal `update_work_facts`-iga kirjutatud
+    kirjed jäävad avaldamisel kettalt (#417, `fresh_merge`).
+    """
+    from .fresh_merge import merge_fresh
+    baseline = _load_creators_index()
     index: dict = {}
     if os.path.exists(BASE_DIR):
         for entry in os.scandir(BASE_DIR):
@@ -169,6 +175,7 @@ def build_works_creators_index() -> None:
             if work_id:
                 index[work_id] = _work_facts_entry(meta, entry.path)
     with _creators_lock:
+        index = merge_fresh(index, baseline, _load_creators_index())
         atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
 
 
