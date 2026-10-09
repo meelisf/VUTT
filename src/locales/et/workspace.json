@@ -357,6 +357,7 @@
         "prose": "Proosatekst",
         "speech": "Kõne",
         "session": "Istung",
+        "section": "Osa",
         "attachment": "Lisa"
       },
       "create": "Loo osa valitud lehtedest",

@@ -8,5 +8,6 @@ export const KIND_STYLE: Record<PartKind, string> = {
   prose: 'bg-rose-100 text-rose-800 border border-rose-300',
   speech: 'bg-violet-100 text-violet-800 border border-violet-300',
   session: 'bg-emerald-100 text-emerald-800 border border-emerald-300',
+  section: 'bg-teal-100 text-teal-800 border border-teal-300',
   attachment: 'bg-gray-100 text-gray-700 border border-gray-300',
 };

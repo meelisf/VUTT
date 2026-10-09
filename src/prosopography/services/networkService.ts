@@ -31,7 +31,7 @@ export interface NetworkWork {
 export interface NetworkPart {
   work_id: string;
   part_id: string;
-  kind: 'letter' | 'poem' | 'prose' | 'speech' | 'session' | 'attachment';
+  kind: 'letter' | 'poem' | 'prose' | 'speech' | 'session' | 'section' | 'attachment';
   title: string;
   year: number | null;
   first_page: number | null;

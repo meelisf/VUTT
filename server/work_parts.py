@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 # Liik on teksti VORM, mitte ülesanne: gratulatsioon, leinaluuletus ja pühendus
 # tulevad rollipaarist (auctor → subject), ADR 0057.
-KINDS = frozenset({"letter", "poem", "prose", "speech", "session", "attachment"})
+KINDS = frozenset({"letter", "poem", "prose", "speech", "session", "section", "attachment"})
 ROLES = frozenset({"auctor", "addressee", "praeses", "participant", "subject"})
 # `abstract_*` = avalik sisukokkuvõte, keel väljanimes (ADR 0039 muster, ADR 0063).
 # `notes` = toimetaja märkus: API annab ta kõigile, avalik vaade teda ei näita.
