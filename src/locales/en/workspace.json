@@ -357,6 +357,7 @@
         "prose": "Prose",
         "speech": "Speech",
         "session": "Session",
+        "section": "Section",
         "attachment": "Attachment"
       },
       "create": "Create a part from the selected pages",

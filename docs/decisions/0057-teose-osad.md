@@ -14,8 +14,11 @@ järjekorras ning lehetoimingud (järjestus, poolitus, kustutus) nihutavad seda.
 - Osad on `_metadata.json` väljal `parts[]`. Osa lehed on **lehefailide tüvede hulk**:
   see võib olla katkendlik (vahelehed kirja sees) ja üks leht võib kuuluda mitmesse
   osasse (üks kiri lõpeb, teine algab samal lehel).
-- Liigid: `letter | poem | prose | speech | session | attachment`. Rollid: `auctor |
+- Liigid: `letter | poem | prose | speech | session | section | attachment`. Rollid: `auctor |
   addressee | praeses | participant | subject`.
+  `section` (täiendus 2026-10-09, silt „Osa”) on žanrineutraalne struktuuriüksus
+  (raamatu peatükk, register), et sisukorda saaks teha ka teosele, mille osad ei ole
+  ükski vormiliik; `prose` ei sobi selleks, sest see on vormiväide.
 - **Liik on teksti VORM, mitte ülesanne** (täiendus 2026-10-05). Gratulatsioon,
   pulma- ja leinaluuletus, pühendus ning hinnang on sama funktsiooni variandid ja
   tulevad rollipaarist: `auctor` → `subject` (õnnitletav / lahkunu), pöördumise saaja

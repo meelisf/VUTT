@@ -487,9 +487,10 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         kui lehti on vahepeal muudetud, lükatakse ettepanek tagasi (stale_pages) —
         loe osad uuesti.
 
-        Iga osa: kind (letter | poem | prose | speech | session | attachment) on
-        teksti VORM: prose = proosatekst (eessõna, järelsõna, hinnang, proosas
-        pühendus). Gratulatsioon või leinaluuletus EI OLE liik — see on auctor +
+        Iga osa: kind (letter | poem | prose | speech | session | section | attachment)
+        on teksti VORM: prose = proosatekst (eessõna, järelsõna, hinnang, proosas
+        pühendus); section = žanrineutraalne struktuuriüksus (raamatu peatükk,
+        register) — kasuta ainult siis, kui ükski vormiliik ei sobi. Gratulatsioon või leinaluuletus EI OLE liik — see on auctor +
         subject (õnnitletav / lahkunu), pöördumise saaja addressee. pages =
         LEHEKÜLJENUMBRID nagu get_pages'is (1-põhised, võivad olla katkendlikud;
         leht võib kuuluda mitmesse osasse), valikuliselt title, incipit,
