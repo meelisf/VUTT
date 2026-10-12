@@ -306,3 +306,85 @@ def test_precheck(work):
     assert aps.precheck_page_ops("pole", []) == {"found": False}
     with pytest.raises(ValueError):
         aps.precheck_page_ops("w1", [{"filename": "x.jpg", "rotate": 90}])
+
+
+# --- Katkemine keset pakki (sy2y27, 2026-10-12): index.lock tõrge 34. poolitusel ---
+
+def _katkev_commit(work, monkeypatch, katkeb_kordusel):
+    """Poolituse commit kukub `katkeb_kordusel`-ndal korral nagu git index.lock-i peale."""
+    import subprocess
+    aps = work["aps"]
+    real = aps.commit_add_and_remove
+    loendur = {"n": 0}
+
+    def _commit(adds, removes, *a, **kw):
+        loendur["n"] += 1
+        if loendur["n"] == katkeb_kordusel:
+            # Päris commit_add_and_remove kirjutab pooled enne git add'i kettale
+            # ja rollback taastab ainult git-teed — jäljenda seda.
+            for p, c in adds:
+                open(p, "w", encoding="utf-8").write(c)
+            raise subprocess.CalledProcessError(128, ["git", "add"], stderr="index.lock: File exists")
+        return real(adds, removes, *a, **kw)
+    monkeypatch.setattr(aps, "commit_add_and_remove", _commit)
+
+
+def test_kukkunud_poolitus_jatab_lehe_puutumata(work, monkeypatch, tmp_path):
+    aps = work["aps"]
+    n = work["names"]
+    def failid():
+        return sorted(p.name for p in work["folder"].iterdir() if not p.name.startswith("."))
+    enne = failid()
+    _katkev_commit(work, monkeypatch, katkeb_kordusel=2)
+
+    with pytest.raises(aps.PageOpsPartialError) as ei:
+        aps.apply_page_ops("w1", [
+            {"filename": n[0], "split_x": 0.5},
+            {"filename": n[2], "split_x": 0.5},
+        ], "admin")
+
+    parast = failid()
+    kolmas = n[2][:-4]
+    assert {f"{kolmas}.jpg", f"{kolmas}.txt", f"{kolmas}.json"} <= set(parast), \
+        "originaal (pilt prügikastist tagasi) peab olema kaustas"
+    # Esimene leht poolitati (−3 +6 faili), kolmanda pooli ei tohi kettale jääda.
+    assert len(parast) == len(enne) + 3, parast
+    assert not (tmp_path / "._trash" / "w1" / "pages" / n[2]).exists()
+    assert len(list((tmp_path / "._originals" / "w1").iterdir())) == 2, \
+        "._originals-is ainult esimese lehe pooled"
+    assert ei.value.applied == [n[0]] and ei.value.transformed == []
+
+
+def test_kukkunud_poolitus_raporteerib_tehtud_poorde(work, monkeypatch):
+    """Pööre jõudis kettale, poolitus mitte → kordusel ei tohi uuesti pöörata."""
+    aps = work["aps"]
+    n = work["names"]
+    _katkev_commit(work, monkeypatch, katkeb_kordusel=1)
+    with pytest.raises(aps.PageOpsPartialError) as ei:
+        aps.apply_page_ops("w1", [
+            {"filename": n[1], "rotate": 90, "split_x": 0.5},
+            {"filename": n[2], "split_x": 0.5},
+        ], "admin")
+    assert ei.value.applied == [] and ei.value.transformed == [n[1]]
+
+
+def test_taustatoo_viga_kannab_tehtud_lehti(monkeypatch):
+    from server import page_ops_jobs
+    from server.admin_page_ops import PageOpsPartialError
+    page_ops_jobs._reset_for_tests()
+
+    def fake(*a, **kw):
+        raise PageOpsPartialError("Katkes", ["a.jpg"], ["b.jpg"])
+
+    monkeypatch.setattr(page_ops_jobs, "apply_page_ops", fake)
+    page_ops_jobs.start("w1", [], "admin", 3)
+    st = _oota("error")
+    assert st["applied"] == ["a.jpg"] and st["transformed"] == ["b.jpg"]
+
+    # ValueError tuleb enne muutmist → midagi ei tehtud, plaan jääb terveks.
+    page_ops_jobs._reset_for_tests()
+    monkeypatch.setattr(page_ops_jobs, "apply_page_ops",
+                        lambda *a, **kw: (_ for _ in ()).throw(ValueError("Lehti ei leitud")))
+    page_ops_jobs.start("w1", [], "admin", 3)
+    st = _oota("error")
+    assert st["applied"] == [] and st["transformed"] == []

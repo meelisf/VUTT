@@ -63,3 +63,25 @@ lõikab teksti `<pb/>` kohalt ja teeb kaks git-commitit (prügikasti rühmitus l
   ainult 0°/180° juures — pööratud kastis oleks joone asukoht oletus.
 - Valvurid: `tests/test_page_ops_batch.py`, `src/pages/manage/__tests__/pageOpsPlan.test.ts`,
   `PageCard.pending.test.tsx`.
+
+## Täiendus 2026-10-12: katkemine keset pakki
+
+Juhtum `sy2y27`: pakk katkes 34. poolitusel
+(`fatal: Unable to create '/data/.git/index.lock': File exists`), sest samal
+sekundil commitis upload'i import (`commit_new_work_to_git`) GitPythoni kaudu
+**ilma** `_git_write_lock`-ita. Kolm muudatust:
+
+- **Iga /data git-indeksi kirjutaja võtab `git_write_lock`-i** (`git_ops`
+  kustutused ja uue teose commit, `trash_ops` taasted checkout → commit ühe
+  luku all, `replace_work_content`, järjekorra muutmine, kollektsiooni
+  kustutus). Valvur: `tests/test_git_kirjutajad_lukus.py`. Protsessiväline
+  kirjutaja (skript konteineris) võib endiselt kokku põrgata.
+- **Kukkunud poolitus võetakse täielikult tagasi** (`_rollback_split`):
+  pooled (jpg/txt/json) ja loodud `._originals`-koopiad kustutatakse,
+  originaali pilt tuuakse prügikastist tagasi. Varem jäid pooled jälgimata
+  lehtedena kausta ja originaali `.txt`/`.json` pildita.
+- **Ootel plaan EI tühjene enam tervikuna.** Töö olek kannab vea korral
+  `applied` (täielikult tehtud lehed) ja `transformed` (pööre/kärbe tehtud,
+  poolitus mitte); klient eemaldab need (`dropApplied`) ja ülejäänud
+  märgistus jääb kordamiseks alles. Kui server seda ei tea (katkestus,
+  ootamatu erind), tühjeneb plaan nagu varem.

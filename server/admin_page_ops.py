@@ -19,7 +19,7 @@ from git import Actor
 from git.exc import GitCommandError
 from PIL import Image
 from .config import BASE_DIR, get_logger
-from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
+from .git_ops import get_or_init_repo, git_write_lock, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import refresh_work_mentions
@@ -257,9 +257,10 @@ def _reorder_pages_unlocked(dir_path: str, new_order: list, username: str, folde
         repo = get_or_init_repo()
         author = Actor(username, f"{username}@vutt.local")
         relative_paths = [os.path.relpath(p, BASE_DIR) for p in changed_json_paths]
-        repo.index.add(relative_paths)
         commit_msg = f"Muuda lehekülgede järjekorda: {folder_name} [{username}]"
-        repo.index.commit(commit_msg, author=author, committer=author)
+        with git_write_lock:
+            repo.index.add(relative_paths)
+            repo.index.commit(commit_msg, author=author, committer=author)
         logger.info(f"Lehekülgede järjekord muudetud: {folder_name} ({len(new_order)} lehte)")
     except GitCommandError as e:
         logger.error(f"Git commit ebaõnnestus järjekorra muutmisel: {e}")
@@ -418,33 +419,66 @@ def _split_page_locked(path: str, work_id: str, page_num: int, split_x: float,
     os.makedirs(orig_dir, exist_ok=True)
     existing_orig = os.path.join(orig_dir, orig_filename)
     src_original = existing_orig if os.path.exists(existing_orig) else orig_img_path
+    created_originals = []
     for half in (left_filename, right_filename):
         dest = os.path.join(orig_dir, half)
         if not os.path.exists(dest):
             shutil.copy2(src_original, dest)
+            created_originals.append(dest)
 
     # Liiguta originaali .jpg prügikasti (ei ole git-tracked)
     trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'pages')
     os.makedirs(trash_dir, exist_ok=True)
-    if os.path.exists(orig_img_path):
-        shutil.move(orig_img_path, os.path.join(trash_dir, orig_filename))
+    trashed_img = os.path.join(trash_dir, orig_filename)
+    moved_orig = os.path.exists(orig_img_path)
+    if moved_orig:
+        shutil.move(orig_img_path, trashed_img)
 
     # ÜKS native commit: lisa pooled + eemalda originaali .txt/.json (#431).
     # Varem kaks commitit, teine GitPythoni kaudu (~2 s) ja ilma git-lukuta.
     # Sõnum algab SPLIT_COMMIT_PREFIX-iga — prügikasti liigitus loeb seda.
-    commit_add_and_remove(
-        [
-            (left_txt_path, left_txt),
-            (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
-            (right_txt_path, right_txt),
-            (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
-        ],
-        [orig_txt_path, orig_json_path],
-        f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): pooled lisatud, originaal eemaldatud [{work_id}]",
-        username,
-    )
+    try:
+        commit_add_and_remove(
+            [
+                (left_txt_path, left_txt),
+                (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
+                (right_txt_path, right_txt),
+                (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
+            ],
+            [orig_txt_path, orig_json_path],
+            f"{SPLIT_COMMIT_PREFIX} {page_num} ({folder_name}): pooled lisatud, originaal eemaldatud [{work_id}]",
+            username,
+        )
+    except Exception:
+        # commit_add_and_remove taastab ainult git-teed (originaali .txt/.json).
+        # Pooled jääksid muidu jälgimata lehtedena kausta ja originaali pilt
+        # prügikasti — leht oleks kettal poolitatud, gitis mitte (sy2y27, 2026-10-12).
+        _rollback_split(
+            [left_img_path, left_txt_path, left_json_path,
+             right_img_path, right_txt_path, right_json_path, *created_originals],
+            trashed_img if moved_orig else None, orig_img_path,
+        )
+        raise
 
     return left_filename, right_filename
+
+
+def _rollback_split(created_paths, trashed_img, orig_img_path):
+    """Poolituse tagasivõtt: kustuta loodud failid, too originaali pilt tagasi.
+
+    Iga samm eraldi — üks tõrge ei tohi ülejäänud koristust ära jätta.
+    """
+    for p in created_paths:
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+        except OSError as e:
+            logger.error(f"SPLIT rollback: ei saanud kustutada {p}: {e}")
+    if trashed_img:
+        try:
+            shutil.move(trashed_img, orig_img_path)
+        except OSError as e:
+            logger.error(f"SPLIT rollback: originaali pilt jäi prügikasti {trashed_img}: {e}")
 
 
 def split_page(work_id: str, page_num: int, split_x: float, username: str) -> dict:
@@ -660,6 +694,17 @@ def precheck_page_ops(work_id: str, ops) -> dict:
     return {"total": len(clean)}
 
 
+class PageOpsPartialError(RuntimeError):
+    """Pakk katkes keset tööd. `applied` = täielikult tehtud lehed, `transformed`
+    = leht, mille pööre/kärbe jõudis kettale, aga poolitus mitte. Klient
+    eemaldab need plaanist ja ülejäänud märgistus jääb kordamiseks alles."""
+
+    def __init__(self, message: str, applied: list, transformed: list):
+        super().__init__(message)
+        self.applied = applied
+        self.transformed = transformed
+
+
 def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
     """Rakendab teose halduse ootel pöörded, kärped ja poolitused ÜHE luku all
     (#431, ADR 0050, ADR 0061).
@@ -673,7 +718,8 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
     SPLIT_COMMIT_PREFIX-it), Meili sünk on üks kord lõpus.
 
     Puuduv leht (vahepeal kustutatud/poolitatud) → ValueError ENNE muutmist.
-    Viga keset pakki → RuntimeError, mille sõnum ütleb, mitu lehte jõuti teha;
+    Viga keset pakki → PageOpsPartialError (RuntimeError), mille sõnum ütleb,
+    mitu lehte jõuti teha, ja mis kannab tehtud lehtede failinimesid;
     Meili sünkitakse ka siis, et indeks vastaks kettale.
 
     `progress(tehtud, kokku)` kutsutakse iga lehe järel (taustatöö olek, #431).
@@ -699,10 +745,13 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
         if progress:
             progress(0, len(clean))
         renamed: dict = {}   # osade sünk (#464): {algne_tüvi: [vasak, parem]}
+        applied: list = []   # täielikult tehtud lehed (kliendile: mis plaanist maha)
+        transformed = None   # leht, mille pööre/kärbe tehti, aga poolitus kukkus
         try:
             for op in clean:
                 fn = op["filename"]
                 adj = op["adjust"]
+                transformed = None
                 if op["rotate"] or adj:
                     quad = adj["quad"] if adj else None
                     _transform_locked(path, work_id, fn,
@@ -712,6 +761,7 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
                                       quad, username)
                     rotated += 1 if op["rotate"] else 0
                     adjusted += 1 if adj else 0
+                    transformed = fn
                 if op["split_x"] is not None:
                     images = get_sorted_images(path)
                     halves = _split_page_locked(path, work_id, images.index(fn) + 1,
@@ -719,14 +769,17 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
                     if halves:
                         renamed[os.path.splitext(fn)[0]] = [os.path.splitext(h)[0] for h in halves]
                     split += 1
+                applied.append(fn)
+                transformed = None
                 if progress:
                     progress(clean.index(op) + 1, len(clean))
         except Exception as e:
             logger.error(f"PAGE-OPS {folder_name}: katkes pärast {rotated} pööret / "
                          f"{adjusted} kärbet / {split} poolitust: {e}")
-            raise RuntimeError(
+            raise PageOpsPartialError(
                 f"Katkes: tehtud {rotated} pööret, {adjusted} kärbet ja {split} poolitust "
-                f"{len(clean)} lehest. Viga: {e}"
+                f"{len(clean)} lehest. Viga: {e}",
+                applied, [transformed] if transformed else [],
             )
         finally:
             if split:

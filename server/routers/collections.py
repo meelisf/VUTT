@@ -11,7 +11,7 @@ from ..cache import get_cached_archives, get_cached_collections
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
 from ..config import ARCHIVES_FILE, BASE_DIR, COLLECTIONS_FILE, get_logger
 from ..deps import get_json_data, require_role
-from ..git_ops import get_or_init_repo
+from ..git_ops import get_or_init_repo, git_write_lock
 from ..meilisearch_ops import sync_work_to_meilisearch_async, update_collection_is_public_async
 from ..git_ops import save_config_with_git
 from ..utils import find_directory_by_id, metadata_lock
@@ -358,12 +358,13 @@ def admin_delete_collection(collection_id: str, background_tasks: BackgroundTask
         try:
             col_name = data[collection_id].get('name', {}).get('et', collection_id)
             author = Actor(user['username'], f"{user['username']}@vutt.local")
-            repo.index.add(files_to_add)
-            repo.index.commit(
-                f"Kustuta kollektsioon '{col_name}': eemaldatud {len(affected)} teosest",
-                author=author,
-                committer=author
-            )
+            with git_write_lock:
+                repo.index.add(files_to_add)
+                repo.index.commit(
+                    f"Kustuta kollektsioon '{col_name}': eemaldatud {len(affected)} teosest",
+                    author=author,
+                    committer=author
+                )
         except Exception as e:
             logger.error(f"Git commit ebaõnnestus kollektsiooni kustutamisel: {e}")
 

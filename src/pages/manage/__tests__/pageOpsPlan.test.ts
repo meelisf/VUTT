@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  clearPendingAdjust, needsServerPreview, pendingCount, pruneMissing, rotatePending, setPendingEdit,
+  clearPendingAdjust, dropApplied, needsServerPreview, pendingCount, pruneMissing, rotatePending, setPendingEdit,
   setPendingSplit, setPendingSplitX, showsCardLine, toRequest,
 } from '../pageOpsPlan';
 
@@ -22,6 +22,17 @@ describe('pageOpsPlan (#431 etapp 3)', () => {
     expect(pendingCount(ops)).toBe(2);
     ops = setPendingSplit(ops, ['a.jpg', 'b.jpg'], false);
     expect(ops).toEqual({ 'a.jpg': { rotate: 90, split: false, split_x: null } });
+  });
+
+  it('dropApplied: tehtud lehed maha, pöördega lehel jääb ainult poolitus (2026-10-12)', () => {
+    let ops = setPendingSplit({}, ['a.jpg', 'b.jpg', 'c.jpg'], true);
+    ops = setPendingEdit(ops, 'b.jpg', 90, ADJ);
+    ops = rotatePending(ops, ['d.jpg'], 90);
+    const next = dropApplied(ops, ['a.jpg'], ['b.jpg', 'd.jpg']);
+    expect(next['a.jpg']).toBeUndefined();
+    expect(next['b.jpg']).toEqual({ rotate: 0, split: true });
+    expect(next['c.jpg']).toEqual(ops['c.jpg']);
+    expect(next['d.jpg']).toBeUndefined();   // ainult pööre, see on tehtud
   });
 
   it('pruneMissing viskab kadunud lehed ja hoiab identiteedi, kui midagi ei kadunud', () => {

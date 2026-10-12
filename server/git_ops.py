@@ -36,7 +36,12 @@ _git_failures_lock = threading.Lock()
 # Gitil on kogu repo kohta üks index.lock. Kuuma salvestustee write+add+commit
 # peab olema protsessi sees järjestatud, et samaaegsed salvestused ei saaks
 # teineteise sisu vale autori commiti sisse stage'ida.
+# KÕIK /data indeksit puudutavad kirjutajad (ka GitPythoni `repo.index`,
+# `git add/rm/checkout`) võtavad selle luku: muidu kukub teine kirjutaja
+# `index.lock: File exists` peale — upload'i import katkestas nii 2026-10-12
+# 34. poolituse keset pakki (sy2y27).
 _git_write_lock = threading.RLock()
+git_write_lock = _git_write_lock
 
 # Cache teose ID-de jaoks (kausta nimi -> (work_id, slug))
 _work_ids_cache = {}
@@ -756,44 +761,45 @@ def commit_new_work_to_git(dir_name, username=None):
         dir_name: Kausta nimi (nt "1632-1")
         username: Commit'i autor. Kui None, kasutatakse "Automaatne" (automaatne import).
     """
-    try:
-        repo = get_or_init_repo()
-        dir_path = os.path.join(BASE_DIR, dir_name)
+    with _git_write_lock:
+        try:
+            repo = get_or_init_repo()
+            dir_path = os.path.join(BASE_DIR, dir_name)
 
-        # Leia kõik txt ja json failid kaustas
-        files_to_add = []
-        txt_count = 0
-        json_count = 0
-        for f in os.listdir(dir_path):
-            if f.endswith('.txt'):
-                relative_path = os.path.join(dir_name, f)
-                files_to_add.append(relative_path)
-                txt_count += 1
-            elif f.endswith('.json'):
-                relative_path = os.path.join(dir_name, f)
-                files_to_add.append(relative_path)
-                json_count += 1
+            # Leia kõik txt ja json failid kaustas
+            files_to_add = []
+            txt_count = 0
+            json_count = 0
+            for f in os.listdir(dir_path):
+                if f.endswith('.txt'):
+                    relative_path = os.path.join(dir_name, f)
+                    files_to_add.append(relative_path)
+                    txt_count += 1
+                elif f.endswith('.json'):
+                    relative_path = os.path.join(dir_name, f)
+                    files_to_add.append(relative_path)
+                    json_count += 1
 
-        if not files_to_add:
+            if not files_to_add:
+                return False
+
+            # Lisa failid indeksisse
+            repo.index.add(files_to_add)
+
+            # Tee commit
+            author_name = username if username else "Automaatne"
+            author = Actor(author_name, f"{author_name}@vutt.local")
+            repo.index.commit(
+                f"Originaal OCR: {dir_name} ({txt_count} lehekülge, {json_count} json)",
+                author=author,
+                committer=author
+            )
+            logger.info(f"GIT: Lisatud uus teos {dir_name} ({txt_count} txt, {json_count} json)")
+            return True
+        except Exception as e:
+            logger.error(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
+            _record_git_failure(dir_name, username or "Automaatne", e)
             return False
-
-        # Lisa failid indeksisse
-        repo.index.add(files_to_add)
-
-        # Tee commit
-        author_name = username if username else "Automaatne"
-        author = Actor(author_name, f"{author_name}@vutt.local")
-        repo.index.commit(
-            f"Originaal OCR: {dir_name} ({txt_count} lehekülge, {json_count} json)",
-            author=author,
-            committer=author
-        )
-        logger.info(f"GIT: Lisatud uus teos {dir_name} ({txt_count} txt, {json_count} json)")
-        return True
-    except Exception as e:
-        logger.error(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
-        _record_git_failure(dir_name, username or "Automaatne", e)
-        return False
 
 
 def delete_work_from_git(folder_name, work_title, work_id, username="VUTT Server"):
@@ -802,22 +808,23 @@ def delete_work_from_git(folder_name, work_title, work_id, username="VUTT Server
     JPG-d peavad olema ENNE seda liigutatud prügikasti.
     Kasutab git add -u (ainult jälgitud failid: txt, json, _metadata.json).
     """
-    try:
-        repo = get_or_init_repo()
-        # Stage deletions (ainult jälgitud failid)
-        repo.git.add('-u', folder_name)
-        # Kontrolli kas on midagi stageitud
-        if not repo.index.diff('HEAD'):
-            logger.info(f"GIT: Teosel {folder_name} polnud jälgitud faile, commit vahele jäetud")
+    with _git_write_lock:
+        try:
+            repo = get_or_init_repo()
+            # Stage deletions (ainult jälgitud failid)
+            repo.git.add('-u', folder_name)
+            # Kontrolli kas on midagi stageitud
+            if not repo.index.diff('HEAD'):
+                logger.info(f"GIT: Teosel {folder_name} polnud jälgitud faile, commit vahele jäetud")
+                return False
+            actor = Actor(username, f"{username}@vutt.local")
+            msg = f"Kustuta teos: {work_title} [{work_id}]"
+            repo.index.commit(msg, author=actor, committer=actor)
+            logger.info(f"GIT: Kustutatud teos {folder_name} [{work_id}]")
+            return True
+        except Exception as e:
+            logger.error(f"GIT viga teose kustutamisel ({folder_name}): {e}")
             return False
-        actor = Actor(username, f"{username}@vutt.local")
-        msg = f"Kustuta teos: {work_title} [{work_id}]"
-        repo.index.commit(msg, author=actor, committer=actor)
-        logger.info(f"GIT: Kustutatud teos {folder_name} [{work_id}]")
-        return True
-    except Exception as e:
-        logger.error(f"GIT viga teose kustutamisel ({folder_name}): {e}")
-        return False
 
 
 def commit_add_and_remove(add_files, remove_paths, message, username="VUTT Server"):
@@ -896,40 +903,41 @@ def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str, user
     Returns:
         bool: True kui õnnestus
     """
-    try:
-        repo = get_or_init_repo()
-        # Stage ainult selle lehe failid (txt + json)
-        files_to_remove = []
-        for ext in ['.txt', '.json']:
-            rel_path = os.path.join(folder_name, base_name + ext)
-            abs_path = os.path.join(BASE_DIR, rel_path)
-            if os.path.exists(abs_path):
-                # Eemalda failisüsteemist ja stage kustutamine
-                try:
-                    repo.index.remove([rel_path])
-                    os.remove(abs_path)
-                    files_to_remove.append(rel_path)
-                except Exception as e:
-                    logger.warning(f"GIT: Ei saanud eemaldada {rel_path}: {e}")
-                    # Proovi git rm otse
+    with _git_write_lock:
+        try:
+            repo = get_or_init_repo()
+            # Stage ainult selle lehe failid (txt + json)
+            files_to_remove = []
+            for ext in ['.txt', '.json']:
+                rel_path = os.path.join(folder_name, base_name + ext)
+                abs_path = os.path.join(BASE_DIR, rel_path)
+                if os.path.exists(abs_path):
+                    # Eemalda failisüsteemist ja stage kustutamine
                     try:
-                        repo.git.rm('--cached', rel_path)
+                        repo.index.remove([rel_path])
                         os.remove(abs_path)
                         files_to_remove.append(rel_path)
-                    except Exception as e2:
-                        logger.error(f"GIT: Faili eemaldamine ebaõnnestus {rel_path}: {e2}")
+                    except Exception as e:
+                        logger.warning(f"GIT: Ei saanud eemaldada {rel_path}: {e}")
+                        # Proovi git rm otse
+                        try:
+                            repo.git.rm('--cached', rel_path)
+                            os.remove(abs_path)
+                            files_to_remove.append(rel_path)
+                        except Exception as e2:
+                            logger.error(f"GIT: Faili eemaldamine ebaõnnestus {rel_path}: {e2}")
 
-        if not files_to_remove:
-            logger.info(f"GIT: Teosel {folder_name}/{base_name} polnud jälgitud faile, commit vahele jäetud")
+            if not files_to_remove:
+                logger.info(f"GIT: Teosel {folder_name}/{base_name} polnud jälgitud faile, commit vahele jäetud")
+                return False
+
+            actor = Actor(username, f"{username}@vutt.local")
+            repo.index.commit(commit_msg, author=actor, committer=actor)
+            logger.info(f"GIT: Kustutatud leht {folder_name}/{base_name}")
+            return True
+        except Exception as e:
+            logger.error(f"GIT viga lehe kustutamisel ({folder_name}/{base_name}): {e}")
             return False
-
-        actor = Actor(username, f"{username}@vutt.local")
-        repo.index.commit(commit_msg, author=actor, committer=actor)
-        logger.info(f"GIT: Kustutatud leht {folder_name}/{base_name}")
-        return True
-    except Exception as e:
-        logger.error(f"GIT viga lehe kustutamisel ({folder_name}/{base_name}): {e}")
-        return False
 
 
 def delete_pages_from_git(folder_name, base_names, commit_msg, username="VUTT Server"):
@@ -941,39 +949,40 @@ def delete_pages_from_git(folder_name, base_names, commit_msg, username="VUTT Se
 
     Returns: eemaldatud relatiivsete teede list.
     """
-    repo = get_or_init_repo()
-    removed = []
-    for base in base_names:
-        for ext in ('.txt', '.json'):
-            rel_path = os.path.join(folder_name, base + ext)
-            abs_path = os.path.join(BASE_DIR, rel_path)
-            if os.path.exists(abs_path):
-                try:
-                    repo.index.remove([rel_path])
-                    os.remove(abs_path)
-                    removed.append(rel_path)
-                except Exception:
-                    repo.git.rm('--cached', rel_path)
-                    os.remove(abs_path)
-                    removed.append(rel_path)
+    with _git_write_lock:
+        repo = get_or_init_repo()
+        removed = []
+        for base in base_names:
+            for ext in ('.txt', '.json'):
+                rel_path = os.path.join(folder_name, base + ext)
+                abs_path = os.path.join(BASE_DIR, rel_path)
+                if os.path.exists(abs_path):
+                    try:
+                        repo.index.remove([rel_path])
+                        os.remove(abs_path)
+                        removed.append(rel_path)
+                    except Exception:
+                        repo.git.rm('--cached', rel_path)
+                        os.remove(abs_path)
+                        removed.append(rel_path)
 
-    if not removed:
-        return []
+        if not removed:
+            return []
 
-    try:
-        actor = Actor(username, f"{username}@vutt.local")
-        repo.index.commit(commit_msg, author=actor, committer=actor)
-    except Exception:
-        # Skoobitud rollback: un-stage ainult need teed ja taasta tööpuu failid HEAD-ist.
         try:
-            repo.git.reset('--', *removed)
-            repo.git.checkout('HEAD', '--', *removed)
-        except Exception as re:
-            logger.error(f"GIT: batch-kustutuse rollback ebaõnnestus: {re}")
-        raise
+            actor = Actor(username, f"{username}@vutt.local")
+            repo.index.commit(commit_msg, author=actor, committer=actor)
+        except Exception:
+            # Skoobitud rollback: un-stage ainult need teed ja taasta tööpuu failid HEAD-ist.
+            try:
+                repo.git.reset('--', *removed)
+                repo.git.checkout('HEAD', '--', *removed)
+            except Exception as re:
+                logger.error(f"GIT: batch-kustutuse rollback ebaõnnestus: {re}")
+            raise
 
-    logger.info(f"GIT: batch-kustutatud {len(removed)} faili kaustast {folder_name}")
-    return removed
+        logger.info(f"GIT: batch-kustutatud {len(removed)} faili kaustast {folder_name}")
+        return removed
 
 
 def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "VUTT Server") -> bool:
@@ -981,42 +990,43 @@ def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "V
     Eemaldab faili gitist ja teeb commit.
     Erinevalt delete_page_from_git()-st võtab absoluutse tee (mitte folder/base).
     """
-    repo = get_or_init_repo()
-    relative_path = os.path.relpath(absolute_path, BASE_DIR)
-    staged = False
-    try:
-        if os.path.exists(absolute_path):
-            try:
-                repo.index.remove([relative_path])
-                staged = True
-            except Exception as e:
-                logger.warning(f"GIT: index.remove ebaõnnestus ({relative_path}): {e}")
+    with _git_write_lock:
+        repo = get_or_init_repo()
+        relative_path = os.path.relpath(absolute_path, BASE_DIR)
+        staged = False
+        try:
+            if os.path.exists(absolute_path):
+                try:
+                    repo.index.remove([relative_path])
+                    staged = True
+                except Exception as e:
+                    logger.warning(f"GIT: index.remove ebaõnnestus ({relative_path}): {e}")
+                    try:
+                        repo.git.rm("--cached", relative_path)
+                        staged = True
+                    except Exception as e2:
+                        logger.error(f"GIT: git rm --cached ebaõnnestus ({relative_path}): {e2}")
+                if staged:
+                    os.remove(absolute_path)
+            else:
                 try:
                     repo.git.rm("--cached", relative_path)
                     staged = True
-                except Exception as e2:
-                    logger.error(f"GIT: git rm --cached ebaõnnestus ({relative_path}): {e2}")
-            if staged:
-                os.remove(absolute_path)
-        else:
-            try:
-                repo.git.rm("--cached", relative_path)
-                staged = True
-            except Exception:
-                logger.info(f"GIT: Fail pole gitis jälgitud, kustutamine vahele jäetud: {relative_path}")
+                except Exception:
+                    logger.info(f"GIT: Fail pole gitis jälgitud, kustutamine vahele jäetud: {relative_path}")
+                    return False
+
+            if not staged:
+                logger.info(f"GIT: Midagi ei staged, commit vahele jäetud: {relative_path}")
                 return False
 
-        if not staged:
-            logger.info(f"GIT: Midagi ei staged, commit vahele jäetud: {relative_path}")
+            actor = Actor(username, f"{username}@vutt.local")
+            repo.index.commit(commit_msg, author=actor, committer=actor)
+            logger.info(f"GIT: Kustutatud {relative_path} ({username})")
+            return True
+        except Exception as e:
+            logger.error(f"GIT viga faili kustutamisel ({relative_path}): {e}")
             return False
-
-        actor = Actor(username, f"{username}@vutt.local")
-        repo.index.commit(commit_msg, author=actor, committer=actor)
-        logger.info(f"GIT: Kustutatud {relative_path} ({username})")
-        return True
-    except Exception as e:
-        logger.error(f"GIT viga faili kustutamisel ({relative_path}): {e}")
-        return False
 
 
 _COMMIT_FIELD_SEP = "\x1f"
