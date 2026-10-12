@@ -29,7 +29,7 @@
     "languagesLabel": "Keeled (valikuline)",
     "continue": "Jätka üleslaadimisele",
     "required": "Kohustuslik väli",
-    "timeEstimate": "Üleslaadimine ja OCR töötlemine kestab vastavalt lk arvule (u 2–3 lk/min).",
+    "timeEstimate": "Üleslaadimine ja OCR töötlemine kestab vastavalt lk arvule (u 8 lk/min).",
     "materialTypeLabel": "Materjali tüüp",
     "materialTypePrint": "Trükitekst",
     "materialTypeHand": "Käsikiri",
@@ -49,7 +49,7 @@
     "processing": "OCR server töötleb...",
     "waitNote": "See võib võtta mõne minuti.",
     "canLeaveNote": "Üleslaadimine ja OCR töötlemine käib taustal — see võtab {{time}}. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
-    "canLeaveNoteUnknown": "Fail on serveris ja OCR töötlemine käib taustal. Kestus sõltub lehekülgede arvust (u 2–3 lk/min) ja täpsustub, kui server on lehed üle lugenud. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla — progress salvestatakse.",
+    "canLeaveNoteUnknown": "Fail on serveris ja OCR töötlemine käib taustal. Kestus sõltub lehekülgede arvust (u 8 lk/min) ja täpsustub, kui server on lehed üle lugenud. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla — progress salvestatakse.",
     "progressLabel": "Edastus: {{pct}}%",
     "multipleImagesNote": "Mitu pilti laetakse üles järjestikuselt — ärge sulgege lehte.",
     "collectingImages": "Pildid üles laadimata — vali kõik failid uuesti.",
@@ -75,7 +75,7 @@
     "importMeili": "Indekseerin otsingusse…",
     "importRunning": "Import käib…",
     "canLeaveNote": "OCR töötlemine käib taustal — see võtab {{time}}. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
-    "canLeaveNoteUnknown": "OCR töötlemine käib taustal; kestus sõltub lehekülgede arvust (u 2–3 lk/min). Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
+    "canLeaveNoteUnknown": "OCR töötlemine käib taustal; kestus sõltub lehekülgede arvust (u 8 lk/min). Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
     "editMetaTitle": "Täienda metaandmeid OCR ootamise ajal",
     "editMetaNote": "Andmed salvestatakse staging'usse ja imporditakse koos teosega.",
     "metaSaveBtn": "Salvesta muudatused",
@@ -155,7 +155,7 @@
   },
   "notice": {
     "title": "Üleslaadimine käib kahes järgus",
-    "body": "Kõigepealt liigub fail sinu masinast serverisse — kestus sõltub sinu ühenduse kiirusest ja seda näidatakse edenemisribal. Selle ajal ära lehelt lahku, muidu üleslaadimine katkeb. Seejärel töötleb OCR-server lehti taustal (u 2–3 lk/min) — siis võid vabalt lahkuda ja hiljem tagasi tulla, progress salvestatakse."
+    "body": "Kõigepealt liigub fail sinu masinast serverisse — kestus sõltub sinu ühenduse kiirusest ja seda näidatakse edenemisribal. Selle ajal ära lehelt lahku, muidu üleslaadimine katkeb. Seejärel töötleb OCR-server lehti taustal (u 8 lk/min) — siis võid vabalt lahkuda ja hiljem tagasi tulla, progress salvestatakse."
   },
   "closeAndMonitor": "Sulge — vaatan progressi hiljem",
   "cancelUpload": "Katkesta üleslaadimine ja kustuta",

@@ -29,7 +29,7 @@
     "languagesLabel": "Languages (optional)",
     "continue": "Continue to upload",
     "required": "Required field",
-    "timeEstimate": "Upload and OCR processing duration depends on page count (approx. 2–3 pages/min).",
+    "timeEstimate": "Upload and OCR processing duration depends on page count (approx. 8 pages/min).",
     "materialTypeLabel": "Material type",
     "materialTypePrint": "Printed text",
     "materialTypeHand": "Manuscript",
@@ -49,7 +49,7 @@
     "processing": "OCR server is processing...",
     "waitNote": "This may take a few minutes.",
     "canLeaveNote": "Upload and OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved.",
-    "canLeaveNoteUnknown": "The file is on the server and OCR is running in the background. The duration depends on the page count (approx. 2–3 pages/min) and becomes exact once the server has counted the pages. You can leave this page and return later — your progress is saved.",
+    "canLeaveNoteUnknown": "The file is on the server and OCR is running in the background. The duration depends on the page count (approx. 8 pages/min) and becomes exact once the server has counted the pages. You can leave this page and return later — your progress is saved.",
     "progressLabel": "Transfer: {{pct}}%",
     "multipleImagesNote": "Multiple images are uploaded sequentially — do not close this page.",
     "collectingImages": "Images not fully uploaded — please select all files again.",
@@ -75,7 +75,7 @@
     "importMeili": "Indexing for search…",
     "importRunning": "Import in progress…",
     "canLeaveNote": "OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
-    "canLeaveNoteUnknown": "OCR processing runs in the background; the duration depends on the page count (approx. 2–3 pages/min). You can leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
+    "canLeaveNoteUnknown": "OCR processing runs in the background; the duration depends on the page count (approx. 8 pages/min). You can leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
     "editMetaTitle": "Fill in metadata while OCR is running",
     "editMetaNote": "Data is saved to staging and will be imported with the work.",
     "metaSaveBtn": "Save changes",
@@ -155,7 +155,7 @@
   },
   "notice": {
     "title": "Uploading happens in two stages",
-    "body": "First the file travels from your machine to the server — this depends on your connection speed and is shown on the progress bar. Do not leave the page during this stage or the upload will be cut off. Then the OCR server processes the pages in the background (approx. 2–3 pages/min) — at that point you can leave freely and return later, your progress is saved."
+    "body": "First the file travels from your machine to the server — this depends on your connection speed and is shown on the progress bar. Do not leave the page during this stage or the upload will be cut off. Then the OCR server processes the pages in the background (approx. 8 pages/min) — at that point you can leave freely and return later, your progress is saved."
   },
   "closeAndMonitor": "Close — I'll check progress later",
   "cancelUpload": "Cancel upload and delete",
