@@ -54,6 +54,13 @@ Kasutaja küsimus oli lihtne: mitu tulemust on **kokku** ootel.
    Kui ükski partii ei ole aktiivne, on `progress` **kõigi selle teose
    batch-tööde koond** (`total`/`ready`/`errors` summeeritud, `active: false`).
 
+   **Täiendus 2026-10-12:** koond on **lehe**, mitte kirje kaupa — iga leht
+   loetakse üks kord oma **uusima** partii (`started_at`) olekuga; sama kehtib
+   `errors`/`active` sõnastikele. Kirjete summeerimine luges vana partii vigase
+   lehe pärast edukat kordust nii vigaseks kui valmiks (sy2y27: 467-lehelise
+   partii järel ühe lehe Gemini-kordus andis „453/468, 15 veaga" ja leht jäi
+   veamärgiga).
+
 ## Tagajärjed
 
 - Kaks numbrit ei saa enam eri partiist tulla. Pärast kahte partiid: „48/48

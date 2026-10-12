@@ -1010,42 +1010,45 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
 
     `progress` on TEOSE, mitte ühe batchi tasemel (ADR 0029): aktiivse batchi ajal
     näitab seda batchi (elav edenemine + katkestamisnupp), muidu KÕIGI selle teose
-    batch-tööde koondit. Varem võttis silmus esimese nähtud kirje ehk lisamis-
-    järjestuses VANIMA batchi — uue partii lõppedes hüppas riba tagasi vana partii
+    batch-tööde koondit — iga leht üks kord, oma uusima partii olekuga. Varem
+    võttis silmus esimese nähtud kirje ehk lisamisjärjestuses VANIMA batchi — uue partii lõppedes hüppas riba tagasi vana partii
     numbritele, samal ajal kui ootel-loendur rääkis juba uuest."""
     active: Dict[str, str] = {}
     errors: Dict[str, str] = {}
     progress: Optional[Dict] = None
     active_job_id: Optional[str] = None   # katkestamiseks Manage-vaates (#217)
     active_provider: Optional[str] = None  # kumb pakkuja parajasti töötab
-    koond_total = koond_ready = koond_errors = 0
+    # Lehe olek = selle lehe UUSIMA partii kirje. Varem liideti kõik partiid
+    # kirjete kaupa: vana partii viga jäi püsima ka siis, kui uuem partii sama
+    # lehe ära tegi, ja leht loeti koondis kaks korda (467 + 1 = „468 lehte").
+    uusim: Dict[str, Dict] = {}
     with _reocr_batch_jobs_lock:
-        for jid, j in _reocr_batch_jobs.items():
-            if j["work_id"] != work_id:
-                continue
-            is_active = j["status"] in ("uploading", "processing")
+        jobs = sorted(((jid, j) for jid, j in _reocr_batch_jobs.items()
+                       if j["work_id"] == work_id),
+                      key=lambda kv: kv[1].get("started_at") or 0)
+        for jid, j in jobs:
             for e in j["pages"]:
-                if e["status"] in ("uploading", "processing"):
-                    active[e["page_filename"]] = e["status"]
-                elif e["status"] == "error" and e.get("error"):
-                    errors[e["page_filename"]] = e["error"]
-            summary = {
-                "total": len(j["pages"]),
-                "ready": sum(1 for e in j["pages"] if e["status"] == "ready"),
-                "errors": sum(1 for e in j["pages"] if e["status"] == "error"),
-                "active": is_active,
-            }
-            koond_total += summary["total"]
-            koond_ready += summary["ready"]
-            koond_errors += summary["errors"]
-            if is_active:
-                progress = summary   # elav batch varjutab koondi
+                uusim[e["page_filename"]] = e
+            if j["status"] in ("uploading", "processing"):
+                progress = {   # elav batch varjutab koondi
+                    "total": len(j["pages"]),
+                    "ready": sum(1 for e in j["pages"] if e["status"] == "ready"),
+                    "errors": sum(1 for e in j["pages"] if e["status"] == "error"),
+                    "active": True,
+                }
                 active_job_id = jid
                 # Vanemad (enne pakkuja-dimensiooni) kirjed on LOSSi omad.
                 active_provider = j.get("provider", "loss")
-    if progress is None and koond_total:
-        progress = {"total": koond_total, "ready": koond_ready,
-                    "errors": koond_errors, "active": False}
+        for fn, e in uusim.items():
+            if e["status"] in ("uploading", "processing"):
+                active[fn] = e["status"]
+            elif e["status"] == "error" and e.get("error"):
+                errors[fn] = e["error"]
+    if progress is None and uusim:
+        progress = {"total": len(uusim),
+                    "ready": sum(1 for e in uusim.values() if e["status"] == "ready"),
+                    "errors": sum(1 for e in uusim.values() if e["status"] == "error"),
+                    "active": False}
     ocr_ready: List[str] = []
     try:
         for fn in os.listdir(work_path):
