@@ -620,7 +620,7 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
                 pass
 
     # Salvesta git HEAD rollback'i jaoks
-    from .git_ops import get_or_init_repo
+    from .git_ops import get_or_init_repo, git_write_lock
     repo = get_or_init_repo()
     old_head = repo.head.commit.hexsha
 
@@ -651,13 +651,15 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
                 old_tracked.append(fname)
                 fpath = os.path.join(work_dir, fname)
                 if os.path.exists(fpath):
-                    repo.git.rm(os.path.join(slug, fname))
+                    with git_write_lock:
+                        repo.git.rm(os.path.join(slug, fname))
         if old_tracked:
             logger.info(f"replace {upload_id}: git rm {len(old_tracked)} vana faili")
     except Exception as e:
         logger.error(f"replace {upload_id}: git rm viga, katkestan ja taastan vana sisu: {e}")
         try:
-            repo.git.checkout(old_head, '--', slug)
+            with git_write_lock:
+                repo.git.checkout(old_head, '--', slug)
             logger.info(f"replace {upload_id}: rollback git checkout OK (head={old_head[:8]})")
         except Exception as rb_git_err:
             logger.error(f"replace {upload_id}: rollback git checkout ebaõnnestus: {rb_git_err}")
@@ -725,7 +727,8 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
         if destructive_started:
             logger.error(f"replace_work_content: rollback after error: {e}")
             try:
-                repo.git.checkout(old_head, '--', slug)
+                with git_write_lock:
+                    repo.git.checkout(old_head, '--', slug)
                 logger.info(f"replace {upload_id}: rollback git checkout OK (head={old_head[:8]})")
             except Exception as rb_git_err:
                 logger.error(f"replace {upload_id}: rollback git checkout ebaõnnestus: {rb_git_err}")
@@ -789,18 +792,21 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
     # 9. Git commit uuendatud sisuga
     try:
-        from .git_ops import get_or_init_repo
+        from .git_ops import get_or_init_repo, git_write_lock
         from git import Actor
         repo = get_or_init_repo()
-        repo.git.add(slug)
-        if repo.is_dirty(index=True):
-            author_name = username if username else "Automaatne"
-            actor = Actor(author_name, f"{author_name}@vutt.local")
-            repo.index.commit(
-                f"Asenda sisu: {slug} ({work_id})",
-                author=actor,
-                committer=actor,
-            )
+        with git_write_lock:
+            repo.git.add(slug)
+            dirty = repo.is_dirty(index=True)
+            if dirty:
+                author_name = username if username else "Automaatne"
+                actor = Actor(author_name, f"{author_name}@vutt.local")
+                repo.index.commit(
+                    f"Asenda sisu: {slug} ({work_id})",
+                    author=actor,
+                    committer=actor,
+                )
+        if dirty:
             logger.info(f"replace {upload_id}: git commit OK ({slug})")
         else:
             logger.info(f"replace {upload_id}: git — muutusi pole, commit vahele jäetud")

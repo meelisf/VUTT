@@ -12,7 +12,7 @@ laeb siis nimekirja uuesti ja näeb, mis kettale jõudis. Teose kohta korraga
 import threading
 import time
 
-from .admin_page_ops import apply_page_ops
+from .admin_page_ops import PageOpsPartialError, apply_page_ops
 from .config import get_logger
 
 logger = get_logger(__name__)
@@ -55,7 +55,16 @@ def start(work_id: str, ops, username: str, total: int) -> bool:
             # kasutajale mõeldud sõnumid; muu logitakse ka.
             if not isinstance(e, (ValueError, RuntimeError)):
                 logger.exception(f"PAGE-OPS töö {work_id} kukkus")
-            _set(work_id, state="error", error=str(e), finished_at=time.time())
+            # `applied`/`transformed` ütlevad kliendile, mis plaanist maha võtta;
+            # ValueError tuleb enne muutmist → midagi ei tehtud. Puuduv väli =
+            # teadmata (ootamatu erind) → klient tühjendab plaani.
+            if isinstance(e, PageOpsPartialError):
+                extra = {"applied": e.applied, "transformed": e.transformed}
+            elif isinstance(e, ValueError):
+                extra = {"applied": [], "transformed": []}
+            else:
+                extra = {}
+            _set(work_id, state="error", error=str(e), finished_at=time.time(), **extra)
 
     threading.Thread(target=run, daemon=True, name=f"page-ops-{work_id}").start()
     return True

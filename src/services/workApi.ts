@@ -261,6 +261,10 @@ export interface PageOpsStatus {
   total?: number;
   result?: PageOpsResult;
   error?: string;
+  /** Vea korral: täielikult tehtud lehed. Puudub = teadmata (plaan tühjaks). */
+  applied?: string[];
+  /** Vea korral: lehed, mille pööre/kärbe tehti, aga poolitus mitte. */
+  transformed?: string[];
 }
 
 /** Käivitab ootel pöörded, kärped ja poolitused taustatööna; edenemine `getWorkPageOpsStatus`-ist. */

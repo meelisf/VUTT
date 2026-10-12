@@ -55,7 +55,7 @@ import { initialManageTab, tabSwitch, type ManageTab } from './manage/partsModel
 import PageActionBar from './manage/PageActionBar';
 import {
   PendingPageOps, clearPendingAdjust, pendingCount, pruneMissing, rotatePending, setPendingEdit,
-  setPendingSplit, setPendingSplitX, toRequest,
+  dropApplied, setPendingSplit, setPendingSplitX, toRequest,
 } from './manage/pageOpsPlan';
 import type { PageAdjust } from './upload/types';
 import { clampSplitX } from '../components/pagePrep/geometry';
@@ -581,6 +581,7 @@ const WorkManage: React.FC = () => {
     setPageOpsSaving(true);
     setPageOpsProgress({ done: 0, total });
     let ok = false;
+    let keep: Pick<PageOpsStatus, 'applied' | 'transformed'> | null = null;
     try {
       for (;;) {
         await new Promise((r) => setTimeout(r, 1000));
@@ -601,6 +602,7 @@ const WorkManage: React.FC = () => {
           ok = true;
         } else if (st.state === 'error') {
           setPageOpsError(st.error || t('manage.pageOps.error'));
+          if (st.applied) keep = { applied: st.applied, transformed: st.transformed ?? [] };
         } else {
           setPageOpsError(t('manage.pageOps.interrupted'));
         }
@@ -608,9 +610,12 @@ const WorkManage: React.FC = () => {
       }
     } finally {
       if (pageOpsPollAlive.current) {
-        // Ootel plaan tühjaks ka vea korral: osaliselt tehtud pööre oleks
-        // uuel „Rakenda"-l teist korda pööratud. Kasutaja märgib uuesti.
-        setPendingOps({});
+        // Vea korral jääb tegemata osa plaanist alles (server ütleb, mis tehti) —
+        // sadade lehtede uuesti märkimine oli 2026-10-12 tegelik kahju. Kui
+        // server seda ei tea (katkestus, ootamatu viga), plaan tühjaks: osaliselt
+        // tehtud pööre oleks uuel „Rakenda"-l teist korda pööratud.
+        const k = keep;
+        setPendingOps((ops) => (k ? dropApplied(ops, k.applied ?? [], k.transformed ?? []) : {}));
         handleClearSelection();
         await loadPages();
         setThumbCacheBust(Date.now());

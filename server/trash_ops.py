@@ -11,7 +11,7 @@ import shutil
 from git import Actor
 
 from .config import BASE_DIR, get_logger
-from .git_ops import get_or_init_repo
+from .git_ops import get_or_init_repo, git_write_lock
 from .utils import WORK_ID_CACHE
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import refresh_work_mentions
@@ -139,35 +139,36 @@ def restore_deleted_work(work_id, username="VUTT Server"):
     if os.path.exists(folder_path):
         return {'ok': False, 'error': f'Kaust {folder_name} on juba olemas'}
 
-    # 4. Git checkout — taasta txt/json/metadata parent commitist
-    try:
-        repo.git.checkout(f'{commit_hash}^', '--', folder_name)
-    except Exception as e:
-        return {'ok': False, 'error': f'Git checkout ebaõnnestus: {e}'}
+    with git_write_lock:  # checkout → commit: indeks ei tohi vahepeal teisele kirjutajale jääda
+        # 4. Git checkout — taasta txt/json/metadata parent commitist
+        try:
+            repo.git.checkout(f'{commit_hash}^', '--', folder_name)
+        except Exception as e:
+            return {'ok': False, 'error': f'Git checkout ebaõnnestus: {e}'}
 
-    # 5. Liiguta JPG-d prügikastist tagasi
-    try:
-        for fname in os.listdir(trash_dir):
-            if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
-                shutil.move(
-                    os.path.join(trash_dir, fname),
-                    os.path.join(folder_path, fname)
-                )
-    except Exception as e:
-        return {'ok': False, 'error': f'JPG-de liigutamine ebaõnnestus: {e}'}
+        # 5. Liiguta JPG-d prügikastist tagasi
+        try:
+            for fname in os.listdir(trash_dir):
+                if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    shutil.move(
+                        os.path.join(trash_dir, fname),
+                        os.path.join(folder_path, fname)
+                    )
+        except Exception as e:
+            return {'ok': False, 'error': f'JPG-de liigutamine ebaõnnestus: {e}'}
 
-    # 6. Git commit — taastamise commit
-    title = work_id
-    try:
-        title_match = re.match(r'Kustuta teos: (.+?) \[', commit_msg)
-        if title_match:
-            title = title_match.group(1)
-        actor = Actor(username, f"{username}@vutt.local")
-        restore_msg = f"Taasta teos: {title} [{work_id}]"
-        repo.index.commit(restore_msg, author=actor, committer=actor)
-        logger.info(f"TRASH: Taastatud teos {folder_name} [{work_id}]")
-    except Exception as e:
-        logger.warning(f"TRASH: Taastamise commit ebaõnnestus: {e}")
+        # 6. Git commit — taastamise commit
+        title = work_id
+        try:
+            title_match = re.match(r'Kustuta teos: (.+?) \[', commit_msg)
+            if title_match:
+                title = title_match.group(1)
+            actor = Actor(username, f"{username}@vutt.local")
+            restore_msg = f"Taasta teos: {title} [{work_id}]"
+            repo.index.commit(restore_msg, author=actor, committer=actor)
+            logger.info(f"TRASH: Taastatud teos {folder_name} [{work_id}]")
+        except Exception as e:
+            logger.warning(f"TRASH: Taastamise commit ebaõnnestus: {e}")
 
     # 7. Meilisearch sync
     try:
@@ -302,35 +303,36 @@ def restore_deleted_page(work_id, folder_name, filename, username="VUTT Server")
         )
         return {'ok': False, 'reason': liik, 'error': selgitus}
 
-    # 2. Taasta .txt ja .json parent commitist
-    restored = []
-    for ext in ['.txt', '.json']:
-        rel_path = f"{folder_name}/{base}{ext}"
+    with git_write_lock:  # checkout → commit ühe luku all
+        # 2. Taasta .txt ja .json parent commitist
+        restored = []
+        for ext in ['.txt', '.json']:
+            rel_path = f"{folder_name}/{base}{ext}"
+            try:
+                repo.git.checkout(f'{commit_hash}^', '--', rel_path)
+                restored.append(ext)
+            except Exception as e:
+                logger.warning(f"TRASH: Ei saanud taastada {rel_path}: {e}")
+
+        if not restored:
+            return {'ok': False, 'error': 'Faile ei õnnestunud gitist taastada'}
+
+        # 3. Liiguta JPG tagasi teose kausta
         try:
-            repo.git.checkout(f'{commit_hash}^', '--', rel_path)
-            restored.append(ext)
+            shutil.move(img_path, os.path.join(work_path, filename))
         except Exception as e:
-            logger.warning(f"TRASH: Ei saanud taastada {rel_path}: {e}")
+            return {'ok': False, 'error': f'Pildi liigutamine ebaõnnestus: {e}'}
 
-    if not restored:
-        return {'ok': False, 'error': 'Faile ei õnnestunud gitist taastada'}
-
-    # 3. Liiguta JPG tagasi teose kausta
-    try:
-        shutil.move(img_path, os.path.join(work_path, filename))
-    except Exception as e:
-        return {'ok': False, 'error': f'Pildi liigutamine ebaõnnestus: {e}'}
-
-    # 4. Git commit
-    try:
-        actor = Actor(username, f"{username}@vutt.local")
-        repo.index.commit(
-            f"Taasta leht: {folder_name}/{base} [{work_id}]",
-            author=actor, committer=actor
-        )
-        logger.info(f"TRASH: Taastatud leht {folder_name}/{base}")
-    except Exception as e:
-        logger.warning(f"TRASH: Taastamise commit ebaõnnestus: {e}")
+        # 4. Git commit
+        try:
+            actor = Actor(username, f"{username}@vutt.local")
+            repo.index.commit(
+                f"Taasta leht: {folder_name}/{base} [{work_id}]",
+                author=actor, committer=actor
+            )
+            logger.info(f"TRASH: Taastatud leht {folder_name}/{base}")
+        except Exception as e:
+            logger.warning(f"TRASH: Taastamise commit ebaõnnestus: {e}")
 
     # 5. Meilisearch sync
     try:

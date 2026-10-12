@@ -121,6 +121,23 @@ export function pruneMissing(ops: PendingPageOps, existing: Iterable<string>): P
   return changed ? next : ops;
 }
 
+/**
+ * Katkenud paki järel: tehtud lehed plaanist maha, ülejäänud märgistus jääb
+ * kordamiseks alles. `transformed` lehel jäi poolitus tegemata, aga pööre ja
+ * kärbe on juba kettal — teist korda ei tohi neid rakendada.
+ */
+export function dropApplied(ops: PendingPageOps, applied: Iterable<string>, transformed: Iterable<string>): PendingPageOps {
+  let next = { ...ops };
+  for (const fn of applied) delete next[fn];
+  for (const fn of transformed) {
+    const op = next[fn];
+    if (!op) continue;
+    const { adjust: _drop, ...rest } = op;
+    next = put(next, fn, { ...rest, rotate: 0 });
+  }
+  return next;
+}
+
 export function pendingCount(ops: PendingPageOps): number {
   return Object.keys(ops).length;
 }
