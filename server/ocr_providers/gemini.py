@@ -270,9 +270,17 @@ def transcribe(image_bytes: bytes, instruction: str,
     raise GeminiError("Gemini päring ebaõnnestus: {}".format(viimane))
 
 
+# Kindlad vasted, mis on pärisnimede reeglist tähtsamad. Ilma selleta jättis
+# mudel „Tartu Ülikooli" pärisnimena tõlkimata (ja käänas: „Tartu Ülikool").
+TOLKE_SONASTIK = (
+    ("Tartu Ülikool (mis tahes käändes)", "University of Tartu"),
+)
+
 TOLKE_JUHIS = (
     "Tõlgi järgnev raamatukogukirje pealkiri eesti keelest inglise keelde. "
     "Pärisnimesid (isikunimed, kohanimed) EI tõlgita — need jäävad muutmata. "
+    "Erand: järgmistel nimedel on kindel ingliskeelne vaste, kasuta seda: "
+    + "; ".join(f"{et} → {en}" for et, en in TOLKE_SONASTIK) + ". "
     "Tagasta AINULT tõlge, ilma selgituste ja jutumärkideta."
 )
 
