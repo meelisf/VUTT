@@ -25,6 +25,14 @@ describe('selectionWrapChanges — mähkimine', () => {
     expect(lulita('⟦ab\n\ncd⟧')).toBe('<i>ab</i>\n\n<i>cd</i>');
   });
 
+  it('add mähib valiku (ADR 0067)', () => {
+    expect(lulita('daß ⟦mir⟧ bedeutende', 'add')).toBe('daß <add>mir</add> bedeutende');
+  });
+
+  it('stiilitäg läheb lisanduse (add) SISSE', () => {
+    expect(lulita('a ⟦<add>mir</add>⟧ b')).toBe('a <add><i>mir</i></add> b');
+  });
+
   it('stiilitäg läheb struktuuritägi (m) SISSE', () => {
     expect(lulita('⟦<m>ab</m>⟧\nx')).toBe('<m><i>ab</i></m>\nx');
     expect(lulita('⟦<m>ab</m>⟧\nx', 'b')).toBe('<m><b>ab</b></m>\nx');

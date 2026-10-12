@@ -114,7 +114,7 @@ def clean_text_for_search(text, keep_ann=False):
     """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
 
     Toetab mõlemat märgendusformaati:
-    - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <fn>n</fn>, <pb/>
+    - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <add>, <fn>n</fn>, <pb/>
     - Vana pseudo-markdown: *italic*, **bold*, ~cs~, [[m:text]], --lk--, [^n]
 
     `keep_ann=True` jätab `<annN>…</annN>` ankrud alles — kõik ÜLEJÄÄNUD

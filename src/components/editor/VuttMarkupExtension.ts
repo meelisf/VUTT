@@ -49,6 +49,8 @@ const VUTT_TAGS: TagDef[] = [
   { tag: 'cs', cls: 'vutt-cs' },
   { tag: 'm',  cls: 'vutt-marginalia' },
   { tag: 'hi', cls: 'vutt-highlight' },
+  // Interlineaarne/veerise lisandus oma lisamiskohas (ADR 0067)
+  { tag: 'add', cls: 'vutt-add' },
   { tag: 'fn', useWidget: true },
   { tag: 'pb', selfClose: true },
   { tag: 'ann', cls: 'vutt-ann', withId: true },

@@ -195,7 +195,7 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
     const specs = cleanMarkupSpecs(
       view.state.doc.toString(), from, to, hidden,
-      s => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, ''),
+      s => s.replace(/<\/?(?:i|b|cs|m|hi|add|fn|pb)[^>]*>/g, ''),
     );
     if (specs.length === 0) return;
     const changes = view.state.changes(specs);

@@ -89,6 +89,17 @@ body:has(.workspace-container) {
   border-radius: 2px;
 }
 
+/* <add>tekst</add> — rea kohale/alla/veerisele kirjutatud lisandus oma lisamiskohas
+   (ADR 0067). Punktiir teksti KOHAL viitab rea kohale kirjutatule. Ülaindeksit
+   (vertical-align, väiksem kiri) EI kasutata: CodeMirroris muudaks see rea kõrgust
+   ja kursori asukohta. Sama klass redaktoris ja lugemisvaates. */
+.vutt-add {
+  color: #047857; /* emerald-700 */
+  text-decoration-line: overline;
+  text-decoration-style: dotted;
+  text-decoration-color: #059669; /* emerald-600 */
+}
+
 /* <fn>n</fn> widget — joonealuse viite marker */
 .vutt-fn-widget {
   color: #0284c7; /* primary-600 */

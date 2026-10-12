@@ -461,3 +461,8 @@ def test_teosele_piiratud_token_kirju_ei_nae():
     payload = jwt.decode(generate_work_scoped_meili_token("abc123"),
                          "test-key-32-chars-long-padding-x", algorithms=["HS256"])
     assert set(payload["searchRules"]) == {"teosed"}
+
+
+def test_clean_text_for_search_add_sisu_jaab_lausesse():
+    """ADR 0067: <add> eemaldatakse, sisu jääb lisamiskohta — otsing leiab lause."""
+    assert clean_text_for_search("daß <add>mir</add> bedeutende Leute") == "dass mir bedeutende Leute"  # ß → ss (#228)

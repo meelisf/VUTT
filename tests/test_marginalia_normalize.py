@@ -213,3 +213,14 @@ def test_idempotentne_tuhja_tagiga():
     for txt in ('<m><i></i> Ratio.</m>', '<m> <b></b> <i>x</i></m>', '<m><i>x</i><b></b> </m>'):
         once = norm(txt)
         assert norm(once) == once, txt
+
+
+# --- <add> (ADR 0067) ---
+
+def test_tuhi_add_koristatakse():
+    assert strip("daß <add></add> mir") == "daß  mir"
+    assert strip("<m><add> </add></m>") == " "   # sisu (tühik) säilib, tägid kaovad
+
+
+def test_add_ristuv_m_liigub_m_sisse():
+    assert norm("<add><m>x</m></add>") == "<m><add>x</add></m>"

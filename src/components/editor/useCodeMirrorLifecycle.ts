@@ -82,6 +82,8 @@ export function useCodeMirrorLifecycle({
             { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
             { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
             { key: 'Alt-m', run: applyMacron },
+            // Lisandus (ADR 0067). Alt-täht ei sobi: Macis annab iga Alt-täht märgi (Alt-a = å).
+            { key: 'Mod-Shift-l', run: () => { wrapWithTagRef.current('add'); return true; } },
           ]),
           editableCompartmentRef.current.of(
             EditorView.editable.of(!readOnly)

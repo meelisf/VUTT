@@ -107,7 +107,7 @@ export function selectionWrapChanges(
   const changes: { from: number; to: number; insert: string }[] = [];
 
   // NUTIKAS PESASTAMINE: stiilitägi (i, b, cs) puhul liigume struktuuri-tägide
-  // (m, hi, fn) SISSE. Nii otsustamisel kui tegevusel — muidu nägi otsus valikut
+  // (m, hi, add, fn) SISSE. Nii otsustamisel kui tegevusel — muidu nägi otsus valikut
   // `<m><i>ab</i></m>` mähkimisena ja jättis orvu `<m><i>ab</m>`.
   const skipStructural = (sFrom: number, sTo: number): [number, number] => {
     if (!['i', 'b', 'cs'].includes(tag)) return [sFrom, sTo];
@@ -119,7 +119,7 @@ export function selectionWrapChanges(
       if (startTagMatch) {
         const tagName = startTagMatch[0].match(/[a-z]+/)?.[0];
         // Kui on struktuuri-täg, hüppame sisse
-        if (tagName && ['m', 'hi', 'fn'].includes(tagName)) {
+        if (tagName && ['m', 'hi', 'add', 'fn'].includes(tagName)) {
           sFrom += startTagMatch[0].length;
           adjusted = true;
         }
@@ -129,7 +129,7 @@ export function selectionWrapChanges(
       const endTagMatch = docText.slice(Math.max(0, sTo - 15), sTo).match(/<\/[^>]+>$/);
       if (endTagMatch) {
         const tagName = endTagMatch[0].match(/[a-z]+/)?.[0];
-        if (tagName && ['m', 'hi', 'fn'].includes(tagName)) {
+        if (tagName && ['m', 'hi', 'add', 'fn'].includes(tagName)) {
           sTo -= endTagMatch[0].length;
           adjusted = true;
         }
