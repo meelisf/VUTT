@@ -40,6 +40,14 @@ def test_juhis_keelab_parisnimede_tolkimise(monkeypatch):
     assert "pärisnime" in juhis.lower() or "proper name" in juhis.lower()
 
 
+def test_juhis_kannab_sonastiku_vasteid():
+    """„Tartu Ülikool" jäi pärisnimena tõlkimata — sõnastik annab kindla vaste."""
+    assert "University of Tartu" in gemini.TOLKE_JUHIS
+    assert "Tartu Ülikool" in gemini.TOLKE_JUHIS
+    assert "Ingria" in gemini.TOLKE_JUHIS
+    assert "Livonia" in gemini.TOLKE_JUHIS
+
+
 def test_erand_ei_logi_erandi_sisu_ainult_tuupi(monkeypatch, caplog):
     """`_api_key()` kutsutakse try-ploki SEES (x-goog-api-key päise jaoks) —
     vigane võti .env-is annab `requests.InvalidHeader`'i, mille sõnum
