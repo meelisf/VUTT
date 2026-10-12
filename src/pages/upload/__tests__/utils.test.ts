@@ -37,8 +37,8 @@ describe('ocrEstimate', () => {
   });
 
   it('arvutab minutid lehekülgede arvust (ümardab üles)', () => {
-    expect(ocrEstimate(5)).toBe('~2 min'); // 5 / 2.5 = 2
-    expect(ocrEstimate(6)).toBe('~3 min'); // 6 / 2.5 = 2.4 → 3
+    expect(ocrEstimate(16)).toBe('~2 min'); // 16 / 8 = 2
+    expect(ocrEstimate(17)).toBe('~3 min'); // 17 / 8 = 2.1 → 3
   });
 });
 
