@@ -23,7 +23,7 @@ interface EditorEditTabProps {
   narrowPane: boolean;
   marginaliaCount: number;
   marginaliaUserMode: MarginaliaMode;
-  wrapWithTag: (tag: 'b' | 'i' | 'cs') => void;
+  wrapWithTag: (tag: 'b' | 'i' | 'cs' | 'add') => void;
   insertMarginalia: () => void;
   insertAtCursor: (text: string) => void;
   cleanMarkup: () => void;

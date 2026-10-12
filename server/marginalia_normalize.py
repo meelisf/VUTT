@@ -22,7 +22,7 @@ import re
 
 # Inline-vormindustägid, mis VÕIVAD <m> ümber/ristuda. EI sisalda 'm' ennast,
 # ega widget-tägi 'fn'/'pb' (need ei esine marginaalia-real samamoodi).
-_INLINE = r'(?:i|b|cs|hi|ann\d*)'
+_INLINE = r'(?:i|b|cs|hi|add|ann\d*)'
 
 # Rida, mis on TERVIKUNA marginaalia: valikuline ws + inline-avatägid + <m> +
 # sisu (ilma <m>/</m>-ta) + </m> + inline-sulgtägid + valikuline ws.
@@ -57,7 +57,7 @@ def _normalize_line(line: str) -> str:
 
 # Tühje paaris-tage koristatakse komplektist (m + inline). EI sisalda 'ann\d*'
 # (ID viitab andmetele), 'fn' (joonealuse viide) ega 'pb' (self-closing).
-_EMPTY_RE = re.compile(r'<(m|i|b|cs|hi)>(\s*)</\1>')
+_EMPTY_RE = re.compile(r'<(m|i|b|cs|hi|add)>(\s*)</\1>')
 
 
 def strip_empty_tags(text: str) -> str:
@@ -67,7 +67,7 @@ def strip_empty_tags(text: str) -> str:
     risustavad faili ja segavad mudeli treenimist. See koristab need.
 
     Reeglid (ettearvatav, deterministlik):
-    - Komplekt: `m, i, b, cs, hi`. Puutumata: `ann\\d*`, `fn`, `pb`.
+    - Komplekt: `m, i, b, cs, hi, add`. Puutumata: `ann\\d*`, `fn`, `pb`.
     - **Säilitab sisu, eemaldab ainult tagid:** `<i> </i>` → ` ` (mitte ``), nii ei
       kao kunagi nähtavat märki põhitekstis.
     - **Pesastatud püsipunktini:** `<m><i></i></m>` → `<m></m>` → ``.

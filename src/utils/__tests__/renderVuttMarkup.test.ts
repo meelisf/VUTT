@@ -16,6 +16,11 @@ describe('renderVuttMarkup — VUTT-tägide renderdamine', () => {
     expect(renderVuttMarkup('a<pb/>b')).toContain('── lk ──');
   });
 
+  it('add lisandusena oma lisamiskohas (ADR 0067)', () => {
+    const html = renderVuttMarkup('daß <add>mir</add> bedeutende');
+    expect(html).toBe('daß <span class="vutt-add">mir</span> bedeutende');
+  });
+
   it('cs ja m', () => {
     expect(renderVuttMarkup('<cs>x</cs>')).toContain('italic tracking-wide');
     expect(renderVuttMarkup('<m>x</m>')).toContain('border-l-2');

@@ -82,6 +82,8 @@ export function useCodeMirrorLifecycle({
             { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
             { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
             { key: 'Alt-m', run: applyMacron },
+            // Lisandus (ADR 0067); sama Alt-muster mis makronil
+            { key: 'Alt-a', run: () => { wrapWithTagRef.current('add'); return true; } },
           ]),
           editableCompartmentRef.current.of(
             EditorView.editable.of(!readOnly)

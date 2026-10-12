@@ -1,13 +1,13 @@
 // renderVuttMarkup.ts — VUTT XML märgenduse konvertimine HTML-iks mobiilivaate jaoks.
-// Kuvab tägid nähtamatult: bold, italic, cs, marginalia, footnote, pagebreak.
+// Kuvab tägid nähtamatult: bold, italic, cs, marginalia, lisandus, footnote, pagebreak.
 
 export function renderVuttMarkup(text: string): string {
   let html = text
     .replace(/&/g, '&amp;')
     // Escape kõik < mis EI alusta lubatud VUTT-tägi (avav/sulgev) → kaitse HTML-injektsiooni
     // eest (security_review Leid A). Kasutaja sisestatud <span onclick=...>, <img onerror=...>
-    // jne muutuvad &lt;-ks; ainult VUTT-tägid (b,i,cs,m,hi,fn,pb,annN) jäävad töötlemiseks alles.
-    .replace(/<(?!\/?(?:b|i|cs|m|hi|fn|pb|ann\d+)\b)/g, '&lt;')
+    // jne muutuvad &lt;-ks; ainult VUTT-tägid (b,i,cs,m,hi,add,fn,pb,annN) jäävad töötlemiseks alles.
+    .replace(/<(?!\/?(?:b|i|cs|m|hi|add|fn|pb|ann\d+)\b)/g, '&lt;')
     // <pb/> — leheküljevahetus
     .replace(/<pb\/>/g, '<span class="block text-center text-gray-300 text-xs my-1 select-none">── lk ──</span>')
     // <fn>n</fn> — joonealune viide superscriptina
@@ -20,6 +20,8 @@ export function renderVuttMarkup(text: string): string {
     // Sisemine märgendus (<i>, <cs> jne) renderdub tavaliste reeglitega.
     .replace(/<m>([\s\S]*?)<\/m>/g, '<span class="block text-[0.85em] leading-snug text-stone-600 border-l-2 border-stone-300 pl-2 my-1">$1</span>')
     .replace(/<hi>([\s\S]*?)<\/hi>/g, '<mark class="bg-yellow-100">$1</mark>')
+    // <add>...</add> — lisandus oma lisamiskohas (ADR 0067), sama klass mis redaktoris
+    .replace(/<add>([\s\S]*?)<\/add>/g, '<span class="vutt-add">$1</span>')
     // <annN>...</annN> — tekstiannotatsioon: sama visuaal mis editoris (.vutt-ann),
     // ilma interaktiivsuseta. ID-d peavad klappima (\1); orvud/valepaarid koristab
     // allolev tundmatute tägide strip (sisu säilib).
