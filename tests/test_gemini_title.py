@@ -44,6 +44,8 @@ def test_juhis_kannab_sonastiku_vasteid():
     """„Tartu Ülikool" jäi pärisnimena tõlkimata — sõnastik annab kindla vaste."""
     assert "University of Tartu" in gemini.TOLKE_JUHIS
     assert "Tartu Ülikool" in gemini.TOLKE_JUHIS
+    assert "Ingria" in gemini.TOLKE_JUHIS
+    assert "Livonia" in gemini.TOLKE_JUHIS
 
 
 def test_erand_ei_logi_erandi_sisu_ainult_tuupi(monkeypatch, caplog):

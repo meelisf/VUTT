@@ -274,6 +274,8 @@ def transcribe(image_bytes: bytes, instruction: str,
 # mudel „Tartu Ülikooli" pärisnimena tõlkimata (ja käänas: „Tartu Ülikool").
 TOLKE_SONASTIK = (
     ("Tartu Ülikool (mis tahes käändes)", "University of Tartu"),
+    ("Ingerimaa (mis tahes käändes)", "Ingria"),
+    ("Liivimaa (mis tahes käändes)", "Livonia"),
 )
 
 TOLKE_JUHIS = (
