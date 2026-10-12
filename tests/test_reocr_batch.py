@@ -409,6 +409,40 @@ def test_build_reocr_status_progress_on_koik_partiid(tmp_path, monkeypatch):
         del reocr_ops._reocr_batch_jobs["UUS"]
 
 
+def test_build_reocr_status_uuem_partii_kirjutab_lehe_oleku_ule(tmp_path):
+    """Leht, mis vanas partiis kukkus ja uues õnnestus, on koondis ÜKS kord ja
+    valmis — mitte viga + valmis (sy2y27: „453/468, 15 veaga" pärast Gemini
+    kordust ühel 467-lehelise partii vigasel lehel)."""
+    from server import reocr_ops
+    work_dir = tmp_path / "teos-kordus"
+    work_dir.mkdir()
+
+    # Uuem partii lisatakse dict'i ENNE vanemat: järjekord tuleb started_at-ist
+    reocr_ops._reocr_batch_jobs["UUS3"] = {
+        "kind": "batch", "work_id": "wk", "slug": "teos-kordus", "status": "done",
+        "started_at": 300, "finished_at": 400, "last_progress_at": 400,
+        "remote_work": "r", "provider": "gemini", "pages": [
+            {"page_filename": "b.jpg", "stem": "b", "status": "ready", "error": None},
+        ],
+    }
+    reocr_ops._reocr_batch_jobs["VANA3"] = {
+        "kind": "batch", "work_id": "wk", "slug": "teos-kordus", "status": "done",
+        "started_at": 100, "finished_at": 200, "last_progress_at": 200,
+        "remote_work": "r", "pages": [
+            {"page_filename": "a.jpg", "stem": "a", "status": "ready", "error": None},
+            {"page_filename": "b.jpg", "stem": "b", "status": "error", "error": "KordusLoop"},
+            {"page_filename": "c.jpg", "stem": "c", "status": "error", "error": "KordusLoop"},
+        ],
+    }
+    try:
+        st = reocr_ops.build_reocr_status("wk", str(work_dir))
+        assert st["progress"] == {"total": 3, "ready": 2, "errors": 1, "active": False}
+        assert st["errors"] == {"c.jpg": "KordusLoop"}
+    finally:
+        del reocr_ops._reocr_batch_jobs["UUS3"]
+        del reocr_ops._reocr_batch_jobs["VANA3"]
+
+
 def test_build_reocr_status_aktiivne_batch_varjutab_koondi(tmp_path):
     """Elava partii ajal näitab progress SEDA partiid — muidu kaoks edenemine
     (ja katkestamisnupp) vanade partiide numbrite sisse."""
