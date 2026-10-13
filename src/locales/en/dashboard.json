@@ -33,7 +33,10 @@
     "protectedLoggedOut": "This is a protected collection. Log in to see its works.",
     "protectedNoAccess": "This is a protected collection and you may not have access to it.",
     "viewAllWorks": "View all works",
-    "loadingShelf": "Loading bookshelf..."
+    "loadingShelf": "Loading bookshelf...",
+    "viewCards": "Grid",
+    "viewList": "List",
+    "viewGroup": "View"
   },
   "error": {
     "connectionError": "Connection error",

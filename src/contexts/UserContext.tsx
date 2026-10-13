@@ -5,12 +5,17 @@ import { setSessionExpiredHandler } from '../services/apiClient';
 import i18n from '../i18n';
 import { useMeilisearch } from './MeilisearchContext';
 
+export type ResultsPage = 'works' | 'persons';
+export type ResultsView = 'cards' | 'list';
+
 export interface UserSettings {
   language?: 'et' | 'en';
   default_tab?: 'edit' | 'annotate';
   characters?: Array<{ char: string; name: string }>;
   /** Lemmikkogud valijates: püsikogu = paljas id, töökollektsioon = `s:<id>` (ADR 0038 kuju). */
   favorite_collections?: string[];
+  /** Tulemuste vaade lehe kaupa (#587); server liidab lehed kokku. */
+  results_view?: Partial<Record<ResultsPage, ResultsView>>;
 }
 
 interface User {

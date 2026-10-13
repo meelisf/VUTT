@@ -1,7 +1,8 @@
 import { hasImpreciseDating, parseDatingText } from '../utils/workDating';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Work, WorkStatus } from '../types';
+import { Work } from '../types';
+import { workStatusDotClass } from '../utils/workStatusDot';
 import { BookOpen, Calendar, User, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, Check } from 'lucide-react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
@@ -9,9 +10,7 @@ import { getEntityUrl } from '../utils/entityUrl';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
-import { useUser } from '../contexts/UserContext';
-import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { useWorkThumbnail } from '../hooks/useWorkThumbnail';
 import { parseYearDisplayRange, formatYearDisplay } from '../utils/yearDisplayUtils';
 import { workDisplayTitle } from '../utils/workTitle';
 
@@ -30,16 +29,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   const [dateParams] = useSearchParams();
   const preciseFilter = [dateParams.get('ys'), dateParams.get('ye')].some(v => v?.includes('-'));
   const { collections, getCollectionName } = useCollection();
-  const { authToken } = useUser();
-  const [thumbnailSrc, setThumbnailSrc] = useState(work.thumbnail_url);
-  const [thumbnailNeedsToken, setThumbnailNeedsToken] = useState(false);
-  const thumbnailTokenTriedRef = React.useRef(false);
-
-  React.useEffect(() => {
-    setThumbnailSrc(work.thumbnail_url);
-    setThumbnailNeedsToken(false);
-    thumbnailTokenTriedRef.current = false;
-  }, [work.thumbnail_url]);
+  const { thumbnailSrc, handleThumbnailError } = useWorkThumbnail(work);
 
   // Pealkiri liidese keeles (ADR 0064): koostatud pealkirja tõlge põhireale
   const displayTitle = workDisplayTitle(work, getLangCode(i18n.language));
@@ -80,62 +70,10 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
     });
   };
 
-  const requestThumbnailToken = React.useCallback(async () => {
-    if (thumbnailTokenTriedRef.current || !work.work_id) return;
-
-    // AuthContext taastub lehe laadimisel asünkroonselt. Kui protected pildi 403 jõuab
-    // enne authToken state'i, kasuta localStorage fallback'i ja ära märgi katset tehtuks
-    // enne kui meil päriselt on token, millega viewer-token küsida.
-    const token = authToken || localStorage.getItem('vutt_token');
-    if (!token) return;
-
-    thumbnailTokenTriedRef.current = true;
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/work/${work.work_id}/viewer-token`, {
-        headers: getAuthHeaders(token),
-        timeout: 10000,
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (data.image_exp && data.image_sig) {
-        const sep = work.thumbnail_url.includes('?') ? '&' : '?';
-        setThumbnailSrc(`${work.thumbnail_url}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
-        setThumbnailNeedsToken(false);
-      }
-    } catch { /* thumbnail jääb placeholder-taustale */ }
-  }, [authToken, work.work_id, work.thumbnail_url]);
-
-  const isRestrictedWork = useMemo(() => {
-    const workCollections = work.collections || [];
-    if (workCollections.length === 0) return false;
-    // Serveri loogika on "public wins": kui kasvõi üks teose otsene kollektsioon
-    // on avalik, on pilt avalik. Kui kõik teadaolevad otsesed kollektsioonid on
-    // restricted, vajab <img> HMAC-tokenit.
-    return workCollections.every(cid => collections[cid]?.visibility === 'restricted');
-  }, [collections, work.collections]);
-
-  React.useEffect(() => {
-    if (thumbnailNeedsToken || isRestrictedWork) void requestThumbnailToken();
-  }, [thumbnailNeedsToken, isRestrictedWork, requestThumbnailToken]);
-
-  const handleThumbnailError = () => {
-    setThumbnailNeedsToken(true);
-    void requestThumbnailToken();
-  };
-
   // Navigeeri töölaudale
   const handleOpenWorkspace = (e: React.MouseEvent) => {
     e.preventDefault();
     navigate(`/work/${work.work_id}/1`);
-  };
-
-  // Staatuse täpp stiilid
-  const getStatusDotStyle = (status?: WorkStatus) => {
-    switch (status) {
-      case 'Valmis': return 'bg-green-500';
-      case 'Töös': return 'bg-amber-400';
-      case 'Toores': default: return 'bg-gray-300';
-    }
   };
 
   // Žanrid massiivist (toetab nii massiivi kui üksikut väärtust)
@@ -331,7 +269,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
 
       <div className="p-4 flex-1 flex flex-col">
 
-        <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight line-clamp-2">
+        <h3 className="text-base font-bold text-gray-900 mb-1 leading-snug line-clamp-3" title={displayTitle.main}>
           <a
             href={`/work/${work.work_id}/1`}
             onClick={handleOpenWorkspace}
@@ -417,7 +355,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             className="p-1 rounded-full hover:bg-gray-100 transition-colors shrink-0"
             title={t('workCard.filterByStatus', { status: t(`common:status.${workStatus}`) })}
           >
-            <span className={`block w-2.5 h-2.5 rounded-full ${getStatusDotStyle(workStatus)}`} />
+            <span className={`block w-2.5 h-2.5 rounded-full ${workStatusDotClass(workStatus)}`} />
           </button>
         </div>
       </div >

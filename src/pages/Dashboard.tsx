@@ -34,6 +34,8 @@ import DashboardBulkActionBar from '../components/dashboard/DashboardBulkActionB
 import WorkSetPicker from '../components/WorkSetPicker';
 import { addWorks } from '../services/workSetService';
 import DashboardResultsHeader from '../components/dashboard/DashboardResultsHeader';
+import { useResultsView } from '../hooks/useResultsView';
+import WorkListRow from '../components/WorkListRow';
 
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
@@ -106,6 +108,9 @@ const Dashboard: React.FC = () => {
 
   // Wikidata rikastatud labelid — Q-koodid millel puudub praeguse keele label
   const [enrichedLabels, setEnrichedLabels] = useState<Record<string, Record<string, string>>>({});
+
+  // Kaardid ↔ loend (#587): valik jääb meelde (brauser + sisseloginul server)
+  const [view, changeView] = useResultsView('works');
 
   // Multi-select režiim (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
@@ -939,6 +944,7 @@ const Dashboard: React.FC = () => {
                     selectedCount={selectedWorkIds.size}
                     statusFiltered={Boolean(statusParam)}
                     totalPages={totalPages}
+                    view={view}
                     labels={{
                       bookshelf: t('results.bookshelf'),
                       enterSelect: t('bulkAssign.enterSelect'),
@@ -949,10 +955,14 @@ const Dashboard: React.FC = () => {
                       worksCount: t('results.worksCount', { count: totalHits }),
                       filtered: t('results.filtered'),
                       pageOf: t('results.pageOf', { current: currentPage, total: totalPages }),
+                      viewCards: t('results.viewCards'),
+                      viewList: t('results.viewList'),
+                      viewGroup: t('results.viewGroup'),
                     }}
                     onToggleSelectMode={() => selectMode ? exitSelectMode() : setSelectMode(true)}
                     onSelectAllVisible={selectAllVisible}
                     onClearSelection={clearSelection}
+                    onViewChange={changeView}
                   />
 
                   {loading ? (
@@ -964,8 +974,21 @@ const Dashboard: React.FC = () => {
                     </div>
                   ) : works.length > 0 ? (
                     <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {currentWorks.map((work, index) => (
+                      {view === 'list' ? (
+                        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                          {currentWorks.map((work) => (
+                            <WorkListRow
+                              key={work.work_id}
+                              work={work}
+                              selectMode={selectMode}
+                              isSelected={selectedWorkIds.has(work.work_id)}
+                              onToggleSelect={(shiftKey) => handleToggleSelect(work.work_id, shiftKey)}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                          {currentWorks.map((work, index) => (
                             <WorkCard
                               key={work.work_id}
                               work={work}
@@ -975,7 +998,8 @@ const Dashboard: React.FC = () => {
                               isPriority={index === 0}
                             />
                           ))}
-                      </div>
+                        </div>
+                      )}
 
                       {/* Pagination */}
                       <Pagination
