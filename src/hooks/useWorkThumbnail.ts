@@ -7,20 +7,20 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 /**
  * Teose pisipildi allikas koos piiratud kogu HMAC-tokeniga.
- * Ühine kaardile (`WorkCard`) ja loendireale (`WorkListRow`).
+ * Ühine kaardile (`WorkCard`) ja loendireale (`WorkListRow`); `url` vaikimisi kaanepilt.
  */
-export function useWorkThumbnail(work: Work) {
+export function useWorkThumbnail(work: Work, url: string = work.thumbnail_url) {
   const { collections } = useCollection();
   const { authToken } = useUser();
-  const [thumbnailSrc, setThumbnailSrc] = useState(work.thumbnail_url);
+  const [thumbnailSrc, setThumbnailSrc] = useState(url);
   const [thumbnailNeedsToken, setThumbnailNeedsToken] = useState(false);
   const thumbnailTokenTriedRef = React.useRef(false);
 
   React.useEffect(() => {
-    setThumbnailSrc(work.thumbnail_url);
+    setThumbnailSrc(url);
     setThumbnailNeedsToken(false);
     thumbnailTokenTriedRef.current = false;
-  }, [work.thumbnail_url]);
+  }, [url]);
 
   const requestThumbnailToken = React.useCallback(async () => {
     if (thumbnailTokenTriedRef.current || !work.work_id) return;
@@ -40,12 +40,12 @@ export function useWorkThumbnail(work: Work) {
       if (!response.ok) return;
       const data = await response.json();
       if (data.image_exp && data.image_sig) {
-        const sep = work.thumbnail_url.includes('?') ? '&' : '?';
-        setThumbnailSrc(`${work.thumbnail_url}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
+        const sep = url.includes('?') ? '&' : '?';
+        setThumbnailSrc(`${url}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
         setThumbnailNeedsToken(false);
       }
     } catch { /* thumbnail jääb placeholder-taustale */ }
-  }, [authToken, work.work_id, work.thumbnail_url]);
+  }, [authToken, work.work_id, url]);
 
   const isRestrictedWork = useMemo(() => {
     const workCollections = work.collections || [];

@@ -144,7 +144,8 @@ export interface Work {
 
   // Lehekülje info (esimese lehe andmed)
   page_count: number;
-  thumbnail_url: string;
+  thumbnail_url: string;          // Kaardi kaanepilt (kastile lõigatud)
+  page_thumbnail_url?: string;    // Esimese lehe täispisipilt (loendivaade)
   work_status?: WorkStatus;
   page_tags?: string[];     // Esimese lehekülje tagid
 }

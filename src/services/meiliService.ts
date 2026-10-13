@@ -32,7 +32,7 @@
 
 import { Page, Work, PageStatus, WorkStatus, ContentSearchHit } from '../types';
 import { MEILI_HOST } from '../config';
-import { getFullImageUrl, getThumbUrl } from './workImageService';
+import { getFullImageUrl, getPageThumbUrl, getThumbUrl } from './workImageService';
 
 // Check for Mixed Content (HTTPS vs HTTP)
 export const checkMixedContent = () => {
@@ -100,6 +100,8 @@ export const normalizeWork = (hit: any): Work => {
     archive_refs: hit.archive_refs || null,
     page_count: hit.page_count || hit.teose_lehekylgede_arv || 0,
     thumbnail_url: getThumbUrl(workId),
+    // Esimese lehe täispisipilt (sama, mida haldus kasutab); loendivaade, #587
+    page_thumbnail_url: hit.lehekylje_pilt ? getPageThumbUrl(workId, hit.lehekylje_pilt) : undefined,
     work_status: hit.work_status || hit.teose_staatus,
     page_tags: hit.page_tags || [],
     shareable: hit.shareable ?? false,

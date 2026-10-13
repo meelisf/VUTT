@@ -409,7 +409,8 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
         'type_object', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url', 'archive_refs',
-        'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
+        'last_modified', 'teose_lehekylgede_arv', 'teose_staatus',
+        'lehekylje_pilt' // loendivaate täispisipilt (#587)
       ],
       attributesToSearchOn: ['title', 'title_en', 'title_original', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjadest (ADR 0064), autoritest ja märksõnadest
       matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
