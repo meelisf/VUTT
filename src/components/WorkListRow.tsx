@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Work } from '../types';
 import { getLabel } from '../utils/metadataUtils';
 import { getLangCode } from '../utils/getLangCode';
@@ -18,8 +18,8 @@ interface WorkListRowProps {
 }
 
 /**
- * Teos loendivaates (#587): väike pisipilt ja TÄISPEALKIRI. Kaardi filtrilingid
- * (autor, aasta, žanr) jäävad kaardile — rida on navigeerimine teosele.
+ * Teos loendivaates (#587): väike pisipilt ja TÄISPEALKIRI. Autor on link nagu kaardil;
+ * aasta ja žanri filtrilingid jäävad kaardile — muu rida on navigeerimine teosele.
  */
 const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
@@ -31,7 +31,7 @@ const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isS
   const href = `/work/${work.work_id}/1`;
 
   const genres = Array.isArray(work.genre) ? work.genre : work.genre ? [work.genre] : [];
-  const creators = (work.creators || []).map(c => c.name).filter(Boolean);
+  const creators = (work.creators || []).filter(c => c.name);
   const typeLabel = work.type ? getLabel(work.type, lang) : '';
 
   const handleClick = (e: React.MouseEvent) => {
@@ -85,7 +85,25 @@ const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isS
           </div>
         )}
         <div className="mt-1 text-sm text-gray-600 flex flex-wrap gap-x-4 gap-y-0.5">
-          {creators.length > 0 && <span>{creators.join(', ')}</span>}
+          {creators.length > 0 && (
+            <span>
+              {creators.map((c, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && ', '}
+                  {/* Isikukaardiga autor viib kaardile; ilma kaardita autor jääb otsinguks (nagu WorkCard) */}
+                  <Link
+                    to={c.id?.startsWith('vutt:P')
+                      ? `/persons/${c.id}`
+                      : `/?${c.role === 'respondens' ? 'respondens' : 'author'}=${encodeURIComponent(c.name)}`}
+                    onClick={(e) => { e.stopPropagation(); if (selectMode) { e.preventDefault(); onToggleSelect?.(e.shiftKey); } }}
+                    className="hover:text-primary-600 hover:underline"
+                  >
+                    {c.name}
+                  </Link>
+                </React.Fragment>
+              ))}
+            </span>
+          )}
           <span className="tabular-nums">{formatYearDisplay(work.year_display, work.year, t, work.dating)}</span>
           <span className="tabular-nums">{work.page_count} {t('common:labels.pages')}</span>
           {typeLabel && <span className="text-gray-400">{typeLabel}</span>}
