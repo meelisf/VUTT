@@ -24,7 +24,8 @@ interface WorkListRowProps {
 const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
   const navigate = useNavigate();
-  const { thumbnailSrc, handleThumbnailError } = useWorkThumbnail(work);
+  // Täispisipilt, mitte kaardi kastile lõigatud kaas — real on leht püsti näha
+  const { thumbnailSrc, handleThumbnailError } = useWorkThumbnail(work, work.page_thumbnail_url || work.thumbnail_url);
   const lang = getLangCode(i18n.language);
   const displayTitle = workDisplayTitle(work, lang);
   const workStatus = work.work_status || 'Toores';
@@ -63,7 +64,7 @@ const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isS
           alt=""
           loading="lazy"
           onError={handleThumbnailError}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
       </div>
       <div className="flex-1 min-w-0">
