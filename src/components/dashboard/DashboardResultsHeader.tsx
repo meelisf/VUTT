@@ -1,6 +1,5 @@
 import { CheckSquare, LayoutGrid, List, Square } from 'lucide-react';
-
-export type DashboardView = 'cards' | 'list';
+import type { ResultsView } from '../../contexts/UserContext';
 
 interface DashboardResultsHeaderProps {
   /**
@@ -14,7 +13,7 @@ interface DashboardResultsHeaderProps {
   selectedCount: number;
   statusFiltered: boolean;
   totalPages: number;
-  view: DashboardView;
+  view: ResultsView;
   labels: {
     bookshelf: string;
     enterSelect: string;
@@ -32,7 +31,7 @@ interface DashboardResultsHeaderProps {
   onToggleSelectMode: () => void;
   onSelectAllVisible: () => void;
   onClearSelection: () => void;
-  onViewChange: (view: DashboardView) => void;
+  onViewChange: (view: ResultsView) => void;
 }
 
 export default function DashboardResultsHeader({

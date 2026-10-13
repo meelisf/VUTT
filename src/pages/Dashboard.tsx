@@ -33,7 +33,8 @@ import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import DashboardBulkActionBar from '../components/dashboard/DashboardBulkActionBar';
 import WorkSetPicker from '../components/WorkSetPicker';
 import { addWorks } from '../services/workSetService';
-import DashboardResultsHeader, { DashboardView } from '../components/dashboard/DashboardResultsHeader';
+import DashboardResultsHeader from '../components/dashboard/DashboardResultsHeader';
+import { useResultsView } from '../hooks/useResultsView';
 import WorkListRow from '../components/WorkListRow';
 
 const ITEMS_PER_PAGE = 12;
@@ -108,14 +109,8 @@ const Dashboard: React.FC = () => {
   // Wikidata rikastatud labelid — Q-koodid millel puudub praeguse keele label
   const [enrichedLabels, setEnrichedLabels] = useState<Record<string, Record<string, string>>>({});
 
-  // Kaardid ↔ loend (#587): brauseri eelistus, kehtib ka sisse logimata kasutajale
-  const [view, setView] = useState<DashboardView>(() => {
-    try { return localStorage.getItem('vutt_dashboard_view') === 'list' ? 'list' : 'cards'; } catch { return 'cards'; }
-  });
-  const changeView = (next: DashboardView) => {
-    setView(next);
-    try { localStorage.setItem('vutt_dashboard_view', next); } catch { /* privaatne aken */ }
-  };
+  // Kaardid ↔ loend (#587): valik jääb meelde (brauser + sisseloginul server)
+  const [view, changeView] = useResultsView('works');
 
   // Multi-select režiim (ainult admin)
   const [selectMode, setSelectMode] = useState(false);

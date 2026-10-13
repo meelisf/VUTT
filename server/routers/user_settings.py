@@ -23,6 +23,20 @@ def _validate_favorite_collections(value) -> list:
     return list(dict.fromkeys(value))
 
 
+# Tulemuste vaade (#587): leht → vaade. Kaart (map) EI ole siin — see on URL-i olek.
+RESULTS_VIEW_PAGES = {"works", "persons"}
+RESULTS_VIEW_VALUES = {"cards", "list"}
+
+
+def _validate_results_view(value) -> dict:
+    """{leht: vaade} lubatud võtmete ja väärtustega. Muu → 400."""
+    if (not isinstance(value, dict)
+            or not all(k in RESULTS_VIEW_PAGES and v in RESULTS_VIEW_VALUES
+                       for k, v in value.items())):
+        raise HTTPException(status_code=400, detail="results_view peab olema {works|persons: cards|list}")
+    return value
+
+
 # sync def → threadpool: kasutaja seadete faililugemine ei blokeeri event-loopi
 @router.get("/user-settings")
 def get_user_settings(request: Request, user=Depends(get_user)):
@@ -44,9 +58,15 @@ async def save_user_settings_endpoint(request: Request, user=Depends(get_user)):
     data = await get_json_data(request)
     if "favorite_collections" in data:
         data["favorite_collections"] = _validate_favorite_collections(data["favorite_collections"])
+    if "results_view" in data:
+        data["results_view"] = _validate_results_view(data["results_view"])
     settings = await run_in_threadpool(load_user_settings, user["username"])
+    # Lehed salvestavad oma vaate eraldi → liida, et ühe lehe kirjutus ei pühiks teist
+    if "results_view" in data:
+        stored = settings.get("results_view")
+        data["results_view"] = {**(stored if isinstance(stored, dict) else {}), **data["results_view"]}
     # Uuenda ainult lubatud väljad
-    allowed_fields = ["language", "default_tab", "characters", "favorite_collections"]
+    allowed_fields = ["language", "default_tab", "characters", "favorite_collections", "results_view"]
     for field in allowed_fields:
         if field in data:
             settings[field] = data[field]
