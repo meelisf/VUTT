@@ -5,14 +5,7 @@
     "reviewEdits": "Ülevaatus"
   },
   "search": {
-    "placeholder": "Otsi teost pealkirja või autori järgi...",
-    "timeRange": "Ajavahemik:",
-    "genre": "Žanr:",
-    "removeAuthorFilter": "Eemalda autori filter",
-    "removeRespondensFilter": "Eemalda respondendi filter",
-    "removePrinterFilter": "Eemalda trükkali filter",
-    "removeStatusFilter": "Eemalda staatuse filter",
-    "clearAll": "Tühista kõik filtrid"
+    "placeholder": "Otsi teost pealkirja või autori järgi..."
   },
   "sort": {
     "label": "Sortimine",
@@ -111,7 +104,6 @@
     "readLess": "Sulge"
   },
   "filters": {
-    "advanced": "Täpsemad valikud",
     "status": "Staatus",
     "genre": "Žanr",
     "searchGenre": "Otsi žanrit...",
@@ -120,7 +112,6 @@
     "type": "Tüüp",
     "languages": "Keel",
     "searchType": "Otsi tüüpi...",
-    "searchLanguage": "Otsi keelt...",
-    "clearAdvanced": "Tühjenda täpsemad filtrid"
+    "searchLanguage": "Otsi keelt..."
   }
 }

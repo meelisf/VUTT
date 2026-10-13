@@ -1,4 +1,3 @@
-import DateRangeInput from '../components/DateRangeInput';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
@@ -8,13 +7,12 @@ import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import Header from '../components/Header';
 import LoginModal from '../components/LoginModal';
-import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { useSelectionScope } from '../hooks/useSelectionScope';
 import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
-import { Search, AlertTriangle, ArrowUpDown, X, User, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
+import { Search, AlertTriangle, X, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
 import CollectionInfoBanner from '../components/CollectionInfoBanner';
 import SafeHtml from '../components/SafeHtml';
@@ -34,7 +32,11 @@ import DashboardBulkActionBar from '../components/dashboard/DashboardBulkActionB
 import WorkSetPicker from '../components/WorkSetPicker';
 import { addWorks } from '../services/workSetService';
 import DashboardResultsHeader from '../components/dashboard/DashboardResultsHeader';
-import { useResultsView } from '../hooks/useResultsView';
+import { useFilterSidebarOpen, useResultsView } from '../hooks/useResultsView';
+import FilterSidebar, { MobileFiltersButton } from '../components/filters/FilterSidebar';
+import WorkFilterSections from '../components/workFilters/WorkFilterSections';
+import WorkFilterChips, { FilterChip } from '../components/workFilters/WorkFilterChips';
+import { useWorkFilterModel } from '../components/workFilters/useWorkFilterModel';
 import WorkListRow from '../components/WorkListRow';
 
 const ITEMS_PER_PAGE = 12;
@@ -97,10 +99,6 @@ const Dashboard: React.FC = () => {
   // Täpsemad filtrid (AdvancedFilters komponent)
   const [selectedTags, setSelectedTags] = useState<string[]>(teoseTagsParam);
 
-  // Kas kuupäevarühmast paremal on üldse midagi (filtrisildid või „Tühista")?
-  // Otsustab, kas eraldajakriips on eraldaja või lihtsalt kriips tühjas ruumis.
-  const aktiivseidSilte = !!(authorParam || respondensParam || printerParam || statusParam
-    || inputValue || yearStart || yearEnd || selectedTags.length > 0);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(genreParam);
   const [selectedType, setSelectedType] = useState<string | null>(typeParam);
   const [selectedStatus, setSelectedStatus] = useState<WorkStatus | null>(statusParam);
@@ -111,6 +109,9 @@ const Dashboard: React.FC = () => {
 
   // Kaardid ↔ loend (#587): valik jääb meelde (brauser + sisseloginul server)
   const [view, changeView] = useResultsView('works');
+  // Filtrite külgriba (#587): lahti/kinni jääb meelde; mobiilipaneel on hetkeolek
+  const [sidebarOpen, setSidebarOpen] = useFilterSidebarOpen('works');
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Multi-select režiim (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
@@ -330,6 +331,38 @@ const Dashboard: React.FC = () => {
     }
     return map;
   }, [works]);
+
+  // Teoste filtrite mudel (#587): ÜKS kord lehe tasemel, et keelevahetuse
+  // iseparandus jookseks ka kinnise külgriba korral
+  const filterModel = useWorkFilterModel({
+    selectedGenre, selectedTags, selectedType, selectedStatus, selectedLanguages,
+    onGenreChange: setSelectedGenre,
+    onTagsChange: setSelectedTags,
+    onTypeChange: setSelectedType,
+    onStatusChange: setSelectedStatus,
+    onLanguagesChange: setSelectedLanguages,
+    facets, genreIdMap, genreLabelToId, tagsIdMap, tagsLabelToId, typeIdMap, typeLabelToId,
+    lang, enrichedLabels,
+  });
+  const activeFilterCount = filterModel.activeCount + (yearStart || yearEnd ? 1 : 0)
+    + (authorParam ? 1 : 0) + (respondensParam ? 1 : 0) + (printerParam ? 1 : 0);
+  const hasActiveFilters = activeFilterCount > 0;
+
+  const removeParam = (key: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete(key);
+    setSearchParams(newParams);
+  };
+
+  // Üks URL-i kirjutus: URL → olek effect tühjendab seejärel ka komponendi oleku.
+  // Otsingusõna, sortimine ja aktiivne kogu jäävad alles.
+  const clearAllFilters = () => {
+    const newParams = new URLSearchParams(searchParams);
+    for (const key of ['ys', 'ye', 'author', 'respondens', 'printer', 'status', 'tags', 'genre', 'type', 'langs', 'page']) {
+      newParams.delete(key);
+    }
+    setSearchParams(newParams);
+  };
 
   // Debounce input updates to URL
   useEffect(() => {
@@ -707,10 +740,33 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Search & Filter Section */}
-          <div className="mb-10 max-w-4xl mx-auto">
-            <div className="flex flex-col gap-4">
-              {/* Search Bar */}
+          {/* Kollektsiooni infobänner (asendub sammus 3 kogu-ribaga, #587) */}
+          <CollectionInfoBanner />
+
+          {/* Filtrite külgriba + tulemused (#587). Kerib AKEN, külgriba on sticky. */}
+          <div className="flex gap-6 items-start">
+            <FilterSidebar
+              open={sidebarOpen}
+              onOpenChange={setSidebarOpen}
+              drawerOpen={filterDrawerOpen}
+              onDrawerOpenChange={setFilterDrawerOpen}
+              activeCount={activeFilterCount}
+            >
+              <WorkFilterSections
+                model={filterModel}
+                yearStart={yearStart}
+                yearEnd={yearEnd}
+                onYearStartChange={setYearStart}
+                onYearEndChange={setYearEnd}
+                statusCounts={facets.teose_staatus}
+              />
+            </FilterSidebar>
+
+          <div className="flex-1 min-w-0">
+          <div className="mb-6">
+            <div className="flex flex-col gap-3">
+              {/* Otsingurida + mobiilis filtrinupp */}
+              <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
@@ -731,6 +787,8 @@ const Dashboard: React.FC = () => {
                     <X size={18} />
                   </button>
                 )}
+              </div>
+              <MobileFiltersButton activeCount={activeFilterCount} onClick={() => setFilterDrawerOpen(true)} />
               </div>
 
               {/* Mobiili kollektsiooni valija */}
@@ -754,167 +812,36 @@ const Dashboard: React.FC = () => {
                 );
               })()}
 
-              {/* Controls Row */}
-              {/* `justify-between` on ära: nelja elemendiga venitas ta eraldajad
-                  tühja ruumi keskele — paremat serva hoiab nüüd `ml-auto`. */}
-              <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-4 bg-white p-2 sm:p-3 rounded-lg border border-gray-200 shadow-sm">
-                {/* Ajavahemik. Eraldi silti („AJAVAHEMIK") ei ole: „Alates"/„Kuni"
-                    ütlevad sama ja silt sõi riba laiust, mille tõttu sortimine
-                    murdus üksi eraldi reale. */}
-                <DateRangeInput start={yearStart} end={yearEnd} onStartChange={setYearStart} onEndChange={setYearEnd} compact />
-
-                {/* Eraldaja ainult siis, kui temast paremal ON midagi eraldada —
-                    ilma filtrisiltideta seisis ta tühjas ruumis. */}
-                {aktiivseidSilte && <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>}
-
-                {/* Author Filter Badge */}
-                {authorParam && (
-                  <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
-                    <User size={14} />
-                    <span className="truncate max-w-32">{authorParam}</span>
-                    <button
-                      onClick={() => {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete('author');
-                        setSearchParams(newParams);
-                      }}
-                      className="ml-1 hover:bg-primary-100 rounded p-0.5"
-                      title={t('search.removeAuthorFilter')}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Respondens Filter Badge */}
-                {respondensParam && (
-                  <div className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md text-sm font-medium">
-                    <User size={14} />
-                    <span className="text-xs text-indigo-500 mr-0.5">resp:</span>
-                    <span className="truncate max-w-32">{respondensParam}</span>
-                    <button
-                      onClick={() => {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete('respondens');
-                        setSearchParams(newParams);
-                      }}
-                      className="ml-1 hover:bg-indigo-100 rounded p-0.5"
-                      title={t('search.removeRespondensFilter')}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Printer Filter Badge */}
-                {printerParam && (
-                  <div className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md text-sm font-medium">
-                    <span className="font-serif">¶</span>
-                    <span className="truncate max-w-32">{isQCode(printerParam) ? (publisherIdMap[printerParam] || enrichedLabels[printerParam]?.[lang] || printerParam) : printerParam}</span>
-                    <button
-                      onClick={() => {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete('printer');
-                        setSearchParams(newParams);
-                      }}
-                      className="ml-1 hover:bg-amber-100 rounded p-0.5"
-                      title={t('search.removePrinterFilter')}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Status Filter Badge */}
-                {statusParam && (
-                  <div className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium ${statusParam === 'Valmis' ? 'bg-green-50 text-green-700' :
-                    statusParam === 'Töös' ? 'bg-amber-50 text-amber-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                    <span>{t(`common:status.${statusParam}`)}</span>
-                    <button
-                      onClick={() => {
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete('status');
-                        setSearchParams(newParams);
-                      }}
-                      className="ml-1 hover:bg-white/50 rounded p-0.5"
-                      title={t('search.removeStatusFilter')}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Reset Filters Button */}
-                {(inputValue || yearStart || yearEnd || authorParam || respondensParam || printerParam || statusParam || selectedTags.length > 0) && (
-                  <button
-                    onClick={() => {
-                      setInputValue('');
-                      setYearStart('');
-                      setYearEnd('');
-                      setSort('year_asc');
-                      setSelectedTags([]);
-                      setSearchParams({});
-                    }}
-                    className="flex items-center justify-center sm:justify-start gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium order-last sm:order-none w-full sm:w-auto"
-                    title={t('search.clearAll')}
-                  >
-                    <X size={14} />
-                    {t('common:buttons.cancel')}
-                  </button>
-                )}
-
-                <div className="h-6 w-px bg-gray-200 hidden sm:block ml-auto"></div>
-
-                {/* Sort Control */}
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown size={16} className="text-gray-400" />
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value)}
-                    aria-label={t('sort.label')}
-                    className="p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none bg-transparent cursor-pointer hover:bg-gray-50"
-                  >
-                    {queryParam && <option value="relevance">{t('sort.relevance')}</option>}
-                    <option value="year_asc">{t('sort.yearAsc')}</option>
-                    <option value="year_desc">{t('sort.yearDesc')}</option>
-                    <option value="az">{t('sort.az')}</option>
-                    <option value="recent">{t('sort.recent')}</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Täpsemad filtrid (žanr, märksõnad, tüüp) */}
-              <AdvancedFilters
-                selectedGenre={selectedGenre}
-                selectedTags={selectedTags}
-                selectedType={selectedType}
-                selectedStatus={selectedStatus}
-                onGenreChange={setSelectedGenre}
-                onTagsChange={setSelectedTags}
-                onTypeChange={setSelectedType}
-                onStatusChange={setSelectedStatus}
-                selectedLanguages={selectedLanguages}
-                onLanguagesChange={setSelectedLanguages}
-                facets={facets}
-                genreIdMap={genreIdMap}
-                genreLabelToId={genreLabelToId}
-                tagsIdMap={tagsIdMap}
-                tagsLabelToId={tagsLabelToId}
-                typeIdMap={typeIdMap}
-                typeLabelToId={typeLabelToId}
-                lang={getLangCode(i18n.language)}
-                enrichedLabels={enrichedLabels}
-              />
+              {/* Aktiivsed filtrid kiipidena — ainult siis, kui mõni on aktiivne */}
+              {hasActiveFilters && (
+                <WorkFilterChips model={filterModel} onClearAll={clearAllFilters}>
+                  {(yearStart || yearEnd) && (
+                    <FilterChip
+                      kind={t('common:labels.year')}
+                      label={`${yearStart || '…'} – ${yearEnd || '…'}`}
+                      onRemove={() => { setYearStart(''); setYearEnd(''); }}
+                    />
+                  )}
+                  {authorParam && (
+                    <FilterChip kind={t('common:labels.author')} label={authorParam} onRemove={() => removeParam('author')} />
+                  )}
+                  {respondensParam && (
+                    <FilterChip kind={t('common:labels.respondens')} label={respondensParam} onRemove={() => removeParam('respondens')} />
+                  )}
+                  {printerParam && (
+                    <FilterChip
+                      kind={t('common:labels.printer')}
+                      label={isQCode(printerParam) ? (publisherIdMap[printerParam] || enrichedLabels[printerParam]?.[lang] || printerParam) : printerParam}
+                      onRemove={() => removeParam('printer')}
+                    />
+                  )}
+                </WorkFilterChips>
+              )}
             </div>
           </div>
 
-          {/* Kollektsiooni infobänner */}
-          <CollectionInfoBanner />
-
           {/* Results Grid */}
-          <div className="max-w-7xl mx-auto">
+          <div>
             {(() => {
               // Server-side filtreerimine - works on juba filtreeritud teose_staatus järgi
               const totalPages = Math.ceil(totalHits / ITEMS_PER_PAGE);
@@ -963,6 +890,20 @@ const Dashboard: React.FC = () => {
                     onSelectAllVisible={selectAllVisible}
                     onClearSelection={clearSelection}
                     onViewChange={changeView}
+                    sortControl={
+                      <select
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value)}
+                        aria-label={t('sort.label')}
+                        className="p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none bg-white cursor-pointer hover:bg-gray-50"
+                      >
+                        {queryParam && <option value="relevance">{t('sort.relevance')}</option>}
+                        <option value="year_asc">{t('sort.yearAsc')}</option>
+                        <option value="year_desc">{t('sort.yearDesc')}</option>
+                        <option value="az">{t('sort.az')}</option>
+                        <option value="recent">{t('sort.recent')}</option>
+                      </select>
+                    }
                   />
 
                   {loading ? (
@@ -987,7 +928,7 @@ const Dashboard: React.FC = () => {
                           ))}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${sidebarOpen ? '' : 'xl:grid-cols-4'} gap-6`}>
                           {currentWorks.map((work, index) => (
                             <WorkCard
                               key={work.work_id}
@@ -1062,6 +1003,8 @@ const Dashboard: React.FC = () => {
                 </>
               );
             })()}
+          </div>
+          </div>
           </div>
         </div>
       </main>

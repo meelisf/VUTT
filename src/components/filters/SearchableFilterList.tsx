@@ -2,29 +2,45 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
 
+type FilterListItem = { value: string; label: string; count: number };
+
 interface SearchableFilterListProps {
-    items: { value: string; label: string; count: number }[];
+    items: FilterListItem[];
     selectedValues: string[];
     onToggle: (value: string) => void;
     placeholder: string;
     isRadio?: boolean;
-    renderItem?: (item: { value: string; label: string; count: number }, isSelected: boolean) => React.ReactNode;
+    renderItem?: (item: FilterListItem, isSelected: boolean) => React.ReactNode;
+    /**
+     * Esilehe külgriba (#587): näita ainult N esimest (sagedasemat) ja ülejäänud
+     * „Näita kõiki" alt. Otsingukast on siis alati nähtav, kui loendis on üle N rea.
+     * Valitud rida on alati nähtav, ka siis, kui ta jääb N-st välja.
+     */
+    collapsedCount?: number;
 }
 
 // Abikomponent otsitava ja keritava filtri loendi jaoks.
-// Näitab otsinguvälja kui itemeid on üle 10.
+// Näitab otsinguvälja kui itemeid on üle 10 (või üle `collapsedCount`).
 const SearchableFilterList: React.FC<SearchableFilterListProps> = ({
-    items, selectedValues, onToggle, placeholder, isRadio = false, renderItem
+    items, selectedValues, onToggle, placeholder, isRadio = false, renderItem, collapsedCount
 }) => {
     const { t } = useTranslation('common');
     const [searchQuery, setSearchQuery] = useState('');
-    const showSearch = items.length > 10;
+    const [showAll, setShowAll] = useState(false);
+    const collapsible = collapsedCount !== undefined && items.length > collapsedCount;
+    const showSearch = collapsible || items.length > 10;
 
     const filteredItems = useMemo(() => {
-        if (!searchQuery) return items;
-        const lowerQuery = searchQuery.toLowerCase();
-        return items.filter(item => item.label.toLowerCase().includes(lowerQuery));
-    }, [items, searchQuery]);
+        if (searchQuery) {
+            const lowerQuery = searchQuery.toLowerCase();
+            return items.filter(item => item.label.toLowerCase().includes(lowerQuery));
+        }
+        if (!collapsible || showAll) return items;
+        return items.filter((item, i) => i < collapsedCount! || selectedValues.includes(item.value));
+    }, [items, searchQuery, collapsible, showAll, collapsedCount, selectedValues]);
+
+    // Kokkupandav loend kerib alles lahti klapituna; vana käitumine (> 10 → kerib) jääb
+    const scrollBox = collapsible ? (showAll || !!searchQuery) && filteredItems.length > 10 : showSearch;
 
     return (
         <div className="space-y-2">
@@ -40,7 +56,7 @@ const SearchableFilterList: React.FC<SearchableFilterListProps> = ({
                     />
                 </div>
             )}
-            <div className={`space-y-1 overflow-y-scroll custom-scrollbar pr-1 ${showSearch ? 'h-60' : ''}`}>
+            <div className={`space-y-1 custom-scrollbar pr-1 ${scrollBox ? 'h-60 overflow-y-scroll' : ''}`}>
                 {filteredItems.length === 0 ? (
                     <div className="text-xs text-gray-400 italic py-2 px-1">{t('labels.noMatches')}</div>
                 ) : (
@@ -64,6 +80,15 @@ const SearchableFilterList: React.FC<SearchableFilterListProps> = ({
                     })
                 )}
             </div>
+            {collapsible && !searchQuery && (
+                <button
+                    type="button"
+                    onClick={() => setShowAll(v => !v)}
+                    className="text-xs text-primary-600 hover:underline px-1"
+                >
+                    {showAll ? t('labels.showLess') : t('labels.showAllCount', { count: items.length })}
+                </button>
+            )}
         </div>
     );
 };

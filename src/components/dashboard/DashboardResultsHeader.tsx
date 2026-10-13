@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { CheckSquare, LayoutGrid, List, Square } from 'lucide-react';
 import type { ResultsView } from '../../contexts/UserContext';
 
@@ -32,6 +33,8 @@ interface DashboardResultsHeaderProps {
   onSelectAllVisible: () => void;
   onClearSelection: () => void;
   onViewChange: (view: ResultsView) => void;
+  /** Sortimise valik (#587: tuli filtriribalt tulemuste päisesse). */
+  sortControl?: ReactNode;
 }
 
 export default function DashboardResultsHeader({
@@ -47,6 +50,7 @@ export default function DashboardResultsHeader({
   onSelectAllVisible,
   onClearSelection,
   onViewChange,
+  sortControl,
 }: DashboardResultsHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 border-b border-gray-200 pb-3">
@@ -93,6 +97,8 @@ export default function DashboardResultsHeader({
         <span className="text-sm text-gray-500">
           {labels.worksCount} {statusFiltered && labels.filtered} {totalPages > 1 && `• ${labels.pageOf}`}
         </span>
+
+        {sortControl}
 
         {hasWorks && (
           <div className="flex border border-gray-300 rounded overflow-hidden bg-white" role="group" aria-label={labels.viewGroup}>

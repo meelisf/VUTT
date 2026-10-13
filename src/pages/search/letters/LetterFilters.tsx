@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Calendar, Languages, MapPin, User, Users, ArrowUpDown } from 'lucide-react';
 import CollapsibleSection from '../../../components/CollapsibleSection';
-import SearchableFilterList from '../SearchableFilterList';
+import SearchableFilterList from '../../../components/filters/SearchableFilterList';
 import { getVocabularies, Vocabularies } from '../../../services/collectionService';
 import { getLangCode } from '../../../utils/getLangCode';
 import type { LetterFilters as Filters, LetterSort } from '../../../services/letterSearch';

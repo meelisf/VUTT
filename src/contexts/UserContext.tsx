@@ -16,6 +16,8 @@ export interface UserSettings {
   favorite_collections?: string[];
   /** Tulemuste vaade lehe kaupa (#587); server liidab lehed kokku. */
   results_view?: Partial<Record<ResultsPage, ResultsView>>;
+  /** Filtrite külgriba lahti (true) / kinni lehe kaupa (#587). */
+  filter_sidebar?: Partial<Record<ResultsPage, boolean>>;
 }
 
 interface User {
