@@ -79,7 +79,7 @@ const Settings: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header showSearchButton={false} pageTitle={t('settings:pageTitle')} />
+      <Header pageTitle={t('settings:pageTitle')} />
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
         {/* Õigused — klapitav, vt ADR 0031 */}

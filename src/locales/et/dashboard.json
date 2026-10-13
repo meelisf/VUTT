@@ -100,8 +100,9 @@
   "collection": {
     "copyLink": "Kopeeri link",
     "linkCopied": "Link kopeeritud!",
-    "readMore": "Loe lähemalt",
-    "readLess": "Sulge"
+    "showDescription": "Kogu kirjeldus",
+    "hideDescription": "Peida kirjeldus",
+    "manage": "Halda"
   },
   "filters": {
     "status": "Staatus",

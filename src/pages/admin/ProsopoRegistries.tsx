@@ -98,7 +98,7 @@ export default function ProsopoRegistries() {
   if (!isAtLeast(user?.role, 'admin')) return null;
 
   return <div className="min-h-screen bg-gray-50">
-    <Header showSearchButton={false} pageTitle={tr('title')} />
+    <Header pageTitle={tr('title')} />
     <main className="mx-auto max-w-5xl p-6">
       <h1 className="mb-2 text-xl font-semibold">{tr('title')}</h1>
       <p className="mb-4 text-sm text-gray-600">{tr('intro')}</p>

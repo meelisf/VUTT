@@ -10,7 +10,9 @@ import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { isSentNotification } from '../utils/notificationText';
 
-const UserMenu: React.FC = () => {
+/** `tone="dark"`: tume päis (#587). */
+const UserMenu: React.FC<{ tone?: 'light' | 'dark' }> = ({ tone = 'light' }) => {
+  const dark = tone === 'dark';
   const { t } = useTranslation(['common', 'auth', 'admin']);
   const { user, authToken, logout } = useUser();
   const [showMenu, setShowMenu] = useState(false);
@@ -88,11 +90,11 @@ const UserMenu: React.FC = () => {
     <div className="relative">
       <button
         onClick={() => setShowMenu(!showMenu)}
-        className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-2 py-1 transition-colors"
+        className={`flex items-center gap-2 rounded-lg px-2 py-1 transition-colors ${dark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
       >
         <div className="text-right hidden sm:block">
-          <p className="text-sm font-medium text-gray-900">{user.name}</p>
-          <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
+          <p className={`text-sm font-medium ${dark ? 'text-white' : 'text-gray-900'}`}>{user.name}</p>
+          <p className={`text-xs ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{t(`common:roles.${user.role}`)}</p>
         </div>
         <div className="relative h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-xs">
           {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -102,7 +104,7 @@ const UserMenu: React.FC = () => {
             </span>
           )}
         </div>
-        <ChevronDown size={14} className={`text-gray-400 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`${dark ? 'text-slate-400' : 'text-gray-400'} transition-transform ${showMenu ? 'rotate-180' : ''}`} />
       </button>
 
       {showMenu && (

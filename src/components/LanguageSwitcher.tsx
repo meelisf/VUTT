@@ -4,9 +4,11 @@ import { Languages } from 'lucide-react';
 
 interface LanguageSwitcherProps {
   className?: string;
+  /** Tume päis (#587) vajab heledat ikooni */
+  tone?: 'light' | 'dark';
 }
 
-const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ className = '' }) => {
+const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ className = '', tone = 'light' }) => {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -27,7 +29,7 @@ const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ className = '' }) =
     <div className={`relative ${className}`}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-center p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        className={`flex items-center justify-center p-2 rounded-lg transition-colors ${tone === 'dark' ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'}`}
         aria-label={t('common:language.select')}
         title={currentLang.name}
       >
