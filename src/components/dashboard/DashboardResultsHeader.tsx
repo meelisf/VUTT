@@ -1,4 +1,6 @@
-import { CheckSquare, Square } from 'lucide-react';
+import { CheckSquare, LayoutGrid, List, Square } from 'lucide-react';
+
+export type DashboardView = 'cards' | 'list';
 
 interface DashboardResultsHeaderProps {
   /**
@@ -12,6 +14,7 @@ interface DashboardResultsHeaderProps {
   selectedCount: number;
   statusFiltered: boolean;
   totalPages: number;
+  view: DashboardView;
   labels: {
     bookshelf: string;
     enterSelect: string;
@@ -22,10 +25,14 @@ interface DashboardResultsHeaderProps {
     worksCount: string;
     filtered: string;
     pageOf: string;
+    viewCards: string;
+    viewList: string;
+    viewGroup: string;
   };
   onToggleSelectMode: () => void;
   onSelectAllVisible: () => void;
   onClearSelection: () => void;
+  onViewChange: (view: DashboardView) => void;
 }
 
 export default function DashboardResultsHeader({
@@ -35,10 +42,12 @@ export default function DashboardResultsHeader({
   selectedCount,
   statusFiltered,
   totalPages,
+  view,
   labels,
   onToggleSelectMode,
   onSelectAllVisible,
   onClearSelection,
+  onViewChange,
 }: DashboardResultsHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 border-b border-gray-200 pb-3">
@@ -85,6 +94,26 @@ export default function DashboardResultsHeader({
         <span className="text-sm text-gray-500">
           {labels.worksCount} {statusFiltered && labels.filtered} {totalPages > 1 && `• ${labels.pageOf}`}
         </span>
+
+        {hasWorks && (
+          <div className="flex border border-gray-300 rounded overflow-hidden bg-white" role="group" aria-label={labels.viewGroup}>
+            {([['cards', LayoutGrid, labels.viewCards], ['list', List, labels.viewList]] as const).map(([v, Icon, label], i) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => onViewChange(v)}
+                aria-pressed={view === v}
+                title={label}
+                aria-label={label}
+                className={`p-1.5 ${i > 0 ? 'border-l border-gray-300' : ''} ${
+                  view === v ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-700'
+                }`}
+              >
+                <Icon size={16} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
