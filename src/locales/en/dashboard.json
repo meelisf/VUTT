@@ -5,14 +5,7 @@
     "reviewEdits": "Review"
   },
   "search": {
-    "placeholder": "Search works by title or author...",
-    "timeRange": "Time range:",
-    "genre": "Genre:",
-    "removeAuthorFilter": "Remove author filter",
-    "removeRespondensFilter": "Remove respondent filter",
-    "removePrinterFilter": "Remove printer filter",
-    "removeStatusFilter": "Remove status filter",
-    "clearAll": "Clear all filters"
+    "placeholder": "Search works by title or author..."
   },
   "sort": {
     "label": "Sort by",
@@ -111,7 +104,6 @@
     "readLess": "Close"
   },
   "filters": {
-    "advanced": "Advanced options",
     "status": "Status",
     "genre": "Genre",
     "searchGenre": "Search genre...",
@@ -120,7 +112,6 @@
     "type": "Type",
     "languages": "Language",
     "searchType": "Search type...",
-    "searchLanguage": "Search language...",
-    "clearAdvanced": "Clear advanced filters"
+    "searchLanguage": "Search language..."
   }
 }

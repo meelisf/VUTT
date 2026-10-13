@@ -59,7 +59,9 @@
     "tags": "Tags",
     "loading": "Loading...",
     "noData": "No data available",
-    "noMatches": "No matches found"
+    "noMatches": "No matches found",
+    "showAllCount": "Show all ({{count}})",
+    "showLess": "Show less"
   },
   "errors": {
     "connectionFailed": "Failed to connect to server",
@@ -337,5 +339,12 @@
     "cropReset": "Remove crop box and forget last used size",
     "cropHint": "Drag a rectangle; resize from handles, move from inside, tilt from the top knob",
     "perspectiveHint": "Place the corners on the page corners. The image will be straightened and cropped to the quadrilateral."
+  },
+  "filterPanel": {
+    "title": "Filters",
+    "show": "Show filters",
+    "hide": "Hide filters",
+    "clearAll": "Clear all",
+    "removeFilter": "Remove filter"
   }
 }

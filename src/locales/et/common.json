@@ -59,7 +59,9 @@
     "tags": "Märksõnad",
     "loading": "Laadin...",
     "noData": "Andmed puuduvad",
-    "noMatches": "Ei leitud vasteid"
+    "noMatches": "Ei leitud vasteid",
+    "showAllCount": "Näita kõiki ({{count}})",
+    "showLess": "Näita vähem"
   },
   "errors": {
     "connectionFailed": "Serveriga ühendamine ebaõnnestus",
@@ -337,5 +339,12 @@
     "cropReset": "Eemalda kärpekast ja unusta viimati kasutatud suurus",
     "cropHint": "Lohista ristkülik; sangadest muuda suurust, seest liiguta, ülemisest nupust kalluta",
     "perspectiveHint": "Aseta nurgad lehe nurkadesse. Pilt sirgestatakse ja lõigatakse nelinurga järgi mõõtu."
+  },
+  "filterPanel": {
+    "title": "Filtrid",
+    "show": "Näita filtreid",
+    "hide": "Peida filtrid",
+    "clearAll": "Tühjenda",
+    "removeFilter": "Eemalda filter"
   }
 }

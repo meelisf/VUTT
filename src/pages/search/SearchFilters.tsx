@@ -4,7 +4,7 @@ import { type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Vocabularies } from '../../services/collectionService';
 import CollapsibleSection from '../../components/CollapsibleSection';
-import SearchableFilterList from './SearchableFilterList';
+import SearchableFilterList from '../../components/filters/SearchableFilterList';
 import { Layers, Calendar, BookOpen, Tag, FileType, User, FileText, Languages } from 'lucide-react';
 import { getLangCode } from '../../utils/getLangCode';
 import { mergeFacetItems } from '../../utils/facetUtils';
