@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, Map, List, Waypoints, Library } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, CheckSquare, Square, GitMerge, X, Map, List, Waypoints, Library } from 'lucide-react';
 import Header from '../../components/Header';
 import Pagination from '../../components/Pagination';
 import PersonCard from '../components/PersonCard';
@@ -345,10 +345,8 @@ const PersonsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header
-        pageTitle={t('pageTitle', 'Isikud')}
-        pageTitleIcon={<Users size={20} className="text-primary-600" />}
-      />
+      {/* Lehe nimi on päise navigatsioonis (#587) */}
+      <Header />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 

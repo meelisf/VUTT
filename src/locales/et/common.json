@@ -92,7 +92,10 @@
     "review": "Muudatused",
     "notifications": "Teavitused",
     "admin": "Admin",
-    "settings": "Seaded"
+    "settings": "Seaded",
+    "label": "Peamenüü",
+    "works": "Teosed",
+    "persons": "Isikud"
   },
   "notifications": {
     "title": "Teavitused",
@@ -200,7 +203,8 @@
     "activeFilter": "Aktiivne kollektsioon",
     "changeInHeader": "Muuda päises olevast valijast",
     "copyLink": "Kopeeri link",
-    "linkCopied": "Link kopeeritud!"
+    "linkCopied": "Link kopeeritud!",
+    "allShort": "Kõik kogud"
   },
   "workSets": {
     "section": "Töökollektsioonid",

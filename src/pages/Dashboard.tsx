@@ -14,7 +14,7 @@ import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, X, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
-import CollectionInfoBanner from '../components/CollectionInfoBanner';
+import CollectionBar from '../components/CollectionBar';
 import SafeHtml from '../components/SafeHtml';
 import Pagination from '../components/Pagination';
 import BulkTagsPicker from '../components/BulkTagsPicker';
@@ -696,6 +696,8 @@ const Dashboard: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
       <Header />
+      {/* Kogu-riba: aktiivne kogu kogu laiuses päise all (#587) */}
+      <CollectionBar />
 
       <main className="flex-1 overflow-y-auto">
         {/* pb reserveerib ruumi hõljuvale action bar'ile select-mode'is (ühtlustatud manage-lehega) */}
@@ -739,9 +741,6 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Kollektsiooni infobänner (asendub sammus 3 kogu-ribaga, #587) */}
-          <CollectionInfoBanner />
 
           {/* Filtrite külgriba + tulemused (#587). Kerib AKEN, külgriba on sticky. */}
           <div className="flex gap-6 items-start">

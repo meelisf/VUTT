@@ -247,7 +247,7 @@ const Notifications: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header showSearchButton={false} pageTitle={t('notifications.title')} pageTitleIcon={<Bell size={20} className="text-primary-700" />} />
+      <Header pageTitle={t('notifications.title')} pageTitleIcon={<Bell size={20} className="text-primary-700" />} />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <Link to="/" className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-6">
           <ChevronLeft size={16} />

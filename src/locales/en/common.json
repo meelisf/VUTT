@@ -92,7 +92,10 @@
     "review": "Changes",
     "notifications": "Notifications",
     "admin": "Admin",
-    "settings": "Settings"
+    "settings": "Settings",
+    "label": "Main menu",
+    "works": "Works",
+    "persons": "Persons"
   },
   "notifications": {
     "title": "Notifications",
@@ -200,7 +203,8 @@
     "activeFilter": "Active Collection",
     "changeInHeader": "Change from the selector in header",
     "copyLink": "Copy link",
-    "linkCopied": "Link copied!"
+    "linkCopied": "Link copied!",
+    "allShort": "All collections"
   },
   "workSets": {
     "section": "Work collections",

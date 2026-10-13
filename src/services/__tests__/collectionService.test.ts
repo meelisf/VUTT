@@ -28,6 +28,7 @@ describe('getCollectionColorClasses', () => {
     expect(getCollectionColorClasses(c)).toEqual({
       bg: 'bg-amber-50', text: 'text-amber-700',
       border: 'border-amber-200', hoverBg: 'hover:bg-amber-100',
+      dot: 'bg-amber-500',
     });
   });
 

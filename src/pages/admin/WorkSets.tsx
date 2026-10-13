@@ -266,7 +266,7 @@ const WorkSets: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header showSearchButton={false} pageTitle={t('workSets.title')} />
+      <Header pageTitle={t('workSets.title')} />
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Sisenetakse kollektsioonide hubist — sinna ka tagasi, mitte admini avalehele. */}
         <Link to="/admin/collections" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">

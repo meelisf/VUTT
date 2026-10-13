@@ -21,6 +21,13 @@ interface CollectionPickerProps {
   onSelect?: (collectionId: string | null) => void;
   showUnassigned?: boolean;  // Näita "Määramata" valikut
   title?: string;  // Kohandatud pealkiri
+  /**
+   * Päise desktopi rippmenüü (#587): sama sisu ilma modaali kesta ja pealkirjata,
+   * ankurdatud kutsuja `relative` konteinerile. Mobiilis jääb modaal.
+   */
+  variant?: 'modal' | 'dropdown';
+  /** Päise variant: kutsutakse pärast valiku muutmist (nt navigeerimiseks nimekirja). */
+  onSelectionChange?: () => void;
 }
 
 // Rekursiivne puuvaate komponent
@@ -108,7 +115,9 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
   onClose,
   onSelect,
   showUnassigned = false,
-  title
+  title,
+  variant = 'modal',
+  onSelectionChange,
 }) => {
   const { t, i18n } = useTranslation(['common']);
   const { selection, setSelection, collections, workSets, workSetsError, refreshWorkSets } = useCollection();
@@ -194,6 +203,8 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
     });
   };
 
+  const dropdown = variant === 'dropdown';
+
   const handleSelect = (id: string | null) => {
     if (onSelect) {
       // Callback variant (massiline määramine)
@@ -201,12 +212,14 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
     } else {
       // Globaalse konteksti variant (header)
       setSelection(id ? { kind: 'collection', id } : { kind: 'all' });
+      onSelectionChange?.();
     }
     onClose();
   };
 
   const handleSelectSet = (next: CollectionSelection) => {
     setSelection(next);
+    onSelectionChange?.();
     onClose();
   };
 
@@ -228,15 +241,26 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen || variant !== 'dropdown') return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, variant, onClose]);
+
   if (!isOpen) return null;
 
   return (
     // Päis on `sticky z-[1200]` — `z-50` jättis modaali ülemise serva (ja
     // sulgemisnupu) väikesel ekraanil päise alla.
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1300]">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[80vh] flex flex-col">
+    <div className={dropdown ? '' : 'fixed inset-0 bg-black/50 flex items-center justify-center z-[1300]'}>
+      {/* Rippmenüü: läbipaistev kiht püüab välise kliki (nagu UserMenu) */}
+      {dropdown && <div className="fixed inset-0 z-[1250]" onClick={onClose} aria-hidden />}
+      <div className={dropdown
+        ? 'absolute right-0 top-full mt-1 z-[1260] bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 w-96 max-w-[90vw] overflow-hidden max-h-[75vh] flex flex-col'
+        : 'bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[80vh] flex flex-col'}>
         {/* Header */}
-        <div className="bg-primary-600 px-6 py-4 flex items-center justify-between">
+        {!dropdown && <div className="bg-primary-600 px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Library size={24} />
             {title || t('collections.title', 'Vali kollektsioon')}
@@ -247,7 +271,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
           >
             <X size={24} />
           </button>
-        </div>
+        </div>}
 
         {/* Ühine otsinguväli — filtreerib mõlemat jaotist korraga */}
         <div className="px-4 pt-4">
@@ -257,6 +281,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              autoFocus={dropdown}
               placeholder={t('workSets.search', 'Otsi kogu nime järgi')}
               className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
@@ -458,11 +483,11 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-3 bg-gray-50">
+        {!dropdown && <div className="border-t border-gray-200 px-6 py-3 bg-gray-50">
           <p className="text-xs text-gray-500 text-center">
             {t('collections.hint', 'Valik salvestub ja kehtib kõigis vaadetes')}
           </p>
-        </div>
+        </div>}
       </div>
     </div>
   );

@@ -100,8 +100,9 @@
   "collection": {
     "copyLink": "Copy link",
     "linkCopied": "Link copied!",
-    "readMore": "Read more",
-    "readLess": "Close"
+    "showDescription": "About this collection",
+    "hideDescription": "Hide description",
+    "manage": "Manage"
   },
   "filters": {
     "status": "Status",
