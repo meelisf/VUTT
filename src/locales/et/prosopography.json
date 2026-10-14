@@ -314,7 +314,6 @@
     "withoutCoordinates": "{{count}} isikul puudub koordinaat",
     "shiftedMarker": "Marker on kattuvuse vältimiseks veidi nihutatud.",
     "thisPerson": "See isik",
-    "scopeNotApplied": "Ei rakendu seoste kaardile",
     "relatedScopeToggle": "Ainult kogus: {{name}}",
     "clearRelationsFilter": "Eemalda seoste filter",
     "collectionHintNamed": "{{name}} kuulub teise kollektsiooni kui praegu valitud („{{selected}}\"). Tema seoste nägemiseks vaheta kollektsiooni.",
@@ -452,7 +451,6 @@
   "outOfVocabRemove": "Eemalda {{label}}",
   "loadingVocab": "Laadin…",
   "scope": {
-    "clearHint": "Eemalda piirang — otsib edasi kogu VUTT-ist",
     "workSet": "Töökollektsioon"
   },
   "similar": {
