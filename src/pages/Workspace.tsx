@@ -22,7 +22,7 @@ import { collectionForWorkSearch } from '../utils/workSearchSelection';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { needsPageLoad, pageLoadKey } from './workspacePageLoad';
 import MetadataModal from '../components/MetadataModal';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogIn, Copy, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogIn, Copy, Check, LayoutGrid } from 'lucide-react';
 import UserMenu from '../components/UserMenu';
 import WorkspaceBackButton from '../components/editor/WorkspaceBackButton';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
@@ -561,8 +561,10 @@ const Workspace: React.FC = () => {
       )}
 
       {/* Top Navigation Bar (desktop only) */}
-      <div className="hidden md:flex h-12 bg-white border-b border-gray-200 items-center justify-between px-4 shrink-0 shadow-sm relative z-50">
-        <div className="flex items-center gap-2">
+      {/* Kolm veergu (võrdsed külgveerud): lehenavigeerimine püsib keskel ka siis, kui
+          vasakule lisandub tagasinupp (#587) — `justify-between` lükkas ta paremale. */}
+      <div className="hidden md:grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-4 h-12 bg-white border-b border-gray-200 items-center px-4 shrink-0 shadow-sm relative z-50">
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
           {/* Avaleht */}
           <button
             onClick={handleNavigateBack}
@@ -637,9 +639,19 @@ const Workspace: React.FC = () => {
           >
             <ChevronRight size={20} />
           </button>
+          {/* Kõik leheküljed ruudustikuna — sama, mis pildivaate tööriistaribal (#587) */}
+          <div className="h-6 w-px bg-gray-200 mx-1" />
+          <button
+            onClick={handleOpenGridView}
+            className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-all"
+            title={t('imageViewer.allPages')}
+            aria-label={t('imageViewer.allPages')}
+          >
+            <LayoutGrid size={18} />
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 justify-self-end">
           {/* Kasutaja menüü */}
           {user ? (
             <UserMenu />
