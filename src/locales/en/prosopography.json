@@ -314,7 +314,6 @@
     "withoutCoordinates": "{{count}} persons without coordinates",
     "shiftedMarker": "Marker slightly shifted to avoid overlap.",
     "thisPerson": "This person",
-    "scopeNotApplied": "Not applied to the relations map",
     "relatedScopeToggle": "Only in: {{name}}",
     "clearRelationsFilter": "Remove relations filter",
     "collectionHintNamed": "{{name}} belongs to a different collection than the one currently selected (“{{selected}}”). Switch collection to see their relations.",
@@ -452,7 +451,6 @@
   "outOfVocabRemove": "Remove {{label}}",
   "loadingVocab": "Loading…",
   "scope": {
-    "clearHint": "Remove restriction — search continues across all of VUTT",
     "workSet": "Work collection"
   },
   "similar": {

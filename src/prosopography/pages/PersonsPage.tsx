@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, CheckSquare, Square, GitMerge, X, Map as MapIcon, List, LayoutGrid, Waypoints, Library } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, CheckSquare, Square, GitMerge, X, Map as MapIcon, List, LayoutGrid, Waypoints } from 'lucide-react';
 import Header from '../../components/Header';
+import CollectionBar from '../../components/CollectionBar';
 import Pagination from '../../components/Pagination';
 import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
@@ -14,7 +15,7 @@ import { FilterChip } from '../../components/workFilters/WorkFilterChips';
 import ResultsViewToggle from '../../components/ResultsViewToggle';
 import { useFilterSidebarOpen, useResultsView } from '../../hooks/useResultsView';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
-import { getVocabularies, getCollectionColorClasses } from '../../services/collectionService';
+import { getVocabularies } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useLatestQuery } from '../../hooks/useLatestQuery';
@@ -30,7 +31,7 @@ const PersonsMap = React.lazy(() => import('../components/PersonsMap'));
 const PersonsPage: React.FC = () => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
-  const { selection, setSelection, selectedCollection, collections, workSets, getCollectionName } = useCollection();
+  const { selection, selectedCollection, collections, workSets, getCollectionName } = useCollection();
   // Töökollektsioon: ID-loendi koostab ja ligipääsu kontrollib SERVER
   // (`work_set` parameeter), mitte klient — isikute filter käib teose-isiku
   // seoste kaudu, mida kliendil ei ole (#354).
@@ -185,45 +186,24 @@ const PersonsPage: React.FC = () => {
     return user?.allowed_collections?.includes(selectedCollection) ? selectedCollection : null;
   }, [collections, selectedCollection, user]);
 
-  /** Aktiivne otsinguulatus pillina. `null` = otsime kogu VUTT-ist.
+  /** Aktiivse ulatuse nimi seoste kaardi lüliti jaoks. `null` = otsime kogu VUTT-ist.
    *
    * Lähtub EFEKTIIVSEST ulatusest, mitte päise valikust: kui kasutajal
-   * kinnisele kogule ligipääsu ei ole, siis otsing teda ei piira ja pilli ka
-   * ei näidata — pill peab ütlema, mis päriselt kehtib.
-   *
-   * Töökollektsioon käib sama pilli kaudu: `selection` on üks token
-   * (ADR 0038) ja nähtamatu piirang tekitab sama vea mõlemal kujul —
-   * kasutaja ei leia isikut ja loob ta uuesti (#240). */
-  const scopePill = useMemo(() => {
-    if (effectiveSelectedCollection) {
-      const collection = collections[effectiveSelectedCollection];
-      return {
-        label: getCollectionName(effectiveSelectedCollection, i18n.language === 'en' ? 'en' : 'et'),
-        colors: getCollectionColorClasses(collection ?? null),
-      };
-    }
+   * kinnisele kogule ligipääsu ei ole, siis otsing teda ei piira. Sama reegel
+   * otsustab, kas kogu-riba (#587, sama mis teoste lehel) üldse näidatakse —
+   * nähtamatu piirang tekitas vea, kus kasutaja ei leidnud isikut ja lõi ta
+   * uuesti (#240); olematu piirangu näitamine eksitaks teistpidi. */
+  const scopeLabel = useMemo(() => {
+    const lang = i18n.language === 'en' ? 'en' : 'et';
+    if (effectiveSelectedCollection) return getCollectionName(effectiveSelectedCollection, lang);
     if (workSetParam) {
       const set = workSets.find(w => w.id === workSetParam);
-      const lang = i18n.language === 'en' ? 'en' : 'et';
-      return {
-        // Sama lahendusahel nagu WorkSetPicker'is: keel → et → en → id.
-        label: set ? (set.name[lang] || set.name.et || set.name.en || set.id)
-                   : t('scope.workSet', 'Töökollektsioon'),
-        colors: getCollectionColorClasses(null),
-      };
+      // Sama lahendusahel nagu WorkSetPicker'is: keel → et → en → id.
+      return set ? (set.name[lang] || set.name.et || set.name.en || set.id)
+                 : t('scope.workSet', 'Töökollektsioon');
     }
     return null;
-  }, [effectiveSelectedCollection, collections, getCollectionName, i18n.language, workSetParam, workSets, t]);
-
-  /** Piirangu eemaldamine tühistab valiku KOGU rakenduses, mitte ainult siin.
-   *
-   * Kokkulepe #240: üks kollektsioonivalik kogu rakenduses. Isikuotsingule ei
-   * teki eraldi varjatud ulatust, seega kirjutame `CollectionContext`-i ja
-   * laseme URL-i sünkil käia oma tavalist teed (`useCollectionUrlSync`,
-   * ADR 0038) — oma vastassuunalist effecti siia EI lisata. */
-  const clearScope = useCallback(() => {
-    setSelection({ kind: 'all' });
-  }, [setSelection]);
+  }, [effectiveSelectedCollection, getCollectionName, i18n.language, workSetParam, workSets, t]);
 
   const selectedIds = new Set(selectedPersons.map(p => p.id));
 
@@ -322,7 +302,6 @@ const PersonsPage: React.FC = () => {
     work_set: workSetParam,
   });
   // Kogu-pill ei rakendu ainult kaardivaates; loend ignoreerib related_to-d.
-  const scopeAppliesHere = view !== 'map' || mapScope.applied;
   const mapFilters = {
     q: query || undefined,
     origin_group: originGroup || undefined,
@@ -379,6 +358,8 @@ const PersonsPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Lehe nimi on päise navigatsioonis (#587) */}
       <Header />
+      {/* Kogu-riba nagu teoste lehel — ainult siis, kui piirang päriselt kehtib */}
+      {scopeLabel && <CollectionBar />}
 
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8">
         {/* Filtrite külgriba + tulemused (#587), peegeldab teoste lehte. Kerib AKEN, külgriba on sticky. */}
@@ -451,28 +432,10 @@ const PersonsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Aktiivsed piirangud ja filtrid kiipidena — ainult siis, kui mõni on.
-              Järjekord laiast kitsaks: kogu piirab korpust, seoste-filter selle sees. */}
-          {(scopePill || relatedTo || hasActiveFilters) && (
+          {/* Aktiivsed filtrid kiipidena — ainult siis, kui mõni on. Kogu on
+              kogu-ribal päise all; seoste-filter on esimene kiip. */}
+          {(relatedTo || hasActiveFilters) && (
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              {scopePill && (
-                <div
-                  className={`flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-sm border ${scopePill.colors.bg} ${scopePill.colors.text} ${scopePill.colors.border} ${scopeAppliesHere ? '' : 'opacity-50'}`}
-                  title={scopeAppliesHere ? undefined : t('map.scopeNotApplied', 'Ei rakendu seoste kaardile')}
-                >
-                  <Library size={12} className="shrink-0" />
-                  <span className="truncate max-w-xs">{scopePill.label}</span>
-                  <button
-                    type="button"
-                    onClick={clearScope}
-                    className={`rounded-full p-1 ${scopePill.colors.hoverBg}`}
-                    title={t('scope.clearHint', 'Eemalda piirang — otsib edasi kogu VUTT-ist')}
-                    aria-label={t('scope.clearHint', 'Eemalda piirang — otsib edasi kogu VUTT-ist')}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              )}
               {relatedTo && (
                 <FilterChip
                   kind={t('map.relationsChip', 'Seosed')}
@@ -480,7 +443,7 @@ const PersonsPage: React.FC = () => {
                   onRemove={clearRelatedTo}
                 />
               )}
-              {relatedTo && view === 'map' && scopePill && (
+              {relatedTo && view === 'map' && scopeLabel && (
                 <label className="flex items-center gap-1.5 px-2 py-0.5 text-sm text-gray-600 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -488,7 +451,7 @@ const PersonsPage: React.FC = () => {
                     onChange={toggleRelatedScope}
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
-                  {t('map.relatedScopeToggle', 'Ainult kogus: {{name}}', { name: scopePill.label })}
+                  {t('map.relatedScopeToggle', 'Ainult kogus: {{name}}', { name: scopeLabel })}
                 </label>
               )}
               {(yearFrom || yearTo) && (
