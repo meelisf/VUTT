@@ -88,6 +88,11 @@ Instructions:
 6. If the page contains two columns or two halves, transcribe left side first, then right side.
 7. Insertions written above or below the line, or in the margin with a mark showing where
    they belong: transcribe them at that point as <add>text</add>.
+   NOT marginal notes — leave out completely: a strip of the neighbouring (facing or previous)
+   page visible along the edge of the image or in the gutter. It shows word fragments and
+   line beginnings or endings cut off by the image edge, often with a column of line numbers
+   ("8.", "10.", "12."). Such fragments are not on this page; never put them in <m> tags.
+   Wrong: <m>bis</m> <m>8.</m> <m>Can</m> <m>dit</m> — cut-off pieces of the next page.
    Marginal notes (written in the margin, not inserted into the text): place each marginal
    note at the position in the text where it appears, using <m>text</m> tags, as separate
    lines between the main text lines. Each line of a multi-line marginal note is a separate
