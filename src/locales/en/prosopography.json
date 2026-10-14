@@ -59,8 +59,6 @@
   "filteredCount": "{{filtered}} / {{total}} persons",
   "unknownYears": "years unknown",
   "floruitShort": "fl. ",
-  "advancedTitle": "Advanced filters",
-  "clearAllFilters": "Clear all filters",
   "works_one": "work",
   "works_other": "works",
   "born": "Born",
@@ -268,7 +266,13 @@
       "origin": "Place of origin"
     }
   },
-  "listView": "List",
+  "filterYearFrom": "From",
+  "filterYearTo": "To",
+  "originPlaceChip": "Place of origin",
+  "sortLabel": "Sort order",
+  "viewGrid": "Grid",
+  "viewList": "List",
+  "viewGroup": "View",
   "loading": "Loading…",
   "persons": "persons",
   "immatriculation": "Matriculation",
@@ -301,6 +305,7 @@
     "confirm": "Delete permanently"
   },
   "map": {
+    "relationsChip": "Relations",
     "view": "Map",
     "showRelations": "Relations map",
     "noMarkers": "No origin places found for the map.",
@@ -309,7 +314,6 @@
     "withoutCoordinates": "{{count}} persons without coordinates",
     "shiftedMarker": "Marker slightly shifted to avoid overlap.",
     "thisPerson": "This person",
-    "relationsFilter": "Relations: {{name}}",
     "scopeNotApplied": "Not applied to the relations map",
     "relatedScopeToggle": "Only in: {{name}}",
     "clearRelationsFilter": "Remove relations filter",

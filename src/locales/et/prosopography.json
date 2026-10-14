@@ -59,8 +59,6 @@
   "filteredCount": "{{filtered}} / {{total}} isikut",
   "unknownYears": "eluaastad teadm.",
   "floruitShort": "fl. ",
-  "advancedTitle": "Täpsemad valikud",
-  "clearAllFilters": "Tühjenda kõik filtrid",
   "works_one": "teos",
   "works_other": "teost",
   "born": "Sündinud",
@@ -268,7 +266,13 @@
       "origin": "Päritolukoht"
     }
   },
-  "listView": "Nimekiri",
+  "filterYearFrom": "Alates",
+  "filterYearTo": "Kuni",
+  "originPlaceChip": "Päritolukoht",
+  "sortLabel": "Järjestus",
+  "viewGrid": "Ruudustik",
+  "viewList": "Loend",
+  "viewGroup": "Vaade",
   "loading": "Laadin…",
   "persons": "isikut",
   "immatriculation": "Immatrikuleerumine",
@@ -301,6 +305,7 @@
     "confirm": "Kustuta jäädavalt"
   },
   "map": {
+    "relationsChip": "Seosed",
     "view": "Kaart",
     "showRelations": "Seoste kaart",
     "noMarkers": "Kaardile kantavaid päritolukohti ei leitud.",
@@ -309,7 +314,6 @@
     "withoutCoordinates": "{{count}} isikul puudub koordinaat",
     "shiftedMarker": "Marker on kattuvuse vältimiseks veidi nihutatud.",
     "thisPerson": "See isik",
-    "relationsFilter": "Seosed: {{name}}",
     "scopeNotApplied": "Ei rakendu seoste kaardile",
     "relatedScopeToggle": "Ainult kogus: {{name}}",
     "clearRelationsFilter": "Eemalda seoste filter",

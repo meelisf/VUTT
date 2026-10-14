@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { CheckSquare, LayoutGrid, List, Square } from 'lucide-react';
 import type { ResultsView } from '../../contexts/UserContext';
+import ResultsViewToggle from '../ResultsViewToggle';
 
 interface DashboardResultsHeaderProps {
   /**
@@ -101,23 +102,15 @@ export default function DashboardResultsHeader({
         {sortControl}
 
         {hasWorks && (
-          <div className="flex border border-gray-300 rounded overflow-hidden bg-white" role="group" aria-label={labels.viewGroup}>
-            {([['cards', LayoutGrid, labels.viewCards], ['list', List, labels.viewList]] as const).map(([v, Icon, label], i) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => onViewChange(v)}
-                aria-pressed={view === v}
-                title={label}
-                aria-label={label}
-                className={`p-1.5 ${i > 0 ? 'border-l border-gray-300' : ''} ${
-                  view === v ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-700'
-                }`}
-              >
-                <Icon size={16} />
-              </button>
-            ))}
-          </div>
+          <ResultsViewToggle
+            value={view}
+            onChange={onViewChange}
+            groupLabel={labels.viewGroup}
+            options={[
+              { value: 'cards', icon: LayoutGrid, label: labels.viewCards },
+              { value: 'list', icon: List, label: labels.viewList },
+            ]}
+          />
         )}
       </div>
     </div>

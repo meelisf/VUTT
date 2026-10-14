@@ -2,12 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, CheckSquare, Square, GitMerge, X, Map, List, Waypoints, Library } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, CheckSquare, Square, GitMerge, X, Map as MapIcon, List, LayoutGrid, Waypoints, Library } from 'lucide-react';
 import Header from '../../components/Header';
 import Pagination from '../../components/Pagination';
 import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
-import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAdvancedFilters';
+import PersonListRow from '../components/PersonListRow';
+import PersonFilterSections, { type GenderFilter } from '../components/PersonFilterSections';
+import FilterSidebar, { MobileFiltersButton } from '../../components/filters/FilterSidebar';
+import { FilterChip } from '../../components/workFilters/WorkFilterChips';
+import ResultsViewToggle from '../../components/ResultsViewToggle';
+import { useFilterSidebarOpen, useResultsView } from '../../hooks/useResultsView';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
 import { getVocabularies, getCollectionColorClasses } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
@@ -58,6 +63,11 @@ const PersonsPage: React.FC = () => {
   const relatedTo = searchParams.get('related_to') ?? '';
   const relatedScope = searchParams.get(RELATED_SCOPE_PARAM);
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
+  // Ruudustik ↔ loend on eelistus (meelde lehe kaupa, #587); geograafiline
+  // kaart ei ole eelistus, vaid URL-i olek (`view=map`, jagatav link).
+  const [resultsView, changeResultsView] = useResultsView('persons');
+  const [sidebarOpen, setSidebarOpen] = useFilterSidebarOpen('persons');
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [seisused, setSeisused] = useState<{ id: string; label: { et: string; en: string } }[]>([]);
 
   // Eraldi state otsingukastile — debounce enne URL uuendamist
@@ -122,6 +132,13 @@ const PersonsPage: React.FC = () => {
       n.delete('offset');
       return n;
     }, { replace: true });
+
+  const viewValue: 'cards' | 'list' | 'map' = view === 'map' ? 'map' : resultsView;
+  const handleViewChange = (v: 'cards' | 'list' | 'map') => {
+    if (v === 'map') { setView('map'); return; }
+    changeResultsView(v);
+    if (view === 'map') setView('list');
+  };
 
   // Seoste-filtri (related_to) fookus-isik: nime teab kaardi-vastus, mitte URL.
   const [focusPerson, setFocusPerson] = useState<ProsopoMapResponse['focus'] | null>(null);
@@ -262,7 +279,11 @@ const PersonsPage: React.FC = () => {
     label: item.labels?.[facetLang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.value,
     count: item.count,
   })), [facets, facetLang]);
-  const institutionFacets = facets?.institutions || [];
+  const institutionFacets = useMemo(() => (facets?.institutions || []).map(item => ({
+    value: item.value,
+    label: item.value,
+    count: item.count,
+  })), [facets]);
   const tagFacets = useMemo(() => (facets?.tags || []).map(item => ({
     value: item.value,
     label: item.labels?.[facetLang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.label,
@@ -274,6 +295,17 @@ const PersonsPage: React.FC = () => {
   }, []);
 
   const hasActiveFilters = !!(originGroup || originPlace || institution || source || gender || yearFrom || yearTo || statusId || tags.length);
+  const activeFilterCount = [originGroup, originPlace, institution, source, gender, yearFrom || yearTo, statusId, tags[0]].filter(Boolean).length;
+  const clearAllFilters = () => setSearchParams(p => {
+    const n = new URLSearchParams(p);
+    ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'tag', 'offset'].forEach(k => n.delete(k));
+    return n;
+  }, { replace: true });
+  const isEn = !!i18n.language?.startsWith('en');
+  const statusLabel = (id: string) => {
+    const item = seisused.find(s => s.id === id);
+    return item ? (isEn ? item.label.en : item.label.et) : id;
+  };
   // Leheküljed kuuluvad NÄIDATUD tulemusele, mitte URL-i uuele offsetile:
   // kordusotsingu ajal ei esitata vana koguarvu uue päringu tulemusena (#425).
   const shownOffset = personsQuery.data?.offset ?? 0;
@@ -348,140 +380,108 @@ const PersonsPage: React.FC = () => {
       {/* Lehe nimi on päise navigatsioonis (#587) */}
       <Header />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8">
+        {/* Filtrite külgriba + tulemused (#587), peegeldab teoste lehte. Kerib AKEN, külgriba on sticky. */}
+        <div className="flex gap-6 items-start">
+          <FilterSidebar
+            open={sidebarOpen}
+            onOpenChange={setSidebarOpen}
+            drawerOpen={filterDrawerOpen}
+            onDrawerOpenChange={setFilterDrawerOpen}
+            activeCount={activeFilterCount}
+          >
+            <PersonFilterSections
+              yearFrom={yearFrom}
+              yearTo={yearTo}
+              originGroup={originGroup}
+              institution={institution}
+              tag={tags[0] ?? ''}
+              statusId={statusId}
+              gender={gender}
+              source={source}
+              originGroups={originGroupFacets}
+              institutions={institutionFacets}
+              tagFacets={tagFacets}
+              seisused={seisused}
+              onYearFromChange={setYearFrom}
+              onYearToChange={setYearTo}
+              onOriginGroupChange={setOriginGroup}
+              onInstitutionChange={setInstitution}
+              onTagChange={setTag}
+              onStatusIdChange={setStatusId}
+              onGenderChange={setGender}
+              onSourceChange={setSource}
+            />
+          </FilterSidebar>
 
-        {/* Tööriistariba */}
-        <div className="flex flex-col gap-3 mb-6">
-          <div className="flex gap-3">
-            {/* Otsing */}
+        <div className="flex-1 min-w-0">
+        {/* Otsingurida + mobiilis filtrinupp + uus isik */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
               <input
                 type="search"
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 placeholder={t('searchPlaceholder', 'Otsi nime järgi…')}
-                className={`w-full pl-9 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 ${inputValue ? 'pr-8' : 'pr-4'}`}
+                className={`w-full pl-12 py-3 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-shadow text-lg ${inputValue ? 'pr-10' : 'pr-4'}`}
               />
               {inputValue && (
                 <button
                   type="button"
                   onClick={() => { setInputValue(''); setQuery(''); }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   tabIndex={-1}
                   aria-label={t('common:form.clearSearch')}
                 >
-                  <X size={14} />
+                  <X size={18} />
                 </button>
               )}
             </div>
-
-            {/* Sortimine */}
-            {view === 'list' && (
-            <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg px-2 py-1.5 shrink-0">
-              <ArrowDownAZ size={15} className="text-gray-400 shrink-0" />
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-                className="bg-transparent text-sm text-gray-700 focus:outline-none cursor-pointer"
-              >
-                <option value="alpha">{t('sortAlpha', 'A–Z')}</option>
-                <option value="birth_year">{t('sortBirthYear', 'Sünniaasta')}</option>
-                <option value="death_year">{t('sortDeathYear', 'Surmaaasta')}</option>
-                <option value="imm_year">{t('sortImmYear', 'Immatrikuleerumine')}</option>
-              </select>
-            </div>
-            )}
-
-            <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => setView('list')}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${view === 'list' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-              >
-                <List size={15} />
-                {t('listView', 'Nimekiri')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('map')}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${view === 'map' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-              >
-                <Map size={15} />
-                {t('map.view', 'Kaart')}
-              </button>
-            </div>
-
-            {/* Admin: liitmise select-mood */}
-            {isAdmin && (
-              <button
-                onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
-                className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg transition-colors whitespace-nowrap ${
-                  selectMode
-                    ? 'text-white bg-primary-600 hover:bg-primary-700'
-                    : 'text-gray-600 bg-white border border-gray-200 hover:bg-gray-50'
-                }`}
-                title={selectMode ? t('merge.exitSelect', 'Välju valikust') : t('merge.enterSelect', 'Vali liitmiseks')}
-              >
-                {selectMode ? <CheckSquare size={15} /> : <Square size={15} />}
-                {selectMode ? t('merge.exitSelect', 'Tühista') : t('merge.enterSelect', 'Liida')}
-              </button>
-            )}
-
+            <MobileFiltersButton activeCount={activeFilterCount} onClick={() => setFilterDrawerOpen(true)} />
             {canEdit && !selectMode && (
               <Link
                 to="/persons/new"
-                className="flex items-center gap-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
+                className="flex items-center gap-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 px-3 py-3 rounded-lg transition-colors whitespace-nowrap shrink-0"
               >
-                <UserPlus size={15} />
-                {t('addPerson', 'Lisa isik')}
+                <UserPlus size={16} />
+                <span className="hidden sm:inline">{t('addPerson', 'Lisa isik')}</span>
               </Link>
             )}
           </div>
 
-          {/* Aktiivsed piirangud otsinguriba all. Järjekord laiast kitsaks:
-              kollektsioon piirab korpust, seoste-filter selle sees. */}
-          {(scopePill || relatedTo) && (
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* Aktiivsed piirangud ja filtrid kiipidena — ainult siis, kui mõni on.
+              Järjekord laiast kitsaks: kogu piirab korpust, seoste-filter selle sees. */}
+          {(scopePill || relatedTo || hasActiveFilters) && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
               {scopePill && (
                 <div
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${scopePill.colors.bg} ${scopePill.colors.text} ${scopePill.colors.border} ${scopeAppliesHere ? '' : 'opacity-50'}`}
+                  className={`flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-sm border ${scopePill.colors.bg} ${scopePill.colors.text} ${scopePill.colors.border} ${scopeAppliesHere ? '' : 'opacity-50'}`}
                   title={scopeAppliesHere ? undefined : t('map.scopeNotApplied', 'Ei rakendu seoste kaardile')}
                 >
-                  <Library size={11} />
+                  <Library size={12} className="shrink-0" />
                   <span className="truncate max-w-xs">{scopePill.label}</span>
                   <button
                     type="button"
                     onClick={clearScope}
-                    className={`ml-0.5 rounded-full p-0.5 ${scopePill.colors.hoverBg}`}
+                    className={`rounded-full p-1 ${scopePill.colors.hoverBg}`}
                     title={t('scope.clearHint', 'Eemalda piirang — otsib edasi kogu VUTT-ist')}
                     aria-label={t('scope.clearHint', 'Eemalda piirang — otsib edasi kogu VUTT-ist')}
                   >
-                    <X size={11} />
+                    <X size={12} />
                   </button>
                 </div>
               )}
               {relatedTo && (
-              <div className="flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-200">
-                <Waypoints size={11} />
-                <span className="truncate max-w-xs">
-                  {t('map.relationsFilter', 'Seosed: {{name}}', {
-                    name: (focusPerson?.id === relatedTo && focusPerson?.label) || t('map.thisPerson', 'See isik'),
-                  })}
-                </span>
-                <button
-                  type="button"
-                  onClick={clearRelatedTo}
-                  className="ml-0.5 hover:bg-primary-100 rounded-full p-0.5"
-                  title={t('map.clearRelationsFilter', 'Eemalda seoste filter')}
-                  aria-label={t('map.clearRelationsFilter', 'Eemalda seoste filter')}
-                >
-                  <X size={11} />
-                </button>
-              </div>
+                <FilterChip
+                  kind={t('map.relationsChip', 'Seosed')}
+                  label={<span className="inline-flex items-center gap-1"><Waypoints size={12} />{(focusPerson?.id === relatedTo && focusPerson?.label) || t('map.thisPerson', 'See isik')}</span>}
+                  onRemove={clearRelatedTo}
+                />
               )}
               {relatedTo && view === 'map' && scopePill && (
-                <label className="flex items-center gap-1.5 px-2 py-0.5 text-xs text-gray-600 cursor-pointer select-none">
+                <label className="flex items-center gap-1.5 px-2 py-0.5 text-sm text-gray-600 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={mapScope.applied}
@@ -491,39 +491,46 @@ const PersonsPage: React.FC = () => {
                   {t('map.relatedScopeToggle', 'Ainult kogus: {{name}}', { name: scopePill.label })}
                 </label>
               )}
+              {(yearFrom || yearTo) && (
+                <FilterChip kind={t('filterYearRangeShort', 'Aeg')} label={`${yearFrom || '…'} – ${yearTo || '…'}`}
+                  onRemove={() => { setYearFrom(''); setYearTo(''); }} />
+              )}
+              {originPlace && (
+                <FilterChip kind={t('originPlaceChip', 'Päritolukoht')} label={originPlace} onRemove={() => setOriginPlace('')} />
+              )}
+              {originGroup && (
+                <FilterChip kind={t('originGroup', 'Päritolu')}
+                  label={originGroupFacets.find(g => g.value === originGroup)?.label ?? originGroup}
+                  onRemove={() => setOriginGroup('')} />
+              )}
+              {institution && (
+                <FilterChip kind={t('filterInstitutionAll', 'Haridusasutus')} label={institution} onRemove={() => setInstitution('')} />
+              )}
+              {tags.map(tag => (
+                <FilterChip key={tag} kind={t('filterTags')}
+                  label={tagFacets.find(f => f.value === tag)?.label ?? tag}
+                  onRemove={() => setTag('')} />
+              ))}
+              {statusId && (
+                <FilterChip kind={t('filterStatus', 'Seisus')} label={statusLabel(statusId)} onRemove={() => setStatusId('')} />
+              )}
+              {gender && (
+                <FilterChip kind={t('filterGenderAll', 'Sugu')}
+                  label={gender === 'M' ? t('filterMale', 'Meessoost') : t('filterFemale', 'Naissoost')}
+                  onRemove={() => setGender('')} />
+              )}
+              {source && (
+                <FilterChip kind={t('filterSourceAll', 'Allikas')}
+                  label={source === 'aa' ? t('filterSourceAA', 'Album Academicum') : source}
+                  onRemove={() => setSource('')} />
+              )}
+              {hasActiveFilters && (
+                <button type="button" onClick={clearAllFilters} className="text-sm text-gray-500 hover:text-red-600 ml-1">
+                  {t('common:filterPanel.clearAll')}
+                </button>
+              )}
             </div>
           )}
-
-          {/* Täpsemad filtrid */}
-          <PersonAdvancedFilters
-            originGroup={originGroup}
-            originPlace={originPlace}
-            institution={institution}
-            source={source}
-            gender={gender}
-            yearFrom={yearFrom}
-            yearTo={yearTo}
-            statusId={statusId}
-            tag={tags[0] ?? ''}
-            originGroups={originGroupFacets}
-            institutions={institutionFacets}
-            tagFacets={tagFacets}
-            seisused={seisused}
-            onOriginGroupChange={setOriginGroup}
-            onOriginPlaceChange={setOriginPlace}
-            onInstitutionChange={setInstitution}
-            onSourceChange={setSource}
-            onGenderChange={setGender}
-            onYearFromChange={setYearFrom}
-            onYearToChange={setYearTo}
-            onStatusIdChange={setStatusId}
-            onTagChange={setTag}
-            onClearAll={() => setSearchParams(p => {
-              const n = new URLSearchParams(p);
-              ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'tag', 'offset'].forEach(k => n.delete(k));
-              return n;
-            }, { replace: true })}
-          />
         </div>
 
         {/* Select-mood toolbar */}
@@ -550,29 +557,83 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Arv / uuendamise märge. Üks püsiv live-piirkond: ekraanilugeja
-            kuuleb „Uuendan…" ja siis uue koguarvu. Kordusotsingu ajal vana
-            koguarvu ei näidata, sest see ei ole uue päringu tulemus (#425). */}
-        {view === 'list' && (
-          <p role="status" aria-live="polite" className="text-xs text-gray-400 mb-4 min-h-4">
-            {refreshing
-              ? <span className="inline-flex items-center gap-1.5 text-primary-600">
-                  <span className="h-3 w-3 rounded-full border-2 border-primary-300 border-t-primary-600 animate-spin" aria-hidden="true" />
-                  {t('refreshing', 'Uuendan…')}
-                </span>
-              : showList && (shownOffset === 0 && total <= LIMIT
-                ? t('totalCount', '{{count}} isikut', { count: total })
-                : t('filteredCount', '{{filtered}} / {{total}} isikut', { filtered: Math.min(shownOffset + LIMIT, total), total }))}
-          </p>
-        )}
+        {/* Tulemuste päis — sama kuju nagu teoste lehel */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 border-b border-gray-200 pb-3">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold text-gray-800">{t('common:nav.persons')}</h2>
+            {isAdmin && view !== 'map' && (
+              <button
+                onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                  selectMode ? 'bg-primary-100 text-primary-700 font-medium' : 'text-gray-500 hover:bg-gray-100'
+                }`}
+                title={selectMode ? t('merge.exitSelect', 'Välju valikust') : t('merge.enterSelect', 'Vali liitmiseks')}
+              >
+                {selectMode ? <CheckSquare size={16} /> : <Square size={16} />}
+                {selectMode ? t('merge.exitSelect', 'Tühista') : t('merge.enterSelect', 'Liida')}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            {/* Üks püsiv live-piirkond: ekraanilugeja kuuleb „Uuendan…" ja siis
+                uue koguarvu. Kordusotsingu ajal vana koguarvu ei näidata, sest see
+                ei ole uue päringu tulemus (#425). */}
+            {view !== 'map' && (
+              <span role="status" aria-live="polite" className="text-sm text-gray-500 min-h-5">
+                {refreshing
+                  ? <span className="inline-flex items-center gap-1.5 text-primary-600">
+                      <span className="h-3 w-3 rounded-full border-2 border-primary-300 border-t-primary-600 animate-spin" aria-hidden="true" />
+                      {t('refreshing', 'Uuendan…')}
+                    </span>
+                  : showList && (shownOffset === 0 && total <= LIMIT
+                    ? t('totalCount', '{{count}} isikut', { count: total })
+                    : t('filteredCount', '{{filtered}} / {{total}} isikut', { filtered: Math.min(shownOffset + LIMIT, total), total }))}
+              </span>
+            )}
+            {view !== 'map' && (
+              <div className="flex items-center gap-1 text-sm">
+                <ArrowDownAZ size={15} className="text-gray-400 shrink-0" />
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value)}
+                  aria-label={t('sortLabel', 'Järjestus')}
+                  className="p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none bg-white cursor-pointer hover:bg-gray-50"
+                >
+                  <option value="alpha">{t('sortAlpha', 'A–Z')}</option>
+                  <option value="birth_year">{t('sortBirthYear', 'Sünniaasta')}</option>
+                  <option value="death_year">{t('sortDeathYear', 'Surmaaasta')}</option>
+                  <option value="imm_year">{t('sortImmYear', 'Immatrikuleerumine')}</option>
+                </select>
+              </div>
+            )}
+            <ResultsViewToggle
+              value={viewValue}
+              onChange={handleViewChange}
+              groupLabel={t('viewGroup')}
+              options={[
+                { value: 'cards', icon: LayoutGrid, label: t('viewGrid') },
+                { value: 'list', icon: List, label: t('viewList') },
+                { value: 'map', icon: MapIcon, label: t('map.view', 'Kaart') },
+              ]}
+            />
+          </div>
+        </div>
 
         {/* Sisu: laadimiskaardid ainult esmalaadimisel (või ulatuse vahetusel) */}
         {view === 'list' && initialLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-busy="true">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-64 bg-white border border-gray-200 rounded-lg animate-pulse" />
-            ))}
-          </div>
+          resultsView === 'list' ? (
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm" aria-busy="true">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-16 border-b border-gray-100 last:border-0 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${sidebarOpen ? '' : 'xl:grid-cols-4'} gap-6`} aria-busy="true">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-64 bg-white border border-gray-200 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          )
         )}
 
         {view === 'list' && listError && (
@@ -597,24 +658,41 @@ const PersonsPage: React.FC = () => {
         )}
 
         {view === 'list' && showList && persons.length > 0 && (
-          <div
-            className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity ${refreshing ? 'opacity-50' : ''}`}
-            aria-busy={refreshing}
-          >
-            {persons.map(person => (
-              <PersonCard
-                key={person.id}
-                person={person}
-                selectMode={selectMode}
-                selected={selectedIds.has(person.id)}
-                onSelect={() => toggleSelect(person)}
-                statusVocab={seisused}
-              />
-            ))}
-          </div>
+          resultsView === 'list' ? (
+            <div
+              className={`bg-white rounded-lg border border-gray-200 shadow-sm transition-opacity ${refreshing ? 'opacity-50' : ''}`}
+              aria-busy={refreshing}
+            >
+              {persons.map(person => (
+                <PersonListRow
+                  key={person.id}
+                  person={person}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(person.id)}
+                  onSelect={() => toggleSelect(person)}
+                  statusVocab={seisused}
+                />
+              ))}
+            </div>
+          ) : (
+            <div
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${sidebarOpen ? '' : 'xl:grid-cols-4'} gap-6 transition-opacity ${refreshing ? 'opacity-50' : ''}`}
+              aria-busy={refreshing}
+            >
+              {persons.map(person => (
+                <PersonCard
+                  key={person.id}
+                  person={person}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(person.id)}
+                  onSelect={() => toggleSelect(person)}
+                  statusVocab={seisused}
+                />
+              ))}
+            </div>
+          )
         )}
 
-        {/* Paginatsioon */}
         {view === 'map' && (
           <React.Suspense fallback={<div className="h-[640px] rounded-xl border border-gray-200 bg-white" />}>
             <PersonsMap
@@ -638,6 +716,8 @@ const PersonsPage: React.FC = () => {
             />
           </div>
         )}
+        </div>
+        </div>
       </main>
 
       {showMergeModal && selectedPersons.length === 2 && (

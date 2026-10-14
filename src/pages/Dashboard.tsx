@@ -699,7 +699,7 @@ const Dashboard: React.FC = () => {
       {/* Kogu-riba: aktiivne kogu kogu laiuses päise all (#587) */}
       <CollectionBar />
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1">
         {/* pb reserveerib ruumi hõljuvale action bar'ile select-mode'is (ühtlustatud manage-lehega) */}
         <div className={`max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8 ${selectMode && selectedWorkIds.size > 0 ? 'pb-32 sm:pb-36' : ''}`}>
 
