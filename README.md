@@ -121,8 +121,8 @@ npm run dev            # http://localhost:3000
 npm run build          # production build → dist/
 ```
 
-The development server proxies `/api/*` and `/meili` to the backend configured in
-`vite.config.ts` (`DEV_BACKEND`); point it at your own instance.
+The development server proxies `/api/*` and `/meili` to a backend on `localhost` (ports 7700,
+8001, 8002); for another instance run `VUTT_DEV_BACKEND=<host> npm run dev`.
 
 Access is by request. The `/register` form submits an application that an administrator reviews;
 an account can also be added directly to `state/users.json`.

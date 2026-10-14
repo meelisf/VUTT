@@ -2,8 +2,11 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Backend server IP arenduses (muuda vastavalt oma võrgule)
-const DEV_BACKEND = '172.17.120.146';
+// Dev-serveri backend. Vaikimisi `localhost`: tootmise backend SSH-tunneli
+// kaudu (pordid 7700/8001/8002, käsk CLAUDE.md-s). Muu instants:
+// `VUTT_DEV_BACKEND=<host> npm run dev`. Shelli muutuja, mitte `.env` (ADR 0021).
+// NB: tunneliga on andmed PÄRIS — sisselogituna läheb salvestus tootmisse.
+const DEV_BACKEND = process.env.VUTT_DEV_BACKEND || 'localhost';
 
 // `loadEnv` on tahtlikult importimata (ADR 0021) — build ei loe `.env`-i
 // üldse. Kliendile mõeldud seaded tulevad `VITE_`-prefiksiga
