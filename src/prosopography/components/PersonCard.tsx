@@ -5,7 +5,7 @@ import PersonSnippet from './PersonSnippet';
 import { MapPin, ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
 import type { VocabularySeisusItem } from '../../services/collectionService';
-import { formatFloruit } from '../utils/personDates';
+import { Initials, Lifespan, verificationDotClass, personOrigin, personStatusText } from '../utils/personDisplay';
 import { personImageProps } from '../utils/personImage';
 
 interface PersonCardProps {
@@ -23,47 +23,7 @@ const ExternalBadge: React.FC<{ label: string }> = ({ label }) => (
   </span>
 );
 
-const getStatusDotStyle = (level: string) => {
-  switch (level) {
-    case 'verified': return 'bg-green-500';
-    case 'reviewed': return 'bg-amber-400';
-    default:         return 'bg-gray-300';
-  }
-};
-
-// Deterministlik taustavärv nime põhjal (igal isikul unikaalne muted toon)
-const nameToColor = (name: string): { bg: string; fg: string } => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return {
-    bg: `hsl(${hue}, 20%, 90%)`,
-    fg: `hsl(${hue}, 25%, 52%)`,
-  };
-};
-
-// Initsiaalid varufotona (nagu WorkCard thumbnail fallback)
-const Initials: React.FC<{ name: string }> = ({ name }) => {
-  const parts = name.trim().split(/\s+/);
-  const initials = parts.length >= 2
-    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    : name.slice(0, 2).toUpperCase();
-  const { bg, fg } = nameToColor(name);
-  return (
-    <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bg }}>
-      <span className="text-3xl font-bold select-none" style={{ color: fg }}>{initials}</span>
-    </div>
-  );
-};
-
 // Kaardi sisu — kasutatakse nii Link- kui select-režiimis
-function resolveLabel(labels: Record<string, string> | null | undefined, lang: string): string | null {
-  if (!labels) return null;
-  return labels[lang] ?? labels['et'] ?? labels['en'] ?? Object.values(labels)[0] ?? null;
-}
-
 function formatImmLabel(dateStr: string, lang: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
   if (!y) return `AA ${dateStr}`;
@@ -157,17 +117,9 @@ const CardInner: React.FC<{
 
         {/* Päritolukoht */}
         {(() => {
-          const lang = i18n.language?.slice(0, 2) ?? 'et';
-          const historical = person.origin_place;
-          const modern = resolveLabel(person.origin_place_labels, lang);
-          const placeLabel = historical
-            ? (modern && modern !== historical ? `${historical} (${modern})` : historical)
-            : (modern ?? null);
-          const parentLabel = resolveLabel(person.origin_parent?.labels, lang) ?? person.origin_parent?.key;
-          const content = placeLabel && parentLabel && placeLabel !== parentLabel
-            ? `${placeLabel} · ${parentLabel}`
-            : placeLabel;
-          if (content && person.origin_coordinates && onOriginClick) {
+          const origin = personOrigin(person, i18n.language?.slice(0, 2) ?? 'et');
+          if (!origin.text) return null;
+          if (origin.hasPlace && person.origin_coordinates && onOriginClick) {
             return (
               <button
                 type="button"
@@ -176,35 +128,17 @@ const CardInner: React.FC<{
                 title={t('map.openPlace', 'Näita kaardil')}
               >
                 <MapPin size={12} />
-                {content}
+                {origin.text}
               </button>
             );
           }
-          if (placeLabel && parentLabel && placeLabel !== parentLabel) {
-            return <p className="text-xs text-gray-400">{placeLabel} · {parentLabel}</p>;
-          }
-          if (placeLabel) {
-            return <p className="text-xs text-gray-400">{placeLabel}</p>;
-          }
-          if (person.origin_group) {
-            const groupLabel = resolveLabel(person.origin_group_labels, lang) ?? person.origin_group;
-            return <p className="text-xs text-gray-400">{groupLabel}</p>;
-          }
-          return null;
+          return <p className="text-xs text-gray-400">{origin.text}</p>;
         })()}
 
         {/* Seisus — lokaliseeritud aktiivses keeles (status_ids → sõnavara), varuks status_labels (eesti) */}
         {(person.status_ids ?? person.status_labels ?? []).length > 0 && (
           <p className="text-sm text-gray-600">
-            {(person.status_ids ?? []).length > 0
-              ? person.status_ids.map((sid, i) => {
-                  const item = statusVocab?.find(s => s.id === sid);
-                  const loc = item
-                    ? (i18n.language?.startsWith('en') ? item.label.en : item.label.et)
-                    : null;
-                  return loc || person.status_labels?.[i] || sid;
-                }).filter(Boolean).join(', ')
-              : (person.status_labels ?? []).join(', ')}
+            {personStatusText(person, statusVocab, !!i18n.language?.startsWith('en'))}
           </p>
         )}
 
@@ -228,7 +162,7 @@ const CardInner: React.FC<{
         )}
 
         <span
-          className={`block w-2.5 h-2.5 rounded-full shrink-0 ${getStatusDotStyle(person.verification_level)}`}
+          className={`block w-2.5 h-2.5 rounded-full shrink-0 ${verificationDotClass(person.verification_level)}`}
           title={person.verification_level}
         />
       </div>
@@ -238,22 +172,10 @@ const CardInner: React.FC<{
 };
 
 const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect, statusVocab }) => {
-  const { t } = useTranslation(['prosopography']);
   const location = useLocation();
   const navigate = useNavigate();
 
-  const lifespanNode = (() => {
-    const sym = 'text-primary-500';
-    const b = person.birth_year ? <><span className={sym}>*</span>{person.birth_year}</> : null;
-    const d = person.death_year ? <><span className={sym}>†</span>{person.death_year}</> : null;
-    if (b && d) return <>{b}{'  '}{d}</>;
-    if (b) return b;
-    if (d) return d;
-    // Eluaastate puudumisel tegutsemisperiood, et lahter ei jääks tühjaks (#240)
-    const fl = formatFloruit(person.floruit_year_from, person.floruit_year_to);
-    if (fl) return <><span className={sym}>{t('floruitShort')}</span>{fl}</>;
-    return <span>{t('unknownYears', 'eluaastad teadm.')}</span>;
-  })();
+  const lifespanNode = <Lifespan person={person} />;
 
   if (selectMode) {
     return (
