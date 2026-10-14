@@ -133,7 +133,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
 
     return (
         <aside className={`
-            md:w-64 md:flex md:flex-col md:border-r border-gray-200 bg-white p-6 overflow-y-auto shrink-0 z-10
+            md:w-64 md:flex md:flex-col md:border-r md:border-l border-gray-200 bg-white p-6 overflow-y-auto shrink-0 z-10
             ${showFiltersMobile ? 'absolute inset-0 z-30 flex flex-col' : 'hidden'}
         `}>
             <div className="flex justify-between items-center mb-6 md:hidden">

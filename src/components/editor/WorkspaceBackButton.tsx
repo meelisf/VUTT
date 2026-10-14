@@ -29,7 +29,7 @@ const WorkspaceBackButton: React.FC<{ returnUrl: string | null; onBack: () => vo
   if (!target) return null;
 
   // Nimekiri näitab aktiivset valikut — sama, mis päises ja kogu-ribal.
-  const name = target === 'search' ? t('navigation.fullTextSearch') : label;
+  const name = target === 'search' ? t('navigation.search') : label;
   const tone = isWorkSet && target === 'list'
     ? 'text-violet-700 bg-violet-50 hover:bg-violet-100'
     : 'text-primary-700 bg-primary-50 hover:bg-primary-100';
