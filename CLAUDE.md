@@ -19,8 +19,16 @@ UI eesti + inglise keeles. **Koodikommentaarid eesti keeles.**
 **Arendus toimub LOKAALSELT. Server on eraldi masin (`ssh vutt`).** Lokaalsed käsud ei tööta serveris ja vastupidi.
 
 ```bash
-npm install && npm run dev    # localhost:5173
+npm install && npm run dev    # localhost:3000
 npm run build                 # → dist/ + eelkompressioon (.br/.gz)
+```
+
+**UI kontroll tootmisandmetega** (lokaalset backendi ei ole): tunnel + dev-server.
+Andmed on PÄRIS — lugemine ja paigutus ohutu, sisselogituna läheb salvestus tootmisse.
+
+```bash
+ssh -N -L 7700:localhost:7700 -L 8001:localhost:8001 -L 8002:localhost:8002 vutt   # eraldi aknas
+npm run dev                   # DEV_BACKEND vaikimisi localhost; muu: VUTT_DEV_BACKEND=<host>
 ```
 
 Väravad (samad jooksevad CI-s, `.github/workflows/ci.yml`):

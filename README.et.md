@@ -120,8 +120,8 @@ npm run dev            # http://localhost:3000
 npm run build          # toodangu build → dist/
 ```
 
-Arendusserver proxib `/api/*` ja `/meili` failis `vite.config.ts` määratud backendile
-(`DEV_BACKEND`); suuna see oma instantsile.
+Arendusserver proxib `/api/*` ja `/meili` backendile aadressil `localhost` (pordid 7700, 8001,
+8002); muu instantsi jaoks `VUTT_DEV_BACKEND=<host> npm run dev`.
 
 Juurdepääs on taotluse alusel. Vorm `/register` esitab taotluse, mille administraator vaatab üle;
 konto võib lisada ka otse faili `state/users.json`.
