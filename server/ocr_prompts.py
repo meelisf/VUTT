@@ -10,6 +10,10 @@ lahkneda ja seda arendatakse edasi siin. Põhjus on mudeliklass: `KURRENT_INSTRU
 on fine-tuunitud mudeli TREENINGVORM (mudel tahab täpselt seda stringi), Gemini on
 üldmudel, kellele juhis on ainus info. Käsikirja juhise triiv on ootuspärane, mitte viga.
 
+Märgendus (p 7) on siiski PARITEET LOSSi `KURRENT_INSTRUCTION_V5`-ga (v5 Kurrendi mudel
+tootmises 2026-10-14): `<add>` lisamiskohas (ADR 0067) ja veeris `<m>`-ridadena — sama
+teose lehed peavad mõlemalt pakkujalt tulema samas märgenduses.
+
 Automaatset valvurit LOSSi vastu ei ole — LOSS ei ole VUTT-i jaoks runtime'is loetav.
 """
 import re
@@ -82,7 +86,13 @@ Instructions:
    - ä, ö, ü, å – transcribe as written
 5. Preserve original capitalization and punctuation.
 6. If the page contains two columns or two halves, transcribe left side first, then right side.
-7. Do not add any XML tags, markdown, or formatting — plain text only.
+7. Insertions written above or below the line, or in the margin with a mark showing where
+   they belong: transcribe them at that point as <add>text</add>.
+   Marginal notes (written in the margin, not inserted into the text): place each marginal
+   note at the position in the text where it appears, using <m>text</m> tags, as separate
+   lines between the main text lines. Each line of a multi-line marginal note is a separate
+   <m> tag.
+   No other XML tags, markdown, or formatting — plain text otherwise.
 
 Blank pages: if the page has no writing on it at all (blank leaf, blank verso, endpaper),
 return exactly this single line and nothing else:
