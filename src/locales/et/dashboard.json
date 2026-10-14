@@ -102,7 +102,9 @@
     "linkCopied": "Link kopeeritud!",
     "showDescription": "Kogu kirjeldus",
     "hideDescription": "Peida kirjeldus",
-    "manage": "Halda"
+    "manage": "Halda",
+    "workCount_one": "{{count}} teos",
+    "workCount_other": "{{count}} teost"
   },
   "filters": {
     "status": "Staatus",

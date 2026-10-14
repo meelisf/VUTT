@@ -30,6 +30,11 @@ export interface WorkSetSummary {
   created_by?: string;
   updated_at?: string;
   ever_published?: boolean;
+  /**
+   * Kutsujale OTSINGUS nähtavate liikmete arv (#587). Ainult loendi
+   * (`GET /work-sets`) vastuses — sama ahel mis `/works` ID-loendil.
+   */
+  count?: number;
 }
 
 interface WorkIdsResponse {

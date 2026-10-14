@@ -102,7 +102,9 @@
     "linkCopied": "Link copied!",
     "showDescription": "About this collection",
     "hideDescription": "Hide description",
-    "manage": "Manage"
+    "manage": "Manage",
+    "workCount_one": "{{count}} work",
+    "workCount_other": "{{count}} works"
   },
   "filters": {
     "status": "Status",

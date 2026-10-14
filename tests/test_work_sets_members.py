@@ -205,3 +205,12 @@ def test_arhiveeritud_kogu_kuulumine_on_endiselt_nahtav(client, work_sets, admin
     r = client.get("/work-sets/for-work/avalik-teos", headers=auth(manager_token))
     # Arhiveerimine ei kustuta liikmesust — teos ON seal kogus ja seda peab näha olema.
     assert [ws["id"] for ws in r.json()["work_sets"]] == [ws_id]
+
+
+def test_kogude_loendi_arv_loeb_ainult_kutsujale_nahtavaid(client, work_sets, viewer_token,
+                                                            admin_token, ws_id):
+    """Valija ja kogu-riba arv (#587): piiratud liige ega kustutatud viide ei loe."""
+    kogud = client.get("/work-sets", headers=auth(viewer_token)).json()["work_sets"]
+    assert [k["count"] for k in kogud if k["id"] == ws_id] == [1]
+    kogud = client.get("/work-sets", headers=auth(admin_token)).json()["work_sets"]
+    assert [k["count"] for k in kogud if k["id"] == ws_id] == [2]
