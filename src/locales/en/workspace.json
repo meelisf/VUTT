@@ -1,5 +1,7 @@
 {
   "navigation": {
+    "backTo": "Back to: {{name}}",
+    "fullTextSearch": "Full-text search",
     "backToDashboard": "Back to home",
     "page": "Page",
     "of": "/",

@@ -207,6 +207,10 @@
     "allShort": "All collections"
   },
   "workSets": {
+    "private": "private",
+    "remove": "Remove",
+    "workCount_one": "{{count}} work",
+    "workCount_other": "{{count}} works",
     "section": "Work collections",
     "permanent": "Permanent collections",
     "create": "Create work collection",

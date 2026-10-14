@@ -24,6 +24,7 @@ import { needsPageLoad, pageLoadKey } from './workspacePageLoad';
 import MetadataModal from '../components/MetadataModal';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogIn, Copy, Check } from 'lucide-react';
 import UserMenu from '../components/UserMenu';
+import WorkspaceBackButton from '../components/editor/WorkspaceBackButton';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { getLabel } from '../utils/metadataUtils';
@@ -571,6 +572,8 @@ const Workspace: React.FC = () => {
             <img src="/logo.png" alt="VUTT" className="h-5 w-auto" />
             <span className="font-bold text-gray-800 tracking-tight hidden sm:inline">{t('common:app.name')}</span>
           </button>
+          {/* Tagasi nimekirja / otsingusse — ainult siis, kui sealt tuldi (#587) */}
+          <WorkspaceBackButton returnUrl={sessionStorage.getItem('vutt_return_url')} onBack={handleNavigateBack} />
           {/* Otsing */}
           <button
             onClick={handleNavigateToSearch}
