@@ -38,6 +38,16 @@ def test_trukise_juhis_sisaldab_vutt_margendust():
         assert marker in GEMINI_PRINT_INSTRUCTION
 
 
+
+def test_kasikirja_juhis_sisaldab_add_ja_m_margendust():
+    """Pariteet LOSSi v5 Kurrendi juhisega (ADR 0067): lisandus <add>, veeris <m>.
+    Vana p 7 keelas XML-i — kui see tagasi tuleb, kaob Gemini väljundist märgendus."""
+    from server.ocr_prompts import GEMINI_HAND_INSTRUCTION
+    for marker in ("<add>", "<m>"):
+        assert marker in GEMINI_HAND_INSTRUCTION
+    assert "Do not add any XML tags" not in GEMINI_HAND_INSTRUCTION
+
+
 def test_strip_eemaldab_markdown_koodiploki():
     from server.ocr_prompts import strip_model_output
     assert strip_model_output("```xml\nMus. 1309\n```") == "Mus. 1309"
