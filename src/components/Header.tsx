@@ -77,7 +77,11 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="bg-slate-800 text-slate-100 border-b border-slate-900 px-3 py-2 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-[1200] shadow-sm">
+      <header className="bg-slate-800 text-slate-100 border-b border-slate-900 sticky top-0 z-[1200] shadow-sm">
+        {/* Tume taust on kogu laiuses, sisu jälgib lehe sisu raami (max-w-7xl,
+            sama mis kogu-ribal ja loendilehtedel) — suurel ekraanil ei valgu
+            logo ja menüü akna servadesse. Workspace'il on oma päis. */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-2 flex items-center justify-between gap-3">
         {/* Vasak pool: logo, navigatsioon, pealkiri */}
         <div className="flex items-center gap-2 sm:gap-5 min-w-0">
           <a href="/" onClick={handleLogoClick} className="hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer shrink-0">
@@ -147,6 +151,7 @@ const Header: React.FC<HeaderProps> = ({
             </button>
           )}
           <LanguageSwitcher tone="dark" />
+        </div>
         </div>
       </header>
 
