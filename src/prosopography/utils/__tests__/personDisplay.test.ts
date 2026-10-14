@@ -14,7 +14,7 @@ describe('personOrigin', () => {
     const p = isik({
       origin_place: 'Reval',
       origin_place_labels: { et: 'Tallinn' },
-      origin_parent: { key: 'estland', labels: { et: 'Eestimaa' } } as ProsopoIndexEntry['origin_parent'],
+      origin_parent: { key: 'estland', id: null, labels: { et: 'Eestimaa' } },
     });
     expect(personOrigin(p, 'et')).toEqual({ text: 'Reval (Tallinn) · Eestimaa', hasPlace: true });
   });
