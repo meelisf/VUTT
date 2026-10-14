@@ -93,6 +93,13 @@ Instructions:
    lines between the main text lines. Each line of a multi-line marginal note is a separate
    <m> tag.
    No other XML tags, markdown, or formatting — plain text otherwise.
+   Example — "nicht" written above the line between "er" and "kommen", and a two-line
+   note "NB. vid." / "infra" in the left margin beside the second line:
+     Er schrieb mir, daß er <add>nicht</add> kommen
+     <m>NB. vid.</m>
+     <m>infra</m>
+     werde, weil die Wege zu schlecht
+   Wrong: putting the insertion on a line of its own ("nicht" between two lines).
 
 Blank pages: if the page has no writing on it at all (blank leaf, blank verso, endpaper),
 return exactly this single line and nothing else:
