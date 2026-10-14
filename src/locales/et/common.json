@@ -207,6 +207,10 @@
     "allShort": "Kõik kogud"
   },
   "workSets": {
+    "private": "privaatne",
+    "remove": "Eemalda",
+    "workCount_one": "{{count}} teos",
+    "workCount_other": "{{count}} teost",
     "section": "Töökollektsioonid",
     "permanent": "Püsikogud",
     "create": "Loo töökollektsioon",

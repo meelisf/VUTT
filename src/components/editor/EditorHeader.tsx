@@ -37,15 +37,21 @@ export default function EditorHeader({
 
   return (
     <div className="bg-white border-b border-gray-200 shrink-0 z-20 shadow-sm">
-      {work && (
-        <div className="px-4 py-1.5 border-b border-gray-50 flex items-center gap-2 text-[11px] text-gray-500 bg-gray-50/50">
-          <span className="font-bold text-gray-700 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
-          <span className="text-gray-300">•</span>
-          <span className="text-gray-400 min-w-0 max-w-[50%] leading-snug">{formatYearDisplay(work.year_display, work.year, t, work.dating)}</span>
-          <span className="text-gray-300">•</span>
-          <span className="italic truncate flex-1">{workDisplayTitle(work, getLangCode(i18n.language)).main}</span>
-        </div>
-      )}
+      {work && (() => {
+        const title = workDisplayTitle(work, getLangCode(i18n.language));
+        // Pealkiri on rea tugevaim element (#587, makett D); lühendatud pealkiri
+        // on hõljumisel tervikuna näha, Info vahekaarti avama ei pea.
+        const fullTitle = title.secondary ? `${title.main}\n${title.secondary}` : title.main;
+        return (
+          <div className="px-4 py-1 border-b border-gray-50 flex items-center gap-2 text-xs text-gray-500 bg-gray-50/50">
+            <span className="font-semibold text-gray-600 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
+            <span className="text-gray-300">•</span>
+            <span className="text-gray-400 min-w-0 max-w-[50%] leading-snug">{formatYearDisplay(work.year_display, work.year, t, work.dating)}</span>
+            <span className="text-gray-300">•</span>
+            <span className="italic truncate flex-1 min-w-0 text-[13px] font-medium text-gray-800" title={fullTitle}>{title.main}</span>
+          </div>
+        );
+      })()}
 
       <div className="px-4 py-2 flex items-center justify-between gap-4">
         <div className="flex bg-gray-100 p-0.5 rounded-lg shadow-inner">
