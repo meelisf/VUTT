@@ -48,6 +48,14 @@ def test_kasikirja_juhis_sisaldab_add_ja_m_margendust():
     assert "Do not add any XML tags" not in GEMINI_HAND_INSTRUCTION
 
 
+def test_kasikirja_juhis_ei_votta_naaberlehe_teksti_margiks():
+    """Fotokoopia serva jääv naaberlehe riba läks Gemini väljundis <m>-iks (1759-diarium,
+    2026-10-14). Juhis peab seda keelama — muidu täitub veeris võõra lehe tükkidega."""
+    from server.ocr_prompts import GEMINI_HAND_INSTRUCTION
+    assert "neighbouring page" in GEMINI_HAND_INSTRUCTION
+    assert "do NOT tag it as <m>" in GEMINI_HAND_INSTRUCTION
+
+
 def test_strip_eemaldab_markdown_koodiploki():
     from server.ocr_prompts import strip_model_output
     assert strip_model_output("```xml\nMus. 1309\n```") == "Mus. 1309"

@@ -100,6 +100,12 @@ Instructions:
      <m>infra</m>
      werde, weil die Wege zu schlecht
    Wrong: putting the insertion on a line of its own ("nicht" between two lines).
+8. Text from a neighbouring page: scans and photocopies often show a strip of the facing or
+   previous page along the edge or in the gutter — word fragments, line beginnings or
+   endings cut off by the edge of the image, sometimes with their own line numbers. This
+   text does not belong to this page: ignore it completely and do NOT tag it as <m>.
+   A real marginal note is written on THIS page beside its main text and is complete;
+   fragments cut off at the edge of the image are not marginal notes.
 
 Blank pages: if the page has no writing on it at all (blank leaf, blank verso, endpaper),
 return exactly this single line and nothing else:
