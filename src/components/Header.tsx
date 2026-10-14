@@ -93,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({
 
           <nav className="hidden md:flex items-center gap-1" aria-label={t('common:nav.label')}>
             <NavLink to="/" end className={navClass}>{t('common:nav.works')}</NavLink>
-            <NavLink to="/search" className={navClass}>{t('header.fullTextSearch')}</NavLink>
+            <NavLink to="/search" className={navClass}>{t('header.search')}</NavLink>
             <NavLink to="/persons" className={navClass}>{t('common:nav.persons')}</NavLink>
           </nav>
 

@@ -5,32 +5,39 @@ import { FileText, Mail } from 'lucide-react';
 import { SearchUnit, switchUnitParams } from './searchUnit';
 
 /**
- * Täistekst | Kirjad (#526). Vahetus säilitab ainult päringu ja kogu (vt switchUnitParams).
- * `fullWidth`: külgriba tipus jagavad nupud laiuse võrdselt.
+ * Täistekst | Kirjad (#526) sakkidena otsinguvälja kohal: valik juhib kogu vaadet
+ * (väli, filtrid, tulemused), mitte üht filtrit — seepärast filtripaneelist väljas.
+ * Vahetus säilitab ainult päringu ja kogu (vt switchUnitParams).
  */
-const SearchUnitToggle: React.FC<{ unit: SearchUnit; fullWidth?: boolean }> = ({ unit, fullWidth = false }) => {
+const SearchUnitToggle: React.FC<{ unit: SearchUnit }> = ({ unit }) => {
   const { t } = useTranslation('search');
   const [, setSearchParams] = useSearchParams();
   const options: { value: SearchUnit; label: string; icon: React.ReactNode }[] = [
-    { value: 'text', label: t('unit.text'), icon: <FileText size={14} /> },
-    { value: 'letters', label: t('unit.letters'), icon: <Mail size={14} /> },
+    { value: 'text', label: t('unit.text'), icon: <FileText size={15} /> },
+    { value: 'letters', label: t('unit.letters'), icon: <Mail size={15} /> },
   ];
   return (
-    <div role="group" aria-label={t('unit.label')} className={`${fullWidth ? 'flex w-full' : 'inline-flex'} rounded-md border border-gray-200 bg-gray-50 p-0.5`}>
-      {options.map(o => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={unit === o.value}
-          onClick={() => { if (unit !== o.value) setSearchParams(prev => switchUnitParams(prev, o.value)); }}
-          className={`${fullWidth ? 'flex-1 justify-center py-1.5' : 'py-1'} flex items-center gap-1.5 rounded px-3 text-xs font-semibold transition-colors ${
-            unit === o.value ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'
-          }`}
-        >
-          {o.icon}
-          {o.label}
-        </button>
-      ))}
+    <div role="tablist" aria-label={t('unit.label')} className="flex gap-6 mb-3">
+      {options.map(o => {
+        const active = unit === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => { if (!active) setSearchParams(prev => switchUnitParams(prev, o.value)); }}
+            className={`flex items-center gap-1.5 h-9 border-b-[3px] text-sm transition-colors ${
+              active
+                ? 'border-primary-600 text-primary-700 font-semibold'
+                : 'border-transparent text-gray-500 font-medium hover:text-gray-800 hover:border-gray-300'
+            }`}
+          >
+            {o.icon}
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 };

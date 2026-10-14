@@ -1,7 +1,7 @@
 {
   "navigation": {
     "backTo": "Tagasi: {{name}}",
-    "fullTextSearch": "Täisteksti otsing",
+    "search": "Otsing",
     "backToDashboard": "Tagasi avalehele",
     "page": "Lk",
     "of": "/",

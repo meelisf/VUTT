@@ -10,7 +10,6 @@ import { getLangCode } from '../../utils/getLangCode';
 import { mergeFacetItems } from '../../utils/facetUtils';
 import { isVuttId } from '../../utils/qcodeUtils';
 import { resolveEntityLabel } from '../../utils/labelUtils';
-import SearchUnitToggle from './SearchUnitToggle';
 
 interface WorkInfo {
     title: string;
@@ -134,7 +133,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
 
     return (
         <aside className={`
-            md:w-64 md:flex md:flex-col md:border-r border-gray-200 bg-white p-6 overflow-y-auto shrink-0 z-10
+            md:w-64 md:flex md:flex-col md:border-r md:border-l border-gray-200 bg-white p-6 overflow-y-auto shrink-0 z-10
             ${showFiltersMobile ? 'absolute inset-0 z-30 flex flex-col' : 'hidden'}
         `}>
             <div className="flex justify-between items-center mb-6 md:hidden">
@@ -143,11 +142,6 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
             </div>
 
             <div className="space-y-2">
-
-                {/* Otsingu ühik (#526) — kitsal ekraanil on lüliti otsinguriba all */}
-                <div className="hidden md:block pb-2">
-                    <SearchUnitToggle unit="text" fullWidth />
-                </div>
 
                 {/* Otsingu ulatus */}
                 <CollapsibleSection

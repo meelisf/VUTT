@@ -20,6 +20,7 @@ import { useFilterDraft } from './search/hooks/useFilterDraft';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import SearchUnitToggle from './search/SearchUnitToggle';
 import MobileSelectionButton from '../components/MobileSelectionButton';
+import CollectionBar from '../components/CollectionBar';
 import LettersSearch from './search/letters/LettersSearch';
 import { readUnit } from './search/searchUnit';
 
@@ -113,9 +114,13 @@ const FullTextSearch: React.FC = () => {
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
             <Header>
+                {/* Kogu-riba nagu Dashboardil ja isikute lehel (#587) */}
+                <CollectionBar />
                 {/* Otsingu vorm */}
-                <div className="bg-white border-b border-gray-200 px-6 py-4">
-                    <div className="max-w-7xl mx-auto">
+                <div className="bg-white border-b border-gray-200 py-4">
+                    {/* Raam = päis ja CollectionBar (max-w-7xl + px-4 sm:px-8), et otsingukast joonduks logo ja keelevalijaga */}
+                    <div className="max-w-7xl mx-auto px-4 sm:px-8">
+                        <SearchUnitToggle unit="text" />
                         <form onSubmit={actions.commit} className="flex gap-2 relative">
                             <div className="relative flex-1">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -151,10 +156,6 @@ const FullTextSearch: React.FC = () => {
                             </button>
                         </form>
 
-                        {/* Otsingu ühik (#526): laial ekraanil külgriba tipus, kitsal siin */}
-                        <div className="mt-3 md:hidden">
-                            <SearchUnitToggle unit="text" />
-                        </div>
                         {/* Aktiivne kogu nagu Dashboardil: laial päise valijas, kitsal see nupp */}
                         <MobileSelectionButton className="mt-3" />
 
@@ -356,7 +357,7 @@ const FullTextSearch: React.FC = () => {
                 </div>
             </Header>
 
-            <div className="flex-1 overflow-hidden flex max-w-7xl mx-auto w-full">
+            <div className="flex-1 overflow-hidden flex max-w-7xl mx-auto w-full md:px-8">
                 <SearchFilters
                     draft={draft}
                     facets={{ ...facets, availableWorks, loading }}

@@ -9,6 +9,7 @@ import { useSelectionScope } from '../../../hooks/useSelectionScope';
 import type { LetterFilters as Filters } from '../../../services/letterSearch';
 import SearchUnitToggle from '../SearchUnitToggle';
 import MobileSelectionButton from '../../../components/MobileSelectionButton';
+import CollectionBar from '../../../components/CollectionBar';
 import { readLetterFilters, writeLetterFilters } from '../searchUnit';
 import LetterFilters from './LetterFilters';
 import LetterResults from './LetterResults';
@@ -59,8 +60,12 @@ const LettersSearch: React.FC = () => {
   return (
     <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
       <Header>
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="max-w-7xl mx-auto">
+        {/* Kogu-riba nagu Dashboardil ja isikute lehel (#587) */}
+        <CollectionBar />
+        <div className="bg-white border-b border-gray-200 py-4">
+          {/* Raam = päis ja CollectionBar (max-w-7xl + px-4 sm:px-8), et otsingukast joonduks logo ja keelevalijaga */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-8">
+            <SearchUnitToggle unit="letters" />
             <form onSubmit={submit} className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -88,19 +93,15 @@ const LettersSearch: React.FC = () => {
                 <Filter size={20} />
               </button>
             </form>
-            {/* Otsingu ühik (#526): laial ekraanil külgriba tipus, kitsal siin */}
-            <div className="mt-3 md:hidden"><SearchUnitToggle unit="letters" /></div>
             {/* Aktiivne kogu nagu Dashboardil: laial päise valijas, kitsal see nupp */}
             <MobileSelectionButton className="mt-3" />
           </div>
         </div>
       </Header>
 
-      <div className="flex-1 overflow-hidden flex max-w-7xl mx-auto w-full">
-        <aside className={`${showFiltersMobile ? 'block' : 'hidden'} md:block w-full md:w-72 shrink-0 overflow-y-auto border-r border-gray-200 bg-white`}>
-          <div className="hidden md:block px-4 pt-4">
-            <SearchUnitToggle unit="letters" fullWidth />
-          </div>
+      <div className="flex-1 overflow-hidden flex max-w-7xl mx-auto w-full md:px-8">
+        {/* Laius ja täidis = täisteksti külgriba (SearchFilters), muidu hüppab lüliti režiimivahetusel */}
+        <aside className={`${showFiltersMobile ? 'block' : 'hidden'} md:block w-full md:w-64 p-6 shrink-0 overflow-y-auto border-r md:border-l border-gray-200 bg-white`}>
           <LetterFilters filters={filters} facets={result?.facetDistribution ?? {}} hasQuery={!!query} onChange={onFiltersChange} />
         </aside>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
