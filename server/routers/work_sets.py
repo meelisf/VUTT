@@ -75,7 +75,14 @@ def get_work_sets(include_archived: bool = False, user=Depends(optional_user)):
     sets = [ws for ws in list_work_sets() if can_view_set(ws, user)]
     if not include_archived:
         sets = [ws for ws in sets if ws.get("status", "active") == "active"]
-    return {"status": "success", "work_sets": [_public_view(ws, user) for ws in sets]}
+    # `count` = kutsujale OTSINGUS nähtavate liikmete arv (#587, #319 p2): sama
+    # ahel, mis `/works` filtrile annab, muidu lekiks piiratud teoste arv.
+    # Hind on üks `_metadata.json` lugemine liikme kohta; 2026-10 oli kõigis
+    # kogudes kokku ~70 liiget. Lagi `WORK_SET_MAX_MEMBERS` kehtib kogu kohta.
+    return {"status": "success", "work_sets": [
+        {**_public_view(ws, user), "count": len(search_visible_work_ids(ws, user))}
+        for ws in sets
+    ]}
 
 
 def _kontrolli_nimi(name) -> None:

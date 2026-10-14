@@ -216,6 +216,35 @@ export const getTypeFacets = async (
   }
 };
 
+/**
+ * Püsikogude teoste arvud kogu-valijale ja kogu-ribale (#587, #319 p2).
+ *
+ * Arv tuleb kutsuja ENDA indeksist (tenant-token) — sama ahel, millega ta
+ * otsib; muidu lekiks piiratud kogu suurus kellelegi, kes kogu ei näe.
+ * `collections_hierarchy` kannab kõiki esivanemaid, seega vanemkogu arv on
+ * alampuu summa. `lehekylje_number = 1` teeb loenduri teosepõhiseks (facet
+ * loeb dokumente ehk lehekülgi, `distinct` seda ei mõjuta).
+ * `hitsPerPage: 0` annab täpse `totalHits`-i (Kõik kogud), mitte hinnangu.
+ */
+export interface CollectionCounts {
+  byCollection: Record<string, number>;
+  total: number;
+}
+
+export const getCollectionCounts = async (index: Index): Promise<CollectionCounts> => {
+  checkMixedContent();
+  const response = await index.search('', {
+    filter: ['lehekylje_number = 1'],
+    hitsPerPage: 0,
+    page: 1,
+    facets: ['collections_hierarchy'],
+  });
+  return {
+    byCollection: (response.facetDistribution?.['collections_hierarchy'] || {}) as Record<string, number>,
+    total: response.totalHits ?? 0,
+  };
+};
+
 // Registrist puuduvate Q-koodide lünga-täite ülempiir. Nii palju esilehti piisab, et
 // katta üksikud registrist puuduvad koodid; erinevalt vanast limit:5000-st on see
 // päring haruldane (normaalolukorras null päringut).

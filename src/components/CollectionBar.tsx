@@ -6,6 +6,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../services/collectionService';
 import { COLLECTION_PARAM, serializeSelection } from '../contexts/collectionUrl';
 import { getLangCode } from '../utils/getLangCode';
+import { useCollectionCounts } from '../hooks/useCollectionCounts';
 
 /**
  * Kogu-riba päise all (#587): milline vaade on aktiivne. Asendab
@@ -21,6 +22,7 @@ const CollectionBar: React.FC = () => {
   const { selection, setSelection, collections, workSets, isLoading } = useCollection();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const counts = useCollectionCounts();
   const lang = getLangCode(i18n.language);
 
   if (selection.kind === 'all') return null;
@@ -43,6 +45,9 @@ const CollectionBar: React.FC = () => {
   const name = collection ? pick(collection.name) : pick(workSet!.name) || workSet!.id;
   const description = collection ? pick(collection.description) : pick(workSet!.description);
   const descriptionLong = collection ? pick(collection.description_long) : '';
+  // Arv tuleb kutsuja enda ahelast (#319 p2): püsikogul Meili facet, töökollektsioonil
+  // serveri `count` (otsingus nähtavad liikmed). Laadimata = ei näidata midagi.
+  const count = collection ? counts?.byCollection[selection.id] ?? (counts ? 0 : undefined) : workSet!.count;
   const parents = collection ? getCollectionHierarchy(collections, selection.id).slice(0, -1) : [];
 
   const handleCopy = async () => {
@@ -78,6 +83,11 @@ const CollectionBar: React.FC = () => {
           ))}
           <h1 className={`text-lg font-semibold ${tone.text}`}>{name}</h1>
           {description && <span className={`text-sm ${tone.text} opacity-75`}>{description}</span>}
+          {count !== undefined && (
+            <span className={`text-sm ${tone.text} opacity-75 tabular-nums whitespace-nowrap`}>
+              {t('collection.workCount', { count })}
+            </span>
+          )}
           {descriptionLong && (
             <button
               type="button"

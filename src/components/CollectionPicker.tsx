@@ -12,6 +12,22 @@ import { createWorkSet } from '../services/workSetService';
 import { CollectionSelection } from '../services/selectionFilter';
 import { getLangCode } from '../utils/getLangCode';
 import { isSessionExpired } from '../utils/apiErrorText';
+import { useCollectionCounts } from '../hooks/useCollectionCounts';
+
+/**
+ * Rea nimi + üherealine lühikirjeldus (#587, #319 p2). Kirjelduseta kogul jääb
+ * teine rida ära — väljamõeldud tekst ei ole parem kui tühi.
+ */
+const RowLabel: React.FC<{ name: string; description?: string }> = ({ name, description }) => (
+  <span className="flex-1 min-w-0 text-left">
+    <span className="block truncate">{name}</span>
+    {description && <span className="block truncate text-xs text-gray-500 font-normal">{description}</span>}
+  </span>
+);
+
+/** Teoste arv rea lõpus. `undefined` = laadimata: ei näidata midagi. */
+const RowCount: React.FC<{ count?: number }> = ({ count }) =>
+  count === undefined ? null : <span className="text-xs text-gray-500 tabular-nums">{count}</span>;
 
 interface CollectionPickerProps {
   // Variant 1: Headeris kasutatav (globaalne kontekst)
@@ -43,7 +59,9 @@ const TreeNode: React.FC<{
   forceExpanded?: boolean;
   /** Lemmiku tärn rea lõpus (puudub, kui kasutaja pole sisse logitud). */
   star?: (id: string) => React.ReactNode;
-}> = ({ node, level, selectedId, onSelect, lang, expandedIds, toggleExpanded, forceExpanded, star }) => {
+  /** Teoste arv kogu kohta (alampuu summa); `undefined` = laadimata. */
+  countOf: (id: string) => number | undefined;
+}> = ({ node, level, selectedId, onSelect, lang, expandedIds, toggleExpanded, forceExpanded, star, countOf }) => {
   const isExpanded = forceExpanded || expandedIds.has(node.id);
   const hasChildren = node.children.length > 0;
   const isSelected = selectedId === node.id;
@@ -79,9 +97,11 @@ const TreeNode: React.FC<{
           className="flex items-center gap-2 flex-1 min-w-0"
         >
           <FolderOpen size={18} className={isSelected ? colorClasses.text : 'text-gray-400'} />
-          <span className="flex-1 truncate text-left">
-            {node.collection.name[lang] || node.collection.name.et}
-          </span>
+          <RowLabel
+            name={node.collection.name[lang] || node.collection.name.et}
+            description={node.collection.description?.[lang] || node.collection.description?.et}
+          />
+          <RowCount count={countOf(node.id)} />
           {isSelected && <Check size={18} className={colorClasses.text} />}
         </button>
         {star?.(node.id)}
@@ -102,6 +122,7 @@ const TreeNode: React.FC<{
               toggleExpanded={toggleExpanded}
               forceExpanded={forceExpanded}
               star={star}
+              countOf={countOf}
             />
           ))}
         </div>
@@ -170,6 +191,11 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
     () => buildPickerEntries(tree, onSelect ? [] : workSets, query, lang),
     [tree, workSets, query, lang, onSelect],
   );
+  // Arvud kutsuja enda ahelast (#319 p2): püsikogud Meili facetist,
+  // töökollektsioonid serveri `count`-ist (otsingus nähtavad liikmed).
+  const counts = useCollectionCounts();
+  const collectionCount = (id: string) => (counts ? counts.byCollection[id] ?? 0 : undefined);
+  const workSetCount = (id: string) => workSets.find(w => w.id === id)?.count;
   const fav = useFavoriteCollections();
   // Lemmikud tulevad samast nähtavast hulgast: täht ei tohi avada kogu, mida
   // valija muidu ei näitaks. Massilise määramise variandis ainult püsikogud.
@@ -303,6 +329,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                 <span className="w-5" />
                 <Library size={18} className={selection.kind === 'all' ? 'text-primary-600' : 'text-gray-400'} />
                 <span className="flex-1">{t('collections.all', 'Kõik tööd')}</span>
+                <RowCount count={counts?.total} />
                 {selection.kind === 'all' && <Check size={18} className="text-primary-600" />}
               </button>
               <div className="border-t border-gray-200 my-2" />
@@ -349,7 +376,13 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                       className="flex items-center gap-2 flex-1 min-w-0 text-left"
                     >
                       <Icon size={18} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
-                      <span className="flex-1 truncate">{e.name[lang] || e.name.et || e.name.en || e.id}</span>
+                      <RowLabel
+                        name={e.name[lang] || e.name.et || e.name.en || e.id}
+                        description={e.kind === 'collection'
+                          ? collections[e.id]?.description?.[lang] || collections[e.id]?.description?.et
+                          : workSets.find(w => w.id === e.id)?.description?.[lang]}
+                      />
+                      <RowCount count={e.kind === 'collection' ? collectionCount(e.id) : workSetCount(e.id)} />
                       {isSelected && <Check size={18} className="text-primary-600" />}
                     </button>
                     {star?.(e.kind, e.id)}
@@ -388,6 +421,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                 toggleExpanded={toggleExpanded}
                 forceExpanded={otsib}
                 star={collectionStar}
+                countOf={collectionCount}
               />
             ))
           )}
@@ -468,9 +502,11 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
                         className="flex items-center gap-2 flex-1 min-w-0 text-left"
                       >
                         <Users size={18} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
-                        <span className="flex-1 truncate">
-                          {ws.name[lang] || ws.name.et || ws.name.en || ws.id}
-                        </span>
+                        <RowLabel
+                          name={ws.name[lang] || ws.name.et || ws.name.en || ws.id}
+                          description={ws.description?.[lang] || ws.description?.et}
+                        />
+                        <RowCount count={ws.count} />
                         {isSelected && <Check size={18} className="text-primary-600" />}
                       </button>
                       {star?.('work_set', ws.id)}

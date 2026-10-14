@@ -61,7 +61,7 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
         <button
           type="button"
           onClick={() => onOpenChange(true)}
-          className="hidden md:flex flex-col items-center gap-2.5 w-11 shrink-0 py-4 self-start sticky top-20 bg-primary-50 border border-primary-200 rounded-lg text-primary-700 hover:bg-primary-100 hover:border-primary-300 transition-colors"
+          className="hidden md:flex flex-col items-center gap-2.5 w-11 shrink-0 py-4 self-start sticky top-8 bg-primary-50 border border-primary-200 rounded-lg text-primary-700 hover:bg-primary-100 hover:border-primary-300 transition-colors"
           title={t('filterPanel.show')}
           aria-label={t('filterPanel.show')}
         >
@@ -78,7 +78,7 @@ const FilterSidebar: React.FC<FilterSidebarProps> = ({
       <aside
         className={`bg-white ${
           drawerOpen ? 'fixed inset-y-0 left-0 z-[1300] w-72 max-w-[85vw] h-full overflow-y-auto shadow-xl px-4 py-4' : 'hidden'
-        } ${open ? 'md:block' : 'md:hidden'} md:static md:z-auto md:w-60 md:max-w-none md:h-auto md:shrink-0 md:self-start md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto md:border md:border-gray-200 md:rounded-lg md:shadow-sm md:px-4 md:py-3`}
+        } ${open ? 'md:block' : 'md:hidden'} md:static md:z-auto md:w-60 md:max-w-none md:h-auto md:shrink-0 md:self-start md:sticky md:top-8 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto md:border md:border-gray-200 md:rounded-lg md:shadow-sm md:px-4 md:py-3`}
         aria-label={t('filterPanel.title')}
       >
         <div className="flex items-center justify-between mb-1">
