@@ -3,8 +3,7 @@ import React, { useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getWorkMetadata } from '../services/workService';
-import { getCollectionColorClasses } from '../services/collectionService';
-import { Search, Filter, Library, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar, Languages, Users } from 'lucide-react';
+import { Search, Filter, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar, Languages } from 'lucide-react';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
@@ -16,11 +15,11 @@ import { useSearchUrlParams } from './search/hooks/useSearchUrlParams';
 import { useSearchResults } from './search/hooks/useSearchResults';
 import { useSearchFacets } from './search/hooks/useSearchFacets';
 import { useSelectionScope } from '../hooks/useSelectionScope';
-import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { useQCodeMaps } from './search/hooks/useQCodeMaps';
 import { useFilterDraft } from './search/hooks/useFilterDraft';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import SearchUnitToggle from './search/SearchUnitToggle';
+import MobileSelectionButton from '../components/MobileSelectionButton';
 import LettersSearch from './search/letters/LettersSearch';
 import { readUnit } from './search/searchUnit';
 
@@ -31,10 +30,8 @@ const FullTextSearch: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { selection, selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+    const { selectedCollection } = useCollection();
     const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
-    // Valiku silt ühest kohast (vt `contexts/selectionDisplay.ts`).
-    const { label: selectionLabel } = useSelectionLabel();
     // Aktiivne kogu käib URL-iga kaasa (#323) — muidu avaneb jagatud link
     // saaja kogus ja annab null vastet.
     useCollectionUrlSync();
@@ -115,7 +112,7 @@ const FullTextSearch: React.FC = () => {
 
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
-            <Header searchControls={<SearchUnitToggle unit="text" />}>
+            <Header>
                 {/* Otsingu vorm */}
                 <div className="bg-white border-b border-gray-200 px-6 py-4">
                     <div className="max-w-7xl mx-auto">
@@ -154,13 +151,15 @@ const FullTextSearch: React.FC = () => {
                             </button>
                         </form>
 
-                        {/* Otsingu ühik (#526): laial ekraanil päises, kitsal siin */}
+                        {/* Otsingu ühik (#526): laial ekraanil külgriba tipus, kitsal siin */}
                         <div className="mt-3 md:hidden">
                             <SearchUnitToggle unit="text" />
                         </div>
+                        {/* Aktiivne kogu nagu Dashboardil: laial päise valijas, kitsal see nupp */}
+                        <MobileSelectionButton className="mt-3" />
 
                         {/* Aktiivsed filtrid otsinguriba all */}
-                        {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || selectedCollection || selection.kind === 'work_set' || urlParams.scope !== 'all' ||
+                        {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || urlParams.scope !== 'all' ||
                             urlParams.pageTags.length > 0 || urlParams.genres.length > 0 || urlParams.types.length > 0 ||
                             urlParams.languages.length > 0 ||
                             urlParams.teoseTags.length > 0 || urlParams.yearStart !== undefined || urlParams.yearEnd !== undefined) && (
@@ -351,39 +350,6 @@ const FullTextSearch: React.FC = () => {
                                         </button>
                                     </div>
                                 )}
-                                {/* Töökollektsioon (#354) — oma kiip, sest ta ei ole `collections`-is */}
-                                {selection.kind === 'work_set' && (
-                                    <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-primary-100 text-primary-800 rounded-full text-xs font-medium border border-primary-200">
-                                        <Users size={11} />
-                                        <span className="truncate max-w-xs">{selectionLabel}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedCollection(null)}
-                                            className="ml-0.5 hover:opacity-70 rounded-full p-0.5"
-                                            title={t('filters.removeFilter')}
-                                        >
-                                            <X size={11} />
-                                        </button>
-                                    </div>
-                                )}
-                                {/* Kollektsioon */}
-                                {selectedCollection && (() => {
-                                    const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
-                                    return (
-                                        <div className={`ml-auto flex items-center gap-1 px-2 py-0.5 ${colorClasses.bg} ${colorClasses.text} rounded-full text-xs font-medium border ${colorClasses.border}`}>
-                                            <Library size={11} />
-                                            <span className="truncate max-w-xs">{getCollectionName(selectedCollection, getLangCode(i18n.language))}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedCollection(null)}
-                                                className="ml-0.5 hover:opacity-70 rounded-full p-0.5"
-                                                title={t('filters.removeFilter')}
-                                            >
-                                                <X size={11} />
-                                            </button>
-                                        </div>
-                                    );
-                                })()}
                             </div>
                         )}
                     </div>

@@ -22,9 +22,6 @@ interface HeaderProps {
   pageTitle?: string;
   /** Valikuline ikoon pealkirja ees */
   pageTitleIcon?: React.ReactNode;
-  /** Otsingulehe juhtnupud (Täistekst | Kirjad, #526) — navigatsiooni ja
-   *  kollektsioonivalija vahel. Ainult `md`-st laiemal; kitsamal on lüliti lehel. */
-  searchControls?: React.ReactNode;
   /** Lisa children sisu (nt otsinguväli) päise alla */
   children?: React.ReactNode;
 }
@@ -39,7 +36,6 @@ const COLLECTION_SCOPED_PATHS = ['/', '/search', '/persons', '/stats'];
 const Header: React.FC<HeaderProps> = ({
   pageTitle,
   pageTitleIcon,
-  searchControls,
   children
 }) => {
   const { t } = useTranslation(['dashboard', 'common', 'auth']);
@@ -100,10 +96,6 @@ const Header: React.FC<HeaderProps> = ({
             <NavLink to="/search" className={navClass}>{t('header.fullTextSearch')}</NavLink>
             <NavLink to="/persons" className={navClass}>{t('common:nav.persons')}</NavLink>
           </nav>
-
-          {searchControls && (
-            <div className="hidden md:flex">{searchControls}</div>
-          )}
 
           {pageTitle && (
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 [&_svg]:text-slate-300">

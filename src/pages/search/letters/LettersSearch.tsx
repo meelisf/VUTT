@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, X, Library, Filter } from 'lucide-react';
+import { Search, X, Filter } from 'lucide-react';
 import Header from '../../../components/Header';
 import Pagination from '../../../components/Pagination';
-import { useCollection } from '../../../contexts/CollectionContext';
 import { useCollectionUrlSync } from '../../../hooks/useCollectionUrlSync';
 import { useSelectionScope } from '../../../hooks/useSelectionScope';
-import { useSelectionLabel } from '../../../hooks/useSelectionLabel';
 import type { LetterFilters as Filters } from '../../../services/letterSearch';
 import SearchUnitToggle from '../SearchUnitToggle';
+import MobileSelectionButton from '../../../components/MobileSelectionButton';
 import { readLetterFilters, writeLetterFilters } from '../searchUnit';
 import LetterFilters from './LetterFilters';
 import LetterResults from './LetterResults';
@@ -23,8 +22,6 @@ const LettersSearch: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Üks URL-sünkroniseerija lehe kohta (ADR 0038) — täisteksti režiim ei ole samal ajal monteeritud.
   useCollectionUrlSync();
-  const { selection, setSelectedCollection } = useCollection();
-  const { label: selectionLabel } = useSelectionLabel();
   const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
 
   const query = searchParams.get('q') || '';
@@ -61,7 +58,7 @@ const LettersSearch: React.FC = () => {
 
   return (
     <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
-      <Header searchControls={<SearchUnitToggle unit="letters" />}>
+      <Header>
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="max-w-7xl mx-auto">
             <form onSubmit={submit} className="flex gap-2">
@@ -91,26 +88,19 @@ const LettersSearch: React.FC = () => {
                 <Filter size={20} />
               </button>
             </form>
-            <div className="flex flex-wrap items-center gap-2 mt-3">
-              {/* Otsingu ühik (#526): laial ekraanil päises, kitsal siin */}
-              <div className="md:hidden"><SearchUnitToggle unit="letters" /></div>
-              {selection.kind !== 'all' && (
-                <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-800 rounded-full text-xs font-medium border border-primary-200">
-                  <Library size={11} />
-                  <span className="truncate max-w-xs">{selectionLabel}</span>
-                  <button type="button" onClick={() => setSelectedCollection(null)}
-                    className="ml-0.5 hover:opacity-70 rounded-full p-0.5" title={t('filters.removeFilter')}>
-                    <X size={11} />
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Otsingu ühik (#526): laial ekraanil külgriba tipus, kitsal siin */}
+            <div className="mt-3 md:hidden"><SearchUnitToggle unit="letters" /></div>
+            {/* Aktiivne kogu nagu Dashboardil: laial päise valijas, kitsal see nupp */}
+            <MobileSelectionButton className="mt-3" />
           </div>
         </div>
       </Header>
 
       <div className="flex-1 overflow-hidden flex max-w-7xl mx-auto w-full">
         <aside className={`${showFiltersMobile ? 'block' : 'hidden'} md:block w-full md:w-72 shrink-0 overflow-y-auto border-r border-gray-200 bg-white`}>
+          <div className="hidden md:block px-4 pt-4">
+            <SearchUnitToggle unit="letters" fullWidth />
+          </div>
           <LetterFilters filters={filters} facets={result?.facetDistribution ?? {}} hasQuery={!!query} onChange={onFiltersChange} />
         </aside>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">

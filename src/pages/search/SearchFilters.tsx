@@ -10,6 +10,7 @@ import { getLangCode } from '../../utils/getLangCode';
 import { mergeFacetItems } from '../../utils/facetUtils';
 import { isVuttId } from '../../utils/qcodeUtils';
 import { resolveEntityLabel } from '../../utils/labelUtils';
+import SearchUnitToggle from './SearchUnitToggle';
 
 interface WorkInfo {
     title: string;
@@ -142,6 +143,11 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
             </div>
 
             <div className="space-y-2">
+
+                {/* Otsingu ühik (#526) — kitsal ekraanil on lüliti otsinguriba all */}
+                <div className="hidden md:block pb-2">
+                    <SearchUnitToggle unit="text" fullWidth />
+                </div>
 
                 {/* Otsingu ulatus */}
                 <CollapsibleSection

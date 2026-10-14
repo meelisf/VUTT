@@ -10,10 +10,10 @@ import LoginModal from '../components/LoginModal';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { useSelectionScope } from '../hooks/useSelectionScope';
-import { useSelectionLabel } from '../hooks/useSelectionLabel';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
-import { Search, AlertTriangle, X, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
+import { Search, AlertTriangle, X, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
+import MobileSelectionButton from '../components/MobileSelectionButton';
 import CollectionBar from '../components/CollectionBar';
 import SafeHtml from '../components/SafeHtml';
 import Pagination from '../components/Pagination';
@@ -54,7 +54,6 @@ const Dashboard: React.FC = () => {
   // päringut teha (piiramata vastus näitaks teoseid väljaspool valikut).
   const { scope, ready: scopeReady, error: scopeError } = useSelectionScope();
   // Valiku silt ühest kohast (vt `contexts/selectionDisplay.ts`).
-  const { label: selectionLabel, colorClasses: selectionColors } = useSelectionLabel();
   // Kolm õiguste telge on eraldi (ADR 0031): metaandmete hulgi-muutmine on
   // admini tegevus, töökollektsiooni lisamine nõuab ainult kogu haldusõigust.
   const managesAnyWorkSet = workSets.some(ws => ws.can_manage && ws.status === 'active');
@@ -121,7 +120,6 @@ const Dashboard: React.FC = () => {
   const [showBulkCollectionPicker, setShowBulkCollectionPicker] = useState(false);
   const [showBulkWorkSetPicker, setShowBulkWorkSetPicker] = useState(false);
   const [bulkWorkSetMessage, setBulkWorkSetMessage] = useState<string | null>(null);
-  const [showMobileCollectionPicker, setShowMobileCollectionPicker] = useState(false);
   const [showBulkTagsPicker, setShowBulkTagsPicker] = useState(false);
   const [showBulkGenrePicker, setShowBulkGenrePicker] = useState(false);
   const [bulkAssignLoading, setBulkAssignLoading] = useState(false);
@@ -791,25 +789,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Mobiili kollektsiooni valija */}
-              {(() => {
-                const colorClasses = selectionColors;
-                return (
-                  <button
-                    className={`sm:hidden flex items-center gap-2 w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                      colorClasses
-                        ? `${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} ${colorClasses.hoverBg}`
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
-                    }`}
-                    onClick={() => setShowMobileCollectionPicker(true)}
-                  >
-                    <Library size={16} className={colorClasses ? colorClasses.text : 'text-primary-600'} />
-                    <span className="flex-1 text-left truncate">
-                      {selectionLabel}
-                    </span>
-                    <ChevronDown size={14} className="shrink-0 opacity-50" />
-                  </button>
-                );
-              })()}
+              <MobileSelectionButton />
 
               {/* Aktiivsed filtrid kiipidena — ainult siis, kui mõni on aktiivne */}
               {hasActiveFilters && (
@@ -1083,12 +1063,6 @@ const Dashboard: React.FC = () => {
           onExitSelectMode={exitSelectMode}
         />
       )}
-
-      {/* Mobiili kollektsiooni filter picker */}
-      <CollectionPicker
-        isOpen={showMobileCollectionPicker}
-        onClose={() => setShowMobileCollectionPicker(false)}
-      />
 
       {/* Bulk Collection Picker Modal */}
       {showBulkCollectionPicker && (

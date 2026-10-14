@@ -4,8 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { FileText, Mail } from 'lucide-react';
 import { SearchUnit, switchUnitParams } from './searchUnit';
 
-/** Täistekst | Kirjad (#526). Vahetus säilitab ainult päringu ja kogu (vt switchUnitParams). */
-const SearchUnitToggle: React.FC<{ unit: SearchUnit }> = ({ unit }) => {
+/**
+ * Täistekst | Kirjad (#526). Vahetus säilitab ainult päringu ja kogu (vt switchUnitParams).
+ * `fullWidth`: külgriba tipus jagavad nupud laiuse võrdselt.
+ */
+const SearchUnitToggle: React.FC<{ unit: SearchUnit; fullWidth?: boolean }> = ({ unit, fullWidth = false }) => {
   const { t } = useTranslation('search');
   const [, setSearchParams] = useSearchParams();
   const options: { value: SearchUnit; label: string; icon: React.ReactNode }[] = [
@@ -13,14 +16,14 @@ const SearchUnitToggle: React.FC<{ unit: SearchUnit }> = ({ unit }) => {
     { value: 'letters', label: t('unit.letters'), icon: <Mail size={14} /> },
   ];
   return (
-    <div role="group" aria-label={t('unit.label')} className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5">
+    <div role="group" aria-label={t('unit.label')} className={`${fullWidth ? 'flex w-full' : 'inline-flex'} rounded-md border border-gray-200 bg-gray-50 p-0.5`}>
       {options.map(o => (
         <button
           key={o.value}
           type="button"
           aria-pressed={unit === o.value}
           onClick={() => { if (unit !== o.value) setSearchParams(prev => switchUnitParams(prev, o.value)); }}
-          className={`flex items-center gap-1.5 rounded px-3 py-1 text-xs font-semibold transition-colors ${
+          className={`${fullWidth ? 'flex-1 justify-center py-1.5' : 'py-1'} flex items-center gap-1.5 rounded px-3 text-xs font-semibold transition-colors ${
             unit === o.value ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'
           }`}
         >
