@@ -30,18 +30,19 @@ Väljaspool osa 1: isik/autor, otsinguleht, isikute leht, sünonüümid (`terms`
 
 ### Millal kiipi näidatakse
 
-- Kiibil on loendur: mitu teost jääb alles, kui **praegustele** filtritele lisada see filter ja jätta päringuks ülejäänud sõnad. Loendur 0 → kiipi ei näidata.
+- Kiibil on loendur: mitu teost näitaks avaleht **pärast vastuvõttu**, st sama otsing, mis vastuvõtu järel tegelikult jookseb: praegused filtrid + see filter (žanril ja tüübil **asendab** olemasoleva, nagu vastuvõtt) ja päringuks ülejäänud sõnad, samade otsinguparameetritega (vt „Ühine otsingupäring"). Loendur 0 → kiipi ei näidata.
 - Juba rakendatud väärtust ei pakuta.
-- Kõige rohkem 3 kiipi. Järjestus: pikem sobitus (sõnade arv, siis tähemärgid) → suurem loendur.
+- Kõige rohkem 3 kiipi. **Eeljärjestus** (enne loendureid): pikem sobitus (sõnade arv, siis tähemärgid) → suurem ulatuse fassetiloendur (sõnavarapäringust, vt hook). Loendurid arvutatakse eeljärjestuses partiidena (3 korraga), kuni 3 positiivset kiipi on leitud või kandidaadid otsas (lagi: 4 partiid = 12 päringut). Kuvamisjärjestus = eeljärjestus. Ükski kandidaat ei jää kärpe tõttu välja enne, kui 3 parema eeljärjestusega kiipi on juba olemas.
 - Kiibil ei ole ×-i. Kiip kaob, kui päring muutub nii, et vihjet ei teki.
 - Kiipe arvutatakse sama 400 ms viitega nagu otsingut.
+- **Vananemine:** iga vihje kannab oma **lähteolekut**: `sourceQuery` (sisend, millest ta tuvastati) + `stateKey` (filtrite, aasta, valiku ja indeksi/tokeni võti). Kui sisend või `stateKey` erineb praegusest, vihjet **ei renderdata** kohe (mitte alles uue arvutuse lõpus). Vastuvõtt kontrollib sama tingimust uuesti ja on vananenud vihje korral no-op. Nii ei saa klikk kirjutada üle teksti, mille kasutaja vahepeal trükkis.
 
 ### Vastuvõtt
 
 1. Kutsutakse `applyWorkFilter(kind, value)`, sama funktsiooni, mida kasutab külgriba.
 2. Päringust (`inputValue`) eemaldatakse sobitunud sõnad; tühikud normaliseeritakse.
 3. Kiip jääb samale kohale ja muutub tavaliseks siniseks `FilterChip`-iks, kollane sähvatus ~600 ms (CSS `transition`, mitte JS-taimer).
-4. Lehekülg läheb 1-le, sorteerimine ja kogu jäävad: seda teeb juba olemasolev URL-i debounce-effect, kiip midagi omaette ei kirjuta.
+4. URL-i kirjutab olemasolev debounce-effect, kiip midagi omaette ei kirjuta. Seega kehtivad sama effecti reeglid: lehekülg läheb 1-le, kogu jääb. **Sorteerimine:** kui päringust jääb tekst alles, jääb sort samaks. Kui vastuvõtt tühjendab päringu (`põhiki` → ``) ja sort oli `relevance`, muudab effect selle `year_asc`-iks (`Dashboard.tsx` „Kui otsing tühjendatakse…"). See on **tahtlik ja jääb**: sama juhtub käsitsi tühjendamisel ja ilma päringuta pole relevantsusel tähendust. Valvur kontrollib seda.
 5. Umami sündmus `filter-hint-accept` (`{ kind }`).
 
 ## Kujundus (kinnitatud brauseri maketiga)
@@ -84,19 +85,27 @@ function detectFilterHints(query: string, vocab: VocabEntry[], lang: 'et' | 'en'
 
 Kõrvalmõjudeta, Reactita, `node`-keskkonnas testitav. Loenduriteta: loendurid ja juba-rakendatud filtreerimine on hooki töö.
 
-### 2. `buildDashboardFilter` — eraldatud filtriehitaja
+### 2. `buildDashboardSearch` — ühine otsingupäring
 
-`searchWorks` ehitab praegu filtrit oma kehas (`searchService.ts`). See osa eraldatakse eksporditud puhtaks funktsiooniks `buildDashboardFilter(options): string[]`, mida kasutavad **nii** `searchWorks` kui ka vihjete loendurid. Nii ei saa loendur ja päris otsing lahku minna. `searchWorks` käitumine ei muutu. Valvuriks on olemasolevad testid ja uus võrdlustest (sama `options` → sama filter).
+`searchWorks` ehitab praegu päringu oma kehas (`searchService.ts`): `normalizeSearchQuery`, filter, `attributesToSearchOn`, `matchingStrategy` (`frequency` päringuga, `last` ilma). Sama filtri jagamisest ei piisa: teistsuguste otsinguväljade või strateegiaga loendur võiks leida vaste lehetekstist, mida avaleht pärast vastuvõttu ei näita. Seepärast eraldatakse eksporditud puhas funktsioon
+
+```ts
+buildDashboardSearch(rawQuery: string, options: DashboardSearchOptions):
+  { q: string; filter: string[]; attributesToSearchOn: string[]; matchingStrategy: MatchingStrategies }
+```
+
+mida kasutavad **nii** `searchWorks` (+ oma `attributesToRetrieve`, fassetid, lehekülg) kui ka loendurid (+ `limit: 0`). `searchWorks` käitumine ei muutu. Valvurid: pinnitud ootused enne/pärast eraldamist ja test, mis võrdleb loenduri ning `searchWorks`-i Meilile saadetud parameetreid (mock-index) sama oleku korral.
 
 ### 3. `useFilterHints` — hook
 
 `src/services/filterHints/useFilterHints.ts`
 
-- **Sõnavara:** üks Meili päring `q: ''`, `limit: 0`, `facets: [genre_ids, tags_ids, type_ids]`, filter = `lehekylje_number = 1` + valik (`pushSelectionFilter`). Vahemälus valiku võtme järgi (moodulitasandil `Map`, **ainult** koodiloend, mitte kasutajapõhine vastus väljaspool sessiooni; kliendi mälu, mitte `server/cache.py`). Sildid tulevad `getEntityLabelsCache()`-st. Ilma registrisildita kood jäetakse välja. `vutt:` koodid jäetakse välja (nagu `tagItems`).
-- **Loendurid:** paralleelsed `index.search` päringud (`Promise.all`; enne loendureid lõigatakse kandidaadid 6-ni, et päringuid oleks piiratud arv). `MeilisearchContext` annab ainult indeksi, mitte klienti, seega `multiSearch` nõuaks konteksti muutmist ja see ei tasu end ära. Iga kandidaadi kohta `q: remainingQuery`, `limit: 0`, `filter = buildDashboardFilter({...praegused valikud, + kandidaat})`. Tulemus on `estimatedTotalHits`. `lehekylje_number = 1` teeb sellest teosepõhise; täpsus pole siin kriitiline, sest loendur on vihje.
+- **Ootab ulatust:** hook ei tee ühtki päringut enne, kui `useSelectionScope().ready` on tõene. Laadimata töökollektsiooni `scope` on `undefined` ja see üksi tähendaks piiranguta korpust (ADR 0042). Sama tingimus, mis avalehe otsingul (`!scopeReady → return`).
+- **Sõnavara:** üks Meili päring `q: ''`, `limit: 0`, `facets: [genre_ids, tags_ids, type_ids]`, filter = `lehekylje_number = 1` + valik (`pushSelectionFilter`). Tulemus annab ka eeljärjestuse fassetiloendurid. **Vahemälu elab hooki sees** (`useRef`), mitte moodulitasandil. Võti = `index` objekt (vahetub tokeni ehk sisse/välja logimise ja õiguste muutusega) + valiku **sisu** võti (püsikogu id või töökollektsiooni `work_id` loend, mitte ainult kogu id, sest sama kogu liikmed võivad muutuda). Teistsugune võti → uus päring. Sildid tulevad `getEntityLabelsCache()`-st. Ilma registrisildita kood jäetakse välja. `vutt:` koodid jäetakse välja (nagu `tagItems`).
+- **Loendurid:** `index.search` partiidena (3 paralleelset, eeljärjestuse kaupa, vt „Millal kiipi näidatakse"). `MeilisearchContext` annab ainult indeksi, mitte klienti, seega `multiSearch` nõuaks konteksti muutmist ja see ei tasu end ära. Iga kandidaadi kohta `buildDashboardSearch(remainingQuery, {...praegused valikud, kandidaat rakendatud})` + `limit: 0`. Kandidaat rakendatakse sama reegliga nagu vastuvõtt (žanr ja tüüp asendavad, märksõna lisandub, aasta seab `ys = ye`). Tulemus on `estimatedTotalHits`: ligikaudne, aga 0 vs > 0 on täpne, ja ainult see otsustab nähtavuse.
 - **Juba rakendatud** väärtused filtreeritakse välja enne loendureid.
-- `AbortController`: uus päring tühistab eelmise. Viga (v.a abort) → `[]`; viga ei lähe kliendivigade ringi, sest vihje on parim-pingutus.
-- Tagastab `FilterHint[] = FilterHintCandidate & { count: number }`.
+- `AbortController`: sisendi, `stateKey` või indeksi muutus tühistab käimasolevad päringud ja tühjendab vihjed kohe. Viga (v.a abort) → `[]`; viga ei lähe kliendivigade ringi, sest vihje on parim-pingutus.
+- Tagastab `FilterHint[] = FilterHintCandidate & { count: number; sourceQuery: string; stateKey: string }`.
 
 ### 4. `applyWorkFilter` — üks rakendaja
 
@@ -117,8 +126,13 @@ Uued võtmed mõlemasse keelde korraga (`dashboard` nimeruum): `filterHints.addF
 ## Testid
 
 - `detectFilterHints.test.ts` (node): `põhiki`, `pohiki`, `PÕHIKI`, `1702 constitu` (aasta + ülejäänud tekst), `1350` / `2026` (väljaspool vahemikku), `abc` (< 4), mitmesõnaline silt + poolik viimane sõna, mitu kandidaati ühest sõnast, `remainingQuery` tühikute normaliseerimine, `en`-keelne kuvamissilt.
-- `buildDashboardFilter.test.ts`: sama `options` → sama filter, mis enne eraldamist (pinnitud ootused).
+- `buildDashboardSearch.test.ts`: sama `(rawQuery, options)` → sama `q`, filter, `attributesToSearchOn`, `matchingStrategy`, mis `searchWorks` saatis enne eraldamist (pinnitud ootused).
 - **Valvur „sama mis külgriba"** (`useWorkFilterModel` test): vihje vastuvõtt ja külgriba `onToggle` sama väärtusega viivad sama `onGenreChange` / `onTagsChange` / `onTypeChange` kutseni samade argumentidega.
+- **Loendur = päris otsing:** mock-index salvestab parameetrid; sama oleku + kandidaadi korral on loenduri `q`, `filter`, `attributesToSearchOn`, `matchingStrategy` identsed `searchWorks`-i omadega pärast vastuvõttu. Žanri asendus kaetud.
+- **Vananemine** (`useFilterHints`, jsdom + võltsajad): vihje on nähtaval → kasutaja trükib → vihje kaob kohe ja vana vihje vastuvõtt on no-op. Sama kogu, filtri ja indeksi (token) vahetusel.
+- **Ulatus:** `ready = false` → null päringut; indeksi vahetus → sõnavara päritakse uuesti.
+- **Partiid:** 7 kandidaati, esimesed 6 loenduriga 0 → seitsmes kuvatakse.
+- **Päringu tühjenemine** vastuvõtul: `q` kaob URL-ist, `relevance` → `year_asc` (tahtlik).
 - `FilterHintChip.test.tsx` (jsdom): kollane punktiir, klikk kutsub `onAccept`, aria-silt.
 - Käsitsi tootmisandmetega (tunnel + `npm run dev`): `põhiki`, `1702 constitu`, `käsikiri`, `disputa`, `loengukat`; valitud kogu ja ilma; mobiil 390 px.
 
