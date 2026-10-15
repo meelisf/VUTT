@@ -25,6 +25,8 @@ Väljaspool osa 1: isik/autor, otsinguleht, isikute leht, sünonüümid (`terms`
 | žanr | vt sildireegel | `filterModel.onGenreChange(qkood)`. Üksikvalik: asendab olemasoleva, nagu külgribal |
 | märksõna | vt sildireegel | `filterModel.toggleTag(qkood)` |
 | tüüp | vt sildireegel | `filterModel.onTypeChange(qkood)` |
+| keel | vt sildireegel; sildid `vocabularies.json` `languages` (et/en) — *lisatud hiljem* | `applyWorkFilter('language', iso)`: lisandub valitutele (mitmikvalik) |
+| staatus | vt sildireegel; eesti silt = väärtus, teine silt UI keele `common:status.*` — *lisatud hiljem* | `applyWorkFilter('status', väärtus)`: asendab |
 
 **Sildireegel:** päringu sõna (≥ 4 tähte) on mõne sildi sõna algus. Sildid on registri `et` ja `en` sildid (A-variant; Wikidata aliased ei kuulu sisse). Võrdlus on tõstu- ja diakriitikutundetu (`NFD` + kombineerivate märkide eemaldus + `casefold`), seega `pohiki` ~ „põhikiri", `ſ` ei ole erijuht (Meili teeb sama). Mitmesõnaline silt („Christian hymn") sobitub järjestikuste päringusõnadega; viimane sõna tohib olla poolik. Ühest sõnast võib tulla mitu kandidaati (`disput` → žanr „disputatsioon" ja sama sõnaga märksõna); kõik lähevad loendurite ja järjestuse kaudu läbi. Reegel on **sildi sõna algus**: `kiri` ei sobi „põhikiri"-ga.
 

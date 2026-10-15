@@ -378,8 +378,11 @@ export const getAuthorFacets = async (
   }
 };
 
+const SCOPE_FACET_FIELDS = ['genre_ids', 'tags_ids', 'type_ids', 'languages', 'teose_staatus'] as const;
+type ScopeFacetField = typeof SCOPE_FACET_FIELDS[number];
+
 /**
- * Ulatuse žanri-, märksõna- ja tüübikoodid koos teoste arvuga (#605:
+ * Ulatuse žanri-, märksõna-, tüübi-, keele- ja staatusekoodid koos teoste arvuga (#605:
  * filtrivihje sõnavara). Ilma otsingusõnata ja muude filtriteta: sõnavara
  * on „mis siin kogus üldse olemas on".
  */
@@ -387,14 +390,14 @@ export const getScopeFacetCodes = async (
   index: Index,
   scope: SelectionScope | undefined,
   signal?: AbortSignal,
-): Promise<{ genre_ids: Record<string, number>; tags_ids: Record<string, number>; type_ids: Record<string, number> }> => {
+): Promise<Record<ScopeFacetField, Record<string, number>>> => {
   const filter: string[] = ['lehekylje_number = 1'];
   pushSelectionFilter(filter, scope);
   const response = await index.search('', {
-    filter, limit: 0, facets: ['genre_ids', 'tags_ids', 'type_ids'],
+    filter, limit: 0, facets: [...SCOPE_FACET_FIELDS],
   }, signal ? { signal } : undefined);
   const fd = response.facetDistribution || {};
-  return { genre_ids: fd['genre_ids'] || {}, tags_ids: fd['tags_ids'] || {}, type_ids: fd['type_ids'] || {} };
+  return Object.fromEntries(SCOPE_FACET_FIELDS.map(f => [f, fd[f] || {}])) as Record<ScopeFacetField, Record<string, number>>;
 };
 
 // Avalehe otsinguväljad. ÜKS allikas otsingule ja filtrivihje loenduritele (#605):

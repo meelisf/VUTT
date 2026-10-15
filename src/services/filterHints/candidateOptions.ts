@@ -1,7 +1,7 @@
 /**
  * Kandidaat rakendatud otsinguvalikutena — SAMA reegel, mis vastuvõtul
- * (applyWorkFilter / setYearStart+End): žanr ja tüüp asendavad (avalehel
- * üksikvalik), märksõna lisandub, aasta seab ys = ye. Loendur peab
+ * (applyWorkFilter / setYearStart+End): žanr, tüüp ja staatus asendavad
+ * (avalehel üksikvalik), märksõna ja keel lisanduvad, aasta seab ys = ye. Loendur peab
  * arvutama just selle päringu, mis vastuvõtu järel jookseb.
  */
 import type { DashboardSearchOptions } from '../searchService';
@@ -13,5 +13,7 @@ export function withCandidate(base: DashboardSearchOptions, c: { kind: HintKind;
     case 'genre': return { ...base, genre: [c.value] };
     case 'type': return { ...base, type: [c.value] };
     case 'tag': return { ...base, teoseTags: [...(base.teoseTags || []), c.value] };
+    case 'language': return { ...base, languages: [...(base.languages || []), c.value] };
+    case 'status': return { ...base, workStatus: c.value };
   }
 }

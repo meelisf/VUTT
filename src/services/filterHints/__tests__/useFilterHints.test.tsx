@@ -13,12 +13,15 @@ const labels: Record<string, Record<string, string>> = {
   Q1123131: { et: 'disputatsioon', en: 'disputation' },
 };
 vi.mock('../../entityLabelsService', () => ({ getEntityLabelsCache: vi.fn(async () => labels) }));
+vi.mock('../../collectionService', () => ({
+  getVocabularies: vi.fn(async () => ({ languages: { lat: { et: 'Ladina', en: 'Latin' }, grc: { et: 'Kreeka', en: 'Greek' } } })),
+}));
 
 import { useFilterHints, UseFilterHintsArgs } from '../useFilterHints';
 import { buildDashboardSearch } from '../../searchService';
 import { withCandidate } from '../candidateOptions';
 
-type Facets = { genre_ids?: Record<string, number>; tags_ids?: Record<string, number>; type_ids?: Record<string, number> };
+type Facets = Partial<Record<'genre_ids' | 'tags_ids' | 'type_ids' | 'languages' | 'teose_staatus', Record<string, number>>>;
 
 /** Võlts-indeks: fassetipäring vs loenduripäring; loendur = counts[filtri kood] ?? 0. */
 function fakeIndex(facets: Facets, counts: Record<string, number>) {
@@ -155,5 +158,40 @@ describe('useFilterHints', () => {
     const { result } = renderHook(() => useFilterHints(base({ index, query: '1702 constitu' })));
     await flush();
     expect(result.current.hints[0]).toMatchObject({ kind: 'year', value: '1702', count: 3, remainingQuery: 'constitu' });
+  });
+
+  it('keel: ladin → keelekiip; loendur lisab keele olemasolevatele', async () => {
+    const index = fakeIndex({ languages: { lat: 50, grc: 3 } }, { 'languages = "lat"': 12 });
+    const args = base({ index, query: 'ladin', searchOptions: { collection: 'c1', lang: 'et', onlyFirstPage: true, languages: ['grc'] } });
+    const { result } = renderHook(() => useFilterHints(args));
+    await flush();
+    expect(result.current.hints[0]).toMatchObject({ kind: 'language', value: 'lat', label: 'Ladina', count: 12, remainingQuery: '' });
+    const countCall = index.search.mock.calls.find((c: any[]) => !c[1].facets)!;
+    expect(countCall[1].filter.join(' ')).toContain('"grc"');
+  });
+
+  it('keel: juba valitud keelt ei pakuta', async () => {
+    const index = fakeIndex({ languages: { lat: 50 } }, { 'languages = "lat"': 12 });
+    const { result } = renderHook(() => useFilterHints(base({ index, query: 'latin', searchOptions: { collection: 'c1', lang: 'et', onlyFirstPage: true, languages: ['lat'] } })));
+    await flush();
+    expect(result.current.hints).toEqual([]);
+  });
+
+  it('staatus: valmis → staatusekiip; inglise UI-s sobitub ka „Done"', async () => {
+    const index = fakeIndex({ teose_staatus: { Valmis: 9, Toores: 40 } }, { 'teose_staatus = "Valmis"': 9 });
+    const et = renderHook(() => useFilterHints(base({ index, query: 'valmis' })));
+    await flush();
+    expect(et.result.current.hints[0]).toMatchObject({ kind: 'status', value: 'Valmis', label: 'Valmis', count: 9 });
+
+    const en = renderHook(() => useFilterHints(base({ index, query: 'done', lang: 'en', statusLabel: s => ({ Valmis: 'Done', Toores: 'Raw' } as Record<string, string>)[s] })));
+    await flush();
+    expect(en.result.current.hints[0]).toMatchObject({ kind: 'status', value: 'Valmis', label: 'Done' });
+  });
+
+  it('staatus: juba rakendatud staatust ei pakuta', async () => {
+    const index = fakeIndex({ teose_staatus: { Valmis: 9 } }, { 'teose_staatus = "Valmis"': 9 });
+    const { result } = renderHook(() => useFilterHints(base({ index, query: 'valmis', searchOptions: { collection: 'c1', lang: 'et', onlyFirstPage: true, workStatus: 'Valmis' } })));
+    await flush();
+    expect(result.current.hints).toEqual([]);
   });
 });

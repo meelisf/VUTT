@@ -47,6 +47,8 @@ const RETURN_URL_KEY = 'vutt_return_url';
 const DASHBOARD_URL_KEY = 'vutt_dashboard_url';
 
 const SEARCH_DEBOUNCE_MS = 400;
+// Filtrivihje liik → külgriba sektsiooni pealkirja võti (`dashboard:filters.*`)
+const HINT_FILTER_KEY = { genre: 'genre', tag: 'tags', type: 'type', language: 'languages', status: 'status' } as const;
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
@@ -374,6 +376,7 @@ const Dashboard: React.FC = () => {
   // Filtrivihjed otsingureal (#605)
   const { hints: filterHints, isCurrent: isHintCurrent } = useFilterHints({
     index, query: inputValue, searchOptions, scopeReady, lang: getLangCode(i18n.language) as 'et' | 'en',
+    statusLabel: (s) => t(`common:status.${s}`),
     debounceMs: SEARCH_DEBOUNCE_MS,
   });
   const [acceptedHint, setAcceptedHint] = useState<FilterHint | null>(null);
@@ -835,7 +838,7 @@ const Dashboard: React.FC = () => {
                     <FilterHintChip
                       key={`${h.kind}:${h.value}`}
                       kind={h.kind === 'year' ? t('common:labels.year')
-                        : t(`dashboard:filters.${h.kind === 'tag' ? 'tags' : h.kind}`)}
+                        : t(`dashboard:filters.${HINT_FILTER_KEY[h.kind]}`)}
                       label={h.label}
                       count={h.count}
                       onAccept={() => acceptHint(h)}

@@ -253,9 +253,13 @@ export function useWorkFilterModel(input: WorkFilterInput) {
   // ÜKS rakendaja külgribale ja filtrivihjele (#605): vastuvõetud vihje peab
   // andma täpselt sama oleku kui külgribal valimine. Ainult LISAMISE suund;
   // eemaldamine käib endiselt kiibi × / külgriba uue klikiga.
-  const applyWorkFilter = (kind: 'genre' | 'tag' | 'type', value: string) => {
+  const applyWorkFilter = (kind: 'genre' | 'tag' | 'type' | 'language' | 'status', value: string) => {
     if (kind === 'genre') onGenreChange(value);
     else if (kind === 'type') onTypeChange(value);
+    else if (kind === 'status') onStatusChange(value as WorkStatus);
+    else if (kind === 'language') {
+      if (!selectedLanguages.includes(value)) onLanguagesChange([...selectedLanguages, value]);
+    }
     else if (!effectiveSelectedTags.includes(value)) onTagsChange([...effectiveSelectedTags, value]);
   };
 

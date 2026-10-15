@@ -2,8 +2,9 @@
  * Filtrivihjed avalehe otsingureale (#605, spec 2026-10-15).
  *
  * - Ei tee päringut enne, kui ulatus on valmis (ADR 0042).
- * - Sõnavara = ulatuse fassetikoodid + registri sildid; vahemälu elab hooki
- *   SEES ja selle võti on indeks (vahetub tokeniga) + valiku sisu.
+ * - Sõnavara = ulatuse fassetikoodid + sildid (Q-koodid registrist, keeled
+ *   sõnavarast, staatus i18n-ist); vahemälu elab hooki SEES ja selle võti on
+ *   indeks (vahetub tokeniga) + valiku sisu + UI keel.
  * - Loendur = SAMA päring, mis vastuvõtu järel jookseb (buildDashboardSearch +
  *   withCandidate), partiidena eeljärjestuses, kuni 3 positiivset.
  * - Iga vihje kannab lähteolekut; vananenud vihjet ei renderdata ega rakendata.
@@ -12,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Index } from 'meilisearch';
 import { buildDashboardSearch, getScopeFacetCodes, DashboardSearchOptions } from '../searchService';
 import { getEntityLabelsCache } from '../entityLabelsService';
+import { getVocabularies } from '../collectionService';
 import { isAbortError } from '../../utils/isAbortError';
 import { isVuttId } from '../../utils/qcodeUtils';
 import { normalizeForSearch } from '../../utils/diacritics';
@@ -30,6 +32,8 @@ export interface UseFilterHintsArgs {
   searchOptions: DashboardSearchOptions;
   scopeReady: boolean;
   lang: 'et' | 'en';
+  /** Staatuse silt UI keeles (`common:status.*`). Eesti silt = väärtus ise. */
+  statusLabel?: (status: string) => string;
   debounceMs?: number;
 }
 
@@ -57,6 +61,9 @@ const scopeKey = (o: DashboardSearchOptions) => JSON.stringify(o.collection ?? n
 /** Kas kandidaat on juba rakendatud? Võrdleb Q-koodi JA sildiga (URL võib kanda silti). */
 function isApplied(c: FilterHintCandidate, o: DashboardSearchOptions, vocab: VocabEntry[]): boolean {
   if (c.kind === 'year') return String(o.yearStart ?? '') === c.value && String(o.yearEnd ?? '') === c.value;
+  // Keel ja staatus on koodid (ISO 639-3 / staatuse väärtus) — siltidega pole URL-is
+  if (c.kind === 'language') return !!o.languages?.includes(c.value);
+  if (c.kind === 'status') return o.workStatus === c.value;
   const current = c.kind === 'genre' ? o.genre : c.kind === 'type' ? o.type : o.teoseTags;
   if (!current?.length) return false;
   const entry = vocab.find(v => v.kind === c.kind && v.id === c.value);
@@ -64,11 +71,12 @@ function isApplied(c: FilterHintCandidate, o: DashboardSearchOptions, vocab: Voc
   return current.some(v => names.has(normalizeForSearch(v)));
 }
 
-export function useFilterHints({ index, query, searchOptions, scopeReady, lang, debounceMs = 400 }: UseFilterHintsArgs) {
+export function useFilterHints({ index, query, searchOptions, scopeReady, lang, statusLabel, debounceMs = 400 }: UseFilterHintsArgs) {
   const [hints, setHints] = useState<FilterHint[]>([]);
   const vocabCache = useRef<{ key: string; vocab: VocabEntry[] } | null>(null);
   const stateKey = hintsStateKey(index, searchOptions);
-  const sKey = `${indexKey(index)}|${scopeKey(searchOptions)}`;
+  // UI keel võtmes: staatuse sildid tulevad praeguse keele i18n-ist
+  const sKey = `${indexKey(index)}|${scopeKey(searchOptions)}|${lang}`;
 
   useEffect(() => {
     // Tühja päringu korral pole midagi arvutada; vanad vihjed peidab isCurrent-filter
@@ -80,9 +88,10 @@ export function useFilterHints({ index, query, searchOptions, scopeReady, lang, 
         // 1. Sõnavara (vahemälust, kui ulatus + indeks samad)
         let vocab = vocabCache.current?.key === sKey ? vocabCache.current.vocab : null;
         if (!vocab) {
-          const [codes, registry] = await Promise.all([
+          const [codes, registry, vocabularies] = await Promise.all([
             getScopeFacetCodes(index, searchOptions.collection, signal),
             getEntityLabelsCache(),
+            getVocabularies(),
           ]);
           const built: VocabEntry[] = [];
           const add = (kind: VocabEntry['kind'], map: Record<string, number>) => {
@@ -94,6 +103,17 @@ export function useFilterHints({ index, query, searchOptions, scopeReady, lang, 
             }
           };
           add('genre', codes.genre_ids); add('tag', codes.tags_ids); add('type', codes.type_ids);
+          // Keel: ISO-kood → sõnavara sildid (sama allikas, mis külgribal)
+          for (const [id, count] of Object.entries(codes.languages)) {
+            const l = vocabularies.languages?.[id];
+            if (!l?.et && !l?.en) continue;
+            built.push({ kind: 'language', id, labels: { et: l.et, en: l.en }, facetCount: count });
+          }
+          // Staatus: väärtus ise on eestikeelne silt; teise keele silt ainult UI keeles
+          for (const [id, count] of Object.entries(codes.teose_staatus)) {
+            const shown = statusLabel?.(id);
+            built.push({ kind: 'status', id, labels: { et: id, ...(lang === 'en' && shown ? { en: shown } : {}) }, facetCount: count });
+          }
           vocabCache.current = { key: sKey, vocab: built };
           vocab = built;
         }
