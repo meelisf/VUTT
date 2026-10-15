@@ -13,7 +13,6 @@ import { useSelectionScope } from '../hooks/useSelectionScope';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, X, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
-import MobileSelectionButton from '../components/MobileSelectionButton';
 import CollectionBar from '../components/CollectionBar';
 import SafeHtml from '../components/SafeHtml';
 import Pagination from '../components/Pagination';
@@ -787,9 +786,6 @@ const Dashboard: React.FC = () => {
               </div>
               <MobileFiltersButton activeCount={activeFilterCount} onClick={() => setFilterDrawerOpen(true)} />
               </div>
-
-              {/* Mobiili kollektsiooni valija */}
-              <MobileSelectionButton />
 
               {/* Aktiivsed filtrid kiipidena — ainult siis, kui mõni on aktiivne */}
               {hasActiveFilters && (

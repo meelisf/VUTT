@@ -19,7 +19,6 @@ import { useQCodeMaps } from './search/hooks/useQCodeMaps';
 import { useFilterDraft } from './search/hooks/useFilterDraft';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import SearchUnitToggle from './search/SearchUnitToggle';
-import MobileSelectionButton from '../components/MobileSelectionButton';
 import CollectionBar from '../components/CollectionBar';
 import LettersSearch from './search/letters/LettersSearch';
 import { readUnit } from './search/searchUnit';
@@ -112,7 +111,7 @@ const FullTextSearch: React.FC = () => {
         resolveEntityLabel(qCode, qCodeMaps.enrichedLabels, langCode, fallbackMap);
 
     return (
-        <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
+        <div className="h-full bg-gray-50 font-sans flex flex-col">
             <Header>
                 {/* Kogu-riba nagu Dashboardil ja isikute lehel (#587) */}
                 <CollectionBar />
@@ -155,9 +154,6 @@ const FullTextSearch: React.FC = () => {
                                 <Filter size={20} />
                             </button>
                         </form>
-
-                        {/* Aktiivne kogu nagu Dashboardil: laial päise valijas, kitsal see nupp */}
-                        <MobileSelectionButton className="mt-3" />
 
                         {/* Aktiivsed filtrid otsinguriba all */}
                         {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || urlParams.scope !== 'all' ||

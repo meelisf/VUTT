@@ -66,8 +66,9 @@ const Header: React.FC<HeaderProps> = ({
     if (!COLLECTION_SCOPED_PATHS.includes(location.pathname)) headerNavigate('/');
   };
 
+  // Mobiilis kitsam polster: kolm linki peavad mahtuma logo ja keelevahetaja vahele
   const navClass = ({ isActive }: { isActive: boolean }) =>
-    `px-3 py-1.5 rounded-md text-sm transition-colors whitespace-nowrap ${
+    `px-2 sm:px-3 py-1.5 rounded-md text-sm transition-colors whitespace-nowrap ${
       isActive ? 'bg-white/10 text-white font-medium' : 'text-slate-300 hover:text-white hover:bg-white/5'
     }`;
 
@@ -86,12 +87,14 @@ const Header: React.FC<HeaderProps> = ({
               <img src="/logo.png" alt="VUTT Logo" className="h-5 sm:h-7 w-auto" />
             </span>
             <div>
-              <h1 className="text-base sm:text-xl font-bold text-white tracking-tight leading-none">{t('common:app.name')}</h1>
+              <h1 className="hidden sm:block text-base sm:text-xl font-bold text-white tracking-tight leading-none">{t('common:app.name')}</h1>
               <p className="hidden lg:block text-[10px] text-slate-400 font-medium tracking-wide uppercase leading-none mt-0.5">{t('common:app.subtitle')}</p>
             </div>
           </a>
 
-          <nav className="hidden md:flex items-center gap-1" aria-label={t('common:nav.label')}>
+          {/* Navigatsioon on nähtav ka mobiilis — ilma selleta ei pääsenud
+              telefonis otsingu- ega isikulehele (ainult otselingiga). */}
+          <nav className="flex items-center gap-0.5 sm:gap-1" aria-label={t('common:nav.label')}>
             <NavLink to="/" end className={navClass}>{t('common:nav.works')}</NavLink>
             <NavLink to="/search" className={navClass}>{t('header.search')}</NavLink>
             <NavLink to="/persons" className={navClass}>{t('common:nav.persons')}</NavLink>
@@ -107,12 +110,14 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* Parem pool: kogu valija, kasutajamenüü, keelevahetaja */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="relative hidden sm:block">
+          {/* Kogu valija alles md-st: kitsamal ei mahu ta navigatsiooni kõrvale
+              ja kogu-riba (CollectionBar) on seal ise valija. */}
+          <div className="relative hidden md:block">
             <button
               onClick={() => setShowCollectionPicker(v => !v)}
               aria-haspopup={isDesktop ? 'listbox' : 'dialog'}
               aria-expanded={showCollectionPicker}
-              className="flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-md border border-slate-600 hover:border-slate-400 text-sm max-w-[18rem] transition-colors"
+              className="flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-md border border-slate-600 hover:border-slate-400 text-sm max-w-[10rem] lg:max-w-[18rem] transition-colors"
             >
               {isWorkSet
                 ? <Bookmark size={14} className="text-violet-300 shrink-0" />

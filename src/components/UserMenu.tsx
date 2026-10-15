@@ -92,7 +92,7 @@ const UserMenu: React.FC<{ tone?: 'light' | 'dark' }> = ({ tone = 'light' }) => 
         onClick={() => setShowMenu(!showMenu)}
         className={`flex items-center gap-2 rounded-lg px-2 py-1 transition-colors ${dark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
       >
-        <div className="text-right hidden sm:block">
+        <div className="text-right hidden sm:block md:hidden lg:block">
           <p className={`text-sm font-medium ${dark ? 'text-white' : 'text-gray-900'}`}>{user.name}</p>
           <p className={`text-xs ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{t(`common:roles.${user.role}`)}</p>
         </div>
@@ -111,8 +111,9 @@ const UserMenu: React.FC<{ tone?: 'light' | 'dark' }> = ({ tone = 'light' }) => 
         <>
           <div className="fixed inset-0 z-[100]" onClick={() => setShowMenu(false)} />
           <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-44 z-[110]">
-            {/* Mobiilne kasutajainfo */}
-            <div className="sm:hidden px-3 py-2 border-b border-gray-100">
+            {/* Kasutajainfo menüüs, kui nupp nime ei näita (mobiil ja md–lg,
+                kus päises on navigatsioon + kogu valija) */}
+            <div className="sm:hidden md:block lg:hidden px-3 py-2 border-b border-gray-100">
               <p className="font-medium text-gray-900 text-sm">{user.name}</p>
               <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
             </div>
