@@ -9,7 +9,7 @@ import json
 import threading
 import urllib.request
 import urllib.parse
-from .config import LABELS_FILE
+from .config import LABELS_FILE, LABEL_OVERRIDES_FILE
 from .utils import atomic_write_json
 
 _LABELS_LOCK = threading.Lock()
@@ -29,7 +29,41 @@ def load_entity_labels():
     return {}
 
 
+def load_label_overrides():
+    """Laeb kohalikud sildiülekirjutused (ADR 0068): Q-kood → {keel: silt}.
+
+    Puuduv või vigane fail = ülekirjutusi pole; Wikidata päring ei tohi
+    selle pärast katkeda.
+    """
+    if not os.path.exists(LABEL_OVERRIDES_FILE):
+        return {}
+    try:
+        with open(LABEL_OVERRIDES_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"LABELS: label_overrides.json lugemine ebaõnnestus: {e}")
+        return {}
+    return {q: v for q, v in data.items() if isinstance(v, dict)} if isinstance(data, dict) else {}
+
+
 def _fetch_wikidata_labels(qcodes):
+    """Pärib Wikidatast labelid ja rakendab peale kohalikud ülekirjutused.
+
+    KÕIK labels.json-i Wikidata-kirjutusteed käivad siit läbi — seepärast
+    elab ülekirjutus siin, mitte üksikutes kutsujates (ADR 0068).
+    """
+    fetched = _fetch_wikidata_labels_raw(qcodes)
+    overrides = load_label_overrides()
+    # Ainult päriselt saabunud kirjetele: kutsujad asendavad registrikirje
+    # tervikuna (`update`), ja ebaõnnestunud päringu järel jääks kirjest
+    # alles ainult ülekirjutatud keel.
+    for qid, entry in fetched.items():
+        if qid in overrides:
+            entry.update(overrides[qid])
+    return fetched
+
+
+def _fetch_wikidata_labels_raw(qcodes):
     """Pärib Wikidatast labelid antud Q-koodidele (batch, max 50 korraga)."""
     results = {}
     qlist = sorted(qcodes)

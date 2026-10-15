@@ -158,6 +158,8 @@ COLLECTIONS_FILE = os.path.join(_DATA_CONFIG_DIR, "collections.json")
 VOCABULARIES_FILE = os.path.join(_DATA_CONFIG_DIR, "vocabularies.json")
 PERSON_ALIASES_FILE = os.path.join(_DATA_CONFIG_DIR, "person_aliases.json")
 LABELS_FILE = os.path.join(_DATA_CONFIG_DIR, "labels.json")
+# Kohalikud sildiülekirjutused Wikidata peale (ADR 0068) — autoriteetne, gitis
+LABEL_OVERRIDES_FILE = os.path.join(_DATA_CONFIG_DIR, "label_overrides.json")
 PLACES_FILE = os.path.join(_DATA_CONFIG_DIR, "places.json")
 ORIGIN_GROUPS_FILE = os.path.join(_DATA_CONFIG_DIR, "origin_groups.json")
 PROSOPOGRAPHY_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "prosopography_index.json")

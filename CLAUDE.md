@@ -118,7 +118,8 @@ from server.config import DATA_CONFIG_DIR, STATE_DIR   # ← ainuõige allikas
 
 **Jälgitav fail on autoriteetne fail (ADR 0040).** Autoriteetne konfiguratsioon
 (`collections.json`, `archives.json`, `places.json`, `origin_groups.json`, `vocabularies.json`,
-`occupations.json`, `institutions.json`)
+`occupations.json`, `institutions.json`; `label_overrides.json` — Wikidata sildi kohalik ülekirjutus, ADR 0068,
+käsitsi + commit)
 kirjutatakse AINULT `save_config_with_git`-iga (`git_ops.py`) — autor tuleb toimingust,
 taustateel `"Automaatne"`. Tuletatud read-modelid, `person_aliases.json` ja `labels.json`
 ei ole gitis ja kasutavad `atomic_write_json`-i. Valvur: `tests/test_config_git_commit.py`.
