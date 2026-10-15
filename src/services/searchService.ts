@@ -441,7 +441,7 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus',
         'lehekylje_pilt' // loendivaate täispisipilt (#587)
       ],
-      attributesToSearchOn: ['title', 'title_en', 'title_original', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjadest (ADR 0064), autoritest ja märksõnadest
+      attributesToSearchOn: ['title', 'title_en', 'title_original', 'authors_text', 'tags_search', 'genre_search'], // Dashboard otsib pealkirjadest (ADR 0064), autoritest, märksõnadest ja žanrist (dokumendiliik, nt „põhikiri“)
       matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
       filter: filter,
       // Facetid arvutatakse kogu filtrile ka serveripoolse lehekülgjaotuse korral.
