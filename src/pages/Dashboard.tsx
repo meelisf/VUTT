@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
-import { searchWorks, FacetDistribution } from '../services/searchService';
+import { searchWorks, FacetDistribution, DashboardSearchOptions } from '../services/searchService';
 import { isQCode } from '../utils/qcodeUtils';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
@@ -34,7 +34,10 @@ import DashboardResultsHeader from '../components/dashboard/DashboardResultsHead
 import { useFilterSidebarOpen, useResultsView } from '../hooks/useResultsView';
 import FilterSidebar, { MobileFiltersButton } from '../components/filters/FilterSidebar';
 import WorkFilterSections from '../components/workFilters/WorkFilterSections';
-import WorkFilterChips, { FilterChip } from '../components/workFilters/WorkFilterChips';
+import WorkFilterChips, { FilterChip, FilterHintChip } from '../components/workFilters/WorkFilterChips';
+import { useFilterHints, FilterHint } from '../services/filterHints/useFilterHints';
+import { trackEvent } from '../services/analytics';
+import { sortAfterQueryChange } from './dashboardQuerySync';
 import { useWorkFilterModel } from '../components/workFilters/useWorkFilterModel';
 import WorkListRow from '../components/WorkListRow';
 
@@ -341,6 +344,46 @@ const Dashboard: React.FC = () => {
     facets, genreIdMap, genreLabelToId, tagsIdMap, tagsLabelToId, typeIdMap, typeLabelToId,
     lang, enrichedLabels,
   });
+  // Otsinguvalikud ÜHES kohas: sama objekt läheb searchWorks-ile JA filtrivihje
+  // loenduritele (#605) — kaks koopiat lahkneksid. Lehekülg/signaal lisab effect.
+  const searchOptions = useMemo<DashboardSearchOptions>(() => ({
+    yearStart: yearStart || undefined,
+    yearEnd: yearEnd || undefined,
+    sort,
+    author: authorParam || undefined,
+    respondens: respondensParam || undefined,
+    printer: printerParam || undefined,
+    workStatus: statusParam || undefined,
+    teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
+    genre: selectedGenre ? [selectedGenre] : undefined,
+    type: selectedType ? [selectedType] : undefined,
+    languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
+    collection: scope,
+    onlyFirstPage: sort !== 'recent',
+    lang: getLangCode(i18n.language),
+  }), [yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedLanguages, scope, i18n.language]);
+
+  // Filtrivihjed otsingureal (#605)
+  const { hints: filterHints, isCurrent: isHintCurrent } = useFilterHints({
+    index, query: inputValue, searchOptions, scopeReady, lang: getLangCode(i18n.language) as 'et' | 'en',
+    debounceMs: SEARCH_DEBOUNCE_MS,
+  });
+  const [acceptedHint, setAcceptedHint] = useState<FilterHint | null>(null);
+
+  // Vastuvõtt = SAMA rakendaja, mis külgribal (applyWorkFilter / aastaväljad).
+  // Vananenud vihje (kasutaja trükkis vahepeal) on no-op: ei tohi uut teksti üle kirjutada.
+  const acceptHint = (h: FilterHint) => {
+    if (!isHintCurrent(h)) return;
+    if (h.kind === 'year') { setYearStart(h.value); setYearEnd(h.value); }
+    else filterModel.applyWorkFilter(h.kind, h.value);
+    setInputValue(h.remainingQuery);
+    setAcceptedHint(h);
+    trackEvent('filter-hint-accept', { kind: h.kind });
+  };
+
+  // Sähvatus ainult vastuvõtu hetkel: järgmine päringumuutus lõpetab selle
+  const flashHint = acceptedHint && inputValue === acceptedHint.remainingQuery ? acceptedHint : null;
+
   const activeFilterCount = filterModel.activeCount + (yearStart || yearEnd ? 1 : 0)
     + (authorParam ? 1 : 0) + (respondensParam ? 1 : 0) + (printerParam ? 1 : 0);
   const hasActiveFilters = activeFilterCount > 0;
@@ -373,9 +416,10 @@ const Dashboard: React.FC = () => {
         else {
           newParams.delete('q');
           // Kui otsing tühjendatakse ja sort on relevantsus, muuda aasta järgi
-          if (sort === 'relevance') {
-            setSort('year_asc');
-            newParams.set('sort', 'year_asc');
+          const nextSort = sortAfterQueryChange(sort, '');
+          if (nextSort !== sort) {
+            setSort(nextSort);
+            newParams.set('sort', nextSort);
           }
         }
         changed = true;
@@ -483,25 +527,9 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const start = yearStart || undefined;
-        const end = yearEnd || undefined;
-
         // Pass filter options to the API (including status filter - server-side)
         const result = await searchWorks(index, queryParam, {
-          yearStart: start,
-          yearEnd: end,
-          sort: sort,
-          author: authorParam || undefined,
-          respondens: respondensParam || undefined,
-          printer: printerParam || undefined,
-          workStatus: statusParam || undefined,
-          teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
-          genre: selectedGenre ? [selectedGenre] : undefined,
-          type: selectedType ? [selectedType] : undefined,
-          languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
-          collection: scope,
-          onlyFirstPage: sort !== 'recent',
-          lang: getLangCode(i18n.language),
+          ...searchOptions,
           offset: (currentPage - 1) * ITEMS_PER_PAGE,
           limit: ITEMS_PER_PAGE,
           signal: controller.signal
@@ -535,7 +563,7 @@ const Dashboard: React.FC = () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [index, collectionsLoading, scopeReady, scope, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedLanguages, currentPage, refreshCounter, i18n.language]);
+  }, [index, collectionsLoading, scopeReady, searchOptions, queryParam, currentPage, refreshCounter]);
 
   // Multi-select helper funktsioonid
   // shift+klõps valib vahemiku viimasest ankrust nähtaval leheküljel (nagu manage-lehel)
@@ -787,14 +815,30 @@ const Dashboard: React.FC = () => {
               <MobileFiltersButton activeCount={activeFilterCount} onClick={() => setFilterDrawerOpen(true)} />
               </div>
 
-              {/* Aktiivsed filtrid kiipidena — ainult siis, kui mõni on aktiivne */}
-              {hasActiveFilters && (
-                <WorkFilterChips model={filterModel} onClearAll={clearAllFilters}>
+              {/* Aktiivsed filtrid + filtrivihjed (#605) samas reas; vihjed rakendatute JÄREL */}
+              {(hasActiveFilters || filterHints.length > 0) && (
+                <WorkFilterChips
+                  model={filterModel}
+                  onClearAll={clearAllFilters}
+                  hasApplied={hasActiveFilters}
+                  highlight={flashHint && flashHint.kind !== 'year' ? { kind: flashHint.kind, value: flashHint.value, label: flashHint.label } : null}
+                  hints={filterHints.length > 0 ? filterHints.map(h => (
+                    <FilterHintChip
+                      key={`${h.kind}:${h.value}`}
+                      kind={h.kind === 'year' ? t('common:labels.year')
+                        : t(`dashboard:filters.${h.kind === 'tag' ? 'tags' : h.kind}`)}
+                      label={h.label}
+                      count={h.count}
+                      onAccept={() => acceptHint(h)}
+                    />
+                  )) : undefined}
+                >
                   {(yearStart || yearEnd) && (
                     <FilterChip
                       kind={t('common:labels.year')}
                       label={`${yearStart || '…'} – ${yearEnd || '…'}`}
                       onRemove={() => { setYearStart(''); setYearEnd(''); }}
+                      highlight={flashHint?.kind === 'year'}
                     />
                   )}
                   {authorParam && (

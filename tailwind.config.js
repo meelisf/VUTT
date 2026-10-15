@@ -24,7 +24,17 @@ export default {
       fontFamily: {
         serif: ['Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
         sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-      }
+      },
+      keyframes: {
+        'hint-flash': {
+          '0%': { boxShadow: '0 0 0 3px #fde68a' },   // amber-200
+          '100%': { boxShadow: '0 0 0 0 rgba(253,230,138,0)' },
+        },
+      },
+      animation: {
+        // Filtrivihje vastuvõtt (#605): kiip sähvatab korra mountimisel
+        'hint-flash': 'hint-flash 600ms ease-out 1',
+      },
     },
   },
   plugins: [],

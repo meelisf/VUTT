@@ -250,11 +250,20 @@ export function useWorkFilterModel(input: WorkFilterInput) {
     }
   }, [effectiveSelectedTags, selectedTags]);
 
+  // ÜKS rakendaja külgribale ja filtrivihjele (#605): vastuvõetud vihje peab
+  // andma täpselt sama oleku kui külgribal valimine. Ainult LISAMISE suund;
+  // eemaldamine käib endiselt kiibi × / külgriba uue klikiga.
+  const applyWorkFilter = (kind: 'genre' | 'tag' | 'type', value: string) => {
+    if (kind === 'genre') onGenreChange(value);
+    else if (kind === 'type') onTypeChange(value);
+    else if (!effectiveSelectedTags.includes(value)) onTagsChange([...effectiveSelectedTags, value]);
+  };
+
   const toggleTag = (tag: string) => {
     if (effectiveSelectedTags.includes(tag)) {
       onTagsChange(effectiveSelectedTags.filter(t => t !== tag));
     } else {
-      onTagsChange([...effectiveSelectedTags, tag]);
+      applyWorkFilter('tag', tag);
     }
   };
 
@@ -278,7 +287,7 @@ export function useWorkFilterModel(input: WorkFilterInput) {
   };
 
   return {
-    input, loading, activeCount, clearAll, toggleTag,
+    input, loading, activeCount, clearAll, toggleTag, applyWorkFilter,
     genreItems, tagItems, typeItems, languageItems,
     effectiveSelectedGenre, selectedGenreItemValue,
     effectiveSelectedType, selectedTypeItemValue,

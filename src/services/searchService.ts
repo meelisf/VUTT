@@ -378,53 +378,100 @@ export const getAuthorFacets = async (
   }
 };
 
+/**
+ * Ulatuse žanri-, märksõna- ja tüübikoodid koos teoste arvuga (#605:
+ * filtrivihje sõnavara). Ilma otsingusõnata ja muude filtriteta: sõnavara
+ * on „mis siin kogus üldse olemas on".
+ */
+export const getScopeFacetCodes = async (
+  index: Index,
+  scope: SelectionScope | undefined,
+  signal?: AbortSignal,
+): Promise<{ genre_ids: Record<string, number>; tags_ids: Record<string, number>; type_ids: Record<string, number> }> => {
+  const filter: string[] = ['lehekylje_number = 1'];
+  pushSelectionFilter(filter, scope);
+  const response = await index.search('', {
+    filter, limit: 0, facets: ['genre_ids', 'tags_ids', 'type_ids'],
+  }, signal ? { signal } : undefined);
+  const fd = response.facetDistribution || {};
+  return { genre_ids: fd['genre_ids'] || {}, tags_ids: fd['tags_ids'] || {}, type_ids: fd['type_ids'] || {} };
+};
+
+// Avalehe otsinguväljad. ÜKS allikas otsingule ja filtrivihje loenduritele (#605):
+// teistsuguste väljadega loendur leiaks vasteid, mida avaleht ei näita.
+export const DASHBOARD_SEARCH_ATTRIBUTES = ['title', 'title_en', 'title_original', 'authors_text', 'tags_search', 'genre_search'];
+
+export interface DashboardSearchCore {
+  q: string;
+  filter: string[];
+  attributesToSearchOn: string[];
+  matchingStrategy: MatchingStrategies;
+  /** „Viimati muudetud" vaade otsib kõigilt lehtedelt → üks tulemus teose kohta. */
+  distinct?: string;
+}
+
+/** Avalehe päringu tuum: normaliseeritud päring, filter, väljad, strateegia. */
+export function buildDashboardSearch(rawQuery: string, options?: DashboardSearchOptions): DashboardSearchCore {
+  const q = normalizeSearchQuery(rawQuery);
+  const filter: string[] = [];
+
+  // ALATI filtreeri esimese lehekülje järgi - tagab õige thumbnail ja tagid
+  // V.A. kui otsime viimati muudetuid (siis tahame näha mis tahes lehte mis muutus)
+  if (options?.onlyFirstPage !== false) {
+    filter.push('lehekylje_number = 1');
+  }
+
+  // Apply server-side filters if provided
+  pushYearFilter(filter, options?.yearStart, options?.yearEnd);
+  if (options?.author) {
+    filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
+  }
+  if (options?.respondens) {
+    filter.push(`respondens_names = "${options.respondens}"`);
+  }
+  if (options?.printer) {
+    filter.push(buildPrinterFilter(options.printer));
+  }
+  if (options?.workStatus) {
+    filter.push(`teose_staatus = "${options.workStatus}"`);
+  }
+  // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
+  if (options?.teoseTags && options.teoseTags.length > 0) {
+    for (const tag of options.teoseTags) filter.push(buildTagFilter(tag));
+  }
+  // V2: Valiku filter — püsikogu `collections_hierarchy` või töökollektsiooni
+  // `work_id IN [...]` (#354).
+  pushSelectionFilter(filter, options?.collection);
+  // V2: Žanri filter (Q-kood → genre_ids, label → bilinguaalne OR)
+  if (options?.genre && options.genre.length > 0) {
+    filter.push(buildMultiFilter(options.genre, buildGenreFilter));
+  }
+  // V2: Tüübi filter (Q-kood → type_ids, label → bilinguaalne OR)
+  if (options?.type && options.type.length > 0) {
+    filter.push(buildMultiFilter(options.type, buildTypeFilter));
+  }
+  // Keele filter — languages on massiiv, seega üks väärtus ühtib massiivi liikmega
+  if (options?.languages && options.languages.length > 0) {
+    filter.push(buildMultiFilter(options.languages, (l) => `languages = "${l}"`));
+  }
+  return {
+    q,
+    filter,
+    attributesToSearchOn: [...DASHBOARD_SEARCH_ATTRIBUTES],
+    matchingStrategy: (q ? 'frequency' : 'last') as unknown as MatchingStrategies,
+    // Esimese lehe filter annab juba ühe dokumendi teose kohta; distinct'i vajab
+    // ainult kõigilt lehtedelt otsiv vaade. Siin, mitte searchWorks-is: muidu loeks
+    // filtrivihje loendur sel juhul lehti, mitte teoseid (#605 lõppülevaatus).
+    ...(options?.onlyFirstPage === false && options?.sort !== 'relevance' ? { distinct: 'work_id' } : {}),
+  };
+}
+
 // Dashboardi otsing: otsib teoseid
 export const searchWorks = async (index: Index, rawQuery: string, options?: DashboardSearchOptions): Promise<SearchWorksResult> => {
   checkMixedContent();
-  const query = normalizeSearchQuery(rawQuery);
 
   try {
-    const filter: string[] = [];
-
-    // ALATI filtreeri esimese lehekülje järgi - tagab õige thumbnail ja tagid
-    // V.A. kui otsime viimati muudetuid (siis tahame näha mis tahes lehte mis muutus)
-    if (options?.onlyFirstPage !== false) {
-      filter.push('lehekylje_number = 1');
-    }
-
-    // Apply server-side filters if provided
-    pushYearFilter(filter, options?.yearStart, options?.yearEnd);
-    if (options?.author) {
-      filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
-    }
-    if (options?.respondens) {
-      filter.push(`respondens_names = "${options.respondens}"`);
-    }
-    if (options?.printer) {
-      filter.push(buildPrinterFilter(options.printer));
-    }
-    if (options?.workStatus) {
-      filter.push(`teose_staatus = "${options.workStatus}"`);
-    }
-    // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
-    if (options?.teoseTags && options.teoseTags.length > 0) {
-      for (const tag of options.teoseTags) filter.push(buildTagFilter(tag));
-    }
-    // V2: Valiku filter — püsikogu `collections_hierarchy` või töökollektsiooni
-    // `work_id IN [...]` (#354).
-    pushSelectionFilter(filter, options?.collection);
-    // V2: Žanri filter (Q-kood → genre_ids, label → bilinguaalne OR)
-    if (options?.genre && options.genre.length > 0) {
-      filter.push(buildMultiFilter(options.genre, buildGenreFilter));
-    }
-    // V2: Tüübi filter (Q-kood → type_ids, label → bilinguaalne OR)
-    if (options?.type && options.type.length > 0) {
-      filter.push(buildMultiFilter(options.type, buildTypeFilter));
-    }
-    // Keele filter — languages on massiiv, seega üks väärtus ühtib massiivi liikmega
-    if (options?.languages && options.languages.length > 0) {
-      filter.push(buildMultiFilter(options.languages, (l) => `languages = "${l}"`));
-    }
+    const { q: query, filter, attributesToSearchOn, matchingStrategy, distinct } = buildDashboardSearch(rawQuery, options);
 
     // Kasutame ID-põhiseid facet välju (Q-koodid) — keeleneutraalsed, ei tekita duplikaate
     const genreFacetField = 'genre_ids';
@@ -441,8 +488,8 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus',
         'lehekylje_pilt' // loendivaate täispisipilt (#587)
       ],
-      attributesToSearchOn: ['title', 'title_en', 'title_original', 'authors_text', 'tags_search', 'genre_search'], // Dashboard otsib pealkirjadest (ADR 0064), autoritest, märksõnadest ja žanrist (dokumendiliik, nt „põhikiri“)
-      matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
+      attributesToSearchOn, // DASHBOARD_SEARCH_ATTRIBUTES (#605: üks allikas)
+      matchingStrategy,
       filter: filter,
       // Facetid arvutatakse kogu filtrile ka serveripoolse lehekülgjaotuse korral.
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
@@ -470,8 +517,8 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
     // Esimese lehe filter annab juba täpselt ühe dokumendi teose kohta, seega
     // distinct oleks seal üleliigne. Seda vajab ainult „viimati muudetud“ vaade,
     // mis otsib kõigilt lehekülgedelt.
-    const useDistinct = options?.onlyFirstPage === false && options?.sort !== 'relevance';
-    if (useDistinct) searchParams.distinct = 'work_id';
+    const useDistinct = !!distinct;
+    if (distinct) searchParams.distinct = distinct;
 
     // Sorting logic
     if (options?.sort) {
