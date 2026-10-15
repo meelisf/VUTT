@@ -9,10 +9,11 @@
  */
 import { normalizeForSearch } from '../../utils/diacritics';
 
-export type HintKind = 'year' | 'genre' | 'tag' | 'type';
+export type HintKind = 'year' | 'genre' | 'tag' | 'type' | 'language' | 'status';
 
 export interface VocabEntry {
-  kind: 'genre' | 'tag' | 'type';
+  kind: Exclude<HintKind, 'year'>;
+  /** Q-kood (žanr/märksõna/tüüp), ISO 639-3 kood (keel) või staatuse väärtus. */
   id: string;
   labels: { et?: string; en?: string };
   /** Sünonüümid (spec „Laiendus"); osa 1-s tühi. */

@@ -44,6 +44,24 @@ describe('applyWorkFilter = sama, mis külgriba valik', () => {
     expect(a.spies.onTagsChange).toHaveBeenCalledWith(['Qa', 'Qb']);
   });
 
+  it('keel: lisandub valitutele nagu külgribal', () => {
+    const { model, spies } = setup({ selectedLanguages: ['grc'] });
+    act(() => model().applyWorkFilter('language', 'lat'));
+    expect(spies.onLanguagesChange).toHaveBeenCalledWith(['grc', 'lat']);
+  });
+
+  it('juba valitud keel: ei muuda midagi', () => {
+    const { model, spies } = setup({ selectedLanguages: ['lat'] });
+    act(() => model().applyWorkFilter('language', 'lat'));
+    expect(spies.onLanguagesChange).not.toHaveBeenCalled();
+  });
+
+  it('staatus asendab', () => {
+    const { model, spies } = setup({ selectedStatus: 'Toores' });
+    act(() => model().applyWorkFilter('status', 'Valmis'));
+    expect(spies.onStatusChange).toHaveBeenCalledWith('Valmis');
+  });
+
   it('juba valitud märksõna: ei muuda midagi', () => {
     const { model, spies } = setup({ selectedTags: ['Qa'] });
     act(() => model().applyWorkFilter('tag', 'Qa'));

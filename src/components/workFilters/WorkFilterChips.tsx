@@ -49,6 +49,8 @@ export const FilterHintChip: React.FC<{ kind: string; label: string; count: numb
   );
 };
 
+type HighlightKind = 'genre' | 'tag' | 'type' | 'language' | 'status';
+
 interface WorkFilterChipsProps {
   model: WorkFilterModel;
   /** Lehe enda filtrid (aasta, autor, respondens, trükkal), mis ei ole mudelis. */
@@ -59,7 +61,7 @@ interface WorkFilterChipsProps {
   /** Kas on rakendatud filtreid (eraldaja + „Tühjenda"). Vaikimisi tõene. */
   hasApplied?: boolean;
   /** Äsja vastuvõetud vihje → selle kiip sähvatab korra. */
-  highlight?: { kind: 'genre' | 'tag' | 'type'; value: string; label: string } | null;
+  highlight?: { kind: HighlightKind; value: string; label: string } | null;
 }
 
 const WorkFilterChips: React.FC<WorkFilterChipsProps> = ({ model, children, onClearAll, hints, hasApplied = true, highlight }) => {
@@ -67,7 +69,7 @@ const WorkFilterChips: React.FC<WorkFilterChipsProps> = ({ model, children, onCl
   const { input, effectiveSelectedGenre, effectiveSelectedType, effectiveSelectedTags, selectedGenreItemValue, selectedTypeItemValue, languageLabel, tagLabel, toggleTag } = model;
   const { genreIdMap, typeIdMap, selectedStatus, selectedLanguages, onGenreChange, onTypeChange, onStatusChange, onLanguagesChange } = input;
   // Valitud väärtus võib olla Q-kood VÕI silt (keelevahetuse iseparandus) — võrdle mõlemat
-  const isHi = (kind: 'genre' | 'tag' | 'type', ...vals: (string | null | undefined)[]) =>
+  const isHi = (kind: HighlightKind, ...vals: (string | null | undefined)[]) =>
     !!highlight && highlight.kind === kind && vals.some(v => v === highlight.value || v === highlight.label);
 
   return (
@@ -87,10 +89,11 @@ const WorkFilterChips: React.FC<WorkFilterChipsProps> = ({ model, children, onCl
       ))}
       {selectedLanguages.map(code => (
         <FilterChip key={code} kind={t('dashboard:filters.languages')} label={languageLabel(code)}
-          onRemove={() => onLanguagesChange(selectedLanguages.filter(l => l !== code))} />
+          onRemove={() => onLanguagesChange(selectedLanguages.filter(l => l !== code))} highlight={isHi('language', code)} />
       ))}
       {selectedStatus && (
-        <FilterChip kind={t('dashboard:filters.status')} label={t(`common:status.${selectedStatus}`)} onRemove={() => onStatusChange(null)} />
+        <FilterChip kind={t('dashboard:filters.status')} label={t(`common:status.${selectedStatus}`)} onRemove={() => onStatusChange(null)}
+          highlight={isHi('status', selectedStatus)} />
       )}
       {hasApplied && hints && <span className="w-px h-[18px] bg-gray-200" aria-hidden="true" />}
       {hints}

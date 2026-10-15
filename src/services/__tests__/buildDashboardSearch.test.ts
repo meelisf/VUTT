@@ -118,10 +118,10 @@ describe('getScopeFacetCodes', () => {
     const [q, params] = mockSearch.mock.calls.at(-1)!;
     expect(q).toBe('');
     expect(params.limit).toBe(0);
-    expect(params.facets).toEqual(['genre_ids', 'tags_ids', 'type_ids']);
+    expect(params.facets).toEqual(['genre_ids', 'tags_ids', 'type_ids', 'languages', 'teose_staatus']);
     expect(params.filter[0]).toBe('lehekylje_number = 1');
     expect(params.filter.length).toBeGreaterThan(1); // + valikuklausel
-    expect(r).toEqual({ genre_ids: { Q1: 3 }, tags_ids: {}, type_ids: { Q2: 1 } });
+    expect(r).toEqual({ genre_ids: { Q1: 3 }, tags_ids: {}, type_ids: { Q2: 1 }, languages: {}, teose_staatus: {} });
   });
 });
 
