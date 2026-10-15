@@ -37,7 +37,7 @@ import WorkFilterSections from '../components/workFilters/WorkFilterSections';
 import WorkFilterChips, { FilterChip, FilterHintChip } from '../components/workFilters/WorkFilterChips';
 import { useFilterHints, FilterHint } from '../services/filterHints/useFilterHints';
 import { trackEvent } from '../services/analytics';
-import { sortAfterQueryChange } from './dashboardQuerySync';
+import { sortAfterQueryChange, createUrlEchoGuard } from './dashboardQuerySync';
 import { useWorkFilterModel } from '../components/workFilters/useWorkFilterModel';
 import WorkListRow from '../components/WorkListRow';
 
@@ -224,8 +224,16 @@ const Dashboard: React.FC = () => {
     };
   }, []);
 
+  // Oma URL-i kirjutuse kaja ei tohi olekut üle kirjutada (kadunud trükitud täht)
+  const [urlEcho] = useState(createUrlEchoGuard);
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
+
   // Sünkrooni filtrite state URL-iga (nt tagasi-navigatsioon või WorkCardilt naasmine).
   useEffect(() => {
+    // Kaja = see effect käivitus meie enda olek → URL kirjutusest; olek on sellega
+    // võrdne või (kui kasutaja vahepeal trükkis) sellest ees — ära vii vana tagasi
+    if (urlEcho.isEcho(searchParamsRef.current)) return;
     setInputValue(queryParam);
     setYearStart(yearStartParam || '');
     setYearEnd(yearEndParam || '');
@@ -235,7 +243,7 @@ const Dashboard: React.FC = () => {
     setSelectedType(typeParam);
     setSelectedLanguages(langsParam);
     setSelectedStatus(statusParam);
-  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsKey, genreParam, typeParam, langsKey, statusParam]);
+  }, [urlEcho, queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsKey, genreParam, typeParam, langsKey, statusParam]);
 
   // Sünkroniseeri lehekülje number URL parameetrist (nt tagasi-navigatsioon, otselink).
   // Serveripoolse lehekülgjaotuse tõttu käivitab currentPage nüüd uue päringu.
@@ -510,11 +518,12 @@ const Dashboard: React.FC = () => {
       }
 
       if (changed) {
+        urlEcho.wrote(newParams);
         setSearchParams(newParams, { replace: true });
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedLanguages, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, langsKey, statusParam, genreLabelToId, tagsLabelToId, typeLabelToId]);
+  }, [urlEcho, inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedLanguages, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, langsKey, statusParam, genreLabelToId, tagsLabelToId, typeLabelToId]);
 
   // Perform search when params change
   useEffect(() => {
