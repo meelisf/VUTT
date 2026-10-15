@@ -109,11 +109,15 @@ export function useFilterHints({ index, query, searchOptions, scopeReady, lang, 
           if (batch.length === 0) break;
           const counts = await Promise.all(batch.map(async c => {
             const core = buildDashboardSearch(c.remainingQuery, withCandidate(searchOptions, c));
+            // page-režiim annab TÄPSE totalHits-i (limit: 0 ainult hinnangu) — kiibi
+            // arv peab olema see, mida avaleht pärast vastuvõttu näitab
             const r = await index.search(core.q, {
               filter: core.filter, attributesToSearchOn: core.attributesToSearchOn,
-              matchingStrategy: core.matchingStrategy, limit: 0,
+              matchingStrategy: core.matchingStrategy, page: 1, hitsPerPage: 0,
+              ...(core.distinct ? { distinct: core.distinct } : {}),
             }, { signal });
-            return (r as { totalHits?: number }).totalHits ?? r.estimatedTotalHits ?? 0;
+            const n = r as { totalHits?: number; estimatedTotalHits?: number };
+            return n.totalHits ?? n.estimatedTotalHits ?? 0;
           }));
           batch.forEach((c, i) => {
             if (counts[i] > 0 && found.length < MAX_HINTS) found.push({ ...c, count: counts[i], sourceQuery: query, stateKey });

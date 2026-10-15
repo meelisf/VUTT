@@ -31,7 +31,8 @@ const rich: DashboardSearchOptions = {
 async function sentParams(q: string, o: DashboardSearchOptions) {
   await searchWorks(mockIndex, q, o);
   const [query, params] = mockSearch.mock.calls.at(-1)!;
-  return { q: query, filter: params.filter, attributesToSearchOn: params.attributesToSearchOn, matchingStrategy: params.matchingStrategy };
+  return { q: query, filter: params.filter, attributesToSearchOn: params.attributesToSearchOn, matchingStrategy: params.matchingStrategy,
+    ...(params.distinct ? { distinct: params.distinct } : {}) };
 }
 
 describe('searchWorks päringu tuum (pinnitud enne eraldamist)', () => {
@@ -74,6 +75,7 @@ describe('searchWorks päringu tuum (pinnitud enne eraldamist)', () => {
           "tags_search",
           "genre_search",
         ],
+        "distinct": "work_id",
         "filter": [],
         "matchingStrategy": "last",
         "q": "",
@@ -120,5 +122,18 @@ describe('getScopeFacetCodes', () => {
     expect(params.filter[0]).toBe('lehekylje_number = 1');
     expect(params.filter.length).toBeGreaterThan(1); // + valikuklausel
     expect(r).toEqual({ genre_ids: { Q1: 3 }, tags_ids: {}, type_ids: { Q2: 1 } });
+  });
+});
+
+describe('buildDashboardSearch distinct (lõppülevaatus: recent loendur luges lehti)', () => {
+  it('onlyFirstPage:false + mitte-relevance → distinct work_id, sama mis searchWorks', async () => {
+    const o: DashboardSearchOptions = { sort: 'recent', onlyFirstPage: false };
+    expect(buildDashboardSearch('', o).distinct).toBe('work_id');
+    await searchWorks(mockIndex, '', o);
+    expect(mockSearch.mock.calls.at(-1)![1].distinct).toBe('work_id');
+  });
+  it('tavavaates distinct puudub', () => {
+    expect(buildDashboardSearch('x', { sort: 'year_asc', onlyFirstPage: true }).distinct).toBeUndefined();
+    expect(buildDashboardSearch('x', { sort: 'relevance', onlyFirstPage: false }).distinct).toBeUndefined();
   });
 });

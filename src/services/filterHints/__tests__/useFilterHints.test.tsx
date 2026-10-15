@@ -26,7 +26,8 @@ function fakeIndex(facets: Facets, counts: Record<string, number>) {
     if (params.facets) return { hits: [], facetDistribution: facets };
     const f: string = params.filter.join(' ');
     const hit = Object.keys(counts).find(code => f.includes(code));
-    return { hits: [], estimatedTotalHits: hit ? counts[hit] : 0 };
+    // Täpne totalHits (page-režiim); estimatedTotalHits on teadlikult vale, et test eristaks
+    return { hits: [], totalHits: hit ? counts[hit] : 0, estimatedTotalHits: 999 };
   });
   return { search } as any;
 }
@@ -68,7 +69,17 @@ describe('useFilterHints', () => {
     const countCall = index.search.mock.calls.find((c: any[]) => !c[1].facets)!;
     const expected = buildDashboardSearch('constitu', withCandidate(args.searchOptions, { kind: 'genre', value: 'Q3497659' }));
     expect(countCall[0]).toBe(expected.q);
-    expect(countCall[1]).toMatchObject({ filter: expected.filter, attributesToSearchOn: expected.attributesToSearchOn, matchingStrategy: expected.matchingStrategy, limit: 0 });
+    expect(countCall[1]).toMatchObject({ filter: expected.filter, attributesToSearchOn: expected.attributesToSearchOn, matchingStrategy: expected.matchingStrategy, page: 1, hitsPerPage: 0 });
+  });
+
+  it('loendur küsib täpse arvu (page/hitsPerPage) ja recent-vaates distinct work_id', async () => {
+    const index = fakeIndex({ genre_ids: { Q3497659: 7 } }, { Q3497659: 7 });
+    const { result } = renderHook(() => useFilterHints(base({ index, query: 'põhiki', searchOptions: { collection: 'c1', lang: 'et', sort: 'recent', onlyFirstPage: false } })));
+    await flush();
+    const countCall = index.search.mock.calls.find((c: any[]) => !c[1].facets)!;
+    expect(countCall[1]).toMatchObject({ page: 1, hitsPerPage: 0, distinct: 'work_id' });
+    expect(countCall[1].limit).toBeUndefined();
+    expect(result.current.hints[0].count).toBe(7);
   });
 
   it('žanri asendus loenduris: vana žanrit filtris ei ole', async () => {
@@ -140,7 +151,7 @@ describe('useFilterHints', () => {
   it('aasta: 1702 constitu', async () => {
     const index = fakeIndex({}, {});
     index.search.mockImplementation(async (_q: string, p: any) =>
-      p.facets ? { hits: [], facetDistribution: {} } : { hits: [], estimatedTotalHits: 3 });
+      p.facets ? { hits: [], facetDistribution: {} } : { hits: [], totalHits: 3, estimatedTotalHits: 999 });
     const { result } = renderHook(() => useFilterHints(base({ index, query: '1702 constitu' })));
     await flush();
     expect(result.current.hints[0]).toMatchObject({ kind: 'year', value: '1702', count: 3, remainingQuery: 'constitu' });

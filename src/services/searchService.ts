@@ -406,6 +406,8 @@ export interface DashboardSearchCore {
   filter: string[];
   attributesToSearchOn: string[];
   matchingStrategy: MatchingStrategies;
+  /** „Viimati muudetud" vaade otsib kõigilt lehtedelt → üks tulemus teose kohta. */
+  distinct?: string;
 }
 
 /** Avalehe päringu tuum: normaliseeritud päring, filter, väljad, strateegia. */
@@ -457,6 +459,10 @@ export function buildDashboardSearch(rawQuery: string, options?: DashboardSearch
     filter,
     attributesToSearchOn: [...DASHBOARD_SEARCH_ATTRIBUTES],
     matchingStrategy: (q ? 'frequency' : 'last') as unknown as MatchingStrategies,
+    // Esimese lehe filter annab juba ühe dokumendi teose kohta; distinct'i vajab
+    // ainult kõigilt lehtedelt otsiv vaade. Siin, mitte searchWorks-is: muidu loeks
+    // filtrivihje loendur sel juhul lehti, mitte teoseid (#605 lõppülevaatus).
+    ...(options?.onlyFirstPage === false && options?.sort !== 'relevance' ? { distinct: 'work_id' } : {}),
   };
 }
 
@@ -465,7 +471,7 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
   checkMixedContent();
 
   try {
-    const { q: query, filter, attributesToSearchOn, matchingStrategy } = buildDashboardSearch(rawQuery, options);
+    const { q: query, filter, attributesToSearchOn, matchingStrategy, distinct } = buildDashboardSearch(rawQuery, options);
 
     // Kasutame ID-põhiseid facet välju (Q-koodid) — keeleneutraalsed, ei tekita duplikaate
     const genreFacetField = 'genre_ids';
@@ -511,8 +517,8 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
     // Esimese lehe filter annab juba täpselt ühe dokumendi teose kohta, seega
     // distinct oleks seal üleliigne. Seda vajab ainult „viimati muudetud“ vaade,
     // mis otsib kõigilt lehekülgedelt.
-    const useDistinct = options?.onlyFirstPage === false && options?.sort !== 'relevance';
-    if (useDistinct) searchParams.distinct = 'work_id';
+    const useDistinct = !!distinct;
+    if (distinct) searchParams.distinct = distinct;
 
     // Sorting logic
     if (options?.sort) {
