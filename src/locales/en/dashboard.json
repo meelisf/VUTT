@@ -116,5 +116,8 @@
     "languages": "Language",
     "searchType": "Search type...",
     "searchLanguage": "Search language..."
+  },
+  "filterHints": {
+    "addFilter": "Add filter"
   }
 }

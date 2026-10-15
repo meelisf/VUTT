@@ -116,5 +116,8 @@
     "languages": "Keel",
     "searchType": "Otsi tüüpi...",
     "searchLanguage": "Otsi keelt..."
+  },
+  "filterHints": {
+    "addFilter": "Lisa filter"
   }
 }
