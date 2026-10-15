@@ -54,6 +54,7 @@
     "errors": {
       "passwordRequired": "Password is required",
       "passwordTooShort": "Password must be at least 12 characters",
+      "passwordTooLong": "Password is too long – the limit is 72 bytes (accented letters take 2 bytes)",
       "passwordTooSimple": "Password is too simple – use more different characters",
       "passwordMismatch": "Passwords do not match",
       "tokenInvalid": "Invite link is expired or invalid",
