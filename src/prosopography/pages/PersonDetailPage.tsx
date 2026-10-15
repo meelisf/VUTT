@@ -792,7 +792,7 @@ const PersonDetailPage: React.FC = () => {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <Lock size={13} className="shrink-0 text-gray-400" />
-                        <span className="text-sm text-gray-500 truncate">{title}</span>
+                        <span className="text-sm text-gray-500 line-clamp-2 sm:line-clamp-1">{title}</span>
                         {yearLabel && <span className="text-xs shrink-0 text-gray-400">{yearLabel}</span>}
                       </div>
                       <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -814,7 +814,7 @@ const PersonDetailPage: React.FC = () => {
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <BookOpen size={13} className={`shrink-0 ${inCollection ? colorClasses?.text : 'text-gray-300'}`} />
-                      <span className={`text-sm transition-colors truncate ${inCollection ? colorClasses?.text : 'text-gray-700 group-hover:text-primary-700'}`}>
+                      <span className={`text-sm transition-colors line-clamp-2 sm:line-clamp-1 ${inCollection ? colorClasses?.text : 'text-gray-700 group-hover:text-primary-700'}`}>
                         {title}
                       </span>
                       {yearLabel && <span className={`text-xs shrink-0 ${inCollection ? colorClasses?.text + ' opacity-70' : 'text-gray-400'}`}>{yearLabel}</span>}

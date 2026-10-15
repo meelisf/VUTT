@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Bookmark, Check, FolderOpen, Link2, X } from 'lucide-react';
+import { Bookmark, Check, ChevronDown, FolderOpen, Library, Link2, X } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../services/collectionService';
 import { COLLECTION_PARAM, serializeSelection } from '../contexts/collectionUrl';
 import { getLangCode } from '../utils/getLangCode';
 import { useCollectionCounts } from '../hooks/useCollectionCounts';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import CollectionPicker from './CollectionPicker';
 
 /**
  * Kogu-riba päise all (#587): milline vaade on aktiivne. Asendab
@@ -16,16 +18,50 @@ import { useCollectionCounts } from '../hooks/useCollectionCounts';
  *
  * Muutub ainult kuvamine — valik käib `setSelection`-i kaudu ja URL-i sünk elab
  * edasi `useCollectionUrlSync`-is (ADR 0038).
+ *
+ * Kitsal ekraanil (`md`-st kitsam, päise valija on peidus) on riba ise valija:
+ * nimi avab `CollectionPicker`-i modaali. Eraldi mobiilinuppu ei ole — see
+ * kordas sama kogu kaks korda üksteise all. „Kõik tööd" olekus näidatakse
+ * kitsal ekraanil kompaktset rida, et valikuni üldse pääseks; laial ekraanil
+ * riba siis puudub.
+ *
+ * `scopeHidden`: leht teab, et valik teda ei piira (isikud ilma ligipääsuta
+ * kogule) — riba käitub nagu „Kõik tööd" olekus.
  */
-const CollectionBar: React.FC = () => {
+const CollectionBar: React.FC<{ scopeHidden?: boolean }> = ({ scopeHidden = false }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
   const { selection, setSelection, collections, workSets, isLoading } = useCollection();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const counts = useCollectionCounts();
   const lang = getLangCode(i18n.language);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
-  if (selection.kind === 'all') return null;
+  const picker = !isDesktop && (
+    <CollectionPicker isOpen={pickerOpen} onClose={() => setPickerOpen(false)} />
+  );
+
+  if (selection.kind === 'all' || scopeHidden) {
+    if (isDesktop) return null;
+    return (
+      <div className="border-b bg-white border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-haspopup="dialog"
+            className="flex items-center gap-2 text-sm font-medium text-gray-700"
+          >
+            <Library size={16} className="text-primary-600" />
+            {t('common:collections.all')}
+            <ChevronDown size={14} className="opacity-50" />
+          </button>
+        </div>
+        {picker}
+      </div>
+    );
+  }
 
   const isSet = selection.kind === 'work_set';
   const collection = isSet ? null : collections[selection.id];
@@ -48,7 +84,9 @@ const CollectionBar: React.FC = () => {
   // Arv tuleb kutsuja enda ahelast (#319 p2): püsikogul Meili facet, töökollektsioonil
   // serveri `count` (otsingus nähtavad liikmed). Laadimata = ei näidata midagi.
   const count = collection ? counts?.byCollection[selection.id] ?? (counts ? 0 : undefined) : workSet!.count;
-  const parents = collection ? getCollectionHierarchy(collections, selection.id).slice(0, -1) : [];
+  // Kitsal ekraanil ainult nimi (= valija): kirjeldus, arv ja vanemkogud
+  // söövad vertikaalset ruumi; arv on loendi päises, vanemad valija modaalis.
+  const parents = collection && isDesktop ? getCollectionHierarchy(collections, selection.id).slice(0, -1) : [];
 
   const handleCopy = async () => {
     const url = `${window.location.origin}/?${COLLECTION_PARAM}=${encodeURIComponent(serializeSelection(selection))}`;
@@ -59,16 +97,15 @@ const CollectionBar: React.FC = () => {
     } catch { /* lõikelaud keelatud — nupp jääb muutumata */ }
   };
 
+  const icon = isSet ? <Bookmark size={16} /> : <FolderOpen size={16} />;
   const subtle = `text-sm ${tone.text} opacity-75 hover:opacity-100 transition-opacity`;
 
   return (
     <div className={`border-b ${tone.bg} ${tone.border}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3">
-        <div className="flex items-start gap-4">
+      <div className={`max-w-7xl mx-auto px-4 sm:px-8 ${isDesktop ? 'py-3' : 'py-2'}`}>
+        <div className={`flex gap-4 ${isDesktop ? 'items-start' : 'items-center'}`}>
         <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className={`${tone.text} opacity-80`}>
-            {isSet ? <Bookmark size={16} /> : <FolderOpen size={16} />}
-          </span>
+          {isDesktop && <span className={`${tone.text} opacity-80`}>{icon}</span>}
           {parents.map(id => (
             <React.Fragment key={id}>
               <button
@@ -81,14 +118,29 @@ const CollectionBar: React.FC = () => {
               <span className={`text-sm ${tone.text} opacity-50`}>›</span>
             </React.Fragment>
           ))}
-          <h1 className={`text-lg font-semibold ${tone.text}`}>{name}</h1>
-          {description && <span className={`text-sm ${tone.text} opacity-75`}>{description}</span>}
-          {count !== undefined && (
+          <h1 className={`${isDesktop ? 'text-lg font-semibold' : 'text-sm font-medium'} ${tone.text}`}>
+            {isDesktop ? name : (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                aria-haspopup="dialog"
+                className="text-left"
+              >
+                {/* Ikoonid teksti sees (mitte flex): murduval nimel jääb noolke
+                    viimase sõna järele, mitte rea paremasse serva */}
+                <span className="inline-block align-[-3px] mr-2 opacity-80">{icon}</span>
+                {name}
+                <ChevronDown size={14} className="inline-block align-[-2px] ml-1.5 opacity-50" />
+              </button>
+            )}
+          </h1>
+          {isDesktop && description && <span className={`text-sm ${tone.text} opacity-75`}>{description}</span>}
+          {isDesktop && count !== undefined && (
             <span className={`text-sm ${tone.text} opacity-75 tabular-nums whitespace-nowrap`}>
               {t('collection.workCount', { count })}
             </span>
           )}
-          {descriptionLong && (
+          {isDesktop && descriptionLong && (
             <button
               type="button"
               onClick={() => setExpanded(v => !v)}
@@ -104,7 +156,7 @@ const CollectionBar: React.FC = () => {
             </Link>
           )}
         </div>
-        <div className="shrink-0 flex items-center gap-3 pt-1">
+        <div className={`shrink-0 flex items-center gap-3 ${isDesktop ? 'pt-1' : ''}`}>
           <button type="button" onClick={handleCopy} className={`${subtle} inline-flex items-center gap-1`} title={t('collection.copyLink')}>
             {copied ? <Check size={14} /> : <Link2 size={14} />}
             <span className="hidden sm:inline">{copied ? t('collection.linkCopied') : t('collection.copyLink')}</span>
@@ -119,12 +171,13 @@ const CollectionBar: React.FC = () => {
           </button>
         </div>
         </div>
-        {expanded && descriptionLong && (
+        {isDesktop && expanded && descriptionLong && (
           <p className={`mt-3 max-w-prose text-sm leading-relaxed whitespace-pre-line ${tone.text}`}>
             {descriptionLong}
           </p>
         )}
       </div>
+      {picker}
     </div>
   );
 };

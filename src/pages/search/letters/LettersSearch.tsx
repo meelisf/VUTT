@@ -8,7 +8,6 @@ import { useCollectionUrlSync } from '../../../hooks/useCollectionUrlSync';
 import { useSelectionScope } from '../../../hooks/useSelectionScope';
 import type { LetterFilters as Filters } from '../../../services/letterSearch';
 import SearchUnitToggle from '../SearchUnitToggle';
-import MobileSelectionButton from '../../../components/MobileSelectionButton';
 import CollectionBar from '../../../components/CollectionBar';
 import { readLetterFilters, writeLetterFilters } from '../searchUnit';
 import LetterFilters from './LetterFilters';
@@ -58,7 +57,7 @@ const LettersSearch: React.FC = () => {
   const message = error || scopeError?.message || null;
 
   return (
-    <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
+    <div className="h-full bg-gray-50 font-sans flex flex-col">
       <Header>
         {/* Kogu-riba nagu Dashboardil ja isikute lehel (#587) */}
         <CollectionBar />
@@ -93,8 +92,6 @@ const LettersSearch: React.FC = () => {
                 <Filter size={20} />
               </button>
             </form>
-            {/* Aktiivne kogu nagu Dashboardil: laial päise valijas, kitsal see nupp */}
-            <MobileSelectionButton className="mt-3" />
           </div>
         </div>
       </Header>

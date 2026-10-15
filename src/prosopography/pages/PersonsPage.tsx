@@ -359,7 +359,7 @@ const PersonsPage: React.FC = () => {
       {/* Lehe nimi on päise navigatsioonis (#587) */}
       <Header />
       {/* Kogu-riba nagu teoste lehel — ainult siis, kui piirang päriselt kehtib */}
-      {scopeLabel && <CollectionBar />}
+      <CollectionBar scopeHidden={!scopeLabel} />
 
       <main className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8">
         {/* Filtrite külgriba + tulemused (#587), peegeldab teoste lehte. Kerib AKEN, külgriba on sticky. */}
@@ -537,12 +537,12 @@ const PersonsPage: React.FC = () => {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             {/* Üks püsiv live-piirkond: ekraanilugeja kuuleb „Uuendan…" ja siis
                 uue koguarvu. Kordusotsingu ajal vana koguarvu ei näidata, sest see
                 ei ole uue päringu tulemus (#425). */}
             {view !== 'map' && (
-              <span role="status" aria-live="polite" className="text-sm text-gray-500 min-h-5">
+              <span role="status" aria-live="polite" className="text-sm text-gray-500 min-h-5 whitespace-nowrap">
                 {refreshing
                   ? <span className="inline-flex items-center gap-1.5 text-primary-600">
                       <span className="h-3 w-3 rounded-full border-2 border-primary-300 border-t-primary-600 animate-spin" aria-hidden="true" />
@@ -555,7 +555,7 @@ const PersonsPage: React.FC = () => {
             )}
             {view !== 'map' && (
               <div className="flex items-center gap-1 text-sm">
-                <ArrowDownAZ size={15} className="text-gray-400 shrink-0" />
+                <ArrowDownAZ size={15} className="hidden sm:block text-gray-400 shrink-0" />
                 <select
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value)}
