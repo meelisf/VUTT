@@ -27,6 +27,7 @@ import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { parseRestoreResponse, type RestoreResult } from './pageRestore';
 import { canRestoreVersion, hasTextChange, type PageChanges } from './historyChanges';
 import { HistoryChangeBadges, HistoryChangeDetails } from './HistoryChanges';
+import { pageFileFromImageUrl } from '../../services/workImageService';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
@@ -99,7 +100,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     const key = `${entry.full_hash}:${annId}`;
     setRestoringAnn(key);
     try {
-      const imagePath = page.image_url.split('/').pop() || '';
+      const imagePath = pageFileFromImageUrl(page.image_url);
       const response = await fetchWithTimeout(`${FILE_API_URL}/page-annotations/restore-as-comment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
@@ -173,7 +174,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     setLastLoadTime(now);
 
     try {
-      const imagePath = page.image_url.split('/').pop() || '';
+      const imagePath = pageFileFromImageUrl(page.image_url);
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/git-history`, {
@@ -218,7 +219,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     setLoadingDiff(key);
 
     try {
-      const imagePath = page.image_url.split('/').pop() || '';
+      const imagePath = pageFileFromImageUrl(page.image_url);
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
       const filepath = `${page.original_path}/${txtFilename}`;
 
@@ -385,7 +386,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
     setIsRestoring(true);
     try {
-      const imagePath = page.image_url.split('/').pop() || '';
+      const imagePath = pageFileFromImageUrl(page.image_url);
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/git-restore`, {

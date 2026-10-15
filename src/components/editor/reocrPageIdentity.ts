@@ -2,6 +2,8 @@
 // mitte editori instantsile — editor ei monteeru lehe vahetusel maha (ADR 0010),
 // seega peab olek lähtestuma siinse võtme muutumisel.
 
+import { pageFileFromImageUrl } from '../../services/workImageService';
+
 export interface ReocrPageIdentity {
   /** Pildifaili nimi (nt "foo_pg_001.jpg") või null, kui lehel pilti pole. */
   pageFilename: string | null;
@@ -15,7 +17,7 @@ export function reocrPageIdentity(
   workId: string | null | undefined,
   imageUrl: string | null | undefined,
 ): ReocrPageIdentity {
-  const pageFilename = imageUrl ? (imageUrl.split('/').pop() || null) : null;
+  const pageFilename = imageUrl ? (pageFileFromImageUrl(imageUrl) || null) : null;
   if (!workId || !pageFilename) {
     return { pageFilename, pageKey: null, storageKey: null };
   }

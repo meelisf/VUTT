@@ -9,13 +9,14 @@ import { checkMixedContent, normalizePage } from './meiliService';
 import type { Index } from 'meilisearch';
 import type { Quad4 } from '../utils/perspectiveQuad';
 import { PageConflictError, conflictFromResponse, type PageFields } from '../components/editor/pageConflict';
+import { pageFileFromImageUrl } from './workImageService';
 
 // Abifunktsioon failisüsteemi salvestamiseks
 const saveToFileSystem = async (
   page: Page, original_catalog: string, image_url: string, authToken?: string, base?: PageFields,
 ): Promise<{ merged?: boolean; page?: PageFields }> => {
   try {
-    const imageFilename = image_url.split('/').pop() || '';
+    const imageFilename = pageFileFromImageUrl(image_url);
     const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
 
     if (!textFilename) {
@@ -147,7 +148,7 @@ export const replyToComment = async (
   text: string,
   authToken?: string
 ): Promise<Annotation[]> => {
-  const imageFilename = page.image_url.split('/').pop() || '';
+  const imageFilename = pageFileFromImageUrl(page.image_url);
   const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
 
   const response = await fetchWithTimeout(`${FILE_API_URL}/page-comments/reply`, {
