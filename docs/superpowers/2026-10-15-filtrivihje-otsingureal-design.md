@@ -121,7 +121,7 @@ mida kasutavad **nii** `searchWorks` (+ oma `attributesToRetrieve`, fassetid, le
 
 ## i18n
 
-Uued võtmed mõlemasse keelde korraga (`dashboard` nimeruum): `filterHints.addFilter` („Lisa filter" / „Add filter", aria), `filterHints.count` (loendur). Liigi sildid tulevad olemasolevatest `filters.genre`, `filters.tags`, `filters.type`, `common:labels.year`.
+Uued võtmed mõlemasse keelde korraga (`dashboard` nimeruum): `filterHints.addFilter` („Lisa filter" / „Add filter", aria). Loendur „(7)" on keelest sõltumatu, võtit ei vaja. Liigi sildid tulevad olemasolevatest `filters.genre`, `filters.tags`, `filters.type`, `common:labels.year`.
 
 ## Testid
 
