@@ -33,7 +33,7 @@ const WorkFilterSections: React.FC<WorkFilterSectionsProps> = ({
   const { t } = useTranslation(['dashboard', 'common']);
   const {
     input, loading, genreItems, tagItems, typeItems, languageItems,
-    selectedGenreItemValue, selectedTypeItemValue, effectiveSelectedTags, toggleTag,
+    selectedGenreItemValue, selectedTypeItemValue, effectiveSelectedTags, toggleTag, applyWorkFilter,
   } = model;
   const { selectedStatus, selectedLanguages, onGenreChange, onTypeChange, onStatusChange, onLanguagesChange } = input;
 
@@ -62,7 +62,7 @@ const WorkFilterSections: React.FC<WorkFilterSectionsProps> = ({
               <SearchableFilterList
                 items={typeItems}
                 selectedValues={selectedTypeItemValue ? [selectedTypeItemValue] : []}
-                onToggle={(val) => onTypeChange(selectedTypeItemValue === val ? null : val)}
+                onToggle={(val) => (selectedTypeItemValue === val ? onTypeChange(null) : applyWorkFilter('type', val))}
                 placeholder={t('filters.searchType')}
                 collapsedCount={VISIBLE}
               />
@@ -79,7 +79,7 @@ const WorkFilterSections: React.FC<WorkFilterSectionsProps> = ({
               <SearchableFilterList
                 items={genreItems}
                 selectedValues={selectedGenreItemValue ? [selectedGenreItemValue] : []}
-                onToggle={(val) => onGenreChange(selectedGenreItemValue === val ? null : val)}
+                onToggle={(val) => (selectedGenreItemValue === val ? onGenreChange(null) : applyWorkFilter('genre', val))}
                 placeholder={t('filters.searchGenre')}
                 collapsedCount={VISIBLE}
               />
