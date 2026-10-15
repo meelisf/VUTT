@@ -231,3 +231,68 @@ def test_new_user_from_invite_gets_bcrypt_hash(monkeypatch, tmp_path):
     username = new_user["username"]
     stored_hash = saved_users[username]["password_hash"]
     assert stored_hash.startswith("$2b$"), f"Uus kasutaja peab saama bcrypt hashi, saadi: {stored_hash[:20]}"
+
+
+# ---------------------------------------------------------------------------
+# Täpitähed: NFC-normaliseerimine ja bcrypti 72 baidi piir
+# ---------------------------------------------------------------------------
+
+_NFC = "Õunapuu ääres öö"                               # ühe koodipunktiga õ/ä/ö
+_NFD = __import__("unicodedata").normalize("NFD", _NFC)  # o + kombineeruv tilde jne
+
+
+def _users_with_hash(password_hash: str) -> dict:
+    return {"mari": {"password_hash": password_hash, "name": "Mari",
+                     "role": "editor", "allowed_collections": []}}
+
+
+def test_nfc_ja_nfd_parool_on_sama(monkeypatch):
+    """NFC-s seatud parool peab sobima NFD-s sisestatuna ja vastupidi."""
+    from server.auth import hash_password
+    import server.auth as auth_mod
+
+    assert _NFC != _NFD
+    monkeypatch.setattr(auth_mod, "_users_cache", _users_with_hash(hash_password(_NFC)))
+    assert auth_mod.verify_user("mari", _NFD) is not None
+    monkeypatch.setattr(auth_mod, "_users_cache", _users_with_hash(hash_password(_NFD)))
+    assert auth_mod.verify_user("mari", _NFC) is not None
+
+
+def test_vana_nfd_hash_toimib_edasi(monkeypatch):
+    """Enne normaliseerimist NFD-baitidest tehtud hash ei tohi kasutajat välja lukustada."""
+    import bcrypt
+    import server.auth as auth_mod
+
+    vana = bcrypt.hashpw(_NFD.encode(), bcrypt.gensalt()).decode()
+    monkeypatch.setattr(auth_mod, "_users_cache", _users_with_hash(vana))
+    assert auth_mod.verify_user("mari", _NFD) is not None
+
+
+def test_ule_72_baidi_sisselogimine_ei_viska(monkeypatch):
+    """bcrypt 5 viskab >72 baidi peal ValueError-i — sisselogimine peab andma lihtsalt None."""
+    from server.auth import hash_password
+    import server.auth as auth_mod
+
+    pikk = "õ" * 40  # 40 märki, 80 baiti
+    monkeypatch.setattr(auth_mod, "_users_cache", _users_with_hash(hash_password("korrektne")))
+    assert auth_mod.verify_user("mari", pikk) is None
+    monkeypatch.setattr(auth_mod, "_users_cache", {})
+    assert auth_mod.verify_user("olematu", pikk) is None
+
+
+def test_parooli_tugevus_loeb_baite_mitte_marke():
+    from server.registration import validate_password_strength
+
+    assert validate_password_strength("õäöü" * 9) is None       # 36 märki, 72 baiti
+    viga = validate_password_strength("õäöü" * 9 + "x")          # 73 baiti
+    assert viga is not None and "72" in viga
+
+
+def test_parooli_pikkus_loetakse_nfc_kujult():
+    """NFD-s 12 koodipunkti, aga kasutaja jaoks ainult 6 märki → liiga lühike."""
+    import unicodedata
+    from server.registration import validate_password_strength
+
+    nfd = unicodedata.normalize("NFD", "õäöüõä")
+    assert len(nfd) == 12
+    assert validate_password_strength(nfd) is not None

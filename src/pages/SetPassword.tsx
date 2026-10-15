@@ -79,8 +79,14 @@ const SetPassword: React.FC = () => {
     if (!password) {
       return t('setPassword.errors.passwordRequired');
     }
-    if (password.length < 12) {
+    // Märgid loetakse NFC kujult nagu serveris (NFD-s oleks „õ" kaks koodipunkti)
+    const normalized = password.normalize('NFC');
+    if ([...normalized].length < 12) {
       return t('setPassword.errors.passwordTooShort');
+    }
+    // bcrypt'i piir on 72 BAITI — täpitäht võtab UTF-8-s 2 baiti
+    if (new TextEncoder().encode(normalized).length > 72) {
+      return t('setPassword.errors.passwordTooLong');
     }
     // Lihtsa parooli kontroll - vähemalt 4 erinevat tähemärki
     const uniqueChars = new Set(password).size;

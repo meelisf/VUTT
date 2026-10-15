@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE, get_logger
 from .auth import (load_users, users_lock, sanitize_edit_collections,
                    load_deleted_usernames, users_transaction, save_users,
-                   hash_password, DeletedUsernamesCorrupt)
+                   hash_password, DeletedUsernamesCorrupt,
+                   normalize_password, MAX_PASSWORD_BYTES)
 from .cache import get_cached_collections
 from .utils import atomic_write_json
 from .user_language import normalize_language
@@ -415,12 +416,17 @@ MIN_UNIQUE_CHARS = 4
 
 def validate_password_strength(password):
     """Kontrollib parooli tugevust. Tagastab veateate stringina või None kui OK."""
+    # Märke loetakse NFC kujult — NFD-s oleks iga täpitäht kaks
+    password = normalize_password(password)
     if len(password) < MIN_PASSWORD_LENGTH:
         return f"Parool peab olema vähemalt {MIN_PASSWORD_LENGTH} tähemärki pikk"
     if len(set(password)) < MIN_UNIQUE_CHARS:
         return "Parool on liiga lihtne (vähemalt 4 erinevat tähemärki nõutud)"
     if password == password[0] * len(password):
         return "Parool on liiga lihtne (korduvad tähemärgid)"
+    if len(password.encode()) > MAX_PASSWORD_BYTES:
+        return (f"Parool on liiga pikk (üle {MAX_PASSWORD_BYTES} baidi; "
+                "täpitäht võtab 2 baiti)")
     return None
 
 

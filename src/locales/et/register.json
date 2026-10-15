@@ -54,6 +54,7 @@
     "errors": {
       "passwordRequired": "Parool on kohustuslik",
       "passwordTooShort": "Parool peab olema vähemalt 12 tähemärki",
+      "passwordTooLong": "Parool on liiga pikk – lubatud on kuni 72 baiti (täpitäht võtab 2 baiti)",
       "passwordTooSimple": "Parool on liiga lihtne – kasuta rohkem erinevaid tähemärke",
       "passwordMismatch": "Paroolid ei ühti",
       "tokenInvalid": "Kutse link on aegunud või vigane",

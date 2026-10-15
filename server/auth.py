@@ -8,6 +8,7 @@ import uuid
 import threading
 import time
 import logging
+import unicodedata
 import bcrypt
 from contextlib import contextmanager
 from datetime import datetime
@@ -273,18 +274,46 @@ def start_background():
 _DUMMY_BCRYPT_HASH = bcrypt.hashpw(b"timing-equalizer", bcrypt.gensalt())
 
 
+# bcrypt (5.x) keeldub pikemast sisendist ValueError-iga. Täpitäht on UTF-8-s
+# 2 baiti, seega piir on baitides, mitte märkides.
+MAX_PASSWORD_BYTES = 72
+
+
+def normalize_password(password: str) -> str:
+    """Sama „õ" võib tulla ühe (NFC) või kahe koodipunktina (o + kombineeruv
+    tilde, NFD). Hash ja kontroll käivad alati NFC kujult."""
+    return unicodedata.normalize("NFC", password)
+
+
+def password_bytes(password: str) -> bytes:
+    return normalize_password(password).encode()
+
+
 def hash_password(password: str) -> str:
     """Hashib parooli bcrypt-iga (soolaga)."""
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return bcrypt.hashpw(password_bytes(password), bcrypt.gensalt()).decode()
+
+
+def _checkpw(password: bytes, stored: bytes) -> bool:
+    # Üle piiri sisend ei saa ühegi salvestatud hashiga klappida (seadmisel
+    # keelatud) — ära lase bcryptil visata, sisselogimine annaks muidu 500.
+    if len(password) > MAX_PASSWORD_BYTES:
+        return False
+    return bcrypt.checkpw(password, stored)
 
 
 def _verify_and_upgrade(username: str, password: str, users: dict) -> bool:
     """Kontrollib parooli ja uuendab SHA-256 hashi bcrypt-ile sisselogimisel."""
     stored = users[username]["password_hash"]
+    # Enne NFC-normaliseerimist tehtud hash võib kanda sisestuse toorbaite —
+    # need proovitakse teisena, et vana NFD-paroolini kasutaja välja ei jääks.
+    kandidaadid = [password_bytes(password)]
+    if password.encode() != kandidaadid[0]:
+        kandidaadid.append(password.encode())
     if stored.startswith("$2b$") or stored.startswith("$2a$"):
-        return bcrypt.checkpw(password.encode(), stored.encode())
+        return any(_checkpw(k, stored.encode()) for k in kandidaadid)
     # SHA-256 tagasiühilduvus — uuenda bcrypt-ile
-    if stored == hashlib.sha256(password.encode()).hexdigest():
+    if any(stored == hashlib.sha256(k).hexdigest() for k in kandidaadid):
         users[username]["password_hash"] = hash_password(password)
         save_users(users)
         return True
@@ -297,7 +326,7 @@ def verify_user(username, password):
     if username not in users:
         # Jooksuta bcrypt dummy hashi vastu, et vastuse aeg oleks sama nagu
         # olemasoleva kasutaja korral (ajastuse-leke / enumeratsiooni vältimine).
-        bcrypt.checkpw(password.encode(), _DUMMY_BCRYPT_HASH)
+        bcrypt.checkpw(password_bytes(password)[:MAX_PASSWORD_BYTES], _DUMMY_BCRYPT_HASH)
         return None
     if not _verify_and_upgrade(username, password, users):
         return None
