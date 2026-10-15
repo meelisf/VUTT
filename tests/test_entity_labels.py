@@ -293,3 +293,49 @@ def test_sync_skips_fetch_when_disabled(tmp_path, monkeypatch):
     monkeypatch.setattr(elo, "_fetch_wikidata_labels", boom)
     assert elo.sync_prosopography_inline_labels(
         registry={}, fetch_missing=False) == {"files": 0, "slots": 0, "fetched": 0}
+
+
+def _write_overrides(tmp_path, monkeypatch, data):
+    import json as _json
+    path = tmp_path / "label_overrides.json"
+    path.write_text(_json.dumps(data), encoding="utf-8")
+    monkeypatch.setattr(elo, "LABEL_OVERRIDES_FILE", str(path))
+
+
+def test_ulekirjutus_voidab_wikidata_sildi(tmp_path, monkeypatch):
+    """ADR 0068: kohalik silt jääb peale ka Wikidata värskendusel."""
+    _write_overrides(tmp_path, monkeypatch, {"Q3497659": {"en": "statutes"}})
+    monkeypatch.setattr(elo, "_fetch_wikidata_labels_raw", lambda q: {
+        "Q3497659": {"en": "articles of association", "et": "põhikiri"},
+        "Q5": {"en": "human"},
+    })
+    fetched = elo._fetch_wikidata_labels(["Q3497659", "Q5"])
+    assert fetched["Q3497659"] == {"en": "statutes", "et": "põhikiri"}
+    assert fetched["Q5"] == {"en": "human"}
+
+
+def test_ulekirjutus_ei_tee_osalist_kirjet_ebaonnestunud_paringust(tmp_path, monkeypatch):
+    """Puuduv Wikidata vastus ei tohi registrikirjet ülekirjutuse keeleks kärpida."""
+    _write_overrides(tmp_path, monkeypatch, {"Q3497659": {"en": "statutes"}})
+    monkeypatch.setattr(elo, "_fetch_wikidata_labels_raw", lambda q: {})
+    assert elo._fetch_wikidata_labels(["Q3497659"]) == {}
+
+
+def test_taisvarskendus_hoiab_ulekirjutust(tmp_path, monkeypatch):
+    _write_overrides(tmp_path, monkeypatch, {"Q3497659": {"en": "statutes"}})
+    registry = {"Q3497659": {"en": "statutes", "et": "põhikiri", "de": "Statut"}}
+    written = {}
+    monkeypatch.setattr(elo, "load_entity_labels", lambda: dict(registry))
+    monkeypatch.setattr(elo, "_fetch_wikidata_labels_raw", lambda q: {
+        "Q3497659": {"en": "articles of association", "et": "põhikiri",
+                     "de": "Gesellschaftsvertrag"}})
+    monkeypatch.setattr(elo, "atomic_write_json",
+                        lambda path, data: written.update({"data": data}))
+    elo.refresh_all_entity_labels()
+    assert written["data"]["Q3497659"]["en"] == "statutes"
+    assert written["data"]["Q3497659"]["de"] == "Gesellschaftsvertrag"
+
+
+def test_puuduv_ulekirjutuste_fail_on_tuhi(tmp_path, monkeypatch):
+    monkeypatch.setattr(elo, "LABEL_OVERRIDES_FILE", str(tmp_path / "puudub.json"))
+    assert elo.load_label_overrides() == {}
