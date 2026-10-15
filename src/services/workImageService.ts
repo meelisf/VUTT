@@ -17,6 +17,21 @@ export const getFullImageUrl = (imagePath: string): string => {
 // kasutaja vana 560 px pilti kuni cache aegumiseni.
 const COVER_VERSION = 2;
 
+/**
+ * Lehe failinimi (kettal olev kuju) pildi URL-ist. `getFullImageUrl` kodeerib
+ * tee `encodeURI`-ga, seega URL-i viimane lõik on „Lieffl%C3%A4…", mitte
+ * „Liefflä…". Serveri teed (/save, ajalugu, re-OCR) vajavad kettal olevat
+ * nime — ilma dekodeerimiseta 404 iga mitte-ASCII failinime korral.
+ */
+export const pageFileFromImageUrl = (imageUrl: string): string => {
+  const last = (imageUrl || '').split('/').pop() || '';
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last; // vigane %-jada: parem toores nimi kui erind salvestusteel
+  }
+};
+
 // Kaanepildi URL konstrueerimine (server leiab ise õige faili)
 export const getThumbUrl = (workId: string): string => {
   if (!workId) return '';

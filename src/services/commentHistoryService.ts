@@ -1,6 +1,7 @@
 import { Page, Annotation } from '../types';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { pageFileFromImageUrl } from './workImageService';
 
 export interface CommentVersion {
   commit_hash: string;
@@ -25,7 +26,7 @@ export interface CommentHistory {
 }
 
 function pageFileNames(page: Page): { original_path: string; file_name: string } {
-  const imageFilename = page.image_url.split('/').pop() || '';
+  const imageFilename = pageFileFromImageUrl(page.image_url);
   const file_name = imageFilename.replace(/\.[^/.]+$/, '') + '.txt';
   return {
     original_path: page.original_path || page.originaal_kataloog || '',
