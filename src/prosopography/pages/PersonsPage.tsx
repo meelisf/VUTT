@@ -398,7 +398,8 @@ const PersonsPage: React.FC = () => {
         <div className="flex-1 min-w-0">
         {/* Otsingurida + mobiilis filtrinupp + uus isik */}
         <div className="mb-6">
-          <div className="flex items-center gap-2">
+          {/* items-stretch: nupud on otsingukastiga sama kõrged */}
+          <div className="flex items-stretch gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
               <input
