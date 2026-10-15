@@ -761,8 +761,8 @@ const Dashboard: React.FC = () => {
           <div className="flex-1 min-w-0">
           <div className="mb-6">
             <div className="flex flex-col gap-3">
-              {/* Otsingurida + mobiilis filtrinupp */}
-              <div className="flex items-center gap-2">
+              {/* Otsingurida + mobiilis filtrinupp; items-stretch: nupp on kastiga sama kõrge */}
+              <div className="flex items-stretch gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
