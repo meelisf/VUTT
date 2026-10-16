@@ -1,7 +1,7 @@
 # ADR 0070 — Lehe tähistus on märgendatud; lehe aadress tuletatakse
 
 **Termin.** *Lehe tähistus* = TEI `fw` (*forme work*): leheküljenumber,
-foliatsioon, signatuur, kustood — lehe kui füüsilise objekti tähistus, mitte
+foliatsioon, signatuur, siirdeviit, veerutiitel — lehe kui füüsilise objekti tähistus, mitte
 teksti osa. **Ei ole marginaalia**: `<m>` (ADR 0003/0009) on sisuline tekst veerisel.
 
 **Kuupäev:** 2026-10-16
@@ -31,11 +31,11 @@ Kolm päris juhtumit (kontrollitud 2026-10-16):
 - **Paginatsioon** — trükistes tavaline, aga ka osa käsikirju on paginatsiooniga.
   Teose tüüp ei määra skeemi.
 
-**Praegune viga otsingutekstis.** Toorfailis on kustood ja signatuur oma ridadel
+**Praegune viga otsingutekstis.** Toorfailis on siirdeviit ja signatuur oma ridadel
 lehe lõpus (`04na2fu4/00003.txt`: `Ehrwür⸗` ⏎ `A ij`). `clean_text_for_search`
-liidab reavahetuse poolituse ja signatuur kleepub kustoodi külge:
+liidab reavahetuse poolituse ja signatuur kleepub siirdeviida külge:
 `lehekylje_tekst` = `…EhrwürA ij`, lk 9 `…seiB`. See on otsinguindeksis, mitte
-ainult MCP kuvas; süsteemne igal poolitatud kustoodil, millele järgneb signatuur.
+ainult MCP kuvas; süsteemne igal poolitatud siirdeviidal, millele järgneb signatuur.
 
 Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
 (`<pb/>` vahel) — pildipõhine aadressiväli kannaks ainult ühte.
