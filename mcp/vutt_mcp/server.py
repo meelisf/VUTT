@@ -135,6 +135,8 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         N tekstisisest toimetajamärkust — get_pages näitab neid ankru juures.
         """
         search_fields = _scope_fields(scope)
+        offset = max(0, int(offset))
+        limit = max(1, min(int(limit), queries.MAX_LIMIT))
         # Teoseülene otsing laotatakse teoste peale: tõmbame üle ja kärbime
         # kuni PAGES_PER_WORK lehte teose kohta. Teosesiseses otsingus
         # (work_id antud) on kapp vale — seal ongi küsimus „kus SELLES teoses".
@@ -154,21 +156,22 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             limit=limit,
             offset=offset if work_id else 0,
         )
-        if not work_id:
-            queries.apply_spread_window(body, offset=offset, limit=limit)
-        data = client.meili_search(body)
-        hits = queries.cap_pages_per_work(data.get("hits", []), kapp)
-        if not work_id:
+        if work_id:
+            data = client.meili_search(body)
+            hits = data.get("hits", [])
+            total = data.get("totalHits", len(hits))
+            on_veel = total > offset + len(hits)
+        else:
             # Kärpimine käib enne offsetit, muidu ei oleks lehekülgede
             # järjestus lehelt lehele sama.
-            hits = hits[offset:offset + limit]
-        total = data.get("totalHits", len(hits))
+            hits, total, on_veel = queries.spread_search(
+                client.meili_search, body, offset=offset, limit=limit, cap=kapp)
         # Järgmise lehe vihje ainult siis, kui aken sai täis JA vasteid on veel.
         # Muidu lubaks see tühja järelpäringut.
         edasi = offset + len(hits)
         return fmt.format_search_hits(
             hits, total, base_url=base_url, compact=compact,
-            next_offset=edasi if len(hits) == limit and total > edasi else None,
+            next_offset=edasi if len(hits) == limit and on_veel else None,
         )
 
     @mcp.tool(structured_output=False)

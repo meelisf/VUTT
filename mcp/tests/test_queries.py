@@ -159,3 +159,47 @@ def test_search_pages_otsib_ainult_lehetekstist():
 
 def test_search_body_ilma_valjadeta_ei_pane_atribuuti():
     assert "attributesToSearchOn" not in queries.build_search_body("x")
+
+
+def _fake_meili(n_works: int, pages_per_work: int):
+    """Meili toorvasted relevantsusjärjekorras: iga teos annab järjest mitu lehte."""
+    raw = [{"work_id": f"w{w}", "lehekylje_number": p}
+           for w in range(n_works) for p in range(pages_per_work)]
+    calls = []
+
+    def fetch(body):
+        calls.append(body["page"])
+        size = body["hitsPerPage"]
+        start = (body["page"] - 1) * size
+        return {"hits": raw[start:start + size], "totalHits": len(raw)}
+    return fetch, calls
+
+
+def test_spread_search_teine_leht_ei_ole_tuhi():
+    """#618: 60 toorvastet → kapiga 3 jääb ~12; offset=20 andis varem tühja vastuse."""
+    fetch, calls = _fake_meili(n_works=40, pages_per_work=15)       # 600 toorvastet
+    body = queries.build_search_body("x", limit=20)
+    hits, total, more = queries.spread_search(fetch, body, offset=20, limit=20, cap=3)
+    assert len(hits) == 20 and more and total == 600
+    assert len(calls) > 1                                             # tõmmati järgmisi aknaid
+    first, _, _ = queries.spread_search(fetch, queries.build_search_body("x", limit=20),
+                                        offset=0, limit=20, cap=3)
+    assert not {(h["work_id"], h["lehekylje_number"]) for h in first} & \
+        {(h["work_id"], h["lehekylje_number"]) for h in hits}
+
+
+def test_spread_search_otsas_ei_paku_jargmist_lehte():
+    fetch, calls = _fake_meili(n_works=4, pages_per_work=10)         # kapiga 12 vastet
+    hits, _, more = queries.spread_search(fetch, queries.build_search_body("x", limit=10),
+                                          offset=0, limit=10, cap=3)
+    assert len(hits) == 10 and more
+    hits, _, more = queries.spread_search(fetch, queries.build_search_body("x", limit=10),
+                                          offset=10, limit=10, cap=3)
+    assert len(hits) == 2 and not more
+
+
+def test_spread_search_tommete_lagi():
+    fetch, calls = _fake_meili(n_works=1, pages_per_work=5000)       # üks teos, kapp 3
+    hits, _, more = queries.spread_search(fetch, queries.build_search_body("x", limit=10),
+                                          offset=0, limit=10, cap=3)
+    assert len(calls) == queries.MAX_SPREAD_ROUNDS and len(hits) == 3

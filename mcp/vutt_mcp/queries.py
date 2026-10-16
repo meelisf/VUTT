@@ -164,6 +164,42 @@ def apply_spread_window(body: dict, *, offset: int, limit: int) -> dict:
     return body
 
 
+# Sügavama lehe jaoks tõmmatakse järgmisi aknaid, kuni kärbitud vasteid on
+# küllalt (#618). Lagi hoiab latentsi piiris: 5 × 60 = 300 toorvastet.
+MAX_SPREAD_ROUNDS = 5
+
+
+def spread_search(fetch, body: dict, *, offset: int, limit: int, cap: int) -> tuple[list[dict], int, bool]:
+    """Teoseülene otsing: kärbib ENNE offsetit ja tõmbab vajadusel järgmisi aknaid.
+
+    Üksainus aken (≤ MAX_FETCH toorvastet) jäi pärast kärpimist sageli lühemaks
+    kui `offset + limit` → teine/kolmas leht tuli tühi, kuigi `totalHits` oli
+    suur (#618). `fetch(body) -> dict` on Meili päring.
+
+    Tagastab (lehe vasted, totalHits, kas on veel).
+    """
+    apply_spread_window(body, offset=offset, limit=limit)
+    window = body["hitsPerPage"]
+    need = offset + limit
+    raw: list[dict] = []
+    total = 0
+    exhausted = False
+    for round_no in range(1, MAX_SPREAD_ROUNDS + 1):
+        body["page"] = round_no
+        data = fetch(body)
+        page_hits = data.get("hits", [])
+        raw.extend(page_hits)
+        total = data.get("totalHits", len(raw))
+        # Lühike aken = vasted otsas; `totalHits` on page/hitsPerPage režiimis täpne.
+        exhausted = len(page_hits) < window or round_no * window >= total
+        if exhausted or len(cap_pages_per_work(raw, cap)) >= need:
+            break
+    capped = cap_pages_per_work(raw, cap)
+    hits = capped[offset:offset + limit]
+    has_more = len(capped) > offset + limit or not exhausted
+    return hits, total, has_more
+
+
 def cap_pages_per_work(hits: list[dict], cap: int) -> list[dict]:
     """Kärbib iga teose osakaalu, säilitades Meili relevantsusjärjekorra.
 
