@@ -20,9 +20,12 @@ impordivad seda fake-package mustriga).
 """
 import re
 
-# Inline-vormindustägid, mis VÕIVAD <m> ümber/ristuda. EI sisalda 'm' ennast,
-# ega widget-tägi 'fn'/'pb' (need ei esine marginaalia-real samamoodi).
-_INLINE = r'(?:i|b|cs|hi|add|ann\d*)'
+from .vutt_tags import VUTT_TAG_REGISTRY, normalize_page_mark_structure, tag_pattern
+
+# Inline-tägid, mis VÕIVAD <m> ümber/ristuda — registrist (ADR 0071, `marginalia_inline`).
+# EI sisalda 'm' ennast ega widget-tägi 'fn'/'pb'. Lehe tähistus on siin: ta võib olla
+# <m> sees, mitte vastupidi (ADR 0070).
+_INLINE = r'(?:' + '|'.join(tag_pattern(t) for t in VUTT_TAG_REGISTRY if t.marginalia_inline) + r')'
 
 # Rida, mis on TERVIKUNA marginaalia: valikuline ws + inline-avatägid + <m> +
 # sisu (ilma <m>/</m>-ta) + </m> + inline-sulgtägid + valikuline ws.
@@ -55,9 +58,11 @@ def _normalize_line(line: str) -> str:
     return f'{ws1}<m>{inner}</m>{ws2}'
 
 
-# Tühje paaris-tage koristatakse komplektist (m + inline). EI sisalda 'ann\d*'
+# Tühje paaris-tage koristatakse registri `strip_empty` järgi. EI sisalda 'ann\d*'
 # (ID viitab andmetele), 'fn' (joonealuse viide) ega 'pb' (self-closing).
-_EMPTY_RE = re.compile(r'<(m|i|b|cs|hi|add)>(\s*)</\1>')
+_EMPTY_RE = re.compile(
+    r'<(' + '|'.join(t.name for t in VUTT_TAG_REGISTRY if t.strip_empty) + r')>(\s*)</\1>'
+)
 
 
 def strip_empty_tags(text: str) -> str:
@@ -67,7 +72,8 @@ def strip_empty_tags(text: str) -> str:
     risustavad faili ja segavad mudeli treenimist. See koristab need.
 
     Reeglid (ettearvatav, deterministlik):
-    - Komplekt: `m, i, b, cs, hi, add`. Puutumata: `ann\\d*`, `fn`, `pb`.
+    - Komplekt registrist (`strip_empty`): `m i b cs hi add fw sig catch rh`.
+      Puutumata: `ann\\d*`, `fn`, `pb`.
     - **Säilitab sisu, eemaldab ainult tagid:** `<i> </i>` → ` ` (mitte ``), nii ei
       kao kunagi nähtavat märki põhitekstis.
     - **Pesastatud püsipunktini:** `<m><i></i></m>` → `<m></m>` → ``.
@@ -95,6 +101,9 @@ def normalize_marginalia_tags(text: str) -> str:
     """
     if not text:
         return text
+    # Lehe tähistus (ADR 0070): sisemised ja kehtetud paarid (üle <pb/>, ristuvad)
+    # kaovad enne <m>-normaliseerimist — üks kord, tulemus on püsipunkt.
+    text = normalize_page_mark_structure(text)
     # Püsipunktini: tühja tagi koristus võib paljastada servatühiku
     # (`<m><i></i> x</m>` → `<m> x</m>`), mille koristab alles järgmine käik.
     prev = None
