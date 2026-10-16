@@ -600,6 +600,12 @@ def delete_person_image(person_id: str, username: str) -> dict:
     return person
 
 
+_ENRICH_FORBIDDEN_ROOTS = frozenset((
+    "id", "created_at", "created_by", "updated_at", "updated_by", "schema_version",
+    "import_batch_ids", "merged_into", "record_status",
+) + SECRET_FIELDS)
+
+
 def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
     """Rakendab kasutaja kinnitatud rikastusmuudatused."""
     def _deep_set(obj: dict, path: str, value):
@@ -636,6 +642,15 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         for key in ANCHOR_FIELDS:
             approved_fields.pop(key, None)
 
+        # Kaardi identiteet ja elutsükkel ei ole rikastatav: `id` muutus suunaks
+        # salvestuse teise kaardi faili (lukk on selle kaardi peal), `merged_into`/
+        # `record_status` on liitmise ja kustutamise (admin) väljad. Sama loend
+        # mis `_apply_card_update`-is + elutsükkel; ka alamrajad (`id.x`).
+        for field_path in list(approved_fields):
+            if field_path.split(".", 1)[0] in _ENRICH_FORBIDDEN_ROOTS:
+                raise ValueError(f"enrich_forbidden_field: {field_path}")
+
+        old_label = (person.get("name") or {}).get("label") or ""
         for field_path, value in approved_fields.items():
             _deep_set(person, field_path, value)
 
@@ -648,9 +663,15 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         person["updated_at"] = now
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
+        fill_person_labels_from_registry(person)
         _save_person_locked(person, username, f"Prosopo rikastus: {name} [{person_id}]")
     _indices()._update_index_entry(person)
     _indices()._update_aliases_entry(person)
+
+    # Nagu update_person: nimi teostes järgib kaarti (luku VÄLJAS).
+    new_label = (person.get("name") or {}).get("label") or ""
+    if new_label and new_label != old_label:
+        _propagate_name_to_works(person_id, new_label, username)
     return person
 
 
