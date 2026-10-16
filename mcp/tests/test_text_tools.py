@@ -260,7 +260,8 @@ async def test_search_pages_compact_joudb_vormistusse(server_with):
 
 
 async def test_search_pages_next_offset_kui_aken_sai_taide(server_with):
-    hits = [_hit(page=n, work_id=f"w{n}") for n in range(1, 6)]
+    # Ületõmbeaken (limit 5 → 15) on täis nagu päris Meilil, kui vasteid on 519.
+    hits = [_hit(page=n, work_id=f"w{n}") for n in range(1, 16)]
     server, _ = server_with([{"hits": hits, "totalHits": 519}])
     out = await _call(server, "search_pages", {"query": "x", "limit": 5})
     assert "offset=5" in out
