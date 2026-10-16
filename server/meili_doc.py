@@ -30,6 +30,7 @@ from .utils import (
     get_labels_by_lang, sanitize_id, parse_year_range, normalize_genre,
 )
 from .marginalia_normalize import normalize_marginalia_tags
+from .vutt_tags import page_mark_entries, remove_page_marks
 
 # Pealkirja lisaväljad (ADR 0064) — tõlge(d) ja transkribeeritud originaal.
 # Uus keel = uus väli siia; ta jõuab metaandmete valge nimekirja
@@ -115,7 +116,8 @@ def clean_text_for_search(text, keep_ann=False):
     """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
 
     Toetab mõlemat märgendusformaati:
-    - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <add>, <fn>n</fn>, <pb/>
+    - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <add>, <fn>n</fn>, <pb/>; lehe tähistus
+      <fw>/<sig>/<catch>/<rh> eemaldatakse koos sisuga (ADR 0070)
     - Vana pseudo-markdown: *italic*, **bold*, ~cs~, [[m:text]], --lk--, [^n]
 
     `keep_ann=True` jätab `<annN>…</annN>` ankrud alles — kõik ÜLEJÄÄNUD
@@ -126,6 +128,12 @@ def clean_text_for_search(text, keep_ann=False):
     """
     if not text:
         return ""
+
+    # 0. Lehe tähistus (ADR 0070): kehtivad välimised paarid KOOS sisuga välja,
+    # ENNE üldist tägieemaldust ja poolituste liitmist. Asendus = tühi string —
+    # tähistus on teksti voos läbipaistev (`dem⸗` ⏎ `<sig>B</sig>` ⏎ `Wort` → `demWort`),
+    # signatuur ei kleepu siirdeviida külge.
+    text = remove_page_marks(text)
 
     # 1. Uus XML märgendus — eemalda kõik VUTT tägid
     # <fn>n</fn> ja <pb/> asendame tühikuga, ülejäänud tägid eemaldame
@@ -470,6 +478,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "lehekylje_tekst": lehekylje_tekst,               # OTSING: põhitekst ILMA marginaaliata
         "marginaalia_tekst": marginaalia_tekst,           # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
         "text_content": page_text,                             # REDAKTOR: algne tekst koos kõigi märkidega
+        "page_marks": page_mark_entries(page_text),            # KUVA (ei otsita): lehe tähistus [{kind,text,seg}], ADR 0070
         "lehekylje_pilt": os.path.join(dir_name, img_name),
         "originaal_kataloog": dir_name,
         "status": page_meta['status'],

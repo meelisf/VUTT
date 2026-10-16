@@ -100,6 +100,26 @@ body:has(.workspace-container) {
   text-decoration-color: #059669; /* emerald-600 */
 }
 
+/* Lehe tähistus (ADR 0070): <fw> <sig> <catch> <rh> — lehe kui füüsilise objekti
+   tähistus, mitte tekst. Hall + kerge taust; liigi silt ::before tägi nimega
+   (keeleneutraalne, sama mis toortekstis). EI vertical-align-i ega font-size
+   muutust (vt .vutt-add): CodeMirroris muudaks see rea kõrgust ja kursorit. */
+.vutt-pm {
+  color: #6b7280; /* gray-500 */
+  background-color: #f3f4f6; /* gray-100 */
+  border-radius: 2px;
+}
+.vutt-pm::before {
+  color: #9ca3af; /* gray-400 */
+  /* Font päritakse: teine font (nt system-ui) muudaks rea kõrgust 1 px võrra. */
+  letter-spacing: 0.03em;
+  margin-right: 0.25em;
+}
+.vutt-pm-fw::before { content: "fw"; }
+.vutt-pm-sig::before { content: "sig"; }
+.vutt-pm-catch::before { content: "catch"; }
+.vutt-pm-rh::before { content: "rh"; }
+
 /* <fn>n</fn> widget — joonealuse viite marker */
 .vutt-fn-widget {
   color: #0284c7; /* primary-600 */

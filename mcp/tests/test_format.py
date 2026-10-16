@@ -540,3 +540,23 @@ def test_mitme_tukiga_ankur_kommentaar_ainult_viimase_tuki_juures():
     assert "⟦Jocoſer:⟧" in out
     assert "[---]76. ← toimetaja: kahtlane!" in out
     assert "ann2" not in out
+
+
+def test_format_pages_naitab_lehe_tahistust_paises():
+    pages = [{
+        "lehekylje_number": 5,
+        "lehekylje_tekst": "derſelben Ihr gnädigſt",
+        "status": "Toores",
+        "page_marks": [{"kind": "sig", "text": "A iij", "seg": 0},
+                       {"kind": "catch", "text": "Vor⸗", "seg": 0}],
+    }]
+    out = fmt.format_pages(pages, base_url=BASE, work_id="abc")
+    paise = out.splitlines()[0]
+    assert "signatuur A iij" in paise
+    assert "siirdeviit Vor⸗" in paise
+
+
+def test_format_pages_ilma_tahistuseta_paises_sama():
+    pages = [{"lehekylje_number": 5, "lehekylje_tekst": "x", "status": "Toores"}]
+    out = fmt.format_pages(pages, base_url=BASE, work_id="abc")
+    assert out.splitlines()[0] == f"── lk 5 · seisund=Toores · {BASE}/work/abc/5"

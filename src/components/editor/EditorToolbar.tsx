@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Columns2, RemoveFormatting, SeparatorHorizontal, SquarePen, StickyNote, Superscript } from 'lucide-react';
+import { Columns2, Hash, RemoveFormatting, SeparatorHorizontal, SquarePen, StickyNote, Superscript } from 'lucide-react';
 import type { MarginaliaMode } from './MarginaliaExtension';
 
 interface EditorToolbarProps {
@@ -14,6 +14,8 @@ interface EditorToolbarProps {
   cleanMarkup: () => void;
   onAnnotateSelection: () => void;
   toggleMarginaliaMode: () => void;
+  pageMarkPaletteOpen: boolean;
+  togglePageMarkPalette: () => void;
 }
 
 // Transkriptsiooniredaktori vormindamise tööriistariba.
@@ -29,6 +31,8 @@ export default function EditorToolbar({
   cleanMarkup,
   onAnnotateSelection,
   toggleMarginaliaMode,
+  pageMarkPaletteOpen,
+  togglePageMarkPalette,
 }: EditorToolbarProps) {
   const { t } = useTranslation(['workspace']);
 
@@ -45,6 +49,9 @@ export default function EditorToolbar({
         <button type="button" onClick={insertMarginalia} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.marginalia')}><StickyNote size={14} />{!compactToolbar && <span>Marginalia</span>}</button>
         <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
         <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
+        <button type="button" onClick={togglePageMarkPalette}
+          className={`w-7 h-7 flex items-center justify-center rounded border ${pageMarkPaletteOpen ? 'bg-gray-100 border-gray-200 text-gray-700' : 'border-transparent hover:bg-gray-100 hover:border-gray-200 text-gray-500'}`}
+          title={t('editor.pageMarks.toolbar')} aria-pressed={pageMarkPaletteOpen}><Hash size={14} /></button>
         <div className="w-px h-4 bg-gray-300 mx-1"></div>
         <button type="button" onClick={cleanMarkup} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.cleanMarkup')}><RemoveFormatting size={14} />{!compactToolbar && <span>{t('editor.tooltips.cleanMarkupButton')}</span>}</button>
         <div className="w-px h-4 bg-gray-300 mx-1"></div>

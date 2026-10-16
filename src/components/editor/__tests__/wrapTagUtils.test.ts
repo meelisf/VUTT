@@ -29,6 +29,10 @@ describe('selectionWrapChanges — mähkimine', () => {
     expect(lulita('daß ⟦mir⟧ bedeutende', 'add')).toBe('daß <add>mir</add> bedeutende');
   });
 
+  it('kursiiv läheb tähistuse sisse (struktuuritäg)', () => {
+    expect(lulita('⟦<sig>A ij</sig>⟧')).toBe('<sig><i>A ij</i></sig>');
+  });
+
   it('stiilitäg läheb lisanduse (add) SISSE', () => {
     expect(lulita('a ⟦<add>mir</add>⟧ b')).toBe('a <add><i>mir</i></add> b');
   });

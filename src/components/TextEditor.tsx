@@ -23,6 +23,7 @@ import { useReOcr } from './editor/useReOcr';
 import { useEditorState } from './editor/useEditorState';
 import { useEditorSave } from './editor/useEditorSave';
 import { useEditorFormattingActions } from './editor/useEditorFormattingActions';
+import { readPaletteOpen, writePaletteOpen } from './editor/PageMarkPalette';
 import { useTextAnnotationActions } from './editor/useTextAnnotationActions';
 import { useCodeMirrorLifecycle } from './editor/useCodeMirrorLifecycle';
 import { useTranscriptionGuide } from './editor/useTranscriptionGuide';
@@ -87,6 +88,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // AnnotationsTab registreerib siia kommentaari-mustandi flushi (vt handleSaveWithDrafts)
   const commentFlushRef = useRef<(() => Annotation[] | null) | null>(null);
   const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
+  // Lehe tähistus (ADR 0070): paneeli lahti/kinni on brauseri mugavusseade,
+  // menüü avab Ctrl/⌘+Shift+F kursori juures.
+  const openPageMarkMenuRef = useRef<() => void>(() => {});
+  const [pageMarkPaletteOpen, setPageMarkPaletteOpen] = useState(readPaletteOpen);
+  const [pageMarkMenu, setPageMarkMenu] = useState<{ left: number; top: number } | null>(null);
+  const togglePageMarkPalette = useCallback(() => {
+    setPageMarkPaletteOpen(o => { writePaletteOpen(!o); return !o; });
+  }, []);
+  const closePageMarkMenu = useCallback(() => { setPageMarkMenu(null); viewRef.current?.focus(); }, []);
+  // Lehevahetus ei monteeri redaktorit maha (ADR 0010): lahtine menüü suletakse
+  // selgesõnaliselt. Sama lehe uuendus (ADR 0060) id-d ei muuda.
+  useEffect(() => { setPageMarkMenu(null); }, [page.id]);
 
   const {
     setIsDirty,
@@ -149,6 +162,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     viewRef,
     handleSaveRef,
     wrapWithTagRef,
+    openPageMarkMenuRef,
     copyPastePlainMarkup,
     setIsDirty,
   });
@@ -231,6 +245,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   const {
     wrapWithTag,
+    wrapPageMark,
     insertAtCursor,
     insertSpecialChar,
     insertCombiningMark,
@@ -246,6 +261,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   }, [handleSave, handleSaveWithDrafts, triggerSave]);
 
   useEffect(() => { wrapWithTagRef.current = wrapWithTag; }, [wrapWithTag]);
+  useEffect(() => {
+    openPageMarkMenuRef.current = () => {
+      const view = viewRef.current;
+      if (!view || readOnly) return;
+      const c = view.coordsAtPos(view.state.selection.main.head);
+      setPageMarkMenu(c ? { left: c.left, top: c.bottom + 4 } : { left: 40, top: 120 });
+    };
+  }, [readOnly]);
 
   const handleDeleteAndSaveTextAnnotation = useCallback(async (annId: number) => {
     await deleteAndSaveTextAnnotation(annId, removeAnnotationFromEditor);
@@ -295,6 +318,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           cleanMarkup={cleanMarkup}
           onAnnotateSelection={handleAnnotateSelection}
           toggleMarginaliaMode={toggleMarginaliaMode}
+          pageMarkPaletteOpen={pageMarkPaletteOpen}
+          togglePageMarkPalette={togglePageMarkPalette}
+          wrapPageMark={wrapPageMark}
+          pageMarkMenu={pageMarkMenu}
+          closePageMarkMenu={closePageMarkMenu}
           reocrStatus={panelReocrStatus}
           reocrText={panelReocrText}
           reocrError={panelReocrError}

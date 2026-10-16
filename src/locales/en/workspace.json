@@ -606,6 +606,22 @@
       "cleanMarkupButton": "Clean",
       "annotate": "Highlight and comment (select text first)"
     },
+    "pageMarks": {
+      "title": "Page marks",
+      "toolbar": "Page marks — show/hide panel",
+      "drag": "Drag",
+      "close": "Close (the toolbar button brings it back)",
+      "fw": "Folio / page number",
+      "sig": "Signature",
+      "catch": "Catchword",
+      "rh": "Running head",
+      "refused": {
+        "multiple": "The selection contains several page marks — select one",
+        "pageBreak": "A page mark cannot cross a page break",
+        "marginalia": "A page mark cannot cross a marginal note boundary",
+        "tagBoundary": "The selection cuts a tag in half — select more precisely"
+      }
+    },
     "marginalia": {
       "toggle": "Marginalia",
       "collapse": "Collapse margin column (badge view)",

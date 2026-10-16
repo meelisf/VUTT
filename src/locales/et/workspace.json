@@ -606,6 +606,22 @@
       "cleanMarkupButton": "Puhasta",
       "annotate": "Märgi ja kommenteeri (vali tekst enne)"
     },
+    "pageMarks": {
+      "title": "Lehe tähistus",
+      "toolbar": "Lehe tähistus — näita/peida paneel",
+      "drag": "Lohista",
+      "close": "Sulge (tööriistariba nupp toob tagasi)",
+      "fw": "Lehe-/leheküljenumber",
+      "sig": "Signatuur",
+      "catch": "Siirdeviit",
+      "rh": "Veerutiitel",
+      "refused": {
+        "multiple": "Valikus on mitu tähistust — vali üks",
+        "pageBreak": "Tähistus ei ületa lehevahetust",
+        "marginalia": "Tähistus ei ületa marginaalia piiri",
+        "tagBoundary": "Valik lõikab märgendi pooleks — vali täpsemalt"
+      }
+    },
     "marginalia": {
       "toggle": "Marginaalid",
       "collapse": "Klapi marginaaliveerg kokku (märgivaade)",

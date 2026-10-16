@@ -224,3 +224,31 @@ def test_tuhi_add_koristatakse():
 
 def test_add_ristuv_m_liigub_m_sisse():
     assert norm("<add><m>x</m></add>") == "<m><add>x</add></m>"
+
+
+# --- Lehe tähistus (ADR 0070, #630) ---
+import json as _json
+import os as _os
+
+import pytest as _pytest
+
+_CASES = _json.load(open(_os.path.join(_os.path.dirname(__file__), "fixtures",
+                                       "page_marks_cases.json"), encoding="utf-8"))
+
+
+@_pytest.mark.parametrize("case", _CASES, ids=[c["name"] for c in _CASES])
+def test_normaliseerija_fikstuurid(case):
+    assert norm(case["text"]) == case["normalized"]
+
+
+def test_tuhi_tahistus_koristatakse():
+    assert strip("a<fw></fw>b<rh> </rh>") == "ab "
+
+
+def test_tahistus_m_sees_m_jaab_valimiseks():
+    assert norm("<fw><m>246</m></fw>") == "<m><fw>246</fw></m>"
+
+
+def test_normaliseerimine_idempotentne_tahistusega():
+    t = "x <sig>A <sig>ij</sig></sig>\n<fw>1<pb/>2</fw>"
+    assert norm(norm(t)) == norm(t)

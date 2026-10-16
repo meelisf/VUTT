@@ -1,0 +1,17 @@
+[
+  {"name": "lihtne", "text": "1. Cor. 1.\n<catch>Ehrwür⸗</catch>\n<sig>A ij</sig>", "spans": [{"kind": "catch", "inner": "Ehrwür⸗"}, {"kind": "sig", "inner": "A ij"}], "normalized": "1. Cor. 1.\n<catch>Ehrwür⸗</catch>\n<sig>A ij</sig>", "search": "1. Cor. 1.", "marks": [{"kind": "catch", "text": "Ehrwür⸗", "seg": 0}, {"kind": "sig", "text": "A ij", "seg": 0}]},
+  {"name": "pesastus", "text": "x <sig>A <sig>ij</sig> muu</sig> y", "spans": [{"kind": "sig", "inner": "A <sig>ij</sig> muu"}], "normalized": "x <sig>A ij muu</sig> y", "search": "x y", "marks": [{"kind": "sig", "text": "A ij muu", "seg": 0}]},
+  {"name": "orv", "text": "x <sig>A ij y", "spans": [], "normalized": "x <sig>A ij y", "search": "x A ij y", "marks": []},
+  {"name": "ule_pb", "text": "<fw>12<pb/>13</fw>", "spans": [], "normalized": "12<pb/>13", "search": "12 13", "marks": []},
+  {"name": "ristuv", "text": "<fw>a<sig>b</fw>c</sig>", "spans": [], "normalized": "abc", "search": "abc", "marks": []},
+  {"name": "m_sees", "text": "<m><fw>246</fw> nota</m>\npõhi", "spans": [{"kind": "fw", "inner": "246"}], "normalized": "<m><fw>246</fw> nota</m>\npõhi", "search": "nota põhi", "marks": [{"kind": "fw", "text": "246", "seg": 0}]},
+  {"name": "laotus_seg", "text": "<fw>12</fw>\na<pb/>\n<fw>13</fw>\nb", "spans": [{"kind": "fw", "inner": "12"}, {"kind": "fw", "inner": "13"}], "normalized": "<fw>12</fw>\na<pb/>\n<fw>13</fw>\nb", "search": "a b", "marks": [{"kind": "fw", "text": "12", "seg": 0}, {"kind": "fw", "text": "13", "seg": 1}]},
+  {"name": "vormindus_sees", "text": "<catch><i>Vor⸗</i></catch>", "spans": [{"kind": "catch", "inner": "<i>Vor⸗</i>"}], "normalized": "<catch><i>Vor⸗</i></catch>", "search": "", "marks": [{"kind": "catch", "text": "Vor⸗", "seg": 0}]},
+  {"name": "labipaistev", "text": "dem⸗\n<sig>A ij</sig>\nWort", "spans": [{"kind": "sig", "inner": "A ij"}], "normalized": "dem⸗\n<sig>A ij</sig>\nWort", "search": "demWort", "marks": [{"kind": "sig", "text": "A ij", "seg": 0}]},
+  {"name": "uhel_real", "text": "dem⸗<sig>A ij</sig> Wort", "spans": [{"kind": "sig", "inner": "A ij"}], "normalized": "dem⸗<sig>A ij</sig> Wort", "search": "dem⸗ Wort", "marks": [{"kind": "sig", "text": "A ij", "seg": 0}]},
+  {"name": "tuhi_sisu", "text": "<sig> </sig>x", "spans": [{"kind": "sig", "inner": " "}], "normalized": " x", "search": "x", "marks": []},
+  {"name": "kehtetu_sees_kehtiv", "text": "<fw>12<pb/><sig>B</sig></fw>", "spans": [], "normalized": "12<pb/>B", "search": "12 B", "marks": []},
+  {"name": "markimata", "text": "Hom. 1903\nVorrede", "spans": [], "normalized": "Hom. 1903\nVorrede", "search": "Hom. 1903 Vorrede", "marks": []},
+  {"name": "ristub_m", "text": "<m>nota <fw>12</m>\nmain</fw> rest", "spans": [], "normalized": "<m>nota 12</m>\nmain rest", "search": "nota 12 main rest", "marks": []},
+  {"name": "sisaldab_m", "text": "<fw>12 <m>nota</m></fw>", "spans": [], "normalized": "12 <m>nota</m>", "search": "12 nota", "marks": []}
+]

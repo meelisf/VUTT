@@ -1,4 +1,4 @@
-import type { MouseEvent, MutableRefObject } from 'react';
+import { useRef, type MouseEvent, type MutableRefObject } from 'react';
 import { PageStatus } from '../../types';
 import type { SpecialCharacter } from './useSpecialChars';
 import type { MarginaliaMode } from './MarginaliaExtension';
@@ -8,6 +8,9 @@ import EditorToolbar from './EditorToolbar';
 import EditorStatusBar from './EditorStatusBar';
 import ReocrPanel from './ReocrPanel';
 import SpecialCharsPanel from './SpecialCharsPanel';
+import PageMarkPalette, { PageMarkMenu } from './PageMarkPalette';
+import type { PageMarkKind } from '../../markup/vuttTags';
+import type { PageMarkRefusal } from './pageMarkEdit';
 
 interface EditorEditTabProps {
   active: boolean;
@@ -29,6 +32,11 @@ interface EditorEditTabProps {
   cleanMarkup: () => void;
   onAnnotateSelection: () => void;
   toggleMarginaliaMode: () => void;
+  pageMarkPaletteOpen: boolean;
+  togglePageMarkPalette: () => void;
+  wrapPageMark: (kind: PageMarkKind) => PageMarkRefusal | null;
+  pageMarkMenu: { left: number; top: number } | null;
+  closePageMarkMenu: () => void;
 
   reocrStatus: ReocrStatus;
   reocrText: string | null;
@@ -71,6 +79,11 @@ export default function EditorEditTab({
   cleanMarkup,
   onAnnotateSelection,
   toggleMarginaliaMode,
+  pageMarkPaletteOpen,
+  togglePageMarkPalette,
+  wrapPageMark,
+  pageMarkMenu,
+  closePageMarkMenu,
   reocrStatus,
   reocrText,
   reocrError,
@@ -90,6 +103,8 @@ export default function EditorEditTab({
   insertSpecialChar,
   insertCombiningMark,
 }: EditorEditTabProps) {
+  // Lehe tähistuse paneeli piirdekast (lohistamine jääb redaktori kasti sisse).
+  const boxRef = useRef<HTMLDivElement>(null);
   return (
     <div className={`flex-1 flex flex-col overflow-hidden ${active ? '' : 'hidden'}`}>
       <div className="bg-white border-b border-gray-100 flex items-center justify-between px-4 py-1.5 shrink-0 gap-4">
@@ -105,6 +120,8 @@ export default function EditorEditTab({
           cleanMarkup={cleanMarkup}
           onAnnotateSelection={onAnnotateSelection}
           toggleMarginaliaMode={toggleMarginaliaMode}
+          pageMarkPaletteOpen={pageMarkPaletteOpen}
+          togglePageMarkPalette={togglePageMarkPalette}
         />
 
         <EditorStatusBar
@@ -123,7 +140,7 @@ export default function EditorEditTab({
         onDelete={deleteOcrFile}
       />
 
-      <div className="flex-1 relative flex overflow-hidden bg-white">
+      <div ref={boxRef} className="flex-1 relative flex overflow-hidden bg-white">
         <ReocrPanel
           variant="overlay"
           status={reocrStatus}
@@ -133,7 +150,15 @@ export default function EditorEditTab({
           onDelete={deleteOcrFile}
         />
         <div ref={editorContainerRef} className="flex-1 overflow-hidden" />
+        {!readOnly && (
+          <PageMarkPalette open={pageMarkPaletteOpen} onClose={togglePageMarkPalette}
+            onApply={wrapPageMark} containerRef={boxRef} />
+        )}
       </div>
+
+      {pageMarkMenu && !readOnly && (
+        <PageMarkMenu anchor={pageMarkMenu} onApply={wrapPageMark} onClose={closePageMarkMenu} />
+      )}
 
       <SpecialCharsPanel
         authToken={authToken}

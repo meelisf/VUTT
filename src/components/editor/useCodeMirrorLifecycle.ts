@@ -19,6 +19,7 @@ interface UseCodeMirrorLifecycleParams {
   viewRef: MutableRefObject<EditorView | null>;
   handleSaveRef: MutableRefObject<() => void>;
   wrapWithTagRef: MutableRefObject<(tag: string) => void>;
+  openPageMarkMenuRef: MutableRefObject<() => void>;
   copyPastePlainMarkup: ReturnType<typeof EditorView.domEventHandlers>;
   setIsDirty: (dirty: boolean) => void;
 }
@@ -31,6 +32,7 @@ export function useCodeMirrorLifecycle({
   viewRef,
   handleSaveRef,
   wrapWithTagRef,
+  openPageMarkMenuRef,
   copyPastePlainMarkup,
   setIsDirty,
 }: UseCodeMirrorLifecycleParams) {
@@ -84,6 +86,8 @@ export function useCodeMirrorLifecycle({
             { key: 'Alt-m', run: applyMacron },
             // Lisandus (ADR 0067). Alt-täht ei sobi: Macis annab iga Alt-täht märgi (Alt-a = å).
             { key: 'Mod-Shift-l', run: () => { wrapWithTagRef.current('add'); return true; } },
+            // Lehe tähistus (ADR 0070): menüü kursori juures. Ctrl+Shift+S/C on brauseri omad.
+            { key: 'Mod-Shift-f', run: () => { openPageMarkMenuRef.current(); return true; }, preventDefault: true },
           ]),
           editableCompartmentRef.current.of(
             EditorView.editable.of(!readOnly)

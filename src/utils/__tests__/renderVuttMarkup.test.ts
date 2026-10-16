@@ -114,3 +114,9 @@ describe('renderVuttMarkup — XSS kaitse (Leid A)', () => {
     expect(out).toContain('&lt;');
   });
 });
+
+describe('renderVuttMarkup — lehe tähistus (ADR 0070)', () => {
+  it('tähistus renderdub klassiga', () => {
+    expect(renderVuttMarkup('<sig>A iij</sig>')).toBe('<span class="vutt-pm vutt-pm-sig">A iij</span>');
+  });
+});
