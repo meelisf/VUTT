@@ -43,7 +43,7 @@ interface TagDef {
   withId?: boolean;  // lisab data-ann-id atribuudi numbrilise sufiksi järgi
 }
 
-const VUTT_TAGS: TagDef[] = [
+export const VUTT_TAGS: TagDef[] = [
   { tag: 'i',  cls: 'vutt-italic' },
   { tag: 'b',  cls: 'vutt-bold' },
   { tag: 'cs', cls: 'vutt-cs' },
@@ -51,6 +51,11 @@ const VUTT_TAGS: TagDef[] = [
   { tag: 'hi', cls: 'vutt-highlight' },
   // Interlineaarne/veerise lisandus oma lisamiskohas (ADR 0067)
   { tag: 'add', cls: 'vutt-add' },
+  // Lehe tähistus (ADR 0070): tähistus, mitte tekst — hall, liigi silt CSS-ist.
+  { tag: 'fw', cls: 'vutt-pm vutt-pm-fw' },
+  { tag: 'sig', cls: 'vutt-pm vutt-pm-sig' },
+  { tag: 'catch', cls: 'vutt-pm vutt-pm-catch' },
+  { tag: 'rh', cls: 'vutt-pm vutt-pm-rh' },
   { tag: 'fn', useWidget: true },
   { tag: 'pb', selfClose: true },
   { tag: 'ann', cls: 'vutt-ann', withId: true },

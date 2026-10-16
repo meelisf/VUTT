@@ -5,6 +5,7 @@ import { vuttMarkupField } from './VuttMarkupExtension';
 import { hiddenBlockRanges, marginaliaField, openMarginalia } from './MarginaliaExtension';
 import { findContainer, selectionWrapChanges } from './wrapTagUtils';
 import { applyCombiningMark } from './combiningMarkCommand';
+import { CLEAN_MARKUP_TAG_RE } from '../../markup/consumers';
 import type { CombiningMark } from '../../utils/combiningMarks';
 import { cleanMarkupSpecs, marginaliaFromSelection, openGroupAt, rangeTouchesOpenMarginalia, toggleGroupStyle } from '../../utils/marginaliaUtils';
 
@@ -195,7 +196,7 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
     const specs = cleanMarkupSpecs(
       view.state.doc.toString(), from, to, hidden,
-      s => s.replace(/<\/?(?:i|b|cs|m|hi|add|fn|pb)[^>]*>/g, ''),
+      s => s.replace(CLEAN_MARKUP_TAG_RE, ''),
     );
     if (specs.length === 0) return;
     const changes = view.state.changes(specs);
