@@ -268,8 +268,13 @@ def _meili_task(method, path, body):
 
 
 def _filter_value(value):
-    """Meili filtri stringiliteraal (jutumärgid ja kurakaldkriips escape'itud)."""
-    return json.dumps(str(value), ensure_ascii=False)
+    """Meili filtri stringiliteraal: escape'itakse ainult kurakaldkriips ja jutumärk.
+
+    Mitte `json.dumps`: see kirjutab ka juhtmärgid (`\\n`, `\\u0001`) JSON-i
+    escape'ideks, mida Meili filtrigrammatika ei tunne (#616). Sama reegel
+    frontendis (`quoteFilterValue`) ja MCP-s (`_quote`).
+    """
+    return '"' + str(value).replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 
 def delete_work_letters(work_id):
@@ -348,7 +353,7 @@ def _delete_extra_pages(work_id, new_count):
         return False
     check_url = f"{MEILI_URL}/indexes/{INDEX_NAME}/search"
     check_body = json.dumps({
-        "filter": [f'work_id = "{work_id}"', f'lehekylje_number > {new_count}'],
+        "filter": [f'work_id = {_filter_value(work_id)}', f'lehekylje_number > {int(new_count)}'],
         "limit": 1,
         "attributesToRetrieve": ["id"]
     }).encode('utf-8')
@@ -365,7 +370,7 @@ def _delete_extra_pages(work_id, new_count):
 
     del_url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents/delete"
     del_body = json.dumps({
-        "filter": [f'work_id = "{work_id}"', f'lehekylje_number > {new_count}']
+        "filter": [f'work_id = {_filter_value(work_id)}', f'lehekylje_number > {int(new_count)}']
     }).encode('utf-8')
     del_req = urllib.request.Request(del_url, data=del_body, method='POST')
     del_req.add_header('Content-Type', 'application/json')
@@ -415,7 +420,7 @@ def delete_work_from_meilisearch(work_id):
     if not MEILI_KEY:
         return False
     url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents/delete"
-    body = {"filter": f'work_id = "{work_id}"'}
+    body = {"filter": f'work_id = {_filter_value(work_id)}'}
     data = json.dumps(body).encode('utf-8')
     req = urllib.request.Request(url, data=data, method='POST')
     req.add_header('Content-Type', 'application/json')
@@ -664,7 +669,7 @@ def _dashboard_search_warmup_body(collection_id=None):
     """Sama kujuga päring nagu dashboardi esmane riiulivaade."""
     filters = ["lehekylje_number = 1"]
     if collection_id:
-        filters.append(f'collections_hierarchy = "{collection_id}"')
+        filters.append(f'collections_hierarchy = {_filter_value(collection_id)}')
 
     return {
         "q": "",
@@ -717,7 +722,7 @@ def _access_rule(user=None) -> dict:
     base_filter = "is_public = true"
     allowed = (user or {}).get("allowed_collections", [])
     if allowed:
-        cols = ", ".join(f'"{c}"' for c in allowed)
+        cols = ", ".join(_filter_value(c) for c in allowed)
         return {"filter": f"{base_filter} OR collections_hierarchy IN [{cols}]"}
     return {"filter": base_filter}
 
@@ -758,7 +763,7 @@ def generate_work_scoped_meili_token(work_id: str, ttl_seconds: int = 3600) -> s
     if not MEILI_SEARCH_KEY or not MEILI_SEARCH_KEY_UID:
         raise RuntimeError("MEILI_SEARCH_KEY ja MEILI_SEARCH_KEY_UID peavad olema seadistatud")
 
-    search_rules = {"teosed": {"filter": f'work_id = "{work_id}"'}}
+    search_rules = {"teosed": {"filter": f'work_id = {_filter_value(work_id)}'}}
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
     payload = {
         "searchRules": search_rules,

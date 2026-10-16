@@ -6,6 +6,7 @@ import {
   buildTypeFilter,
   buildPrinterFilter,
   buildMultiFilter,
+  quoteFilterValue,
 } from '../filterUtils';
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,21 @@ describe('buildMultiFilter', () => {
     // Kui kasutaja on valinud nii eesti kui inglise labeli (peaks kasutama Q-koode, aga käidumine on määratletud)
     expect(buildMultiFilter(['oratsioon', 'oration'], buildGenreFilter)).toBe(
       '((genre_et = "oratsioon" OR genre_en = "oratsioon") OR (genre_et = "oration" OR genre_en = "oration"))'
+    );
+  });
+});
+
+describe('quoteFilterValue (#616)', () => {
+  it('escape\'ib kurakaldkriipsu enne jutumärki', () => {
+    expect(quoteFilterValue('Reval')).toBe('"Reval"');
+    expect(quoteFilterValue('a"b')).toBe('"a\\"b"');
+    expect(quoteFilterValue('a\\"b')).toBe('"a\\\\\\"b"');
+    expect(quoteFilterValue('lõpp\\')).toBe('"lõpp\\\\"');
+  });
+
+  it('jutumärgiga märksõna jääb ühe stringi sisse', () => {
+    expect(buildTagFilter('"x" OR is_public = false')).toBe(
+      '(tags_et = "\\"x\\" OR is_public = false" OR tags_en = "\\"x\\" OR is_public = false")',
     );
   });
 });

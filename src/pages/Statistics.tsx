@@ -13,6 +13,7 @@ import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
 import { getGenreFacets, getGenreLabelMap } from '../services/searchService';
+import { quoteFilterValue } from '../utils/filterUtils';
 
 interface StatusCount {
   name: string;
@@ -75,7 +76,7 @@ const Statistics: React.FC = () => {
       try {
         const filter: string[] = [];
         filter.push(...scopeFilter);
-        if (selectedGenre) filter.push(`genre_ids = "${selectedGenre}"`);
+        if (selectedGenre) filter.push(`genre_ids = ${quoteFilterValue(selectedGenre)}`);
 
         const statusResult = await index.search('', {
           limit: 0,
@@ -160,7 +161,7 @@ const Statistics: React.FC = () => {
 
         // Samm 2: andmed sama vahemiku jaoks (nüüd ka žanrifiltriga)
         const dataFilter = ['lehekylje_number = 1', ...scopeFilter];
-        if (selectedGenre) dataFilter.push(`genre_ids = "${selectedGenre}"`);
+        if (selectedGenre) dataFilter.push(`genre_ids = ${quoteFilterValue(selectedGenre)}`);
 
         const dataResult = await index.search('', { limit: 0, facets: ['year'], filter: dataFilter });
 

@@ -195,8 +195,12 @@ def normalize_query(text: str) -> str:
 
 
 def _quote(value) -> str:
-    """Meili filtri stringiliteraal — jutumärgid sisus escape'itakse."""
-    return '"' + str(value).replace('"', '\\"') + '"'
+    """Meili filtri stringiliteraal — kurakaldkriips ja jutumärk escape'itakse.
+
+    Kurakaldkriips ENNE jutumärki: muidu muutus `\\"` kujuks `\\\\"` ja
+    jutumärk lõpetas stringi (#616). Sama reegel serveri `_filter_value`-is.
+    """
+    return '"' + str(value).replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 
 def build_search_body(

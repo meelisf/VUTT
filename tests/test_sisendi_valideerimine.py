@@ -99,3 +99,12 @@ def test_isiku_esitus_koodita_ei_vasta_lehtede_kohta(tmp_path, monkeypatch):
                         lambda items: pytest.fail("lehti loeti enne koodi kontrolli"))
     with pytest.raises(ep.ProposalError, match="invalid_or_expired_handoff"):
         ep.submit("vale", "vutt:Pabc", "2026-01-01", [{"kind": "occupation"}])
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("Reval", '"Reval"'), ('a"b', '"a\\"b"'), ('a\\"b', '"a\\\\\\"b"'), ("lõpp\\", '"lõpp\\\\"'),
+])
+def test_meili_filtri_vaartus_escape(value, expected):
+    """#616: kurakaldkriips enne jutumärki — sama reegel frontendis ja MCP-s."""
+    from server.meilisearch_ops import _filter_value
+    assert _filter_value(value) == expected

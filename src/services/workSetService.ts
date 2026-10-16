@@ -10,6 +10,7 @@
  * ainult jätkata samade ID-de filtreerimist kuni järgmise päringuni.
  */
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, apiDeleteWithBody } from './apiClient';
+import { quoteFilterValue } from '../utils/filterUtils';
 
 export interface WorkSetSummary {
   id: string;
@@ -210,7 +211,7 @@ export async function getWorkSetMembers(
   const res = await index.search('', {
     filter: [
       'lehekylje_number = 1',
-      `work_id IN [${workIds.map(id => `"${id}"`).join(', ')}]`,
+      `work_id IN [${workIds.map(id => quoteFilterValue(id)).join(', ')}]`,
     ],
     attributesToRetrieve: ['work_id', 'pealkiri', 'title', 'year_display', 'aasta'],
     limit: workIds.length,

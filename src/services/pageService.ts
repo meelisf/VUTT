@@ -10,6 +10,7 @@ import type { Index } from 'meilisearch';
 import type { Quad4 } from '../utils/perspectiveQuad';
 import { PageConflictError, conflictFromResponse, type PageFields } from '../components/editor/pageConflict';
 import { pageFileFromImageUrl } from './workImageService';
+import { quoteFilterValue } from '../utils/filterUtils';
 
 // Abifunktsioon failisüsteemi salvestamiseks
 const saveToFileSystem = async (
@@ -99,7 +100,7 @@ export const getPage = async (index: Index, workId: string, pageNum: number): Pr
     // Otsime work_id (nanoid) järgi
     // See võimaldab mõlemat tüüpi URL-e: /work/r20x08/1 ja /work/1640-4/1
     const response = await index.search('', {
-      filter: [`work_id = "${workId}"`, `lehekylje_number = ${pageNum}`],
+      filter: [`work_id = ${quoteFilterValue(workId)}`, `lehekylje_number = ${pageNum}`],
       limit: 1
     });
 

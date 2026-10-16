@@ -48,11 +48,11 @@ def otsi_teos_external_url_jargi(url: str) -> Optional[dict]:
     """
     if not url:
         return None
-    from ..meilisearch_ops import _meili_search
+    from ..meilisearch_ops import _filter_value, _meili_search
     try:
         tulemus = _meili_search({
             "q": "",
-            "filter": 'external_url = "{}"'.format(url.replace('"', "")),
+            "filter": f"external_url = {_filter_value(url)}",
             "limit": 1,
             "attributesToRetrieve": ["work_id", "title"],
         })

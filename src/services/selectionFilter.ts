@@ -7,6 +7,8 @@
  * 2. Laadimata loend (null) VISKAB. Kutsuja peab ootama loendi ära; vaikne
  *    tagasilangus piiramata korpusele näitaks kasutajale teoseid väljaspool valikut.
  */
+import { quoteFilterValue } from '../utils/filterUtils';
+
 export type CollectionSelection =
   | { kind: 'all' }
   | { kind: 'collection'; id: string }
@@ -18,12 +20,12 @@ export function selectionFilterClause(
 ): string[] {
   if (selection.kind === 'all') return [];
   if (selection.kind === 'collection') {
-    return [`collections_hierarchy = "${selection.id}"`];
+    return [`collections_hierarchy = ${quoteFilterValue(selection.id)}`];
   }
   if (workIds === null) {
     throw new Error(`Töökollektsiooni ${selection.id} ID-loend ei ole veel laetud`);
   }
-  return [`work_id IN [${workIds.map(id => `"${id}"`).join(', ')}]`];
+  return [`work_id IN [${workIds.map(id => quoteFilterValue(id)).join(', ')}]`];
 }
 
 /**
@@ -43,7 +45,7 @@ export type SelectionScope =
  */
 export function scopeClauses(scope?: SelectionScope): string[] {
   if (!scope) return [];
-  if (typeof scope === 'string') return [`collections_hierarchy = "${scope}"`];
+  if (typeof scope === 'string') return [`collections_hierarchy = ${quoteFilterValue(scope)}`];
   // VISKAB laadimata loendi peal — tahtlikult: piiramata päring näitaks
   // teoseid väljaspool valikut.
   return selectionFilterClause(scope.selection, scope.workSetIds);
