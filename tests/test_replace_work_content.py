@@ -255,3 +255,48 @@ def test_asendus_hoiab_teose_lukku(tmp_path, monkeypatch):
     upload_ops.replace_work_content("u1", "w1", {}, "admin", None)
     assert seen == [True]
     assert not admin_page_ops._get_thread_lock(work_dir.name).locked()
+
+
+class _KirjutavSftp(_ListSftp):
+    """Edukas asendus: `get` kirjutab kohaliku faili, nagu päris SFTP."""
+
+    def get(self, remote, local):
+        super().get(remote, local)
+        Path(local).write_text("uus tekst" if local.endswith(".txt") else "jpg", encoding="utf-8")
+
+
+def test_asendus_varskendab_mainimised_ja_osad(tmp_path, monkeypatch):
+    """#626, ADR 0055: lehehulk vahetub tervikuna → `refresh_work_mentions`
+    (mis ühtlustab ka osad, ADR 0057) peab jooksma UUTE lehtede peal, enne Meili sünki."""
+    import server.git_ops as git_ops
+    import server.meilisearch_ops as meili_ops
+    from server.prosopography import relations
+
+    upload_id, work_id, slug, work_dir, data_dir = _setup_replace_files(tmp_path, monkeypatch)
+    repo = Repo.init(str(data_dir))
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "test").set_value("user", "email", "test@example.test")
+    repo.index.add([f"{slug}/_metadata.json", f"{slug}/vana-teos_pg_001.txt", f"{slug}/vana-teos_pg_001.json"])
+    repo.index.commit("Algseis")
+
+    items = ["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _upload_id: _KirjutavSftp(items))
+    monkeypatch.setattr(git_ops, "get_or_init_repo", lambda: repo)
+    monkeypatch.setattr(upload_ops, "_ssh_rm_rf", lambda *a: None)
+    monkeypatch.setattr(upload_ops, "close_ssh", lambda *a: None)
+
+    jarjekord = []
+
+    def fake_refresh(path, wid=None, renamed=None):
+        lehed = sorted(p.name for p in Path(path).glob("*.txt"))
+        jarjekord.append(("refresh", path, wid, lehed))
+
+    monkeypatch.setattr(relations, "refresh_work_mentions", fake_refresh)
+    monkeypatch.setattr(meili_ops, "sync_work_to_meilisearch", lambda s: jarjekord.append(("meili", s)) or True)
+
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+
+    assert [j[0] for j in jarjekord] == ["refresh", "meili"]
+    _, path, wid, lehed = jarjekord[0]
+    assert (path, wid) == (str(work_dir), work_id)
+    assert lehed and "vana-teos_pg_001.txt" not in lehed, lehed
