@@ -6,6 +6,8 @@ import { hiddenBlockRanges, marginaliaField, openMarginalia } from './Marginalia
 import { findContainer, selectionWrapChanges } from './wrapTagUtils';
 import { applyCombiningMark } from './combiningMarkCommand';
 import { CLEAN_MARKUP_TAG_RE } from '../../markup/consumers';
+import { pageMarkEdit, type PageMarkRefusal } from './pageMarkEdit';
+import type { PageMarkKind } from '../../markup/vuttTags';
 import type { CombiningMark } from '../../utils/combiningMarks';
 import { cleanMarkupSpecs, marginaliaFromSelection, openGroupAt, rangeTouchesOpenMarginalia, toggleGroupStyle } from '../../utils/marginaliaUtils';
 
@@ -209,8 +211,30 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     view.focus();
   }, [readOnly, viewRef]);
 
+  // Lehe tähistus (ADR 0070): üks tehing; keeldumisel tekst ei muutu ja põhjus
+  // tagastatakse paneelile kuvamiseks.
+  const wrapPageMark = useCallback((kind: PageMarkKind): PageMarkRefusal | null => {
+    const view = viewRef.current;
+    if (!view || readOnly) return null;
+    const { from, to } = view.state.selection.main;
+    const r = pageMarkEdit(view.state.doc.toString(), from, to, kind, hiddenBlockRanges(view.state));
+    if (!r.ok) {
+      view.focus();
+      return r.reason;
+    }
+    const changes = view.state.changes(r.changes);
+    view.dispatch({
+      changes,
+      selection: EditorSelection.cursor(r.cursor ?? changes.mapPos(to, 1)),
+      annotations: Transaction.userEvent.of('input.format'),
+    });
+    view.focus();
+    return null;
+  }, [readOnly, viewRef]);
+
   return {
     wrapWithTag,
+    wrapPageMark,
     insertAtCursor,
     insertSpecialChar,
     insertCombiningMark,
