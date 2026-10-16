@@ -241,3 +241,17 @@ def test_replace_ei_jata_mudeli_veaga_lehte_impordist_valja(tmp_path, monkeypatc
 
     assert exc.value.status_code == 400
     assert "2" in exc.value.detail, exc.value.detail
+
+
+def test_asendus_hoiab_teose_lukku(tmp_path, monkeypatch):
+    """#619: asendus kustutab ja kirjutab lehti — lehetoiming samal teosel peab ootama."""
+    from server import admin_page_ops, upload_ops, utils
+    work_dir = tmp_path / "1690-slug-w1"
+    work_dir.mkdir()
+    monkeypatch.setattr(utils, "find_directory_by_id", lambda wid: str(work_dir))
+    seen = []
+    monkeypatch.setattr(upload_ops, "_replace_work_content_locked",
+                        lambda *a: seen.append(admin_page_ops._get_thread_lock(work_dir.name).locked()) or {})
+    upload_ops.replace_work_content("u1", "w1", {}, "admin", None)
+    assert seen == [True]
+    assert not admin_page_ops._get_thread_lock(work_dir.name).locked()

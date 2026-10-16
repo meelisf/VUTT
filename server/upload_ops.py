@@ -544,6 +544,22 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
     )
 
 def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: dict, username: str, background_tasks) -> dict:
+    """Asendus teose luku all (#619): lehtede kustutamine + uute kirjutus ei tohi
+    kattuda lehetoimingu, osade muudatuse ega teise asendusega samal teosel."""
+    from .admin_page_ops import work_lock
+    from .utils import find_directory_by_id
+
+    work_dir = find_directory_by_id(target_work_id)
+    if not work_dir:
+        return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
+                                            username, background_tasks)
+    with work_lock(os.path.basename(work_dir), work_dir):
+        return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
+                                            username, background_tasks)
+
+
+def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_updates: dict,
+                                 username: str, background_tasks) -> dict:
     """
     Asendab olemasoleva teose sisu uue OCR-itud materjaliga.
 
@@ -629,7 +645,8 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
     # 5. Arhiveeri vanad JPG-d prügikasti
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    trash_dir = os.path.join(BASE_DIR, '._trash', target_work_id, 'replaced_content', timestamp)
+    # Kanooniline id (mitte päringu parameeter): prügikast on teose id järgi.
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_content', timestamp)
     os.makedirs(trash_dir, exist_ok=True)
 
     destructive_started = True

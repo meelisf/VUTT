@@ -343,7 +343,7 @@ const Maintenance: React.FC = () => {
                         <>
                           <td className="px-3 py-2 text-gray-800">{info.name}</td>
                           <td className="px-3 py-2">
-                            {info.url ? (
+                            {info.url && /^https?:\/\//i.test(info.url) ? (
                               <a href={info.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-600 hover:underline truncate block max-w-[140px]">
                                 {info.url.replace(/^https?:\/\//, '')} ↗
                               </a>

@@ -13,9 +13,9 @@ import { resolveProposedPerson, type ProposedPerson } from '../../../services/wo
 import BusyNote from '../../../components/BusyNote';
 
 const ID_URL: Record<string, (id: string) => string> = {
-  gnd: id => `https://d-nb.info/gnd/${id}`,
-  wikidata: id => `https://www.wikidata.org/wiki/${id}`,
-  viaf: id => `https://viaf.org/viaf/${id}`,
+  gnd: id => `https://d-nb.info/gnd/${encodeURIComponent(id)}`,
+  wikidata: id => `https://www.wikidata.org/wiki/${encodeURIComponent(id)}`,
+  viaf: id => `https://viaf.org/viaf/${encodeURIComponent(id)}`,
 };
 
 interface Props {

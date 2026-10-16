@@ -20,6 +20,8 @@ from .trash_reason import liigita, on_taastatav
 logger = get_logger(__name__)
 
 TRASH_DIR = os.path.join(BASE_DIR, '._trash')
+# Sama kuju mis history_thumbs.py-s.
+_WORK_ID_RE = re.compile(r'[a-zA-Z0-9_-]{1,64}')
 
 
 def list_deleted_works():
@@ -103,6 +105,9 @@ def restore_deleted_work(work_id, username="VUTT Server"):
     7. Cache uuendamine
     8. Kustuta prügikasti kaust
     """
+    # work_id läheb nii teesse kui git --grep regexisse (#619).
+    if not _WORK_ID_RE.fullmatch(str(work_id or '')):
+        return {'ok': False, 'error': 'Vigane teose ID'}
     trash_dir = os.path.join(TRASH_DIR, work_id)
     if not os.path.exists(trash_dir):
         return {'ok': False, 'error': 'Prügikastis ei leitud'}
@@ -273,6 +278,13 @@ def restore_deleted_page(work_id, folder_name, filename, username="VUTT Server")
     4. Git commit
     5. Meilisearch sync
     """
+    if not _WORK_ID_RE.fullmatch(str(work_id or '')):
+        return {'ok': False, 'error': 'Vigane teose ID'}
+    # Pildifail (mitte .txt) — sama reegel mis check_page_filename-il: lihtne
+    # nimi, `_`/`.` algus on reserveeritud.
+    if (not filename or filename != os.path.basename(filename)
+            or filename.startswith(('_', '.')) or '\\' in filename or '\x00' in filename):
+        return {'ok': False, 'error': 'Vigane failinimi'}
     base = os.path.splitext(filename)[0]
     trash_pages_dir = os.path.join(TRASH_DIR, work_id, 'pages')
     img_path = os.path.join(trash_pages_dir, filename)

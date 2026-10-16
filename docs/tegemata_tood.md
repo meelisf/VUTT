@@ -22,14 +22,6 @@ Slug-põhised pildi-URLid saaksid 403; praegu päästab `image_server.translate_
 **Parandus:** step 4 peaks võrdlema otse `entry.name == target_id`. Enne kontrolli, kas
 `sanitize_id` seal oli mõeldud URL-dekodeeritud nime jaoks.
 
-### `_check_image_access` on fail-OPEN, kui metaandmeid ei õnnestu laadida
-
-**Fail:** `server/image_server.py` — `if meta is None ... return True`
-
-Kui `_metadata.json` on rikutud/loetamatu, muutub piiratud teose pilt avalikuks.
-**Parandus:** eralda „ei ole piiratud" ja „ei suutnud lugeda" — viimane peaks keelama.
-(Leitud käsitsi-ülevaatusel 2026-07-21, N2.)
-
 ### `get_client_ip` usaldab kliendi-kontrollitavaid päiseid
 
 **Fail:** `server/rate_limit.py:87`

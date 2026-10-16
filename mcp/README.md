@@ -281,8 +281,9 @@ CI jooksutab `pytest tests/ mcp/tests/` — selgesõnaline tee, sest `testpaths`
   `-> str` tagastusele ka `structured_content`-i, mille tugi on klientide vahel
   ebaühtlane.
 - stdio-režiimis kirjutab ainult MCP protokoll `stdout`-i; logid `stderr`-i.
-- Skaneeringu piltide baite ei väljastata kunagi — ainult töölaua lingid.
-  `is_public` kaitseb pilte, mitte teksti.
+- Skaneeringu pilti annab ainult `get_page_image` (OCR-i kontrolliks) — tokenita
+  päring pildiserverisse, seega sama ligipääs mis sisselogimata töölaual; muud
+  tööriistad annavad töölaua lingid.
 - Meili väljanimed on legacy (ADR 0006). `mcp/tests/test_meili_contract.py`
   valvab, et päringus kasutatavad väljad oleksid indeksiseadetes õiges rühmas
   (filterable / sortable / searchable) — mitte ainult dokumendis olemas.

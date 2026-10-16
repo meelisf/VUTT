@@ -101,42 +101,47 @@ def add_registration(name, email, affiliation, motivation, gdpr_consent=False,
     Sanitiseerimine käib sama funktsiooniga mis päris ulatus, et kaks
     nimekirja ei saaks lahkneda: tundmatu id ja virtuaalgrupp kukuvad välja.
     """
-    data = load_pending_registrations()
+    # Lugemine kuni kirjutuseni ühe luku all (#619): kaks samaaegset taotlust
+    # lugesid sama seisu ja teine salvestus pühkis esimese. Järjekord
+    # registrations_lock → tokens_lock/users (suggest_username_for_email);
+    # vastupidist ei võeta kusagil.
+    with registrations_lock:
+        data = load_pending_registrations()
 
-    # Kontrolli, kas sama email on juba ootel
-    for reg in data["registrations"]:
-        if reg["email"].lower() == email.lower() and reg["status"] == "pending":
-            return None, "Selle e-posti aadressiga taotlus on juba ootel"
+        # Kontrolli, kas sama email on juba ootel
+        for reg in data["registrations"]:
+            if reg["email"].lower() == email.lower() and reg["status"] == "pending":
+                return None, "Selle e-posti aadressiga taotlus on juba ootel"
 
-    # Kontrolli, kas sama email on juba kasutajate seas
-    users = load_users()
-    for username, user_data in users.items():
-        if user_data.get("email", "").lower() == email.lower():
-            return None, "Selle e-posti aadressiga kasutaja on juba olemas"
+        # Kontrolli, kas sama email on juba kasutajate seas
+        users = load_users()
+        for username, user_data in users.items():
+            if user_data.get("email", "").lower() == email.lower():
+                return None, "Selle e-posti aadressiga kasutaja on juba olemas"
 
-    registration = {
-        "id": str(uuid.uuid4()),
-        "name": name,
-        "email": email.lower(),
-        "username": suggest_username_for_email(email),
-        "affiliation": affiliation,
-        "motivation": motivation,
-        # Soov, mitte volitus — vt funktsiooni dokumentatsiooni.
-        "interest_collections": sanitize_edit_collections(
-            interest_collections or [], get_cached_collections()
-        )[:MAX_INTEREST_COLLECTIONS],
-        # Keel püütakse vormilt: enne esimest sisselogimist ei ole kasutajal
-        # ühtki teist kohta, kus oma keelt öelda.
-        "language": normalize_language(language),
-        "gdpr_consent_at": datetime.now().isoformat() if gdpr_consent else None,
-        "submitted_at": datetime.now().isoformat(),
-        "status": "pending",
-        "reviewed_by": None,
-        "reviewed_at": None
-    }
+        registration = {
+            "id": str(uuid.uuid4()),
+            "name": name,
+            "email": email.lower(),
+            "username": suggest_username_for_email(email),
+            "affiliation": affiliation,
+            "motivation": motivation,
+            # Soov, mitte volitus — vt funktsiooni dokumentatsiooni.
+            "interest_collections": sanitize_edit_collections(
+                interest_collections or [], get_cached_collections()
+            )[:MAX_INTEREST_COLLECTIONS],
+            # Keel püütakse vormilt: enne esimest sisselogimist ei ole kasutajal
+            # ühtki teist kohta, kus oma keelt öelda.
+            "language": normalize_language(language),
+            "gdpr_consent_at": datetime.now().isoformat() if gdpr_consent else None,
+            "submitted_at": datetime.now().isoformat(),
+            "status": "pending",
+            "reviewed_by": None,
+            "reviewed_at": None
+        }
 
-    data["registrations"].append(registration)
-    save_pending_registrations(data)
+        data["registrations"].append(registration)
+        save_pending_registrations(data)
 
     logger.info(f"Uus registreerimistaotlus: {name} ({email})")
     return registration, None
@@ -152,15 +157,16 @@ def get_registration_by_id(reg_id):
 
 
 def update_registration_status(reg_id, status, reviewed_by):
-    """Uuendab registreerimistaotluse staatust."""
-    data = load_pending_registrations()
-    for reg in data["registrations"]:
-        if reg["id"] == reg_id:
-            reg["status"] = status
-            reg["reviewed_by"] = reviewed_by
-            reg["reviewed_at"] = datetime.now().isoformat()
-            save_pending_registrations(data)
-            return reg
+    """Uuendab registreerimistaotluse staatust (loe–muuda–kirjuta luku all, #619)."""
+    with registrations_lock:
+        data = load_pending_registrations()
+        for reg in data["registrations"]:
+            if reg["id"] == reg_id:
+                reg["status"] = status
+                reg["reviewed_by"] = reviewed_by
+                reg["reviewed_at"] = datetime.now().isoformat()
+                save_pending_registrations(data)
+                return reg
     return None
 
 

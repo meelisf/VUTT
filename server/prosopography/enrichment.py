@@ -511,8 +511,17 @@ def _parse_dnb_jsonld(nodes: list, gnd_id: str) -> dict:
     return result
 
 
+# GND kuju (sama mis `candidates._GND_ID_RE`): ID läheb URL-i teekonda, seega
+# `/`, `?` või `..` ei tohi sinna jõuda (#619).
+_GND_ID_RE = re.compile(r"[0-9]+[0-9X-]*")
+# VIAF RDF/XML kirje on mõnikümmend kB; lagi kaitseb vigase vastuse eest.
+_VIAF_MAX_BYTES = 2 * 1024 * 1024
+
+
 def _fetch_gnd_dnb(gnd_id: str) -> Optional[dict]:
     """Varutee otse Saksa rahvusraamatukogust, kui lobid.org ei vasta."""
+    if not _GND_ID_RE.fullmatch(gnd_id or ""):
+        return None
     url = f"https://d-nb.info/gnd/{gnd_id}/about/lds.jsonld"
     try:
         req = urllib.request.Request(url, headers=dict(HEADERS, Accept="application/json"))
@@ -617,6 +626,8 @@ def _parse_lobid(data: dict) -> dict:
 
 def _fetch_lobid_raw(gnd_id: str) -> Optional[dict]:
     """lobid.org toorvastus või None (tõrge/aegumine)."""
+    if not _GND_ID_RE.fullmatch(gnd_id or ""):
+        return None
     url = f"https://lobid.org/gnd/{gnd_id}.json"
     try:
         req = urllib.request.Request(url, headers=HEADERS)
@@ -721,7 +732,10 @@ def _fetch_viaf(viaf_id: str) -> Optional[dict]:
     try:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as resp:
-            xml_text = resp.read().decode("utf-8")
+            raw = resp.read(_VIAF_MAX_BYTES + 1)
+            if len(raw) > _VIAF_MAX_BYTES:
+                raise ValueError(f"VIAF vastus üle {_VIAF_MAX_BYTES} baidi")
+            xml_text = raw.decode("utf-8")
     except Exception as e:
         logger.warning("VIAF rikastus ebaõnnestus (%s): %s", url, e)
         return None

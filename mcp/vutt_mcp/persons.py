@@ -82,8 +82,11 @@ def search(client, base_url: str, **filters) -> str:
 
 def detail(client, base_url: str, person_id: str, include_relations: bool) -> str:
     """Isikukaardi täisandmed. Seotud teoste ja seoste arv on lae all."""
+    # ID läheb URL-i teekonda — sama kontroll mis enrichment_context-is (#619).
+    if not _PERSON_ID.fullmatch(person_id or ""):
+        raise VuttError("Vigane person_id; kasuta search_persons tulemusest saadud vutt:P… ID-d.")
     try:
-        person = client.api_get(f"{LIST_PATH}/{person_id}")
+        person = client.api_get(f"{LIST_PATH}/{quote(person_id, safe='')}")
     except VuttNotFound as exc:
         raise VuttNotFound(
             f"Isikut person_id={person_id} ei leitud. Otsi õige ID üles "
@@ -241,7 +244,7 @@ def _relations_section(client, person_id: str) -> str:
     """
     try:
         items = client.api_get(
-            f"{LIST_PATH}/work-relations/{person_id}",
+            f"{LIST_PATH}/work-relations/{quote(person_id, safe='')}",
             params={"limit": MAX_RELATIONS},
         )
     except Exception:

@@ -210,7 +210,7 @@ def get_notifications(request: Request, user=Depends(get_user)):
 
 
 @router.get("/notification-recipients")
-async def get_notification_recipients(user=Depends(require_role("editor"))):
+def get_notification_recipients(user=Depends(require_role("editor"))):
     """Kasutajate nimekiri teatise saatmise UI jaoks (editor+)."""
     users = [
         {
