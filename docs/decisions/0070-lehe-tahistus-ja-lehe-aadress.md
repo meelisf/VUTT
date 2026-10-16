@@ -6,7 +6,7 @@ teksti osa. **Ei ole marginaalia**: `<m>` (ADR 0003/0009) on sisuline tekst veer
 
 **Kuupäev:** 2026-10-16
 **Staatus:** ettepanek (spekk enne teostust, mitu ülevaatust; 1. ja 2. ülevaatus 2026-10-16 sisse viidud)
-**Seotud:** #526 (kirjad), ADR 0003/0009 (`<m>`), ADR 0044 (peidetud täg),
+**Seotud:** ADR 0071 (märgenduse register), #526 (kirjad), ADR 0003/0009 (`<m>`), ADR 0044 (peidetud täg),
 ADR 0055 (mainimised tagimuutusel), ADR 0067 (`<add>`), ADR 0030 (`page_map`)
 
 ## Kontekst
@@ -39,6 +39,10 @@ ainult MCP kuvas; süsteemne igal poolitatud siirdeviidal, millele järgneb sign
 
 Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
 (`<pb/>` vahel) — pildipõhine aadressiväli kannaks ainult ühte.
+
+**Teostus (spekk 1):** `docs/superpowers/specs/2026-10-16-lehe-tahistus-tagid-design.md`,
+plaan `docs/superpowers/plans/2026-10-17-lehe-tahistus-tagid.md` — tägid, otsingutekst,
+`page_marks`, paneel. Aadressi tuletus (punktid 4–7) on spekk 2.
 
 ## Otsus (ettepanek)
 
