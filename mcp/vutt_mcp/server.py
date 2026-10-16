@@ -133,6 +133,10 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         Tulemuse `seisund` ütleb, kui usaldusväärne transkriptsioon on
         (skaala serveri juhendis). `märkusi: N` lehereal tähendab, et lehel on
         N tekstisisest toimetajamärkust — get_pages näitab neid ankru juures.
+
+        LEHE TÄHISTUS (leheküljenumber, signatuur, siirdeviit, veerutiitel) ei ole
+        otsingutekstis — „A iij" või „Vorrede" otsimine ei leia märgendatud tähistust.
+        get_pages näitab tähistust lehe päises.
         """
         search_fields = _scope_fields(scope)
         offset = max(0, int(offset))
@@ -251,6 +255,9 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         järjestusnumbrit (skaneeringute järjekord) — MITTE trükise paginatsiooni
         ega foliatsiooni. Varauusaegse teose puhul on „p. 12", „fol. B2r" ja
         VUTT-i kaheteistkümnes skaneering üldjuhul kolm eri asja.
+
+        Kui lehel on märgendatud lehe tähistus, on see päises (`signatuur A iij ·
+        siirdeviit Vor⸗`) — see on trükise/käsikirja enda tähistus, mitte VUTT-i number.
 
         Korraga kuni 20 lehekülge. Marginaalia tagastatakse eraldi märgistatuna,
         sest see on füüsiliselt eraldi tekstikiht.

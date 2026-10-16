@@ -47,6 +47,18 @@ def needs_role_legend(creators: list[dict]) -> bool:
     return any((c.get("role") or "auctor") != "auctor" for c in creators)
 
 
+# Lehe tähistus (ADR 0070) — raamatukogusõnastiku eelistermin. Otsing seda ei leia:
+# tähistus on otsingutekstist väljas, ainult kuvamiseks.
+PAGE_MARK_LABELS = {"fw": "nr", "sig": "signatuur", "catch": "siirdeviit", "rh": "veerutiitel"}
+
+
+def _page_marks_header(page: dict) -> str:
+    marks = page.get("page_marks") or []
+    osad = [f"{PAGE_MARK_LABELS.get(m.get('kind'), m.get('kind'))} {m.get('text')}"
+            for m in marks if isinstance(m, dict) and m.get("text")]
+    return "".join(f"{o} · " for o in osad)
+
+
 def work_url(work_id: str, page: int | None = None, *, base_url: str) -> str:
     """Töölaua link. Skaneeringu pildi URL-i EI väljastata (vt spekk)."""
     if page is None:
@@ -379,6 +391,7 @@ def format_pages(pages: list[dict], *, base_url: str, work_id: str) -> str:
         num = page.get("lehekylje_number")
         blocks.append(
             f"── lk {num} · seisund={page.get('status', '?')} · "
+            + _page_marks_header(page)
             + work_url(work_id, num, base_url=base_url)
         )
 

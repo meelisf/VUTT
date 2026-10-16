@@ -45,6 +45,9 @@ PAGE_RETRIEVE_FIELDS = [
     # teist tekstikoopiat.
     "lehekylje_tekst_ann",
     "marginaalia_tekst",
+    # Lehe tähistus (ADR 0070): leheküljenumber, signatuur, siirdeviit, veerutiitel —
+    # otsingutekstist väljas, siin ainult kuvamiseks.
+    "page_marks",
     # Toimetajakiht: tekstisisesed märkused, lehe kommentaarid, lehe märksõnad.
     # Kõik kolm on inimese hinnang tekstile ja olid MCP eest peidus.
     "text_annotations",

@@ -186,6 +186,10 @@ täisnimekiri tuleb `get_work`-ist.
 
 ### Otsinguulatus ja rühmitamine
 
+**Lehe tähistus** (leheküljenumber, signatuur, siirdeviit, veerutiitel; ADR 0070) ei ole
+otsingutekstis — `search_pages` seda ei leia; `get_pages` näitab märgendatud tähistust
+lehe päises (`signatuur A iij · siirdeviit Vor⸗`).
+
 `search_pages` otsib **ainult lehetekstist** (`PAGE_SEARCH_FIELDS`), `search_works`
 ka pealkirjast ja autoritest (`WORK_SEARCH_FIELDS`). Teose metaandmed on
 dubleeritud igale lehe-dokumendile, nii et ilma selle piiranguta andis üks
