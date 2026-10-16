@@ -30,6 +30,7 @@ import PersonSourcesCard from '../components/PersonSourcesCard';
 import { evidenceRef, evidenceWorkIds, type EvidenceRef } from '../utils/evidenceRef';
 import type { EnrichmentEvidence } from '../services/prosopographyService';
 import { useWorkTitles } from '../hooks/useWorkTitles';
+import { quoteFilterValue } from '../../utils/filterUtils';
 
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
 const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
@@ -390,7 +391,7 @@ const PersonDetailPage: React.FC = () => {
           const batches: string[][] = [];
           for (let i = 0; i < uniqueWorkIds.length; i += BATCH) batches.push(uniqueWorkIds.slice(i, i + BATCH));
           Promise.all(batches.map(batch => {
-            const ids = batch.map((wid: string) => `"${wid}"`).join(', ');
+            const ids = batch.map((wid: string) => quoteFilterValue(wid)).join(', ');
             return index.search('', {
               filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
               attributesToRetrieve: ['work_id', 'title', 'year', 'year_display', 'dating', 'collections_hierarchy'],

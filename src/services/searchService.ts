@@ -8,7 +8,7 @@ import { isAbortError } from '../utils/isAbortError';
 import { Work, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } from '../types';
 import { MEILI_HOST } from '../config';
 import { checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
-import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
+import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter, quoteFilterValue } from '../utils/filterUtils';
 import { buildIdMap } from '../utils/buildObjectIdMap';
 import { getEntityLabelsCache } from './entityLabelsService';
 import { pickLabelByLang } from '../utils/labelUtils';
@@ -285,7 +285,7 @@ const resolveLabelsFromRegistry = async (
 
   checkMixedContent();
   try {
-    const values = missing.map(q => `"${q}"`).join(', ');
+    const values = missing.map(q => quoteFilterValue(q)).join(', ');
     const response = await index.search('', {
       filter: ['lehekylje_number = 1', `${fields.idsField} IN [${values}]`],
       limit: LABEL_GAPFILL_LIMIT,
@@ -427,16 +427,16 @@ export function buildDashboardSearch(rawQuery: string, options?: DashboardSearch
   // Apply server-side filters if provided
   pushYearFilter(filter, options?.yearStart, options?.yearEnd);
   if (options?.author) {
-    filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
+    filter.push(`(author_names = ${quoteFilterValue(options.author)} OR respondens_names = ${quoteFilterValue(options.author)})`);
   }
   if (options?.respondens) {
-    filter.push(`respondens_names = "${options.respondens}"`);
+    filter.push(`respondens_names = ${quoteFilterValue(options.respondens)}`);
   }
   if (options?.printer) {
     filter.push(buildPrinterFilter(options.printer));
   }
   if (options?.workStatus) {
-    filter.push(`teose_staatus = "${options.workStatus}"`);
+    filter.push(`teose_staatus = ${quoteFilterValue(options.workStatus)}`);
   }
   // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
   if (options?.teoseTags && options.teoseTags.length > 0) {
@@ -455,7 +455,7 @@ export function buildDashboardSearch(rawQuery: string, options?: DashboardSearch
   }
   // Keele filter — languages on massiiv, seega üks väärtus ühtib massiivi liikmega
   if (options?.languages && options.languages.length > 0) {
-    filter.push(buildMultiFilter(options.languages, (l) => `languages = "${l}"`));
+    filter.push(buildMultiFilter(options.languages, (l) => `languages = ${quoteFilterValue(l)}`));
   }
   return {
     q,
@@ -647,7 +647,7 @@ async function fetchWorkLevelFacets(
     responses = await Promise.all(batches.map(batch => index.search('', {
       limit: 0,
       filter: [
-        `work_id IN [${batch.map(id => `"${id}"`).join(', ')}]`,
+        `work_id IN [${batch.map(id => quoteFilterValue(id)).join(', ')}]`,
         'lehekylje_number = 1',
       ],
       facets: [...facetFields, 'author_names', 'respondens_names', 'originaal_kataloog'],
@@ -686,9 +686,9 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
   const offset = (page - 1) * limit;
   const filter: string[] = [];
 
-  if (options.workId) filter.push(`work_id = "${options.workId}"`);
+  if (options.workId) filter.push(`work_id = ${quoteFilterValue(options.workId)}`);
   pushYearFilter(filter, options.yearStart, options.yearEnd);
-  if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
+  if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = ${quoteFilterValue(options.catalog)}`);
   // Teose märksõnade filter (AND loogika)
   if (options.teoseTags && options.teoseTags.length > 0) {
     for (const tag of options.teoseTags) filter.push(buildTagFilter(tag));
@@ -709,14 +709,14 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
   }
   // Keele filter — languages on massiiv, seega üks väärtus ühtib massiivi liikmega
   if (options.languages && options.languages.length > 0) {
-    filter.push(buildMultiFilter(options.languages, (l) => `languages = "${l}"`));
+    filter.push(buildMultiFilter(options.languages, (l) => `languages = ${quoteFilterValue(l)}`));
   }
   // V2: Autori filter (kõik creators: author_names + respondens_names)
   if (options.author) {
-    filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
+    filter.push(`(author_names = ${quoteFilterValue(options.author)} OR respondens_names = ${quoteFilterValue(options.author)})`);
   }
   if (options.subjectPerson) {
-    filter.push(`tags_ids = "${options.subjectPerson}"`);
+    filter.push(`tags_ids = ${quoteFilterValue(options.subjectPerson)}`);
   }
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
@@ -922,10 +922,10 @@ export const searchWorkHits = async (index: Index, rawQuery: string, workId: str
   checkMixedContent();
   const query = normalizeSearchQuery(rawQuery);
 
-  const filter: string[] = [`work_id = "${workId}"`];
+  const filter: string[] = [`work_id = ${quoteFilterValue(workId)}`];
 
   pushYearFilter(filter, options.yearStart, options.yearEnd);
-  if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
+  if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = ${quoteFilterValue(options.catalog)}`);
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
   // „Terve dokument" katab KÕIK tekstiväljad — sh text_annotations_text.

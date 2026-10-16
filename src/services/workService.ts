@@ -6,6 +6,7 @@ import { Work, WorkStatus, PageStatus } from '../types';
 import { calculateWorkStatus, checkMixedContent, normalizeWork } from './meiliService';
 import { getPageThumbUrl } from './workImageService';
 import type { Index } from 'meilisearch';
+import { quoteFilterValue } from '../utils/filterUtils';
 
 // Pärib mitme teose staatused korraga (efektiivsem kui ühekaupa)
 // NB: Kuna indeksil on distinct='work_id', peame tegema eraldi päringud iga teose jaoks
@@ -20,7 +21,7 @@ export const getWorkStatuses = async (index: Index, workIds: string[]): Promise<
     // ühes päringus saada kõiki lehekülgi erinevatest teostest
     const promises = workIds.map(async (workId) => {
       const response = await index.search('', {
-        filter: [`work_id = "${workId}"`],
+        filter: [`work_id = ${quoteFilterValue(workId)}`],
         attributesToRetrieve: ['work_id', 'status', 'lehekylje_number'],
         limit: 500  // Piisav ühe teose kõigile lehekülgedele
       });
@@ -60,7 +61,7 @@ export const getWorkMetadata = async (index: Index, workId: string): Promise<Wor
   try {
     // Otsime work_id (nanoid) järgi
     const response = await index.search('', {
-      filter: [`work_id = "${workId}"`],
+      filter: [`work_id = ${quoteFilterValue(workId)}`],
       attributesToRetrieve: [
         // V2 väljad
         'work_id', 'id', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'location', 'location_object', 'publisher', 'publisher_object', 'publisher_id',
@@ -102,7 +103,7 @@ export const getWorkPageImages = async (
   const limit = Math.min(Math.ceil(pageCount * 1.1) + 10, 1000);
   try {
     const response = await index.search('', {
-      filter: [`work_id = "${workId}"`],
+      filter: [`work_id = ${quoteFilterValue(workId)}`],
       attributesToRetrieve: ['lehekylje_number', 'lehekylje_pilt', 'has_annotations'],
       limit,
     });

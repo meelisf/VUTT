@@ -10,6 +10,7 @@ import { scopeClauses, SelectionScope } from './selectionFilter';
 import { normalizeSearchQuery } from './searchService';
 import { dateBound } from '../utils/workDating';
 import type { WorkDating } from '../utils/workDating';
+import { quoteFilterValue } from '../utils/filterUtils';
 
 export const LETTERS_PER_PAGE = 20;
 
@@ -59,10 +60,8 @@ export interface LetterSearchResult {
 
 export const LETTER_FACETS = ['authors', 'addressees', 'place_from', 'place_to', 'languages'] as const;
 
-const quote = (v: string) => JSON.stringify(v);
-
 function pushIn(filter: string[], field: string, values: string[]): void {
-  if (values.length) filter.push(`${field} IN [${values.map(quote).join(', ')}]`);
+  if (values.length) filter.push(`${field} IN [${values.map(v => quoteFilterValue(v)).join(', ')}]`);
 }
 
 export function buildLetterFilter(f: LetterFilters, scope: SelectionScope | undefined): string[] {
