@@ -8,6 +8,8 @@ ADR 0003/0009 (`<m>`), #526 (kirjad)
 **Ülevaatus:** spekk vajab enne plaani **mitut ülevaatusringi** (kasutaja nõue).
 1. ring 2026-10-16 sisse viidud (struktuurireeglid, paaride sidumine, tarbijapõhised
 lipud, poolitus üle tähistuse, TEI `header`, ADR 0070 ühtlustus).
+2. ring 2026-10-16: vorminduse laiendust ei ole (poolitus), `<pb/>` reegel serveris,
+üks `page_mark_spans` kolmele tarbijale.
 
 ## Probleem
 
@@ -114,10 +116,18 @@ lihtne, ka siin.
 enne `<fn>`/`<pb/>` asendust, üldist tägieemaldust ja poolituste liitmist:
 **tähistuse paarid eemaldatakse koos sisuga, asendus = tühi string**.
 
-- **Paarid, mitte regex.** Tägid seotakse paarideks nagu `findOrphanTags` (pinu); eemaldatakse
-  iga **välimine** tähistuse paar koos kõigega, mis tema sees on (ka teised tähistused —
-  `<sig>A <sig>ij</sig> muu</sig>` → kaob tervikuna). **Paarita** tähistuse täg on tavaline
-  täg: täg kaob, sisu jääb otsingusse — muidu kaotaks üks orv `<sig>` lehe ülejäänud teksti.
+- **Üks paaride sidumise funktsioon** `page_mark_spans(text)` (`server/vutt_tags.py`), mida
+  kasutavad **kõik kolm tarbijat** — otsingupuhastus, `page_marks` ja normaliseerija —, et
+  sama teksti ei tõlgendataks kaheti. Tagastab **kehtivad välimised** tähistuse paarid:
+  - tägid seotakse paarideks pinuga (nagu `findOrphanTags`), mitte regexiga;
+  - **välimine** paar loeb, sisemised tähistused on tema sisu
+    (`<sig>A <sig>ij</sig> muu</sig>` → üks paar, kaob tervikuna);
+  - **paarita** täg ei ole tähistus: täg kaob nagu tavaline täg, sisu jääb otsingusse —
+    muidu kaotaks üks orv `<sig>` lehe ülejäänud teksti;
+  - **paar, mille sees on `<pb/>`, ei ole kehtiv tähistus** (`<fw>12<pb/>13</fw>`): tägid
+    kaovad nagu tavalised, sisu ja `<pb/>` jäävad, `page_marks`-i kirjet ei teki. Muidu
+    saaks kahe tekstiosa kohta ühe kirje.
+- Puhastus eemaldab `page_mark_spans` vahemikud koos sisuga.
 - **Tühi string, mitte reavahetus:** ümbritsev tühik/reavahetus jääb nagu originaalis.
   Tähistus on teksti voos **läbipaistev** — poolitus liitub üle eemaldatud tähistuse
   täpselt siis, kui originaalis oli poolituse järel reavahetus. See on õige: tähistus ei ole
@@ -147,6 +157,9 @@ olev:
                {"kind": "catch", "text": "habe", "seg": 0}]
 ```
 
+- Kirjed tulevad **samast `page_mark_spans`-ist**: üks kirje välimise kehtiva paari kohta;
+  pesastatud sisendist üks kirje, paarita tägist ja üle `<pb/>` ulatuvast paarist kirjet ei
+  teki.
 - Järjekord = tekstis. `text` = sisu sisemiste tägideta, tühikud ahendatud, muidu
   täht-tähelt; tühi sisu jäetakse välja.
 - `seg` = `<pb/>`-de arv enne tägi (laotuse tekstiosa; spekk 2 vajab).
@@ -159,11 +172,14 @@ olev:
 - `strip_empty_tags` komplekt + `fw sig catch rh` → tühi `<sig></sig>` kaob salvestusel.
 - `_INLINE` + needsamad: `<m>` jääb välimiseks, tähistus võib olla `<m>` sees (OCR võib
   veerise ploki sisse panna ka nurga foliatsiooninumbri), **mitte vastupidi**.
-- **Uus: tähistus ei sisalda tähistust.** Välimise tähistuse paari sees olevad tähistuse
-  tägid (mis tahes liik) eemaldatakse, sisu jääb. Kehtib igale kirjutatavale tekstile —
-  ka kleebitud, imporditud ja OCR-ist tulnud. Nii on „pesastust ei ole" kontrollitav
-  invariant (test: normaliseeritud tekstis ei ole tähistust tähistuse sees);
-  otsingupuhastus ei sõltu sellest (vt ülal, välimine paar).
+- **Uus: tähistuse struktuur** (`page_mark_spans` põhjal), igale kirjutatavale tekstile —
+  ka kleebitud, imporditud ja OCR-ist tulnud:
+  - välimise paari sees olevad tähistuse tägid (mis tahes liik) eemaldatakse, sisu jääb;
+  - üle `<pb/>` ulatuva paari ümbristägid eemaldatakse, sisu ja `<pb/>` jäävad.
+
+  Kontrollitavad invariandid (test): normaliseeritud tekstis ei ole tähistust tähistuse
+  sees ega tähistust, mis sisaldab `<pb/>`. Indekseerija ei sõltu normaliseerimisest —
+  normaliseerimata tekst annab `page_mark_spans` kaudu sama tulemuse.
 
 **Olemasolev korpus:** migratsiooni ja täisreindeksit ei ole. Märgendamata lehtedel jääb
 tähistus põhiteksti nagu praegu; `page_marks` tekib iga lehe järgmisel sünkil (tühjana).
@@ -180,8 +196,17 @@ tähistus põhiteksti nagu praegu; `page_marks` tekib iga lehe järgmisel sünki
 - **Keeldumine** (tekst ei muutu, paneelis/menüüs lühike vihje): vahemik sisaldab
   `<pb/>`-d (tähistus ei ületa lehevahetust; muidu saaks `page_marks` kahe lehekülje kohta
   ühe kirje); vahemik ületab `<m>` ploki piiri või sisaldab peidetud marginaaliaplokki.
-- **Ristuv vormindus:** kui vahemik lõikab `<i>`/`<b>`/… paari pooleks, laiendatakse see
-  tasakaalus vahemikuks (`wrapTagUtils` `balancedCut`, sama mis `wrapWithTag`).
+- **Vormindus: valitud nähtav ulatus säilib, laiendust ei ole.** Tähistus ei tohi
+  kunagi haarata põhiteksti, mida kasutaja ei valinud (`<i>põhitekst 12</i>`, valitud `12`
+  — `balancedCut` laiendaks kogu kursiivile ja põhitekst kaoks otsingust):
+  - vahemik on ühe vormindustägi (`i b cs hi add`) sisu sees → tähistus läheb **selle
+    sisse**: `<i>põhitekst <fw>12</fw></i>`;
+  - vahemik lõikab vormindustägi piiri → vormindustäg **poolitatakse** vahemiku piiril
+    (sulge + ava uuesti), tähistus katab täpselt valitud nähtava teksti:
+    `<i>ab</i>|cd|e` valik `b…d` → `<i>a</i><fw><i>b</i>cd</fw>e`;
+  - piir läbiks muud kui vormindustägi (`m`, `annN`, `fn`, `pb`) → **keeldu**.
+- Kõik kontrollid (`<pb/>`, marginaalia, olemasolevad tähistused) käivad **lõpliku**
+  vahemiku kohta, pärast poolitust.
 - Tühi rida → lisa `<kind></kind>`, kursor sisse.
 - Tehing `userEvent: 'input.format'` (filtrid lasevad läbi, `wrapWithTag` muster).
 
@@ -244,7 +269,11 @@ pytest:
 - `strip_empty_tags` ja `normalize_marginalia_tags` uute tägidega.
 - `clean_text_for_search` lisaks: tähistusele järgnev põhitekst (tabeli neli juhtu);
   pesastatud tähistus (välimine kaob tervikuna); paarita tähistus (sisu jääb).
-- Normaliseerija: tähistus tähistuse sees → sisemine täg eemaldatud; idempotentne.
+- Normaliseerija: tähistus tähistuse sees → sisemine täg eemaldatud; `<fw>12<pb/>13</fw>`
+  → `12<pb/>13`; idempotentne.
+- `page_mark_spans` ühine tabel kolmele tarbijale: pesastus, orv, üle `<pb/>`, `<m>` sees —
+  puhastus, `page_marks` ja normaliseerija annavad samale sisendile kooskõlalise tulemuse
+  (`<fw>12<pb/>13</fw>`: otsingus `12 13`, `page_marks` tühi).
 - **Paarsustest:** TS- ja Pythoni register samad (nimi, TEI, kõik lipud); iga
   tarbijaloend (`VUTT_TAGS`, `_INLINE`, `_EMPTY_RE`, `cleanMarkup` regex, `wrapTagUtils`
   plokitägid, `renderVuttMarkup` lubatud nimekiri) **võrdub** registrist lipu järgi
@@ -254,7 +283,9 @@ vitest:
 
 - `wrapPageMark`: rida ilma valikuta, valik, eemaldamine, vahetus, tühi rida, tehingu
   `userEvent`; kursor tähistuse sees → terve paar; mitu tähistust → keeldumine; `<pb/>`
-  vahemikus → keeldumine; ristuv `<i>` → laiendus; kursor avatud `<m>` plokis → ainult
+  vahemikus → keeldumine; valik kursiivi sees → tähistus kursiivi sees, põhitekst
+  puutumata; ristuv `<i>` → poolitus, nähtav ulatus sama; ristuv `annN` → keeldumine;
+  kursor avatud `<m>` plokis → ainult
   ploki sisu; peidetud marginaaliaplokk vahemikus → keeldumine (`marginaliaProtectionFilter`
   ei tohi poolikut muudatust jätta).
 - Redaktori dekoratsioonid + `atomicRanges` uutel tägidel (`vuttMarkupAdd.test.ts`
