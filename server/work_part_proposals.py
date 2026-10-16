@@ -19,8 +19,10 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
 import time
 from contextlib import contextmanager
+from functools import wraps
 from typing import Optional
 
 from .config import STATE_DIR
@@ -44,6 +46,21 @@ MAX_PERSONS = 50
 _PERSON_KEYS = {"ref", "name", "aliases", "birth_year", "death_year", "identifiers", "note", "evidence"}
 _PERSON_SCHEMES = {"gnd", "wikidata", "viaf"}
 _REF = re.compile(r"^[A-Za-z0-9_-]{1,20}$")
+
+# Otsused loevad ettepaneku rea, teevad faili- ja git-töö ning kirjutavad payload'i
+# tervikuna tagasi. Kaks kiiret otsust kirjutasid teineteise üle (#615). Teose
+# lukk siia ei sobi — `create_part` võtab selle ise ja lukk ei ole korduv.
+# Järjekord: _DECIDE_LOCK → work_lock → metadata_lock (ja isikulukud).
+_DECIDE_LOCK = threading.RLock()
+
+
+def _serialized(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        with _DECIDE_LOCK:
+            return fn(*args, **kwargs)
+    return wrapper
+
 
 
 class ProposalError(ValueError):
@@ -398,6 +415,7 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
     return out
 
 
+@_serialized
 def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: int,
            action: str, override: Optional[dict] = None, mode: Optional[str] = None,
            background_tasks=None) -> Optional[dict]:
@@ -434,8 +452,10 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
             try:
                 if target:
                     existing = next(p for p in _current_parts(work_dir) if p.get("id") == target)
-                    data = dict(override) if isinstance(override, dict) else \
-                        merge_part(existing, data, explicit=bool(item.get("explicit_target")))
+                    # Toimetaja `override` on juba `data` (koos ülal seatud `attached_to`-ga);
+                    # uuesti `dict(override)` pühkis selle ära.
+                    if not isinstance(override, dict):
+                        data = merge_part(existing, data, explicit=bool(item.get("explicit_target")))
                     data.pop("id", None); data.pop("needs_review", None)
                     created = wp.update_part(work_dir, target, data, username, background_tasks)
                 else:
@@ -452,6 +472,7 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
 MAX_BATCH = 500
 
 
+@_serialized
 def decide_many(work_id: str, work_dir: str, username: str, picks: list,
                 background_tasks=None) -> list[dict]:
     """„Lisa kõik": valitud read (`[(proposal_id, index)]`) vastu ÜHE kirjutusega.
@@ -511,6 +532,9 @@ def decide_many(work_id: str, work_dir: str, username: str, picks: list,
                 data = merge_part(existing, data, explicit=bool(item.get("explicit_target")))
                 data.pop("id", None); data.pop("needs_review", None)
                 op.update(op="update", part_id=existing_id)
+                # Järgmine sama osa uuendus liidab selle tulemuse, mitte algseisu vastu.
+                current = [{**data, "id": existing_id} if p.get("id") == existing_id else p
+                           for p in current]
             else:
                 op["op"] = "create"
             op["data"] = data
@@ -528,6 +552,7 @@ def decide_many(work_id: str, work_dir: str, username: str, picks: list,
     return created
 
 
+@_serialized
 def resolve_person(proposal_id: str, work_id: str, work_dir: str, username: str, ref: str,
                    action: str, person_id: Optional[str] = None) -> dict:
     """Pakutud isik: `create` (create_person_checked, ADR 0048), `link` olemasolevaga

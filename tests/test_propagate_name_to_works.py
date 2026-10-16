@@ -38,10 +38,14 @@ def _fake_save(path, content, *args, **kwargs):
 
 def _run(data_dir: Path, new_label: str = "Karl XII"):
     """Käivitab _propagate_name_to_works koos mocktidega (git + meili)."""
+    # Juurväljad käivad bulk_update_works kaudu (#615) — mockid metadata_ops-i nimedele.
     with (
         patch("server.config.BASE_DIR", str(data_dir)),
-        patch("server.git_ops.save_with_git", side_effect=_fake_save) as mock_git,
-        patch("server.meilisearch_ops.sync_work_to_meilisearch_async", return_value=None) as mock_meili,
+        patch("server.metadata_ops.save_with_git", side_effect=_fake_save) as mock_git,
+        patch("server.metadata_ops.sync_work_to_meilisearch_async", return_value=None) as mock_meili,
+        patch("server.metadata_ops.update_work_collections"),
+        patch("server.metadata_ops.update_work_facts"),
+        patch("server.metadata_ops.uncommitted_paths", return_value=[]),
     ):
         _propagate_name_to_works(PERSON_ID, new_label, "testuser")
         return mock_git, mock_meili

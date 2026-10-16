@@ -521,3 +521,27 @@ def test_asendus_ei_puutu_ankrut(work):
     wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept")
     (part,) = _meta(work)["parts"]
     assert part["abstract_en"] == "A letter." and part[wp.ANCHOR] == old[wp.ANCHOR]
+
+
+def test_parandatud_uuendus_saab_lisa_viite_kirjale(work):
+    """#615: uuenduse `override` asendas ka eelnevalt lahendatud `attached_to`."""
+    attach = {"kind": "attachment", "title": "Lisa", "pages": [5], "attached_to": 0}
+    _submit(work, [LETTER, attach])
+    (p,) = wpp.list_pending("w1", work, "ed")
+    letter = wpp.decide(p["proposal_id"], "w1", work, "ed", 0, "accept")
+    wpp.decide(p["proposal_id"], "w1", work, "ed", 1, "accept")
+    # Teine ettepanek parandab samu osi (sama liik + samad lehed → uuendus).
+    _submit(work, [LETTER, attach])
+    (p2,) = wpp.list_pending("w1", work, "ed")
+    wpp.decide(p2["proposal_id"], "w1", work, "ed", 0, "accept")
+    lisa = wpp.decide(p2["proposal_id"], "w1", work, "ed", 1, "accept",
+                      override={**p2["items"][1]["part"], "title": "Parandatud lisa"})
+    assert lisa["title"] == "Parandatud lisa"
+    assert lisa["attached_to"] == letter["id"]
+    assert len(_meta(work)["parts"]) == 2
+
+
+def test_otsused_on_jarjestatud():
+    """#615: kaks kiiret otsust samal ettepanekul ei tohi teineteist üle kirjutada."""
+    for fn in (wpp.decide, wpp.decide_many, wpp.resolve_person):
+        assert getattr(fn, "__wrapped__", None) is not None, fn.__name__
