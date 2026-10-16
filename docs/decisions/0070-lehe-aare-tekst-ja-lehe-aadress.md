@@ -1,7 +1,7 @@
 # ADR 0070 — Lehe ääre tekst on märgendatud; lehe aadress tuletatakse
 
 **Kuupäev:** 2026-10-16
-**Staatus:** ettepanek (spekk enne teostust, mitu ülevaatust)
+**Staatus:** ettepanek (spekk enne teostust, mitu ülevaatust; 1. ülevaatus 2026-10-16 sisse viidud)
 **Seotud:** #526 (kirjad), ADR 0003/0009 (`<m>`), ADR 0044 (peidetud täg),
 ADR 0055 (mainimised tagimuutusel), ADR 0067 (`<add>`), ADR 0030 (`page_map`)
 
@@ -40,9 +40,10 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
 
 1. **Kaks kihti.**
    - *Transkriptsioon* — see, mis lehel kirjas on, **täht-tähelt** ja ainult
-     seal, kus midagi kirjas on.
+     seal, kus midagi kirjas on. Tekstis ei ole kunagi toimetaja väärtust.
    - *Lehe aadress* — normaliseeritud ja tsiteeritav (`246v`, `A4v`, `12`), ka
-     lehtedele, millel endal midagi ei ole. **Tuletatakse**, ei sisestata.
+     lehtedele, millel endal midagi ei ole. Tuletatakse; käsitsi määratud
+     aadress on **eraldi andmed koos päritoluga** (punkt 5), mitte tekst.
 2. **Kolm paaristägi** VUTT-i tägisüsteemis (`<i> <b> <cs> <m> <hi> <ann> <add>`
    kõrval), atribuutideta, sisu täht-tähelt:
    - `<fw>` — lehekülje- või foliatsiooninumber (TEI *forme work*);
@@ -50,63 +51,89 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
    - `<catch>` — kustood.
 
    Üks täg kolme jaoks ei sobi: `B` ja `246` ei ole sisu järgi eristatavad, ja
-   aadressi tuletus vajab teada, kumb on lehe number ja kumb signatuur.
-   Nurksulud sisus (`<fw>[247v]</fw>`) = toimetaja lisatud väärtus, mis
-   kirjutab tuletuse üle (TEI tava).
+   aadressi tuletus vajab teada, kumb on lehe number ja kumb signatuur. Lehel
+   päriselt olevad nurksulud jäävad tägi sisse nagu muu tekst.
 3. **Otsingutekst.** `clean_text_for_search` eemaldab kõik kolm tägi **koos
    sisuga** ja **enne** poolituste liitmist. Sisu läheb lehedokumendi eraldi
    väljadesse (ainult `meili_doc.py`, ADR 0006).
-4. **Aadressi tuletus** (server, teose tasemel — sõltub naaberlehtedest):
+4. **Füüsiline lehekülg ja ankur.** Tuletuse ühik on füüsiline lehekülg, mitte
+   pilt: pilt koos `<pb/>`-ga eraldatud tekstiosadega annab ühe või mitu füüsilist
+   lehekülge, igaühel oma aadress. **Ankur** = füüsilise lehekülje `<fw>`/`<sig>`
+   (liik + nähtav sisu + asukoht) või käsitsi määratud aadress. Seos tekstiosa ja
+   aadressi vahel peab püsima ka pildi poolitamisel (ADR 0030 `page_map`).
+5. **Käsitsi aadress** (lehel ei ole midagi, aga toimetaja teab, nt `[247v]`):
+   eraldi kirje füüsilise lehekülje kohta, päritoluga `manual` ja autoriga.
+   Kirjutatakse sama sisestusabi kaudu (punkt 8), aga tekst ei muutu.
+6. **Skeem on määratud, mitte arvatud.** Tsiteeritav aadress arvutatakse ainult
+   **teose (vajadusel osa) tasemel määratud skeemi** järgi: `foliation`,
+   `pagination`, `signatures` (+ esmane, kui paralleelseid on mitu). Ilma skeemita
+   tuletust ei tehta — on ainult nähtavad ja käsitsi ankrud. Automaatne tuvastus
+   (punkt 8) annab skeemi kohta **ettepaneku**, mille toimetaja kinnitab.
+7. **Tuletus ja selle piirid** (server, teose tasemel):
    - Parser: silt = **tüvi + number + valikuline `r`/`v`**. Tüvi on suvaline
      (ka sümbolid), number araabia või rooma (`ij` = 2, `iij` = 3, lõpu-`j` = `i`);
-     tüvi ilma numbrita = poogna 1. leht.
-   - Ankrute vahel loendatakse edasi skeemi järgi (foliatsioon: `r`/`v`
-     vaheldumisi; signatuur: lehed poognas `r`/`v`; paginatsioon: +1). **Iga
-     ankur nullib arvestuse** — viga ei kogune.
-   - Ilma ankruta lehtedel aadress puudub (mitte oletus teose algusest).
-   - Laotuspildil mitu aadressi (`<pb/>` vahel).
-   - Ümberarvutus tägimuutusel ja igal lehenumbreid muutval teel — sama päästik
-     nagu `refresh_work_mentions` (ADR 0055): järjestus, poolitus, lisamine,
-     kustutamine, taaste.
-5. **Sisestus — ettepanek pakub järgmist ANKRUT, mitte aadressi.** Kiirklahv
-   lisab tägi esimese kandidaadiga (valitud): Enter võtab, Tab vahetab, kirjutamine
-   asendab; vihje näitab põhjust („eelmine 246v → foliatsioon"). Kandidaadid
-   annab **puhas funktsioon** viimasest 2–3 sildist (eelmised lehed + sama lehe
-   varasemad tägid):
+     tüvi ilma numbrita = poogna 1. leht. Parsimatu ankur on nähtav silt ilma
+     normaliseeritud aadressita.
+   - Loendus algab ankrust ja kehtib **edasi järgmise ankruni, osa piirini või
+     skeemi muutuseni**, kumb enne tuleb. Enne teose/osa esimest ankrut ja katkestuse
+     järel on aadress **määramata**. Tagasi (ankrust eespool) ei loendata.
+   - **Vastuolu:** kui järgmine ankur ei vasta loendusele (nt puuduv skaneering,
+     hüpe kirjade vahel ilma osapiirita), saavad kõik vahepealsed tuletatud aadressid
+     lipu `conflict` — neid ei kustutata ega parandata vaikselt, vaade näitab neid
+     ebakindlana ja toimetaja lahendab käsitsi ankruga või osapiiriga. Poogna
+     pikkust ei eeldata: signatuuriskeemis on järgmise poogna algus alati ankur.
+   - Laotus: pildi tekstiosade järjekord ei pruugi olla loenduse järjekord
+     (`[2v|1r]`). Laotuspildil ei loendata ühelt tekstiosalt teisele — iga osa
+     vajab oma ankrut või loendust naaberpildist; reegel spekis.
+   - **Salvestuskoht: teose tasemel taastatav read-model** (ADR 0007), mitte lehe
+     JSON — üks ankru parandus ei kirjuta ümber järgnevate lehtede JSON-e ega
+     git-ajalugu. Kirje füüsilise lehekülje kohta: nähtav silt (liik), normaliseeritud
+     aadress, päritolu (`visible` | `derived` | `manual`), `conflict`-lipp.
+     Paralleelsed numeratsioonid säilivad kõik; kuvamiseks esmane skeemi järgi.
+     Autoriteetsed on ainult tekst (nähtavad ankrud), käsitsi aadressid ja skeem.
+   - **Päästik** võrdleb ankrute **sisu ja asukohti** (mitte ainult hulka):
+     `<fw>246</fw>` → `<fw>248</fw>` muudab aadresse. Lisaks kõik lehenumbreid
+     muutvad teed (sama hulk nagu `refresh_work_mentions`, ADR 0055), skeemi ja
+     käsitsi aadressi muutus. Arvutus **eelneb** Meili sünkile — praegu paneb
+     `/save` sünki järjekorda enne mainimiste skanni (`editing.py` ~rida 237),
+     aadressiga nii ei tohi.
+8. **Sisestus v1: ilma ettepanekuta.** Kiirklahv/nupp lisab tühja tägi (`<fw></fw>`,
+   `<sig></sig>`, `<catch></catch>`) ja paneb kursori sisse, nagu `wrapWithTag`;
+   valitud teksti ümber mähib. Ettepanekut ei tehta (kasutaja 2026-10-16):
+   - vaev on niigi väike — foliatsioonis ankur ainult rectol, verso tuletab server;
+     signatuurid on harvad;
+   - ettepanekufunktsioon on kõige erijuhurohkem osa (vajab ankrute liiki,
+     asukohta ja kaugust; `12`, `13` võib olla paginatsioon või foliatsioon
+     rectodel) ja vale pakkumise ülekirjutamine on suurem töö kui numbri sisestus;
+   - automaatika õige koht on OCR (punkt 9): uus materjal tuleb märgendatuna,
+     inimene ainult kontrollib.
 
-   | Viimased | Skeem | Ettepanek |
-   |---|---|---|
-   | `12`, `13` | paginatsioon | `14` |
-   | `246`, `246v` / `246v` | foliatsioon | `247` |
-   | `246r`, `246v` | foliatsioon r-iga | `247r` (kirjaviis säilib) |
-   | `xi`, `xii` | rooma, sama suurus | `xiii` |
-   | `A ij`, `A iij` | signatuur, kirjaviis säilib | `A iiij`, teisena „ei midagi" / `B` |
-   | `)(2`, `*3`, `Aa2` | signatuur, tüvi muutmata | `)(3`, `*4`, `Aa3` |
-   | `246` üksi | kahemõtteline | `246v` ja `247` |
-
-   Kahemõttelisel juhul järjestab teose tüüp (käsikiri → foliatsioon ees,
-   trükis → paginatsioon ees); **ajalugu kaalub tüübi alati üles**. Poogna
-   lõppu ja järgmist tüve funktsioon ei tea — inimene kirjutab üle, järgmine
-   ettepanek jätkab sealt.
-6. **OCR** (hilisem samm): Gemini juhis märgendab ääre teksti kohe. Praegu ta
+   Skeemi ettepanek (punkt 6) võib siiski tulla lihtsast loendusest (kas
+   ankrud on igal lehel või üle ühe, kas `v`-ga), sest see tehakse kord teose kohta
+   ja toimetaja kinnitab. Ankru ettepanekut kaalutakse uuesti alles päris kasutuse
+   järel.
+9. **OCR** (hilisem samm): Gemini juhis märgendab ääre teksti kohe. Praegu ta
    kirjutab selle omaette reale (või jätab pliiatsinumbri välja).
 
 ## Lahtised küsimused (spekki)
 
 - **Tägide nimed** (`<fw>`/`<sig>`/`<catch>` vs lühemad või eestikeelsed).
-- **Kus elab tuletatud aadress:** lehe JSON-i serveripoolne väli (üks tägimuutus
-  kirjutab järgmiste lehtede JSON-id kuni järgmise ankruni) vs teose tasemel
-  read-model (ADR 0007, taastatav). Kumb on Meili sünkiga lihtsam.
-- **Mitu paralleelset numeratsiooni** samal lehel (vana foliatsioon + arhiivi oma;
-  paginatsioon + signatuur on juba kaks tägi). Kumb on „lehe aadress"?
-- **Verso `r`** — kas normaliseeritud aadress kannab `246r` või `246`.
+- **Käsitsi aadressi autoriteetne asukoht** (lehe JSON-i väli vs teose tasemel
+  fail) — read-model teda kanda ei saa, sest see on taastatav.
+- **Füüsilise lehekülje identiteet** laotuse ja poolituse üle: pilditüvi +
+  tekstiosa indeks? Mis juhtub tekstiga, kui laotuspilt poolitatakse.
+- **Laotuse loendusreegel** (punkt 7) — kas lubada `[2v|1r]` mustrit kirjeldada
+  (bifoolium), või nõuda ankrut igale poolele.
+- **Ankru ettepanek** — v1-s ei ole (punkt 8); uuesti, kui päris kasutus näitab vajadust.
+- **Skeemi kinnitamise UI** ja skeemi muutus teose sees (eelmäng rooma, edasi araabia).
+- **Recto `r`** — kas normaliseeritud aadress kannab `246r` või `246`.
 - **Olemasolev korpus:** ääreread on praegu märgendita (viimased read). Kas
   heuristiline ettepanek (lühike viimane rida signatuuri mustriga) ülevaatusele —
   automaatne migratsioon ei ole tõenäoliselt ohutu.
 - **Treeningandmed** (`build_vutt_dataset.py`): kas tägid antakse mudelile edasi.
-- **Kasutus:** kuvamine Workspace'is, URL (`/work/{id}/246v`?), osa ulatus
-  „l. 246–247v" (#526, TEI `msItem/locus`), kirjaotsingu tulemusrida, MCP
-  (`get_pages` päis), IIIF `canvas` label, CMIF.
+- **Kasutus:** kuvamine Workspace'is (sh `conflict`), URL (`/work/{id}/246v`?),
+  osa ulatus „l. 246–247v" (#526, TEI `msItem/locus`), kirjaotsingu tulemusrida,
+  MCP (`get_pages` päis), IIIF `canvas` label, CMIF.
 
 ## Tagajärjed
 
@@ -116,7 +143,7 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
   (täg ei tohi minna `<m>` sisse ega vastupidi — reegel spekis), transkribeerimisjuhendid.
 - Server: `clean_text_for_search` (järjekord: ääre tägid enne poolituste
   liitmist), `meili_doc.py` + `meili_settings.py` (filtreeritav väli
-  MÕLEMASSE loendisse), serveripoolsed lehe väljad, aadressi tuletaja ja selle
-  päästikud.
+  MÕLEMASSE loendisse), aadressi read-model + `rebuild`, tuletaja ja selle
+  päästikud (enne Meili sünki), skeemi väli teose/osa metaandmetes.
 - Spekk vajab **mitut ülevaatust** enne teostust — puudutab redaktori
   invariante, otsinguteksti ja lehenumbreid muutvaid teid korraga.
