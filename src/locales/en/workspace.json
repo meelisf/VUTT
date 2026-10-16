@@ -667,9 +667,9 @@
   "conflict": {
     "title": "The page was changed meanwhile",
     "message": "Someone changed this page after you opened it. These changes cannot be merged automatically:",
-    "takeTheirsHint": "“Use server version” copies your text to the clipboard first.",
+    "takeTheirsHint": "“Discard my changes” copies your text to the clipboard first.",
     "keepMine": "Save my version",
-    "takeTheirs": "Use server version",
+    "takeTheirs": "Discard my changes",
     "cancel": "Cancel",
     "chunksIntro": "You and {{author}} changed the same lines. Choose which version to keep at each place:",
     "chunksIntroUnknown": "Someone else changed the same lines. Choose which version to keep at each place:",

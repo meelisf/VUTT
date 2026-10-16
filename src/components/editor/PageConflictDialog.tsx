@@ -49,13 +49,15 @@ const Segmendid: React.FC<{ segments: DiffSegment[]; markClass: string }> = ({ s
  * minu / tema / mõlemad; tulemus läheb redaktorisse salvestamata. Muidu
  * (vana server, mitte-teksti kokkupõrge) jääb tervikvalik.
  *
- * `z-[1300]`: päis on `z-[1200]` (CLAUDE.md, z-index kihid).
+ * Paneel katab AINULT redaktori paani (lähim positsioneeritud esivanem —
+ * Workspace'i parem pool), mitte kogu ekraani: pildipaan jääb kõrvale
+ * suumitavaks ja liigutatavaks, et toimetaja saaks valikut pildilt kontrollida.
+ * Seepärast ei ole ta modaalne: Tab ei ole lõksus ja Esc kehtib ainult paneelis.
  */
 const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
   conflict, onKeepMine, onTakeTheirs, onApplyChoices, onCancel,
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const open = conflict !== null;
 
@@ -68,27 +70,13 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
     setChoices(new Array(conflictCount).fill(null));
   }, [conflict, conflictCount]);
 
-  // Fookus ohutuimale valikule; Esc = tühista; Tab jääb dialoogi sisse.
+  // Fookus ohutuimale valikule; sulgemisel tagasi sinna, kus see oli.
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     cancelRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
-      if (e.key !== 'Tab') return;
-      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])');
-      if (!focusable || focusable.length === 0) { e.preventDefault(); return; }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      previous?.focus?.();
-    };
-  }, [open, onCancel]);
+    return () => { previous?.focus?.(); };
+  }, [open]);
 
   // Põrkuvad tükid koos kontekstiga ja sõnatasemel esiletõstuga.
   const kohad = useMemo(() => {
@@ -97,10 +85,18 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
       if (c.kind !== 'conflict') return [];
       const eel = chunks[i - 1];
       const järel = chunks[i + 1];
+      // Kahe koha vahele jääv lühike vahe näidatakse ÜKS kord, eelmise koha
+      // järelkontekstina — muidu korduksid samad read kahes kastis.
+      const lühike = (ok: TextChunk | undefined) =>
+        ok?.kind === 'ok' && ok.text.replace(/\n$/, '').split('\n').length <= 2 * KONTEKST_READ;
+      const eelJagatud = chunks[i - 2]?.kind === 'conflict' && lühike(eel);
+      const järelJagatud = chunks[i + 2]?.kind === 'conflict' && lühike(järel);
       return [{
         chunk: c,
-        before: eel?.kind === 'ok' ? viimasedRead(eel.text, KONTEKST_READ) : '',
-        after: järel?.kind === 'ok' ? esimesedRead(järel.text, KONTEKST_READ) : '',
+        before: eel?.kind === 'ok' && !eelJagatud ? viimasedRead(eel.text, KONTEKST_READ) : '',
+        after: järel?.kind === 'ok'
+          ? (järelJagatud ? järel.text.replace(/\n$/, '') : esimesedRead(järel.text, KONTEKST_READ))
+          : '',
         diff: wordDiff(c.mine, c.theirs),
       }];
     });
@@ -143,29 +139,50 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
   const allChosen = choices.length === conflictCount && choices.every(c => c !== null);
   const setChoice = (i: number, v: ChunkChoice) => setChoices(prev => prev.map((c, j) => (j === i ? v : c)));
 
-  const valikuKast = (checked: boolean) => (
-    `block cursor-pointer rounded-lg border-2 p-3 transition-colors ${
-      checked ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`
-  );
+  // Ajaloo diffiga sama keel (HistoryTab): mono read, vasak värviline äär.
+  // Värv tähistab KES (sinine = tema, merevaigune = sina), mitte lisatud/eemaldatud —
+  // kumbki versioon ei ole veel ära visatud.
+  const VARV = {
+    theirs: { rida: 'border-sky-400 bg-sky-50 text-sky-950', valitud: 'bg-sky-100', mark: 'bg-sky-200', raadio: 'accent-sky-600' },
+    mine: { rida: 'border-amber-400 bg-amber-50 text-amber-950', valitud: 'bg-amber-100', mark: 'bg-amber-200', raadio: 'accent-amber-600' },
+  } as const;
 
-  const tekstiplokk = (segments: DiffSegment[], markClass: string, raw: string) => (
-    <pre className="mt-2 font-mono text-sm whitespace-pre-wrap break-words text-gray-900">
-      {raw ? <Segmendid segments={segments} markClass={markClass} /> : <span className="italic text-gray-500">{t('conflict.emptyChunk')}</span>}
-    </pre>
-  );
+  const kontekst = (text: string) => text.split('\n').map((rida, j) => (
+    <div key={j} className="pl-4 border-l-4 border-transparent text-gray-500 whitespace-pre-wrap break-words">{rida || '\u00a0'}</div>
+  ));
+
+  const versioon = (i: number, kes: 'theirs' | 'mine', silt: string, raw: string, segments: DiffSegment[]) => {
+    const v = VARV[kes];
+    const valik = choices[i];
+    const sees = valik === kes || valik === 'both';
+    const tuhm = valik !== null && !sees;
+    const read = raw.replace(/\n$/, '');
+    return (
+      <label className={`block cursor-pointer transition-opacity ${tuhm ? 'opacity-40' : ''}`}>
+        <div className={`flex items-center gap-2 pl-3 py-1 border-l-4 font-sans text-xs text-gray-700 ${v.rida} ${sees ? v.valitud : ''}`}>
+          <input type="radio" name={`chunk-${i}`} checked={valik === kes}
+            onChange={() => setChoice(i, kes)} className={v.raadio} />
+          <span className="font-medium">{silt}</span>
+        </div>
+        <div className={`pl-4 pb-1 border-l-4 whitespace-pre-wrap break-words ${v.rida} ${sees ? v.valitud : ''}`}>
+          {raw
+            ? <Segmendid segments={segments} markClass={v.mark} />
+            : <span className="italic font-sans text-gray-500">{t('conflict.emptyChunk')}</span>}
+          {raw && !read && '\u00a0'}
+        </div>
+      </label>
+    );
+  };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1300]"
-      onMouseDown={e => { if (e.target === e.currentTarget) onCancel(); }}
-    >
+    <div className="absolute inset-0 z-40 bg-gray-900/30 flex items-center justify-center p-3 font-sans whitespace-normal text-left">
       <div
-        ref={dialogRef}
-        role="alertdialog"
-        aria-modal="true"
+        role="dialog"
+        aria-modal="false"
         aria-labelledby="page-conflict-title"
         aria-describedby="page-conflict-message"
-        className={`bg-white rounded-xl shadow-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh] ${chunks ? 'max-w-5xl' : 'max-w-lg'}`}
+        onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onCancel(); } }}
+        className={`bg-white rounded-xl shadow-2xl w-full overflow-hidden flex flex-col max-h-full ${chunks ? 'h-full' : 'max-w-lg'}`}
       >
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-3 shrink-0">
           <div className="p-2 bg-amber-100 rounded-full">
@@ -176,60 +193,47 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
           </h2>
         </div>
 
-        <div className="px-6 py-4 space-y-4 overflow-y-auto">
+        <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
           {chunks ? (
             <>
-              <p id="page-conflict-message" className="text-gray-600">
-                {theirsLast
-                  ? t('conflict.chunksIntro', { author: theirsLast.author })
-                  : t('conflict.chunksIntroUnknown')}
-              </p>
-              {conflictCount > 1 && (
-                <div className="flex flex-wrap gap-2 text-sm">
-                  <button type="button" onClick={() => setChoices(new Array(conflictCount).fill('mine'))}
-                    className="px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-100">
-                    {t('conflict.allMine')}
-                  </button>
-                  <button type="button" onClick={() => setChoices(new Array(conflictCount).fill('theirs'))}
-                    className="px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-100">
-                    {t('conflict.allTheirs')}
-                  </button>
-                </div>
-              )}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p id="page-conflict-message" className="text-gray-600">
+                  {theirsLast
+                    ? t('conflict.chunksIntro', { author: theirsLast.author })
+                    : t('conflict.chunksIntroUnknown')}
+                </p>
+                {conflictCount > 1 && (
+                  <div className="flex gap-3 text-xs">
+                    <button type="button" onClick={() => setChoices(new Array(conflictCount).fill('theirs'))}
+                      className="text-sky-700 hover:underline">
+                      {t('conflict.allTheirs')}
+                    </button>
+                    <button type="button" onClick={() => setChoices(new Array(conflictCount).fill('mine'))}
+                      className="text-amber-700 hover:underline">
+                      {t('conflict.allMine')}
+                    </button>
+                  </div>
+                )}
+              </div>
               {kohad.map((k, i) => (
-                <fieldset key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
-                  <legend className="px-1 text-sm font-medium text-gray-700">
-                    {t('conflict.place', { n: i + 1, total: conflictCount })}
-                  </legend>
-                  {k.before && (
-                    <pre className="font-mono text-xs whitespace-pre-wrap break-words text-gray-400">{k.before}</pre>
-                  )}
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <label className={valikuKast(choices[i] === 'mine')}>
-                      <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
-                        <input type="radio" name={`chunk-${i}`} checked={choices[i] === 'mine'}
-                          onChange={() => setChoice(i, 'mine')} className="accent-amber-600" />
-                        {t('conflict.mineLabel')}
-                      </span>
-                      {tekstiplokk(k.diff.a, 'bg-amber-200', k.chunk.mine)}
-                    </label>
-                    <label className={valikuKast(choices[i] === 'theirs')}>
-                      <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
-                        <input type="radio" name={`chunk-${i}`} checked={choices[i] === 'theirs'}
-                          onChange={() => setChoice(i, 'theirs')} className="accent-amber-600" />
-                        {theirsLabel}
-                      </span>
-                      {tekstiplokk(k.diff.b, 'bg-sky-200', k.chunk.theirs)}
+                <fieldset key={i} className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                  <legend className="sr-only">{t('conflict.place', { n: i + 1, total: conflictCount })}</legend>
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                    <span aria-hidden="true" className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {t('conflict.place', { n: i + 1, total: conflictCount })}
+                    </span>
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                      <input type="radio" name={`chunk-${i}`} checked={choices[i] === 'both'}
+                        onChange={() => setChoice(i, 'both')} className="accent-gray-600" />
+                      {t('conflict.both')}
                     </label>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input type="radio" name={`chunk-${i}`} checked={choices[i] === 'both'}
-                      onChange={() => setChoice(i, 'both')} className="accent-amber-600" />
-                    {t('conflict.both')}
-                  </label>
-                  {k.after && (
-                    <pre className="font-mono text-xs whitespace-pre-wrap break-words text-gray-400">{k.after}</pre>
-                  )}
+                  <div className="py-2 font-mono text-sm space-y-0.5">
+                    {k.before && kontekst(k.before)}
+                    {versioon(i, 'theirs', theirsLabel, k.chunk.theirs, k.diff.b)}
+                    {versioon(i, 'mine', t('conflict.mineLabel'), k.chunk.mine, k.diff.a)}
+                    {k.after && kontekst(k.after)}
+                  </div>
                 </fieldset>
               ))}
               {otherFields.length > 0 && (
@@ -240,7 +244,7 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
                   </ul>
                 </div>
               )}
-              <p className="text-xs text-gray-500">{t('conflict.applyHint')} {t('conflict.takeTheirsHint')}</p>
+              <p className="text-xs text-gray-500">{t('conflict.applyHint')}</p>
             </>
           ) : (
             <>
@@ -254,13 +258,17 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
         </div>
 
         <div className="px-6 py-4 bg-gray-50 flex flex-wrap justify-end gap-3 shrink-0 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onTakeTheirs}
-            className="px-4 py-2 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-700"
-          >
-            {t('conflict.takeTheirs')}
-          </button>
+          {/* Tükkide dialoogis ei ole: viskaks ära ka minu põrkumata parandused —
+              „Kõikjal tema" + Rakenda teeb sama ohutumalt. */}
+          {!chunks && (
+            <button
+              type="button"
+              onClick={onTakeTheirs}
+              className="px-4 py-2 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-700"
+            >
+              {t('conflict.takeTheirs')}
+            </button>
+          )}
           <button
             ref={cancelRef}
             type="button"

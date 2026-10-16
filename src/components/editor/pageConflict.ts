@@ -138,9 +138,38 @@ export interface DiffSegment {
   changed: boolean;
 }
 
+/** LCS kahe järjendi vahel; tagastab joonduse sammud (`=` ühine, `a`/`b` ainult ühes). */
+function lcsSammud<T>(ta: T[], tb: T[]): ('=' | 'a' | 'b')[] {
+  const n = ta.length, m = tb.length;
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i][j] = ta[i] === tb[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const sammud: ('=' | 'a' | 'b')[] = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (ta[i] === tb[j]) { sammud.push('='); i++; j++; }
+    else if (lcs[i + 1][j] >= lcs[i][j + 1]) { sammud.push('a'); i++; }
+    else { sammud.push('b'); j++; }
+  }
+  while (i++ < n) sammud.push('a');
+  while (j++ < m) sammud.push('b');
+  return sammud;
+}
+
+function lisa(out: DiffSegment[], text: string, changed: boolean) {
+  const last = out[out.length - 1];
+  if (last && last.changed === changed) last.text += text;
+  else out.push({ text, changed });
+}
+
 /**
- * Sõnatasemel erinevus kahe tüki vahel esiletõstuks (LCS). Transkriptsioonis
- * on vahe tihti üks täht (ſ/s, u/v) — ilma esiletõstuta ei leia silm seda üles.
+ * Erinevus kahe tüki vahel esiletõstuks. Joondus käib sõnade kaupa (LCS);
+ * kui sõna on asendatud ühe sarnase sõnaga, tõstetakse esile ainult erinevad
+ * TÄHED. Transkriptsioonis on vahe tihti üks täht (u/v, ſ/s, i/j) — terve
+ * värviline sõna ei näita, kus see täht on.
  * Suurel tükil loobutakse (ruutkeerukus), siis on kõik `changed: false`.
  */
 export function wordDiff(a: string, b: string): { a: DiffSegment[]; b: DiffSegment[] } {
@@ -149,29 +178,45 @@ export function wordDiff(a: string, b: string): { a: DiffSegment[]; b: DiffSegme
   if (ta.length * tb.length > 250_000) {
     return { a: [{ text: a, changed: false }], b: [{ text: b, changed: false }] };
   }
-  const n = ta.length, m = tb.length;
-  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      lcs[i][j] = ta[i] === tb[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
-    }
-  }
   const outA: DiffSegment[] = [];
   const outB: DiffSegment[] = [];
-  const push = (out: DiffSegment[], text: string, changed: boolean) => {
-    const last = out[out.length - 1];
-    if (last && last.changed === changed) last.text += text;
-    else out.push({ text, changed });
+  let pA: string[] = [];
+  let pB: string[] = [];
+
+  // Kahe ühise sõna vahele jäänud muudatus.
+  const tühjenda = () => {
+    if (pA.length === 1 && pB.length === 1 && sarnased(pA[0], pB[0])) {
+      const ca = Array.from(pA[0]);
+      const cb = Array.from(pB[0]);
+      let i = 0, j = 0;
+      for (const samm of lcsSammud(ca, cb)) {
+        if (samm === '=') { lisa(outA, ca[i++], false); lisa(outB, cb[j++], false); }
+        else if (samm === 'a') lisa(outA, ca[i++], true);
+        else lisa(outB, cb[j++], true);
+      }
+    } else {
+      for (const t of pA) lisa(outA, t, true);
+      for (const t of pB) lisa(outB, t, true);
+    }
+    pA = [];
+    pB = [];
   };
+
   let i = 0, j = 0;
-  while (i < n && j < m) {
-    if (ta[i] === tb[j]) { push(outA, ta[i++], false); push(outB, tb[j++], false); }
-    else if (lcs[i + 1][j] >= lcs[i][j + 1]) push(outA, ta[i++], true);
-    else push(outB, tb[j++], true);
+  for (const samm of lcsSammud(ta, tb)) {
+    if (samm === '=') { tühjenda(); lisa(outA, ta[i++], false); lisa(outB, tb[j++], false); }
+    else if (samm === 'a') pA.push(ta[i++]);
+    else pB.push(tb[j++]);
   }
-  while (i < n) push(outA, ta[i++], true);
-  while (j < m) push(outB, tb[j++], true);
+  tühjenda();
   return { a: outA, b: outB };
+}
+
+/** Kas kaks sõna on sama sõna variandid: ühiseid tähti vähemalt pool pikemast. */
+function sarnased(x: string, y: string): boolean {
+  const cx = Array.from(x), cy = Array.from(y);
+  const ühised = lcsSammud(cx, cy).filter(s => s === '=').length;
+  return ühised * 2 >= Math.max(cx.length, cy.length);
 }
 
 /**

@@ -131,10 +131,24 @@ describe('tükkide kaupa lahendus (#612)', () => {
     expect(annotationsForText(tekst, minu, nende, minuTekst)).toEqual([a(1, 'minu üks'), a(9, 'vana orb'), a(3, 'nende kolm')]);
   });
 
-  it('wordDiff tõstab esile ainult erineva sõna', () => {
-    const d = wordDiff('in der Stadt', 'in der Stadſ');
+  it('wordDiff: sarnases sõnas tõstetakse esile ainult erinev täht', () => {
+    const d = wordDiff('M. LAURENTII LUDENII,', 'M. LAVRENTII LVDENII,');
+    expect(d.a).toEqual([
+      { text: 'M. LA', changed: false }, { text: 'U', changed: true },
+      { text: 'RENTII L', changed: false }, { text: 'U', changed: true }, { text: 'DENII,', changed: false },
+    ]);
+    expect(d.b.filter(x => x.changed).map(x => x.text)).toEqual(['V', 'V']);
+  });
+
+  it('wordDiff: täiesti erinev sõna on terve esile tõstetud', () => {
+    const d = wordDiff('in der Stadt', 'in der Kirche');
     expect(d.a).toEqual([{ text: 'in der ', changed: false }, { text: 'Stadt', changed: true }]);
-    expect(d.b).toEqual([{ text: 'in der ', changed: false }, { text: 'Stadſ', changed: true }]);
+    expect(d.b).toEqual([{ text: 'in der ', changed: false }, { text: 'Kirche', changed: true }]);
+  });
+
+  it('wordDiff: lisatud sõnad (mitu) on tervikuna esile tõstetud', () => {
+    const d = wordDiff('JOHANNES ERICI', 'JOHANNES ERICI <i>Gothus</i>');
+    expect(d.b).toEqual([{ text: 'JOHANNES ERICI', changed: false }, { text: ' <i>Gothus</i>', changed: true }]);
   });
 
   it('minimalTextChange jätab ühise alguse ja lõpu puutumata', () => {

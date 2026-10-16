@@ -667,9 +667,9 @@
   "conflict": {
     "title": "Lehte muudeti vahepeal",
     "message": "Keegi muutis sama lehte pärast seda, kui sa selle avasid. Neid muudatusi ei saa automaatselt liita:",
-    "takeTheirsHint": "„Võta serveri versioon” kopeerib sinu teksti enne lõikelauale.",
+    "takeTheirsHint": "„Loobu minu muudatustest” kopeerib sinu teksti enne lõikelauale.",
     "keepMine": "Salvesta minu versioon",
-    "takeTheirs": "Võta serveri versioon",
+    "takeTheirs": "Loobu minu muudatustest",
     "cancel": "Tühista",
     "chunksIntro": "Sina ja {{author}} muutsite samu ridu. Vali iga koha juures, milline versioon jääb:",
     "chunksIntroUnknown": "Keegi teine muutis samu ridu. Vali iga koha juures, milline versioon jääb:",

@@ -64,9 +64,18 @@ oli üks üksus. Dialoog pakkus pimesi „salvesta minu", mis kirjutas teise tö
   salvestamata tööks — järgmine Ctrl+S oleks teise toimetaja read üle kirjutanud.
 - „Salvesta minu" tekstikokkupõrkel võtab baasi ka serveri annotatsioonikirjed:
   minu tekst võidab tervikuna, muidu jääks nende ankruta kirje orvuks.
-- **Dialoog (PR 2):** tekstikokkupõrkel valitakse iga põrkuva tüki juures
-  minu / tema / mõlemad (sõnatasemel esiletõstuga; 409 kannab ka `theirs_last`
-  = lehe viimane commit). Tulemus läheb redaktorisse **salvestamata**; baas =
-  `retryBase` (konfliktsed üksused serveri omad), nii et Ctrl+S salvestab valiku
-  ja muud vahepealsed muudatused liidetakse edasi. Pimedat „Salvesta minu"
-  tekstikokkupõrkel enam ei ole — see jääb ainult tükkideta juhule.
+- **Dialoog (PR 2):** tekstikokkupõrkel valitakse iga põrkuva koha juures
+  tema / minu / mõlemad. 409 kannab ka `theirs_last` (lehe viimane commit).
+  Kujunduskeel = ajaloo diff (`HistoryTab`): mono read, vasak värviline äär;
+  värv tähistab KES (sinine tema, merevaigune sina), mitte lisatud/eemaldatud.
+  Sarnases sõnas tõstetakse esile ainult erinevad tähed (u/v, ſ/s).
+- **Paneel, mitte modaal:** katab ainult redaktori paani, pildipaan jääb
+  suumitavaks — valikut kontrollitakse pildilt. Seetõttu ei ole Tab lõksus ja
+  Esc kehtib ainult paneelis.
+- Tulemus läheb redaktorisse **salvestamata**; baas = `retryBase` (konfliktsed
+  üksused serveri omad), nii et Ctrl+S salvestab valiku ja muud vahepealsed
+  muudatused liidetakse edasi.
+- Tükkide paneelis ei ole „Salvesta minu" ega „Võta serveri versioon": viimane
+  viskaks ära ka põrkumata parandused, „Kõikjal tema" teeb sama ohutumalt.
+  Tükkideta juhul (staatus, kommentaar) jääb tervikvalik, nupp nimega
+  „Loobu minu muudatustest".

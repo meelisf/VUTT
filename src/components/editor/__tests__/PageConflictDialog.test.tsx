@@ -31,13 +31,15 @@ describe('PageConflictDialog — tükkide valik (#612)', () => {
     const rakenda = screen.getByRole('button', { name: 'conflict.apply' });
     expect((rakenda as HTMLButtonElement).disabled).toBe(true);
     const raadiod = screen.getAllByRole('radio');
-    expect(raadiod).toHaveLength(6);                  // 2 kohta × minu/tema/mõlemad
+    expect(raadiod).toHaveLength(6);                  // 2 kohta × mõlemad/tema/minu
     fireEvent.click(raadiod[1]);                      // koht 1: tema
     expect((rakenda as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(raadiod[5]);                      // koht 2: mõlemad
+    fireEvent.click(raadiod[3]);                      // koht 2: mõlemad
     fireEvent.click(rakenda);
     expect(p.onApplyChoices).toHaveBeenCalledWith(['theirs', 'both']);
     expect(screen.queryByRole('button', { name: 'conflict.keepMine' })).toBeNull();
+    // „Loobu minu muudatustest“ viskaks ära ka põrkumata parandused — tükkides seda pole.
+    expect(screen.queryByRole('button', { name: 'conflict.takeTheirs' })).toBeNull();
   });
 
   it('kustutatud read on märgitud, mitte tühi kast', () => {
@@ -56,6 +58,7 @@ describe('PageConflictDialog — tükkide valik (#612)', () => {
   it('tükkideta (vana server, ainult staatus) jääb tervikvalik', () => {
     render(<PageConflictDialog {...props({ conflict: { fields: ['status'], current } })} />);
     expect(screen.getByRole('button', { name: 'conflict.keepMine' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'conflict.takeTheirs' })).toBeTruthy();
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
 });
