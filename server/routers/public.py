@@ -76,11 +76,14 @@ def get_viewer_token(work_id: str, request: Request):
     user = _get_optional_user(request)
     if not can_read_work(meta, user):
         raise HTTPException(status_code=403, detail="Ligipääs keelatud")
-    meili_token = generate_work_scoped_meili_token(work_id)
+    # Kanooniline id, mitte URL-i parameeter: `_load_work_metadata` leiab teose ka
+    # kaustanime järgi, aga Meili `work_id` ja pildiserveri allkiri on `meta["id"]` (#617).
+    canonical_id = meta.get("id") or work_id
+    meili_token = generate_work_scoped_meili_token(canonical_id)
     image_exp = int(_time.time()) + 3600
     image_sig = _hmac.new(
         IMAGE_TOKEN_SECRET.encode(),
-        f"image:{work_id}:{image_exp}".encode(),
+        f"image:{canonical_id}:{image_exp}".encode(),
         _hashlib.sha256,
     ).hexdigest()
     return {"token": meili_token, "image_exp": image_exp, "image_sig": image_sig}

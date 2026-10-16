@@ -119,3 +119,21 @@ def test_viewer_token_includes_image_credentials(env, monkeypatch):
     exp = str(data["image_exp"])
     expected = hmac_mod.new(b"test-image-secret", f"image:def456:{exp}".encode(), hashlib.sha256).hexdigest()
     assert data["image_sig"] == expected
+
+
+def test_viewer_token_kaustanimega_allkirjastab_kanoonilise_id(env, monkeypatch):
+    """#617: teos leitakse ka kaustanime järgi, aga token ja pildiallkiri on meta["id"]."""
+    import hashlib, hmac, jwt
+    from server.config import IMAGE_TOKEN_SECRET
+    from server.routers import public as public_router
+    meta = {**SHAREABLE_META, "id": "kanoon1"}
+    monkeypatch.setattr(public_router, "_load_work_metadata",
+                        lambda work_id: meta if work_id == "1690-slug-kanoon1" else None)
+    r = env["client"].get("/work/1690-slug-kanoon1/viewer-token")
+    assert r.status_code == 200
+    body = r.json()
+    payload = jwt.decode(body["token"], "test-key-32-chars-long-padding-x", algorithms=["HS256"])
+    assert payload["searchRules"] == {"teosed": {"filter": 'work_id = "kanoon1"'}}
+    oodatud = hmac.new(IMAGE_TOKEN_SECRET.encode(), f"image:kanoon1:{body['image_exp']}".encode(),
+                       hashlib.sha256).hexdigest()
+    assert body["image_sig"] == oodatud

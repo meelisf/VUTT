@@ -213,8 +213,10 @@ def sync_work_to_meilisearch(dir_name):
         dir_path, dir_name, collections, people_data, _archives, labels_store
     )
     if not documents:
-        # Lehti pole → kirju pole: kustuta enne väljumist, muidu jääks vana kiri otsingusse.
+        # Lehti pole → kirju ega lehti indeksis: kustuta enne väljumist, muidu
+        # jääksid vana kiri ja viimased kustutatud lehed otsingusse (#617).
         delete_work_letters(meta.get('id') or teose_id)
+        _delete_extra_pages(meta.get('id') or teose_id, 0)
         logger.warning(f"SÜNK: Pilte/dokumente ei leitud kaustas: {dir_name}")
         return False
 

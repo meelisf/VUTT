@@ -426,3 +426,21 @@ def test_text_content_jaab_puutumata(synced_eszett):
     doc = synced_eszett["docs"][0]
     assert "gewiß, daß" in doc["text_content"]
     assert "<m>groß</m>" in doc["text_content"]
+
+
+def test_viimase_lehe_kustutamine_puhastab_lehed_indeksist(tmp_path, monkeypatch):
+    """#617: lehtedeta teos kustutas kirjad, aga vanad lehedokumendid jäid otsingusse."""
+    work_dir = tmp_path / SLUG
+    work_dir.mkdir()
+    _write_metadata(work_dir)
+    monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
+    monkeypatch.setattr(ops, "load_people_aliases", lambda: PEOPLE)
+    monkeypatch.setattr(ops, "load_labels_store", lambda: LABELS)
+    deleted, letters = [], []
+    monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: deleted.append((wid, n)) or True)
+    monkeypatch.setattr(ops, "delete_work_letters", lambda wid: letters.append(wid))
+    monkeypatch.setattr(ops, "send_to_meilisearch", lambda *a, **k: pytest.fail("tühja teost ei saadeta"))
+
+    assert ops.sync_work_to_meilisearch(SLUG) is False
+    assert deleted == [(WORK_ID, 0)] and letters == [WORK_ID]
