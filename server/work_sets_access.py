@@ -8,7 +8,7 @@ import json
 import os
 from typing import Optional
 
-from .access_ops import is_work_public
+from .access_ops import is_work_public, work_collection_hierarchy
 from .auth import can_manage_user, is_at_least
 from .config import WORK_SET_MAX_ACCESS
 from .utils import find_directory_by_id
@@ -57,7 +57,7 @@ def is_search_visible(work_metadata: dict, user: Optional[dict]) -> bool:
     if is_at_least(user.get("role") or "contributor", "admin"):
         return True
     allowed = set(user.get("allowed_collections") or [])
-    return bool(allowed & set(work_metadata.get("collections") or []))
+    return bool(allowed & work_collection_hierarchy(work_metadata))
 
 
 def search_visible_work_ids(ws: dict, user: Optional[dict]) -> list:

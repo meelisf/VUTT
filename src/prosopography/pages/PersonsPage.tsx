@@ -15,7 +15,7 @@ import { FilterChip } from '../../components/workFilters/WorkFilterChips';
 import ResultsViewToggle from '../../components/ResultsViewToggle';
 import { useFilterSidebarOpen, useResultsView } from '../../hooks/useResultsView';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
-import { getVocabularies } from '../../services/collectionService';
+import { getVocabularies, isCollectionAllowed, isCollectionRestricted } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useLatestQuery } from '../../hooks/useLatestQuery';
@@ -181,9 +181,10 @@ const PersonsPage: React.FC = () => {
     if (!selectedCollection) return null;
     const collection = collections[selectedCollection];
     if (!collection) return null;
-    if (collection.visibility !== 'restricted') return selectedCollection;
+    if (!isCollectionRestricted(collections, selectedCollection)) return selectedCollection;
     if (isAtLeast(user?.role, 'admin')) return selectedCollection;
-    return user?.allowed_collections?.includes(selectedCollection) ? selectedCollection : null;
+    return isCollectionAllowed(collections, selectedCollection, user?.allowed_collections ?? [])
+      ? selectedCollection : null;
   }, [collections, selectedCollection, user]);
 
   /** Aktiivse ulatuse nimi seoste kaardi lüliti jaoks. `null` = otsime kogu VUTT-ist.

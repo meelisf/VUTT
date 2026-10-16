@@ -3,6 +3,7 @@ import { Work } from '../types';
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
+import { isCollectionRestricted } from '../services/collectionService';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 /**
@@ -52,8 +53,8 @@ export function useWorkThumbnail(work: Work, url: string = work.thumbnail_url) {
     if (workCollections.length === 0) return false;
     // Serveri loogika on "public wins": kui kasvõi üks teose otsene kollektsioon
     // on avalik, on pilt avalik. Kui kõik teadaolevad otsesed kollektsioonid on
-    // restricted, vajab <img> HMAC-tokenit.
-    return workCollections.every(cid => collections[cid]?.visibility === 'restricted');
+    // restricted (ka privaatselt vanemalt päritult, #617), vajab <img> HMAC-tokenit.
+    return workCollections.every(cid => isCollectionRestricted(collections, cid));
   }, [collections, work.collections]);
 
   React.useEffect(() => {

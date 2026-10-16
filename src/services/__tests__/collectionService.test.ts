@@ -7,6 +7,8 @@ import {
   getCollectionName,
   getCollectionById,
   getCollectionHierarchy,
+  isCollectionAllowed,
+  isCollectionRestricted,
   getRootCollections,
   getChildCollections,
   buildCollectionTree,
@@ -222,5 +224,29 @@ describe('getVocabularies', () => {
   it('viga → tühi struktuur', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('net')));
     expect(await getVocabularies()).toEqual(emptyVocab);
+  });
+});
+
+describe('isCollectionRestricted / isCollectionAllowed (#617)', () => {
+  const kogud = {
+    priv: { name: { et: 'P', en: 'P' }, visibility: 'restricted' as const },
+    laps: { name: { et: 'L', en: 'L' }, parent: 'priv' },
+    lapselaps: { name: { et: 'LL', en: 'LL' }, parent: 'laps', visibility: 'public' as const },
+    avalik: { name: { et: 'A', en: 'A' } },
+    a: { name: { et: 'a', en: 'a' }, parent: 'b' },
+    b: { name: { et: 'b', en: 'b' }, parent: 'a' },
+  };
+
+  it('alamkogu pärib privaatsuse, ka enda public-määrangu vastu', () => {
+    expect(isCollectionRestricted(kogud, 'laps')).toBe(true);
+    expect(isCollectionRestricted(kogud, 'lapselaps')).toBe(true);
+    expect(isCollectionRestricted(kogud, 'avalik')).toBe(false);
+    expect(isCollectionRestricted(kogud, 'tundmatu')).toBe(false);
+    expect(isCollectionRestricted(kogud, 'a')).toBe(false); // tsükkel ei jää kinni
+  });
+
+  it('esivanema lugemisõigus katab alamkogu', () => {
+    expect(isCollectionAllowed(kogud, 'lapselaps', ['priv'])).toBe(true);
+    expect(isCollectionAllowed(kogud, 'priv', ['laps'])).toBe(false);
   });
 });

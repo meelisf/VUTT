@@ -190,6 +190,7 @@
     "visibilityPublic": "Public",
     "visibilityRestricted": "Restricted",
     "visibilityHint": "Works in a restricted collection are accessible only to the listed users and to admins.",
+    "visibilityInherited": "The parent collection is restricted — this subcollection is restricted regardless of the setting here.",
     "allowedUsers": "Users with access:",
     "noAllowedUsers": "No users have access",
     "descriptionPlaceholderEt": "Short description in Estonian...",

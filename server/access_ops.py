@@ -6,20 +6,27 @@ from fastapi import HTTPException
 
 from .cache import get_cached_collections
 from .auth import is_at_least
+from .collection_tree import collection_chain, is_work_public_in
 
 
 def is_work_public(work_metadata: dict) -> bool:
     """Arvutab teose avalikkuse dünaamiliselt collections.json põhjal.
-    "public wins": piisab ühest avalikust kollektsioonist.
+    "public wins": piisab ühest avalikust kollektsioonist; privaatse kogu
+    alamkogu on privaatne (#617, `collection_tree`).
     """
     work_cols = work_metadata.get("collections", [])
     if not work_cols:
         return True
+    return is_work_public_in(work_cols, get_cached_collections())
+
+
+def work_collection_hierarchy(work_metadata: dict) -> set:
+    """Teose kogud koos esivanematega — sama hulk, mis Meili `collections_hierarchy`."""
     collections_config = get_cached_collections()
-    for col_id in work_cols:
-        if collections_config.get(col_id, {}).get("visibility", "public") == "public":
-            return True
-    return False
+    out = set()
+    for col_id in work_metadata.get("collections") or []:
+        out.update(collection_chain(col_id, collections_config))
+    return out
 
 
 def can_read_work(work_metadata: dict, user: Optional[dict]) -> bool:
@@ -34,9 +41,11 @@ def can_read_work(work_metadata: dict, user: Optional[dict]) -> bool:
         return False
     if is_at_least(user.get("role", "contributor"), "admin"):
         return True
+    # Esivanema lugemisõigus katab alamkogu (sama mis tenant-tokeni
+    # `collections_hierarchy IN [allowed]`): päritud privaatsus ei tohi
+    # lugejat alamkogust välja lukustada.
     allowed = set(user.get("allowed_collections", []))
-    work_collections = set(work_metadata.get("collections", []))
-    return bool(allowed & work_collections)
+    return bool(allowed & work_collection_hierarchy(work_metadata))
 
 
 def can_write_work(work_metadata: dict, user: Optional[dict]) -> bool:

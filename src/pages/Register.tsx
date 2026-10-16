@@ -10,6 +10,7 @@ import {
   Collections,
   getCollections,
   getWritableCollectionOptions,
+  isCollectionRestricted,
 } from '../services/collectionService';
 import { defaultRegistrationLanguage, UiLanguage } from './registerLanguage';
 import { MAX_INTEREST_COLLECTIONS, toggleInterest } from './registerInterest';
@@ -347,7 +348,7 @@ const Register: React.FC = () => {
                         />
                         <span className="min-w-0">
                           <span className="text-sm text-gray-800">{name}</span>
-                          {collection?.visibility === 'restricted' && (
+                          {isCollectionRestricted(collections, id) && (
                             <span className="ml-2 text-xs text-amber-700">{t('form.interestRestricted')}</span>
                           )}
                           {description && (
