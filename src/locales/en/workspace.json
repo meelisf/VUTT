@@ -675,7 +675,8 @@
       "text": "Text",
       "status": "Status",
       "page_tags": "Tags",
-      "comment": "Comment “{{text}}”"
+      "comment": "Comment “{{text}}”",
+      "annotation": "Text annotation “{{text}}”"
     }
   }
 }

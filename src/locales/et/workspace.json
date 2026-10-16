@@ -675,7 +675,8 @@
       "text": "Tekst",
       "status": "Staatus",
       "page_tags": "Märksõnad",
-      "comment": "Kommentaar „{{text}}”"
+      "comment": "Kommentaar „{{text}}”",
+      "annotation": "Tekstiannotatsioon „{{text}}”"
     }
   }
 }

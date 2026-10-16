@@ -58,6 +58,14 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
         text: text ? (text.length > 40 ? `${text.slice(0, 40)}…` : text) : id,
       });
     }
+    if (field.startsWith('annotations:')) {
+      const id = field.slice('annotations:'.length);
+      const a = conflict.current.text_annotations.find(x => String(x.id) === id);
+      const text = (a?.comment || '').trim();
+      return t('conflict.field.annotation', {
+        text: text ? (text.length > 40 ? `${text.slice(0, 40)}…` : text) : id,
+      });
+    }
     return t(`conflict.field.${field}`, { defaultValue: field });
   };
 

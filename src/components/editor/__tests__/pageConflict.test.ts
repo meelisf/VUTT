@@ -62,6 +62,14 @@ describe('retryBase — „Salvesta minu versioon"', () => {
     const current = leht({ comments: [c('c1', 'nende')] });
     expect(retryBase(base, current, ['comments:c1']).comments).toEqual([c('c1', 'nende')]);
   });
+
+  it('konfliktis annotatsioon: ainult see kirje võetakse serverist', () => {
+    const a = (id: number, comment: string) => ({ id, comment, author: 'u', created_at: '' });
+    const base = leht({ text_annotations: [a(1, 'vana'), a(2, 'b')] });
+    const current = leht({ text_annotations: [a(1, 'nende'), a(2, 'serveri b')] });
+    expect(retryBase(base, current, ['annotations:1']).text_annotations).toEqual([a(1, 'nende'), a(2, 'b')]);
+    expect(base.text_annotations[0].comment).toBe('vana');
+  });
 });
 
 describe('conflictFromResponse', () => {
