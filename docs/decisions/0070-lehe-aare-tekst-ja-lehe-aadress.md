@@ -1,7 +1,7 @@
 # ADR 0070 — Lehe ääre tekst on märgendatud; lehe aadress tuletatakse
 
 **Kuupäev:** 2026-10-16
-**Staatus:** ettepanek (spekk enne teostust, mitu ülevaatust; 1. ülevaatus 2026-10-16 sisse viidud)
+**Staatus:** ettepanek (spekk enne teostust, mitu ülevaatust; 1. ja 2. ülevaatus 2026-10-16 sisse viidud)
 **Seotud:** #526 (kirjad), ADR 0003/0009 (`<m>`), ADR 0044 (peidetud täg),
 ADR 0055 (mainimised tagimuutusel), ADR 0067 (`<add>`), ADR 0030 (`page_map`)
 
@@ -60,28 +60,44 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
    pilt: pilt koos `<pb/>`-ga eraldatud tekstiosadega annab ühe või mitu füüsilist
    lehekülge, igaühel oma aadress. **Ankur** = füüsilise lehekülje `<fw>`/`<sig>`
    (liik + nähtav sisu + asukoht) või käsitsi määratud aadress. Seos tekstiosa ja
-   aadressi vahel peab püsima ka pildi poolitamisel (ADR 0030 `page_map`).
+   aadressi vahel peab püsima pildi poolitamisel ja `<pb/>` muutmisel. ADR 0030
+   `page_map` on ainult eeskuju: ta seob impordi lähtepildi väljundpiltidega, aga ei
+   identifitseeri `<pb/>` tekstiosi ega kata hilisemaid poolitusi (lahtine küsimus).
 5. **Käsitsi aadress** (lehel ei ole midagi, aga toimetaja teab, nt `[247v]`):
    eraldi kirje füüsilise lehekülje kohta, päritoluga `manual` ja autoriga.
-   Kirjutatakse sama sisestusabi kaudu (punkt 8), aga tekst ei muutu.
+   Sisestatakse **eraldi käsuga** (nt lehe aadressi väli Workspace'is), mitte
+   tägi-nuppudega — need muudavad ainult teksti.
 6. **Skeem on määratud, mitte arvatud.** Tsiteeritav aadress arvutatakse ainult
    **teose (vajadusel osa) tasemel määratud skeemi** järgi: `foliation`,
-   `pagination`, `signatures` (+ esmane, kui paralleelseid on mitu). Ilma skeemita
+   `pagination`, `signatures`. Ilma skeemita
    tuletust ei tehta — on ainult nähtavad ja käsitsi ankrud. Automaatne tuvastus
    (punkt 8) annab skeemi kohta **ettepaneku**, mille toimetaja kinnitab.
 7. **Tuletus ja selle piirid** (server, teose tasemel):
-   - Parser: silt = **tüvi + number + valikuline `r`/`v`**. Tüvi on suvaline
-     (ka sümbolid), number araabia või rooma (`ij` = 2, `iij` = 3, lõpu-`j` = `i`);
-     tüvi ilma numbrita = poogna 1. leht. Parsimatu ankur on nähtav silt ilma
-     normaliseeritud aadressita.
+   - **Parser sõltub tägi liigist ja skeemist**, mitte ainult sisust:
+     - `<fw>` + `pagination`: araabia või rooma number (eelmäng `xii`);
+     - `<fw>` + `foliation`: number + valikuline `r`/`v`;
+     - `<sig>`: **tüvi + valikuline poognasisene number**. Tüvi on suvaline
+       (ka sümbolid), number araabia või rooma (`ij` = 2, `iij` = 3, lõpu-`j` = `i`);
+       tüvi ilma numbrita = poogna 1. leht. `<sig>C</sig>` on poogen C, **mitte**
+       rooma 100 — rooma tõlgendus kehtib ainult tüve järel olevale osale.
+   - **Parsimatu ankur katkestab loenduse:** ta jääb nähtavaks sildiks ilma
+     normaliseeritud aadressita ja **sellest edasi aadressi ei tuletata kuni
+     järgmise kehtiva ankruni**. Loendus ei jätka varasemast ankrust üle
+     tundmatu numeratsioonimuutuse.
    - Loendus algab ankrust ja kehtib **edasi järgmise ankruni, osa piirini või
      skeemi muutuseni**, kumb enne tuleb. Enne teose/osa esimest ankrut ja katkestuse
      järel on aadress **määramata**. Tagasi (ankrust eespool) ei loendata.
-   - **Vastuolu:** kui järgmine ankur ei vasta loendusele (nt puuduv skaneering,
-     hüpe kirjade vahel ilma osapiirita), saavad kõik vahepealsed tuletatud aadressid
-     lipu `conflict` — neid ei kustutata ega parandata vaikselt, vaade näitab neid
-     ebakindlana ja toimetaja lahendab käsitsi ankruga või osapiiriga. Poogna
-     pikkust ei eeldata: signatuuriskeemis on järgmise poogna algus alati ankur.
+   - **Vastuolu vs uus jada.** Eristatakse kahte juhtu:
+     - *lubatud uus algus* — vahepealsed aadressid jäävad kehtima: signatuuris uus
+       tüvi poogna 1. lehena (loendur ootas `A5r`, ankur on `B`; poogna pikkus pole
+       teada), samuti osa piir ja skeemi muutus;
+     - *vastuolu sama jada sees* — ankur on sama jada (sama tüvi / sama
+       numeratsioon), aga väärtus ei vasta loendusele (nt puuduv skaneering,
+       foliatsiooni hüpe kirjade vahel ilma osapiirita): kõik vahepealsed tuletatud
+       aadressid saavad lipu `conflict`. Neid ei kustutata ega parandata vaikselt;
+       vaade näitab ebakindlana, toimetaja lahendab käsitsi ankruga või osapiiriga.
+     Kas foliatsiooni/paginatsiooni tagasihüpe või suur edasihüpe on alati vastuolu
+     või võib olla uus jada, otsustab spekk (praegu: vastuolu).
    - Laotus: pildi tekstiosade järjekord ei pruugi olla loenduse järjekord
      (`[2v|1r]`). Laotuspildil ei loendata ühelt tekstiosalt teisele — iga osa
      vajab oma ankrut või loendust naaberpildist; reegel spekis.
@@ -89,7 +105,11 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
      JSON — üks ankru parandus ei kirjuta ümber järgnevate lehtede JSON-e ega
      git-ajalugu. Kirje füüsilise lehekülje kohta: nähtav silt (liik), normaliseeritud
      aadress, päritolu (`visible` | `derived` | `manual`), `conflict`-lipp.
-     Paralleelsed numeratsioonid säilivad kõik; kuvamiseks esmane skeemi järgi.
+     **Paralleelsed sama liiki numeratsioonid** (vana foliatsioon + arhiivi oma —
+     mõlemad `<fw>`) on **v1 piirang**: lehe kohta loetakse üks `<fw>`-jada;
+     teine `<fw>` samal füüsilisel leheküljel on nähtav silt, aga loendusse ei lähe.
+     Jada identiteet (kuidas ankur seotakse konkreetse numeratsiooniga) on lahtine
+     küsimus. `<fw>` ja `<sig>` on eri jadad ja säilivad mõlemad.
      Autoriteetsed on ainult tekst (nähtavad ankrud), käsitsi aadressid ja skeem.
    - **Päästik** võrdleb ankrute **sisu ja asukohti** (mitte ainult hulka):
      `<fw>246</fw>` → `<fw>248</fw>` muudab aadresse. Lisaks kõik lehenumbreid
@@ -120,7 +140,11 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
 - **Tägide nimed** (`<fw>`/`<sig>`/`<catch>` vs lühemad või eestikeelsed).
 - **Käsitsi aadressi autoriteetne asukoht** (lehe JSON-i väli vs teose tasemel
   fail) — read-model teda kanda ei saa, sest see on taastatav.
-- **Füüsilise lehekülje identiteet** laotuse ja poolituse üle: pilditüvi +
+- **Paralleelsete sama liiki numeratsioonide identiteet** (v1 piirang, p. 7):
+  kuidas `<fw>` seotakse jadaga (järjekord lehel? eraldi täg? jada nimi?).
+- **Füüsilise lehekülje identiteet** laotuse, poolituse ja `<pb/>` lisamise,
+  kustutamise ja nihutamise üle — viimased võivad käsitsi aadressi vale
+  tekstiosaga siduda ka ilma pilditoiminguta: pilditüvi +
   tekstiosa indeks? Mis juhtub tekstiga, kui laotuspilt poolitatakse.
 - **Laotuse loendusreegel** (punkt 7) — kas lubada `[2v|1r]` mustrit kirjeldada
   (bifoolium), või nõuda ankrut igale poolele.
