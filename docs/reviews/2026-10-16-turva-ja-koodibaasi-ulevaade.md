@@ -30,10 +30,10 @@ osaliselt aegunud või ekslikud (vt veerg „Märkus").
 | **O16-10** registreerimine / reset | #619 / PR #625 | **Tehtud** | Registreerimise loe–muuda–kirjuta luku all. Reseti pool oli **juba atomaarne** (`_validate_and_consume_token`) — ülevaate väide aegunud. |
 | **O16-11** p1 viimane leht jääb indeksisse | #617 / PR #622 | **Tehtud** | |
 | **O16-11** p2 alamkogu nähtavus | #617 / PR #627 | **Tehtud + ADR 0069** | Tooteotsus: privaatse kogu alamkogu on privaatne; arvutus ainult `server/collection_tree.py`. |
-| **O16-11** p3 kaanepilt (= R24-06) | #419 / PR (fix/kaanepilt-419) | **Tehtud** | Esilehe vahemälu signatuuriga (piltide nimed + JSON-ide mtime): korduspäring ei parsi JSON-e. Mõõdetud 1000 lk: külm 23 ms → soe 5 ms (jääb `glob` + `stat`). Ülevaate väide „välistab `strikethrough` lehed" oli vale — JSON-e loeti `sequence` järjestuse pärast. |
+| **O16-11** p3 kaanepilt (= R24-06) | #419 / PR #629 | **Tehtud** | Esilehe vahemälu signatuuriga (piltide nimed + JSON-ide mtime): korduspäring ei parsi JSON-e. Mõõdetud 1000 lk: külm 23 ms → soe 5 ms (jääb `glob` + `stat`). Ülevaate väide „välistab `strikethrough` lehed" oli vale — JSON-e loeti `sequence` järjestuse pärast. |
 | **O16-12** GND / VIAF / ADA sisend | #619 / PR #625 | **Tehtud** | |
 | **O16-13** p2 username-preview rate-limit | PR #620 | **Tehtud** | |
-| **O16-13** p1 nginx `vutt_auth` `/reset/*` | PR (fix/kaanepilt-419) | **Tehtud** | `reset/validate` ja `reset/set-password` range tsooni alla; rakenduse `check_rate_limit` oli juba olemas. |
+| **O16-13** p1 nginx `vutt_auth` `/reset/*` | PR #629 | **Tehtud** | `reset/validate` ja `reset/set-password` range tsooni alla; rakenduse `check_rate_limit` oli juba olemas. |
 | **O16-14** p1 prügikast | #619 / PR #625 | **Tehtud** | |
 | **O16-14** p2 `replace_work_content` lukk | #619 / PR #625, #626 / PR #628 | **Tehtud + leitud lisaviga** | Luku järel selgus, et asendus ei kutsunud `refresh_work_mentions`-it (ADR 0055) → #626, parandatud. |
 | **O16-14** p3 `user_settings_ops` | — | **Tagasi lükatud** | `username` tuleb sessioonist, mitte kliendilt → tee-süst ei ole võimalik; võidujooks ainult sama kasutaja kahe tabi vahel. |
