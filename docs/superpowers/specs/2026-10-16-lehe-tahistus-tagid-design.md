@@ -116,9 +116,13 @@ lihtne, ka siin.
 enne `<fn>`/`<pb/>` asendust, üldist tägieemaldust ja poolituste liitmist:
 **tähistuse paarid eemaldatakse koos sisuga, asendus = tühi string**.
 
-- **Üks paaride sidumise funktsioon** `page_mark_spans(text)` (`server/vutt_tags.py`), mida
-  kasutavad **kõik kolm tarbijat** — otsingupuhastus, `page_marks` ja normaliseerija —, et
-  sama teksti ei tõlgendataks kaheti. Tagastab **kehtivad välimised** tähistuse paarid:
+- **Üks parser** `parse_page_marks(text)` (`server/vutt_tags.py`), mida kasutavad **kõik
+  kolm tarbijat** — otsingupuhastus, `page_marks` ja normaliseerija —, et sama teksti ei
+  tõlgendataks kaheti. Tagastab **kõik** tähistuse paarid koos tägide asukohtadega ning
+  lippudega `valid` (ei sisalda `<pb/>`) ja `outer` (ei ole teise paari sees); paarita
+  tägid eraldi. Otsingupuhastus ja `page_marks` valivad kehtivad välimised paarid
+  (`page_mark_spans` = `valid and outer`); normaliseerija vajab ka kehtetuid ja sisemisi,
+  et nende ümbristägid eemaldada. Reeglid:
   - tägid seotakse paarideks pinuga (nagu `findOrphanTags`), mitte regexiga;
   - **välimine** paar loeb, sisemised tähistused on tema sisu
     (`<sig>A <sig>ij</sig> muu</sig>` → üks paar, kaob tervikuna);
@@ -128,6 +132,7 @@ enne `<fn>`/`<pb/>` asendust, üldist tägieemaldust ja poolituste liitmist:
     kaovad nagu tavalised, sisu ja `<pb/>` jäävad, `page_marks`-i kirjet ei teki. Muidu
     saaks kahe tekstiosa kohta ühe kirje.
 - Puhastus eemaldab `page_mark_spans` vahemikud koos sisuga.
+  (Ülevaatus 2026-10-17: parser tagastab kõik paarid, mitte ainult kehtivad välimised.)
 - **Tühi string, mitte reavahetus:** ümbritsev tühik/reavahetus jääb nagu originaalis.
   Tähistus on teksti voos **läbipaistev** — poolitus liitub üle eemaldatud tähistuse
   täpselt siis, kui originaalis oli poolituse järel reavahetus. See on õige: tähistus ei ole
@@ -172,7 +177,7 @@ olev:
 - `strip_empty_tags` komplekt + `fw sig catch rh` → tühi `<sig></sig>` kaob salvestusel.
 - `_INLINE` + needsamad: `<m>` jääb välimiseks, tähistus võib olla `<m>` sees (OCR võib
   veerise ploki sisse panna ka nurga foliatsiooninumbri), **mitte vastupidi**.
-- **Uus: tähistuse struktuur** (`page_mark_spans` põhjal), igale kirjutatavale tekstile —
+- **Uus: tähistuse struktuur** (`parse_page_marks` põhjal), igale kirjutatavale tekstile —
   ka kleebitud, imporditud ja OCR-ist tulnud:
   - välimise paari sees olevad tähistuse tägid (mis tahes liik) eemaldatakse, sisu jääb;
   - üle `<pb/>` ulatuva paari ümbristägid eemaldatakse, sisu ja `<pb/>` jäävad.
@@ -271,7 +276,7 @@ pytest:
   pesastatud tähistus (välimine kaob tervikuna); paarita tähistus (sisu jääb).
 - Normaliseerija: tähistus tähistuse sees → sisemine täg eemaldatud; `<fw>12<pb/>13</fw>`
   → `12<pb/>13`; idempotentne.
-- `page_mark_spans` ühine tabel kolmele tarbijale: pesastus, orv, üle `<pb/>`, `<m>` sees —
+- `parse_page_marks` / `page_mark_spans` ühine tabel kolmele tarbijale: pesastus, orv, üle `<pb/>`, `<m>` sees —
   puhastus, `page_marks` ja normaliseerija annavad samale sisendile kooskõlalise tulemuse
   (`<fw>12<pb/>13</fw>`: otsingus `12 13`, `page_marks` tühi).
 - **Paarsustest:** TS- ja Pythoni register samad (nimi, TEI, kõik lipud); iga
