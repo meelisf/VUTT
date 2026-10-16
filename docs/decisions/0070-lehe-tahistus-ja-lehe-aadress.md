@@ -1,4 +1,8 @@
-# ADR 0070 — Lehe ääre tekst on märgendatud; lehe aadress tuletatakse
+# ADR 0070 — Lehe tähistus on märgendatud; lehe aadress tuletatakse
+
+**Termin.** *Lehe tähistus* = TEI `fw` (*forme work*): leheküljenumber,
+foliatsioon, signatuur, kustood — lehe kui füüsilise objekti tähistus, mitte
+teksti osa. **Ei ole marginaalia**: `<m>` (ADR 0003/0009) on sisuline tekst veerisel.
 
 **Kuupäev:** 2026-10-16
 **Staatus:** ettepanek (spekk enne teostust, mitu ülevaatust; 1. ja 2. ülevaatus 2026-10-16 sisse viidud)
@@ -132,8 +136,13 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
    ankrud on igal lehel või üle ühe, kas `v`-ga), sest see tehakse kord teose kohta
    ja toimetaja kinnitab. Ankru ettepanekut kaalutakse uuesti alles päris kasutuse
    järel.
-9. **OCR** (hilisem samm): Gemini juhis märgendab ääre teksti kohe. Praegu ta
-   kirjutab selle omaette reale (või jätab pliiatsinumbri välja).
+9. **OCR** (eraldi rada): lehe tähistust märgendavad nii Gemini juhis kui ka oma
+   peenhäälestatud mudel (Qwen 3.5 9B, LOSS). Mudeli siht on VUTT-i ekspordi
+   (`build_vutt_dataset.py`) kuju, seega peab ekspordileping olema paigas koos
+   tägidega. Võimalikud olemasolevad allikad (kontrollida LOSSis): DTA TEI
+   `<fw type="pageNum|sig|catch">`, PAGE XML `TextRegion @type`
+   (`page-number`, `signature-mark`, `catch-word`). Praegu kirjutab OCR tähistuse
+   omaette reale või jätab pliiatsinumbri välja.
 
 ## Lahtised küsimused (spekki)
 
@@ -151,7 +160,7 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
 - **Ankru ettepanek** — v1-s ei ole (punkt 8); uuesti, kui päris kasutus näitab vajadust.
 - **Skeemi kinnitamise UI** ja skeemi muutus teose sees (eelmäng rooma, edasi araabia).
 - **Recto `r`** — kas normaliseeritud aadress kannab `246r` või `246`.
-- **Olemasolev korpus:** ääreread on praegu märgendita (viimased read). Kas
+- **Olemasolev korpus:** lehe tähistuse read on praegu märgendita (viimased read). Kas
   heuristiline ettepanek (lühike viimane rida signatuuri mustriga) ülevaatusele —
   automaatne migratsioon ei ole tõenäoliselt ohutu.
 - **Treeningandmed** (`build_vutt_dataset.py`): kas tägid antakse mudelile edasi.
@@ -165,7 +174,7 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
   mark-dekoratsioon + `atomicRanges`, ADR 0044), `renderVuttMarkup.ts`,
   sanitiseerija ja `strip_empty_tags`, `cleanMarkup`, marginaalia normaliseerija
   (täg ei tohi minna `<m>` sisse ega vastupidi — reegel spekis), transkribeerimisjuhendid.
-- Server: `clean_text_for_search` (järjekord: ääre tägid enne poolituste
+- Server: `clean_text_for_search` (järjekord: tähistuse tägid enne poolituste
   liitmist), `meili_doc.py` + `meili_settings.py` (filtreeritav väli
   MÕLEMASSE loendisse), aadressi read-model + `rebuild`, tuletaja ja selle
   päästikud (enne Meili sünki), skeemi väli teose/osa metaandmetes.
