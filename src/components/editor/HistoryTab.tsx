@@ -21,7 +21,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Annotation, Page, Work } from '../../types';
-import type { Collections } from '../../services/collectionService';
+import { isCollectionRestricted, type Collections } from '../../services/collectionService';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { parseRestoreResponse, type RestoreResult } from './pageRestore';
@@ -439,7 +439,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   const [shareableSaving, setShareableSaving] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const hasRestrictedCollection = (work?.collections || []).some(
-    collectionId => collections?.[collectionId]?.visibility === 'restricted'
+    collectionId => !!collections && isCollectionRestricted(collections, collectionId)
   );
 
   React.useEffect(() => {

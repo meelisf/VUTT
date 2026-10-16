@@ -9,6 +9,7 @@ from starlette.concurrency import run_in_threadpool
 from ..auth import delete_user_sessions, save_users, users_transaction
 from ..cache import get_cached_archives, get_cached_collections
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
+from ..collection_tree import is_collection_public
 from ..config import ARCHIVES_FILE, BASE_DIR, COLLECTIONS_FILE, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import get_or_init_repo, git_write_lock
@@ -203,7 +204,9 @@ def admin_collection_users(collection_id: str, user=Depends(require_role("admin"
         "collection": col,
         "allowed_users": allowed_usernames,
         "edit_users": edit_usernames,
-        "visibility": col.get("visibility", "public"),
+        # KEHTIV nähtavus (#617): avaliku määranguga alamkogu privaatse vanema
+        # all on privaatne ja lugemismäärang mõjub talle.
+        "visibility": "public" if is_collection_public(collection_id, data) else "restricted",
         "is_virtual": col.get("type") == "virtual_group",
     }
 

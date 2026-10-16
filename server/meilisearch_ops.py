@@ -48,6 +48,7 @@ logger = get_logger(__name__)
 
 # Meilisearch päringu timeout sekundites
 MEILI_TIMEOUT = 10
+from .collection_tree import collection_descendants, is_work_public_in
 from .meili_settings import (
     RUNTIME_REQUIRED_FILTERABLE, MAX_VALUES_PER_FACET, LETTERS_INDEX_NAME,
     LETTERS_SEARCHABLE_ATTRIBUTES, LETTERS_FILTERABLE_ATTRIBUTES, LETTERS_SORTABLE_ATTRIBUTES,
@@ -590,12 +591,18 @@ def _ensure_filterable_attributes():
 
 
 def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
-    """Uuendab kõigi antud kollektsiooni teoste is_public välja Meilisearchi asünkroonselt."""
+    """Uuendab kollektsiooni JA tema järglaste teoste is_public välja Meilisearchi asünkroonselt.
+
+    Järglased on sees, sest alamkogu pärib vanema privaatsuse (#617). Väärtus
+    arvutatakse iga teose kohta uuesti (`is_public_flag` ei kehti teosele, millel
+    on ka mõni teine avalik kogu).
+    """
     def _do_update():
         if not os.path.isdir(BASE_DIR):
             return
         docs_to_update = []
         all_cols = load_collections()
+        affected = collection_descendants(collection_id, all_cols)
         for folder in os.listdir(BASE_DIR):
             meta_path = os.path.join(BASE_DIR, folder, '_metadata.json')
             if not os.path.exists(meta_path):
@@ -604,16 +611,13 @@ def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
                 with open(meta_path, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                 work_cols = meta.get('collections', [])
-                if collection_id not in work_cols:
+                if not affected.intersection(work_cols):
                     continue
                 # Teose nanoid on _metadata.json väljal `id` (mitte `work_id`), slugi
                 # varuvariant nagu meili_doc.build_work_documents-is — muidu ei leia
                 # uuendus ühtki lehedokumenti ja nähtavuse muutus jääb Meilisse jõudmata.
                 work_id = meta.get('id') or sanitize_id(folder)
-                new_is_public = any(
-                    all_cols.get(c, {}).get("visibility", "public") == "public"
-                    for c in work_cols
-                ) if work_cols else True
+                new_is_public = is_work_public_in(work_cols, all_cols)
                 folder_path = os.path.join(BASE_DIR, folder)
                 images = sorted([
                     f for f in os.listdir(folder_path)

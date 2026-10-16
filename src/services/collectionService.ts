@@ -192,6 +192,44 @@ export function getCollectionHierarchy(collections: Collections, id: string): st
 }
 
 /**
+ * Kogu ja tema esivanemad (alates kogust endast). Tsüklikindel — sama mis
+ * serveri `collection_tree.collection_chain`.
+ */
+function collectionChain(collections: Collections, id: string): string[] {
+  const chain: string[] = [];
+  const seen = new Set<string>();
+  let currentId: string | undefined = id;
+  while (currentId && !seen.has(currentId)) {
+    seen.add(currentId);
+    chain.push(currentId);
+    currentId = collections[currentId]?.parent;
+  }
+  return chain;
+}
+
+/**
+ * Kehtiv nähtavus (#617): privaatse kogu alamkogu on privaatne. Kogu enda
+ * `visibility` on salvestatud määrang; tundmatu kogu ei ole piiratud.
+ * Peegeldab serveri `server/collection_tree.py` reeglit.
+ */
+export function isCollectionRestricted(collections: Collections, id: string): boolean {
+  return collectionChain(collections, id).some(
+    cid => collections[cid]?.visibility === 'restricted'
+  );
+}
+
+/**
+ * Kas lugemisõigus (`allowed_collections`) katab kogu — otse või esivanema
+ * kaudu, nagu tenant-tokeni `collections_hierarchy IN [allowed]`.
+ */
+export function isCollectionAllowed(
+  collections: Collections, id: string, allowed: Iterable<string>,
+): boolean {
+  const allowedSet = new Set(allowed);
+  return collectionChain(collections, id).some(cid => allowedSet.has(cid));
+}
+
+/**
  * Tagastab kõik tippkollektsioonid (ilma vanemata).
  * Sorteeritud order välja järgi.
  */

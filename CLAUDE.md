@@ -234,6 +234,8 @@ ainult `contributor`) ei anna KUNAGI lugemisõigust; lugemisõigus on
 `allowed_collections`. Uus kirjutustee kutsub `can_write_work`-i, ei kirjuta oma
 kontrolli. Õigusotsust EI tehta `work_collections_index.json` põhjal — see on
 read-model (ADR 0007); autoriteet on `_metadata.json`.
+Kogu nähtavus pärib (ADR 0069): privaatse kogu alamkogu on privaatne, arvutus AINULT
+`server/collection_tree.py` (frontendis `isCollectionRestricted`) — ära loe `visibility`-t otse.
 Kutsuja õigused tulevad **sessioonist** (ADR 0046): `get_user` ja `optional_user`
 annavad sama kasutaja, tokenit loeb AINULT `deps.py`. Seepärast PEAB iga
 `allowed_collections`/`edit_collections` kirjutus kutsuma `delete_user_sessions`-it

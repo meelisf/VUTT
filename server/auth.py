@@ -13,6 +13,7 @@ import bcrypt
 from contextlib import contextmanager
 from datetime import datetime
 from .cache import get_cached_collections
+from .collection_tree import is_collection_public
 from .config import USERS_FILE, SESSION_DURATION, DELETED_USERNAMES_FILE
 from .utils import atomic_write_json
 from .heartbeat import mark_error, mark_success, register_job
@@ -591,7 +592,9 @@ def apply_collection_rights_delta(changes, admin_user):
             kogu = collections_config.get(collection_id)
             if kogu is None:
                 return False, f"Kollektsiooni '{collection_id}' ei leitud", {}
-            if field == "allowed" and kogu.get("visibility") != "restricted":
+            # Kehtiv nähtavus (#617): avaliku määranguga alamkogu privaatse
+            # vanema all on privaatne ja lugemisõigus on talle mõtekas.
+            if field == "allowed" and is_collection_public(collection_id, collections_config):
                 return False, (f"Kollektsioon '{collection_id}' on avalik — "
                                f"lugemisõiguse määrangut ei lisata"), {}
             if field == "edit" and kogu.get("type") == "virtual_group":

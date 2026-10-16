@@ -16,6 +16,7 @@ def kogud(backend_env):
         "kinnine": {"name": {"et": "Kinnine"}, "visibility": "restricted"},
         "avalik": {"name": {"et": "Avalik"}, "visibility": "public"},
         "ruhm": {"name": {"et": "Rühm"}, "type": "virtual_group"},
+        "kinnise-laps": {"name": {"et": "Laps"}, "parent": "kinnine", "visibility": "public"},
     }, ensure_ascii=False), encoding="utf-8")
     return fail
 
@@ -108,3 +109,11 @@ def test_put_ilma_allowed_usersita_toimib(client, login, backend_env, kogud):
                    headers=_auth(token))
     assert r.status_code == 200, r.text
     assert json.loads(kogud.read_text())["kinnine"]["color"] == "rose"
+
+
+def test_visibility_on_kehtiv_parib_vanemalt(client, login, backend_env, kogud):
+    # #617: avaliku määranguga alamkogu privaatse vanema all on privaatne —
+    # paneel peab lugemismäärangut pakkuma.
+    token = login("admin", "adminpass")
+    d = client.get("/admin/collections/kinnise-laps/users", headers=_auth(token)).json()
+    assert d["visibility"] == "restricted"

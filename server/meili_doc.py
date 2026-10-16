@@ -20,6 +20,7 @@ Väljanimede ORTOGRAAFIA: Meilisearch kasutab vanemat 'y'-ortograafiat
 otsingufiltrid eeldavad neid (vt issue #16, CLAUDE.md).
 """
 from .work_dating import index_dating, dating_updates
+from .collection_tree import is_work_public_in
 import os
 import re
 import json
@@ -499,10 +500,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "notes": normalize_eszett(work_ctx.get('notes')),
         "collections": work_ctx['work_collections'],
         "collections_hierarchy": work_ctx['collections_hierarchy'],
-        "is_public": any(
-            work_ctx['collections'].get(c, {}).get("visibility", "public") == "public"
-            for c in work_ctx['work_collections']
-        ) if work_ctx['work_collections'] else True,
+        "is_public": is_work_public_in(work_ctx['work_collections'], work_ctx['collections']),
         "shareable": work_ctx['shareable'],
         "location": get_label(location),
         "location_object": location,

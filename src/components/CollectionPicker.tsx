@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen, Search, Users, Plus, Loader2 } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
-import { buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
+import { buildCollectionTree, CollectionTreeNode, getCollectionColorClasses, isCollectionAllowed, isCollectionRestricted } from '../services/collectionService';
 import { buildPickerEntries, favoriteEntries } from './pickerEntries';
 import { useFavoriteCollections } from '../hooks/useFavoriteCollections';
 import FavoriteStar from './FavoriteStar';
@@ -157,10 +157,10 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
   // Filtreeri kollektsioonid kasutaja ligipääsu järgi
   const visibleCollections = useMemo(() => {
     if (isAtLeast(user?.role, 'admin')) return collections;
-    const allowed = new Set(user?.allowed_collections ?? []);
+    const allowed = user?.allowed_collections ?? [];
     return Object.fromEntries(
-      Object.entries(collections).filter(([id, col]) =>
-        (col as any).visibility !== 'restricted' || allowed.has(id)
+      Object.entries(collections).filter(([id]) =>
+        !isCollectionRestricted(collections, id) || isCollectionAllowed(collections, id, allowed)
       )
     );
   }, [collections, user]);

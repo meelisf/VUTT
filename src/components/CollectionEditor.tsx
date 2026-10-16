@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Trash2 } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
-import { buildCollectionTree } from '../services/collectionService';
+import { buildCollectionTree, isCollectionRestricted } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { apiPost } from '../services/apiClient';
@@ -278,6 +278,10 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
             <p className="text-xs text-gray-400 mt-1">
               {t('collections.visibilityHint')}
             </p>
+            {/* Vanema privaatsus kaalub üles alamkogu enda määrangu (#617). */}
+            {collections[valitud]?.parent && isCollectionRestricted(collections, collections[valitud].parent!) && (
+              <p className="text-xs text-amber-700 mt-1">{t('collections.visibilityInherited')}</p>
+            )}
           </div>
             </>
           )}

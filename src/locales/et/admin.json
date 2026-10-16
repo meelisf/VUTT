@@ -190,6 +190,7 @@
     "visibilityPublic": "Avalik",
     "visibilityRestricted": "Piiratud",
     "visibilityHint": "Piiratud kollektsiooni teosed on ligipääsetavad ainult antud kasutajatele ja adminidele.",
+    "visibilityInherited": "Ülemkollektsioon on piiratud — see alamkollektsioon on piiratud sõltumata siinsest valikust.",
     "allowedUsers": "Ligipääsuga kasutajad:",
     "noAllowedUsers": "Pole ligipääsuga kasutajaid",
     "descriptionPlaceholderEt": "Lühikirjeldus eesti keeles...",
