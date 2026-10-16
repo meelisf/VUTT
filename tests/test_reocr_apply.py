@@ -231,3 +231,22 @@ def test_apply_vigane_json_ei_katkesta_teksti_rakendamist(work):
 
     assert result["applied"] == ["pg1.jpg"]
     assert (folder / "pg1.txt").read_text(encoding="utf-8") == "uus tekst"
+
+
+def test_apply_hoiab_lehelukku_lugemisest_commitini(work, monkeypatch):
+    """#615: lepitus kirjutab lehe JSON-i tervikuna — samaaegne kommentaar läheks kaduma."""
+    import server.reocr_apply as ra
+    from server.page_locks import page_lock_acquire_nowait
+    folder = work["folder"]
+    for n in (1, 2):
+        (folder / f"pg{n}.ocr").write_text("uus", encoding="utf-8")
+    nahtud = {}
+    paris = ra.save_with_git
+
+    def save(*a, **k):
+        nahtud.update({fn: page_lock_acquire_nowait(str(folder / fn)) for fn in ("pg1.json", "pg2.txt")})
+        return paris(*a, **k)
+    monkeypatch.setattr(ra, "save_with_git", save)
+    ra.apply_ocr_results(str(folder), ["pg2.jpg", "pg1.jpg"], "admin")
+    assert nahtud == {"pg1.json": False, "pg2.txt": False}
+    assert page_lock_acquire_nowait(str(folder / "pg1.txt"))

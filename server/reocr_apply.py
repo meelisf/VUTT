@@ -7,6 +7,7 @@ docs/_archive/superpowers/specs/done/2026-08-07-reocr-hulgi-vastuvott-design.md.
 import json
 import os
 import unicodedata
+from contextlib import ExitStack
 from typing import Dict, List, Optional, Tuple
 
 from .annotation_ops import (
@@ -18,6 +19,7 @@ from .config import get_logger
 from .git_ops import save_with_git
 from .macron import convert_ocr_text, work_languages
 from .marginalia_normalize import normalize_marginalia_tags
+from .page_locks import page_lock
 
 logger = get_logger(__name__)
 
@@ -84,7 +86,19 @@ def apply_ocr_results(work_path: str, page_filenames: List[str], username: str) 
 
     Ühe lehe tõrge ei katkesta ülejäänuid — vigased lehed lähevad 'failed' loendisse.
     Tagastab {"applied", "failed", "commit_hash", "git_committed"}.
+
+    Kõigi lehtede `page_lock` on käes lehe JSON-i lugemisest commitini (#615):
+    lepitus kirjutab JSON-i tervikuna üle ja samaaegne kommentaarivastus või
+    `/save` läheks muidu kaduma. Lukud võetakse sorteeritud järjekorras —
+    teised teed võtavad ainult ühe lehe luku, seega tsüklit ei teki.
     """
+    with ExitStack() as stack:
+        for txt_path in sorted({_txt_path(work_path, fn) for fn in page_filenames}):
+            stack.enter_context(page_lock(txt_path))
+        return _apply_ocr_results_locked(work_path, page_filenames, username)
+
+
+def _apply_ocr_results_locked(work_path: str, page_filenames: List[str], username: str) -> Dict:
     applied: List[str] = []
     failed: List[Dict[str, str]] = []
     writes: List[Tuple[str, str]] = []  # [(txt_path, tekst)]

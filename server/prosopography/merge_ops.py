@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from . import state
 from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, rebuild_indices
-from .person_crud import _id_to_path, get_person
+from .person_crud import _AsyncTasks, _id_to_path, get_person
 from .locks import ext_id_claim_lock, merge_operation_lock, person_lock
 from ._compat import sync_from_facade
 from ..prosopo_biography_fields import (
@@ -194,54 +194,97 @@ def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
                 )
 
     target_label = (target.get("name") or {}).get("label") or source.get("name", {}).get("label", "")
-    from ..config import BASE_DIR as data_dir
-    from ..meilisearch_ops import sync_work_to_meilisearch_async
-
-    changed_files = []
-    if os.path.exists(data_dir):
-        for work_entry in os.scandir(data_dir):
-            if not work_entry.is_dir():
-                continue
-            meta_path = os.path.join(work_entry.path, "_metadata.json")
-            if not os.path.exists(meta_path):
-                continue
-            try:
-                with open(meta_path, encoding="utf-8") as f:
-                    meta = json.load(f)
-            except Exception:
-                continue
-            changed = False
-            for c in meta.get("creators", []):
-                if isinstance(c, dict) and c.get("id") == source_id:
-                    c["id"] = target_id
-                    c["label"] = target_label
-                    c["name"] = target_label
-                    changed = True
-            for tag in meta.get("tags", []):
-                if isinstance(tag, dict) and tag.get("id") == source_id:
-                    tag["id"] = target_id
-                    tag["label"] = target_label
-                    changed = True
-            pub = meta.get("publisher")
-            if isinstance(pub, dict) and pub.get("id") == source_id:
-                meta["publisher"]["id"] = target_id
-                meta["publisher"]["label"] = target_label
-                changed = True
-            if changed:
-                changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
-
-    if changed_files:
-        commit_msg = f"Prosopo liitmine: {source_id} → {target_id} ({target_label})"
-        primary_path, primary_content = changed_files[0]
-        additional = changed_files[1:] if len(changed_files) > 1 else None
-        state.save_with_git(primary_path, primary_content, username,
-                             message=commit_msg, additional_files=additional)
-        for meta_path, _ in changed_files:
-            dir_name = os.path.basename(os.path.dirname(meta_path))
-            sync_work_to_meilisearch_async(dir_name)
+    _rebind_work_metadata(source_id, target_id, target_label, username)
 
     rebuild_indices()
     return get_person(target_id)
+
+
+def _works_referencing(source_id: str) -> tuple[list[str], list[str]]:
+    """(_metadata.json teed, kus isik on juurväljal; teosekaustad, kus ta on osas).
+
+    Eelfilter luku VÄLJAS — tegelik muudatus käib värske koopia peal luku all."""
+    from ..config import BASE_DIR as data_dir
+
+    root_paths, parts_dirs = [], []
+    if not os.path.exists(data_dir):
+        return root_paths, parts_dirs
+    for work_entry in os.scandir(data_dir):
+        if not work_entry.is_dir():
+            continue
+        meta_path = os.path.join(work_entry.path, "_metadata.json")
+        try:
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, ValueError):
+            continue
+        refs = [*(meta.get("creators") or []), *(meta.get("tags") or []), meta.get("publisher")]
+        if any(isinstance(r, dict) and r.get("id") == source_id for r in refs):
+            root_paths.append(meta_path)
+        if any(isinstance(c, dict) and c.get("id") == source_id
+               for p in meta.get("parts") or [] if isinstance(p, dict)
+               for c in p.get("creators") or []):
+            parts_dirs.append(work_entry.path)
+    return root_paths, parts_dirs
+
+
+def _rebind_work_metadata(source_id: str, target_id: str, target_label: str, username: str) -> None:
+    """Teoste juurväljad (creators/tags/publisher) source → target.
+
+    `bulk_update_works` kaudu (#615): `metadata_lock` lugemisest kirjutamiseni,
+    üks commit, `update_work_facts` ja Meili sünk iga muutunud teose kohta.
+    Varem kirjutati faile otse ja samaaegne metaandmete salvestus läks kaduma.
+    Osad (`parts[].creators`) EI käi siit — need muudab `merge_person` pärast
+    isikulukke `work_parts` kaudu (ADR 0057).
+    """
+    import copy
+    from ..metadata_ops import bulk_update_works
+
+    root_paths, _ = _works_referencing(source_id)
+    if not root_paths:
+        return
+
+    def transform(meta: dict) -> dict:
+        updates = {}
+        for field in ("creators", "tags"):
+            items = copy.deepcopy(meta.get(field) or [])
+            hit = False
+            for item in items:
+                if isinstance(item, dict) and item.get("id") == source_id:
+                    item["id"] = target_id
+                    item["label"] = target_label
+                    if field == "creators":
+                        item["name"] = target_label
+                    hit = True
+            if hit:
+                updates[field] = items
+        pub = meta.get("publisher")
+        if isinstance(pub, dict) and pub.get("id") == source_id:
+            updates["publisher"] = {**pub, "id": target_id, "label": target_label}
+        return updates
+
+    bulk_update_works(
+        [(p, transform) for p in root_paths], username,
+        f"Prosopo liitmine teostes: {source_id} → {target_id} ({target_label})",
+        background_tasks=_AsyncTasks,
+    )
+
+
+def _rebind_work_parts(source_id: str, target_id: str, username: str) -> None:
+    """Osade loojad source → target. Kutsutakse isikulukkude VÄLJAS: `work_parts`
+    võtab `work_lock`-i ja lukkude järjekord peab jääma work_lock → metadata_lock."""
+    from .. import work_parts
+
+    _, parts_dirs = _works_referencing(source_id)
+    if not parts_dirs:
+        return
+    target = get_person(target_id) or {}
+    target_label = (target.get("name") or {}).get("label") or ""
+    for work_dir in parts_dirs:
+        try:
+            work_parts.rebind_person(work_dir, source_id, target_id, target_label, username)
+        except Exception as e:
+            state.logger.warning("Osade liitmine ebaõnnestus (%s): %s", work_dir, e)
 
 
 def merge_person(source_id: str, target_id: str, username: str) -> dict:
@@ -256,7 +299,11 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
         with ExitStack() as stack:
             for person_id in sorted((source_id, target_id)):
                 stack.enter_context(person_lock(person_id))
-            return _merge_person_locked(source_id, target_id, username)
+            merged = _merge_person_locked(source_id, target_id, username)
+    # Kirjade saatjad/saajad jt osade loojad — ilma selleta jäid nad viitama
+    # hauakivile (#615). Osa kirjutus uuendab ka oma person_to_works kirjed.
+    _rebind_work_parts(source_id, target_id, username)
+    return merged
 
 
 def delete_person(person_id: str, username: str) -> dict:

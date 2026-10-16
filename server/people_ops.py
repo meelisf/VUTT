@@ -10,7 +10,25 @@ from .utils import atomic_write_json
 
 logger = get_logger(__name__)
 
-PEOPLE_LOCK = threading.Lock()
+def _aliases_lock():
+    """`person_aliases.json`-i ÜKS lukk (#615) — sama, mida `prosopography.indices`
+    hoiab oma `vutt:P…` võtmete kirjutamisel. Kaks eraldi lukku lasid kahel
+    terve faili loe-muuda-kirjuta tsüklil teineteise muudatused üle kirjutada.
+    Laisk import: `cache` → `people_ops` laaditakse enne prosopograafia paketti.
+    """
+    from .prosopography.state import _aliases_lock as lock
+    return lock
+
+
+def _store_aliases(creator_id, new_info):
+    """Kirjutab ühe isiku aliased (ja ristviited) luku all; võrgupäring on ENNE."""
+    with _aliases_lock():
+        people_data = load_people_data()
+        people_data[creator_id] = new_info
+        for val in new_info.get('ids', {}).values():
+            if val and val != creator_id:
+                people_data[val] = new_info
+        save_people_data(people_data)
 
 # Wikidata nõuab User-Agent päist
 HEADERS = {
@@ -140,36 +158,27 @@ def fetch_gnd_aliases(gnd_id):
 def update_person_async(creator_id, source=None, force=False):
     """Uuendab isiku andmeid taustal. force=True jätab aliaste kontrolli vahele."""
     def task():
-        with PEOPLE_LOCK:
-            people_data = load_people_data()
+        # Kui juba olemas ja force pole, ei tee midagi (aliasteta kirjet täiendame)
+        if not force:
+            existing = load_people_data().get(creator_id)
+            if existing and existing.get('aliases'):
+                return
 
-            # Kui juba olemas ja force pole, ei tee midagi
-            if not force and creator_id in people_data:
-                # Kontrollime kas aliased on olemas, kui ei, siis proovime täiendada
-                if people_data[creator_id].get('aliases'):
-                    return
-            
-            logger.info(f"PEOPLE: Otsin andmeid isikule {creator_id}...")
-            
-            new_info = None
-            if creator_id.startswith('Q'):
-                new_info = fetch_wikidata_aliases(creator_id)
-            elif source == 'gnd' or (len(creator_id) > 5 and creator_id.isdigit()):
-                new_info = fetch_gnd_aliases(creator_id)
-            
-            if new_info:
-                # Salvestame peamise ID järgi
-                people_data[creator_id] = new_info
-                
-                # Kui leiti teisi ID-sid, tekitame viited (võrdväärsed kirjed)
-                for key, val in new_info.get('ids', {}).items():
-                    if val and val != creator_id:
-                        people_data[val] = new_info
-                
-                save_people_data(people_data)
-                logger.info(f"PEOPLE: Uuendatud isik {creator_id} ({new_info['primary_name']})")
-            else:
-                logger.warning(f"PEOPLE: Ei leitud andmeid isikule {creator_id}")
+        logger.info(f"PEOPLE: Otsin andmeid isikule {creator_id}...")
+
+        # Võrgupäring luku VÄLJAS: lukk on jagatud kaardisalvestusega (#615).
+        new_info = None
+        if creator_id.startswith('Q'):
+            new_info = fetch_wikidata_aliases(creator_id)
+        elif source == 'gnd' or (len(creator_id) > 5 and creator_id.isdigit()):
+            new_info = fetch_gnd_aliases(creator_id)
+
+        if new_info:
+            # Peamise ID järgi + teised ID-d võrdväärsete viidetena
+            _store_aliases(creator_id, new_info)
+            logger.info(f"PEOPLE: Uuendatud isik {creator_id} ({new_info['primary_name']})")
+        else:
+            logger.warning(f"PEOPLE: Ei leitud andmeid isikule {creator_id}")
 
     thread = threading.Thread(target=task)
     thread.daemon = True
@@ -265,7 +274,7 @@ def refresh_all_people():
     viimased deduplitseeritakse primary_name järgi, eelistades Wikidata ID-d.
     Tagastab: {"updated": N, "errors": N, "total": N}
     """
-    with PEOPLE_LOCK:
+    with _aliases_lock():
         people_data = load_people_data()
 
     # Deduplitseeri failis olevad välised kirjed: primary_name → parim ID + source
@@ -314,15 +323,7 @@ def refresh_all_people():
                 new_info = fetch_gnd_aliases(best_id)
 
             if new_info:
-                with PEOPLE_LOCK:
-                    people_data = load_people_data()
-                    # Uuenda peamine kirje
-                    people_data[best_id] = new_info
-                    # Uuenda cross-reference kirjed
-                    for key, val in new_info.get('ids', {}).items():
-                        if val and val != best_id:
-                            people_data[val] = new_info
-                    save_people_data(people_data)
+                _store_aliases(best_id, new_info)
                 updated += 1
             else:
                 errors += 1

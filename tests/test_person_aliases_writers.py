@@ -139,3 +139,29 @@ def test_refresh_all_people_ei_kysi_vutt_id_kohta(tmp_path, monkeypatch):
     tulemus = people_ops.refresh_all_people()
 
     assert tulemus == {"updated": 0, "errors": 0, "total": 0}
+
+
+def test_mõlemad_kirjutajad_jagavad_ühte_lukku_ja_võrk_on_luku_väljas(tmp_path, monkeypatch):
+    """#615: kaks eri lukku lasid terve faili loe-muuda-kirjuta tsüklitel teineteist
+    üle kirjutada. Jagatud lukk ei tohi hoida võrgupäringut (kaardisalvestus ootaks)."""
+    import threading
+    from server import people_ops
+    from server.prosopography import state
+    assert people_ops._aliases_lock() is state._aliases_lock
+
+    f = tmp_path / "person_aliases.json"
+    f.write_text(json.dumps({"vutt:Paaa": {"primary_name": "A", "aliases": [], "ids": {}}}))
+    monkeypatch.setattr(people_ops, "PEOPLE_FILE", str(f))
+    lukus_paringul = []
+
+    def fetch(qid):
+        lukus_paringul.append(state._aliases_lock.locked())
+        return {"primary_name": "Fischer", "aliases": ["Fischer"], "ids": {"gnd": "118533495"}}
+    monkeypatch.setattr(people_ops, "fetch_wikidata_aliases", fetch)
+    started = []
+    monkeypatch.setattr(threading.Thread, "start", lambda self: (started.append(self), self.run()))
+    people_ops.update_person_async("Q123", force=True)
+
+    assert lukus_paringul == [False]
+    data = json.loads(f.read_text())
+    assert set(data) == {"vutt:Paaa", "Q123", "118533495"}

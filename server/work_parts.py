@@ -226,6 +226,34 @@ def relabel_person(work_dir: str, person_id: str, new_label: str, username: str)
     return True
 
 
+def rebind_person(work_dir: str, source_id: str, target_id: str, target_label: str,
+                  username: str) -> bool:
+    """Isikute liitmine osade `creators`-is: source → target (#615).
+
+    Nagu `relabel_person` — `_write` kaudu, mitte otsekirjutusena. Tagastab False,
+    kui teose osades source'i ei ole.
+    """
+    try:
+        with open(os.path.join(work_dir, "_metadata.json"), encoding="utf-8") as f:
+            parts = json.load(f).get("parts") or []
+    except (OSError, ValueError):
+        return False
+    if not any(c.get("id") == source_id for p in parts for c in p.get("creators") or []):
+        return False
+
+    def mutate(current: list, _stems: list) -> tuple[list, bool]:
+        for p in current:
+            for c in p.get("creators") or []:
+                if c.get("id") == source_id:
+                    c["id"] = target_id
+                    if target_label:
+                        c["name"] = target_label
+        return current, True
+
+    _write(work_dir, username, f"Prosopo liitmine osades: {source_id} → {target_id}", mutate)
+    return True
+
+
 def _refresh_mention_parts(work_dir: str) -> None:
     """Mainimiste `part_ids` sõltub osade lehtedest → osa muutuse järel uuesti.
 

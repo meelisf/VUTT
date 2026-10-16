@@ -279,60 +279,81 @@ def _make_date_obj(year) -> dict:
     }
 
 
+class _AsyncTasks:
+    """`bulk_update_works`-i `background_tasks` liides: ainus ülesanne on
+    `sync_work_to_meilisearch_async`, mis on niigi asünkroonne — kutsume kohe.
+    Ilma selleta sünkiks bulk iga teose SÜNKROONSELT (sagedane autor = kümned teosed)."""
+
+    @staticmethod
+    def add_task(func, *args, **kwargs):
+        func(*args, **kwargs)
+
+
 def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> None:
-    """Uuendab teoste _metadata.json creator/tag/publisher labelid kui nimi muutus."""
-    # Import siin säilitab vana testitava käitumise: patch("server.config.BASE_DIR")
-    # ja patch("server.git_ops.save_with_git") mõjutavad seda helperit (vt
-    # _commit_propagated_names).
+    """Uuendab teoste _metadata.json creator/tag/publisher labelid kui nimi muutus.
+
+    Juurväljad `bulk_update_works` kaudu (#615): `metadata_lock` lugemisest
+    kirjutamiseni, üks commit, Meili sünk muutunud teostele. Varem kirjutati
+    faile otse ja samaaegne metaandmete salvestus läks kaduma.
+    """
+    import copy
     from ..config import BASE_DIR as data_dir
+    from ..metadata_ops import bulk_update_works
 
     sync_from_facade()
     if not os.path.exists(data_dir):
         return
 
-    changed_files = []
+    def _label_off(item) -> bool:
+        return isinstance(item, dict) and item.get("id") == person_id and item.get("label") != new_label
+
+    root_paths = []
     parts_dirs = []  # teosed, mille OSADES isik esineb (#526) — kirjutatakse work_parts kaudu
+    # Eelfilter luku VÄLJAS; tegelik muudatus käib värske koopia peal luku all.
     for work_entry in os.scandir(data_dir):
         if not work_entry.is_dir():
             continue
         meta_path = os.path.join(work_entry.path, "_metadata.json")
-        if not os.path.exists(meta_path):
-            continue
         try:
             with open(meta_path, encoding="utf-8") as f:
                 meta = json.load(f)
         except Exception:
             continue
-        changed = False
-        for c in meta.get("creators", []):
-            if not isinstance(c, dict) or c.get("id") != person_id:
-                continue
-            if c.get("label") == new_label and c.get("name") == new_label:
-                continue
-            c["label"] = new_label
-            c["name"] = new_label
-            changed = True
-        for t in meta.get("tags", []):
-            if not isinstance(t, dict) or t.get("id") != person_id:
-                continue
-            if t.get("label") == new_label:
-                continue
-            t["label"] = new_label
-            changed = True
-        pub = meta.get("publisher")
-        if isinstance(pub, dict) and pub.get("id") == person_id:
-            if pub.get("label") != new_label:
-                pub["label"] = new_label
-                changed = True
-        if changed:
-            changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
+        creators = meta.get("creators") or []
+        if (any(_label_off(c) or (isinstance(c, dict) and c.get("id") == person_id
+                                  and c.get("name") != new_label) for c in creators)
+                or any(_label_off(t) for t in meta.get("tags") or [])
+                or _label_off(meta.get("publisher"))):
+            root_paths.append(meta_path)
         if any(isinstance(c, dict) and c.get("id") == person_id
                for p in meta.get("parts") or [] if isinstance(p, dict)
                for c in p.get("creators") or []):
             parts_dirs.append(work_entry.path)
 
-    if changed_files:
-        _commit_propagated_names(person_id, new_label, username, changed_files)
+    def transform(meta: dict) -> dict:
+        updates = {}
+        creators = copy.deepcopy(meta.get("creators") or [])
+        if any(isinstance(c, dict) and c.get("id") == person_id for c in creators):
+            for c in creators:
+                if isinstance(c, dict) and c.get("id") == person_id:
+                    c["label"] = new_label
+                    c["name"] = new_label
+            updates["creators"] = creators
+        tags = copy.deepcopy(meta.get("tags") or [])
+        if any(isinstance(t, dict) and t.get("id") == person_id for t in tags):
+            for t in tags:
+                if isinstance(t, dict) and t.get("id") == person_id:
+                    t["label"] = new_label
+            updates["tags"] = tags
+        pub = meta.get("publisher")
+        if isinstance(pub, dict) and pub.get("id") == person_id:
+            updates["publisher"] = {**pub, "label": new_label}
+        return updates
+
+    if root_paths:
+        bulk_update_works([(p, transform) for p in root_paths], username,
+                          f"Prosopo nime uuendus ({person_id}): {new_label}",
+                          background_tasks=_AsyncTasks)
 
     # Osad muutuvad AINULT work_parts kaudu luku all (ADR 0057); see teeb ka
     # oma commiti ja Meili sünki. Üks vigane teos ei peata teisi.
@@ -342,21 +363,6 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
             work_parts.relabel_person(work_dir, person_id, new_label, username)
         except Exception as e:
             state.logger.warning("Osade nimeuuendus ebaõnnestus (%s): %s", work_dir, e)
-
-
-def _commit_propagated_names(person_id: str, new_label: str, username: str, changed_files: list) -> None:
-    from ..git_ops import save_with_git
-
-    commit_msg = f"Prosopo nime uuendus ({person_id}): {new_label}"
-    primary_path, primary_content = changed_files[0]
-    additional = changed_files[1:] if len(changed_files) > 1 else None
-    save_with_git(primary_path, primary_content, username,
-                  message=commit_msg, additional_files=additional)
-
-    from ..meilisearch_ops import sync_work_to_meilisearch_async
-    for meta_path, _ in changed_files:
-        dir_name = os.path.basename(os.path.dirname(meta_path))
-        sync_work_to_meilisearch_async(dir_name)
 
 
 def _apply_card_update(person: dict, data: dict, now: str) -> None:
