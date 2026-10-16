@@ -48,18 +48,23 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
    - *Lehe aadress* — normaliseeritud ja tsiteeritav (`246v`, `A4v`, `12`), ka
      lehtedele, millel endal midagi ei ole. Tuletatakse; käsitsi määratud
      aadress on **eraldi andmed koos päritoluga** (punkt 5), mitte tekst.
-2. **Kolm paaristägi** VUTT-i tägisüsteemis (`<i> <b> <cs> <m> <hi> <ann> <add>`
-   kõrval), atribuutideta, sisu täht-tähelt:
-   - `<fw>` — lehekülje- või foliatsiooninumber (TEI *forme work*);
-   - `<sig>` — poognasignatuur;
-   - `<catch>` — kustood.
+2. **Neli paaristägi** VUTT-i tägisüsteemis (`<i> <b> <cs> <m> <hi> <ann> <add>`
+   kõrval), atribuutideta, sisu täht-tähelt (terminid raamatukogusõnastikust):
+   - `<fw>` — lehenummerdus / leheküljenummerdus (TEI `fw type="pageNum"`);
+   - `<sig>` — signatuur (`fw type="sig"`);
+   - `<catch>` — siirdeviit, rööptermin kustos (`fw type="catch"`);
+   - `<rh>` — veerutiitel (`fw type="header"`; DTA `head`).
 
-   Üks täg kolme jaoks ei sobi: `B` ja `246` ei ole sisu järgi eristatavad, ja
+   Tähistus võib olla `<m>` sees, mitte vastupidi; tähistus ei sisalda tähistust.
+   Detailid: spekk `docs/superpowers/specs/2026-10-16-lehe-tahistus-tagid-design.md`.
+
+   Üks täg kõigi jaoks ei sobi: `B` ja `246` ei ole sisu järgi eristatavad, ja
    aadressi tuletus vajab teada, kumb on lehe number ja kumb signatuur. Lehel
    päriselt olevad nurksulud jäävad tägi sisse nagu muu tekst.
-3. **Otsingutekst.** `clean_text_for_search` eemaldab kõik kolm tägi **koos
-   sisuga** ja **enne** poolituste liitmist. Sisu läheb lehedokumendi eraldi
-   väljadesse (ainult `meili_doc.py`, ADR 0006).
+3. **Otsingutekst.** `clean_text_for_search` eemaldab tähistuse paarid **koos
+   sisuga** (tühi string, tähistus on teksti voos läbipaistev) ja **enne** poolituste
+   liitmist. Sisu läheb lehedokumendi **mitteotsitavasse** välja `page_marks`
+   (ainult `meili_doc.py`, ADR 0006); filtreeritav väli tuleb vajadusel spekiga 2.
 4. **Füüsiline lehekülg ja ankur.** Tuletuse ühik on füüsiline lehekülg, mitte
    pilt: pilt koos `<pb/>`-ga eraldatud tekstiosadega annab ühe või mitu füüsilist
    lehekülge, igaühel oma aadress. **Ankur** = füüsilise lehekülje `<fw>`/`<sig>`
@@ -121,9 +126,10 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
      käsitsi aadressi muutus. Arvutus **eelneb** Meili sünkile — praegu paneb
      `/save` sünki järjekorda enne mainimiste skanni (`editing.py` ~rida 237),
      aadressiga nii ei tohi.
-8. **Sisestus v1: ilma ettepanekuta.** Kiirklahv/nupp lisab tühja tägi (`<fw></fw>`,
-   `<sig></sig>`, `<catch></catch>`) ja paneb kursori sisse, nagu `wrapWithTag`;
-   valitud teksti ümber mähib. Ettepanekut ei tehta (kasutaja 2026-10-16):
+8. **Sisestus v1: ilma ettepanekuta.** Lohistatav alati nähtav paneel nelja nupuga
+   + kiirklahv `Ctrl/⌘+Shift+F` (menüü). Valikuta mähitakse kursori rida, valikuga
+   valik; tühjal real lisatakse tühi täg (spekk 1, katse 2026-10-16). Ankru
+   ettepanekut ei tehta (kasutaja 2026-10-16):
    - vaev on niigi väike — foliatsioonis ankur ainult rectol, verso tuletab server;
      signatuurid on harvad;
    - ettepanekufunktsioon on kõige erijuhurohkem osa (vajab ankrute liiki,
@@ -173,10 +179,11 @@ Laotusena pildistatud lehel (`[2v|1r]`) on ühes pildis kaks füüsilist lehte
 - Uus täg muudab samu kohti nagu ADR 0067: `VUTT_TAGS` (`VuttMarkupExtension.ts`,
   mark-dekoratsioon + `atomicRanges`, ADR 0044), `renderVuttMarkup.ts`,
   sanitiseerija ja `strip_empty_tags`, `cleanMarkup`, marginaalia normaliseerija
-  (täg ei tohi minna `<m>` sisse ega vastupidi — reegel spekis), transkribeerimisjuhendid.
+  (tähistus võib olla `<m>` sees, mitte vastupidi), transkribeerimisjuhendid,
+  tägide register (ADR 0071).
 - Server: `clean_text_for_search` (järjekord: tähistuse tägid enne poolituste
-  liitmist), `meili_doc.py` + `meili_settings.py` (filtreeritav väli
-  MÕLEMASSE loendisse), aadressi read-model + `rebuild`, tuletaja ja selle
+  liitmist), `meili_doc.py` (`page_marks`; filtreeritav väli spekis 2 — siis
+  `meili_settings.py` MÕLEMASSE loendisse), aadressi read-model + `rebuild`, tuletaja ja selle
   päästikud (enne Meili sünki), skeemi väli teose/osa metaandmetes.
 - Spekk vajab **mitut ülevaatust** enne teostust — puudutab redaktori
   invariante, otsinguteksti ja lehenumbreid muutvaid teid korraga.

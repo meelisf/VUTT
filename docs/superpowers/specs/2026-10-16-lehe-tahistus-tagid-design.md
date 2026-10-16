@@ -6,6 +6,8 @@ ettepanek), 0071 (uus: märgendus on TEI alamhulga lühisüntaks) · **Seotud:**
 ADR 0003/0009 (`<m>`), #526 (kirjad)
 
 **Ülevaatus:** spekk vajab enne plaani **mitut ülevaatusringi** (kasutaja nõue).
+1. ring 2026-10-16 sisse viidud (struktuurireeglid, paaride sidumine, tarbijapõhised
+lipud, poolitus üle tähistuse, TEI `header`, ADR 0070 ühtlustus).
 
 ## Probleem
 
@@ -31,7 +33,7 @@ seda.
 | `fw` | `fw type="pageNum"` | lehenummerdus / leheküljenummerdus | foliatsioon, paginatsioon | foliation / pagination |
 | `sig` | `fw type="sig"` | signatuur | — | signature |
 | `catch` | `fw type="catch"` | siirdeviit | kustos | catchword |
-| `rh` | `fw type="head"` | veerutiitel | (jooksev pealkiri — sõnastikus pole) | running head |
+| `rh` | `fw type="header"` | veerutiitel | (jooksev pealkiri — sõnastikus pole) | running head |
 
 **Lehe tähistus** = TEI `fw` (*forme work*): lehe kui füüsilise objekti tähistus, mitte
 teksti osa. **Ei ole marginaalia** — `<m>` on sisuline tekst veerisel.
@@ -75,7 +77,10 @@ puhas, märgitakse see ausalt erandina.
 | `annN` | ankur toimetaja märkusele (kontrollida: `anchor`/`span`) | jah | jah |
 | `fn` | viide joonealusele (kontrollida: `ref`/`note`) | jah | ei |
 | `pb` | `pb` | ise suletud | ei |
-| `fw` `sig` `catch` `rh` | `fw type="pageNum\|sig\|catch\|head"` | jah | **ei → `page_marks`** |
+| `fw` `sig` `catch` `rh` | `fw type="pageNum\|sig\|catch\|header"` | jah | **ei → `page_marks`** |
+
+`header` on TEI soovitatud väärtus ülaserva jooksvale pealkirjale; DTA kasutab `head`-i —
+mõlemad teisenduvad `<rh>`-ks.
 
 **Registrid.** Kaks, sama sisuga:
 
@@ -83,31 +88,52 @@ puhas, märgitakse see ausalt erandina.
 - `server/vutt_tags.py` — `VUTT_TAG_REGISTRY`
 
 Kirje: `name`, `tei`, `paired` (bool), `search` (`keep` | `drop` | `marginalia`),
-`pageMark` (bool; `pageMarkLabel` i18n-võti). Python ei loe frontendi puud: backendi
-image ei kanna `src/`-i.
+`pageMark` (bool; `pageMarkLabel` i18n-võti) ning **tarbijapõhised lipud**, mis teevad
+praegused erandid nähtavaks:
+
+| Lipp | Tarbija | Praegused erandid |
+|---|---|---|
+| `marginaliaInline` | `marginalia_normalize._INLINE` | `m` ei ole (ta on ise välimine) |
+| `stripEmpty` | `marginalia_normalize._EMPTY_RE` | `annN`, `fn`, `pb` ei ole |
+| `cleanMarkup` (`remove` \| `keep`) | `cleanMarkup` regex | `annN` = `keep` (annotatsioon säilib) |
+| `wrapBlock` | `wrapTagUtils` plokitägid | ainult `m hi add fn` (+ neli uut) |
+
+Python ei loe frontendi puud: backendi image ei kanna `src/`-i.
 
 **Kes tarbib registrit otse (uus kood):** `clean_text_for_search` tähistuse samm,
 `page_marks`, `renderVuttMarkup` lubatud tägid, paneel/menüü. **Kordusloendid jäävad
 paigale** (`VUTT_TAGS` redaktoris, `marginalia_normalize._INLINE` ja `_EMPTY_RE`,
 `cleanMarkup` regex `useEditorFormattingActions.ts`, `wrapTagUtils` plokitägid) — neid
-valvab paarsustest (osa 4). Koondamine registrisse on eraldi koristus, kui lihtne, ka
-siin.
+valvab paarsustest (osa 4): iga loend **võrdub** registrist tuletatud tarbija
+alamhulgaga, mitte „kõik nimed kõikjal". Koondamine registrisse on eraldi koristus, kui
+lihtne, ka siin.
 
 ### 2. Server
 
 **`clean_text_for_search`** (`server/meili_doc.py`). Uus alamsamm **sammu 1 algusesse**,
 enne `<fn>`/`<pb/>` asendust, üldist tägieemaldust ja poolituste liitmist:
+**tähistuse paarid eemaldatakse koos sisuga, asendus = tühi string**.
 
-```
-<(fw|sig|catch|rh)>[\s\S]*?</\1>   →   "\n"      # nimed registrist, pageMark=true
-```
+- **Paarid, mitte regex.** Tägid seotakse paarideks nagu `findOrphanTags` (pinu); eemaldatakse
+  iga **välimine** tähistuse paar koos kõigega, mis tema sees on (ka teised tähistused —
+  `<sig>A <sig>ij</sig> muu</sig>` → kaob tervikuna). **Paarita** tähistuse täg on tavaline
+  täg: täg kaob, sisu jääb otsingusse — muidu kaotaks üks orv `<sig>` lehe ülejäänud teksti.
+- **Tühi string, mitte reavahetus:** ümbritsev tühik/reavahetus jääb nagu originaalis.
+  Tähistus on teksti voos **läbipaistev** — poolitus liitub üle eemaldatud tähistuse
+  täpselt siis, kui originaalis oli poolituse järel reavahetus. See on õige: tähistus ei ole
+  tekst, sõna jätkub temast edasi. Kontrollitud 2026-10-16 praeguse funktsiooniga:
 
-- Reavahetus (mitte tühik): eelnev `…dem⸗` ei liitu järgnevaga üle eemaldatud tähistuse
-  rohkem kui praegu; signatuur ei kleepu kunagi. Näide: `Ehrwür⸗\n<sig>A ij</sig>` →
-  `Ehrwür` (märgendamata siirdeviida poolitus ripub, aga ei kleepu);
-  `<catch>Ehrwür⸗</catch>\n<sig>A ij</sig>` → mõlemad kadunud.
+  | Sisend | Tulemus |
+  |---|---|
+  | `1. Cor. 1.` ⏎ `<catch>Ehrwür⸗</catch>` ⏎ `<sig>A ij</sig>` | `1. Cor. 1.` |
+  | `Ehrwür⸗` ⏎ `<sig>A ij</sig>` (siirdeviit märgendamata) | `Ehrwür` (ripub, ei kleepu) |
+  | `dem⸗` ⏎ `<sig>A ij</sig>` ⏎ `Wort` | `demWort` (sõna jätkub) |
+  | `dem⸗<sig>A ij</sig> Wort` (ühel real) | `dem⸗ Wort` (reavahetust pole → ei liitu) |
+
+  (Asendus reavahetusega oleks viimase muutnud `demWort`-iks — uus liitmine, mida
+  originaalis ei olnud.)
 - Tähistuse sees võivad olla tavalised tägid (`<catch><i>Vor⸗</i></catch>`) — sisu kaob
-  tervikuna. Sama liigi pesastust ei ole.
+  tervikuna.
 - Kehtib kõigile tarbijatele: `lehekylje_tekst`, `lehekylje_tekst_ann` (`keep_ann`),
   `marginaalia_tekst` (tähistus `<m>` sees), kirjaindeksi `letter_text` (ehitatakse
   lehedokumentidest).
@@ -128,11 +154,16 @@ olev:
   `meili_settings.py` ei muutu. Meili tagastab vaikimisi.
 - Kirjaindeks (`kirjad`) `page_marks`-i ei saa (spekk 2 otsustab osa ulatuse).
 
-**Normaliseerija** (`server/marginalia_normalize.py`):
+**Normaliseerija** (`server/marginalia_normalize.py`, kutsutakse KÕIGIS kirjutusteedes):
 
 - `strip_empty_tags` komplekt + `fw sig catch rh` → tühi `<sig></sig>` kaob salvestusel.
 - `_INLINE` + needsamad: `<m>` jääb välimiseks, tähistus võib olla `<m>` sees (OCR võib
-  veerise ploki sisse panna ka nurga foliatsiooninumbri).
+  veerise ploki sisse panna ka nurga foliatsiooninumbri), **mitte vastupidi**.
+- **Uus: tähistus ei sisalda tähistust.** Välimise tähistuse paari sees olevad tähistuse
+  tägid (mis tahes liik) eemaldatakse, sisu jääb. Kehtib igale kirjutatavale tekstile —
+  ka kleebitud, imporditud ja OCR-ist tulnud. Nii on „pesastust ei ole" kontrollitav
+  invariant (test: normaliseeritud tekstis ei ole tähistust tähistuse sees);
+  otsingupuhastus ei sõltu sellest (vt ülal, välimine paar).
 
 **Olemasolev korpus:** migratsiooni ja täisreindeksit ei ole. Märgendamata lehtedel jääb
 tähistus põhiteksti nagu praegu; `page_marks` tekib iga lehe järgmisel sünkil (tühjana).
@@ -141,11 +172,18 @@ tähistus põhiteksti nagu praegu; `page_marks` tekib iga lehe järgmisel sünki
 
 **Tegevus `wrapPageMark(kind)`** (uus, `components/editor/`):
 
-- valik olemas → mähi valik;
-- **valikut pole → mähi kursori rida**, äärmised tühikud välja jäetud;
-- vahemik on juba tähistuse täg: **sama liik → eemalda, teine liik → vaheta**;
-- tühi rida → lisa `<kind></kind>`, kursor sisse;
-- tehing `userEvent: 'input.format'` (filtrid lasevad läbi, `wrapWithTag` muster).
+- **Sihtvahemik:** valik; valikuta kursori rida, äärmised tühikud välja jäetud. Kui kursor
+  on `<m>` ploki sees, piirdub rida ploki sisuga.
+- **Olemasolev tähistus:** kui kursor või vahemik puudutab tähistuse paari, tegutseb käsk
+  **terve paari** peal — sama liik → eemalda, teine liik → vaheta. Vahemik, mis puudutab
+  **mitut** tähistust → keeldu.
+- **Keeldumine** (tekst ei muutu, paneelis/menüüs lühike vihje): vahemik sisaldab
+  `<pb/>`-d (tähistus ei ületa lehevahetust; muidu saaks `page_marks` kahe lehekülje kohta
+  ühe kirje); vahemik ületab `<m>` ploki piiri või sisaldab peidetud marginaaliaplokki.
+- **Ristuv vormindus:** kui vahemik lõikab `<i>`/`<b>`/… paari pooleks, laiendatakse see
+  tasakaalus vahemikuks (`wrapTagUtils` `balancedCut`, sama mis `wrapWithTag`).
+- Tühi rida → lisa `<kind></kind>`, kursor sisse.
+- Tehing `userEvent: 'input.format'` (filtrid lasevad läbi, `wrapWithTag` muster).
 
 **Paneel** (uus komponent, Workspace'i redaktori konteineris):
 
@@ -204,14 +242,21 @@ pytest:
 - `page_marks`: järjekord, `seg`, tühi list, tühi sisu välja, tühikud, täht-täheline
   sisu, `<m>` sees.
 - `strip_empty_tags` ja `normalize_marginalia_tags` uute tägidega.
-- **Paarsustest:** TS- ja Pythoni register samad (nimi, TEI, lipud); iga registri täg on
-  olemas `VUTT_TAGS`-is, `_INLINE`/`_EMPTY_RE`-s (paaristäg), `cleanMarkup` regexis,
-  `renderVuttMarkup` lubatud nimekirjas.
+- `clean_text_for_search` lisaks: tähistusele järgnev põhitekst (tabeli neli juhtu);
+  pesastatud tähistus (välimine kaob tervikuna); paarita tähistus (sisu jääb).
+- Normaliseerija: tähistus tähistuse sees → sisemine täg eemaldatud; idempotentne.
+- **Paarsustest:** TS- ja Pythoni register samad (nimi, TEI, kõik lipud); iga
+  tarbijaloend (`VUTT_TAGS`, `_INLINE`, `_EMPTY_RE`, `cleanMarkup` regex, `wrapTagUtils`
+  plokitägid, `renderVuttMarkup` lubatud nimekiri) **võrdub** registrist lipu järgi
+  tuletatud alamhulgaga — erandid on registris, mitte testis.
 
 vitest:
 
 - `wrapPageMark`: rida ilma valikuta, valik, eemaldamine, vahetus, tühi rida, tehingu
-  `userEvent`.
+  `userEvent`; kursor tähistuse sees → terve paar; mitu tähistust → keeldumine; `<pb/>`
+  vahemikus → keeldumine; ristuv `<i>` → laiendus; kursor avatud `<m>` plokis → ainult
+  ploki sisu; peidetud marginaaliaplokk vahemikus → keeldumine (`marginaliaProtectionFilter`
+  ei tohi poolikut muudatust jätta).
 - Redaktori dekoratsioonid + `atomicRanges` uutel tägidel (`vuttMarkupAdd.test.ts`
   muster).
 - `renderVuttMarkup`.
@@ -222,8 +267,10 @@ vitest:
 **Dokumendid.**
 
 - ADR 0071 (uus) + register `docs/decisions/README.md`.
-- ADR 0070: terminid (siirdeviit, veerutiitel, lehenummerdus/leheküljenummerdus),
-  viide spekile.
+- ADR 0070 sisuline ühtlustamine: neli tägi (+`rh`), tähistus võib olla `<m>` sees
+  (mitte vastupidi), spekk 1 väli on mitteotsitav `page_marks` (filtreeritav väli kuulub
+  vajadusel spekki 2), sisestus = rea mähkimine + paneel, TEI `header`, terminid; viide
+  spekile.
 - Transkribeerimisjuhend `public/transcription_guide.html` + `_en.html`: jaotis
   „Lehe tähistus", näited `lzogr0` lk 3–5 ja `04na2fu4` lk 3, reegel „funktsiooni järgi",
   siirdeviida poolitusmärk jääb tägi sisse.
@@ -244,8 +291,8 @@ vitest:
   lehed ei muutu. Kuivkäivitus: `clean_text_for_search` vana vs uus kogu korpuse peal
   peab andma **null erinevust** (keegi pole veel märgendanud) — kinnitab, et samm ei
   puuduta midagi muud (vt `feedback_salvestusreegel_kuivkaivitus`).
-- **Regex ja sama nimega tekst:** `<fw>` jne on ainult VUTT-i märgendus; toores `<` on
-  muu tekstina escape'itud (`renderVuttMarkup`). Pesastamata non-greedy muster eeldab,
-  et sama liiki tähistus ei ole iseenda sees.
+- **Sama nimega tekst:** `<fw>` jne on ainult VUTT-i märgendus; toores `<` on muu
+  tekstina escape'itud (`renderVuttMarkup`). Pesastus ja orvud on käsitletud paaride
+  sidumisega (osa 2), mitte eeldusega.
 - **Paneel varjab teksti** — lohistatav ja suletav; vaikimisi asukoht valitakse nii, et
   esimene rida jääb nähtavaks.
