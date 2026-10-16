@@ -130,8 +130,36 @@ DIRECTORY = BASE_DIR
 # =========================================================
 
 
+# Esilehe vahemälu (#419): {work_path: (signatuur, esimene pilt)}. Järjestus tuleb
+# lehtede JSON-ide `sequence`-ist; 1000 lehega teosel on see 1000 JSON-i parsimist
+# iga kaane päringu kohta. Signatuur = piltide nimed + kõrval-JSON-ide mtime: lisamine
+# ja kustutamine muudavad nimehulka, iga järjestuse muutus kirjutab JSON-i. stat on
+# odav, parsimine mitte. Protsessi-lokaalne (pildiserver on oma protsess).
+_FIRST_IMAGE_CACHE = {}
+
+
+def _page_json_mtime(img_path):
+    try:
+        return os.stat(os.path.splitext(img_path)[0] + '.json').st_mtime_ns
+    except OSError:
+        return None
+
+
+def _sequence_sort_key(img_path):
+    """Sorteeri sequence välja järgi (kui olemas), muidu failinime järgi."""
+    json_path = os.path.splitext(img_path)[0] + '.json'
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            seq = json.load(f).get('sequence')
+        if seq is not None:
+            return (0, int(seq), os.path.basename(img_path).lower())
+    except Exception:
+        pass
+    return (1, 0, os.path.basename(img_path).lower())
+
+
 def get_first_image(work_path):
-    """Leiab esimese pildi teose kataloogist (sorteeritud tähestikuliselt).
+    """Leiab teose esimese lehe pildi (`sequence` järgi, muidu failinime järgi).
 
     Ignoreerib _thumb_*.jpg ja muud _ algusega faile.
     Toetab JPG ja PNG formaate.
@@ -144,21 +172,17 @@ def get_first_image(work_path):
     images = [f for f in all_images if not os.path.basename(f).startswith('_')]
 
     if not images:
+        _FIRST_IMAGE_CACHE.pop(work_path, None)
         return None
 
-    # Sorteeri sequence välja järgi (kui olemas), muidu failinime järgi
-    def sort_key(img_path):
-        json_path = os.path.splitext(img_path)[0] + '.json'
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                seq = json.load(f).get('sequence')
-            if seq is not None:
-                return (0, int(seq), os.path.basename(img_path).lower())
-        except Exception:
-            pass
-        return (1, 0, os.path.basename(img_path).lower())
+    signature = hash(tuple(sorted(
+        (os.path.basename(p), _page_json_mtime(p)) for p in images)))
+    cached = _FIRST_IMAGE_CACHE.get(work_path)
+    if cached and cached[0] == signature:
+        return cached[1]
 
-    images.sort(key=sort_key)
+    images.sort(key=_sequence_sort_key)
+    _FIRST_IMAGE_CACHE[work_path] = (signature, images[0])
     return images[0]
 
 
@@ -268,9 +292,9 @@ def generate_cover(source_path, cover_path):
                                   COVER_QUALITY, 'THUMB')
 
 
-def get_or_create_og_image(work_path):
+def get_or_create_og_image(work_path, first_image=None):
     """Tagastab teose cache'itud jagamispildi, genereerides selle vajadusel."""
-    first_image = get_first_image(work_path)
+    first_image = first_image or get_first_image(work_path)
     if not first_image:
         return None
 
@@ -293,7 +317,7 @@ def get_or_create_og_image(work_path):
     return output_path
 
 
-def get_or_create_thumbnail(work_path):
+def get_or_create_thumbnail(work_path, first_image=None):
     """Tagastab teose dashboardi-kaanepildi tee, genereerides selle vajadusel.
 
     Kaas on OMA variant (`_cover_v{N}_NIMI.jpg`, COVER_BOX/COVER_QUALITY), mitte
@@ -304,12 +328,13 @@ def get_or_create_thumbnail(work_path):
 
     Args:
         work_path: Teose kataloog
+        first_image: juba leitud esileht (handler leiab selle niikuinii)
 
     Returns:
         Kaanepildi failitee või None kui genereerimine ebaõnnestus
     """
     # 1. Leia praegune esimene leht
-    first_image = get_first_image(work_path)
+    first_image = first_image or get_first_image(work_path)
     if not first_image:
         print(f"[THUMB] Kataloogis pole pilte: {work_path}")
         return None
@@ -462,8 +487,8 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
                     not _is_safe_image_path(os.path.join(thumbs_dir, 'check.jpg'), work_dir)):
                 self.send_error(403, "Keelatud")
                 return
-            image_path = (get_or_create_thumbnail(work_dir) if parts[1] == '_thumb'
-                          else get_or_create_og_image(work_dir))
+            image_path = (get_or_create_thumbnail(work_dir, first_image) if parts[1] == '_thumb'
+                          else get_or_create_og_image(work_dir, first_image))
         elif (len(parts) == 3 and parts[1] == '_thumbs' and
               parts[2].startswith('_thumb_') and
               not parts[2][len('_thumb_'):].startswith(('.', '_')) and

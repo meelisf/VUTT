@@ -295,3 +295,73 @@ def test_check_image_access_allows_shareable_without_token():
     from server.image_server import _check_image_access
     meta = {"id": "syktl7", "collections": ["col-restricted"], "shareable": True}
     assert _check_image_access("syktl7", meta, "") is True
+
+
+# --- #419: esilehe valik ei loe valmis teosel kõigi lehtede JSON-e ---
+
+def _sequence_work(tmp_path, n):
+    import json
+    from PIL import Image
+    work = tmp_path / "teos"
+    work.mkdir()
+    for i in range(n):
+        Image.new("RGB", (40, 60), "white").save(work / f"p{i:04d}.jpg")
+        (work / f"p{i:04d}.json").write_text(json.dumps({"sequence": (n - i) * 100}))
+    return work
+
+
+def _count_json_opens(monkeypatch):
+    import builtins
+    opened = []
+    real_open = builtins.open
+
+    def counting_open(file, *args, **kwargs):
+        if str(file).endswith(".json"):
+            opened.append(str(file))
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", counting_open)
+    return opened
+
+
+def test_esileht_korduspaering_ei_loe_jsone(tmp_path, monkeypatch):
+    from server.image_server import get_first_image
+    work = _sequence_work(tmp_path, 50)
+    assert os.path.basename(get_first_image(str(work))) == "p0049.jpg"  # väikseim sequence
+    opened = _count_json_opens(monkeypatch)
+    assert os.path.basename(get_first_image(str(work))) == "p0049.jpg"
+    assert opened == []
+
+
+def test_esileht_jarjestuse_muutus_vahetab_esilehe(tmp_path):
+    import json
+    from server.image_server import get_first_image
+    work = _sequence_work(tmp_path, 5)
+    assert os.path.basename(get_first_image(str(work))) == "p0004.jpg"
+    path = work / "p0002.json"
+    path.write_text(json.dumps({"sequence": 1}))
+    st = os.stat(path)
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))  # sama-tiksu kirjutus
+    assert os.path.basename(get_first_image(str(work))) == "p0002.jpg"
+
+
+def test_esileht_kustutamine_ja_lisamine(tmp_path):
+    import json
+    from PIL import Image
+    from server.image_server import get_first_image
+    work = _sequence_work(tmp_path, 5)
+    os.remove(work / "p0004.jpg")
+    os.remove(work / "p0004.json")
+    assert os.path.basename(get_first_image(str(work))) == "p0003.jpg"
+    Image.new("RGB", (40, 60), "white").save(work / "uus.jpg")
+    (work / "uus.json").write_text(json.dumps({"sequence": 0}))
+    assert os.path.basename(get_first_image(str(work))) == "uus.jpg"
+
+
+def test_kaas_korduspaering_ei_loe_jsone(tmp_path, monkeypatch):
+    from server.image_server import get_or_create_thumbnail
+    work = _sequence_work(tmp_path, 20)
+    first = get_or_create_thumbnail(str(work))
+    opened = _count_json_opens(monkeypatch)
+    assert get_or_create_thumbnail(str(work)) == first
+    assert opened == []

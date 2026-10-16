@@ -30,10 +30,10 @@ osaliselt aegunud või ekslikud (vt veerg „Märkus").
 | **O16-10** registreerimine / reset | #619 / PR #625 | **Tehtud** | Registreerimise loe–muuda–kirjuta luku all. Reseti pool oli **juba atomaarne** (`_validate_and_consume_token`) — ülevaate väide aegunud. |
 | **O16-11** p1 viimane leht jääb indeksisse | #617 / PR #622 | **Tehtud** | |
 | **O16-11** p2 alamkogu nähtavus | #617 / PR #627 | **Tehtud + ADR 0069** | Tooteotsus: privaatse kogu alamkogu on privaatne; arvutus ainult `server/collection_tree.py`. |
-| **O16-11** p3 kaanepilt (= R24-06) | #419 | **LAHTI** | Ainus avatud R24 leid. |
+| **O16-11** p3 kaanepilt (= R24-06) | #419 / PR (fix/kaanepilt-419) | **Tehtud** | Esilehe vahemälu signatuuriga (piltide nimed + JSON-ide mtime): korduspäring ei parsi JSON-e. Mõõdetud 1000 lk: külm 23 ms → soe 5 ms (jääb `glob` + `stat`). Ülevaate väide „välistab `strikethrough` lehed" oli vale — JSON-e loeti `sequence` järjestuse pärast. |
 | **O16-12** GND / VIAF / ADA sisend | #619 / PR #625 | **Tehtud** | |
 | **O16-13** p2 username-preview rate-limit | PR #620 | **Tehtud** | |
-| **O16-13** p1 nginx `vutt_auth` `/reset/*` | — | **Tegemata, teadlikult** | Mõlemal reset-teel on rakenduse `check_rate_limit`; nginxi laiendus oleks ainult lisakiht. Võib teha järgmise nginx-muudatusega kaasa. |
+| **O16-13** p1 nginx `vutt_auth` `/reset/*` | PR (fix/kaanepilt-419) | **Tehtud** | `reset/validate` ja `reset/set-password` range tsooni alla; rakenduse `check_rate_limit` oli juba olemas. |
 | **O16-14** p1 prügikast | #619 / PR #625 | **Tehtud** | |
 | **O16-14** p2 `replace_work_content` lukk | #619 / PR #625, #626 / PR #628 | **Tehtud + leitud lisaviga** | Luku järel selgus, et asendus ei kutsunud `refresh_work_mentions`-it (ADR 0055) → #626, parandatud. |
 | **O16-14** p3 `user_settings_ops` | — | **Tagasi lükatud** | `username` tuleb sessioonist, mitte kliendilt → tee-süst ei ole võimalik; võidujooks ainult sama kasutaja kahe tabi vahel. |
@@ -46,8 +46,9 @@ Kõrvalt samal päeval: **#612** (lehe teksti liitmine ridade kaupa + kokkupõrk
 dialoog, PR #614) — ei ole selle ülevaate leid, aga puudutab sama
 `page_merge.py` pinda.
 
-**Lahti jääb:** #419 (kaanepilt, R24-06); S27-05 (konteinerite õigused,
-osaline) ja S27-07 SSH (ootab IT-d) varasemast; väike jääk O16-13 p1 ilma issue'ta.
+**Lahti jääb:** ainult IT-ga arutatav — S27-05 jääk (teenusekasutajad,
+read-only korpus) ja S27-07 (SSH parooliautentimine, tulemüür). Koodipoolseid
+lahtisi leide selles ülevaates ei ole.
 
 ---
 
@@ -80,9 +81,9 @@ Leitud uued või avatud kitsaskohad on tähistatud koodidega **`O16-01` .. `O16-
 | **S27-02** | `/work/{work_id}/download` ja `/work-Archive` puuduv ligipääsukontroll | **Parandatud** | `download-ticket` (`server/routers/public.py:92-199`) ja `can_read_work` (`server/routers/pages.py:42-46`). |
 | **S27-03** | Pika elueaga Meilisearchi tenant-tokenid | **Leevendatud** | Autentitud tokeni TTL on 15 min (`server/routers/auth.py:35`). |
 | **S27-04** | `client-error` logimürgitamine ja tokenite leke logisse | **Parandatud** | `src/utils/scrubSensitive.ts` ja `server/routers/client_errors.py:61-127`. |
-| **S27-05** | Konteinerite liigsed õigused (`root`, SSH võti, `MEILI_MASTER_KEY`) | **Osaliselt parandatud** | `no-new-privileges:true`, eraldi `~/.ssh/vutt_ocr_ed25519`, `vutt-images` ilma `MEILI_MASTER_KEY`-ta (`docker-compose.yml:22-67`). |
+| **S27-05** | Konteinerite liigsed õigused (`root`, SSH võti, `MEILI_MASTER_KEY`) | **Osaliselt parandatud** | `no-new-privileges:true`, eraldi `~/.ssh/vutt_ocr_ed25519`, `vutt-images` ilma `MEILI_MASTER_KEY`-ta (`docker-compose.yml:22-67`). Jääk (teenusekasutajad, read-only korpus pildiserverile) — IT-ga arutada. |
 | **S27-06** | `paramiko.AutoAddPolicy()` SSH MITM risk | **Parandatud** | `verify_host_key` (`server/upload/ocr_client.py:25-50`). |
-| **S27-07** | Kuupäevafiltri indeksiviga `/admin/registrations` otspunktis | **Eemaldatud** | Katkine filtreerimine eemaldati. |
+| **S27-07** | Hosti võrgupiirid (SSH parooliautentimine, UFW) | **Avatud — IT-ga arutada** | Vt `2026-09-27` ülevaade; `badmin`-konto ligipääsuviis teadmata. (Ülevaate algne rida kirjeldas siin ekslikult kuupäevafiltrit.) |
 
 ---
 
@@ -431,7 +432,7 @@ Muuta `registrations_lock = threading.RLock()` ja hoida `with registrations_lock
 
 ## 5. Soovitatav tööjärjekord (tegevusplaan)
 
-Seis: vt jaotis 0 (`[x]` tehtud, `[~]` osaliselt — samm 7: #419; samm 8: nginx `/reset/*`). Allolev kontrollnimekiri on järjestatud nii, et iga samm on iseseisvalt testitav ja kommititav:
+Seis: vt jaotis 0 (`[x]` tehtud, kõik tehtud). Allolev kontrollnimekiri on järjestatud nii, et iga samm on iseseisvalt testitav ja kommititav:
 
 - [x] **Samm 1 (O16-01):** Kaitsta `apply_enrichment` (`server/prosopography/person_crud.py:603-654`) süsteemiväljade ülekirjutamise eest + lisada `name.label` muutumisel nime propagatsioon.
 - [x] **Samm 2 (O16-02):** Lisada `commit_hash` hex-SHA valideerimine (`server/git_ops.py:642, 696`), piirata `_catalog_from_filepath` täpselt 2 segmendile (`server/routers/editing.py:80-90`) ning kontrollida `commit_hash` kuulumist faili ajalukku `git_restore_endpoint` ja `person_restore` sees.
@@ -439,5 +440,5 @@ Seis: vt jaotis 0 (`[x]` tehtud, `[~]` osaliselt — samm 7: #419; samm 8: nginx
 - [x] **Samm 4 (O16-04):** Ühtlustada `person_aliases.json` lukk (`server/people_ops.py:13`), parandada `work_part_proposals.py` lukustus ja rida 428 `override` viga ning lisada `_merge_person_locked` sisse `parts[].creators` uuendus ja `metadata_lock`.
 - [x] **Samm 5 (O16-05, O16-06):** Tõsta handoff-koodi kontroll `enrichment_proposals.submit` ja `work_part_proposals.submit` algusesse ning tühistada kasutaja handoff-koodid kasutaja kustutamisel / rolli muutmisel.
 - [x] **Samm 6 (O16-07, O16-08):** Parandada Meilisearchi filtri-stringide ekraniseerimine (`mcp/vutt_mcp/queries.py`, `src/utils/filterUtils.ts`, `src/services/selectionFilter.ts`, `src/services/searchService.ts`, `server/meilisearch_ops.py`, `server/routers/upload.py`) ja `canonical_id` kasutus `get_viewer_token` sees (`server/routers/public.py:63-86`).
-- [~] **Samm 7 (O16-09, O16-10, O16-11):** Parandada MCP `search_pages` pagineerimine, `registration.py` lukustus, `meilisearch_ops.py` tühja teose lehekülgede kustutamine ja `image_server.py` kaanepildi vahemälu kontroll (**R24-06**).
-- [~] **Samm 8 (O16-12 .. O16-17):** Süvakaitse ja hooldustööd (GND/VIAF/ADA valideerimine, Nginxi `vutt_auth` laiendamine `/reset/*` peale, `trash_ops.py` / `user_settings_ops.py` valideerimine, `work_part_proposals.db` `0o644` õigused, `dangerouslySetInnerHTMLGuard.test.ts` laiendamine ja dokumentatsiooni uuendamine).
+- [x] **Samm 7 (O16-09, O16-10, O16-11):** Parandada MCP `search_pages` pagineerimine, `registration.py` lukustus, `meilisearch_ops.py` tühja teose lehekülgede kustutamine ja `image_server.py` kaanepildi vahemälu kontroll (**R24-06**).
+- [x] **Samm 8 (O16-12 .. O16-17):** Süvakaitse ja hooldustööd (GND/VIAF/ADA valideerimine, Nginxi `vutt_auth` laiendamine `/reset/*` peale, `trash_ops.py` / `user_settings_ops.py` valideerimine, `work_part_proposals.db` `0o644` õigused, `dangerouslySetInnerHTMLGuard.test.ts` laiendamine ja dokumentatsiooni uuendamine).
