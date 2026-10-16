@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ChangeSet } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { Annotation, Page, PageStatus, TextAnnotation } from '../../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
@@ -7,8 +8,8 @@ import { replyToComment } from '../../services/pageService';
 import { pageSwapAnnotation } from './editorAnnotations';
 import { savedStateAfterRestore, type RestoreResult } from './pageRestore';
 import {
-  PageConflictError, baseFromSavedState, retryBase,
-  type PageFields, type SaveOutcome,
+  PageConflictError, annotationsForText, assembleChunks, baseFromSavedState, minimalTextChange, retryBase,
+  type ChunkChoice, type PageFields, type SaveOutcome,
 } from './pageConflict';
 
 export interface EditorSavedState {
@@ -108,7 +109,20 @@ export function useEditorSave({
       afterSave?.();
       if (merged) {
         // Server liitis vahepealse ketta seisu (#455): see ON nüüd salvestatud
-        // seis. Tekst jõuab redaktorisse Workspace `page` kaudu (useEditorState).
+        // seis. Tekst pannakse redaktorisse SIIN — Workspace `page` kaudu see
+        // ei jõuaks: `keepEditorText` näeb sissetulevat = salvestatud teksti ja
+        // peab redaktori sisu salvestamata tööks (#612). Kui kasutaja trükkis
+        // salvestuse ajal edasi, kaardistatakse serveri muudatus tema omade
+        // peale: muidu kaoks kas tema trükitu või järgmine Ctrl+S kirjutaks
+        // teise toimetaja read üle.
+        const view = viewRef.current;
+        const saadetud = updatedPage.text_content;
+        const editorText = view ? view.state.doc.toString() : saadetud;
+        if (view && merged.text_content !== saadetud) {
+          const serveri = ChangeSet.of(minimalTextChange(saadetud, merged.text_content), saadetud.length);
+          const vahepeal = ChangeSet.of(minimalTextChange(saadetud, editorText), saadetud.length);
+          view.dispatch({ changes: serveri.map(vahepeal), annotations: pageSwapAnnotation.of(true) });
+        }
         setComments(merged.comments);
         setTextAnnotations(merged.text_annotations);
         setPageTags(merged.page_tags);
@@ -119,6 +133,8 @@ export function useEditorSave({
           page_tags: merged.page_tags,
           text_annotations: merged.text_annotations,
         });
+        setIsDirty(editorText !== saadetud);
+        return true;
       } else {
         setSavedState({ ...nextSaved, text: updatedPage.text_content });
       }
@@ -137,7 +153,7 @@ export function useEditorSave({
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [formatSaveError, onSave, setComments, setIsDirty, setIsSaving, setPageTags, setSaveError, setSavedState, setTextAnnotations]);
+  }, [formatSaveError, onSave, setComments, setIsDirty, setIsSaving, setPageTags, setSaveError, setSavedState, setTextAnnotations, viewRef]);
 
   /** „Salvesta minu versioon": konfliktis üksustes võidab minu seis, teiste muudatused mujal jäävad. */
   const resolveConflictKeepMine = useCallback(async (): Promise<boolean> => {
@@ -179,7 +195,43 @@ export function useEditorSave({
     });
   }, [onPageRestored, pageConflict, setComments, setIsDirty, setPageTags, setSavedState, setTextAnnotations, viewRef]);
 
+  /**
+   * Tükkide kaupa lahendus (#612): kokku pandud tekst läheb redaktorisse
+   * SALVESTAMATA — kasutaja kontrollib ja salvestab ise. Baas = vana baas, kus
+   * konfliktsed üksused on serveri omad: järgmisel Ctrl+S-il võidab nendes
+   * redaktori seis, teiste muudatused mujal liidetakse edasi.
+   */
+  const resolveConflictWithChoices = useCallback((choices: ChunkChoice[]) => {
+    const c = pageConflict;
+    const chunks = c?.error.textChunks;
+    if (!c || !chunks) return;
+    setPageConflict(null);
+    const cur = c.error.current;
+    const tekst = assembleChunks(chunks, choices);
+    const view = viewRef.current;
+    if (view) {
+      const praegu = view.state.doc.toString();
+      if (praegu !== tekst) {
+        view.dispatch({ changes: minimalTextChange(praegu, tekst), annotations: pageSwapAnnotation.of(true) });
+      }
+    }
+    setTextAnnotations(annotationsForText(
+      tekst, c.updatedPage.text_annotations || [], cur.text_annotations, c.updatedPage.text_content,
+    ));
+    const { text_content: baasTekst, ...baas } = retryBase(c.base, cur, c.error.fields);
+    setSavedState({ ...baas, text: baasTekst });
+    setIsDirty(true);
+  }, [pageConflict, setIsDirty, setSavedState, setTextAnnotations, viewRef]);
+
   const cancelConflict = useCallback(() => setPageConflict(null), []);
+
+  // Stabiilne identiteet: dialoog lähtestab valikud uue kokkupõrke peale.
+  const conflictView = useMemo(() => (pageConflict ? {
+    fields: pageConflict.error.fields,
+    current: pageConflict.error.current,
+    textChunks: pageConflict.error.textChunks,
+    theirsLast: pageConflict.error.theirsLast,
+  } : null), [pageConflict]);
 
   const handleSave = useCallback(async (): Promise<boolean> => {
     const updatedPage = makePage(comments, textAnnotations);
@@ -279,7 +331,8 @@ export function useEditorSave({
     handleCommentsRestored,
     handlePageRestored,
     handleReplyToComment,
-    pageConflict: pageConflict ? { fields: pageConflict.error.fields, current: pageConflict.error.current } : null,
+    pageConflict: conflictView,
+    resolveConflictWithChoices,
     resolveConflictKeepMine,
     resolveConflictTakeTheirs,
     cancelConflict,

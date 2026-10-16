@@ -667,15 +667,29 @@
   "conflict": {
     "title": "Lehte muudeti vahepeal",
     "message": "Keegi muutis sama lehte pärast seda, kui sa selle avasid. Neid muudatusi ei saa automaatselt liita:",
-    "takeTheirsHint": "„Võta serveri versioon” kopeerib sinu teksti enne lõikelauale.",
+    "takeTheirsHint": "„Loobu minu muudatustest” kopeerib sinu teksti enne lõikelauale.",
     "keepMine": "Salvesta minu versioon",
-    "takeTheirs": "Võta serveri versioon",
+    "takeTheirs": "Loobu minu muudatustest",
     "cancel": "Tühista",
+    "chunksIntro": "Sina ja {{author}} muutsite samu ridu. Vali iga koha juures, milline versioon jääb:",
+    "chunksIntroUnknown": "Keegi teine muutis samu ridu. Vali iga koha juures, milline versioon jääb:",
+    "place": "Koht {{n}}/{{total}}",
+    "mineLabel": "Sinu versioon",
+    "theirsBy": "{{author}}, {{time}}",
+    "theirsUnknown": "Serveri versioon",
+    "both": "Mõlemad (enne tema, siis sinu read)",
+    "emptyChunk": "(tühi — read on kustutatud)",
+    "allMine": "Kõikjal minu",
+    "allTheirs": "Kõikjal tema",
+    "otherFieldsMine": "Muud kokkupõrked — neis jääb sinu versioon:",
+    "apply": "Rakenda valik",
+    "applyHint": "Valitud tekst läheb redaktorisse salvestamata — kontrolli ja salvesta (Ctrl+S).",
     "field": {
       "text": "Tekst",
       "status": "Staatus",
       "page_tags": "Märksõnad",
-      "comment": "Kommentaar „{{text}}”"
+      "comment": "Kommentaar „{{text}}”",
+      "annotation": "Tekstiannotatsioon „{{text}}”"
     }
   }
 }

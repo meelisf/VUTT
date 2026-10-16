@@ -74,6 +74,39 @@ describe('lehe salvestuse liitmine redaktoris (#455)', () => {
     expect(result.current.st.hasUnsavedChanges).toBe(false);
   });
 
+  it('liidetud tekst jõuab redaktorisse ja kursor jääb paigale (#612)', async () => {
+    const merged: PageFields = { ...serveris, text_content: 'MINU rida\nnende rida', status: PageStatus.RAW };
+    const onSave = vi.fn<OnSave>(async () => ({ merged }));
+    const { result } = renderHook(() => useRedaktor(onSave));
+    const view = result.current.viewRef.current!;
+    trüki(view, 'MINU rida\nvana rida');
+    view.dispatch({ selection: { anchor: 4 } });
+    act(() => { result.current.st.setIsDirty(true); });
+    await act(async () => { await result.current.save.handleSave(); });
+    expect(view.state.doc.toString()).toBe('MINU rida\nnende rida');
+    expect(view.state.selection.main.anchor).toBe(4);
+    expect(result.current.st.savedState.text).toBe('MINU rida\nnende rida');
+    expect(result.current.st.isDirty).toBe(false);
+  });
+
+  it('salvestuse ajal trükitu jääb alles ja liidetud read tulevad juurde (#612)', async () => {
+    const merged: PageFields = { ...serveris, text_content: 'MINU rida\nnende rida', status: PageStatus.RAW };
+    let view: EditorView;
+    const onSave = vi.fn<OnSave>(async () => {
+      // Kasutaja trükib, kuni server vastab.
+      view.dispatch({ changes: { from: 0, insert: '! ' } });
+      return { merged };
+    });
+    const { result } = renderHook(() => useRedaktor(onSave));
+    view = result.current.viewRef.current!;
+    trüki(view, 'MINU rida\nvana rida');
+    await act(async () => { await result.current.save.handleSave(); });
+    expect(view.state.doc.toString()).toBe('! MINU rida\nnende rida');
+    // Baas = ketta seis; redaktori lisandus on salvestamata töö.
+    expect(result.current.st.savedState.text).toBe('MINU rida\nnende rida');
+    expect(result.current.st.isDirty).toBe(true);
+  });
+
   it('kokkupõrge: midagi ei märgita salvestatuks, dialoog avaneb', async () => {
     const onSave = vi.fn<OnSave>(async () => { throw new PageConflictError(['text'], serveris); });
     const { result } = renderHook(() => useRedaktor(onSave));
@@ -116,5 +149,31 @@ describe('lehe salvestuse liitmine redaktoris (#455)', () => {
       text_content: 'nende tekst', status: PageStatus.CORRECTED,
     }));
     expect(result.current.save.pageConflict).toBeNull();
+  });
+
+  it('tükkide valik läheb redaktorisse salvestamata; järgmine baas = serveri tekst (#612)', async () => {
+    const tükid = [
+      { kind: 'ok' as const, text: 'üks\n' },
+      { kind: 'conflict' as const, base: 'vana\n', mine: 'minu\n', theirs: 'nende\n' },
+      { kind: 'ok' as const, text: 'lõpp' },
+    ];
+    const serveri = { ...serveris, text_content: 'üks\nnende\nlõpp' };
+    const onSave = vi.fn<OnSave>()
+      .mockRejectedValueOnce(new PageConflictError(['text'], serveri, tükid))
+      .mockResolvedValueOnce({ merged: null });
+    const { result } = renderHook(() => useRedaktor(onSave));
+    const view = result.current.viewRef.current!;
+    trüki(view, 'üks\nminu\nlõpp');
+    await act(async () => { await result.current.save.handleSave(); });
+    expect(result.current.save.pageConflict?.textChunks).toEqual(tükid);
+    act(() => { result.current.save.resolveConflictWithChoices(['both']); });
+    expect(view.state.doc.toString()).toBe('üks\nnende\nminu\nlõpp');
+    expect(result.current.save.pageConflict).toBeNull();
+    expect(result.current.st.isDirty).toBe(true);
+    expect(onSave).toHaveBeenCalledTimes(1);           // ise ei salvesta
+    await act(async () => { await result.current.save.handleSave(); });
+    const [saadetud, base] = onSave.mock.calls[1];
+    expect(saadetud.text_content).toBe('üks\nnende\nminu\nlõpp');
+    expect(base.text_content).toBe('üks\nnende\nlõpp');
   });
 });

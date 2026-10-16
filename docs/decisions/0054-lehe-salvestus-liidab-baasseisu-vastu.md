@@ -41,3 +41,41 @@ redaktor näidata vana seisu.
 - Workspace ei neela enam salvestusvigu: `runSave` saab vea ja `isDirty` jääb.
 - Valvurid: `tests/test_page_merge.py`, `tests/test_save_liitmine.py`,
   `src/components/editor/__tests__/pageConflict*.test.ts(x)`.
+
+## Täiendus 2026-10-16: tekst ridade kaupa (#612)
+
+Kaks toimetajat parandasid sama lehe eri ridu ja said kokkupõrke, sest tekst
+oli üks üksus. Dialoog pakkus pimesi „salvesta minu", mis kirjutas teise töö üle.
+
+- **Tekst liidetakse ridade kaupa** (`merge_text`, diff3 `difflib`-iga). Mõlema
+  poole muudatus, mis kattub või **puutub** (naaberread, sama lisamiskoht), on
+  kokkupõrge — nagu git. Sama rea kaks parandust põrkuvad alati.
+- **`text_annotations` on eraldi üksus**, id kaupa nagu kommentaarid
+  (`annotations:<id>`). Ankrud elavad tekstis, seega kontrollib `_seose_vead`
+  pärast liitmist paaristägide tasakaalu ning `<annN>` ↔ kirje vastavust. Uus
+  vastuolu, mida kummaski sisendis ei olnud → kogu tekst on kokkupõrge.
+  Juba kettal olev orb ei ole liitmise süü.
+- **409 kannab `text_chunks`** (`ok` / `conflict` tükid kogu teksti ulatuses) —
+  diff arvutatakse ainult serveris; dialoog (#612 PR 2) valib tükkide kaupa.
+- Liidetud tekst läbib uuesti `_normalize_page_text`-i.
+- **Klient paneb liidetud teksti redaktorisse ise** (`runSave`, `ChangeSet.map`
+  salvestuse ajal trükitu peale). Workspace `page` kaudu see ei jõua:
+  `keepEditorText` näeb sissetulevat = salvestatud teksti ja peab redaktori sisu
+  salvestamata tööks — järgmine Ctrl+S oleks teise toimetaja read üle kirjutanud.
+- „Salvesta minu" tekstikokkupõrkel võtab baasi ka serveri annotatsioonikirjed:
+  minu tekst võidab tervikuna, muidu jääks nende ankruta kirje orvuks.
+- **Dialoog (PR 2):** tekstikokkupõrkel valitakse iga põrkuva koha juures
+  tema / minu / mõlemad. 409 kannab ka `theirs_last` (lehe viimane commit).
+  Kujunduskeel = ajaloo diff (`HistoryTab`): mono read, vasak värviline äär;
+  värv tähistab KES (sinine tema, merevaigune sina), mitte lisatud/eemaldatud.
+  Sarnases sõnas tõstetakse esile ainult erinevad tähed (u/v, ſ/s).
+- **Paneel, mitte modaal:** katab ainult redaktori paani, pildipaan jääb
+  suumitavaks — valikut kontrollitakse pildilt. Seetõttu ei ole Tab lõksus ja
+  Esc kehtib ainult paneelis.
+- Tulemus läheb redaktorisse **salvestamata**; baas = `retryBase` (konfliktsed
+  üksused serveri omad), nii et Ctrl+S salvestab valiku ja muud vahepealsed
+  muudatused liidetakse edasi.
+- Tükkide paneelis ei ole „Salvesta minu" ega „Võta serveri versioon": viimane
+  viskaks ära ka põrkumata parandused, „Kõikjal tema" teeb sama ohutumalt.
+  Tükkideta juhul (staatus, kommentaar) jääb tervikvalik, nupp nimega
+  „Loobu minu muudatustest".

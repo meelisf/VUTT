@@ -1,5 +1,5 @@
 """#455: lehe kolmesuunalise liitmise reeglid (puhas funktsioon)."""
-from server.page_merge import merge_page
+from server.page_merge import merge_page, merge_text, text_conflict_chunks
 
 
 def _c(cid, text="t", replies=None):
@@ -35,7 +35,7 @@ def test_tuupjuht_mina_tekst_nemad_vastus():
     assert merged["comments"][0]["replies"] == [{"id": "r1", "text": "vastus"}]
 
 
-def test_molemad_muutsid_teksti_on_konflikt():
+def test_molemad_muutsid_sama_rida_on_konflikt():
     _m, konfliktid = merge_page(_leht(), _leht(text_content="A"), _leht(text_content="B"))
     assert konfliktid == ["text"]
 
@@ -45,14 +45,43 @@ def test_sama_muutus_molemal_ei_ole_konflikt():
     assert konfliktid == [] and merged["status"] == "Valmis"
 
 
-def test_tekst_ja_tekstiannotatsioonid_on_uks_uksus():
-    """Mina muutsin kirjet, nemad teksti → ankrud võivad lahku minna → konflikt."""
+def test_annotatsiooni_kirje_ja_tekst_liidetakse_eraldi():
+    """#612: mina muutsin kirjet, nemad teksti (ankur alles) → mõlemad jäävad."""
     ann = [{"id": 1, "comment": "m"}]
-    base = _leht(text_annotations=ann)
-    mina = _leht(text_annotations=[{"id": 1, "comment": "muudetud"}])
-    nemad = _leht(text_content="teine tekst", text_annotations=ann)
+    base = _leht(text_content="<ann1>sõna</ann1>\nteine", text_annotations=ann)
+    mina = _leht(text_content=base["text_content"], text_annotations=[{"id": 1, "comment": "muudetud"}])
+    nemad = _leht(text_content="<ann1>sõna</ann1>\nTEINE", text_annotations=ann)
+    merged, konfliktid = merge_page(base, mina, nemad)
+    assert konfliktid == []
+    assert merged["text_content"] == "<ann1>sõna</ann1>\nTEINE"
+    assert merged["text_annotations"] == [{"id": 1, "comment": "muudetud"}]
+
+
+def test_sama_annotatsiooni_kirje_muutsid_molemad():
+    tekst = "<ann1>x</ann1>"
+    base = _leht(text_content=tekst, text_annotations=[{"id": 1, "comment": "a"}])
+    _m, konfliktid = merge_page(base, _leht(text_content=tekst, text_annotations=[{"id": 1, "comment": "b"}]),
+                                _leht(text_content=tekst, text_annotations=[{"id": 1, "comment": "c"}]))
+    assert konfliktid == ["annotations:1"]
+
+
+def test_liitmine_ei_tohi_ankrut_orvuks_jatta():
+    """Nemad kustutasid annotatsiooni (kirje + tägid), mina tõstsin sulgeva tägi
+    teisele reale → liidetud tekstis oleks kirjeta </ann1> → kokkupõrge."""
+    base = _leht(text_content="<ann1>a\nb</ann1>\nc\nd", text_annotations=[{"id": 1, "comment": "x"}])
+    mina = _leht(text_content="<ann1>a\nb\nc</ann1>\nd", text_annotations=[{"id": 1, "comment": "x"}])
+    nemad = _leht(text_content="a\nb\nc\nd", text_annotations=[])
     _m, konfliktid = merge_page(base, mina, nemad)
     assert konfliktid == ["text"]
+
+
+def test_kettal_olnud_vana_orb_ei_tee_konflikti():
+    """Orb, mis oli juba sisendis, ei ole liitmise süü."""
+    base = _leht(text_content="<ann9>a</ann9>\nb\nc\nd")
+    mina = _leht(text_content="<ann9>a</ann9>\nB\nc\nd")
+    nemad = _leht(text_content="<ann9>a</ann9>\nb\nc\nD")
+    merged, konfliktid = merge_page(base, mina, nemad)
+    assert konfliktid == [] and merged["text_content"] == "<ann9>a</ann9>\nB\nc\nD"
 
 
 def test_staatus_ja_margksonad_eraldi():
@@ -119,3 +148,71 @@ def test_votmejarjekord_ei_ole_muudatus():
     nemad = _leht(page_tags=[{"label": "x", "id": "Q1"}])
     merged, konfliktid = merge_page(base, _leht(status="Töös", page_tags=[{"id": "Q1", "label": "x"}]), nemad)
     assert konfliktid == []
+
+
+# --- #612: tekst ridade kaupa ---
+
+def test_eri_read_liidetakse():
+    base = _leht(text_content="üks\nkaks\nkolm\nneli\nviis\n")
+    mina = _leht(text_content="ÜKS\nkaks\nkolm\nneli\nviis\n")
+    nemad = _leht(text_content="üks\nkaks\nkolm\nneli\nVIIS\n")
+    merged, konfliktid = merge_page(base, mina, nemad)
+    assert konfliktid == []
+    assert merged["text_content"] == "ÜKS\nkaks\nkolm\nneli\nVIIS\n"
+
+
+def test_lisamine_ja_kustutamine_eri_kohas():
+    merged, tükid = merge_text("a\nb\nc\nd\ne", "a\nuus\nb\nc\nd\ne", "a\nb\nc\ne")
+    assert merged == "a\nuus\nb\nc\ne"
+
+
+def test_naaberread_on_kokkuporge():
+    """Nagu git: kokkupuutuvad muudatused põrkuvad (ohutu pool)."""
+    merged, tükid = merge_text("a\nb\nc", "A\nb\nc", "a\nB\nc")
+    assert merged is None
+    assert [t["kind"] for t in tükid] == ["conflict", "ok"]
+    assert tükid[0] == {"kind": "conflict", "base": "a\nb\n", "mine": "A\nb\n", "theirs": "a\nB\n"}
+
+
+def test_sama_rea_konflikti_tukid_katavad_kogu_teksti():
+    base = "üks\nkaks\nkolm\nneli\nviis"
+    merged, tükid = merge_text(base, "üks\nkaks\nKOLM\nneli\nviis", "üks\nkaks\nkolm!\nneli\nviis")
+    assert merged is None
+    assert tükid == [
+        {"kind": "ok", "text": "üks\nkaks\n"},
+        {"kind": "conflict", "base": "kolm\n", "mine": "KOLM\n", "theirs": "kolm!\n"},
+        {"kind": "ok", "text": "neli\nviis"},
+    ]
+
+
+def test_molemad_lisasid_samasse_kohta_erineva_rea():
+    merged, tükid = merge_text("a\nb", "a\nx\nb", "a\ny\nb")
+    assert merged is None
+    assert [t for t in tükid if t["kind"] == "conflict"] == [
+        {"kind": "conflict", "base": "", "mine": "x\n", "theirs": "y\n"}]
+
+
+def test_sama_muudatus_molemal_pool():
+    merged, _ = merge_text("a\nb\nc", "a\nB\nc", "a\nB\nc")
+    assert merged == "a\nB\nc"
+
+
+def test_mitu_muudatust_uhel_poolel_nihked_oiged():
+    base = "\n".join(str(i) for i in range(10))
+    mina = base.replace("1\n", "1\n1b\n").replace("5\n", "")
+    nemad = base.replace("8\n", "8!\n")
+    merged, _ = merge_text(base, mina, nemad)
+    assert merged == "0\n1\n1b\n2\n3\n4\n6\n7\n8!\n9"
+
+
+def test_tuhi_baas():
+    merged, _ = merge_text("", "a", "")
+    assert merged == "a"
+    merged, tükid = merge_text("", "a", "b")
+    assert merged is None
+
+
+def test_konflikti_tukid_kui_tagide_kontroll_lukkas_tagasi():
+    """Ridade liitmine õnnestus, aga merge_page lükkas tagasi → üks tükk kogu tekstiga."""
+    assert text_conflict_chunks("a\nb", "A\nb", "a\nB\n") == [
+        {"kind": "conflict", "base": "a\nb", "mine": "A\nb", "theirs": "a\nB\n"}]

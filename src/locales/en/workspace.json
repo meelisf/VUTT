@@ -667,15 +667,29 @@
   "conflict": {
     "title": "The page was changed meanwhile",
     "message": "Someone changed this page after you opened it. These changes cannot be merged automatically:",
-    "takeTheirsHint": "“Use server version” copies your text to the clipboard first.",
+    "takeTheirsHint": "“Discard my changes” copies your text to the clipboard first.",
     "keepMine": "Save my version",
-    "takeTheirs": "Use server version",
+    "takeTheirs": "Discard my changes",
     "cancel": "Cancel",
+    "chunksIntro": "You and {{author}} changed the same lines. Choose which version to keep at each place:",
+    "chunksIntroUnknown": "Someone else changed the same lines. Choose which version to keep at each place:",
+    "place": "Place {{n}}/{{total}}",
+    "mineLabel": "Your version",
+    "theirsBy": "{{author}}, {{time}}",
+    "theirsUnknown": "Server version",
+    "both": "Both (their lines first, then yours)",
+    "emptyChunk": "(empty — lines were deleted)",
+    "allMine": "Mine everywhere",
+    "allTheirs": "Theirs everywhere",
+    "otherFieldsMine": "Other conflicts — your version is kept in these:",
+    "apply": "Apply choice",
+    "applyHint": "The chosen text goes into the editor unsaved — check it and save (Ctrl+S).",
     "field": {
       "text": "Text",
       "status": "Status",
       "page_tags": "Tags",
-      "comment": "Comment “{{text}}”"
+      "comment": "Comment “{{text}}”",
+      "annotation": "Text annotation “{{text}}”"
     }
   }
 }

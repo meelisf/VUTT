@@ -89,6 +89,8 @@ def test_sama_valja_muutus_on_409_ja_ketas_puutumata(client, login, leht):
     body = r.json()["detail"]
     assert body["conflict"] is True and body["fields"] == ["text"]
     assert body["current"]["text_content"] == "teise inimese tekst"
+    assert body["text_chunks"] == [{"kind": "conflict", "base": "vana tekst",
+                                    "mine": "minu tekst", "theirs": "teise inimese tekst"}]
     assert _ketas(leht)[0] == "teise inimese tekst"
 
 
@@ -128,3 +130,31 @@ def test_aegunud_baas_ja_puutumata_vali_voetakse_kettalt(client, login, leht):
     assert r.status_code == 200, r.text
     assert r.json()["merged"] is True
     assert _ketas(leht)[1]["status"] == "Parandatud"
+
+
+MITMEREALINE = "rida üks\nrida kaks\nrida kolm\nrida neli\n"
+
+
+def test_eri_ridade_parandused_liidetakse_kettale(client, login, leht):
+    """#612: kaks toimetajat, eri read → mõlemad parandused alles, 409 ei tule."""
+    leht["txt"].write_text(MITMEREALINE.replace("rida neli", "rida NELI"), encoding="utf-8")
+    base = {**BASE, "text_content": MITMEREALINE}
+    r = _save(client, login, text=MITMEREALINE.replace("rida üks", "rida ÜKS"), base=base)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["merged"] is True
+    assert body["page"]["text_content"] == "rida ÜKS\nrida kaks\nrida kolm\nrida NELI\n"
+    assert _ketas(leht)[0] == "rida ÜKS\nrida kaks\nrida kolm\nrida NELI\n"
+
+
+def test_sama_rea_konflikt_annab_tukid(client, login, leht):
+    leht["txt"].write_text(MITMEREALINE.replace("rida kolm", "rida 3"), encoding="utf-8")
+    base = {**BASE, "text_content": MITMEREALINE}
+    r = _save(client, login, text=MITMEREALINE.replace("rida kolm", "rida III"), base=base)
+    assert r.status_code == 409, r.text
+    tükid = r.json()["detail"]["text_chunks"]
+    assert [t for t in tükid if t["kind"] == "conflict"] == [
+        {"kind": "conflict", "base": "rida kolm\n", "mine": "rida III\n", "theirs": "rida 3\n"}]
+    # Kes viimati muutis (dialoogi jaoks): fixture'i commit „v1" autor „t".
+    assert r.json()["detail"]["theirs_last"]["author"] == "t"
+    assert _ketas(leht)[0] == MITMEREALINE.replace("rida kolm", "rida 3")

@@ -35,7 +35,7 @@ from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..page_history import build_page_history
 from ..page_locks import page_lock
-from ..page_merge import PAGE_FIELDS, merge_page, read_page_view
+from ..page_merge import PAGE_FIELDS, merge_page, read_page_view, text_conflict_chunks
 from ..page_paths import check_page_filename, require_existing_page
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.indices import page_person_ids
@@ -100,10 +100,11 @@ def _normalize_page_text(text):
 class _PageConflict(Exception):
     """Kolmesuunalise liitmise kokkupõrge (#455): midagi ei kirjutatud."""
 
-    def __init__(self, fields, current):
+    def __init__(self, fields, current, text_chunks=None):
         super().__init__(", ".join(fields))
         self.fields = fields
         self.current = current
+        self.text_chunks = text_chunks
 
 
 def _merge_with_base(txt_path, json_path, text, client_meta, base):
@@ -123,7 +124,11 @@ def _merge_with_base(txt_path, json_path, text, client_meta, base):
     }
     merged, konfliktid = merge_page(base_view, mine, theirs)
     if konfliktid:
-        raise _PageConflict(konfliktid, theirs)
+        tükid = (text_conflict_chunks(base_view["text_content"], text, theirs["text_content"])
+                 if "text" in konfliktid else None)
+        raise _PageConflict(konfliktid, theirs, tükid)
+    # Ridade liitmine (#612) segab kahe poole ridu — kanooniline kuju uuesti.
+    merged["text_content"] = _normalize_page_text(merged["text_content"])
     panustas = any(
         json.dumps(merged[k], sort_keys=True, ensure_ascii=False)
         != json.dumps(mine[k], sort_keys=True, ensure_ascii=False)
@@ -131,6 +136,20 @@ def _merge_with_base(txt_path, json_path, text, client_meta, base):
     )
     meta = {**client_meta, **{k: merged[k] for k in PAGE_FIELDS if k != "text_content"}}
     return merged["text_content"], meta, (merged if panustas else None)
+
+
+def _viimane_muutja(catalog, filename):
+    """Lehe viimane commit dialoogi jaoks („Mari, 14:02", #612). Parim katse:
+    git-tõrge ei tohi kokkupõrke vastust ära rikkuda."""
+    stem = os.path.splitext(filename)[0]
+    try:
+        ajalugu = get_file_git_history(
+            [f"{catalog}/{filename}", f"{catalog}/{stem}.json"], max_count=1)
+    except Exception:
+        return None
+    if not ajalugu:
+        return None
+    return {"author": ajalugu[0]["author"], "date": ajalugu[0]["date"]}
 
 
 def _save_page_locked(txt_path, text, client_meta, username, base=None):
@@ -204,8 +223,11 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
         )
     except _PageConflict as e:
         # Ketas puutumata; klient näitab konfliktidialoogi (#455).
+        theirs_last = await run_in_threadpool(_viimane_muutja, catalog, filename)
         raise HTTPException(status_code=409, detail={
             "conflict": True, "fields": e.fields, "current": e.current,
+            **({"text_chunks": e.text_chunks} if e.text_chunks else {}),
+            **({"theirs_last": theirs_last} if theirs_last else {}),
         })
     # Liidetud seis tagasi kliendile: ketta panus peab redaktorisse jõudma.
     merged_extra = {"merged": True, "page": merged_page} if merged_page is not None else {}
