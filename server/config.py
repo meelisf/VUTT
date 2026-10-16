@@ -281,6 +281,9 @@ RATE_LIMITS = {
     '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
     '/reset/validate': (10, 300),       # 10 valideerimist 5 min jooksul IP kohta
     '/reset/set-password': (5, 300),    # 5 katset 5 min jooksul (nagu invite)
+    # Kasutajanime eelvaade on avalik ja vastab ka hõivatuse kohta; lagi lai,
+    # sest vorm küsib seda e-posti trükkimise ajal (debounce'itud).
+    '/register/username-preview': (30, 60),
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
     # Kliendivigade raport (#133): endpoint on avalik, sest vead tabavad ka
     # välja logimata kasutajaid. Lagi on lai, sest üks katkine leht võib

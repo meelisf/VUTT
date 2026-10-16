@@ -636,6 +636,21 @@ def get_file_git_history(paths, max_count=50):
     return get_file_git_history_window(paths, max_count=max_count)[0]
 
 
+# Kliendilt tulev commiti viide on AINULT räsi (valikuliselt vanem `^`).
+# Revisjoniavaldised (`HEAD~3`, `main@{..}`) ja `-`-ga algavad väärtused
+# lähevad git'ile argumendina ja annaksid ligi suvalisele commitile.
+_COMMIT_REF_RE = re.compile(r"[0-9a-fA-F]{7,40}\^?")
+
+
+def is_valid_commit_ref(commit_hash) -> bool:
+    return isinstance(commit_hash, str) and bool(_COMMIT_REF_RE.fullmatch(commit_hash))
+
+
+def _literal_pathspec(path: str) -> str:
+    """Tee ilma pathspec-maagiata: `:(exclude)…` vms prefiks ei laiendaks valikut."""
+    return path if path.startswith(":(literal)") else f":(literal){path}"
+
+
 def get_file_at_commit(relative_path, commit_hash):
     """
     Tagastab faili sisu kindlas commitist.
@@ -647,6 +662,9 @@ def get_file_at_commit(relative_path, commit_hash):
     Returns:
         str: Faili sisu või None kui ei leidnud
     """
+    if not is_valid_commit_ref(commit_hash):
+        logger.warning("Vigane commiti viide: %r", commit_hash)
+        return None
     repo = get_or_init_repo()
 
     try:
@@ -690,6 +708,12 @@ def get_commit_diff(commit_hash, filepaths=None):
     Returns:
         dict: {"diff": str, "additions": int, "deletions": int, "files": list}
     """
+    if not is_valid_commit_ref(commit_hash):
+        logger.warning("Vigane commiti viide: %r", commit_hash)
+        return None
+    if filepaths:
+        filepaths = ([_literal_pathspec(p) for p in filepaths]
+                     if isinstance(filepaths, list) else _literal_pathspec(filepaths))
     repo = get_or_init_repo()
 
     # Git "empty tree" hash - kasutatakse esimese commiti võrdluseks
@@ -699,7 +723,7 @@ def get_commit_diff(commit_hash, filepaths=None):
         # Vanem loetakse TEKSTINA, mitte `commit.parents` kaudu: see on laisk
         # lugemine jagatud objektibaasist ja võib samaaegsel päringul anda
         # võõra commiti andmed (#337).
-        resolved = repo.git.rev_parse(commit_hash).strip()
+        resolved = repo.git.rev_parse("--verify", "--end-of-options", f"{commit_hash}^{{commit}}").strip()
         parents = repo.git.log("-1", "--format=%P", resolved).split()
         parent_hash = parents[0] if parents else EMPTY_TREE
 

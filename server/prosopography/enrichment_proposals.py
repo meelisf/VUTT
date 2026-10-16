@@ -287,6 +287,21 @@ def _check_registry_entries(items: list) -> None:
                     f"items[{index}]: registry_entry_mismatch: {key} on ettepanekus eri sisuga")
 
 
+def _handoff_ok(row, person_id: str, now: int) -> bool:
+    return not (row is None or row["expires_at"] <= now
+                or (row["scope"] == "person" and row["person_id"] != person_id))
+
+
+def _require_live_handoff(digest: str, person_id: str) -> None:
+    now = int(time.time())
+    with _db() as db:
+        row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (digest,)).fetchone()
+    if not _handoff_ok(row, person_id, now):
+        raise ProposalError("invalid_or_expired_handoff")
+    if row["uses"] >= row["max_uses"]:
+        raise ProposalError("handoff_used_up")
+
+
 def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict:
     """Kulutab koodi ja talletab ainult ajutise ettepaneku ühe transaktsiooniga."""
     if not isinstance(code, str) or len(code) > 100 or not valid_person_id(person_id):
@@ -308,6 +323,10 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     payload = json.dumps(items, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")
+    # Kood ENNE korpuse- ja kaardikontrolle: otspunkt on autentimata ja need
+    # vastaksid muidu ka koodita küsijale (teoste lehtede arv, kaardi versioon).
+    # Kuju-vead ülal ei loe midagi. Ainult lugemine — kood kulub allpool INSERT-iga.
+    _require_live_handoff(hashlib.sha256(code.encode()).hexdigest(), person_id)
     _check_vutt_pages(items)
     # Ettepanek peab põhinema elaval kaardiversioonil (enne koodi kasutust, et viga seda ei kulutaks).
     from .person_crud import get_person
@@ -323,8 +342,7 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     with _db() as db:
         _clean(db, now)
         row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (digest,)).fetchone()
-        if (row is None or row["expires_at"] <= now
-                or (row["scope"] == "person" and row["person_id"] != person_id)):
+        if not _handoff_ok(row, person_id, now):
             raise ProposalError("invalid_or_expired_handoff")
         # Tingimuslik UPDATE hoiab lae ka samaaegsete esituste korral.
         changed = db.execute(

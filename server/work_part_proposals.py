@@ -329,6 +329,15 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
         raise ProposalError("invalid_handoff")
     if not isinstance(parts, list) or not 1 <= len(parts) <= MAX_PARTS:
         raise ProposalError("invalid_parts")
+    # Kood ENNE teose lugemist: otspunkt on autentimata ja `stale_pages` vastaks
+    # muidu ka koodita küsijale. Ainult lugemine — kood kulub allpool INSERT-iga.
+    with _db() as db:
+        row = db.execute("SELECT * FROM handoff WHERE code_hash=?",
+                         (hashlib.sha256(code.encode()).hexdigest(),)).fetchone()
+    if row is None or row["expires_at"] <= int(time.time()) or row["work_id"] != work_id:
+        raise ProposalError("invalid_or_expired_handoff")
+    if row["uses"] >= row["max_uses"]:
+        raise ProposalError("handoff_used_up")
     stems = wp.page_stems(work_dir)
     if version != pages_version(work_dir):
         raise ProposalError("stale_pages")

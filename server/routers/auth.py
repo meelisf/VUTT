@@ -145,7 +145,11 @@ async def register(request: Request):
 
 
 @router.get("/register/username-preview")
-async def register_username_preview(email: str = ""):
+async def register_username_preview(request: Request, email: str = ""):
+    allowed, retry_after = check_rate_limit(get_client_ip(request), "/register/username-preview")
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": "Liiga palju päringuid"},
+                            headers={"Retry-After": str(retry_after)})
     email = email.strip().lower()
     if not email or "@" not in email:
         return {"status": "success", "username": ""}

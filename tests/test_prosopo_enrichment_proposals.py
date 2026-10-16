@@ -435,9 +435,11 @@ def test_valideerimisviga_nimetab_kirje_ja_valja(item, expected):
      "items[0]: page_out_of_range: teoses w1 on 50 lehekülge"),
 ])
 def test_toend_peab_olema_vuttis_kontrollitav(source, expected):
-    """Veebiallikas ei ole tõend; korpuse viide osutab päris teosele ja lehele."""
+    """Veebiallikas ei ole tõend; korpuse viide osutab päris teosele ja lehele.
+    Korpuse kontroll jookseb alles kehtiva koodiga (autentimata otspunkt)."""
+    code = proposals.issue_handoff("vutt:Pabc", "editor", "session", "t")["code"]
     with pytest.raises(proposals.ProposalError) as exc:
-        proposals.submit("c", "vutt:Pabc", "2026-01-01", [_item(evidence=[source])])
+        proposals.submit(code, "vutt:Pabc", "2026-01-01", [_item(evidence=[source])])
     assert str(exc.value).startswith(expected)
 
 
