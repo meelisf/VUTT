@@ -94,9 +94,9 @@ def test_import_as_work_kirjutab_ada_provenance_oigele_lehele(tmp_path, monkeypa
             "handle": "10062/7822",
             "item_uuid": "u1",
             "sources": [
-                {"name": "a.pdf", "bitstream_uuid": "bs-a",
+                {"name": "a.pdf", "bitstream_uuid": "0a0a0a0a-0000-4000-8000-00000000000a",
                  "first_src_page": 1, "page_count": 1},
-                {"name": "b.pdf", "bitstream_uuid": "bs-b",
+                {"name": "b.pdf", "bitstream_uuid": "0b0b0b0b-0000-4000-8000-00000000000b",
                  "first_src_page": 2, "page_count": 2},
             ],
         },
@@ -114,7 +114,7 @@ def test_import_as_work_kirjutab_ada_provenance_oigele_lehele(tmp_path, monkeypa
 
     lk1 = _leht_json(1)
     assert lk1.get("source", {}).get("name") == "a.pdf"
-    assert lk1.get("source", {}).get("bitstream_uuid") == "bs-a"
+    assert lk1.get("source", {}).get("bitstream_uuid") == "0a0a0a0a-0000-4000-8000-00000000000a"
     assert len(lk1["comments"]) == 1
     assert lk1["comments"][0]["author"] == "ada-import"
     assert "a.pdf" in lk1["comments"][0]["text"]
@@ -183,9 +183,9 @@ def test_import_as_work_ankur_jargib_jrk_mitte_lehekylje_numbrit(tmp_path, monke
             "handle": "10062/7822",
             "item_uuid": "u1",
             "sources": [
-                {"name": "a.pdf", "bitstream_uuid": "bs-a",
+                {"name": "a.pdf", "bitstream_uuid": "0a0a0a0a-0000-4000-8000-00000000000a",
                  "first_src_page": 1, "page_count": 1},
-                {"name": "b.pdf", "bitstream_uuid": "bs-b",
+                {"name": "b.pdf", "bitstream_uuid": "0b0b0b0b-0000-4000-8000-00000000000b",
                  "first_src_page": 2, "page_count": 2},
             ],
         },

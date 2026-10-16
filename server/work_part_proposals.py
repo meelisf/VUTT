@@ -57,6 +57,14 @@ def pages_version(work_dir: str) -> str:
 @contextmanager
 def _db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    # 0644 nagu enrichment_proposals: varundus (`meelisf`) peab root'i loodud
+    # faili lugeda saama (#131). Seni hoidis seda ainult umask (#619).
+    try:
+        fd = os.open(DB_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        pass
+    else:
+        os.close(fd)
     db = sqlite3.connect(DB_PATH, timeout=5)
     try:
         db.row_factory = sqlite3.Row
@@ -81,6 +89,14 @@ def _db():
 def _clean(db, now: int) -> None:
     db.execute("DELETE FROM handoff WHERE expires_at < ?", (now,))
     db.execute("DELETE FROM proposal WHERE expires_at < ?", (now,))
+
+
+def revoke_handoffs(username: str) -> int:
+    """Kustutab kasutaja üleandmiskoodid (konto kustutus / rolli muutus, #619)."""
+    if not os.path.exists(DB_PATH):
+        return 0                 # koode pole kunagi antud — ära loo andmebaasi
+    with _db() as db:
+        return db.execute("DELETE FROM handoff WHERE username=?", (username,)).rowcount
 
 
 def issue_handoff(work_id: str, work_dir: str, username: str) -> dict:

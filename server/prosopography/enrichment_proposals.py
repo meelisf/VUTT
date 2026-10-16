@@ -100,6 +100,14 @@ def _clean(db, now: int) -> None:
     db.execute("DELETE FROM proposal WHERE expires_at < ?", (now,))
 
 
+def revoke_handoffs(username: str) -> int:
+    """Kustutab kasutaja üleandmiskoodid (konto kustutus / rolli muutus, #619)."""
+    if not os.path.exists(DB_PATH):
+        return 0                 # koode pole kunagi antud — ära loo andmebaasi
+    with _db() as db:
+        return db.execute("DELETE FROM handoff WHERE username=?", (username,)).rowcount
+
+
 def issue_handoff(person_id: Optional[str], username: str, session_fingerprint: str,
                   updated_at: str = "") -> dict:
     """Esituskood ühele isikule (`person_id`) või kõigile isikutele (`None`).

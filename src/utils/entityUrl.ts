@@ -14,19 +14,19 @@ export function getEntityUrl(id: string | null | undefined, source?: string): st
 
   // Wikidata Q-koodid
   if (isQCode(id)) {
-    return `https://www.wikidata.org/wiki/${id}`;
+    return `https://www.wikidata.org/wiki/${encodeURIComponent(id)}`;
   }
 
   // GND koodid (GND:1202439284)
   if (source === 'gnd' || id.toUpperCase().startsWith('GND:')) {
     const gndId = id.replace(/^gnd:/i, '');
-    return `https://explore.gnd.network/gnd/${gndId}`;
+    return `https://explore.gnd.network/gnd/${encodeURIComponent(gndId)}`;
   }
 
   // VIAF koodid (VIAF:12345 või viaf:12345)
   if (source === 'viaf' || id.toUpperCase().startsWith('VIAF:')) {
     const viafId = id.replace(/^viaf:/i, '');
-    return `https://viaf.org/viaf/${viafId}`;
+    return `https://viaf.org/viaf/${encodeURIComponent(viafId)}`;
   }
 
   // Album Academicum - pole avalikult kättesaadav

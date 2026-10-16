@@ -4,6 +4,7 @@ Tõde on FAILIDES, mitte mälus: `017.pdf` olemasolu tähendab „see tükk on t
 Poolik allalaadimine elab `.part`-failina ja ei näe kunagi välja nagu valmis fail.
 """
 import os
+import re
 import subprocess
 import threading
 
@@ -12,6 +13,8 @@ import requests
 from ..config import get_logger, UPLOADS_DIR
 from ..upload import state as upload_state
 from . import client as ada_client
+
+_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 logger = get_logger(__name__)
 
@@ -175,6 +178,9 @@ def _toota(upload_id: str) -> None:
                 logger.info("ADA fetch katkestatud (staging kadus): %s", upload_id)
                 return
             siht = os.path.join(kaust, "{:03d}.pdf".format(jrk))
+            # UUID läheb URL-i teekonda — ainult kanooniline kuju (#619).
+            if not _UUID_RE.fullmatch(str(allikas.get("bitstream_uuid") or "")):
+                raise ValueError("Vigane bitstream_uuid: {!r}".format(allikas.get("bitstream_uuid")))
             url = "{}/core/bitstreams/{}/content".format(
                 ada_client.BASE, allikas["bitstream_uuid"]
             )

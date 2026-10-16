@@ -93,13 +93,13 @@ def test_search_tuhi_tulemus():
 def test_detail_piirab_seotud_teosed_viiekumnega():
     works = [{"work_id": f"w{i}", "role": "auctor"} for i in range(178)]
     client = FakeClient(
-        {"/prosopography/vutt:X": {"id": "vutt:X", "name": {"label": "Test"},
+        {"/prosopography/vutt%3APX": {"id": "vutt:PX", "name": {"label": "Test"},
                                    "works": works}},
         {"/prosopography/work-titles": {
             "titles": {f"w{i}": {"title": f"Teos {i}"} for i in range(178)}
         }},
     )
-    out = persons.detail(client, BASE, "vutt:X", include_relations=False)
+    out = persons.detail(client, BASE, "vutt:PX", include_relations=False)
     assert "seotud_teoseid: 178" in out
     assert out.count("role=") <= persons.MAX_RELATED_WORKS
     assert "128" in out  # 178 - 50 välja jäetud
@@ -109,33 +109,33 @@ def test_detail_piirab_seotud_teosed_viiekumnega():
 def test_detail_kysib_pealkirju_ainult_naidatavatele():
     works = [{"work_id": f"w{i}", "role": "auctor"} for i in range(178)]
     client = FakeClient(
-        {"/prosopography/vutt:X": {"id": "vutt:X", "name": {"label": "T"},
+        {"/prosopography/vutt%3APX": {"id": "vutt:PX", "name": {"label": "T"},
                                    "works": works}},
     )
-    persons.detail(client, BASE, "vutt:X", include_relations=False)
+    persons.detail(client, BASE, "vutt:PX", include_relations=False)
     _, body = client.posts[0]
     assert len(body["work_ids"]) == persons.MAX_RELATED_WORKS
 
 
 def test_detail_markib_kaitstud_kollektsiooni_ilma_lingita():
     client = FakeClient(
-        {"/prosopography/vutt:X": {"id": "vutt:X", "name": {"label": "T"},
+        {"/prosopography/vutt%3APX": {"id": "vutt:PX", "name": {"label": "T"},
                                    "works": [{"work_id": "w1", "role": "auctor"}]}},
         {"/prosopography/work-titles": {
             "titles": {"w1": {"title": "Salajane", "restricted": True}}
         }},
     )
-    out = persons.detail(client, BASE, "vutt:X", include_relations=False)
+    out = persons.detail(client, BASE, "vutt:PX", include_relations=False)
     assert "kaitstud kollektsioon" in out
     assert f"{BASE}/work/w1" not in out
 
 
 def test_detail_ilma_relations_liputa_ei_kysi_seoseid():
     client = FakeClient(
-        {"/prosopography/vutt:X": {"id": "vutt:X", "name": {"label": "T"},
+        {"/prosopography/vutt%3APX": {"id": "vutt:PX", "name": {"label": "T"},
                                    "works": []}},
     )
-    out = persons.detail(client, BASE, "vutt:X", include_relations=False)
+    out = persons.detail(client, BASE, "vutt:PX", include_relations=False)
     assert "isikuseosed" not in out.lower()
     assert not any("work-relations" in path for path, _ in client.gets)
 
@@ -143,14 +143,14 @@ def test_detail_ilma_relations_liputa_ei_kysi_seoseid():
 def test_detail_relations_kasutab_massiivi_vastust():
     """work-relations tagastab LISTI, mitte {"results": [...]}."""
     client = FakeClient({
-        "/prosopography/vutt:X": {"id": "vutt:X", "name": {"label": "T"}, "works": []},
-        "/prosopography/work-relations/vutt:X": [
+        "/prosopography/vutt%3APX": {"id": "vutt:PX", "name": {"label": "T"}, "works": []},
+        "/prosopography/work-relations/vutt%3APX": [
             {"person_id": "vutt:P1", "person_name": "Petrus Schonbergius",
              "shared_works_count": 7,
              "shared_works": [{"work_id": "w1", "work_title": "väga pikk pealkiri" * 40}]},
         ],
     })
-    out = persons.detail(client, BASE, "vutt:X", include_relations=True)
+    out = persons.detail(client, BASE, "vutt:PX", include_relations=True)
     assert "Petrus Schonbergius" in out
     assert "7" in out
     # shared_works pealkirju EI dumbata — token-kulu
@@ -160,12 +160,12 @@ def test_detail_relations_kasutab_massiivi_vastust():
 def test_detail_tundmatu_id_annab_selge_vea():
     client = FakeClient({})
     with pytest.raises(VuttNotFound) as exc:
-        persons.detail(client, BASE, "vutt:puudub", include_relations=False)
+        persons.detail(client, BASE, "vutt:Ppuudub", include_relations=False)
     assert "search_persons" in str(exc.value)
 
 
 def test_detail_kuvab_molemad_keeleväljad_ja_aa_eraldi():
-    client = FakeClient({"/prosopography/vutt:Pabc": {
+    client = FakeClient({"/prosopography/vutt%3APabc": {
         "id": "vutt:Pabc", "name": {"label": "Lünaeus"},
         "biography_et": "Eestikeelne elulugu.",
         "biography_en": "English biography.",
@@ -386,3 +386,12 @@ async def test_ettepaneku_juhis_primaarallikas_haridus_ja_nimetus():
     juhis = tools["submit_person_enrichment_proposal"]
     for fraas in ("PRIMAARALLIKAS", '"imm."', "kraad", "ametinimetus, mitte lause"):
         assert fraas in juhis, fraas
+
+
+@pytest.mark.parametrize("bad", ["vutt:P../admin", "Q123", "vutt:Pabc/x", ""])
+def test_detail_kontrollib_id_kuju_enne_paringut(bad):
+    """#619: ID läheb URL-i teekonda — sama kontroll mis enrichment_context-is."""
+    client = FakeClient({})
+    with pytest.raises(VuttError, match="Vigane person_id"):
+        persons.detail(client, BASE, bad, include_relations=False)
+    assert client.gets == []

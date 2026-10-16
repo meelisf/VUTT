@@ -7,6 +7,12 @@ const ALLOWED = new Set([
   'src/components/SafeHtml.tsx',
   'src/utils/__tests__/dangerouslySetInnerHTMLGuard.test.ts',
 ]);
+// Otse-DOM-i HTML-kirjutus (#619): CodeMirrori vidin ei ole React, seal läheb
+// sisu `renderVuttMarkup`-i kaudu (lubatud tägide nimekiri + escape).
+const ALLOWED_DOM = new Set([
+  'src/components/editor/MarginaliaExtension.ts',
+  'src/utils/__tests__/dangerouslySetInnerHTMLGuard.test.ts',
+]);
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -24,6 +30,16 @@ describe('dangerouslySetInnerHTML guard', () => {
       .map((path) => ({ path, rel: relative(process.cwd(), path) }))
       .filter(({ rel }) => !ALLOWED.has(rel))
       .filter(({ path }) => /dangerouslySetInnerHTML\s*=/.test(readFileSync(path, 'utf8')))
+      .map(({ rel }) => rel);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('otse-DOM-i HTML-kirjutus ainult teadaolevas sanitiseeritud kohas', () => {
+    const offenders = walk(SRC_DIR)
+      .map((path) => ({ path, rel: relative(process.cwd(), path) }))
+      .filter(({ rel }) => !ALLOWED_DOM.has(rel))
+      .filter(({ path }) => /\.(?:inner|outer)HTML\s*=(?!=)|insertAdjacentHTML\s*\(/.test(readFileSync(path, 'utf8')))
       .map(({ rel }) => rel);
 
     expect(offenders).toEqual([]);

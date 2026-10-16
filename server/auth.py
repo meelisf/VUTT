@@ -446,6 +446,20 @@ def get_all_users():
     return result
 
 
+def _revoke_agent_handoffs(username):
+    """MCP üleandmiskoodid (ADR 0058) kehtivad kuni 8 h ja on seotud KASUTAJAGA —
+    konto kustutamine või rolli muutus peab need tühistama nagu sessioonid (#619).
+    Ootel ettepanekud jäävad: neid kinnitab sisselogitud toimetaja. Tõrge ei
+    katkesta haldustoimingut — kood aegub niikuinii."""
+    from .prosopography import enrichment_proposals
+    from . import work_part_proposals
+    for module in (enrichment_proposals, work_part_proposals):
+        try:
+            module.revoke_handoffs(username)
+        except Exception as e:
+            print(f"MCP koodide tühistus ebaõnnestus ({module.__name__}, {username}): {e}")
+
+
 def update_user_role(username, new_role, admin_user):
     """
     Muudab kasutaja rolli.
@@ -489,6 +503,7 @@ def update_user_role(username, new_role, admin_user):
     # muuta privileegi-invarianti). Lazy import — väldib ring-importi password_reset ↔ auth.
     from .password_reset import revoke_user_reset_tokens
     revoke_user_reset_tokens(username, "role_changed")
+    _revoke_agent_handoffs(username)
 
     print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' rolli: {old_role} -> {new_role}. Invalideeritud {invalidated} sessiooni.")
     return True, "Roll muudetud"
@@ -659,6 +674,7 @@ def delete_user(username, admin_user):
 
     from .password_reset import revoke_user_reset_tokens
     revoke_user_reset_tokens(username, "user_deleted")
+    _revoke_agent_handoffs(username)
 
     print(f"Admin '{admin_user['username']}' kustutas kasutaja '{username}' ({deleted_name}). Eemaldatud {removed} sessiooni.")
     return True, "Kasutaja kustutatud"

@@ -738,9 +738,9 @@ const PersonEditPage: React.FC = () => {
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">{t('form.identifiers')}</label>
             <div className="space-y-2">
               {[
-                { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345', url: (v: string) => `https://www.wikidata.org/wiki/${v}` },
-                { key: 'gnd_id', label: 'GND', placeholder: '123456789', url: (v: string) => `https://d-nb.info/gnd/${v}` },
-                { key: 'viaf_id', label: 'VIAF', placeholder: '12345678', url: (v: string) => `https://viaf.org/viaf/${v}` },
+                { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345', url: (v: string) => `https://www.wikidata.org/wiki/${encodeURIComponent(v)}` },
+                { key: 'gnd_id', label: 'GND', placeholder: '123456789', url: (v: string) => `https://d-nb.info/gnd/${encodeURIComponent(v)}` },
+                { key: 'viaf_id', label: 'VIAF', placeholder: '12345678', url: (v: string) => `https://viaf.org/viaf/${encodeURIComponent(v)}` },
                 { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA:123', url: null },
               ].map(({ key, label, placeholder, url }) => {
                 const val = draft[key as keyof FormDraft] as string;

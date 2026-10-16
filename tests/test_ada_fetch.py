@@ -262,9 +262,9 @@ def test_toota_taidab_lehepiirid_ja_expected_pages_on_liidetud_arv(upload, tmp_p
     numbrid (4, 2, 3 → kokku 9) valitud nii, et need kaks tõesti erineksid ja
     väär implementatsioon (nt expected_pages=len(allikad)=3) jääks vahele."""
     allikad = [
-        {"bitstream_uuid": "a", "size_bytes": 10, "name": "001.pdf"},
-        {"bitstream_uuid": "b", "size_bytes": 20, "name": "002.pdf"},
-        {"bitstream_uuid": "c", "size_bytes": 30, "name": "003.pdf"},
+        {"bitstream_uuid": "0000000a-0000-4000-8000-00000000000a", "size_bytes": 10, "name": "001.pdf"},
+        {"bitstream_uuid": "0000000b-0000-4000-8000-00000000000b", "size_bytes": 20, "name": "002.pdf"},
+        {"bitstream_uuid": "0000000c-0000-4000-8000-00000000000c", "size_bytes": 30, "name": "003.pdf"},
     ]
     upload_state.set_upload_state(
         upload, ada={"handle": "10062/7822", "item_uuid": "u", "sources": allikad}
@@ -302,7 +302,7 @@ def test_toota_katkestus_looke_ja_liitmise_vahel_ei_liida_ega_kirjuta(upload, tm
     """F3: staging kustub PÄRAST allalaadimistsüklit, aga ENNE liitmist
     (nt kasutaja vajutab „Katkesta" täpselt siis). `_toota` peab selle
     kontrolli-punktis märkama ja mitte liitma ega olekut kirjutama."""
-    allikad = [{"bitstream_uuid": "a", "size_bytes": 10, "name": "001.pdf"}]
+    allikad = [{"bitstream_uuid": "0000000a-0000-4000-8000-00000000000a", "size_bytes": 10, "name": "001.pdf"}]
     upload_state.set_upload_state(
         upload, ada={"handle": "10062/7822", "item_uuid": "u", "sources": allikad}
     )
@@ -344,7 +344,7 @@ def test_toota_koristuse_ebaonnestumine_ei_riku_edu(upload, tmp_path, monkeypatc
     ajutise ada/-kausta koristusel viskab (nt NFS-i viivitus, õigused), EI
     tohi see kirjutada üle juba õnnestunud fetch'i tulemust ada_error'iks.
     Koristus on omaette try-plokk täpselt selleks."""
-    allikad = [{"bitstream_uuid": "a", "size_bytes": 10, "name": "001.pdf"}]
+    allikad = [{"bitstream_uuid": "0000000a-0000-4000-8000-00000000000a", "size_bytes": 10, "name": "001.pdf"}]
     upload_state.set_upload_state(
         upload, ada={"handle": "10062/7822", "item_uuid": "u", "sources": allikad}
     )
