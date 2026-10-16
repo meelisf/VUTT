@@ -830,6 +830,12 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     except Exception as e:
         logger.warning(f"replace {upload_id}: git commit ebaõnnestus: {e}")
 
+    # 9b. Lehehulk vahetus tervikuna (#626, ADR 0055): vanade lehtede `mentioned`-kirjed
+    # ja osade lehetüved tuleb uute lehtede järgi ühtlustada. Enne Meili sünki, et
+    # sünk kannaks ühtlustatud osi. Viga logitakse funktsiooni sees, ei visata.
+    from .prosopography import relations as _relations
+    _relations.refresh_work_mentions(work_dir, work_id)
+
     # 10. Meilisearch sünk
     try:
         from .meilisearch_ops import sync_work_to_meilisearch
