@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChangeSet } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
@@ -8,8 +8,8 @@ import { replyToComment } from '../../services/pageService';
 import { pageSwapAnnotation } from './editorAnnotations';
 import { savedStateAfterRestore, type RestoreResult } from './pageRestore';
 import {
-  PageConflictError, baseFromSavedState, minimalTextChange, retryBase,
-  type PageFields, type SaveOutcome,
+  PageConflictError, annotationsForText, assembleChunks, baseFromSavedState, minimalTextChange, retryBase,
+  type ChunkChoice, type PageFields, type SaveOutcome,
 } from './pageConflict';
 
 export interface EditorSavedState {
@@ -195,7 +195,43 @@ export function useEditorSave({
     });
   }, [onPageRestored, pageConflict, setComments, setIsDirty, setPageTags, setSavedState, setTextAnnotations, viewRef]);
 
+  /**
+   * Tükkide kaupa lahendus (#612): kokku pandud tekst läheb redaktorisse
+   * SALVESTAMATA — kasutaja kontrollib ja salvestab ise. Baas = vana baas, kus
+   * konfliktsed üksused on serveri omad: järgmisel Ctrl+S-il võidab nendes
+   * redaktori seis, teiste muudatused mujal liidetakse edasi.
+   */
+  const resolveConflictWithChoices = useCallback((choices: ChunkChoice[]) => {
+    const c = pageConflict;
+    const chunks = c?.error.textChunks;
+    if (!c || !chunks) return;
+    setPageConflict(null);
+    const cur = c.error.current;
+    const tekst = assembleChunks(chunks, choices);
+    const view = viewRef.current;
+    if (view) {
+      const praegu = view.state.doc.toString();
+      if (praegu !== tekst) {
+        view.dispatch({ changes: minimalTextChange(praegu, tekst), annotations: pageSwapAnnotation.of(true) });
+      }
+    }
+    setTextAnnotations(annotationsForText(
+      tekst, c.updatedPage.text_annotations || [], cur.text_annotations, c.updatedPage.text_content,
+    ));
+    const { text_content: baasTekst, ...baas } = retryBase(c.base, cur, c.error.fields);
+    setSavedState({ ...baas, text: baasTekst });
+    setIsDirty(true);
+  }, [pageConflict, setIsDirty, setSavedState, setTextAnnotations, viewRef]);
+
   const cancelConflict = useCallback(() => setPageConflict(null), []);
+
+  // Stabiilne identiteet: dialoog lähtestab valikud uue kokkupõrke peale.
+  const conflictView = useMemo(() => (pageConflict ? {
+    fields: pageConflict.error.fields,
+    current: pageConflict.error.current,
+    textChunks: pageConflict.error.textChunks,
+    theirsLast: pageConflict.error.theirsLast,
+  } : null), [pageConflict]);
 
   const handleSave = useCallback(async (): Promise<boolean> => {
     const updatedPage = makePage(comments, textAnnotations);
@@ -295,7 +331,8 @@ export function useEditorSave({
     handleCommentsRestored,
     handlePageRestored,
     handleReplyToComment,
-    pageConflict: pageConflict ? { fields: pageConflict.error.fields, current: pageConflict.error.current } : null,
+    pageConflict: conflictView,
+    resolveConflictWithChoices,
     resolveConflictKeepMine,
     resolveConflictTakeTheirs,
     cancelConflict,

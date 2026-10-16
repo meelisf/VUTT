@@ -155,4 +155,6 @@ def test_sama_rea_konflikt_annab_tukid(client, login, leht):
     tükid = r.json()["detail"]["text_chunks"]
     assert [t for t in tükid if t["kind"] == "conflict"] == [
         {"kind": "conflict", "base": "rida kolm\n", "mine": "rida III\n", "theirs": "rida 3\n"}]
+    # Kes viimati muutis (dialoogi jaoks): fixture'i commit „v1" autor „t".
+    assert r.json()["detail"]["theirs_last"]["author"] == "t"
     assert _ketas(leht)[0] == MITMEREALINE.replace("rida kolm", "rida 3")

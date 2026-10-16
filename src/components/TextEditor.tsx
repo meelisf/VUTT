@@ -206,6 +206,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     pageConflict,
     resolveConflictKeepMine,
     resolveConflictTakeTheirs,
+    resolveConflictWithChoices,
     cancelConflict,
   } = useEditorSave({
     page,
@@ -375,6 +376,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       conflict={pageConflict}
       onKeepMine={() => { void resolveConflictKeepMine(); }}
       onTakeTheirs={() => { void resolveConflictTakeTheirs(); }}
+      onApplyChoices={resolveConflictWithChoices}
       onCancel={cancelConflict}
     />
 

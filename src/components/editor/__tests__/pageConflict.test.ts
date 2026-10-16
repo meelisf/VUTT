@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { PageStatus, type Annotation } from '../../../types';
 import {
   PageConflictError,
+  annotationsForText,
+  assembleChunks,
   baseFromSavedState,
   conflictFromResponse,
+  minimalTextChange,
   retryBase,
+  wordDiff,
   type PageFields,
+  type TextChunk,
 } from '../pageConflict';
 
 const c = (id: string, text = 't', replies: unknown[] = []) =>
@@ -84,5 +89,56 @@ describe('conflictFromResponse', () => {
   it('muu staatus või kuju → null', () => {
     expect(conflictFromResponse(500, { detail: 'x' })).toBeNull();
     expect(conflictFromResponse(409, { detail: 'Commit ei kuulu' })).toBeNull();
+  });
+});
+
+describe('tükkide kaupa lahendus (#612)', () => {
+  const tükid: TextChunk[] = [
+    { kind: 'ok', text: 'üks\n' },
+    { kind: 'conflict', base: 'kaks\n', mine: 'KAKS\n', theirs: 'kaks!\n' },
+    { kind: 'ok', text: 'kolm\n' },
+    { kind: 'conflict', base: 'neli', mine: 'NELI', theirs: 'neli!' },
+  ];
+
+  it('conflictFromResponse loeb tükid ja viimase muutja', () => {
+    const e = conflictFromResponse(409, { detail: {
+      conflict: true, fields: ['text'], current: leht(), text_chunks: tükid,
+      theirs_last: { author: 'mari', date: '2026-10-16T10:00:00+03:00' },
+    } });
+    expect(e?.textChunks).toEqual(tükid);
+    expect(e?.theirsLast).toEqual({ author: 'mari', date: '2026-10-16T10:00:00+03:00' });
+  });
+
+  it('tundmatu tüki kuju → tükke ei kasutata (tagasi tervikvalikule)', () => {
+    const e = conflictFromResponse(409, { detail: {
+      conflict: true, fields: ['text'], current: leht(), text_chunks: [{ kind: 'muu' }],
+    } });
+    expect(e?.textChunks).toBeNull();
+    expect(e?.theirsLast).toBeNull();
+  });
+
+  it('assembleChunks: minu / tema / mõlemad', () => {
+    expect(assembleChunks(tükid, ['mine', 'theirs'])).toBe('üks\nKAKS\nkolm\nneli!');
+    expect(assembleChunks(tükid, ['both', 'both'])).toBe('üks\nkaks!\nKAKS\nkolm\nneli!\nNELI');
+  });
+
+  it('annotationsForText: tema tükist tulnud ankur saab tema kirje, minu väljajäänud kirje kukub', () => {
+    const a = (id: number, comment: string) => ({ id, comment, author: 'u', created_at: '' });
+    const minu = [a(1, 'minu üks'), a(2, 'minu kaks'), a(9, 'vana orb')];
+    const nende = [a(1, 'nende üks'), a(3, 'nende kolm')];
+    const tekst = '<ann1>x</ann1> <ann3>y</ann3>';
+    const minuTekst = '<ann1>x</ann1> <ann2>z</ann2>';
+    expect(annotationsForText(tekst, minu, nende, minuTekst)).toEqual([a(1, 'minu üks'), a(9, 'vana orb'), a(3, 'nende kolm')]);
+  });
+
+  it('wordDiff tõstab esile ainult erineva sõna', () => {
+    const d = wordDiff('in der Stadt', 'in der Stadſ');
+    expect(d.a).toEqual([{ text: 'in der ', changed: false }, { text: 'Stadt', changed: true }]);
+    expect(d.b).toEqual([{ text: 'in der ', changed: false }, { text: 'Stadſ', changed: true }]);
+  });
+
+  it('minimalTextChange jätab ühise alguse ja lõpu puutumata', () => {
+    expect(minimalTextChange('abc\nxyz', 'abc\nXyz')).toEqual({ from: 4, to: 5, insert: 'X' });
+    expect(minimalTextChange('aa', 'aaa')).toEqual({ from: 2, to: 2, insert: 'a' });
   });
 });

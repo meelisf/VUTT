@@ -138,6 +138,20 @@ def _merge_with_base(txt_path, json_path, text, client_meta, base):
     return merged["text_content"], meta, (merged if panustas else None)
 
 
+def _viimane_muutja(catalog, filename):
+    """Lehe viimane commit dialoogi jaoks („Mari, 14:02", #612). Parim katse:
+    git-tõrge ei tohi kokkupõrke vastust ära rikkuda."""
+    stem = os.path.splitext(filename)[0]
+    try:
+        ajalugu = get_file_git_history(
+            [f"{catalog}/{filename}", f"{catalog}/{stem}.json"], max_count=1)
+    except Exception:
+        return None
+    if not ajalugu:
+        return None
+    return {"author": ajalugu[0]["author"], "date": ajalugu[0]["date"]}
+
+
 def _save_page_locked(txt_path, text, client_meta, username, base=None):
     """Lehe kirjutus lehe luku all (#416): serveripoolsete väljade liitmine,
     muutusteta kontroll ja kirjutus näevad sama seisu.
@@ -209,9 +223,11 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
         )
     except _PageConflict as e:
         # Ketas puutumata; klient näitab konfliktidialoogi (#455).
+        theirs_last = await run_in_threadpool(_viimane_muutja, catalog, filename)
         raise HTTPException(status_code=409, detail={
             "conflict": True, "fields": e.fields, "current": e.current,
             **({"text_chunks": e.text_chunks} if e.text_chunks else {}),
+            **({"theirs_last": theirs_last} if theirs_last else {}),
         })
     # Liidetud seis tagasi kliendile: ketta panus peab redaktorisse jõudma.
     merged_extra = {"merged": True, "page": merged_page} if merged_page is not None else {}

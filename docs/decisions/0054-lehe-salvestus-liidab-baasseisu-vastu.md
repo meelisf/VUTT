@@ -64,3 +64,9 @@ oli üks üksus. Dialoog pakkus pimesi „salvesta minu", mis kirjutas teise tö
   salvestamata tööks — järgmine Ctrl+S oleks teise toimetaja read üle kirjutanud.
 - „Salvesta minu" tekstikokkupõrkel võtab baasi ka serveri annotatsioonikirjed:
   minu tekst võidab tervikuna, muidu jääks nende ankruta kirje orvuks.
+- **Dialoog (PR 2):** tekstikokkupõrkel valitakse iga põrkuva tüki juures
+  minu / tema / mõlemad (sõnatasemel esiletõstuga; 409 kannab ka `theirs_last`
+  = lehe viimane commit). Tulemus läheb redaktorisse **salvestamata**; baas =
+  `retryBase` (konfliktsed üksused serveri omad), nii et Ctrl+S salvestab valiku
+  ja muud vahepealsed muudatused liidetakse edasi. Pimedat „Salvesta minu"
+  tekstikokkupõrkel enam ei ole — see jääb ainult tükkideta juhule.

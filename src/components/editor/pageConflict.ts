@@ -22,9 +22,28 @@ export interface SaveOutcome {
   merged: PageFields | null;
 }
 
+/** Teksti tükk kokkupõrke vastuses (#612): tükid katavad kogu teksti. */
+export type TextChunk =
+  | { kind: 'ok'; text: string }
+  | { kind: 'conflict'; base: string; mine: string; theirs: string };
+
+/** Kasutaja valik ühe põrkuva tüki kohta. `both` = enne tema, siis minu. */
+export type ChunkChoice = 'mine' | 'theirs' | 'both';
+
+/** Lehe viimane muutja serveris (git), dialoogi jaoks. */
+export interface TheirsLast {
+  author: string;
+  date: string;
+}
+
 /** Kokkupõrge: midagi ei salvestatud. `fields`: `text`, `status`, `page_tags`, `comments:<id>`, `annotations:<id>`. */
 export class PageConflictError extends Error {
-  constructor(public fields: string[], public current: PageFields) {
+  constructor(
+    public fields: string[],
+    public current: PageFields,
+    public textChunks: TextChunk[] | null = null,
+    public theirsLast: TheirsLast | null = null,
+  ) {
     super(`Lehe salvestus põrkus: ${fields.join(', ')}`);
     this.name = 'PageConflictError';
   }
@@ -45,9 +64,114 @@ export function conflictFromResponse(status: number, body: unknown): PageConflic
   if (status !== 409 || !body || typeof body !== 'object') return null;
   const detail = (body as { detail?: unknown }).detail;
   if (!detail || typeof detail !== 'object') return null;
-  const d = detail as { conflict?: unknown; fields?: unknown; current?: unknown };
+  const d = detail as { conflict?: unknown; fields?: unknown; current?: unknown; text_chunks?: unknown; theirs_last?: unknown };
   if (d.conflict !== true || !Array.isArray(d.fields) || !d.current || typeof d.current !== 'object') return null;
-  return new PageConflictError(d.fields.map(String), d.current as PageFields);
+  return new PageConflictError(
+    d.fields.map(String), d.current as PageFields, parseChunks(d.text_chunks), parseTheirsLast(d.theirs_last),
+  );
+}
+
+function parseChunks(raw: unknown): TextChunk[] | null {
+  if (!Array.isArray(raw)) return null;
+  const str = (v: unknown) => typeof v === 'string';
+  const chunks: TextChunk[] = [];
+  for (const c of raw) {
+    if (c && c.kind === 'ok' && str(c.text)) chunks.push({ kind: 'ok', text: c.text });
+    else if (c && c.kind === 'conflict' && str(c.base) && str(c.mine) && str(c.theirs)) {
+      chunks.push({ kind: 'conflict', base: c.base, mine: c.mine, theirs: c.theirs });
+    } else return null;   // tundmatu kuju → dialoog langeb tagasi tervikvalikule
+  }
+  return chunks.some(c => c.kind === 'conflict') ? chunks : null;
+}
+
+function parseTheirsLast(raw: unknown): TheirsLast | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as { author?: unknown; date?: unknown };
+  return typeof r.author === 'string' && typeof r.date === 'string' ? { author: r.author, date: r.date } : null;
+}
+
+/**
+ * Tükid + valikud → redaktori tekst. `choices[i]` käib i-nda PÕRKUVA tüki kohta.
+ * `both`: enne tema read, siis minu — reavahetus vahele, kui tema tükk ei lõpe sellega.
+ */
+export function assembleChunks(chunks: TextChunk[], choices: ChunkChoice[]): string {
+  let i = 0;
+  return chunks.map(c => {
+    if (c.kind === 'ok') return c.text;
+    const valik = choices[i++];
+    if (valik === 'theirs') return c.theirs;
+    if (valik === 'both') {
+      const vahe = c.theirs && c.mine && !c.theirs.endsWith('\n') ? '\n' : '';
+      return c.theirs + vahe + c.mine;
+    }
+    return c.mine;
+  }).join('');
+}
+
+const ANN_TAG_RE = /<ann(\d+)>/g;
+
+function annIdsInText(text: string): Set<string> {
+  return new Set(Array.from(text.matchAll(ANN_TAG_RE), m => m[1]));
+}
+
+/**
+ * Tükkidest kokku pandud teksti annotatsioonikirjed: tekstis oleva ankru kirje
+ * tuleb minult, kui mul see on, muidu serverist (tema tükist tulnud ankur).
+ * Minu kirje, mille ankur jäi minu valikuga välja, kukub ära; minu juba enne
+ * ankruta olnud kirje (vana orb) jääb — see pole selle valiku süü.
+ */
+export function annotationsForText(
+  text: string, mine: TextAnnotation[], theirs: TextAnnotation[], mineText: string,
+): TextAnnotation[] {
+  const tekstis = annIdsInText(text);
+  const minuTekstis = annIdsInText(mineText);
+  const tulemus = mine.filter(a => tekstis.has(String(a.id)) || !minuTekstis.has(String(a.id)));
+  const olemas = new Set(tulemus.map(a => String(a.id)));
+  for (const a of theirs) {
+    if (tekstis.has(String(a.id)) && !olemas.has(String(a.id))) tulemus.push(a);
+  }
+  return tulemus;
+}
+
+export interface DiffSegment {
+  text: string;
+  changed: boolean;
+}
+
+/**
+ * Sõnatasemel erinevus kahe tüki vahel esiletõstuks (LCS). Transkriptsioonis
+ * on vahe tihti üks täht (ſ/s, u/v) — ilma esiletõstuta ei leia silm seda üles.
+ * Suurel tükil loobutakse (ruutkeerukus), siis on kõik `changed: false`.
+ */
+export function wordDiff(a: string, b: string): { a: DiffSegment[]; b: DiffSegment[] } {
+  const ta = a.split(/(\s+)/).filter(Boolean);
+  const tb = b.split(/(\s+)/).filter(Boolean);
+  if (ta.length * tb.length > 250_000) {
+    return { a: [{ text: a, changed: false }], b: [{ text: b, changed: false }] };
+  }
+  const n = ta.length, m = tb.length;
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i][j] = ta[i] === tb[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const outA: DiffSegment[] = [];
+  const outB: DiffSegment[] = [];
+  const push = (out: DiffSegment[], text: string, changed: boolean) => {
+    const last = out[out.length - 1];
+    if (last && last.changed === changed) last.text += text;
+    else out.push({ text, changed });
+  };
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (ta[i] === tb[j]) { push(outA, ta[i++], false); push(outB, tb[j++], false); }
+    else if (lcs[i + 1][j] >= lcs[i][j + 1]) push(outA, ta[i++], true);
+    else push(outB, tb[j++], true);
+  }
+  while (i < n) push(outA, ta[i++], true);
+  while (j < m) push(outB, tb[j++], true);
+  return { a: outA, b: outB };
 }
 
 /**
