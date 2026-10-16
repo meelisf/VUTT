@@ -131,6 +131,11 @@ enne `<fn>`/`<pb/>` asendust, üldist tägieemaldust ja poolituste liitmist:
   - **paar, mille sees on `<pb/>`, ei ole kehtiv tähistus** (`<fw>12<pb/>13</fw>`): tägid
     kaovad nagu tavalised, sisu ja `<pb/>` jäävad, `page_marks`-i kirjet ei teki. Muidu
     saaks kahe tekstiosa kohta ühe kirje.
+  - **paar, mille sees on `<m>` või `</m>`, ei ole kehtiv tähistus** (lõppülevaatus
+    2026-10-17): tähistus võib olla `<m>` sees, mitte vastupidi ega `<m>` piiriga ristuvalt.
+    Muidu loeks `page_marks` põhiteksti või marginaalia leheküljenumbriks, kuigi otsing
+    tõlgendab teisiti. Normaliseerija eemaldab sellise paari tägid PÄRAST `<m>` välimiseks
+    tõstmist (`<fw><m>246</m></fw>` → `<m><fw>246</fw></m>`).
 - Puhastus eemaldab `page_mark_spans` vahemikud koos sisuga.
   (Ülevaatus 2026-10-17: parser tagastab kõik paarid, mitte ainult kehtivad välimised.)
 - **Tühi string, mitte reavahetus:** ümbritsev tühik/reavahetus jääb nagu originaalis.

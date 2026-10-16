@@ -90,3 +90,21 @@ describe('pageMarkEdit — vormindus: nähtav ulatus säilib', () => {
     expect(run('<i>Vorr‸ede</i>\nhabe', 'rh').doc).toBe('<rh><i>Vorrede</i></rh>\nhabe');
   });
 });
+
+describe('pageMarkEdit — lõppülevaatuse leiud', () => {
+  it('valik algab kohe sulgeva vormindustägi ees → tähistus tägist väljas', () => {
+    expect(run('<i>ab</i>⟦cd⟧', 'fw').doc).toBe('<i>ab</i><fw>cd</fw>');
+    expect(pageMarkEdit('<i>ab</i>cd', 5, 11, 'fw', [])).toEqual({ ok: true, changes: [
+      { from: 9, to: 9, insert: '<fw>' }, { from: 11, to: 11, insert: '</fw>' }] });
+  });
+  it('valik lõpeb kohe avava vormindustägi järel → tähistus tägist väljas', () => {
+    expect(pageMarkEdit('cd<i>ab</i>', 0, 5, 'fw', [])).toEqual({ ok: true, changes: [
+      { from: 0, to: 0, insert: '<fw>' }, { from: 2, to: 2, insert: '</fw>' }] });
+  });
+  it('peidetud marginaaliaploki sees olevat tähistust ei vahetata ega eemaldata', () => {
+    const doc = 'body\n<m><sig>A</sig> nota</m>\nmore';
+    const hidden = [{ from: 5, to: 29 }];
+    expect(pageMarkEdit(doc, 0, doc.length, 'fw', hidden)).toEqual({ ok: false, reason: 'marginalia' });
+    expect(pageMarkEdit(doc, 5, 5, 'sig', hidden)).toEqual({ ok: false, reason: 'marginalia' });
+  });
+});

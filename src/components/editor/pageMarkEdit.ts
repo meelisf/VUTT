@@ -72,6 +72,12 @@ export function pageMarkEdit(
   while (from < to && isWs(doc[from])) from++;
   while (to > from && isWs(doc[to - 1])) to--;
 
+  // Peidetud (suletud) marginaalia: ka seal olevat tähistust ei vahetata ega
+  // eemaldata — kaitsefilter lõikaks muudatusest poole välja ja paar ristuks.
+  if (hidden.some(h => (h.from < to && h.to > from) || (caret >= 0 && h.from <= caret && caret <= h.to))) {
+    return { ok: false, reason: 'marginalia' };
+  }
+
   // 2. Olemasolev tähistus: puudutamine → terve paar.
   const touched = parsePageMarks(doc).pairs.filter(p =>
     caret >= 0 ? (p.openFrom <= caret && caret <= p.closeTo) || (p.openFrom < to && p.closeTo > from)
@@ -95,9 +101,19 @@ export function pageMarkEdit(
     return { ok: true, changes: [{ from: at, to: at, insert: `<${kind}></${kind}>` }], cursor: at + kind.length + 2 };
   }
 
-  // 4. Keeldumised lõpliku vahemiku kohta.
-  if (hidden.some(h => h.from < to && h.to > from)) return { ok: false, reason: 'marginalia' };
+  // 4. Serv vormindustägi kõrval: valik, mis algab kohe sulgeva tägi ees või lõpeb
+  // kohe avava järel, ei haara seda tägi (muidu ristuks tähistus vormindusega).
   const toks = tokens(doc);
+  for (let moved = true; moved;) {
+    moved = false;
+    const c = toks.find(t => t.close && t.from === from && t.to <= to && FORMAT_TAGS.has(t.name));
+    if (c) { from = c.to; moved = true; }
+    const o = toks.find(t => !t.close && !t.self && t.to === to && t.from >= from && FORMAT_TAGS.has(t.name));
+    if (o) { to = o.from; moved = true; }
+  }
+  if (from >= to) return { ok: false, reason: 'tagBoundary' };
+
+  // Keeldumised lõpliku vahemiku kohta.
   if (toks.some(t => (t.from < from && from < t.to) || (t.from < to && to < t.to))) return { ok: false, reason: 'tagBoundary' };
   const inside = toks.filter(t => t.from >= from && t.to <= to);
   if (inside.some(t => t.name === 'pb')) return { ok: false, reason: 'pageBreak' };

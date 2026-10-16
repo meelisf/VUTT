@@ -59,6 +59,8 @@ def tag_pattern(t: TagDef) -> str:
 
 _PM_TOKEN_RE = re.compile(r"<(/?)(" + "|".join(PAGE_MARK_KINDS) + r")>")
 _PB_RE = re.compile(r"<pb\s*/>")
+# <m> või </m> paari sees: tähistus võib olla <m> sees, mitte vastupidi (ADR 0070).
+_M_TAG_RE = re.compile(r"</?m>")
 _ANY_TAG_RE = re.compile(r"</?[a-z]+\d*/?>")
 
 
@@ -69,7 +71,7 @@ class PageMarkPair:
     open_to: int
     close_from: int
     close_to: int
-    valid: bool   # ei sisalda <pb/>-d ega ristu teise paariga
+    valid: bool   # ei sisalda <pb/>-d ega <m>-tägi ega ristu teise paariga
     outer: bool   # ei ole ühegi teise paari sees
 
 
@@ -105,8 +107,10 @@ def parse_page_marks(text: str):
             elif (of2 < of < ct2 < ct) or (of < of2 < ct < ct2):
                 crossing = True
         has_pb = bool(_PB_RE.search(text, ot, cf))
+        has_m = bool(_M_TAG_RE.search(text, ot, cf))
         pairs.append(PageMarkPair(kind, of, ot, cf, ct,
-                                  valid=not has_pb and not crossing, outer=not contained))
+                                  valid=not has_pb and not has_m and not crossing,
+                                  outer=not contained))
     return pairs, orphans
 
 

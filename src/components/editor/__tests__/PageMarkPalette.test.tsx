@@ -67,3 +67,34 @@ describe('PageMarkMenu', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+describe('PageMarkMenu — ei neela võõraid klahve', () => {
+  it('Ctrl/⌘+täht ei rakenda liiki ja sulgeb menüü (Ctrl+S salvestab edasi)', () => {
+    const onApply = vi.fn(() => null);
+    const onClose = vi.fn();
+    render(<PageMarkMenu anchor={{ left: 0, top: 0 }} onApply={onApply} onClose={onClose} />);
+    const ev = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });
+    document.dispatchEvent(ev);
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('muu klahv sulgeb menüü ja jõuab redaktorisse', () => {
+    const onApply = vi.fn(() => null);
+    const onClose = vi.fn();
+    render(<PageMarkMenu anchor={{ left: 0, top: 0 }} onApply={onApply} onClose={onClose} />);
+    const ev = new KeyboardEvent('keydown', { key: 'x', bubbles: true, cancelable: true });
+    document.dispatchEvent(ev);
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('klõps menüüst väljas sulgeb', () => {
+    const onClose = vi.fn();
+    render(<PageMarkMenu anchor={{ left: 0, top: 0 }} onApply={() => null} onClose={onClose} />);
+    fireEvent.mouseDown(document.body);
+    expect(onClose).toHaveBeenCalled();
+  });
+});

@@ -113,8 +113,14 @@ export function PageMarkMenu({ anchor, onApply, onClose }: MenuProps) {
   const { t } = useTranslation(['workspace']);
   const [active, setActive] = useState(0);
   const { msg, show } = useRefusal();
+  const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Pelgalt muuteklahv (Shift jne) ei tee midagi. Muuteklahviga kombinatsioon
+      // (Ctrl+S, Ctrl+C) ja muu klahv sulgevad menüü ning jõuavad edasi — menüü ei
+      // tohi neelata salvestust ega trükkimist.
+      if (['Shift', 'Control', 'Meta', 'Alt'].includes(e.key)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) { onClose(); return; }
       const byKey = PAGE_MARK_KINDS.find(k => KEY_OF[k] === e.key.toLowerCase());
       let handled = true;
       if (byKey) { const r = onApply(byKey); show(r); if (!r) onClose(); }
@@ -122,14 +128,22 @@ export function PageMarkMenu({ anchor, onApply, onClose }: MenuProps) {
       else if (e.key === 'ArrowUp') setActive(a => (a + PAGE_MARK_KINDS.length - 1) % PAGE_MARK_KINDS.length);
       else if (e.key === 'Enter') { const r = onApply(PAGE_MARK_KINDS[active]); show(r); if (!r) onClose(); }
       else if (e.key === 'Escape') onClose();
-      else handled = false;
+      else { handled = false; onClose(); }
       if (handled) { e.preventDefault(); e.stopPropagation(); }
     };
+    // Klõps menüüst väljas sulgeb (nt tagasi teksti või kommentaari kasti).
+    const onDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) onClose();
+    };
     document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
+    document.addEventListener('mousedown', onDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('mousedown', onDown, true);
+    };
   }, [active, onApply, onClose, show]);
   return (
-    <div role="menu" style={{ left: anchor.left, top: anchor.top }}
+    <div ref={menuRef} role="menu" style={{ left: anchor.left, top: anchor.top }}
       className="fixed z-[1250] min-w-[220px] rounded-md border border-gray-300 bg-white p-1 text-xs shadow-lg">
       <div className="px-2 pb-1 pt-0.5 text-[11px] text-gray-400">{t('editor.pageMarks.title')}</div>
       {PAGE_MARK_KINDS.map((k, i) => (

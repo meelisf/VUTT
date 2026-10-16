@@ -8,7 +8,7 @@ export interface PageMarkPair {
   openTo: number;
   closeFrom: number;
   closeTo: number;
-  /** ei sisalda <pb/>-d ega ristu teise paariga */
+  /** ei sisalda <pb/>-d ega <m>-tägi ega ristu teise paariga */
   valid: boolean;
   /** ei ole ühegi teise paari sees */
   outer: boolean;
@@ -16,6 +16,8 @@ export interface PageMarkPair {
 
 const TOKEN_RE = new RegExp(`<(/?)(${PAGE_MARK_KINDS.join('|')})>`, 'g');
 const PB_RE = /<pb\s*\/>/;
+// <m> või </m> paari sees: tähistus võib olla <m> sees, mitte vastupidi (ADR 0070).
+const M_TAG_RE = /<\/?m>/;
 
 export function parsePageMarks(text: string): { pairs: PageMarkPair[]; orphans: { from: number; to: number }[] } {
   const stacks = new Map<string, { from: number; to: number }[]>(PAGE_MARK_KINDS.map(k => [k, []]));
@@ -45,9 +47,11 @@ export function parsePageMarks(text: string): { pairs: PageMarkPair[]; orphans: 
       if (o.of < r.of && r.ct < o.ct) contained = true;
       else if ((o.of < r.of && r.of < o.ct && o.ct < r.ct) || (r.of < o.of && o.of < r.ct && r.ct < o.ct)) crossing = true;
     });
-    const hasPb = PB_RE.test(text.slice(r.ot, r.cf));
+    const inner = text.slice(r.ot, r.cf);
+    const hasPb = PB_RE.test(inner);
+    const hasM = M_TAG_RE.test(inner);
     return { kind: r.kind, openFrom: r.of, openTo: r.ot, closeFrom: r.cf, closeTo: r.ct,
-      valid: !hasPb && !crossing, outer: !contained };
+      valid: !hasPb && !hasM && !crossing, outer: !contained };
   });
   return { pairs, orphans };
 }

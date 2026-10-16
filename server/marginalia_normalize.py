@@ -101,9 +101,6 @@ def normalize_marginalia_tags(text: str) -> str:
     """
     if not text:
         return text
-    # Lehe tähistus (ADR 0070): sisemised ja kehtetud paarid (üle <pb/>, ristuvad)
-    # kaovad enne <m>-normaliseerimist — üks kord, tulemus on püsipunkt.
-    text = normalize_page_mark_structure(text)
     # Püsipunktini: tühja tagi koristus võib paljastada servatühiku
     # (`<m><i></i> x</m>` → `<m> x</m>`), mille koristab alles järgmine käik.
     prev = None
@@ -115,4 +112,8 @@ def normalize_marginalia_tags(text: str) -> str:
             text = '\n'.join(_normalize_line(p) for p in parts)
         # Tühjade tagide koristus jookseb ALATI (ka inline-tühjad failides ilma <m>-ta).
         text = strip_empty_tags(text)
+        # Lehe tähistus (ADR 0070): sisemised ja kehtetud paarid (üle <pb/>, <m>-iga
+        # ristuvad, teineteisega ristuvad) kaovad. PÄRAST <m> välimiseks tõstmist —
+        # `<fw><m>x</m></fw>` saab nii `<m><fw>x</fw></m>`-ks, mitte kaotab tähistuse.
+        text = normalize_page_mark_structure(text)
     return text
