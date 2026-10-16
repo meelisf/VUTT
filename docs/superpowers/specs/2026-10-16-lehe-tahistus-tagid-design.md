@@ -1,0 +1,251 @@
+# Lehe tähistus: tägid, otsingutekst ja märgenduse register (#630, spekk 1)
+
+**Kuupäev:** 2026-10-16 · **Issue:** #630 · **ADR:** 0070 (lehe tähistus ja aadress,
+ettepanek), 0071 (uus: märgendus on TEI alamhulga lühisüntaks) · **Seotud:** ADR 0006
+(Meili väljad ainult `meili_doc.py`-s), ADR 0044 (peidetud täg), ADR 0067 (`<add>`),
+ADR 0003/0009 (`<m>`), #526 (kirjad)
+
+**Ülevaatus:** spekk vajab enne plaani **mitut ülevaatusringi** (kasutaja nõue).
+
+## Probleem
+
+1. **Otsingutekst on vigane.** Lehe tähistus — siirdeviit, signatuur — on toorfailis oma
+   ridadel lehe lõpus, aga `clean_text_for_search` liidab reavahetuse poolituse ja
+   signatuur kleepub siirdeviida külge (`04na2fu4` lk 3: `Ehrwür⸗` ⏎ `A ij` →
+   `lehekylje_tekst` = `…EhrwürA ij`; lk 9 `…seiB`). Siirdeviit on otsingus ka topelt
+   (`lzogr0` lk 4 lõpp + lk 5 algus `derſelben`). Veerutiitel kordub igal lehel
+   (`lzogr0` lk 4 `Vorrede`).
+2. **Viitamiseks pole alust.** Lehe tähistust ei saa praegu märgendada; aadressi
+   tuletus (spekk 2) vajab märgendatud ankruid.
+3. **Märgendus kasvab ilma reeglita.** 9 tägi, ühtki kirjapandud reeglit, mis tägiks
+   kõlbab; tägide loend on ≥ 6 kohas koodis (`<add>` puudutas 19 faili, #579). Iga
+   uus täg võib vaikselt mõnest kohast välja jääda.
+
+## Terminid
+
+Raamatukogusõnastiku (Sõnaveeb, `rara`) eelistermin; UI, juhend ja dokumendid kasutavad
+seda.
+
+| Täg | TEI | Eelistermin (et) | Rööptermin | en |
+|---|---|---|---|---|
+| `fw` | `fw type="pageNum"` | lehenummerdus / leheküljenummerdus | foliatsioon, paginatsioon | foliation / pagination |
+| `sig` | `fw type="sig"` | signatuur | — | signature |
+| `catch` | `fw type="catch"` | siirdeviit | kustos | catchword |
+| `rh` | `fw type="head"` | veerutiitel | (jooksev pealkiri — sõnastikus pole) | running head |
+
+**Lehe tähistus** = TEI `fw` (*forme work*): lehe kui füüsilise objekti tähistus, mitte
+teksti osa. **Ei ole marginaalia** — `<m>` on sisuline tekst veerisel.
+
+## Otsused arutelust
+
+1. **Neli paaristägi** `<fw>` `<sig>` `<catch>` `<rh>`, atribuutideta, sisu täht-tähelt
+   (`A iij`, `Vor⸗`, `Vorrede`). Üks täg ei sobi: `B` ja `246` ei ole sisu järgi
+   eristatavad. `<rh>`, mitte `<head>` — TEI `head` on päris pealkiri.
+2. **Täg funktsiooni, mitte sõna järgi.** `Vorrede.` jaotise alguses (`lzogr0` lk 3) on
+   pealkiri; järgmiste lehtede ülaservas sama sõna on `<rh>`.
+3. **Märgendus on TEI alamhulga lühisüntaks** (ADR 0071): uus täg ainult otsese TEI
+   vastega; atribuute ei ole — TEI atribuudi info kannab nimi; iga täg on registris koos
+   TEI vaste ja käitumisega. VUTT ei leiuta tähendust, mida TEI-s pole.
+4. **`cs` jääb suhteliseks** (koodivahetus teose põhikirja suhtes). TEI teeb sama:
+   põhikiri deklareeritakse kord (`<text rendition=…>`), kõrvalekalle märgitakse. Puudu on
+   ainult põhikirja väli — eraldi issue. ADR 0071 märgib `cs`-i erandina, mille TEI
+   teisendus vajab seda välja.
+5. **Tähistus otsingutekstist välja, Meilis nähtav.** Eraldi mitteotsitav väli
+   `page_marks`; MCP näitab seda lehe päises.
+6. **Sisestus: lohistatav alati nähtav paneel** + kiirklahv. Katse (`spike/lehe-tahistus-
+   kiirklahv`, `repro/pagemarks.html`, 2026-10-16): rippmenüüs „peab valikut jahtima";
+   paneel nelja nupuga on „selgelt palju mugavam, eriti kui seda nihutada saab".
+7. **Ankru ettepanekut ei tehta** (ADR 0070 p. 8).
+
+## Disain
+
+### 1. Register ja ADR 0071
+
+**ADR 0071 — VUTT-i märgendus on TEI alamhulga lühisüntaks.** Kolm reeglit (otsus 3) ja
+tabel kõigi 13 tägi kohta. Kirjutamisel kontrollitakse iga vaste; kus vaste ei ole
+puhas, märgitakse see ausalt erandina.
+
+| Täg | TEI | Paaris | Sisu otsingusse |
+|---|---|---|---|
+| `i` `b` | `hi rend="italic\|bold"` | jah | jah |
+| `cs` | `hi`, kiri vastupidine põhikirjale (erand, vt otsus 4) | jah | jah |
+| `hi` | `hi` | jah | jah |
+| `m` | `note place="margin"` | jah | eraldi väli `marginaalia_tekst` |
+| `add` | `add` | jah | jah |
+| `annN` | ankur toimetaja märkusele (kontrollida: `anchor`/`span`) | jah | jah |
+| `fn` | viide joonealusele (kontrollida: `ref`/`note`) | jah | ei |
+| `pb` | `pb` | ise suletud | ei |
+| `fw` `sig` `catch` `rh` | `fw type="pageNum\|sig\|catch\|head"` | jah | **ei → `page_marks`** |
+
+**Registrid.** Kaks, sama sisuga:
+
+- `src/markup/vuttTags.ts` — `export const VUTT_TAG_REGISTRY`
+- `server/vutt_tags.py` — `VUTT_TAG_REGISTRY`
+
+Kirje: `name`, `tei`, `paired` (bool), `search` (`keep` | `drop` | `marginalia`),
+`pageMark` (bool; `pageMarkLabel` i18n-võti). Python ei loe frontendi puud: backendi
+image ei kanna `src/`-i.
+
+**Kes tarbib registrit otse (uus kood):** `clean_text_for_search` tähistuse samm,
+`page_marks`, `renderVuttMarkup` lubatud tägid, paneel/menüü. **Kordusloendid jäävad
+paigale** (`VUTT_TAGS` redaktoris, `marginalia_normalize._INLINE` ja `_EMPTY_RE`,
+`cleanMarkup` regex `useEditorFormattingActions.ts`, `wrapTagUtils` plokitägid) — neid
+valvab paarsustest (osa 4). Koondamine registrisse on eraldi koristus, kui lihtne, ka
+siin.
+
+### 2. Server
+
+**`clean_text_for_search`** (`server/meili_doc.py`). Uus alamsamm **sammu 1 algusesse**,
+enne `<fn>`/`<pb/>` asendust, üldist tägieemaldust ja poolituste liitmist:
+
+```
+<(fw|sig|catch|rh)>[\s\S]*?</\1>   →   "\n"      # nimed registrist, pageMark=true
+```
+
+- Reavahetus (mitte tühik): eelnev `…dem⸗` ei liitu järgnevaga üle eemaldatud tähistuse
+  rohkem kui praegu; signatuur ei kleepu kunagi. Näide: `Ehrwür⸗\n<sig>A ij</sig>` →
+  `Ehrwür` (märgendamata siirdeviida poolitus ripub, aga ei kleepu);
+  `<catch>Ehrwür⸗</catch>\n<sig>A ij</sig>` → mõlemad kadunud.
+- Tähistuse sees võivad olla tavalised tägid (`<catch><i>Vor⸗</i></catch>`) — sisu kaob
+  tervikuna. Sama liigi pesastust ei ole.
+- Kehtib kõigile tarbijatele: `lehekylje_tekst`, `lehekylje_tekst_ann` (`keep_ann`),
+  `marginaalia_tekst` (tähistus `<m>` sees), kirjaindeksi `letter_text` (ehitatakse
+  lehedokumentidest).
+
+**`page_marks`** — uus väli lehedokumendis, **ainult `meili_doc.py`** (ADR 0006).
+Ehitatakse **toorest** lehe tekstist (enne `split_marginalia`), et leida ka `<m>` sees
+olev:
+
+```json
+"page_marks": [{"kind": "rh", "text": "Vorrede", "seg": 0},
+               {"kind": "catch", "text": "habe", "seg": 0}]
+```
+
+- Järjekord = tekstis. `text` = sisu sisemiste tägideta, tühikud ahendatud, muidu
+  täht-tähelt; tühi sisu jäetakse välja.
+- `seg` = `<pb/>`-de arv enne tägi (laotuse tekstiosa; spekk 2 vajab).
+- **Alati olemas** (tühja listina). Ei ole `SEARCHABLE_ATTRIBUTES`-is ega filtreeritav;
+  `meili_settings.py` ei muutu. Meili tagastab vaikimisi.
+- Kirjaindeks (`kirjad`) `page_marks`-i ei saa (spekk 2 otsustab osa ulatuse).
+
+**Normaliseerija** (`server/marginalia_normalize.py`):
+
+- `strip_empty_tags` komplekt + `fw sig catch rh` → tühi `<sig></sig>` kaob salvestusel.
+- `_INLINE` + needsamad: `<m>` jääb välimiseks, tähistus võib olla `<m>` sees (OCR võib
+  veerise ploki sisse panna ka nurga foliatsiooninumbri).
+
+**Olemasolev korpus:** migratsiooni ja täisreindeksit ei ole. Märgendamata lehtedel jääb
+tähistus põhiteksti nagu praegu; `page_marks` tekib iga lehe järgmisel sünkil (tühjana).
+
+### 3. Redaktor ja lugemisvaade
+
+**Tegevus `wrapPageMark(kind)`** (uus, `components/editor/`):
+
+- valik olemas → mähi valik;
+- **valikut pole → mähi kursori rida**, äärmised tühikud välja jäetud;
+- vahemik on juba tähistuse täg: **sama liik → eemalda, teine liik → vaheta**;
+- tühi rida → lisa `<kind></kind>`, kursor sisse;
+- tehing `userEvent: 'input.format'` (filtrid lasevad läbi, `wrapWithTag` muster).
+
+**Paneel** (uus komponent, Workspace'i redaktori konteineris):
+
+- Alati nähtav, vaikimisi teksti ala paremas ülanurgas; neli nuppu (silt + kiirklahvi
+  täht) ja `×`.
+- **Lohistatav sildist** (`⠿ Lehe tähistus`); jääb redaktori kasti piiresse.
+- Lahti/kinni ja asukoht = **brauseri mugavusseade** (`localStorage`,
+  `vutt_pagemark_palette`, `…_pos`; try/catch, puudumisel vaikimisi lahti ja nurgas).
+- Tööriistaribal üks nupp **„Lehe tähistus"** — näitab/peidab paneeli.
+- Nupu `mousedown` ei võta redaktorilt fookust ega valikut (`preventDefault`).
+- z-index redaktori sees (`z-10`), päise (`z-[1200]`) ja modaalide all.
+- Paneel katab pika rea otsa ja võib katta marginaaliaveergu — selleks lohistamine.
+- Ainult redaktoris (lugemisvaates ei ole). Mobiilivaadet ei kontrollita (redaktor ei ole
+  mobiilis).
+
+**Kiirklahv** `Ctrl/⌘+Shift+F` → menüü kursori juures; valik tähega `f` `s` `c` `r` või
+nooled + Enter, Esc sulgeb. (`Ctrl+Shift+S/C` on brauseri omad; Alt+täht annab Macis
+märgi.)
+
+**Kuvamine.**
+
+- Redaktor: `VUTT_TAGS` + neli kirjet, mark-dekoratsioon + `atomicRanges` (ADR 0044),
+  klass `vutt-pm vutt-pm-<kind>`: väiksem hall kiri, kerge taust, liigi silt väikese
+  ülaindeksina (`::before`). Silt on **tägi nimi** (`fw` `sig` `catch` `rh`) —
+  keeleneutraalne, sama mis toortekstis, CSS-i sisu ei vaja i18n-i. Täisnimi (eelistermin)
+  on paneeli nupul ja menüüs.
+- Lugemisvaade (`renderVuttMarkup`): samad klassid; lubatud tägid registrist.
+
+**Teised tegevused.** „Eemalda vormindus" (`cleanMarkup`) eemaldab ka need tägid (sisu
+jääb). `wrapTagUtils` plokitägide loend + neli. Orvud koristab `vuttAutoSanitizer` nagu
+teisi (`findOrphanTags` kasutab `VUTT_TAGS`-i).
+
+**i18n** (ADR 0011): kõik sildid mõlemasse keelde korraga (`workspace` nimeruum).
+
+### 4. MCP, eksport, testid, dokumendid
+
+**MCP** (`mcp/vutt_mcp/`):
+
+- `queries.py` lisab `page_marks` `attributesToRetrieve`-sse.
+- `get_pages` päis: `── lk 5 · seisund=Toores · signatuur A iij · siirdeviit Vor⸗`;
+  puuduv/tühi väli → päis nagu praegu.
+- `search_pages` tähistust ei leia — tööriista kirjeldus ja `mcp/README.md` ütlevad seda.
+- Reeglid: `server`-it ei impordita; kuju valvab `test_meili_contract`.
+
+**Eksport.** VUTT-i poolelt muutust pole: toortekst koos tägidega, nagu `<add>`. ADR 0071
+kirjutab lepingu lahti. LOSSi ehitajad (`build_vutt_dataset.py`, DTA `fw`, PAGE
+`TextRegion @type`) ja Gemini juhis = **eraldi rada** (uus issue).
+
+**Testid.**
+
+pytest:
+
+- `clean_text_for_search`: `Ehrwür⸗` ⏎ `<sig>A ij</sig>` ei kleepu; mõlemad märgendatud;
+  `<i>` tähistuse sees; tähistus `<m>` sees (`marginaalia_tekst`); `keep_ann`; laotus
+  `<pb/>`-ga.
+- `page_marks`: järjekord, `seg`, tühi list, tühi sisu välja, tühikud, täht-täheline
+  sisu, `<m>` sees.
+- `strip_empty_tags` ja `normalize_marginalia_tags` uute tägidega.
+- **Paarsustest:** TS- ja Pythoni register samad (nimi, TEI, lipud); iga registri täg on
+  olemas `VUTT_TAGS`-is, `_INLINE`/`_EMPTY_RE`-s (paaristäg), `cleanMarkup` regexis,
+  `renderVuttMarkup` lubatud nimekirjas.
+
+vitest:
+
+- `wrapPageMark`: rida ilma valikuta, valik, eemaldamine, vahetus, tühi rida, tehingu
+  `userEvent`.
+- Redaktori dekoratsioonid + `atomicRanges` uutel tägidel (`vuttMarkupAdd.test.ts`
+  muster).
+- `renderVuttMarkup`.
+- Paneel (`/** @vitest-environment jsdom */`): klikk mähib, `×` peidab, olek ja asukoht
+  taastuvad, `localStorage` puudumine ei murra.
+- i18n paarsus (olemasolev valvur).
+
+**Dokumendid.**
+
+- ADR 0071 (uus) + register `docs/decisions/README.md`.
+- ADR 0070: terminid (siirdeviit, veerutiitel, lehenummerdus/leheküljenummerdus),
+  viide spekile.
+- Transkribeerimisjuhend `public/transcription_guide.html` + `_en.html`: jaotis
+  „Lehe tähistus", näited `lzogr0` lk 3–5 ja `04na2fu4` lk 3, reegel „funktsiooni järgi",
+  siirdeviida poolitusmärk jääb tägi sisse.
+- #630: spekk 1 / spekk 2 jaotus; uus issue OCR-rajale; uus issue põhikirja väljale.
+
+## Väljaspool skoopi
+
+- Lehe aadressi tuletus, skeem, käsitsi aadress, `conflict` (spekk 2, ADR 0070).
+- Olemasoleva korpuse märgendamine (ka heuristiline ettepanek).
+- OCR: Gemini juhis, Qwen treeningandmed (eraldi rada).
+- Põhikirja väli ja `cs`-i TEI teisendus.
+- TEI eksport (reeglid tagavad, et see on hiljem mehaaniline).
+- Kordusloendite täielik koondamine registrisse (paarsustest katab).
+
+## Riskid
+
+- **Otsingutekst muutub märgendatud lehtedel** — oodatud ja soovitud; märgendamata
+  lehed ei muutu. Kuivkäivitus: `clean_text_for_search` vana vs uus kogu korpuse peal
+  peab andma **null erinevust** (keegi pole veel märgendanud) — kinnitab, et samm ei
+  puuduta midagi muud (vt `feedback_salvestusreegel_kuivkaivitus`).
+- **Regex ja sama nimega tekst:** `<fw>` jne on ainult VUTT-i märgendus; toores `<` on
+  muu tekstina escape'itud (`renderVuttMarkup`). Pesastamata non-greedy muster eeldab,
+  et sama liiki tähistus ei ole iseenda sees.
+- **Paneel varjab teksti** — lohistatav ja suletav; vaikimisi asukoht valitakse nii, et
+  esimene rida jääb nähtavaks.
