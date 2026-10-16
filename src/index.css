@@ -111,7 +111,7 @@ body:has(.workspace-container) {
 }
 .vutt-pm::before {
   color: #9ca3af; /* gray-400 */
-  font-family: system-ui, sans-serif;
+  /* Font päritakse: teine font (nt system-ui) muudaks rea kõrgust 1 px võrra. */
   letter-spacing: 0.03em;
   margin-right: 0.25em;
 }
