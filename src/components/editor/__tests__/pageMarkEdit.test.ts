@@ -37,6 +37,15 @@ describe('pageMarkEdit — rida ja valik', () => {
   it('valiku servatühikud jäävad välja', () => {
     expect(run('Hom.⟦ 1903 ⟧', 'fw').doc).toBe('Hom. <fw>1903</fw> ');
   });
+  it('kolmikklõpsu valik (rida + reavahetus): reavahetus jääb välja', () => {
+    expect(run('⟦IOANNIS RAVLINII\n⟧te ſub imperio', 'rh').doc).toBe('<rh>IOANNIS RAVLINII</rh>\nte ſub imperio');
+  });
+  it('valiku algusest reavahetus välja, sisemine reavahetus jääb', () => {
+    expect(run('a⟦\nB ij\nverwü⸗\n⟧b', 'rh').doc).toBe('a\n<rh>B ij\nverwü⸗</rh>\nb');
+  });
+  it('kolmikklõps järgmise rea tähistuse ees ei puuduta seda', () => {
+    expect(run('⟦verwü⸗\n⟧<sig>B ij</sig>', 'catch').doc).toBe('<catch>verwü⸗</catch>\n<sig>B ij</sig>');
+  });
   it('tühi rida: tühi paar, kursor sisse', () => {
     expect(run('a\n‸\nb', 'fw')).toEqual({ doc: 'a\n<fw></fw>\nb', cursor: 6 });
   });
