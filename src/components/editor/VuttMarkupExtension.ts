@@ -10,6 +10,7 @@
 import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
 import { Annotation, RangeSetBuilder, StateField, Transaction } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
+import i18n from 'i18next';
 
 // Widget <pb/> (leheküljevahetus) kuvamiseks
 class PageBreakWidget extends WidgetType {
@@ -41,6 +42,7 @@ interface TagDef {
   selfClose?: boolean;
   useWidget?: boolean;
   withId?: boolean;  // lisab data-ann-id atribuudi numbrilise sufiksi järgi
+  pageMark?: boolean;  // lisab title-vihje liigi nimega (lehe tähistus, ADR 0070)
 }
 
 export const VUTT_TAGS: TagDef[] = [
@@ -51,11 +53,11 @@ export const VUTT_TAGS: TagDef[] = [
   { tag: 'hi', cls: 'vutt-highlight' },
   // Interlineaarne/veerise lisandus oma lisamiskohas (ADR 0067)
   { tag: 'add', cls: 'vutt-add' },
-  // Lehe tähistus (ADR 0070): tähistus, mitte tekst — hall, liigi silt CSS-ist.
-  { tag: 'fw', cls: 'vutt-pm vutt-pm-fw' },
-  { tag: 'sig', cls: 'vutt-pm vutt-pm-sig' },
-  { tag: 'catch', cls: 'vutt-pm vutt-pm-catch' },
-  { tag: 'rh', cls: 'vutt-pm vutt-pm-rh' },
+  // Lehe tähistus (ADR 0070): tähistus, mitte tekst — sinakas toon, liik hõljukvihjes.
+  { tag: 'fw', cls: 'vutt-pm vutt-pm-fw', pageMark: true },
+  { tag: 'sig', cls: 'vutt-pm vutt-pm-sig', pageMark: true },
+  { tag: 'catch', cls: 'vutt-pm vutt-pm-catch', pageMark: true },
+  { tag: 'rh', cls: 'vutt-pm vutt-pm-rh', pageMark: true },
   { tag: 'fn', useWidget: true },
   { tag: 'pb', selfClose: true },
   { tag: 'ann', cls: 'vutt-ann', withId: true },
@@ -159,9 +161,11 @@ function buildMarkup(text: string): MarkupSets {
 
         // Sisu stiilmark (vutt-italic jne) — võib replace-idega kattuda
         if (tagDef.cls && open.openEnd < from) {
-          const attrs = tagDef.withId && open.num
+          const attrs: Record<string, string> | undefined = tagDef.withId && open.num
             ? { 'data-ann-id': open.num }
-            : undefined;
+            : tagDef.pageMark
+              ? { title: i18n.t(`workspace:editor.pageMarks.${tagDef.tag}`) }
+              : undefined;
           decoRanges.push({
             from: open.openEnd,
             to: from,
