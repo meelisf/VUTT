@@ -615,6 +615,12 @@
       "sig": "Signatuur",
       "catch": "Siirdeviit",
       "rh": "Veerutiitel",
+      "short": {
+        "fw": "Nr",
+        "sig": "Sig",
+        "catch": "Kustos",
+        "rh": "Tiitel"
+      },
       "refused": {
         "multiple": "Valikus on mitu tähistust — vali üks",
         "pageBreak": "Tähistus ei ületa lehevahetust",
