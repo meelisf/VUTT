@@ -615,6 +615,12 @@
       "sig": "Signature",
       "catch": "Catchword",
       "rh": "Running head",
+      "short": {
+        "fw": "Folio",
+        "sig": "Sig",
+        "catch": "Catch",
+        "rh": "Head"
+      },
       "refused": {
         "multiple": "The selection contains several page marks — select one",
         "pageBreak": "A page mark cannot cross a page break",

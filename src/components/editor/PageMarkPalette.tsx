@@ -10,6 +10,16 @@ import type { PageMarkRefusal } from './pageMarkEdit';
 const OPEN_KEY = 'vutt_pagemark_palette';
 const POS_KEY = 'vutt_pagemark_palette_pos';
 const KEY_OF: Record<PageMarkKind, string> = { fw: 'f', sig: 's', catch: 'c', rh: 'r' };
+// Liigi toon — sama mis tekstis (.vutt-pm-* index.css-is).
+const KIND_CLS: Record<PageMarkKind, string> = {
+  fw: 'border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100',
+  sig: 'border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100',
+  catch: 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100',
+  rh: 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100',
+};
+const DOT_CLS: Record<PageMarkKind, string> = {
+  fw: 'bg-orange-400', sig: 'bg-violet-400', catch: 'bg-sky-400', rh: 'bg-green-400',
+};
 
 export function readPaletteOpen(): boolean {
   try { return localStorage.getItem(OPEN_KEY) !== '0'; } catch { return true; }
@@ -87,12 +97,14 @@ export default function PageMarkPalette({ open, onClose, onApply, containerRef }
   return (
     <div ref={palRef} data-testid="pagemark-palette" style={style}
       className="absolute z-10 flex items-center gap-1 rounded-md border border-gray-300 bg-white/95 px-1.5 py-1 text-xs shadow-sm">
-      <span onPointerDown={startDrag} title={t('editor.pageMarks.drag')}
-        className="cursor-grab select-none pr-1 text-[11px] text-gray-400">⠿ {t('editor.pageMarks.title')}</span>
+      {/* Kompaktne: pealkiri ja liigi täisnimi on hõljukvihjes, nupul lühinimi. */}
+      <span onPointerDown={startDrag} title={`${t('editor.pageMarks.title')} — ${t('editor.pageMarks.drag')}`}
+        className="cursor-grab select-none px-0.5 text-[11px] text-gray-400">⠿</span>
       {PAGE_MARK_KINDS.map(k => (
         <button key={k} type="button" onMouseDown={e => { e.preventDefault(); show(onApply(k)); }}
-          className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-gray-700 hover:border-indigo-200 hover:bg-indigo-50">
-          {t(`editor.pageMarks.${k}`)}<span className="ml-1 font-mono text-[10px] text-gray-400">{KEY_OF[k]}</span>
+          title={t(`editor.pageMarks.${k}`)} aria-label={t(`editor.pageMarks.${k}`)}
+          className={`rounded border px-1.5 py-0.5 ${KIND_CLS[k]}`}>
+          {t(`editor.pageMarks.short.${k}`)}<span className="ml-1 font-mono text-[10px] opacity-50">{KEY_OF[k]}</span>
         </button>
       ))}
       <button type="button" onMouseDown={e => { e.preventDefault(); onClose(); }} title={t('editor.pageMarks.close')}
@@ -149,7 +161,7 @@ export function PageMarkMenu({ anchor, onApply, onClose }: MenuProps) {
       {PAGE_MARK_KINDS.map((k, i) => (
         <div key={k} role="menuitem" onMouseDown={e => { e.preventDefault(); const r = onApply(k); show(r); if (!r) onClose(); }}
           className={`flex cursor-pointer justify-between gap-4 rounded px-2 py-1 ${i === active ? 'bg-indigo-50' : 'hover:bg-indigo-50'}`}>
-          <span>{t(`editor.pageMarks.${k}`)}</span><span className="font-mono text-gray-400">{KEY_OF[k]}</span>
+          <span className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-sm ${DOT_CLS[k]}`} />{t(`editor.pageMarks.${k}`)}</span><span className="font-mono text-gray-400">{KEY_OF[k]}</span>
         </div>
       ))}
       {msg && <div role="status" className="px-2 py-1 text-[11px] text-amber-800">{msg}</div>}

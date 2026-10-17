@@ -101,26 +101,31 @@ body:has(.workspace-container) {
 }
 
 /* Lehe tähistus (ADR 0070): <fw> <sig> <catch> <rh> — lehe kui füüsilise objekti
-   tähistus, mitte tekst. Sinakas toon (hall on <cs>-i oma) + vasakul sakk ikooniga
-   (lucide type-outline). Sõnalist silti EI ole (tägi nimi nägi välja nagu lehe
-   tekst) — liik on hõljukvihjes. Sakk on inline-block, kõrgus 1em < rea kõrgus:
-   EI muuda rea kõrgust ega kursori asukohta (vt .vutt-add). */
+   tähistus, mitte tekst. Iga liik oma tooniga (hall on <cs>-i oma), vasakul sakk
+   valge ikooniga (lucide type-outline). Sõnalist silti EI ole (tägi nimi nägi välja
+   nagu lehe tekst) — liik on hõljukvihjes. Toonid kattuvad lehe tähistuse paneeli
+   nuppudega (PageMarkPalette KIND_CLS). Sakk on inline-block, kõrgus 1em < rea
+   kõrgus: EI muuda rea kõrgust ega kursori asukohta (vt .vutt-add). */
 .vutt-pm {
-  color: #0369a1; /* sky-700 */
-  background-color: #f0f9ff; /* sky-50 */
+  color: var(--pm-text);
+  background-color: var(--pm-bg);
   border-radius: 2px;
 }
 .vutt-pm::before {
   content: "";
   display: inline-block;
-  width: 1.1em;
+  width: 0.9em;
   height: 1em;
   vertical-align: -0.15em;
   margin-right: 0.2em;
   border-radius: 2px 0 0 2px;
-  background: #bae6fd /* sky-200 */ no-repeat center / 0.65em
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230369a1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 16.5a.5.5 0 0 0 .5.5h.5a2 2 0 0 1 0 4H9a2 2 0 0 1 0-4h.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5V8a2 2 0 0 1-4 0V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-4 0v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5Z'/%3E%3C/svg%3E");
+  background: var(--pm-tab) no-repeat center / 0.5em
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 16.5a.5.5 0 0 0 .5.5h.5a2 2 0 0 1 0 4H9a2 2 0 0 1 0-4h.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5V8a2 2 0 0 1-4 0V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-4 0v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5Z'/%3E%3C/svg%3E");
 }
+.vutt-pm-fw    { --pm-text: #9a3412; --pm-bg: #fff7ed; --pm-tab: #fb923c; } /* orange-800/50/400 */
+.vutt-pm-sig   { --pm-text: #5b21b6; --pm-bg: #f5f3ff; --pm-tab: #a78bfa; } /* violet */
+.vutt-pm-catch { --pm-text: #075985; --pm-bg: #f0f9ff; --pm-tab: #38bdf8; } /* sky */
+.vutt-pm-rh    { --pm-text: #166534; --pm-bg: #f0fdf4; --pm-tab: #4ade80; } /* green */
 
 /* <fn>n</fn> widget — joonealuse viite marker */
 .vutt-fn-widget {
