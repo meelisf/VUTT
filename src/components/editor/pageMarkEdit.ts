@@ -48,7 +48,8 @@ function pairsOf(toks: Token[]): Pair[] {
   return pairs;
 }
 
-const isWs = (c: string) => c === ' ' || c === '\t';
+// Servadest kärbitakse ka reavahetus: kolmikklõps valib rea koos lõpu \n-iga.
+const isWs = (c: string) => c === ' ' || c === '\t' || c === '\n' || c === '\r';
 
 export function pageMarkEdit(
   doc: string, selFrom: number, selTo: number, kind: PageMarkKind,
