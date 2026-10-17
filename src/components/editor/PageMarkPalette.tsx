@@ -4,11 +4,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
-import { PAGE_MARK_KINDS, type PageMarkKind } from '../../markup/vuttTags';
+import type { PageMarkKind } from '../../markup/vuttTags';
 import type { PageMarkRefusal } from './pageMarkEdit';
 
 const OPEN_KEY = 'vutt_pagemark_palette';
 const POS_KEY = 'vutt_pagemark_palette_pos';
+// Kuvajärjekord (paneel + menüü) — lehe lugemise järjekord, mitte registri oma.
+const PAGE_MARK_KINDS: readonly PageMarkKind[] = ['fw', 'rh', 'catch', 'sig'];
 const KEY_OF: Record<PageMarkKind, string> = { fw: 'f', sig: 's', catch: 'c', rh: 'r' };
 // Liigi toon — sama mis tekstis (.vutt-pm-* index.css-is).
 const KIND_CLS: Record<PageMarkKind, string> = {
