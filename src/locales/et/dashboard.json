@@ -44,6 +44,7 @@
     "copyright": "© 2025 Tartu Ülikool"
   },
   "workCard": {
+    "inContents": "Sisukorras: {{names}}",
     "filterByAuthor": "Filtreeri autori järgi",
     "filterByYear": "Filtreeri aasta järgi",
     "filterByStatus": "Filtreeri staatuse \"{{status}}\" järgi",

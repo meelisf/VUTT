@@ -1,6 +1,7 @@
 import { hasImpreciseDating, parseDatingText } from '../utils/workDating';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PartPersonsHint from './PartPersonsHint';
 import { Work } from '../types';
 import { workStatusDotClass } from '../utils/workStatusDot';
 import { BookOpen, Calendar, User, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, Check } from 'lucide-react';
@@ -286,6 +287,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
 
         <div className="mt-2 space-y-2 text-sm text-gray-600 flex-1">
           {renderAuthors()}
+          <PartPersonsHint names={work.matched_part_persons} />
           
           <button
             onClick={(e) => {

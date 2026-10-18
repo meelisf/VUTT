@@ -14,6 +14,7 @@ import { getEntityLabelsCache } from './entityLabelsService';
 import { pickLabelByLang } from '../utils/labelUtils';
 import type { MatchingStrategies, Index } from 'meilisearch';
 import { HIGHLIGHT_PRE_TAG, HIGHLIGHT_POST_TAG } from '../utils/sanitizeHtml';
+import { partPersonMatches } from '../utils/partPersonMatches';
 
 /**
  * ß → ss otsingupäringus (#228).
@@ -402,7 +403,8 @@ export const getScopeFacetCodes = async (
 
 // Avalehe otsinguväljad. ÜKS allikas otsingule ja filtrivihje loenduritele (#605):
 // teistsuguste väljadega loendur leiaks vasteid, mida avaleht ei näita.
-export const DASHBOARD_SEARCH_ATTRIBUTES = ['title', 'title_en', 'title_original', 'authors_text', 'tags_search', 'genre_search'];
+// `part_persons_text` (ADR 0072) on teose isikute järel — teose enda isik järjestuses eespool.
+export const DASHBOARD_SEARCH_ATTRIBUTES = ['title', 'title_en', 'title_original', 'authors_text', 'part_persons_text', 'tags_search', 'genre_search'];
 
 export interface DashboardSearchCore {
   q: string;
@@ -486,7 +488,7 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
         'id', 'work_id', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'publisher_id',
         'publisher_object', 'location_object',
         'type_object', 'genre_object', 'collections', 'collections_hierarchy',
-        'creators', 'authors_text', 'tags_object', 'languages',
+        'creators', 'authors_text', 'part_persons_text', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url', 'archive_refs',
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus',
         'lehekylje_pilt' // loendivaate täispisipilt (#587)
@@ -580,6 +582,8 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
     // (Bröms < Börk) — lehe sisu sorteeriti eesti kollatsiooniga, lehepiirid jäid Meili
     // omasse, seega A–Z lehitsemine ei olnud monotoonne.
     const works: Work[] = uniqueHits.map(normalizeWork);
+    // Kaart ütleb, kui teos leiti ainult sisukorra isiku järgi (ADR 0072).
+    if (query) for (const w of works) w.matched_part_persons = partPersonMatches(w, query);
 
     // Tagasta tulemused koos facetidega
     const facetDistribution = response.facetDistribution || {};

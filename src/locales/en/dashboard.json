@@ -44,6 +44,7 @@
     "copyright": "© 2025 University of Tartu"
   },
   "workCard": {
+    "inContents": "In contents: {{names}}",
     "filterByAuthor": "Filter by author",
     "filterByYear": "Filter by year",
     "filterByStatus": "Filter by status \"{{status}}\"",

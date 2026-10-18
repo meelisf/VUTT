@@ -191,7 +191,7 @@ otsingutekstis — `search_pages` seda ei leia; `get_pages` näitab märgendatud
 lehe päises (`signatuur A iij · siirdeviit Vor⸗`).
 
 `search_pages` otsib **ainult lehetekstist** (`PAGE_SEARCH_FIELDS`), `search_works`
-ka pealkirjast ja autoritest (`WORK_SEARCH_FIELDS`). Teose metaandmed on
+ka pealkirjast, autoritest ja osade isikutest (`WORK_SEARCH_FIELDS`, ADR 0072). Teose metaandmed on
 dubleeritud igale lehe-dokumendile, nii et ilma selle piiranguta andis üks
 pealkirjavaste kõik teose leheküljed „vasteks" — „Buchdrucker" 469 vastet,
 millest 380 ei sisaldanud sõna, ja top-10 ühest teosest. Vt ADR 0027.

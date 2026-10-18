@@ -13,6 +13,7 @@ SEARCHABLE_ATTRIBUTES = [
     "title_en",        # ADR 0064 — ka dashboardi attributesToSearchOn-is
     "title_original",
     "authors_text",
+    "part_persons_text",  # ADR 0072 — osade isikud; teose isikute järel, ka dashboardi attributesToSearchOn-is
     "year",
     "location_search",
     "publisher_search",

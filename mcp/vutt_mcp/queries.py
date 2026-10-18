@@ -94,7 +94,7 @@ WORK_OVERVIEW_RETRIEVE_FIELDS = [
 # millest 380 ei sisaldanud sõna üldse, ja top-10 tuli ühest teosest.
 # Sama jaotus nagu töölaual (searchService.ts, scope='original').
 PAGE_SEARCH_FIELDS = ["lehekylje_tekst", "marginaalia_tekst"]
-WORK_SEARCH_FIELDS = PAGE_SEARCH_FIELDS + ["title", "authors_text"]
+WORK_SEARCH_FIELDS = PAGE_SEARCH_FIELDS + ["title", "authors_text", "part_persons_text"]  # osade isikud, ADR 0072
 
 # Toimetajakihi otsinguulatus (ADR 0041). Need väljad on LEHE tasandil (mitte
 # teose metaandmed), seega ADR 0027 probleem — üks pealkirjavaste teeb kogu
