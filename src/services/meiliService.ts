@@ -89,6 +89,7 @@ export const normalizeWork = (hit: any): Work => {
     collections_hierarchy: hit.collections_hierarchy || [],
     creators: hit.creators || [],
     authors_text: hit.authors_text || [],
+    part_persons_text: hit.part_persons_text || [],
     tags: hit.tags_object ?? [],
     notes: hit.notes || null,
     languages: hit.languages || [],

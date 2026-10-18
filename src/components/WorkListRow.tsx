@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import PartPersonsHint from './PartPersonsHint';
 import { Check } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Work } from '../types';
@@ -109,6 +110,7 @@ const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isS
           <span className="tabular-nums">{work.page_count} {t('common:labels.pages')}</span>
           {typeLabel && <span className="text-gray-400">{typeLabel}</span>}
         </div>
+        <PartPersonsHint names={work.matched_part_persons} className="mt-0.5" />
       </div>
       <div className="hidden sm:flex flex-col items-end gap-2 shrink-0">
         {genres.length > 0 && (

@@ -385,6 +385,22 @@ def _compute_work_aliases(creators, publisher, tags, people_data):
     return aliases, authors_text, publisher_aliases, tag_aliases
 
 
+def compute_part_persons_text(parts, people_data):
+    """Osade isikud teose otsingusse (ADR 0072): nimed + nimevariandid, kordusteta.
+
+    Teose tasemel, mitte lehe kaupa — dashboard otsib teose esimese lehe dokumendist.
+    Need EI ole teose isikud: ei lähe `creators`-isse ega `authors_text`-i.
+    """
+    names = []
+    for part in parts if isinstance(parts, list) else []:
+        if not isinstance(part, dict):
+            continue
+        creators = [c for c in part.get('creators') or [] if isinstance(c, dict)]
+        names += [c['name'] for c in creators if c.get('name')]
+        names += get_creator_aliases(creators, people_data)
+    return list(dict.fromkeys(normalize_eszett(n) for n in names if n))
+
+
 # =========================================================
 # KOLLEKTSIOONIDE HIERARHIA
 # =========================================================
@@ -533,6 +549,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "languages": work_ctx['languages'],
         "creators": creators,
         "authors_text": [normalize_eszett(a) for a in work_ctx['authors_text']],
+        "part_persons_text": work_ctx['part_persons_text'],      # osade isikud, mitte teose isikud (ADR 0072)
         "author_names": list(dict.fromkeys(
             name for c in creators
             if c.get('name') and c.get('role') != 'respondens'
@@ -645,6 +662,7 @@ def get_work_metadata(doc_path, dir_name, collections):
         'external_url': None,
         'archive_refs': [],
         'shareable': False,
+        'parts': [],
     }
 
     if not os.path.exists(metadata_json_path):
@@ -697,6 +715,7 @@ def get_work_metadata(doc_path, dir_name, collections):
     result['external_url'] = meta.get('external_url')
     result['archive_refs'] = meta.get('archive_refs') or []
     result['shareable'] = meta.get('shareable', False)
+    result['parts'] = meta.get('parts') or []
 
     if meta.get('series'):
         result['series'] = meta['series']
@@ -772,6 +791,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         'languages': doc_metadata.get('languages', []),
         'creators': creators,
         'authors_text': authors_text,
+        'part_persons_text': compute_part_persons_text(doc_metadata.get('parts'), people_data),
         'people_data': people_data,
         'labels_store': labels_store,
         'ester_id': doc_metadata.get('ester_id'),

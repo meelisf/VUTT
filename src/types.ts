@@ -123,6 +123,8 @@ export interface Work {
   // Isikud - KASUTA SEDA, mitte author/respondens!
   creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];  // Denormaliseeritud otsinguks
+  part_persons_text?: string[];    // Osade isikud otsinguks — EI ole teose isikud (ADR 0072)
+  matched_part_persons?: string[]; // Dashboard: osade isikud, kelle järgi teos leiti (partPersonMatches)
 
   // Märksõnad, märkused ja keeled
   tags?: LinkedEntity[];    // Märksõnad (LinkedEntity objektid)
