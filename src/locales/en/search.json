@@ -102,6 +102,8 @@
     "pageFallback": "Letter, p. {{page}}",
     "inWork": "In",
     "count": "Letters: {{count}}",
-    "pages": "{{count}} p."
+    "pages": "{{count}} p.",
+    "page": "p. {{page}}",
+    "abstract": "Abstract"
   }
 }

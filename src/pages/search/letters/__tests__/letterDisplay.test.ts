@@ -42,10 +42,10 @@ describe('letterHeadline', () => {
 
 describe('letterSnippet', () => {
   it('tekstivaste → tekstikatke', () => {
-    expect(letterSnippet(hit({ _formatted: { letter_text: '…a <mark>b</mark> c…' } }))).toBe('…a <mark>b</mark> c…');
+    expect(letterSnippet(hit({ _formatted: { letter_text: '…a <mark>b</mark> c…' } }))).toEqual({ text: '…a <mark>b</mark> c…', source: 'text' });
   });
   it('vaste ainult kokkuvõttes → kokkuvõtte katke', () => {
-    expect(letterSnippet(hit({ _formatted: { letter_text: '…a b…', abstract: 'x <mark>y</mark>' } }))).toBe('x <mark>y</mark>');
+    expect(letterSnippet(hit({ _formatted: { letter_text: '…a b…', abstract: 'x <mark>y</mark>' } }))).toEqual({ text: 'x <mark>y</mark>', source: 'abstract' });
   });
   it('nimevaste (märgendit pole tekstis ega kokkuvõttes) → null', () => {
     expect(letterSnippet(hit({ _formatted: { letter_text: '…a b…', abstract: '' } }))).toBeNull();

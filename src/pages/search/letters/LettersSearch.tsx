@@ -114,7 +114,7 @@ const LettersSearch: React.FC = () => {
                 {t('letters.count', { count: result.totalHits })}
               </div>
               <div className={loading ? 'opacity-60' : ''}>
-                <LetterResults hits={result.hits} />
+                <LetterResults hits={result.hits} query={query} />
               </div>
               <Pagination
                 currentPage={page}

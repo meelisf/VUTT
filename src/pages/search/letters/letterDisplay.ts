@@ -38,11 +38,12 @@ export function letterHeadline(hit: LetterHit, t: T): string {
 
 const hasMark = (s?: string): s is string => !!s && s.includes('<mark>');
 
-/** Tekstikatke ainult siis, kui vaste on tekstis või kokkuvõttes; nimevaste korral null. */
-export function letterSnippet(hit: LetterHit): string | null {
+/** Tekstikatke ainult siis, kui vaste on tekstis või kokkuvõttes; nimevaste korral null.
+ *  `source` määrab rea sildi: kokkuvõte on „Regest", tekst ilma lehe teadmiseta sildita. */
+export function letterSnippet(hit: LetterHit): { text: string; source: 'text' | 'abstract' } | null {
   const f = hit._formatted;
-  if (hasMark(f?.letter_text)) return f!.letter_text!;
-  if (hasMark(f?.abstract)) return f!.abstract!;
+  if (hasMark(f?.letter_text)) return { text: f!.letter_text!, source: 'text' };
+  if (hasMark(f?.abstract)) return { text: f!.abstract!, source: 'abstract' };
   return null;
 }
 
