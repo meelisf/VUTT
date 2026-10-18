@@ -170,6 +170,15 @@ plaan `docs/superpowers/plans/2026-10-17-lehe-tahistus-tagid.md` — tägid, ots
 - **Ankru ettepanek** — v1-s ei ole (punkt 8); uuesti, kui päris kasutus näitab vajadust.
 - **Skeemi kinnitamise UI** ja skeemi muutus teose sees (eelmäng rooma, edasi araabia).
 - **Recto `r`** — kas normaliseeritud aadress kannab `246r` või `246`.
+- **Topeltnumber lehel** — `o17ekb` lk 171 ja 173 kannavad mõlemad `<fw>86</fw>`
+  (koodeksi foliatsiooniviga, täiendus 2026-10-18). Nähtav ankur jääb täht-tähelt;
+  teine leht vajab eristavat käsitsi aadressi (`86a`/`86bis`, p. 5), millest loendus
+  jätkub. Kas lahendamata duplikaat on `conflict` (p. 7 „tagasihüpe") või oma juht?
+  Igal juhul **ei ole aadress unikaalne**: URL `/work/{id}/86v` võib viidata kahele
+  lehele ja peab siis andma valiku, mitte valima vaikselt esimese.
+- **Katsejuhtum:** `o17ekb` (Fischeri kirjad) — foliatsioon ainult rectol, osadega
+  kirjakogu, topeltnumber. Esimene kasutus on kirjade sisukord (aadress lk-numbri
+  kõrval, lk jääb navigeerimislingiks).
 - **Olemasolev korpus:** lehe tähistuse read on praegu märgendita (viimased read). Kas
   heuristiline ettepanek (lühike viimane rida signatuuri mustriga) ülevaatusele —
   automaatne migratsioon ei ole tõenäoliselt ohutu.
