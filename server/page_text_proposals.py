@@ -431,3 +431,18 @@ def mark_stale(proposal_id: str, stems) -> int:
         return sum(db.execute("UPDATE proposal_page SET state='stale', decided_at=? "
                               "WHERE proposal_id=? AND stem=? AND state='pending'",
                               (now, proposal_id, s)).rowcount for s in stems)
+
+
+def mark_rejected(proposal_id: str, stems, username: str) -> int:
+    """CAS pending|stale → rejected. Kutsuja hoiab `proposal_lock`-i."""
+    with _db() as db:
+        return _set_state(db, proposal_id, stems, "rejected", username)
+
+
+def page_ref(proposal_id: str, stem: str):
+    """Ülevaatust vajav lehe ettepanek `/save` viite jaoks; muu → ProposalError."""
+    with _db() as db:
+        row = _page_row(db, proposal_id, stem)
+    if row["state"] not in REVIEW_STATES:
+        raise ProposalError("proposal_decided")
+    return row
