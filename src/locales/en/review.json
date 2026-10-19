@@ -93,8 +93,6 @@
   },
   "proposals": {
     "title": "Agent proposals",
-    "handoffAll": "Code for agent (all works)",
-    "handoffInfo": "The code is valid until {{time}} ({{uses}} submissions). Copy it to the agent:",
     "error": "Action failed: {{error}}",
     "empty": "No pending proposals.",
     "counts": "pending {{pending}}, stale {{stale}}"

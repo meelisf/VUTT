@@ -545,3 +545,34 @@ def test_otsused_on_jarjestatud():
     """#615: kaks kiiret otsust samal ettepanekul ei tohi teineteist üle kirjutada."""
     for fn in (wpp.decide, wpp.decide_many, wpp.resolve_person):
         assert getattr(fn, "__wrapped__", None) is not None, fn.__name__
+
+
+# ── Ühtne agendikood (#641 järg): üks kood teose halduses, osad + tekst ──────
+
+def test_uks_kood_kehtib_osadele_ja_tekstile(client, work, monkeypatch, tmp_path):
+    from server import page_text_proposals as ptp
+    monkeypatch.setattr(ptp, "DB_PATH", str(tmp_path / "ptp.sqlite3"))
+    with open(f"{work}/t-001.txt", "w", encoding="utf-8") as f:
+        f.write("vana tekst\n")
+    h = client.post("/works/w1/parts/handoff", json={}).json()
+    assert h["scope"] == "work"
+    r = client.post("/works/parts-proposals/submit", json={
+        "code": h["code"], "work_id": "w1", "pages_version": h["pages_version"], "parts": [LETTER]})
+    assert r.status_code == 200
+    src = ptp.read_source(h["code"], "w1", work, 1)
+    assert src["text"] == "vana tekst\n"
+
+
+def test_kood_koigile_teostele(client, work, monkeypatch, tmp_path):
+    from server import page_text_proposals as ptp
+    monkeypatch.setattr(ptp, "DB_PATH", str(tmp_path / "ptp.sqlite3"))
+    h = client.post("/works/w1/parts/handoff", json={"scope": "all"}).json()
+    assert h["scope"] == "all" and h["work_id"] is None
+    # Teise teose osade ettepanek sama koodiga: kood kehtib, peatab alles versioon.
+    with pytest.raises(wpp.ProposalError, match="stale_pages"):
+        wpp.submit(h["code"], "muu", work, "vale-versioon", [LETTER])
+    assert ptp.check_code(h["code"], "suvaline")["work_id"] is None
+
+
+def test_vale_ulatus_400(client):
+    assert client.post("/works/w1/parts/handoff", json={"scope": "kõik"}).status_code == 400

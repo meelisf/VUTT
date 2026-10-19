@@ -121,9 +121,10 @@ def proposal_lock(proposal_id: str):
 
 # ── Kood ──────────────────────────────────────────────────────────────────
 
-def issue_handoff(work_id: Optional[str], username: str) -> dict:
-    """Kood agendile: üks teos või (`None`) kõik teosed. Õiguse kontrollib router."""
-    code = secrets.token_urlsafe(32)
+def issue_handoff(work_id: Optional[str], username: str, code: Optional[str] = None) -> dict:
+    """Kood agendile: üks teos või (`None`) kõik teosed. Õiguse kontrollib router.
+    Kood antakse teose halduses koos osade koodiga (`/works/{id}/parts/handoff`)."""
+    code = code or secrets.token_urlsafe(32)
     now = int(time.time())
     with _db() as db:
         _clean(db, now)

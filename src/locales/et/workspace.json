@@ -312,9 +312,9 @@
     "parts": {
       "proposals": {
         "title": "Agendi ettepanekud",
-        "createCode": "Kood agendile",
+        "createCode": "Kood agendile (see teos)",
         "refresh": "Värskenda",
-        "codeHelp": "Anna see kood MCP-vestluses agendile koos juhisega, nt „Tee teose {{workId}} osade sisukord”. Kood kehtib 8 tundi ja ainult sellele teosele, kuni {{max}} esitust.",
+        "codeHelp": "Anna see kood MCP-vestluses agendile koos juhisega, nt „Tee teose {{workId}} osade sisukord” või „Märgenda foliatsioon”. Kood kehtib osade ja lehe teksti ettepanekutele, 8 tundi ja ainult sellele teosele, kuni {{max}} esitust.",
         "copy": "Kopeeri",
         "copied": "Kopeeritud",
         "expires": "Aegub",
@@ -351,7 +351,9 @@
         "empty": "Ootel ettepanekuid pole. Loo kood ja anna see agendile, et ta pakuks osad (kirjad, istungid jm) välja.",
         "working": "Salvestan…",
         "accepting_one": "Lisan {{count}} osa…",
-        "accepting_other": "Lisan {{count}} osa…"
+        "accepting_other": "Lisan {{count}} osa…",
+        "createCodeAll": "Kood agendile (kõik teosed)",
+        "codeHelpAll": "Anna see kood MCP-vestluses agendile koos juhisega. Kood kehtib osade ja lehe teksti ettepanekutele KÕIGIS teostes, 8 tundi, kuni {{max}} esitust."
       },
       "kinds": {
         "letter": "Kiri",
@@ -734,9 +736,6 @@
     "jobError": "Paki kinnitus ebaõnnestus: {{error}}",
     "alreadyRunning": "Selle teose paki kinnitus juba käib.",
     "error": "Toiming ebaõnnestus: {{error}}",
-    "handoff": "Kood agendile (see teos)",
-    "handoffAll": "Kood agendile (kõik teosed)",
-    "handoffInfo": "Kood kehtib kuni {{time}} ({{uses}} esitust). Kopeeri see agendile:",
-    "copy": "Kopeeri"
+    "handoffAll": "Kood agendile (kõik teosed)"
   }
 }

@@ -116,16 +116,23 @@ def revoke_handoffs(username: str) -> int:
         return db.execute("DELETE FROM handoff WHERE username=?", (username,)).rowcount
 
 
-def issue_handoff(work_id: str, work_dir: str, username: str) -> dict:
-    """Kood ühe teose osade ettepanekuteks; `can_write_work` kontrollib router."""
-    code = secrets.token_urlsafe(32)
+ALL_WORKS = "*"   # ulatus „kõik teosed" (veerg on NOT NULL)
+
+
+def issue_handoff(work_id: str, work_dir: str, username: str, code: Optional[str] = None,
+                  all_works: bool = False) -> dict:
+    """Kood osade ettepanekuteks; `can_write_work` kontrollib router. `code` antakse
+    ette, kui sama kood registreeritakse ka tekstiettepanekutele (ühtne agendikood)."""
+    code = code or secrets.token_urlsafe(32)
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
         db.execute("INSERT INTO handoff VALUES (?, ?, ?, ?, ?, 0)",
-                   (hashlib.sha256(code.encode()).hexdigest(), work_id, username, now + CODE_TTL, MAX_USES))
+                   (hashlib.sha256(code.encode()).hexdigest(), ALL_WORKS if all_works else work_id,
+                    username, now + CODE_TTL, MAX_USES))
     return {"code": code, "expires_at": now + CODE_TTL, "max_uses": MAX_USES,
-            "work_id": work_id, "pages_version": pages_version(work_dir)}
+            "work_id": None if all_works else work_id, "scope": "all" if all_works else "work",
+            "pages_version": pages_version(work_dir)}
 
 
 def _short(value, limit: int) -> bool:
@@ -367,7 +374,7 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
     with _db() as db:
         row = db.execute("SELECT * FROM handoff WHERE code_hash=?",
                          (hashlib.sha256(code.encode()).hexdigest(),)).fetchone()
-    if row is None or row["expires_at"] <= int(time.time()) or row["work_id"] != work_id:
+    if row is None or row["expires_at"] <= int(time.time()) or row["work_id"] not in (work_id, ALL_WORKS):
         raise ProposalError("invalid_or_expired_handoff")
     if row["uses"] >= row["max_uses"]:
         raise ProposalError("handoff_used_up")
@@ -387,7 +394,7 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
     with _db() as db:
         _clean(db, now)
         row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (digest,)).fetchone()
-        if row is None or row["expires_at"] <= now or row["work_id"] != work_id:
+        if row is None or row["expires_at"] <= now or row["work_id"] not in (work_id, ALL_WORKS):
             raise ProposalError("invalid_or_expired_handoff")
         if db.execute("UPDATE handoff SET uses = uses + 1 WHERE code_hash=? AND uses < max_uses",
                       (digest,)).rowcount != 1:

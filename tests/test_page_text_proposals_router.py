@@ -44,9 +44,8 @@ def client(work, monkeypatch):
 
 
 def _code(client, work_id="w1"):
-    r = client.post("/text-proposals/handoff", json={"work_id": work_id} if work_id else {})
-    assert r.status_code == 200, r.text
-    return r.json()["code"]
+    # Kood antakse teose halduses (/works/{id}/parts/handoff) — siin otse moodulist.
+    return ptp.issue_handoff(work_id, "su")["code"]
 
 
 def test_voog(client, work):
@@ -89,7 +88,7 @@ def test_stale_page_409(client, work):
 
 def test_superadmin_otspunktid_admin_403(client):
     client.state["user"] = {"username": "ad", "role": "admin"}
-    for method, path in [("post", "/text-proposals/handoff"), ("get", "/text-proposals"),
+    for method, path in [("get", "/text-proposals"),
                          ("get", "/works/w1/text-proposals"),
                          ("get", "/works/w1/text-proposals/x/pages/t-001"),
                          ("post", "/works/w1/text-proposals/x/pages/t-001/reject"),

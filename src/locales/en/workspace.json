@@ -312,9 +312,9 @@
     "parts": {
       "proposals": {
         "title": "Agent proposals",
-        "createCode": "Code for agent",
+        "createCode": "Code for agent (this work)",
         "refresh": "Refresh",
-        "codeHelp": "Give this code to the agent in the MCP conversation with an instruction, e.g. “Make the table of contents for work {{workId}}”. Valid for 8 hours, for this work only, up to {{max}} submissions.",
+        "codeHelp": "Give this code to the agent in the MCP conversation with an instruction, e.g. “Make the table of contents for work {{workId}}” or “Mark the foliation”. Valid for part and page-text proposals, 8 hours, for this work only, up to {{max}} submissions.",
         "copy": "Copy",
         "copied": "Copied",
         "expires": "Expires",
@@ -351,7 +351,9 @@
         "empty": "No pending proposals. Create a code and give it to the agent to propose parts (letters, sessions etc.).",
         "working": "Saving…",
         "accepting_one": "Adding {{count}} part…",
-        "accepting_other": "Adding {{count}} parts…"
+        "accepting_other": "Adding {{count}} parts…",
+        "createCodeAll": "Code for agent (all works)",
+        "codeHelpAll": "Give this code to the agent in the MCP conversation with an instruction. Valid for part and page-text proposals in ALL works, 8 hours, up to {{max}} submissions."
       },
       "kinds": {
         "letter": "Letter",
@@ -734,9 +736,6 @@
     "jobError": "Accepting the batch failed: {{error}}",
     "alreadyRunning": "A batch is already being accepted for this work.",
     "error": "Action failed: {{error}}",
-    "handoff": "Code for agent (this work)",
-    "handoffAll": "Code for agent (all works)",
-    "handoffInfo": "The code is valid until {{time}} ({{uses}} submissions). Copy it to the agent:",
-    "copy": "Copy"
+    "handoffAll": "Code for agent (all works)"
   }
 }

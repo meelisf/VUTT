@@ -1,14 +1,14 @@
 /** @vitest-environment jsdom */
 // #641: Review lehe „Agendi ettepanekud" — pakkide loend ja kood kõigile teostele.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AgentProposalsSection from '../AgentProposalsSection';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, o?: Record<string, unknown>) => (o ? `${k}:${JSON.stringify(o)}` : k) }),
 }));
-const svc = vi.hoisted(() => ({ listPacks: vi.fn(), issueHandoff: vi.fn() }));
+const svc = vi.hoisted(() => ({ listPacks: vi.fn() }));
 vi.mock('../../../services/textProposalService', () => svc);
 
 const PACK = {
@@ -27,7 +27,7 @@ const renderIt = () => render(
   </MemoryRouter>,
 );
 
-beforeEach(() => { svc.listPacks.mockReset(); svc.issueHandoff.mockReset(); });
+beforeEach(() => { svc.listPacks.mockReset(); });
 
 describe('AgentProposalsSection', () => {
   it('loendi rida viib esimesele ülevaatust vajavale lehele', async () => {
@@ -35,14 +35,5 @@ describe('AgentProposalsSection', () => {
     renderIt();
     fireEvent.click(await screen.findByText(/kustosed/));
     expect(await screen.findByText('LEHT')).toBeTruthy();
-  });
-
-  it('koodi nupp näitab koodi', async () => {
-    svc.listPacks.mockResolvedValue([]);
-    svc.issueHandoff.mockResolvedValue({ code: 'KOOD123', expires_at: 1_700_000_000, max_uses: 20, work_id: null });
-    renderIt();
-    fireEvent.click(await screen.findByText('proposals.handoffAll'));
-    await waitFor(() => expect(screen.getByText('KOOD123')).toBeTruthy());
-    expect(svc.issueHandoff).toHaveBeenCalledWith('t');
   });
 });

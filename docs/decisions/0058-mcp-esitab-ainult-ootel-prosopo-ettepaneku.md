@@ -137,8 +137,10 @@ Sama piir kehtib lehe tekstile. Spekk:
 `docs/superpowers/specs/2026-10-19-mcp-lehe-teksti-ettepanek-design.md`.
 
 - MCP kirjutab ka lehe teksti AINULT ootel ettepanekuna
-  (`state/page_text_proposals.sqlite3`). Kood antakse ühele teosele või kõigile
-  teostele (8 h, 20 esitust). Kõik otsused ja koodid on ainult superadminil. Iga
+  (`state/page_text_proposals.sqlite3`). Agendikood on ÜKS: teose halduses
+  („Osad" → „Kood agendile", `POST /works/{id}/parts/handoff`, `scope` = `work` |
+  `all`), ja see kehtib nii osade kui ka lehe teksti ettepanekutele (8 h, 20 esitust
+  kummagi kohta). Kõik otsused ja koodid on ainult superadminil. Iga
   superadmin näeb kõiki ettepanekuid. Piiratud teos on lubatud. Toortekst
   (`/works/text-proposals/source`) väljastatakse AINULT kehtiva koodiga, sest
   `/api/files/` on avalik.
