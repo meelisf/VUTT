@@ -49,3 +49,34 @@ def test_struktuuri_normaliseerimine_idempotentne():
     for case in CASES:
         once = normalize_page_mark_structure(case["text"])
         assert normalize_page_mark_structure(once) == once
+
+
+# ── Märgenduse struktuurikontroll (#641): agendi ettepanek ei tohi lisada vigu ──
+
+from server.vutt_tags import ann_tokens, has_ann_token, markup_errors, new_markup_errors
+
+
+def test_tundmatu_ja_paarita():
+    e = markup_errors("<x>a</x> <i>b")
+    assert e[("unknown", "x")] == 2 and e[("unclosed", "i")] == 1
+
+
+def test_ristuvad_paarid():
+    # Arvud jäävad samaks, struktuur läheb katki — arvude võrdlus seda ei näeks.
+    assert new_markup_errors("<i>x</i>", "</i>x<i>")
+    assert any(k[0] == "crossing" for k in markup_errors("<i>a<b>b</i>c</b>"))
+
+
+def test_m_reavahetusega():
+    assert ("m_newline", "m") in markup_errors("<m>a\nb</m>")
+
+
+def test_vana_viga_ei_blokeeri():
+    base = "a < b </i> vana"
+    assert new_markup_errors(base, base.replace("vana", "uus")) == []
+
+
+def test_pb_ja_annN():
+    assert not markup_errors("a<pb/>b <ann3>c</ann3>")
+    assert ann_tokens("x<ann1>a</ann1> <ann12>b</ann12>") == ["<ann1>", "</ann1>", "<ann12>", "</ann12>"]
+    assert has_ann_token("üks</ann1> kaks") and not has_ann_token("annab")

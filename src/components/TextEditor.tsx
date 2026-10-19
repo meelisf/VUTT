@@ -13,6 +13,11 @@ import AnnotationDialog from './editor/AnnotationDialog';
 import PageConflictDialog from './editor/PageConflictDialog';
 import type { PageFields, SaveOutcome } from './editor/pageConflict';
 import AnnotationPopover from './editor/AnnotationPopover';
+import TextProposalPanel from './editor/TextProposalPanel';
+import { useTextProposal } from './editor/useTextProposal';
+import type { RestoreResult } from './editor/pageRestore';
+import { issueHandoff, type ProposalHandoff } from '../services/textProposalService';
+import type { ProposalRef } from '../services/pageService';
 
 
 // CM6 impordid
@@ -33,7 +38,7 @@ import type { EditorTab } from './editor/types';
 interface TextEditorProps {
   page: Page;
   work?: Work;
-  onSave: (updatedPage: Page, base: PageFields) => Promise<SaveOutcome>;
+  onSave: (updatedPage: Page, base: PageFields, proposal?: ProposalRef) => Promise<SaveOutcome>;
   onUnsavedChanges?: (hasChanges: boolean) => void;
   onOpenMetaModal?: () => void;
   readOnly?: boolean;
@@ -45,9 +50,15 @@ interface TextEditorProps {
   collections?: Collections;
   /** Git-taaste salvestas lehe serveris — vanem uuendab oma `page`-objekti (#375). */
   onPageRestored?: (patch: Partial<Page>) => void;
+  /** Agendi tekstiettepanekud (#641): Workspace'i ühtne dialoog + lehele liikumine. */
+  runGuarded?: (fn: () => void) => void;
+  onNavigateToPage?: (pageNo: number) => void;
 }
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections, onPageRestored }) => {
+const runNow = (fn: () => void) => fn();
+const noNav = () => {};
+
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections, onPageRestored, runGuarded = runNow, onNavigateToPage = noNav }) => {
   const { user, authToken, userSettings } = useUser();
   const {
     specialCharacters,
@@ -119,6 +130,32 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setSavedState,
     hasUnsavedChanges,
   } = useEditorState({ page, viewRef, onUnsavedChanges });
+
+  // Agendi tekstiettepanek (#641) — ainult superadmin. `useEditorSave` luuakse
+  // allpool ja vajab aktiivset viidet, seega vahetatakse callback'id ref'ide kaudu.
+  const pageRefreshedRef = useRef<((r: RestoreResult) => void) | null>(null);
+  const saveWithDraftsRef = useRef<(() => Promise<boolean>) | null>(null);
+  const proposal = useTextProposal({
+    page, viewRef, enabled: isAtLeast(user?.role, 'superadmin') && !readOnly, token: authToken,
+    hasUnsavedChanges, setSavedState, setComments, setTextAnnotations, setPageTags, setIsDirty,
+    runGuarded, navigateToPage: onNavigateToPage,
+    onPageRefreshedRef: pageRefreshedRef, saveWithDraftsRef,
+  });
+  const proposalRefRef = useRef(proposal.activeRef);
+  proposalRefRef.current = proposal.activeRef;
+  const proposalAfterSave = proposal.afterSave;
+  const saveWithProposal = useCallback(async (updatedPage: Page, base: PageFields): Promise<SaveOutcome> => {
+    const ref = proposalRefRef.current ?? undefined;
+    const outcome = await onSave(updatedPage, base, ref);
+    if (ref) void proposalAfterSave();
+    return outcome;
+  }, [onSave, proposalAfterSave]);
+  const [handoff, setHandoff] = useState<ProposalHandoff | null>(null);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const requestHandoff = useCallback(() => {
+    if (!authToken) return;
+    issueHandoff(authToken, page.work_id).then(setHandoff, (e: Error) => setHandoffError(e.message));
+  }, [authToken, page.work_id]);
 
   const {
     annDialogOpen,
@@ -230,7 +267,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     page_tags,
     textAnnotations,
     setTextAnnotations,
-    onSave,
+    onSave: saveWithProposal,
     savedState,
     setSavedState,
     setPageTags,
@@ -252,6 +289,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     insertMarginalia,
     cleanMarkup,
   } = useEditorFormattingActions({ viewRef, readOnly });
+
+  useEffect(() => {
+    pageRefreshedRef.current = handlePageRestored;
+    saveWithDraftsRef.current = handleSaveWithDrafts;
+  }, [handlePageRestored, handleSaveWithDrafts]);
 
   // --- Salvestamine ---
   useEffect(() => {
@@ -297,6 +339,26 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       />
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
+
+        {activeTab === 'edit' && isAtLeast(user?.role, 'superadmin') && !readOnly && (
+          <TextProposalPanel
+            review={proposal.review}
+            pack={proposal.pack}
+            pendingNotLoaded={proposal.pendingNotLoaded}
+            loaded={proposal.loaded}
+            job={proposal.job}
+            error={proposal.error ?? handoffError}
+            onLoad={() => runGuarded(() => { void proposal.loadIntoEditor(); })}
+            onReject={() => { void proposal.reject(); }}
+            onRejectPack={() => { void proposal.rejectPack(); }}
+            onAcceptPack={proposal.acceptPack}
+            onSaveAndNext={() => { void proposal.saveAndNext(); }}
+            onPrev={proposal.prev}
+            onNext={proposal.next}
+            onHandoff={requestHandoff}
+            handoff={handoff}
+          />
+        )}
 
         {/* TEXT TAB CONTENT — alati DOM-is, et CodeMirror ei häviks */}
         <EditorEditTab

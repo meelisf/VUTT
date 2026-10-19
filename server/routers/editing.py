@@ -2,7 +2,6 @@ from ..work_dating import dating_updates
 import json
 import os
 import subprocess
-import unicodedata
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -30,13 +29,14 @@ from ..git_ops import (
     get_recent_commits,
     save_with_git,
 )
-from ..marginalia_normalize import normalize_marginalia_tags
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..page_history import build_page_history
 from ..page_locks import page_lock
 from ..page_merge import PAGE_FIELDS, merge_page, read_page_view, text_conflict_chunks
 from ..page_paths import check_page_filename, require_existing_page
+from ..page_text import normalize_page_text
+from .. import page_text_proposals
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.indices import page_person_ids
 from ..prosopography.relations import update_page_person_mentions
@@ -90,11 +90,8 @@ def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
     return catalog, "/".join(parts)
 
 
-def _normalize_page_text(text):
-    """Salvestatava lehe teksti kanooniline kuju: NFC + marginaalia-tägid (<m> välimiseks)."""
-    if not text:
-        return ""
-    return normalize_marginalia_tags(unicodedata.normalize('NFC', text))
+# Kanooniline kuju elab `page_text`-is (jagatud tekstiettepanekutega, #641).
+_normalize_page_text = normalize_page_text
 
 
 class _PageConflict(Exception):
@@ -112,6 +109,9 @@ def _merge_with_base(txt_path, json_path, text, client_meta, base):
     lehe luku all. Tagastab (tekst, meta, liidetud_leht | None) — viimane on
     olemas, kui ketta seis panustas (klient peab selle üle võtma)."""
     theirs = read_page_view(txt_path, json_path)
+    # Ketas võib olla mittekanooniline (vana fail, NFD): võrdle samal kujul kui
+    # kliendi baasi, muidu annab muutmata ketas vale konflikti (#641).
+    theirs["text_content"] = _normalize_page_text(theirs["text_content"])
     mine = {
         "text_content": text,
         **{k: client_meta.get(k) if client_meta.get(k) is not None else ([] if k != "status" else "Toores")
@@ -152,7 +152,7 @@ def _viimane_muutja(catalog, filename):
     return {"author": ajalugu[0]["author"], "date": ajalugu[0]["date"]}
 
 
-def _save_page_locked(txt_path, text, client_meta, username, base=None):
+def _save_page_locked(txt_path, text, client_meta, username, base=None, message=None):
     """Lehe kirjutus lehe luku all (#416): serveripoolsete väljade liitmine,
     muutusteta kontroll ja kirjutus näevad sama seisu.
 
@@ -195,8 +195,49 @@ def _save_page_locked(txt_path, text, client_meta, username, base=None):
             txt_path,
             text,
             username,
+            message=message,
             additional_files=additional if additional else None,
         ), merged_page, isikud_enne != isikud_parast
+
+
+def _proposal_ref(proposal, catalog, filename):
+    """`/save` `proposal`-viide (#641): ülevaatust vajav leht SELLE teose SELLEL lehel."""
+    if not isinstance(proposal, dict) or not isinstance(proposal.get("id"), str) \
+            or not isinstance(proposal.get("stem"), str):
+        raise HTTPException(status_code=400, detail="Vigane ettepaneku viide")
+    if proposal["stem"] != os.path.splitext(filename)[0]:
+        raise HTTPException(status_code=400, detail="Ettepanek on teise lehe kohta")
+    try:
+        row = page_text_proposals.page_ref(proposal["id"], proposal["stem"])
+    except page_text_proposals.ProposalError:
+        # Ettepanek otsustati vahepeal mujal (agent esitas uuesti, teine superadmin,
+        # aegumine): toimetaja salvestus EI tohi selle pärast kukkuda — muidu jääks
+        # tema töö lõksu. Salvestus käib tavaliselt, ettepaneku olekut ei puututa.
+        return None
+    meta = _read_json_file(os.path.join(BASE_DIR, catalog, "_metadata.json"))
+    if (meta or {}).get("id") != row["work_id"]:
+        raise HTTPException(status_code=400, detail="Ettepanek on teise teose kohta")
+    return proposal["id"], proposal["stem"]
+
+
+def _save_with_proposal(ref, txt_path, text, client_meta, username, base):
+    """Lukujärjekord: ettepaneku lukk → lehe lukk (`_save_page_locked` sees) → git.
+    Olek muutub ainult eduka salvestuse järel; 409 jätab ettepaneku ootele."""
+    pid, stem = ref
+    with page_text_proposals.proposal_lock(pid):
+        with page_lock(txt_path):
+            enne = normalize_page_text(page_text_proposals.read_raw(txt_path))
+        tulemus = _save_page_locked(txt_path, text, client_meta, username, base,
+                                    message=f"MCP-ettepanek {pid}: {os.path.relpath(txt_path, BASE_DIR)}")
+        with page_lock(txt_path):
+            parast = page_text_proposals.read_raw(txt_path)
+        if tulemus[0] is None or parast == enne:
+            # Tekst jäi samaks (nt toimetaja taastas ketta teksti; JSON-i muutus
+            # üksi ei ole ettepaneku vastuvõtt) → ettepanekut ei võetud vastu.
+            page_text_proposals.mark_rejected(pid, [stem], username)
+            return tulemus, "rejected"
+        page_text_proposals.mark_accepted(pid, [stem], username)
+        return tulemus, "accepted"
 
 
 @router.post("/save")
@@ -216,11 +257,26 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     await run_in_threadpool(require_existing_page, BASE_DIR, catalog, filename)
 
     txt_path = os.path.join(BASE_DIR, catalog, filename)
+    proposal_ref = None
+    proposal_state = None
+    if data.get('proposal') is not None:
+        # Agendi tekstiettepaneku kinnitus (#641) — töövoog on ainult superadminil.
+        if not is_at_least(user.get('role'), 'superadmin'):
+            raise HTTPException(status_code=403, detail="Ettepanekuid kinnitab ainult superadmin")
+        proposal_ref = await run_in_threadpool(_proposal_ref, data['proposal'], catalog, filename)
+        if proposal_ref is None:
+            proposal_state = "already_decided"
     try:
-        git_result, merged_page, isikud_muutusid = await run_in_threadpool(
-            _save_page_locked, txt_path, text, data.get('meta_content'), user['username'],
-            data.get('base'),
-        )
+        if proposal_ref:
+            (git_result, merged_page, isikud_muutusid), proposal_state = await run_in_threadpool(
+                _save_with_proposal, proposal_ref, txt_path, text, data.get('meta_content'),
+                user['username'], data.get('base'),
+            )
+        else:
+            git_result, merged_page, isikud_muutusid = await run_in_threadpool(
+                _save_page_locked, txt_path, text, data.get('meta_content'), user['username'],
+                data.get('base'),
+            )
     except _PageConflict as e:
         # Ketas puutumata; klient näitab konfliktidialoogi (#455).
         theirs_last = await run_in_threadpool(_viimane_muutja, catalog, filename)
@@ -232,8 +288,10 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     # Liidetud seis tagasi kliendile: ketta panus peab redaktorisse jõudma.
     merged_extra = {"merged": True, "page": merged_page} if merged_page is not None else {}
     # Muutusteta Ctrl+S: ei kirjuta kettale, ei commiti ega indekseeri (#173).
+    proposal_extra = {"proposal_state": proposal_state} if proposal_state else {}
     if git_result is None:
-        return {"status": "success", "changed": False, "git_committed": True, "commit_hash": "", **merged_extra}
+        return {"status": "success", "changed": False, "git_committed": True, "commit_hash": "",
+                **merged_extra, **proposal_extra}
 
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     work_id = (data.get('meta_content') or {}).get('work_id')
@@ -249,7 +307,7 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     if page_tag_qcodes:
         background_tasks.add_task(enrich_entity_labels_async_qcodes, page_tag_qcodes)
 
-    response = {"status": "success", "changed": True, "commit_hash": git_result.get("commit_hash", "")[:8], "git_committed": True, **merged_extra}
+    response = {"status": "success", "changed": True, "commit_hash": git_result.get("commit_hash", "")[:8], "git_committed": True, **merged_extra, **proposal_extra}
     if git_result.get("success") is False:
         response["git_committed"] = False
         response["warning"] = "Tekst salvestati kettale, aga Git versioonihalduse commit ebaõnnestus."

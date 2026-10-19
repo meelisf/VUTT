@@ -37,6 +37,8 @@ import {
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
+import { isAtLeast } from '../utils/roleUtils';
+import AgentProposalsSection from './review/AgentProposalsSection';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
@@ -584,6 +586,9 @@ const Review: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Agendi tekstiettepanekud (#641) — ainult superadmin */}
+          {token && isAtLeast(user?.role, 'superadmin') && <AgentProposalsSection token={token} />}
 
           {/* Tab bar (ainult adminile) */}
           {isAdmin && (

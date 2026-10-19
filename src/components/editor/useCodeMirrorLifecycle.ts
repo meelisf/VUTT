@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { proposalDiffExtension } from './proposalDiffExtension';
 import { Compartment, EditorState } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search';
@@ -94,6 +95,7 @@ export function useCodeMirrorLifecycle({
           ),
           search({ top: false, createPanel: createVuttSearchPanel }),
           vuttMarkupExtension,
+          proposalDiffExtension(),
           marginaliaCompartmentRef.current.of(
             marginaliaExtension(localStorage.getItem('vutt_marginalia_view') === 'badge' ? 'badge' : 'column')
           ),

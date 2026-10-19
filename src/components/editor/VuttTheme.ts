@@ -79,6 +79,17 @@ export const vuttTheme = EditorView.theme({
     borderRadius: '2px',
     cursor: 'help',
   },
+  // Agendi tekstiettepaneku diff (#641): lisatu roheline, kustutatu läbikriipsutatud.
+  '.vutt-prop-ins': {
+    backgroundColor: '#dcfce7',
+    borderBottom: '2px solid #16a34a',
+  },
+  '.vutt-prop-del': {
+    color: '#b91c1c',
+    backgroundColor: '#fee2e2',
+    textDecoration: 'line-through',
+    userSelect: 'none',
+  },
   // Otsingupaneel — block-layout et <br> töötaks, kõik read eraldi
   '.cm-search': {
     padding: '5px 8px 6px',

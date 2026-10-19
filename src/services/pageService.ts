@@ -12,9 +12,13 @@ import { PageConflictError, conflictFromResponse, type PageFields } from '../com
 import { pageFileFromImageUrl } from './workImageService';
 import { quoteFilterValue } from '../utils/filterUtils';
 
+/** `/save` viide agendi tekstiettepanekule (#641). */
+export interface ProposalRef { id: string; stem: string }
+
 // Abifunktsioon failisüsteemi salvestamiseks
 const saveToFileSystem = async (
   page: Page, original_catalog: string, image_url: string, authToken?: string, base?: PageFields,
+  proposal?: ProposalRef,
 ): Promise<{ merged?: boolean; page?: PageFields }> => {
   try {
     const imageFilename = pageFileFromImageUrl(image_url);
@@ -43,6 +47,8 @@ const saveToFileSystem = async (
       work_id: page.work_id,
       // Kolmesuunalise liitmise baas (#455, ADR 0054)
       ...(base ? { base } : {}),
+      // Agendi tekstiettepaneku kinnitus (#641) — ainult superadmin
+      ...(proposal ? { proposal } : {}),
     };
 
     const response = await fetchWithTimeout(`${FILE_API_URL}/save`, {
@@ -121,13 +127,14 @@ export const savePage = async (
   _userName: string = 'Anonüümne',
   authToken?: string,
   base?: PageFields,
+  proposal?: ProposalRef,
 ): Promise<{ page: Page; merged: PageFields | null }> => {
   try {
     // Meilisearchi uuendamine toimub backendis (file_server.py kutsub sync_work_to_meilisearch)
     // Frontend kasutab ainult otsinguvõtit, millel pole kirjutamisõigust
 
     if (page.original_path && page.image_url) {
-      const result = await saveToFileSystem(page, page.original_path, page.image_url, authToken, base);
+      const result = await saveToFileSystem(page, page.original_path, page.image_url, authToken, base, proposal);
       // Server liitis vahepealse ketta seisu (#455) — see on nüüd salvestatud leht.
       if (result.merged && result.page) {
         return { page: { ...page, ...result.page }, merged: result.page };

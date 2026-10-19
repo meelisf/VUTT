@@ -713,5 +713,30 @@
       "comment": "Kommentaar „{{text}}”",
       "annotation": "Tekstiannotatsioon „{{text}}”"
     }
+  },
+  "proposal": {
+    "title": "Agendi ettepanek",
+    "packNote": "Pakk: {{note}}",
+    "pageNote": "Lehe märkus: {{note}}",
+    "remaining": "Ülevaatamata lehti: {{count}}",
+    "loaded": "Ettepanek on redaktoris salvestamata muudatusena. Kontrolli pildi järgi; Ctrl+S kinnitab, vale koha saad otse parandada.",
+    "notLoaded": "Lehel on ootel ettepanek, aga sul on salvestamata muudatusi.",
+    "load": "Lae ettepanek",
+    "stale": "Leht on pärast ettepanekut muutunud ja automaatne liitmine ei õnnestunud. Agendi muudatus on all lugemiseks; too vajalik käsitsi üle ja salvesta või lükka tagasi.",
+    "reject": "Lükka tagasi",
+    "rejectPack": "Lükka pakk tagasi",
+    "acceptPack": "Kinnita kogu pakk",
+    "saveAndNext": "Salvesta ja järgmine",
+    "prev": "Eelmine",
+    "next": "Järgmine",
+    "jobRunning": "Kinnitan pakki… {{done}}/{{total}}",
+    "jobDone": "Pakk kinnitatud: {{accepted}} lehte, aegunud {{stale}}, vahele jäetud {{skipped}}.",
+    "jobError": "Paki kinnitus ebaõnnestus: {{error}}",
+    "alreadyRunning": "Selle teose paki kinnitus juba käib.",
+    "error": "Toiming ebaõnnestus: {{error}}",
+    "handoff": "Kood agendile (see teos)",
+    "handoffAll": "Kood agendile (kõik teosed)",
+    "handoffInfo": "Kood kehtib kuni {{time}} ({{uses}} esitust). Kopeeri see agendile:",
+    "copy": "Kopeeri"
   }
 }

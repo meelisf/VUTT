@@ -12,6 +12,7 @@ import re
 from mcp.server.mcpserver import MCPServer
 
 from . import format as fmt
+from . import page_text
 from . import parts as work_parts_mod
 from . import persons
 from . import queries
@@ -539,6 +540,45 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         Võrguvea järel ära saada sama ettepanekut pimesi uuesti.
         """
         return work_parts_mod.submit_parts(client, handoff_code, work_id, pages_version, parts, persons)
+
+    @mcp.tool(structured_output=False)
+    async def get_page_source(handoff_code: str, work_id: str, page: int) -> str:
+        """Tagastab lehe TOORTEKSTI parandusettepaneku aluseks (märgendus ja reavahetused alles).
+
+        get_pages EI kõlba aluseks: see on otsinguks puhastatud tekst (reavahetused
+        tühikuks, poolitused liidetud, märgendus eemaldatud, ß → ss). Parandus selle
+        põhjal kustutaks lehe struktuuri.
+
+        handoff_code tuleb superadminilt (Review → „Agendi ettepanekud" või Workspace'i
+        ettepanekupaneel); kehtib 8 h, ühele teosele või kõigile. page = VUTT-i 1-põhine
+        järjestusnumber nagu get_pages'is. Vastuses: stem (lehe püsiv tunnus), text_hash
+        (räsi täpselt sellest tekstist), status, text ja tags — VUTT-i lubatud tägid
+        (paired=false: üksiktäg nagu <pb/>). Muid tägisid ära leiuta (nt tabelit pole).
+        <m>…</m> on üks füüsiline ääremärkuse rida ja ei sisalda reavahetust; <fw>,
+        <sig>, <catch>, <rh> märgivad leheküljenumbrit, signatuuri, kustost ja
+        veerutiitlit. Lugemine koodi kasutuskorda ei kuluta.
+        """
+        return page_text.page_source(client, handoff_code, work_id, page)
+
+    @mcp.tool(structured_output=False)
+    async def submit_page_text_proposal(handoff_code: str, work_id: str, pages: list[dict],
+                                        note: str = "") -> str:
+        """Esitab lehe teksti parandused OOTEL ettepanekuna; lehti ei muudeta.
+
+        pages = [{stem, text_hash, edits: [{old, new}], note?}], kus stem ja text_hash
+        tulevad get_page_source'ist. Iga `old` peab lehe toortekstis esinema TÄPSELT
+        üks kord (anna vajadusel pikem kontekst); asendused rakenduvad järjest.
+        <annN>/</annN> ankrutokeneid ei tohi old ega new sisaldada — ankru sees olevat
+        teksti tohib parandada. Märgendus peab jääma terveks: muudatus ei tohi tekitada
+        paarita ega ristuvat tägi ega tundmatut tägi.
+
+        Kontrolli iga muudatus pildi järgi (get_page_image) ja kirjuta note'i, mida ja
+        kuidas kontrollisid (nt „kustosed lk 1–80, pildi järgi"). Kuni 200 lehte ja
+        100 asendust lehel. Kui leht on vahepeal muutunud (stale_page) või old ei
+        leidu, loe leht uuesti get_page_source'iga. Sama lehe uus esitus asendab sinu
+        varasema ootel ettepaneku. Võrguvea järel ära saada pimesi uuesti.
+        """
+        return page_text.submit(client, handoff_code, work_id, pages, note)
 
     @mcp.tool(structured_output=False)
     async def get_person_enrichment_context(person_id: str) -> str:
