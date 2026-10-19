@@ -527,7 +527,7 @@ tee (järjestus, poolitus, lisamine, kustutamine, taaste) PEAB kutsuma `refresh_
 
 **Autentimine** — rollid `contributor` < `editor` < `admin` < `superadmin`. Kontroll ALATI
 `is_at_least()` / `isAtLeast()`, **mitte** `role == "admin"`. Token UUID, 24h;
-localStorage `vutt_user`, `vutt_token`. `contributor` muudatused lähevad ülevaatusele.
+localStorage `vutt_user`, `vutt_token`. `contributor`-i eelkinnitust EI OLE (eemaldatud 099d0ad, ADR 0031) — järelevalve käib nähtavuse kaudu.
 Login: kahekihiline rate-limit (nginx 1r/s + app 5/60s) + konto-lockout.
 
 `GET /prosopography/{id}` on **autentimata avalik** ja tagastab salvestatud kaardi JSON-i.
