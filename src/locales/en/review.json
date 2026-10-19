@@ -94,7 +94,6 @@
   "proposals": {
     "title": "Agent proposals",
     "error": "Action failed: {{error}}",
-    "empty": "No pending proposals.",
     "counts": "pending {{pending}}, stale {{stale}}"
   }
 }
