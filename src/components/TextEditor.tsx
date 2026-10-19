@@ -13,7 +13,7 @@ import AnnotationDialog from './editor/AnnotationDialog';
 import PageConflictDialog from './editor/PageConflictDialog';
 import type { PageFields, SaveOutcome } from './editor/pageConflict';
 import AnnotationPopover from './editor/AnnotationPopover';
-import TextProposalPanel from './editor/TextProposalPanel';
+import TextProposalPanel, { shouldShowProposalPanel } from './editor/TextProposalPanel';
 import { useTextProposal } from './editor/useTextProposal';
 import type { RestoreResult } from './editor/pageRestore';
 import type { ProposalRef } from '../services/pageService';
@@ -333,7 +333,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
 
-        {activeTab === 'edit' && isAtLeast(user?.role, 'superadmin') && !readOnly && (
+        {activeTab === 'edit' && isAtLeast(user?.role, 'superadmin') && !readOnly && shouldShowProposalPanel(proposal) && (
           <TextProposalPanel
             review={proposal.review}
             pack={proposal.pack}
