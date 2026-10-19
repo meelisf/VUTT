@@ -90,5 +90,13 @@
   },
   "collectionFilter": {
     "personsHidden": "prosopograafia muudatused on peidus"
+  },
+  "proposals": {
+    "title": "Agendi ettepanekud",
+    "handoffAll": "Kood agendile (kõik teosed)",
+    "handoffInfo": "Kood kehtib kuni {{time}} ({{uses}} esitust). Kopeeri see agendile:",
+    "error": "Toiming ebaõnnestus: {{error}}",
+    "empty": "Ootel ettepanekuid ei ole.",
+    "counts": "ootel {{pending}}, aegunud {{stale}}"
   }
 }
