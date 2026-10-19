@@ -150,7 +150,7 @@ const Workspace: React.FC = () => {
     return editorSaveRef.current();
   }, []);
 
-  const { dialogProps, runGuarded } = useUnsavedChangesGuard({
+  const { dialogProps, runGuarded, allowNextNavigation } = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     onSave: handleGuardSave,
   });
@@ -730,6 +730,13 @@ const Workspace: React.FC = () => {
             onNavigateToPage={(pageNo) => {
               setGridSelectedPage(null);
               runGuarded(() => navigate(`/work/${workId}/${pageNo}`, { replace: true }));
+            }}
+            onNavigateAfterSave={(pageNo) => {
+              // Salvestus just õnnestus, aga `hasUnsavedChanges` on kuni järgmise
+              // renderduseni veel true — ilma loata avaneks salvestamata dialoog.
+              setGridSelectedPage(null);
+              allowNextNavigation();
+              navigate(`/work/${workId}/${pageNo}`, { replace: true });
             }}
             onPageRestored={(patch) => {
               setPage(prev => prev ? { ...prev, ...patch } : prev);

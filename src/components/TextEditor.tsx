@@ -52,12 +52,14 @@ interface TextEditorProps {
   /** Agendi tekstiettepanekud (#641): Workspace'i ühtne dialoog + lehele liikumine. */
   runGuarded?: (fn: () => void) => void;
   onNavigateToPage?: (pageNo: number) => void;
+  /** Sama, aga pärast edukat salvestust (guard lubab ühe navigeerimise). */
+  onNavigateAfterSave?: (pageNo: number) => void;
 }
 
 const runNow = (fn: () => void) => fn();
 const noNav = () => {};
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections, onPageRestored, runGuarded = runNow, onNavigateToPage = noNav }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections, onPageRestored, runGuarded = runNow, onNavigateToPage = noNav, onNavigateAfterSave = noNav }) => {
   const { user, authToken, userSettings } = useUser();
   const {
     specialCharacters,
@@ -137,7 +139,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const proposal = useTextProposal({
     page, viewRef, enabled: isAtLeast(user?.role, 'superadmin') && !readOnly, token: authToken,
     hasUnsavedChanges, setSavedState, setComments, setTextAnnotations, setPageTags, setIsDirty,
-    runGuarded, navigateToPage: onNavigateToPage,
+    runGuarded, navigateToPage: onNavigateToPage, navigateAfterSave: onNavigateAfterSave,
     onPageRefreshedRef: pageRefreshedRef, saveWithDraftsRef,
   });
   const proposalRefRef = useRef(proposal.activeRef);
