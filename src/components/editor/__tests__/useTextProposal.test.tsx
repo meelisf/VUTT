@@ -34,7 +34,7 @@ const REVIEW = (over = {}) => ({
   note: '', pack_note: 'pakk', work_id: 'w1', ...over,
 });
 
-const nav = { runGuarded: vi.fn((fn: () => void) => fn()), navigateToPage: vi.fn(), refreshed: vi.fn() };
+const nav = { runGuarded: vi.fn((fn: () => void) => fn()), navigateToPage: vi.fn(), navigateAfterSave: vi.fn(), refreshed: vi.fn() };
 
 function useHarness(page: Page, enabled = true) {
   const viewRef = useRef<EditorView | null>(null);
@@ -47,7 +47,7 @@ function useHarness(page: Page, enabled = true) {
     page, viewRef, enabled, token: 't', hasUnsavedChanges: st.hasUnsavedChanges,
     setSavedState: st.setSavedState, setComments: st.setComments,
     setTextAnnotations: st.setTextAnnotations, setPageTags: st.setPageTags, setIsDirty: st.setIsDirty,
-    runGuarded: nav.runGuarded, navigateToPage: nav.navigateToPage,
+    runGuarded: nav.runGuarded, navigateToPage: nav.navigateToPage, navigateAfterSave: nav.navigateAfterSave,
     onPageRefreshedRef: { current: nav.refreshed }, saveWithDraftsRef: { current: async () => true }, pollMs: 1,
   });
   return { st, tp, viewRef };
@@ -195,7 +195,10 @@ describe('useTextProposal — pakk ja liikumine', () => {
     const { result } = renderHook(() => useHarness(mkPage('a', 1)));
     await waitFor(() => expect(result.current.tp.next).not.toBeNull());
     await act(async () => { await result.current.tp.saveAndNext(); });
-    expect(nav.navigateToPage).toHaveBeenCalledWith(3);
+    // Workspace'i dirty-lipp on salvestuse järel veel vana (uueneb renderdusel):
+    // guardiga navigeerimine avaks salvestamata muudatuste dialoogi.
+    expect(nav.navigateAfterSave).toHaveBeenCalledWith(3);
+    expect(nav.navigateToPage).not.toHaveBeenCalled();
   });
 });
 

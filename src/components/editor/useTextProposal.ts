@@ -38,6 +38,9 @@ interface UseTextProposalParams {
   /** Workspace'i ühtne salvestamata muudatuste dialoog (salvesta / loobu / tühista). */
   runGuarded: (fn: () => void) => void;
   navigateToPage: (pageNo: number) => void;
+  /** Navigeerimine kohe pärast EDUKAT salvestust: guardi lipp on alles järgmisel
+   *  renderdusel puhas, seega peab kutsuja navigeerimise selgesõnaliselt lubama. */
+  navigateAfterSave: (pageNo: number) => void;
   /** `handlePageRestored` (useEditorSave luuakse hiljem, seega ref). */
   onPageRefreshedRef: MutableRefObject<((r: RestoreResult) => void) | null>;
   saveWithDraftsRef: MutableRefObject<(() => Promise<boolean>) | null>;
@@ -52,7 +55,7 @@ export const pageStem = (page: Page) => pageFileFromImageUrl(page.image_url || '
 export function useTextProposal({
   page, viewRef, enabled, token, hasUnsavedChanges,
   setSavedState, setComments, setTextAnnotations, setPageTags, setIsDirty,
-  runGuarded, navigateToPage, onPageRefreshedRef, saveWithDraftsRef, pollMs = 1500,
+  runGuarded, navigateToPage, navigateAfterSave, onPageRefreshedRef, saveWithDraftsRef, pollMs = 1500,
 }: UseTextProposalParams) {
   const [job, setJob] = useState<ProposalJob | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -186,8 +189,8 @@ export function useTextProposal({
   const saveAndNext = useCallback(async () => {
     const target = nextPage?.page_no;
     const ok = await saveWithDraftsRef.current?.();
-    if (ok && target) navigateToPage(target);
-  }, [nextPage?.page_no, saveWithDraftsRef, navigateToPage]);
+    if (ok && target) navigateAfterSave(target);
+  }, [nextPage?.page_no, saveWithDraftsRef, navigateAfterSave]);
 
   /** Paki töö lõpus: aktiivne leht kettalt (salvestatud seis), pakk uuesti. */
   const refreshAfterJob = useCallback(async (proposalId: string) => {
