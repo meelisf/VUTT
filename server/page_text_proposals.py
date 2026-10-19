@@ -446,3 +446,89 @@ def page_ref(proposal_id: str, stem: str):
     if row["state"] not in REVIEW_STATES:
         raise ProposalError("proposal_decided")
     return row
+
+
+# ── Paki kinnitus ─────────────────────────────────────────────────────────
+
+def _sync_meili(work_dir: str) -> None:
+    from .meilisearch_ops import sync_work_to_meilisearch_async
+    sync_work_to_meilisearch_async(os.path.basename(work_dir))
+
+
+def _restore(originals) -> None:
+    from .utils import atomic_write_text
+    for path, raw in originals:
+        atomic_write_text(path, raw)
+
+
+def apply_pack(proposal_id: str, work_dir: str, username: str, progress=None) -> dict:
+    """Kõik ootel lehed ÜHE commit'iga. Lehelukud hoitakse lugemisest commit'ini
+    (vahepealne Ctrl+S ootab, mitte ei kao). Git-viga → kirjutatud failid
+    taastatakse toimingueelsest seisust lukke vabastamata ja lehed jäävad ootele.
+    Commit'imata pooliku töö (protsess suri) leht taastatakse enne HEAD-ist."""
+    accepted, stale, skipped, writes, originals = [], [], [], [], []
+    with proposal_lock(proposal_id):
+        with _db() as db:
+            rows = db.execute("SELECT * FROM proposal_page WHERE proposal_id=? ORDER BY stem",
+                              (proposal_id,)).fetchall()
+        if not rows:
+            raise ProposalError("unknown_proposal")
+        todo = [r for r in rows if r["state"] == "pending"]
+        skipped = [r["stem"] for r in rows if r["state"] != "pending"]
+        with ExitStack() as stack:
+            for r in todo:
+                stack.enter_context(page_lock(_txt_path(work_dir, r["stem"])))
+            paths = [_txt_path(work_dir, r["stem"]) for r in todo if os.path.exists(_txt_path(work_dir, r["stem"]))]
+            committed = git_ops.committed_state(paths)
+            if committed is None:
+                raise RuntimeError("git_status_failed")
+            try:
+                for i, r in enumerate(todo):
+                    path = _txt_path(work_dir, r["stem"])
+                    if not os.path.exists(path):
+                        stale.append(r["stem"])
+                        continue
+                    raw = read_raw(path)
+                    if committed.get(path) is False:
+                        # HEAD-ist taastatakse AINULT meie enda pooleli jäänud töö: kettal on
+                        # täpselt see, mille see ettepanek HEAD-i peale kirjutaks. Muu
+                        # commit'imata sisu (nt /save, mille commit ebaõnnestus) on
+                        # inimese tekst — see liidetakse nagu tavaline ketas.
+                        head = git_ops.head_bytes(os.path.relpath(path, git_ops.BASE_DIR))
+                        head_text = head.decode("utf-8") if head is not None else None
+                        if head_text is not None and raw != head_text and rebase(
+                                r["base_text"], r["proposed_text"], head_text, []) == raw:
+                            originals.append((path, raw))
+                            raw = head_text
+                            _restore([(path, raw)])
+                    view = read_page_view(path, os.path.splitext(path)[0] + ".json")
+                    merged = rebase(r["base_text"], r["proposed_text"], raw, view["text_annotations"])
+                    if merged is None:
+                        stale.append(r["stem"])
+                    elif merged == raw and raw != r["base_text"]:
+                        accepted.append(r["stem"])        # juba rakendatud ja commit'itud
+                    elif merged == raw:
+                        stale.append(r["stem"])            # ketas sai vahepeal sama sisu muul teel
+                    else:
+                        if not any(p == path for p, _ in originals):
+                            originals.append((path, raw))
+                        writes.append((path, merged, r["stem"]))
+                    if progress:
+                        progress(i + 1, len(todo))
+                if writes:
+                    (first, content, _), rest = writes[0], writes[1:]
+                    res = git_ops.save_with_git(
+                        first, content, username,
+                        message=f"MCP-ettepanek {proposal_id}: {len(writes)} lehte",
+                        additional_files=[(p, c) for p, c, _ in rest] or None)
+                    if not res or res.get("success") is False:
+                        raise RuntimeError("git_failed")
+            except Exception:
+                _restore(originals)
+                raise
+            accepted += [s for _, _, s in writes]
+            mark_accepted(proposal_id, accepted, username)
+            mark_stale(proposal_id, stale)
+    if writes:
+        _sync_meili(work_dir)
+    return {"accepted": sorted(accepted), "stale": sorted(stale), "skipped": sorted(skipped)}
