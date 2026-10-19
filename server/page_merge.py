@@ -195,6 +195,10 @@ def _seose_vead(text: str, annotations) -> set:
     return vead
 
 
+# Avalik nimi tekstiettepanekute ümberbaseerimisele (#641).
+annotation_link_errors = _seose_vead
+
+
 def merge_page(base: dict, mine: dict, theirs: dict):
     """Tagastab (liidetud leht, konfliktide loend). Konflikti korral on liidetud
     leht mittetäielik ja seda EI tohi kirjutada."""

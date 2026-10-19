@@ -561,6 +561,43 @@ def uncommitted_paths(filepaths):
     return [abs_path for rel, abs_path in rel_to_abs.items() if rel in dirty]
 
 
+def committed_state(filepaths):
+    """{absoluutne tee: kas kettal on sama mis HEAD-is}. Erinevalt
+    `uncommitted_paths`-ist on git-viga `None`, mitte „kõik commit'itud" —
+    tekstiettepaneku taaste (#641) ei tohi viga commit'iks tõlgendada."""
+    rel_to_abs = {}
+    for path in filepaths:
+        rel = os.path.relpath(path, BASE_DIR)
+        if rel.startswith(".."):
+            return None
+        rel_to_abs[rel] = path
+    if not rel_to_abs:
+        return {}
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain", "-z", "--untracked-files=all", "--", *rel_to_abs],
+            cwd=BASE_DIR, check=True, capture_output=True, text=True,
+        ).stdout
+    except (subprocess.CalledProcessError, OSError) as e:
+        logger.warning(f"Git status ebaõnnestus ({len(rel_to_abs)} faili): {e}")
+        return None
+    dirty = {entry[3:] for entry in out.split("\0") if len(entry) > 3}
+    return {abs_path: rel not in dirty for rel, abs_path in rel_to_abs.items()}
+
+
+def head_bytes(relative_path):
+    """Faili sisu HEAD-is toorbaitidena (GitPythoni `git.show` lõikab lõpu-
+    reavahetuse ära). Puudub / viga → None."""
+    try:
+        # `HEAD:<tee>` on puu-tee, mitte pathspec — `:(literal)` siia ei sobi.
+        r = subprocess.run(["git", "show", f"HEAD:{relative_path}"],
+                           cwd=BASE_DIR, capture_output=True)
+    except OSError as e:
+        logger.warning(f"Git show ebaõnnestus ({relative_path}): {e}")
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
 def save_config_with_git(filepath, data, username, message=None, indent=2):
     """Kirjutab autoriteetse konfiguratsioonifaili ja commitib selle (#346).
 

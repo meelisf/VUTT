@@ -22,9 +22,10 @@ from typing import Optional
 
 from .config import STATE_DIR
 from .page_locks import page_lock
-from .page_merge import read_page_view
+from .page_merge import annotation_link_errors, merge_text, read_page_view
 from .page_text import normalize_page_text, text_hash
 from .vutt_tags import ann_tokens, has_ann_token, new_markup_errors
+from . import git_ops
 from . import work_parts as wp
 
 DB_PATH = os.path.join(STATE_DIR, "page_text_proposals.sqlite3")
@@ -291,3 +292,142 @@ def submit(code: str, work_id: str, work_dir: str, pages: list, note: str) -> di
                 [(proposal_id, stem, no, base, prop, pnote) for stem, no, base, prop, pnote in results])
     return {"proposal_id": proposal_id, "work_id": work_id, "pages": len(results),
             "superseded": superseded, "expires_at": now + PROPOSAL_TTL}
+
+
+# ── Ümberbaseerimine ja ülevaatus ─────────────────────────────────────────
+
+def rebase(base_text: str, proposed_text: str, disk_text: str, annotations) -> Optional[str]:
+    """Ettepanek liidetuna ketta praeguse tekstiga; None = kokkupõrge.
+
+    Kõik kolm võrreldakse kanoonilisel kujul (ketas võib olla NFD, ettepanek on
+    normaliseeritud). `merge_text` võib konfliktita jätta üksiku `</i>`-i, seega
+    kontrollitakse märgendust ja ankruid uuesti KETTA vastu (inimese muudatus on lubatud).
+    """
+    disk = normalize_page_text(disk_text)
+    merged, _ = merge_text(normalize_page_text(base_text), proposed_text, disk)
+    if merged is None:
+        return None
+    merged = normalize_page_text(merged)
+    if new_markup_errors(disk, merged) or ann_tokens(merged) != ann_tokens(disk):
+        return None
+    if annotation_link_errors(merged, annotations) - annotation_link_errors(disk, annotations):
+        return None
+    return merged
+
+
+def _set_state(db, proposal_id: str, stems, state: str, username: Optional[str]) -> int:
+    now = int(time.time())
+    n = 0
+    for stem in stems:
+        n += db.execute(
+            "UPDATE proposal_page SET state=?, decided_by=?, decided_at=? "
+            f"WHERE proposal_id=? AND stem=? AND state IN {REVIEW_STATES}",
+            (state, username, now, proposal_id, stem)).rowcount
+    return n
+
+
+def _page_row(db, proposal_id: str, stem: str):
+    row = db.execute(
+        "SELECT pp.*, p.note AS pack_note, p.work_id FROM proposal_page pp "
+        "JOIN proposal p ON p.id = pp.proposal_id WHERE pp.proposal_id=? AND pp.stem=?",
+        (proposal_id, stem)).fetchone()
+    if row is None:
+        raise ProposalError("unknown_proposal")
+    return row
+
+
+def review_page(proposal_id: str, stem: str, work_dir: str) -> dict:
+    """Lehe ettepanek ülevaatuseks, ÜHE hetktõmmisena: lehe vaade ja selle vastu
+    liidetud kandidaat loetakse sama `page_lock`-i all. Klient rakendab need koos.
+
+    Lugemine ei kirjuta kunagi lehte. Olek võib muutuda: konflikt → stale,
+    lahenenud konflikt → pending, commit'itud ja juba kettal → accepted (taaste)."""
+    path = _txt_path(work_dir, stem)
+    with proposal_lock(proposal_id):
+        with _db() as db:
+            row = _page_row(db, proposal_id, stem)
+        state = row["state"]
+        page = None
+        proposed_now = None
+        with page_lock(path):
+            if os.path.exists(path):
+                page = read_page_view(path, os.path.splitext(path)[0] + ".json")
+                page["text_content"] = read_raw(path)
+            if state in REVIEW_STATES:
+                if page is not None:
+                    proposed_now = rebase(row["base_text"], row["proposed_text"],
+                                          page["text_content"], page["text_annotations"])
+                new_state = "stale" if proposed_now is None else "pending"
+                if proposed_now is not None and proposed_now == page["text_content"] \
+                        and page["text_content"] != row["base_text"]:
+                    # Taaste (spekk): ainult commit'itud seis on rakendatud ettepanek;
+                    # commit'imata või git-viga jääb ootele (paki töö taastab HEAD-ist).
+                    if (git_ops.committed_state([path]) or {}).get(path) is True:
+                        new_state = "accepted"
+                if new_state != state:
+                    with _db() as db:
+                        _set_state(db, proposal_id, [stem], new_state,
+                                   "taaste" if new_state == "accepted" else None)
+                    state = new_state
+    return {"proposal_id": proposal_id, "stem": stem, "page_no": row["page_no"],
+            "state": state, "page": page,
+            "proposed_now": proposed_now if state == "pending" else None,
+            "base_text": row["base_text"], "proposed_text": row["proposed_text"],
+            "note": row["note"], "pack_note": row["pack_note"], "work_id": row["work_id"]}
+
+
+def list_pending(work_id: Optional[str] = None) -> list:
+    """Pakid, milles on ülevaatust vajavaid (pending ∪ stale) lehti."""
+    now = int(time.time())
+    with _db() as db:
+        _clean(db, now)
+        q = ("SELECT p.* FROM proposal p WHERE EXISTS (SELECT 1 FROM proposal_page pp "
+             f"WHERE pp.proposal_id = p.id AND pp.state IN {REVIEW_STATES})")
+        args: tuple = ()
+        if work_id is not None:
+            q += " AND p.work_id=?"
+            args = (work_id,)
+        packs = []
+        for p in db.execute(q + " ORDER BY p.created_at", args).fetchall():
+            pages = db.execute("SELECT stem, page_no, state FROM proposal_page WHERE proposal_id=? "
+                               "ORDER BY page_no", (p["id"],)).fetchall()
+            counts = {k: 0 for k in ("pending", "stale", "accepted", "rejected")}
+            for r in pages:
+                if r["state"] in counts:
+                    counts[r["state"]] += 1
+            packs.append({"proposal_id": p["id"], "work_id": p["work_id"], "note": p["note"],
+                          "username": p["username"], "created_at": p["created_at"],
+                          "counts": counts,
+                          "pages": [{"stem": r["stem"], "page_no": r["page_no"], "state": r["state"]}
+                                    for r in pages if r["state"] != "superseded"]})
+    return packs
+
+
+def reject_page(proposal_id: str, stem: str, username: str) -> int:
+    with proposal_lock(proposal_id):
+        with _db() as db:
+            return _set_state(db, proposal_id, [stem], "rejected", username)
+
+
+def reject_pack(proposal_id: str, username: str) -> int:
+    with proposal_lock(proposal_id):
+        with _db() as db:
+            stems = [r["stem"] for r in db.execute(
+                f"SELECT stem FROM proposal_page WHERE proposal_id=? AND state IN {REVIEW_STATES}",
+                (proposal_id,))]
+            return _set_state(db, proposal_id, stems, "rejected", username)
+
+
+def mark_accepted(proposal_id: str, stems, username: str) -> int:
+    """CAS pending|stale → accepted. Kutsuja hoiab `proposal_lock`-i."""
+    with _db() as db:
+        return _set_state(db, proposal_id, stems, "accepted", username)
+
+
+def mark_stale(proposal_id: str, stems) -> int:
+    """CAS pending → stale (paki töö konflikt). Kutsuja hoiab `proposal_lock`-i."""
+    now = int(time.time())
+    with _db() as db:
+        return sum(db.execute("UPDATE proposal_page SET state='stale', decided_at=? "
+                              "WHERE proposal_id=? AND stem=? AND state='pending'",
+                              (now, proposal_id, s)).rowcount for s in stems)

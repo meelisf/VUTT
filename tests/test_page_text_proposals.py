@@ -1,6 +1,7 @@
 """Agendi lehe teksti ettepanekud (#641, ADR 0058 täiendus): kood → toortekst →
 asendused → ootel ettepanek. Esitus EI muuda lehte."""
 import hashlib
+import os
 import json
 import sqlite3
 import unicodedata
@@ -195,3 +196,140 @@ def test_laed(work, monkeypatch):
     monkeypatch.setattr(ptp, "MAX_EDITS", 1)
     with pytest.raises(ptp.ProposalError, match="too_many_edits:t-001"):
         ptp.submit(code, "w1", work, [{**p, "edits": p["edits"] * 2}], "")
+
+
+# ── Ümberbaseerimine, loetelu, otsused, taaste (Task 4) ──────────────────────
+
+import subprocess
+
+from server import git_ops
+from server.page_locks import page_lock_acquire_nowait
+
+
+@pytest.fixture
+def repo(work, monkeypatch):
+    root = os.path.dirname(work)
+    subprocess.run(["git", "init", "-q", root], check=True)
+    subprocess.run(["git", "-C", root, "-c", "user.name=t", "-c", "user.email=t@t", "add", "."], check=True)
+    subprocess.run(["git", "-C", root, "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "v1"], check=True)
+    monkeypatch.setattr(git_ops, "BASE_DIR", root)
+    return root
+
+
+def _commit(root):
+    subprocess.run(["git", "-C", root, "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qam", "v2"], check=True)
+
+
+def _esita(work, n=1, old="vana", new="uus"):
+    code = _code()
+    return ptp.submit(code, "w1", work, [_page(work, code, n, [{"old": old, "new": new}])], "pakk")["proposal_id"]
+
+
+def _state(pid, stem="t-001"):
+    return {r["stem"]: r["state"] for r in _rows(pid)}[stem]
+
+
+def test_rebase_puhas():
+    assert ptp.rebase("a\nvana\n", "a\nuus\n", "a\nvana\n", []) == "a\nuus\n"
+
+
+def test_rebase_mujalt_muudetud():
+    assert ptp.rebase("a\nvana\nc\nd\n", "a\nuus\nc\nd\n", "a\nvana\nc\nD\n", []) == "a\nuus\nc\nD\n"
+
+
+def test_rebase_uksik_sulgev_tag_on_kokkuporge():
+    base = "<i>a\nx\ny</i>\nz\nw"
+    assert ptp.rebase(base, "a\nx\ny\nz\nw", "<i>a\nx\ny\nz\nw</i>", []) is None
+
+
+def test_rebase_konflikt():
+    assert ptp.rebase("a\nvana\n", "a\nuus\n", "a\nmuu\n", []) is None
+
+
+def test_review_page_uks_hetktommis(work, repo, monkeypatch):
+    pid = _esita(work)
+    nahtud = []
+    orig = ptp.rebase
+
+    def kontroll(*a, **k):
+        nahtud.append(page_lock_acquire_nowait(f"{work}/t-001.txt"))
+        return orig(*a, **k)
+    monkeypatch.setattr(ptp, "rebase", kontroll)
+    r = ptp.review_page(pid, "t-001", work)
+    assert nahtud == [False]               # liideti lehe luku all
+    assert r["state"] == "pending" and r["page"]["text_content"] == _txt(work, 1)
+    assert r["proposed_now"] == _txt(work, 1).replace("vana", "uus")
+
+
+def test_review_page_stale_kui_konflikt(work, repo):
+    pid = _esita(work)
+    _write(work, 1, "leht 1 muu\nteine rida\n")
+    r = ptp.review_page(pid, "t-001", work)
+    assert r["state"] == "stale" and r["proposed_now"] is None and _state(pid) == "stale"
+
+
+def test_taaste_commititud(work, repo):
+    pid = _esita(work)
+    uus = _txt(work, 1).replace("vana", "uus")
+    _write(work, 1, uus)
+    _commit(repo)
+    r = ptp.review_page(pid, "t-001", work)
+    assert r["state"] == "accepted" and _txt(work, 1) == uus
+
+
+def test_taaste_commitimata_ei_kirjuta(work, repo):
+    pid = _esita(work)
+    uus = _txt(work, 1).replace("vana", "uus")
+    _write(work, 1, uus)
+    r = ptp.review_page(pid, "t-001", work)
+    assert r["state"] == "pending" and _txt(work, 1) == uus
+
+
+def test_taaste_git_viga(work, repo, monkeypatch):
+    pid = _esita(work)
+    _write(work, 1, _txt(work, 1).replace("vana", "uus"))
+    _commit(repo)
+    monkeypatch.setattr(git_ops, "committed_state", lambda paths: None)
+    assert ptp.review_page(pid, "t-001", work)["state"] == "pending"
+
+
+def test_kustutatud_leht_stale(work, repo):
+    pid = _esita(work)
+    os.remove(f"{work}/t-001.txt")
+    r = ptp.review_page(pid, "t-001", work)
+    assert r["state"] == "stale" and r["page"] is None
+
+
+def test_list_pending_stale_hoiab_paki_loendis(work, repo):
+    pid = _esita(work)
+    assert [p["proposal_id"] for p in ptp.list_pending("w1")] == [pid]
+    _write(work, 1, "leht 1 muu\nteine rida\n")
+    ptp.review_page(pid, "t-001", work)
+    (p,) = ptp.list_pending()
+    assert p["counts"]["stale"] == 1 and p["pages"][0]["page_no"] == 1
+    ptp.reject_page(pid, "t-001", "ed")
+    assert ptp.list_pending() == []
+
+
+def test_reject_cas(work):
+    pid = _esita(work)
+    assert ptp.reject_pack(pid, "ed") == 1
+    assert ptp.reject_pack(pid, "ed") == 0
+    assert _state(pid) == "rejected"
+
+
+def test_mark_accepted_ainult_ootel(work):
+    pid = _esita(work)
+    assert ptp.mark_accepted(pid, ["t-001"], "ed") == 1
+    assert ptp.mark_accepted(pid, ["t-001"], "ed") == 0
+
+
+def test_committed_state_ja_head_bytes(work, repo):
+    p = f"{work}/t-001.txt"
+    assert git_ops.committed_state([p]) == {p: True}
+    _write(work, 1, "muudetud\n")
+    assert git_ops.committed_state([p]) == {p: False}
+    assert git_ops.head_bytes("slug-w1/t-001.txt") == b"leht 1 vana\nteine rida\n"
+    assert git_ops.head_bytes("slug-w1/puudub.txt") is None
