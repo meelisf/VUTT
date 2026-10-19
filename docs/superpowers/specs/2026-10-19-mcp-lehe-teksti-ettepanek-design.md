@@ -203,6 +203,15 @@ järjekord nagu `work_part_proposals.submit`: kood → teos → sisu):
 kuni 100 edit'i lehel, keha ≤ 2 MB. Ettepanek aegub 14 päevaga (`PROPOSAL_TTL`
 nagu osadel).
 
+**Olemasoleva `/save`-i parandus (teostuse ulatuses).** `_merge_with_base`
+normaliseerib kliendi `base`-i teksti, kuid ketta teksti (`theirs`) mitte. Kui kettal
+on mittekanooniline tekst (nt lahutatud Unicode'i märgid: `Café` NFD-s), annab
+liitmine konflikti, kuigi ketas pole muutunud (reprodutseeritud 2026-10-19: ettepanek
+`vana` → `uus` sellisel lehel). Parandus: liitmises võrreldakse `base`-i ja ketast
+samal normaliseeritud kujul (ka `theirs` läbib `_normalize_page_text`-i). Lisada tuleb
+regressioonitest. Räsi ja asendused jäävad toortekstipõhiseks, nagu ülal kokku lepitud.
+Ümberbaseerimine ja paki töö kasutavad sama ühtlustatud liitmist.
+
 **Ümberbaseerimine enne näitamist** (kriitiline, anti-eesmärk 1). Ketas võib
 esituse ja ülevaatuse vahel muutuda. Redaktori salvestuse `base` on laadimishetke
 ketas (`useEditorSave` `baseFromSavedState`), mitte `base_text`. Kui redaktorisse
@@ -265,12 +274,20 @@ andja järgi. Töövoog on niikuinii ainult superadminile.
     Töö hoiab iga kirjutatava lehe **toimingueelset toorteksti mälus** ja taastab
     Git-vea korral kõik kirjutatud failid sellest, **lukke vabastamata**. Lehed jäävad
     ootele ja töö tulemus on viga. Meili sünki ei käivitata.
-  - **Katkestus pärast edukat commit'i, enne SQLite'i olekumuutust** (protsess sureb):
-    lehed jäävad `pending` olekusse, kuigi tekst on kettal. Iga ümberbaseerimine
-    (lugemine, paki töö) tuvastab selle: kui `proposed_now == ketta_tekst` ja
-    `ketta_tekst != base_text`, on ettepanek juba rakendatud. Leht märgitakse
-    `accepted` ilma kirjutuseta. Sama reegel parandab ka muul viisil (käsitsi)
-    sisse kantud ettepaneku.
+  - **Katkestus keset tööd** (protsess sureb). Teksti võrdsus üksi ei tõesta
+    commit'i, sest protsess võis surra ka pärast failide kirjutamist, aga enne commit'i.
+    Seepärast eristab taaste kahte juhtu lehe kaupa, git'i järgi:
+    - **Commit'itud** (lehe `.txt` ei ole `uncommitted_paths`-is, st ketas == HEAD)
+      ja `proposed_now == ketta_tekst != base_text` → ettepanek on rakendatud. Leht
+      märgitakse `accepted` ilma kirjutuseta. Ajalugu ja `git revert` on olemas.
+    - **Commit'imata** (ketas ≠ HEAD) → poolik töö. Paki töö algul (lehelukkude all)
+      taastatakse sellise lehe `.txt` HEAD-ist (`git show HEAD:<tee>`) ja töö jätkub
+      tavapäraselt. Ümberbaseerimine lugemisel ei kirjuta: see näitab lehte ootel
+      olevana ja jätab parandamise paki tööle või järgmisele `/save`-ile.
+    - **Git-viga kontrollis** (`uncommitted_paths` tagastab vea korral tühja loendi,
+      fail-open) → seda ei tõlgendata commit'ituna. Taaste peab kasutama varianti, mis
+      eristab viga, ja vea korral jätab lehe ootele.
+
   - **Olekumuutused on serialiseeritud ettepaneku kaupa:** kinnitus, tagasilükkamine,
     `superseded` ja `/save` kaudu kinnitamine käivad sama ettepaneku-luku all
     (protsessi lukk ettepaneku id järgi).
@@ -361,13 +378,19 @@ ADR 0058 täiendus „lehe teksti ettepanek". Põhimõtted:
 
 - Esitus: `text_hash` ei klapi → `stale_page`. Ümberjärjestatud teos: tüvi viib õigele
   lehele. `old` puudub või on mitmekordne → viga, midagi ei talletata.
-  `</i>x<i>` ja `<ann1>` dubleerimine → `invalid_markup`. Vana vigane märgendus
+  `</i>x<i>` → `invalid_markup`. `<ann1>` dubleerimine või ankru piiri nihutamine
+  (`<ann1>üks</ann1> kaks` → `<ann1>üks kaks</ann1>`) → `anchor_touched`. Vana vigane märgendus
   kettal ei blokeeri parandust.
 - Ümberbaseerimine: konfliktita liitmine, mis jätab üksiku `</i>` → `stale`. Vastuse
   `page` ja `proposed_now` on samast hetktõmmisest.
 - Paki kinnitus + samaaegne `/save` samal lehel: `/save` ootab, kumbki ei kao. Tundmatu täg,
   tasakaalustamata paar või muutunud `ann`-hulk → `invalid_markup`. Muutusteta leht
-  jäetakse välja. Kood: aegunud, kasutatud, vale teos. Piiratud teos → tagasi.
+  jäetakse välja. Kood: aegunud, kasutatud, vale teos. Koodi ulatuses piiratud teos
+  on lubatud (esitus ja `source`). Ilma kehtiva koodita `source` toorteksti ei väljasta.
+- `/save` regressioon: NFD-tekstiga leht kettal, klient saadab muutmata `base`-i →
+  liitmine ilma konfliktita.
+- Taaste: commit'itud + `pending` → `accepted` ilma kirjutuseta. Commit'imata pooleli
+  kirjutus → paki töö taastab HEAD-ist. `git status` viga → leht jääb ootele.
 - Normaliseerimine: talletatud `proposed_text` == see, mille `/save` kirjutaks.
 - Paki kinnitus: vahepeal sama koha muutnud leht → `stale`, ketas puutumata. Mujalt
   muudetud leht → liidetud. Juba otsustatud leht → vahele. Üks commit. JSON (seisund,
