@@ -158,3 +158,17 @@ def test_sama_rea_konflikt_annab_tukid(client, login, leht):
     # Kes viimati muutis (dialoogi jaoks): fixture'i commit „v1" autor „t".
     assert r.json()["detail"]["theirs_last"]["author"] == "t"
     assert _ketas(leht)[0] == MITMEREALINE.replace("rida kolm", "rida 3")
+
+
+def test_mittekanooniline_ketas_ei_anna_vale_konflikti(leht):
+    """#641: `_merge_with_base` normaliseeris kliendi baasi, aga mitte ketast —
+    NFD-tekstiga lehel andis muutmata ketas konflikti."""
+    import unicodedata
+    nfd = unicodedata.normalize("NFD", "Café vana\nteine rida")
+    leht["txt"].write_text(nfd, encoding="utf-8")
+    base = {**BASE, "text_content": nfd}
+    meta = {"status": "Toores", "work_id": "work1", "page_tags": [], "text_annotations": [],
+            "comments": BASE["comments"]}
+    uus = editing._normalize_page_text("Café uus\nteine rida")
+    editing._save_page_locked(str(leht["txt"]), uus, meta, "u", base=base)
+    assert leht["txt"].read_text(encoding="utf-8") == unicodedata.normalize("NFC", "Café uus\nteine rida")

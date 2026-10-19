@@ -2,7 +2,6 @@ from ..work_dating import dating_updates
 import json
 import os
 import subprocess
-import unicodedata
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -30,13 +29,13 @@ from ..git_ops import (
     get_recent_commits,
     save_with_git,
 )
-from ..marginalia_normalize import normalize_marginalia_tags
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..page_history import build_page_history
 from ..page_locks import page_lock
 from ..page_merge import PAGE_FIELDS, merge_page, read_page_view, text_conflict_chunks
 from ..page_paths import check_page_filename, require_existing_page
+from ..page_text import normalize_page_text
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.indices import page_person_ids
 from ..prosopography.relations import update_page_person_mentions
@@ -90,11 +89,8 @@ def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
     return catalog, "/".join(parts)
 
 
-def _normalize_page_text(text):
-    """Salvestatava lehe teksti kanooniline kuju: NFC + marginaalia-tägid (<m> välimiseks)."""
-    if not text:
-        return ""
-    return normalize_marginalia_tags(unicodedata.normalize('NFC', text))
+# Kanooniline kuju elab `page_text`-is (jagatud tekstiettepanekutega, #641).
+_normalize_page_text = normalize_page_text
 
 
 class _PageConflict(Exception):
@@ -112,6 +108,9 @@ def _merge_with_base(txt_path, json_path, text, client_meta, base):
     lehe luku all. Tagastab (tekst, meta, liidetud_leht | None) — viimane on
     olemas, kui ketta seis panustas (klient peab selle üle võtma)."""
     theirs = read_page_view(txt_path, json_path)
+    # Ketas võib olla mittekanooniline (vana fail, NFD): võrdle samal kujul kui
+    # kliendi baasi, muidu annab muutmata ketas vale konflikti (#641).
+    theirs["text_content"] = _normalize_page_text(theirs["text_content"])
     mine = {
         "text_content": text,
         **{k: client_meta.get(k) if client_meta.get(k) is not None else ([] if k != "status" else "Toores")
