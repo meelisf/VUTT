@@ -37,3 +37,13 @@ describe('AgentProposalsSection', () => {
     expect(await screen.findByText('LEHT')).toBeTruthy();
   });
 });
+
+describe('AgentProposalsSection tühjana', () => {
+  it('ootel ettepanekuteta jaotist ei renderdata', async () => {
+    svc.listPacks.mockResolvedValue([]);
+    const { container } = renderIt();
+    await new Promise(r => setTimeout(r, 0));
+    expect(svc.listPacks).toHaveBeenCalled();
+    expect(container.textContent).toBe('');
+  });
+});

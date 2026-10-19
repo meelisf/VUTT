@@ -94,7 +94,6 @@
   "proposals": {
     "title": "Agendi ettepanekud",
     "error": "Toiming ebaõnnestus: {{error}}",
-    "empty": "Ootel ettepanekuid ei ole.",
     "counts": "ootel {{pending}}, aegunud {{stale}}"
   }
 }

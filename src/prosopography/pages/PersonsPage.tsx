@@ -174,7 +174,6 @@ const PersonsPage: React.FC = () => {
   const [showMergeModal, setShowMergeModal] = useState(false);
 
 
-  const isAdmin = isAtLeast(user?.role, 'admin');
   const canEdit = isAtLeast(user?.role, 'editor');
   const token = authToken ?? '';
   const effectiveSelectedCollection = useMemo(() => {
@@ -526,7 +525,8 @@ const PersonsPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 border-b border-gray-200 pb-3">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-gray-800">{t('common:nav.persons')}</h2>
-            {isAdmin && view !== 'map' && (
+            {/* Liitmine: editor ja kõrgemad (server: require_role("editor")) */}
+            {canEdit && view !== 'map' && (
               <button
                 onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${

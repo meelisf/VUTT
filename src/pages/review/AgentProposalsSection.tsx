@@ -21,6 +21,9 @@ export default function AgentProposalsSection({ token }: { token: string }) {
     navigate(`/work/${p.work_id}/${first?.page_no ?? 1}`);
   };
 
+  // Ootel ettepanekuteta jaotist ei näidata (ka mitte laadimise ajal).
+  if (packs.length === 0 && !error) return null;
+
   return (
     <div className="mx-6 my-4 rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
       <div className="flex flex-wrap items-center gap-2">
@@ -28,9 +31,7 @@ export default function AgentProposalsSection({ token }: { token: string }) {
         <h2 className="font-semibold">{t('proposals.title')}</h2>
       </div>
       {error && <div className="mt-2 text-red-700">{t('proposals.error', { error })}</div>}
-      {packs.length === 0 ? (
-        <p className="mt-2 text-xs text-violet-700">{t('proposals.empty')}</p>
-      ) : (
+      {packs.length > 0 && (
         <ul className="mt-2 divide-y divide-violet-100">
           {packs.map(p => (
             <li key={p.proposal_id}>
