@@ -713,5 +713,30 @@
       "comment": "Comment “{{text}}”",
       "annotation": "Text annotation “{{text}}”"
     }
+  },
+  "proposal": {
+    "title": "Agent proposal",
+    "packNote": "Batch: {{note}}",
+    "pageNote": "Page note: {{note}}",
+    "remaining": "Pages to review: {{count}}",
+    "loaded": "The proposal is in the editor as an unsaved change. Check it against the image; Ctrl+S accepts it, and you can fix anything wrong directly.",
+    "notLoaded": "This page has a pending proposal, but you have unsaved changes.",
+    "load": "Load proposal",
+    "stale": "The page changed after the proposal and automatic merging failed. The agent's change is shown below for reference; carry over what is needed and save, or reject it.",
+    "reject": "Reject",
+    "rejectPack": "Reject batch",
+    "acceptPack": "Accept whole batch",
+    "saveAndNext": "Save and next",
+    "prev": "Previous",
+    "next": "Next",
+    "jobRunning": "Accepting batch… {{done}}/{{total}}",
+    "jobDone": "Batch accepted: {{accepted}} pages, stale {{stale}}, skipped {{skipped}}.",
+    "jobError": "Accepting the batch failed: {{error}}",
+    "alreadyRunning": "A batch is already being accepted for this work.",
+    "error": "Action failed: {{error}}",
+    "handoff": "Code for agent (this work)",
+    "handoffAll": "Code for agent (all works)",
+    "handoffInfo": "The code is valid until {{time}} ({{uses}} submissions). Copy it to the agent:",
+    "copy": "Copy"
   }
 }

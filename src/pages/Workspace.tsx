@@ -5,7 +5,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MeiliSearch } from 'meilisearch';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { useAdjacentPagePrefetch } from '../hooks/useAdjacentPagePrefetch';
-import { getPage, savePage } from '../services/pageService';
+import { getPage, savePage, type ProposalRef } from '../services/pageService';
 import type { PageFields, SaveOutcome } from '../components/editor/pageConflict';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
@@ -316,7 +316,7 @@ const Workspace: React.FC = () => {
     }
   };
 
-  const handleSave = async (updatedPage: Page, base: PageFields): Promise<SaveOutcome> => {
+  const handleSave = async (updatedPage: Page, base: PageFields, proposal?: ProposalRef): Promise<SaveOutcome> => {
     // Kontrolli, kas kasutaja on sisse logitud
     if (!user) {
       setSaveError(t('saveError.notLoggedIn'));
@@ -336,7 +336,7 @@ const Workspace: React.FC = () => {
     const baseWithStatus = { ...base, status: page?.status ?? base.status };
     try {
       const { page: savedPage, merged } = await savePage(
-        pageWithStatus, t('history.action.saved_changes'), user.name, authToken, baseWithStatus,
+        pageWithStatus, t('history.action.saved_changes'), user.name, authToken, baseWithStatus, proposal,
       );
       setPage(savedPage);
       setCurrentStatus(savedPage.status);
@@ -726,6 +726,11 @@ const Workspace: React.FC = () => {
             triggerSave={editorSaveRef}
             onWorkUpdate={(updatedWork) => setWork(prev => prev ? { ...prev, ...updatedWork } : prev)}
             collections={collections}
+            runGuarded={runGuarded}
+            onNavigateToPage={(pageNo) => {
+              setGridSelectedPage(null);
+              runGuarded(() => navigate(`/work/${workId}/${pageNo}`, { replace: true }));
+            }}
             onPageRestored={(patch) => {
               setPage(prev => prev ? { ...prev, ...patch } : prev);
               // „Võta serveri versioon" (#455) võib staatust muuta
