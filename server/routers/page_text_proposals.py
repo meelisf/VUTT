@@ -91,18 +91,6 @@ async def text_proposal_submit(request: Request):
                                    data["pages"], data.get("note"))
 
 
-@router.post("/text-proposals/handoff")
-def text_proposal_handoff(body: dict = Body(default={}), user=Depends(require_role("superadmin"))):
-    """Kood agendile: üks teos (`work_id`) või kõik teosed."""
-    allowed, retry = check_rate_limit(user["username"], "/text-proposals-handoff")
-    if not allowed:
-        raise HTTPException(status_code=429, detail="Liiga palju koode", headers={"Retry-After": str(retry)})
-    work_id = (body or {}).get("work_id")
-    if work_id is not None:
-        _work_dir(work_id)
-    return ptp.issue_handoff(work_id, user["username"])
-
-
 @router.get("/text-proposals")
 def text_proposals_all(user=Depends(require_role("superadmin"))):
     return ptp.list_pending()

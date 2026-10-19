@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bot, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { diffWords } from '../../utils/textDiff';
@@ -18,14 +18,11 @@ interface TextProposalPanelProps {
   onSaveAndNext: () => void;
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
-  onHandoff: () => void;
-  handoff: { code: string; expires_at: number; max_uses: number } | null;
 }
 
 // Agendi tekstiettepaneku riba redaktori kohal (#641; ainult superadmin).
 export default function TextProposalPanel(p: TextProposalPanelProps) {
   const { t } = useTranslation(['workspace', 'common']);
-  const [copied, setCopied] = useState(false);
   const remaining = p.pack ? p.pack.counts.pending + p.pack.counts.stale : 0;
   const staleDiff = useMemo(
     () => (p.review?.state === 'stale' ? diffWords(p.review.base_text, p.review.proposed_text) : null),
@@ -76,10 +73,6 @@ export default function TextProposalPanel(p: TextProposalPanelProps) {
               </button>
             </>
           )}
-          <button type="button" onClick={p.onHandoff}
-            className="px-2 py-0.5 rounded border border-violet-300 hover:bg-violet-100">
-            {t('proposal.handoff')}
-          </button>
         </div>
       </div>
 
@@ -119,18 +112,6 @@ export default function TextProposalPanel(p: TextProposalPanelProps) {
       )}
       {p.job?.state === 'error' && <div className="text-red-700">{t('proposal.jobError', { error: p.job.error })}</div>}
       {p.error && <div className="text-red-700">{t('proposal.error', { error: p.error })}</div>}
-      {p.handoff && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span>{t('proposal.handoffInfo', {
-            time: new Date(p.handoff.expires_at * 1000).toLocaleString(), uses: p.handoff.max_uses,
-          })}</span>
-          <code className="select-all rounded bg-white px-1.5 py-0.5 font-mono">{p.handoff.code}</code>
-          <button type="button" className="px-2 py-0.5 rounded border border-violet-300 hover:bg-violet-100"
-            onClick={() => { void navigator.clipboard?.writeText(p.handoff!.code); setCopied(true); }}>
-            {copied ? '✓' : t('proposal.copy')}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

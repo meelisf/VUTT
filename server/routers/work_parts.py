@@ -14,6 +14,7 @@ from ..deps import optional_user, require_role
 from ..utils import find_directory_by_id
 from ..work_sets_access import load_work_metadata_by_id
 from .. import work_parts as wp
+from .. import page_text_proposals as ptp
 from .. import work_part_proposals as wpp
 from ..rate_limit import check_rate_limit, get_client_ip
 
@@ -97,12 +98,19 @@ def _wpp(fn, *args, **kwargs):
 
 
 @router.post("/works/{work_id}/parts/handoff")
-def parts_handoff(work_id: str, user=Depends(require_role("superadmin"))):
-    """Kood agendile selle teose osade ettepanekuteks (8 h, mitu esitust)."""
+def parts_handoff(work_id: str, body: dict = Body(default={}), user=Depends(require_role("superadmin"))):
+    """ÜKS agendikood teose halduses (8 h, mitu esitust): kehtib nii osade kui
+    lehe teksti ettepanekutele (#641). `scope`: "work" (see teos) või "all" (kõik)."""
+    scope = (body or {}).get("scope", "work")
+    if scope not in ("work", "all"):
+        raise HTTPException(status_code=400, detail="scope peab olema 'work' või 'all'")
     allowed, retry = check_rate_limit(user["username"], "/works/parts-handoff")
     if not allowed:
         raise HTTPException(status_code=429, detail="Liiga palju koode", headers={"Retry-After": str(retry)})
-    return _wpp(wpp.issue_handoff, work_id, _writable(work_id, user), user["username"])
+    path = _writable(work_id, user)
+    out = _wpp(wpp.issue_handoff, work_id, path, user["username"], None, scope == "all")
+    ptp.issue_handoff(None if scope == "all" else work_id, user["username"], code=out["code"])
+    return out
 
 
 @router.get("/works/{work_id}/parts/proposals")

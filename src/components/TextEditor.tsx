@@ -16,7 +16,6 @@ import AnnotationPopover from './editor/AnnotationPopover';
 import TextProposalPanel from './editor/TextProposalPanel';
 import { useTextProposal } from './editor/useTextProposal';
 import type { RestoreResult } from './editor/pageRestore';
-import { issueHandoff, type ProposalHandoff } from '../services/textProposalService';
 import type { ProposalRef } from '../services/pageService';
 
 
@@ -150,12 +149,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     if (ref) void proposalAfterSave();
     return outcome;
   }, [onSave, proposalAfterSave]);
-  const [handoff, setHandoff] = useState<ProposalHandoff | null>(null);
-  const [handoffError, setHandoffError] = useState<string | null>(null);
-  const requestHandoff = useCallback(() => {
-    if (!authToken) return;
-    issueHandoff(authToken, page.work_id).then(setHandoff, (e: Error) => setHandoffError(e.message));
-  }, [authToken, page.work_id]);
 
   const {
     annDialogOpen,
@@ -347,7 +340,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             pendingNotLoaded={proposal.pendingNotLoaded}
             loaded={proposal.loaded}
             job={proposal.job}
-            error={proposal.error ?? handoffError}
+            error={proposal.error}
             onLoad={() => runGuarded(() => { void proposal.loadIntoEditor(); })}
             onReject={() => { void proposal.reject(); }}
             onRejectPack={() => { void proposal.rejectPack(); }}
@@ -355,8 +348,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             onSaveAndNext={() => { void proposal.saveAndNext(); }}
             onPrev={proposal.prev}
             onNext={proposal.next}
-            onHandoff={requestHandoff}
-            handoff={handoff}
           />
         )}
 

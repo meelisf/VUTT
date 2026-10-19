@@ -549,8 +549,8 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         tühikuks, poolitused liidetud, märgendus eemaldatud, ß → ss). Parandus selle
         põhjal kustutaks lehe struktuuri.
 
-        handoff_code tuleb superadminilt (Review → „Agendi ettepanekud" või Workspace'i
-        ettepanekupaneel); kehtib 8 h, ühele teosele või kõigile. page = VUTT-i 1-põhine
+        handoff_code tuleb superadminilt (teose haldus → „Osad" → „Kood agendile"); sama
+        kood kehtib ka osade ettepanekutele, 8 h, ühele teosele või kõigile. page = VUTT-i 1-põhine
         järjestusnumber nagu get_pages'is. Vastuses: stem (lehe püsiv tunnus), text_hash
         (räsi täpselt sellest tekstist), status, text ja tags — VUTT-i lubatud tägid
         (paired=false: üksiktäg nagu <pb/>). Muid tägisid ära leiuta (nt tabelit pole).

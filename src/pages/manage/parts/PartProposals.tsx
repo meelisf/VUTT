@@ -96,9 +96,14 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
             <Check size={14} /> {tp('acceptAll', { count: pending.length })}
           </button>
         )}
-        <button type="button" disabled={busy} onClick={() => run(async () => setHandoff(await createPartsHandoff(workId, token)))}
+        {/* ÜKS agendikood (#641): osad + lehe teksti parandused; ulatus see teos või kõik. */}
+        <button type="button" disabled={busy} onClick={() => run(async () => setHandoff(await createPartsHandoff(workId, token, 'work')))}
           className={`${pending.length > 1 ? '' : 'ml-auto '}rounded border border-violet-300 bg-white px-2.5 py-1 text-violet-800 hover:bg-violet-100 disabled:opacity-50`}>
           {tp('createCode')}
+        </button>
+        <button type="button" disabled={busy} onClick={() => run(async () => setHandoff(await createPartsHandoff(workId, token, 'all')))}
+          className="rounded border border-violet-300 bg-white px-2.5 py-1 text-violet-800 hover:bg-violet-100 disabled:opacity-50">
+          {tp('createCodeAll')}
         </button>
         <button type="button" disabled={busy} onClick={() => void run(load)} aria-label={tp('refresh')} title={tp('refresh')}
           className="rounded p-1.5 text-violet-700 hover:bg-violet-100 disabled:opacity-50">
@@ -108,7 +113,9 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
 
       {handoff && (
         <div className="mt-2 rounded border border-violet-200 bg-white p-2">
-          <p className="text-xs text-gray-600">{tp('codeHelp', { workId, max: handoff.max_uses })}</p>
+          <p className="text-xs text-gray-600">
+            {tp(handoff.scope === 'all' ? 'codeHelpAll' : 'codeHelp', { workId, max: handoff.max_uses })}
+          </p>
           <div className="mt-1 flex items-center gap-2">
             <code className="min-w-0 flex-1 break-all select-all text-xs">{handoff.code}</code>
             <CopyButton text={handoff.code} label={tp('copy')} copiedLabel={tp('copied')} />

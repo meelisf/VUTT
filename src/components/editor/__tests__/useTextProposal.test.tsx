@@ -13,7 +13,7 @@ import { proposalDiffExtension, proposalDiffField } from '../proposalDiffExtensi
 
 const svc = vi.hoisted(() => ({
   listPacks: vi.fn(), getReviewPage: vi.fn(), rejectPage: vi.fn(), rejectPack: vi.fn(),
-  acceptPack: vi.fn(), getJobStatus: vi.fn(), issueHandoff: vi.fn(),
+  acceptPack: vi.fn(), getJobStatus: vi.fn(),
 }));
 vi.mock('../../../services/textProposalService', () => svc);
 

@@ -42,12 +42,6 @@ export interface ProposalJob {
   error?: string;
 }
 
-export interface ProposalHandoff {
-  code: string;
-  expires_at: number;
-  max_uses: number;
-  work_id: string | null;
-}
 
 const enc = encodeURIComponent;
 
@@ -84,7 +78,3 @@ export const acceptPack = async (token: string, workId: string, proposalId: stri
 
 export const getJobStatus = (token: string, workId: string) =>
   call<ProposalJob>(token, `/works/${enc(workId)}/text-proposals/job`);
-
-export const issueHandoff = (token: string, workId?: string) =>
-  call<ProposalHandoff>(token, '/text-proposals/handoff',
-    { method: 'POST', body: JSON.stringify(workId ? { work_id: workId } : {}) });

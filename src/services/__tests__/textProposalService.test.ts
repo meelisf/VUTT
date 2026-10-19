@@ -7,7 +7,7 @@ vi.mock('../../utils/fetchWithTimeout', () => ({
   getAuthHeaders: (t?: string) => (t ? { Authorization: `Bearer ${t}` } : {}),
 }));
 
-import { acceptPack, getReviewPage, issueHandoff, listPacks, rejectPage } from '../textProposalService';
+import { acceptPack, getReviewPage, listPacks, rejectPage } from '../textProposalService';
 import { savePage } from '../pageService';
 
 const ok = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
@@ -39,13 +39,6 @@ describe('textProposalService', () => {
     await expect(rejectPage('t', 'w1', 'p1', 't-001')).rejects.toThrow('unknown_proposal');
   });
 
-  it('issueHandoff: teos või kõik', async () => {
-    fetchMock.mockResolvedValue(ok({ code: 'c' }));
-    await issueHandoff('t', 'w1');
-    await issueHandoff('t');
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ work_id: 'w1' });
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({});
-  });
 
   it('savePage saadab proposal-viite', async () => {
     fetchMock.mockResolvedValue(ok({ status: 'success' }));
