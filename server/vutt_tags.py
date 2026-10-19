@@ -158,3 +158,66 @@ def normalize_page_mark_structure(text: str) -> str:
     for a, b in sorted(cuts, reverse=True):
         text = text[:a] + text[b:]
     return text
+
+
+# ── Märgenduse struktuurikontroll (#641) ─────────────────────────────────────
+# Agendi tekstiettepanek ei tohi lisada UUSI vigu; kettal olev vana viga
+# (orb, literaalne `<`) ei tohi aga blokeerida ühe tähe parandust. Seepärast
+# loendab `markup_errors` vead ja kutsuja võrdleb kahte teksti.
+
+_TOKEN_RE = re.compile(r"<(/?)([a-z]+\d*)(/?)>")
+_ANN_TOKEN_RE = re.compile(r"</?ann\d+>")
+
+
+def _registry_name(name: str):
+    for t in VUTT_TAG_REGISTRY:
+        if re.fullmatch(tag_pattern(t), name):
+            return t
+    return None
+
+
+def markup_errors(text: str) -> "Counter[tuple[str, str]]":
+    """Märgenduse vead loendurina: (liik, täg). Liik: unknown | unclosed |
+    unopened | crossing | m_newline."""
+    from collections import Counter
+    errors: Counter = Counter()
+    stack: list = []          # (nimi, sisu algus)
+    for m in _TOKEN_RE.finditer(text or ""):
+        closing, name, selfclosing = m.group(1), m.group(2), m.group(3)
+        tag = _registry_name(name)
+        if tag is None:
+            errors[("unknown", name)] += 1
+            continue
+        if not tag.paired or selfclosing:
+            continue
+        if not closing:
+            stack.append((name, m.end()))
+            continue
+        if stack and stack[-1][0] == name:
+            _, start = stack.pop()
+            if tag.name == "m" and "\n" in text[start:m.start()]:
+                errors[("m_newline", "m")] += 1
+        elif any(n == name for n, _ in stack):
+            # Sulgev täg sügavamal pinus: vahepealsed paarid ristuvad.
+            while stack[-1][0] != name:
+                errors[("crossing", stack.pop()[0])] += 1
+            stack.pop()
+        else:
+            errors[("unopened", name)] += 1
+    for name, _ in stack:
+        errors[("unclosed", name)] += 1
+    return errors
+
+
+def new_markup_errors(base: str, proposed: str) -> list:
+    """Vead, mida `base`-is ei olnud (multihulga vahe), sorteeritult."""
+    return sorted((markup_errors(proposed) - markup_errors(base)).elements())
+
+
+def ann_tokens(text: str) -> list:
+    """Annotatsiooniankrute tokenid järjekorras, sõnasõnaliselt."""
+    return _ANN_TOKEN_RE.findall(text or "")
+
+
+def has_ann_token(s: str) -> bool:
+    return bool(_ANN_TOKEN_RE.search(s or ""))
