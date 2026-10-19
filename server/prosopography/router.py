@@ -971,10 +971,10 @@ async def person_restore(person_id: str, request: Request, user=Depends(require_
 async def prosopography_merge(
     source_id: str,
     request: Request,
-    user=Depends(require_role("admin")),
+    user=Depends(require_role("editor")),
 ):
     """
-    Liidab source kirje target kirjesse (admin only).
+    Liidab source kirje target kirjesse (editor ja kõrgemad; 2026-10-19 varem admin).
     Body: { "target_id": "vutt:Pxxx" }
     Source → tombstone. Tagastab uuendatud target kirje.
     """
