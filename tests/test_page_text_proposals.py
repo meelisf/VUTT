@@ -71,8 +71,12 @@ def test_source_nouab_koodi(work):
 
 def test_source_vale_teos_ja_leht(work):
     code = _code()
+    muu = os.path.join(os.path.dirname(work), "slug-muu")
+    os.makedirs(muu)
+    with open(os.path.join(muu, "_metadata.json"), "w") as f:
+        json.dump({"id": "muu"}, f)
     with pytest.raises(ptp.ProposalError, match="invalid_or_expired_handoff"):
-        ptp.read_source(code, "muu", work, 1)
+        ptp.read_source(code, "muu", muu, 1)
     with pytest.raises(ptp.ProposalError, match="unknown_page"):
         ptp.read_source(code, "w1", work, 9)
 
@@ -333,3 +337,15 @@ def test_committed_state_ja_head_bytes(work, repo):
     assert git_ops.committed_state([p]) == {p: False}
     assert git_ops.head_bytes("slug-w1/t-001.txt") == b"leht 1 vana\nteine rida\n"
     assert git_ops.head_bytes("slug-w1/puudub.txt") is None
+
+
+
+def test_slug_kanoniseeritakse_nanoidiks(work):
+    """Lõppülevaatus: kõigi teoste koodiga ja slugiga esitatud ettepanek jäi Workspace'ile nähtamatuks."""
+    code = _code(None)
+    src = ptp.read_source(code, "slug-w1", work, 1)
+    assert src["work_id"] == "w1"
+    res = ptp.submit(code, "slug-w1", work, [{"stem": "t-001", "text_hash": src["text_hash"],
+                                              "edits": [{"old": "vana", "new": "uus"}]}], "")
+    assert res["work_id"] == "w1"
+    assert [p["proposal_id"] for p in ptp.list_pending("w1")] == [res["proposal_id"]]

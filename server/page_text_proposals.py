@@ -11,6 +11,7 @@ Lukkude järjekord KÕIGIS teedes (spekk): ettepanekulukud id järjekorras →
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import secrets
 import sqlite3
@@ -166,8 +167,20 @@ def read_raw(path: str) -> str:
         return ""
 
 
+def canonical_work_id(work_dir: str, given: str) -> str:
+    """Teose nanoid `_metadata.json`-ist: `find_directory_by_id` leiab ka slugi
+    järgi, aga ettepanek peab kandma nanoid'i, muidu ei näe Workspace seda."""
+    try:
+        with open(os.path.join(work_dir, "_metadata.json"), encoding="utf-8") as f:
+            wid = json.load(f).get("id")
+    except (OSError, ValueError, AttributeError):
+        wid = None
+    return wid if isinstance(wid, str) and wid else given
+
+
 def read_source(code: str, work_id: str, work_dir: str, page: int) -> dict:
     """Lehe toortekst agendile: tüvi on püsiv identifikaator, räsi toorbaitidest."""
+    work_id = canonical_work_id(work_dir, work_id)
     check_code(code, work_id)
     stems = wp.page_stems(work_dir)
     if not isinstance(page, int) or isinstance(page, bool) or not 1 <= page <= len(stems):
@@ -225,6 +238,7 @@ def _short_note(value, field: str) -> str:
 
 def submit(code: str, work_id: str, work_dir: str, pages: list, note: str) -> dict:
     """Talletab ainult ootel ettepaneku; lehti ei muudeta."""
+    work_id = canonical_work_id(work_dir, work_id)
     row = check_code(code, work_id)
     if row["uses"] >= row["max_uses"]:
         raise ProposalError("handoff_used_up")

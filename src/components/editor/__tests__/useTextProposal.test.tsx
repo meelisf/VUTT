@@ -89,7 +89,7 @@ describe('useTextProposal', () => {
     expect(result.current.tp.pendingNotLoaded).toBe(true);
     // Laadimata ettepanek: kasutaja enda salvestus EI tohi kanda ettepaneku viidet.
     expect(result.current.tp.activeRef).toBeNull();
-    act(() => result.current.tp.loadIntoEditor());
+    await act(async () => { await result.current.tp.loadIntoEditor(); });
     expect(result.current.tp.activeRef).toEqual({ id: 'p1', stem: 't-001' });
     expect(doc(result.current.viewRef.current)).toBe('leht uus\n');
   });
@@ -196,5 +196,51 @@ describe('useTextProposal — pakk ja liikumine', () => {
     await waitFor(() => expect(result.current.tp.next).not.toBeNull());
     await act(async () => { await result.current.tp.saveAndNext(); });
     expect(nav.navigateToPage).toHaveBeenCalledWith(3);
+  });
+});
+
+describe('useTextProposal — lõppülevaatuse parandused', () => {
+  it('„Lae ettepanek" pärast salvestust kasutab värsket hetktõmmist', async () => {
+    let lase: (v: unknown) => void = () => {};
+    svc.getReviewPage.mockReturnValueOnce(new Promise(r => { lase = r; }));
+    const { result, rerender } = renderHook(({ p }) => useHarness(p), { initialProps: { p: mkPage('a', 1) } });
+    await waitFor(() => expect(svc.getReviewPage).toHaveBeenCalled());
+    act(() => { result.current.st.setIsDirty(true); });
+    await act(async () => { lase(REVIEW()); });
+    expect(result.current.tp.pendingNotLoaded).toBe(true);
+    // Kasutaja salvestas oma muudatuse dialoogis; server liidab ettepaneku uue ketta vastu.
+    svc.getReviewPage.mockResolvedValue(REVIEW({
+      page: { ...REVIEW().page, text_content: 'minu leht vana\n' }, proposed_now: 'minu leht uus\n' }));
+    // Workspace `setPage(savedPage)` pärast salvestust: sama leht, uus tekst.
+    rerender({ p: mkPage('a', 1, 'minu leht vana\n') });
+    act(() => { result.current.st.setIsDirty(false); });
+    await act(async () => { await result.current.tp.loadIntoEditor(); });
+    expect(doc(result.current.viewRef.current)).toBe('minu leht uus\n');
+    expect(result.current.st.savedState.text).toBe('minu leht vana\n');
+  });
+
+  it('pollimine lõpetab püsiva vea korral', async () => {
+    svc.acceptPack.mockResolvedValue(undefined);
+    svc.getJobStatus.mockRejectedValue(new Error('HTTP 401'));
+    const { result } = renderHook(() => useHarness(mkPage('a', 1)));
+    await waitFor(() => expect(result.current.tp.pack).not.toBeNull());
+    await act(async () => { result.current.tp.acceptPack(); });
+    await waitFor(() => expect(result.current.tp.error).toBe('job_status_unavailable'));
+    const n = svc.getJobStatus.mock.calls.length;
+    await new Promise(r => setTimeout(r, 30));
+    expect(svc.getJobStatus.mock.calls.length).toBe(n);
+  });
+
+  it('pollimine lõpeb lahtimonteerimisel', async () => {
+    svc.acceptPack.mockResolvedValue(undefined);
+    svc.getJobStatus.mockResolvedValue({ state: 'running', done: 0, total: 1 });
+    const { result, unmount } = renderHook(() => useHarness(mkPage('a', 1)));
+    await waitFor(() => expect(result.current.tp.pack).not.toBeNull());
+    await act(async () => { result.current.tp.acceptPack(); });
+    await waitFor(() => expect(svc.getJobStatus).toHaveBeenCalled());
+    unmount();
+    const n = svc.getJobStatus.mock.calls.length;
+    await new Promise(r => setTimeout(r, 30));
+    expect(svc.getJobStatus.mock.calls.length).toBeLessThanOrEqual(n + 1);
   });
 });

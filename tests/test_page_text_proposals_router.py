@@ -138,3 +138,15 @@ def test_revoke_kutsutakse_rollimuutusel(monkeypatch):
     monkeypatch.setattr(ptp, "revoke_handoffs", lambda u: kutsutud.append(u))
     auth._revoke_agent_handoffs("kasutaja")
     assert kutsutud == ["kasutaja"]
+
+
+def test_avalikud_otspunktid_on_piiratud(client):
+    """Lõppülevaatus: võtmed puudusid RATE_LIMITS-ist → check_rate_limit oli vaikne no-op."""
+    from server import rate_limit
+    rate_limit._rate_limit_store.clear()
+    koodid = [client.post("/works/text-proposals/submit", json={}).status_code for _ in range(31)]
+    assert koodid[-1] == 429
+    rate_limit._rate_limit_store.clear()
+    koodid = [client.post("/works/text-proposals/source", json={}).status_code for _ in range(121)]
+    assert koodid[-1] == 429
+    rate_limit._rate_limit_store.clear()

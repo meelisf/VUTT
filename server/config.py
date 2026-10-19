@@ -302,6 +302,10 @@ RATE_LIMITS = {
     '/prosopography/enrichment-proposal-submit': (30, 300),
     '/works/parts-handoff': (30, 3600),
     '/works/parts-proposals-submit': (30, 300),
+    # Agendi lehe teksti ettepanekud (#641): source/submit on autentimata (kood on õigus).
+    '/text-proposals-handoff': (30, 3600),
+    '/works/text-proposals-submit': (30, 300),
+    '/works/text-proposals-source': (120, 300),
 }
 
 # =========================================================

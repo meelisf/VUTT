@@ -74,7 +74,7 @@ def test_save_viide_mitte_superadmin_403(client, login, leht, ettepanek):
     assert leht["txt"].read_text(encoding="utf-8") == "vana tekst"
 
 
-@pytest.mark.parametrize("proposal", [{"id": "x", "stem": "pg1"}, {"stem": "pg1"}, "pg1"])
+@pytest.mark.parametrize("proposal", [{"stem": "pg1"}, "pg1"])
 def test_save_vigane_viide_400(client, login, leht, ettepanek, proposal):
     r = _save(client, login, text="uus tekst", proposal=proposal)
     assert r.status_code == 400
@@ -104,3 +104,25 @@ def test_lukujarjekord(client, login, leht, ettepanek, monkeypatch):
     monkeypatch.setattr(editing, "_save_page_locked", s_locked)
     _save(client, login, text="uus tekst", proposal={"id": ettepanek, "stem": "pg1"})
     assert jarjekord[:2] == ["proposal", "page"]
+
+
+@pytest.mark.parametrize("vahepeal", ["uuesti_esitatud", "tundmatu"])
+def test_otsustatud_ettepanek_ei_blokeeri_salvestust(client, login, leht, ettepanek, vahepeal):
+    """Lõppülevaatus: agent esitas lehe uuesti (superseded) või ettepanek aegus —
+    toimetaja salvestus peab ikka õnnestuma, ettepaneku olekut puutumata."""
+    pid = ettepanek
+    if vahepeal == "uuesti_esitatud":
+        folder = leht["txt"].parent
+        code = ptp.issue_handoff("work1", "agent")["code"]
+        src = ptp.read_source(code, "work1", str(folder), 1)
+        ptp.submit(code, "work1", str(folder), [{"stem": "pg1", "text_hash": src["text_hash"],
+                                                 "edits": [{"old": "vana", "new": "teine"}]}], "")
+        assert _row_state(pid) == "superseded"
+    else:
+        pid = "puudub"
+    r = _save(client, login, text="minu tekst", proposal={"id": pid, "stem": "pg1"})
+    assert r.status_code == 200, r.text
+    assert r.json()["proposal_state"] == "already_decided"
+    assert leht["txt"].read_text(encoding="utf-8") == "minu tekst"
+    if vahepeal == "uuesti_esitatud":
+        assert _row_state(pid) == "superseded"

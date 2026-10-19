@@ -45,6 +45,7 @@ interface UseTextProposalParams {
 }
 
 const REVIEW_STATES = new Set(['pending', 'stale']);
+const MAX_POLL_ERRORS = 10;
 
 export const pageStem = (page: Page) => pageFileFromImageUrl(page.image_url || '').replace(/\.[^/.]+$/, '');
 
@@ -129,10 +130,19 @@ export function useTextProposal({
   const activeRef: ProposalRef | null =
     review && (loaded || review.state === 'stale') ? { id: review.proposal_id, stem: review.stem } : null;
 
-  /** „Lae ettepanek" — kutsuja on salvestamata muudatused juba lahendanud (dialoog). */
-  const loadIntoEditor = useCallback(() => {
-    if (review) apply(review);
-  }, [review, apply]);
+  /** „Lae ettepanek" — kutsuja on salvestamata muudatused juba lahendanud (dialoog).
+   * Küsitakse UUESTI: dialoogi „Salvesta" muutis ketast ja vana vastus oleks vale
+   * hetktõmmis (salvestatud seis + kandidaat peavad olema samast lugemisest). */
+  const loadIntoEditor = useCallback(async () => {
+    const t = tokenRef.current;
+    const forPage = page.id;
+    if (!review || !t) return;
+    const r = await getReviewPage(t, review.work_id, review.proposal_id, review.stem).catch(() => null);
+    if (!r || pageIdRef.current !== forPage) return;
+    setReview(r);
+    if (r.state === 'pending' && r.proposed_now !== null) apply(r);
+    else setPendingNotLoaded(false);
+  }, [review, apply, page.id]);
 
   /** Lehe tagasilükkamine: redaktor tagasi ketta tekstile. */
   const reject = useCallback(async () => {
@@ -196,17 +206,31 @@ export function useTextProposal({
     await load();
   }, [workId, pack, stem, page.id, clearDiff, onPageRefreshedRef, load]);
 
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
   const poll = useCallback(async (proposalId: string) => {
     const t = tokenRef.current;
     if (!t || !workId) return;
-    for (;;) {
+    // Lagi: püsiv võrgu-/autentimisviga ei tohi pollida lõputult; lahtimonteerimisel stopp.
+    let vigu = 0;
+    while (mountedRef.current) {
       await new Promise(r => setTimeout(r, pollMs));
+      if (!mountedRef.current) return;
       const st = await getJobStatus(t, workId).catch(() => null);
-      if (!st) continue;
+      if (!st) {
+        if (++vigu >= MAX_POLL_ERRORS) {
+          setJob(null);
+          setError('job_status_unavailable');
+          return;
+        }
+        continue;
+      }
+      vigu = 0;
       setJob(st);
       if (st.state !== 'running') break;
     }
-    await refreshAfterJob(proposalId);
+    if (mountedRef.current) await refreshAfterJob(proposalId);
   }, [workId, pollMs, refreshAfterJob]);
 
   /** „Kinnita kogu pakk": salvestamata muudatused lahendab ühtne dialoog ENNE. */

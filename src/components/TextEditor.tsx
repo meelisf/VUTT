@@ -348,7 +348,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             loaded={proposal.loaded}
             job={proposal.job}
             error={proposal.error ?? handoffError}
-            onLoad={() => runGuarded(proposal.loadIntoEditor)}
+            onLoad={() => runGuarded(() => { void proposal.loadIntoEditor(); })}
             onReject={() => { void proposal.reject(); }}
             onRejectPack={() => { void proposal.rejectPack(); }}
             onAcceptPack={proposal.acceptPack}

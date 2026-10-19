@@ -209,8 +209,11 @@ def _proposal_ref(proposal, catalog, filename):
         raise HTTPException(status_code=400, detail="Ettepanek on teise lehe kohta")
     try:
         row = page_text_proposals.page_ref(proposal["id"], proposal["stem"])
-    except page_text_proposals.ProposalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except page_text_proposals.ProposalError:
+        # Ettepanek otsustati vahepeal mujal (agent esitas uuesti, teine superadmin,
+        # aegumine): toimetaja salvestus EI tohi selle pärast kukkuda — muidu jääks
+        # tema töö lõksu. Salvestus käib tavaliselt, ettepaneku olekut ei puututa.
+        return None
     meta = _read_json_file(os.path.join(BASE_DIR, catalog, "_metadata.json"))
     if (meta or {}).get("id") != row["work_id"]:
         raise HTTPException(status_code=400, detail="Ettepanek on teise teose kohta")
@@ -261,6 +264,8 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
         if not is_at_least(user.get('role'), 'superadmin'):
             raise HTTPException(status_code=403, detail="Ettepanekuid kinnitab ainult superadmin")
         proposal_ref = await run_in_threadpool(_proposal_ref, data['proposal'], catalog, filename)
+        if proposal_ref is None:
+            proposal_state = "already_decided"
     try:
         if proposal_ref:
             (git_result, merged_page, isikud_muutusid), proposal_state = await run_in_threadpool(
