@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatLetterDating, letterHeadline, letterSnippet, splitMarks } from '../letterDisplay';
+import { abstractSnippet, formatLetterDating, letterHeadline, letterPageExcerpts, splitMarks } from '../letterDisplay';
 import type { LetterHit } from '../../../../services/letterSearch';
 
 const t = (key: string, opts?: Record<string, unknown>) => `${key}${opts ? JSON.stringify(opts) : ''}`;
@@ -40,15 +40,76 @@ describe('letterHeadline', () => {
   });
 });
 
-describe('letterSnippet', () => {
-  it('tekstivaste → tekstikatke', () => {
-    expect(letterSnippet(hit({ _formatted: { letter_text: '…a <mark>b</mark> c…' } }))).toBe('…a <mark>b</mark> c…');
+describe('abstractSnippet', () => {
+  it('vaste regestis → regesti katke; muidu null', () => {
+    expect(abstractSnippet(hit({ _formatted: { abstract: 'x <mark>y</mark>' } }))).toBe('x <mark>y</mark>');
+    expect(abstractSnippet(hit({ _formatted: { abstract: 'x y' } }))).toBeNull();
   });
-  it('vaste ainult kokkuvõttes → kokkuvõtte katke', () => {
-    expect(letterSnippet(hit({ _formatted: { letter_text: '…a b…', abstract: 'x <mark>y</mark>' } }))).toBe('x <mark>y</mark>');
+});
+
+/** Kiri lehtedest nagu `build_letter_documents`: '\n'-iga liidetud, alguskohad UTF-8 baitides. */
+const letter = (pageTexts: [number, string][], words: string[]) => {
+  const enc = new TextEncoder();
+  let text = '';
+  const pages = pageTexts.map(([n, t]) => {
+    const start = enc.encode(text).length + (text ? 1 : 0);
+    if (t) text = text ? `${text}\n${t}` : t;
+    return { n, img: `a-${n}.jpg`, start };
   });
-  it('nimevaste (märgendit pole tekstis ega kokkuvõttes) → null', () => {
-    expect(letterSnippet(hit({ _formatted: { letter_text: '…a b…', abstract: '' } }))).toBeNull();
+  const bytes = enc.encode(text);
+  const positions = words.flatMap(w => {
+    const wb = enc.encode(w);
+    const out: { start: number; length: number }[] = [];
+    for (let i = 0; i + wb.length <= bytes.length; i++) {
+      if (wb.every((x, j) => bytes[i + j] === x)) out.push({ start: i, length: wb.length });
+    }
+    return out;
+  });
+  return hit({ letter_text: text, pages, _matchesPosition: { letter_text: positions } });
+};
+
+describe('letterPageExcerpts', () => {
+  it('leht leitakse BAITIDE järgi: täpitähed enne vastet ei nihuta lehte', () => {
+    const h = letter([[6, 'Größe ſo ääääää'], [7, 'Die Messe in Leipzig']], ['Messe']);
+    expect(letterPageExcerpts(h)).toEqual({
+      excerpts: [{ page: 7, text: 'Die <mark>Messe</mark> in Leipzig' }], hitPages: [7],
+    });
+  });
+
+  it('üks katke lehe kohta, kõik vasted aknas märgitud; tühi leht ei saa vastet', () => {
+    const h = letter([[6, 'messe eins messe zwei'], [7, ''], [8, 'drei messe']], ['messe']);
+    const r = letterPageExcerpts(h);
+    expect(r.hitPages).toEqual([6, 8]);
+    expect(r.excerpts).toEqual([
+      { page: 6, text: '<mark>messe</mark> eins <mark>messe</mark> zwei' },
+      { page: 8, text: 'drei <mark>messe</mark>' },
+    ]);
+  });
+
+  it('katke ei ulatu üle lehe piiri ja lõigatakse sõnapiirilt', () => {
+    const long = Array.from({ length: 60 }, (_, i) => `w${i}`).join(' ');
+    const h = letter([[6, `${long} Messe ${long}`], [7, 'järgmine leht']], ['Messe']);
+    const [x] = letterPageExcerpts(h).excerpts;
+    expect(x.text.startsWith('…w')).toBe(true);
+    expect(x.text.endsWith('…')).toBe(true);
+    expect(x.text).not.toContain('järgmine');
+    expect(x.text).toMatch(/ <mark>Messe<\/mark> /);
+  });
+
+  it('kuni kolm katket, esiletõst kõigil tabatud lehtedel', () => {
+    const h = letter([[1, 'a x'], [2, 'b x'], [3, 'c x'], [4, 'd x']], ['x']);
+    const r = letterPageExcerpts(h);
+    expect(r.excerpts.map(e => e.page)).toEqual([1, 2, 3]);
+    expect(r.hitPages).toEqual([1, 2, 3, 4]);
+  });
+
+  it('lehtedeta indeks (enne taasehitust): katke sildita, lehte ei oletata', () => {
+    const h = { ...letter([[6, 'eine Messe']], ['Messe']), pages: undefined };
+    expect(letterPageExcerpts(h)).toEqual({ excerpts: [{ page: null, text: 'eine <mark>Messe</mark>' }], hitPages: [] });
+  });
+
+  it('vasteta (nimi, regest) → tühi', () => {
+    expect(letterPageExcerpts(letter([[6, 'tekst']], []))).toEqual({ excerpts: [], hitPages: [] });
   });
 });
 

@@ -897,6 +897,22 @@ def build_letter_documents(meta, page_documents, people_data):
         place_from = part.get('place') or {}
         place_to = part.get('place_to') or {}
 
+        # Kirja tekst = lehed järjest; `pages[].start` on lehe algus selles tekstis
+        # UTF-8 BAITIDES — Meili `_matchesPosition` loeb baite, nii et klient leiab
+        # vaste lehe ilma lehtede indeksita (#526). Tühi leht saab järgmise lehe
+        # alguse: vaste ei saa temale langeda.
+        chunks, page_refs, offset = [], [], 0
+        for d in pages:
+            page_refs.append({
+                'n': d['lehekylje_number'],
+                'img': os.path.basename(d.get('lehekylje_pilt') or ''),
+                'start': offset + (1 if chunks else 0),
+            })
+            for t in (d.get('lehekylje_tekst'), d.get('marginaalia_tekst')):
+                if t:
+                    offset += (1 if chunks else 0) + len(t.encode('utf-8'))
+                    chunks.append(t)
+
         doc = {
             'id': f"{work_id}__{part['id']}",
             'work_id': work_id,
@@ -912,8 +928,8 @@ def build_letter_documents(meta, page_documents, people_data):
             'names_text': normalize_eszett(' '.join(n for n in all_names + aliases if n)),
             'place_from': place_from.get('label') or '',
             'place_to': place_to.get('label') or '',
-            'letter_text': '\n'.join(
-                t for d in pages for t in (d.get('lehekylje_tekst'), d.get('marginaalia_tekst')) if t),
+            'letter_text': '\n'.join(chunks),
+            'pages': page_refs,
             'first_page': pages[0]['lehekylje_number'],
             'page_count': len(pages),
             'work_title': first.get('title') or '',
@@ -929,6 +945,10 @@ def build_letter_documents(meta, page_documents, people_data):
                 doc[key] = place['id']
         if part.get('languages'):
             doc['languages'] = part['languages']
+        # Regest kuvamiseks originaalkujul; otsitav `abstract` on normaliseeritud ja liidetud.
+        for key in ('abstract_et', 'abstract_en'):
+            if part.get(key):
+                doc[key] = part[key]
         # Ainult kirja enda dateering: year_range=None, teose aasta ei ole varuvariant.
         if part.get('dating'):
             dating = index_dating({'dating': part['dating']}, None)
