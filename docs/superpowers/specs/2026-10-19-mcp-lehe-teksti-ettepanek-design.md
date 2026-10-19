@@ -90,7 +90,7 @@ lehe kaupa või pistelise kontrolli järel terve paki korraga.
 ### Andmevoog
 
 ```
-agent: get_page_source(work_id, page)  ── server loeb KETTALT → {stem, text, text_hash}
+agent: get_page_source(code, work_id, page)  ── server loeb KETTALT → {stem, text, text_hash}
 agent: submit_page_text_proposal(code, work_id, pages=[{stem, text_hash, edits[], note}], note)
 server: iga leht → ketta tekst (page_lock) → text_hash kontroll → edits → normaliseeri
         → struktuurikontroll → talletab {base = ketta tekst, proposed} SQLite-s; lehte EI muuda
@@ -100,9 +100,11 @@ superadmin, Workspace: ettepanek redaktoris → Ctrl+S (/save, base = ketta leht
 
 ### MCP tööriistad (`mcp/vutt_mcp/`)
 
-**`get_page_source(work_id, page)`**: lehe toores tekst, seisund, **tüvi** (`stem`,
-failinimi, püsiv leheidentifikaator) ja **`text_hash`** (sha256 normaliseeritud
-tekstist), lisaks lühike tägide loend. Tekst tuleb **serveri otspunktist, mis loeb
+**`get_page_source(handoff_code, work_id, page)`**: lehe toores tekst, seisund,
+**tüvi** (`stem`, failinimi, püsiv leheidentifikaator) ja **`text_hash`** = sha256
+**täpselt tagastatud toorteksti UTF-8 baitidest** (mitte normaliseeritud tekstist:
+kaks erinevat toorteksti võivad normaliseeruda samaks ja asendused rakenduvad
+toortekstile), lisaks lühike tägide loend. Tekst tuleb **serveri otspunktist, mis loeb
 ketta `.txt`-i** (nt `POST /works/{id}/pages/{n}/source`), mitte Meilist.
 **Otspunkt nõuab üleandmiskoodi** (kehtiv, teos koodi ulatuses; lugemine kasutuskorda
 ei kuluta). Ilma koodita lekiks piiratud teoste toores tekst avalikult, sest
@@ -164,7 +166,10 @@ järjekord nagu `work_part_proposals.submit`: kood → teos → sisu):
    ka piiratud teos on lubatud.
 2. Iga lehe kohta `page_lock`-i all loe ketta `.txt` ja kontrolli `text_hash`-i. See
    tekst on `base_text`.
-3. Rakenda `edits`. Siis `_normalize_page_text` → `proposed_text`. Normaliseerimine
+3. Rakenda `edits` **toortekstile** (`base_text` = ketta baidid, normaliseerimata).
+   Alles siis `_normalize_page_text` → `proposed_text`. Kui kettal olev tekst ei olnud
+   kanoonilisel kujul, näitab diff ka normaliseerimise muudatusi. See on sama, mida
+   tavaline Ctrl+S teeks. Normaliseerimine
    tuleb teha esitusel, et ülevaatuse diff ja kinnitus kirjutaksid sama teksti.
    `_normalize_page_text` tuleb tõsta `editing.py`-st jagatud kohta.
 4. **Struktuurikontroll: muudatus ei tohi tekitada UUSI vigu** (*minu otsus*: kettal
@@ -179,11 +184,14 @@ järjekord nagu `work_part_proposals.submit`: kood → teos → sisu):
    Nõue: `markup_errors(proposed)` ⊆ `markup_errors(base)` (multihulgana, võti =
    vea liik + täg). Uus viga → `invalid_markup` koos lehe, tägi ja põhjusega. Midagi
    ei talletata.
-5. **Annotatsiooniankrud on puutumata.** `<annN>`/`</annN>` tokenite **järjestatud
-   loend** on `proposed`-is identne `base`-iga. Seega ei lisandu, kao, dubleeru ega
-   vahetu ühtki ankrut. Ankru sees olevat teksti agent muuta tohib (OCR-viga), ankru
-   piire mitte. Lisaks peab `merge_page._seose_vead` (tekst ↔ `text_annotations`)
-   jääma samaks.
+5. **Annotatsiooniankrud on puutumata.** Ühegi edit'i `old` ega `new` ei tohi
+   sisaldada `<annN>`/`</annN>` tokenit → muidu `anchor_touched`. Nii ei saa asendus
+   ankrut lisada, kustutada, dubleerida ega tõsta üle säiliva teksti
+   (`<ann1>üks</ann1> kaks` → `<ann1>üks kaks</ann1>` on keelatud, sest `old` sisaldab
+   `</ann1>`). Ankru sees olevat teksti agent muuta tohib (OCR-viga). Lisakontroll:
+   ann-tokenite järjestatud loend on identne ja `merge_page._seose_vead` (tekst ↔
+   `text_annotations`) jääb samaks. Pärast ümberbaseerimist võrreldakse ann-tokeneid
+   **ketta** tekstiga, sest inimese ankrumuudatus on lubatud.
 6. `proposed_text == base_text` lehed jäetakse vaikselt välja (ADR 0012 vaim).
    Tühi pakk → `no_changes`.
 7. **Lehel on korraga üks ootel ettepanek** (*minu otsus*). Uus esitus samale tüvele
@@ -248,12 +256,33 @@ andja järgi. Töövoog on niikuinii ainult superadminile.
   ankrukontroll nagu ülal.
   - Puhas → kirjuta tekst. JSON jääb puutumata, ka seisund.
   - Kokkupõrge → leht `stale`, ketast ei puudutata.
-  - Kõik kirjutatud lehed lähevad **ühte commit'i** (`save_with_git` +
-    `additional_files` või `commit_add_and_remove`, mitte N eraldi commit'i: GitPython
-    commit on /data repos ~2 s). Meili sünk **üks kord** teose kohta.
+  - Kõik kirjutatud lehed lähevad **ühte commit'i**, mitte N eraldi commit'i (iga
+    commit on oma `git add` + `commit` tsükkel ja N lehe pakk teeks N korda Meili- ja
+    git-tööd). Meili sünk **üks kord** teose kohta.
+  - **Commit'i viga = ketas taastatakse.** `save_with_git` kirjutab failid enne
+    commit'i ja jätab Git-vea korral uue sisu kettale. Tavalisel Ctrl+S-il on see
+    hoiatusega aktsepteeritud, aga kinnitamata pakk ei tohi avalikku teksti jääda.
+    Töö hoiab iga kirjutatava lehe **toimingueelset toorteksti mälus** ja taastab
+    Git-vea korral kõik kirjutatud failid sellest, **lukke vabastamata**. Lehed jäävad
+    ootele ja töö tulemus on viga. Meili sünki ei käivitata.
+  - **Katkestus pärast edukat commit'i, enne SQLite'i olekumuutust** (protsess sureb):
+    lehed jäävad `pending` olekusse, kuigi tekst on kettal. Iga ümberbaseerimine
+    (lugemine, paki töö) tuvastab selle: kui `proposed_now == ketta_tekst` ja
+    `ketta_tekst != base_text`, on ettepanek juba rakendatud. Leht märgitakse
+    `accepted` ilma kirjutuseta. Sama reegel parandab ka muul viisil (käsitsi)
+    sisse kantud ettepaneku.
   - **Olekumuutused on serialiseeritud ettepaneku kaupa:** kinnitus, tagasilükkamine,
     `superseded` ja `/save` kaudu kinnitamine käivad sama ettepaneku-luku all
-    (protsessi lukk ettepaneku id järgi). SQLite üleminekud on CAS-id
+    (protsessi lukk ettepaneku id järgi).
+  - **Lukkude kohustuslik järjekord KÕIGIS teedes:** ettepanekulukud **id järjekorras**
+    → lehelukud **tüve järjekorras** → git-kirjutuslukk (`_git_write_lock`, võetakse
+    `save_with_git`-i sees). Lukke ei võeta kunagi vastupidi.
+    - `/save` `proposal`-viitega võtab ettepanekuluku **enne** `_save_page_locked`-i
+      (mis võtab lehe luku).
+    - Esitus, mis muudab varasemaid pakke `superseded`-iks, võtab kõigi puudutatud
+      varasemate ettepanekute lukud (id järjekorras) enne lehelukke.
+    - Paki töö: oma ettepaneku lukk → lehelukud → commit.
+    - `/save` ilma viiteta võtab ainult lehe luku, nagu praegu. SQLite üleminekud on CAS-id
     (`UPDATE … WHERE state IN ('pending','stale')`). Paki töö loeb lehtede olekud
     luku all ja märgib kirjutatud lehed `accepted` pärast edukat commit'i. Commit'i
     ebaõnnestumisel jäävad lehed ootele.
@@ -272,7 +301,7 @@ isikutägid elavad JSON-is (ADR 0055).
   ootel", nupud **Lükka tagasi** (leht), **Kinnita kogu pakk**, **Lükka tagasi pakk**,
   **← eelmine / järgmine →** (ainult ootel lehtede vahel, ka üle teose).
 - Ettepaneku tekst (`proposed_now`, serveris ümberbaseeritud, vt ülal) laetakse
-  redaktorisse salvestamata muudatusena (`isDirty`). Salvestuse `base` on ketta leht,
+  redaktorisse salvestamata muudatusena. Salvestuse `base` on ketta leht,
   nagu tavaliselt. See on ohutu ainult seetõttu, et `proposed_now` on juba sama ketta
   vastu liidetud. Paljast `proposed_text`-i redaktorisse ei laadita.
 - **Diff esile tõstetud** redaktori sees: kustutatu läbi kriipsutatud / punasega,
@@ -290,13 +319,17 @@ isikutägid elavad JSON-is (ADR 0055).
 - **„Salvesta ja järgmine"** salvestab ja liigub järgmisele ülevaatust vajavale lehele.
   *Minu otsus:* see on paneeli eraldi nupp. Tavaline Ctrl+S jääb lehele,
   et redaktori harjumus ei muutuks.
-- **Mustand enne paki kinnitust:** kui aktiivne leht on `isDirty`, avab „Kinnita kogu
-  pakk" kõigepealt `UnsavedChangesDialog`-i (salvesta / loobu). Salvestamisel läheb
-  aktiivne leht `/save` + `proposal`-viitega (toimetaja versioon), alles siis
-  käivitub paki töö. Server ei saa redaktori mustandit näha, seega ilma selle sammuta
+- **Mustand enne paki kinnitust:** kontroll on **`hasUnsavedChanges`**
+  (`useEditorState`), mitte `isDirty`. Seisund, kommentaarid, annotatsioonid ja
+  kommentaarimustand võivad olla muudetud ka siis, kui `isDirty === false`. Kui neid
+  on, avab „Kinnita kogu pakk" kõigepealt `UnsavedChangesDialog`-i (salvesta / loobu).
+  Salvestamisel läheb aktiivne leht `/save` + `proposal`-viitega (toimetaja versioon).
+  Paki töö käivitub **alles pärast edukat salvestusvastust**. Salvestusviga
+  (sh 409) või dialoogi tühistamine → paki tööd ei käivitata. Server ei saa redaktori mustandit näha, seega ilma selle sammuta
   kinnitaks ta algse kandidaadi.
-- **Hilinenud ettepanekuvastus:** ettepanek laetakse redaktorisse ainult siis, kui leht
-  on veel puhas (`!isDirty`) ja sama leht (`pageLoadKey` sama). Kui kasutaja on juba
+- **Hilinenud ettepanekuvastus:** ettepanek laetakse redaktorisse ainult siis, kui
+  lehel pole salvestamata muudatusi (`!hasUnsavedChanges`, sest vastus asendab kogu
+  baasseisu) ja sama leht (`pageLoadKey` sama). Kui kasutaja on juba
   kirjutama hakanud, näitab paneel „Ettepanek ootel" ja nuppu „Lae ettepanek", mis
   käib läbi `UnsavedChangesDialog`-i.
 - Paki kinnituse ajal näitab paneel edenemist (pollib staatust). Pärast seda
