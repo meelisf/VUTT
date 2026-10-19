@@ -53,13 +53,18 @@ describe('buildAdaCreateExtras', () => {
 });
 
 describe('buildAdaCreateExtras — ingliskeelne pealkiri (ADR 0064)', () => {
-  it('masintõlge läheb title_en-i, pealkiri ise jääb ADA omaks', () => {
-    const extras = buildAdaCreateExtras({ ...ADA_RESULT, title_en_suggestion: '65 letters to Karl Morgenstern' });
+  it('käsikiri (koostatud pealkiri): masintõlge läheb title_en-i, pealkiri jääb ADA omaks', () => {
+    const extras = buildAdaCreateExtras({ ...ADA_RESULT, title_en_suggestion: '65 letters to Karl Morgenstern' }, true);
     expect(extras.title_en).toBe('65 letters to Karl Morgenstern');
     expect(extras).not.toHaveProperty('title');
   });
 
+  it('trükis (transkribeeritud pealkiri): tõlget ei kasutata', () => {
+    const extras = buildAdaCreateExtras({ ...ADA_RESULT, title_en_suggestion: 'Disputation on …' }, false);
+    expect(extras).not.toHaveProperty('title_en');
+  });
+
   it('tõlketa: title_en võtit ei ole', () => {
-    expect(buildAdaCreateExtras(ADA_RESULT)).not.toHaveProperty('title_en');
+    expect(buildAdaCreateExtras(ADA_RESULT, true)).not.toHaveProperty('title_en');
   });
 });
