@@ -12,8 +12,8 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../../../contexts/UserContext', () => ({ useUser: () => ({ authToken: null }) }));
 
-const previews = new Map<string, unknown>();
-vi.mock('../useLetterPreviews', () => ({ useLetterPreviews: () => previews }));
+const fetchSpy = vi.fn();
+vi.stubGlobal('fetch', fetchSpy);
 
 import LetterResults from '../LetterResults';
 import type { LetterHit } from '../../../../services/letterSearch';
@@ -26,7 +26,7 @@ const base: LetterHit = {
 
 describe('LetterResults', () => {
   it('link avab kirja koodeksis ?part=-iga; tühi kiri saab varukuva, mitte tühja rida', () => {
-    render(<MemoryRouter><LetterResults hits={[base]} query="" /></MemoryRouter>);
+    render(<MemoryRouter><LetterResults hits={[base]} /></MemoryRouter>);
     const [link] = screen.getAllByRole('link');
     expect(link.getAttribute('href')).toBe('/work/w1/6?part=p1');
     expect(link.textContent).toContain('letters.pageFallback:{"page":6}');
@@ -34,70 +34,68 @@ describe('LetterResults', () => {
   });
 
   it('tekstikatke esiletõstuga, ilma HTML-i süstimata', () => {
-    const hit = { ...base, authors: ['Spener'], _formatted: { letter_text: 'a <mark>orati</mark> <img src=x>' } };
-    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} query="" /></MemoryRouter>);
+    const text = 'a orati <img src=x>';
+    const hit = { ...base, letter_text: text, _matchesPosition: { letter_text: [{ start: 2, length: 5 }] } };
+    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
     expect(container.querySelector('mark')?.textContent).toBe('orati');
     expect(container.querySelector('img')).toBeNull();
     expect(container.textContent).toContain('<img src=x>');
   });
 
   it('nimevaste: tekstikatket pole', () => {
-    const hit = { ...base, authors: ['Spener'], _formatted: { letter_text: 'tekst ilma vasteta' } };
-    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} query="" /></MemoryRouter>);
+    const hit = { ...base, authors: ['Spener'], letter_text: 'tekst ilma vasteta', _matchesPosition: { names_text: [{ start: 0, length: 6 }] } };
+    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
     expect(container.querySelector('p')).toBeNull();
   });
 
   it('allikakuju on hõljuva vihjena, mitte reas', () => {
     const hit = { ...base, dating: { start: '1703-03-03', source_text: 'Moskva, 03.03.1703 (märge)' } };
-    render(<MemoryRouter><LetterResults hits={[hit]} query="" /></MemoryRouter>);
+    render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
     const headline = screen.getByText('1703-03-03');
     expect(headline.getAttribute('title')).toBe('Moskva, 03.03.1703 (märge)');
   });
 });
 
-describe('LetterResults eelvaade: üks kuju (lehtede riba + sildiga lõigud)', () => {
-  const part = { id: 'p1', kind: 'letter', pages: [], creators: [], abstract_et: 'Regest eesti keeles; ß jääb', abstract_en: null };
-  const pages = Array.from({ length: 10 }, (_, i) => ({ page: 6 + i, thumb: `/t/${i}.jpg` }));
+describe('LetterResults: üks kuju (lehtede riba + sildiga lõigud), kõik kirjadokumendist', () => {
+  const pages = Array.from({ length: 10 }, (_, i) => ({ n: 6 + i, img: `a-${6 + i}.jpg`, start: i * 6 }));
+  // 10 lehte à 'lk0 x' (5 baiti) + '\n' → lehe i algus = i * 6.
+  const letter_text = Array.from({ length: 10 }, (_, i) => `lk${i} x`).join('\n');
   const labels = (c: HTMLElement) => [...c.querySelectorAll('ol > li ul > li > span')].map(s => s.textContent);
 
   it('sirvides: riba lageni + „+N", iga pisipilt viib oma lehele; lõik = regest originaalkujul sildiga', () => {
-    previews.set(base.id, { part, pages, pageHits: null });
-    const { container } = render(<MemoryRouter><LetterResults hits={[base]} query="" /></MemoryRouter>);
+    const hit = { ...base, pages, letter_text, abstract_et: 'Regest eesti keeles; ß jääb' };
+    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
     expect(container.querySelectorAll('img')).toHaveLength(8);
     expect(container.textContent).toContain('+2');
     expect(screen.getByLabelText('letters.page:{"page":7}').getAttribute('href')).toBe('/work/w1/7?part=p1');
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/api/images/w1/_thumbs/_thumb_a-6.jpg');
     expect(labels(container)).toEqual(['letters.abstract']);
     expect(container.textContent).toContain('Regest eesti keeles; ß jääb');
-    previews.clear();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('otsides lehe tekstist: SAMA riba (tabatud leht esile) + lõik sildiga „lk N", kirja-tasandi lõiku pole', () => {
-    previews.set(base.id, { part, pages, pageHits: [{ page: 7, thumb: '/t/1.jpg', snippet: 'a <mark>orati</mark>' }] });
-    const hit = { ...base, _formatted: { letter_text: 'kogu kirja <mark>orati</mark>' } };
-    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} query="orati" /></MemoryRouter>);
-    expect(container.querySelectorAll('img')).toHaveLength(8);
+  it('otsides lehe tekstist: tabatud leht esile + lõik sildiga „lk N"', () => {
+    const hit = { ...base, pages, letter_text, abstract_et: 'Regest', _matchesPosition: { letter_text: [{ start: 6 + 4, length: 1 }] } };
+    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
     expect(screen.getByLabelText('letters.page:{"page":7}').querySelector('img')?.className).toContain('ring-');
     expect(screen.getByLabelText('letters.page:{"page":8}').querySelector('img')?.className).not.toContain('ring-');
     expect(labels(container)).toEqual(['letters.page:{"page":7}']);
-    expect(container.textContent).not.toContain('kogu kirja');
-    previews.clear();
+    expect(container.querySelector('mark')?.textContent).toBe('x');
+    expect(container.textContent).not.toContain('Regest');
   });
 
-  it('vaste regestis: sama riba, lõik sildiga „Regest"', () => {
-    previews.set(base.id, { part, pages, pageHits: [] });
-    const hit = { ...base, _formatted: { abstract: 'regest <mark>orati</mark>' } };
-    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} query="orati" /></MemoryRouter>);
+  it('vaste regestis: lõik sildiga „Regest"', () => {
+    const hit = { ...base, pages, letter_text, _formatted: { abstract: 'regest <mark>orati</mark>' } };
+    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
     expect(container.querySelectorAll('img')).toHaveLength(8);
     expect(labels(container)).toEqual(['letters.abstract']);
     expect(container.querySelector('mark')?.textContent).toBe('orati');
-    previews.clear();
   });
 
-  it('vaste kirja tekstis, lehte ei leitud: lõik sildita (lehte ei oletata)', () => {
-    previews.set(base.id, { part, pages, pageHits: [] });
-    const hit = { ...base, _formatted: { letter_text: 'tekst <mark>orati</mark>' } };
-    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} query="orati" /></MemoryRouter>);
+  it('indeks enne taasehitust (lehti pole): riba puudub, tekstikatke sildita', () => {
+    const hit = { ...base, letter_text: 'tekst orati', _matchesPosition: { letter_text: [{ start: 6, length: 5 }] } };
+    const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
+    expect(container.querySelectorAll('img')).toHaveLength(0);
     expect(labels(container)).toEqual(['']);
-    previews.clear();
   });
 });

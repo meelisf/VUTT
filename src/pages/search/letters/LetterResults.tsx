@@ -6,12 +6,11 @@ import type { LetterHit } from '../../../services/letterSearch';
 import { useUser } from '../../../contexts/UserContext';
 import { getLangCode } from '../../../utils/getLangCode';
 import { partAbstract } from '../../manage/partsModel';
-import { letterHeadline, letterSnippet, splitMarks } from './letterDisplay';
-import { useLetterPreviews } from './useLetterPreviews';
+import { abstractSnippet, letterHeadline, letterPageExcerpts, splitMarks } from './letterDisplay';
+import { letterThumbUrl, useImageTokens } from './useImageTokens';
 
 interface Props {
   hits: LetterHit[];
-  query: string;
 }
 
 /** Pisipilte real; ülejäänu on „+N" (mahu kinnitus, mitte lugemiseks). */
@@ -29,34 +28,34 @@ const Snippet: React.FC<{ text: string }> = ({ text }) => (
 interface Excerpt { key: string; label: string | null; page?: number; text: string; marked: boolean }
 
 /** Üks rida = üks kiri; link avab kirja koodeksis (`?part=` avab osa sisukorras). */
-const LetterResults: React.FC<Props> = ({ hits, query }) => {
+const LetterResults: React.FC<Props> = ({ hits }) => {
   const { t, i18n } = useTranslation(['search', 'workspace']);
   const { authToken } = useUser();
-  const previews = useLetterPreviews(hits, query, authToken);
+  const imageTokens = useImageTokens(hits, authToken);
   const lang = getLangCode(i18n.language);
   return (
     <ol className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
       {hits.map(hit => {
         const to = `/work/${hit.work_id}/${hit.first_page}?part=${encodeURIComponent(hit.part_id)}`;
         const pageTo = (page: number) => `/work/${hit.work_id}/${page}?part=${encodeURIComponent(hit.part_id)}`;
-        const preview = previews.get(hit.id);
-        const pageHits = preview?.pageHits ?? [];
-        const hitPages = new Set(pageHits.map(h => h.page));
         // Üks kuju igale reale: lehtede riba (maht) + sildiga lõigud (kus vaste on).
-        // Tabatud lehed võidavad kirja-tasandi lõigu; see jääb, kui tabas regest
-        // või kirja tekst, mille lehte lehtede indeks ei leidnud.
-        const letterLevel = pageHits.length ? null : letterSnippet(hit);
-        const summary = !pageHits.length && !letterLevel && preview ? partAbstract(preview.part, lang) : null;
-        const excerpts: Excerpt[] = pageHits.length
-          ? pageHits.map(h => ({ key: `p${h.page}`, label: t('letters.page', { page: h.page }), page: h.page, text: h.snippet, marked: true }))
-          : letterLevel
-            ? [{ key: 'l', label: letterLevel.source === 'abstract' ? t('letters.abstract') : null, text: letterLevel.text, marked: true }]
+        // Kõik tuleb SAMAST kirjadokumendist — leht vaste asukohast, mitte teisest indeksist.
+        const { excerpts: pageExcerpts, hitPages } = letterPageExcerpts(hit);
+        const inAbstract = pageExcerpts.length ? null : abstractSnippet(hit);
+        const summary = pageExcerpts.length || inAbstract ? null : partAbstract(hit, lang);
+        const excerpts: Excerpt[] = pageExcerpts.length
+          ? pageExcerpts.map((x, i) => (x.page != null
+            ? { key: `p${x.page}`, label: t('letters.page', { page: x.page }), page: x.page, text: x.text, marked: true }
+            : { key: `t${i}`, label: null, text: x.text, marked: true }))
+          : inAbstract
+            ? [{ key: 'a', label: t('letters.abstract'), text: inAbstract, marked: true }]
             : summary
               ? [{ key: 's', label: t('letters.abstract'), text: summary.otherLang
                 ? `${summary.text} (${t(`workspace:manage.parts.${summary.otherLang === 'et' ? 'abstractInEt' : 'abstractInEn'}`)})`
                 : summary.text, marked: false }]
               : [];
-        const pages = preview?.pages ?? [];
+        const pages = [...(hit.pages ?? [])].sort((x, y) => x.n - y.n);
+        const tokenQuery = imageTokens.get(hit.work_id) ?? '';
         return (
           <li key={hit.id} className="px-4 py-3">
             <Link to={to} className="group flex items-start gap-2">
@@ -74,11 +73,11 @@ const LetterResults: React.FC<Props> = ({ hits, query }) => {
               {pages.length > 0 && (
                 <div className="mt-2 flex items-end gap-1.5">
                   {pages.slice(0, MAX_THUMBS).map(p => (
-                    <Link key={p.page} to={pageTo(p.page)} title={t('letters.page', { page: p.page })}
-                      aria-label={t('letters.page', { page: p.page })}>
-                      <img src={p.thumb} alt="" loading="lazy"
+                    <Link key={p.n} to={pageTo(p.n)} title={t('letters.page', { page: p.n })}
+                      aria-label={t('letters.page', { page: p.n })}>
+                      <img src={letterThumbUrl(hit.work_id, p.img, tokenQuery)} alt="" loading="lazy"
                         className={`h-16 w-12 rounded-sm border bg-gray-100 object-cover hover:border-primary-400 ${
-                          hitPages.has(p.page) ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-gray-200'}`}
+                          hitPages.includes(p.n) ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-gray-200'}`}
                         onError={e => { e.currentTarget.style.display = 'none'; }} />
                     </Link>
                   ))}

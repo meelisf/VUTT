@@ -126,6 +126,27 @@ def test_kokkuvote_mõlemast_keelest():
     assert d["abstract"] == "Eesti English"
 
 
+def test_lehtede_alguskohad_baitides():
+    """`pages[].start` peab langema kokku Meili `_matchesPosition`-iga (UTF-8 baidid)."""
+    pages = [_page(2, text="Größe", marg="äär"), _page(3), _page(4, text="Messe ſo")]
+    d = _build([_letter(pages=["a-002", "a-003", "a-004"])], pages=pages)[0]
+    text = d["letter_text"].encode("utf-8")
+    assert d["pages"] == [
+        {"n": 2, "img": "a-002.jpg", "start": 0},
+        # Tühi leht saab järgmise lehe alguse — vaste ei lange temale.
+        {"n": 3, "img": "a-003.jpg", "start": len("Größe\näär\n".encode())},
+        {"n": 4, "img": "a-004.jpg", "start": len("Größe\näär\n".encode())},
+    ]
+    assert text[d["pages"][2]["start"]:].decode() == "Messe ſo"
+    assert text[len("Größe\n".encode()):].decode().startswith("äär")
+
+
+def test_regest_originaalkujul():
+    d = _build([_letter(abstract_et="Größe", abstract_en="Size")])[0]
+    assert (d["abstract_et"], d["abstract_en"]) == ("Größe", "Size")
+    assert "abstract_et" not in _build([_letter()])[0]
+
+
 def test_tuhjad_lehedokumendid():
     assert build_letter_documents({"parts": [_letter()]}, [], {}) == []
 

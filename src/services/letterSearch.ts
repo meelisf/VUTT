@@ -48,7 +48,24 @@ export interface LetterHit {
   first_page: number;
   page_count: number;
   work_title: string;
-  _formatted?: Partial<Record<'letter_text' | 'abstract' | 'title' | 'incipit', string>>;
+  is_public?: boolean;
+  /** Kirja tekst (lehed järjest); lehe leidmiseks vaste asukohast, mitte kuvamiseks tervikuna. */
+  letter_text?: string;
+  /** Puudub enne kirjaindeksi taasehitust — siis lehte ei näidata. */
+  pages?: LetterPageRef[];
+  /** Regest originaalkujul (otsitav `abstract` on normaliseeritud ja liidetud). */
+  abstract_et?: string;
+  abstract_en?: string;
+  _formatted?: Partial<Record<'abstract' | 'title' | 'incipit', string>>;
+  /** Meili `showMatchesPosition`: `start`/`length` UTF-8 BAITIDES. */
+  _matchesPosition?: Record<string, { start: number; length: number }[]>;
+}
+
+/** Kirja leht indeksis: `start` = lehe algus `letter_text`-is UTF-8 baitides. */
+export interface LetterPageRef {
+  n: number;
+  img: string;
+  start: number;
 }
 
 export interface LetterSearchResult {
@@ -97,11 +114,14 @@ export async function searchLetters(
     attributesToRetrieve: [
       'id', 'work_id', 'part_id', 'title', 'incipit', 'abstract', 'authors', 'addressees',
       'place_from', 'place_to', 'dating', 'languages', 'first_page', 'page_count', 'work_title',
-      // _formatted sisaldab ainult tagastatavaid välju — katke vajab teksti.
+      'is_public', 'pages', 'abstract_et', 'abstract_en',
+      // Tekst + vaste asukohad → lehe katked kliendis (letterPageExcerpts):
+      // Meili katke on üks kogu kirja kohta ega ütle, mis lehel ta on.
       'letter_text',
     ],
-    attributesToHighlight: ['letter_text', 'abstract', 'title', 'incipit'],
-    attributesToCrop: ['letter_text', 'abstract'],
+    showMatchesPosition: true,
+    attributesToHighlight: ['abstract', 'title', 'incipit'],
+    attributesToCrop: ['abstract'],
     cropLength: 30,
     highlightPreTag: '<mark>',
     highlightPostTag: '</mark>',

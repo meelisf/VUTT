@@ -48,3 +48,22 @@ teos), mitte eraldi teos.
 - Seaded: `meili_settings.LETTERS_*`; runtime rakendab need stardil
   (`_ensure_letters_index`), deploy ei vaja käsitsi Meili sammu. Esmane täitmine =
   `server_seed_data.sh`.
+
+## Täiendus 2026-10-19: vaste leht tuleb kirjadokumendist (#526)
+
+Tulemusreal näidatakse kirja lehti (pisipildid) ja vaste katket lehe kaupa
+(„lk N"). Lehte EI otsita `teosed`-indeksist: kaks indeksit sobitavad erinevalt
+(kirjavea tolerants — „messe" tabas `kirjad`-is „müssen", samadel lehtedel
+`teosed`-is mitte) ja kiri jäi lehe-vasteta.
+
+- Kirjadokumendis on `pages: [{n, img, start}]` — töölaua lehenumber,
+  pildifail ja lehe algus `letter_text`-is **UTF-8 baitides**, sest Meili
+  `_matchesPosition` loeb baite. Tühi leht saab järgmise lehe alguse.
+- Klient küsib `showMatchesPosition`-iga ja lõikab katked ise
+  (`letterDisplay.letterPageExcerpts`); `letter_text` ei ole enam
+  `attributesToCrop`-is. Katke ei ulatu üle lehe piiri.
+- `abstract_et`/`abstract_en` on dokumendis kuvamiseks originaalkujul; otsitav
+  `abstract` jääb normaliseerituks (ß → ss, keeled liidetud).
+- Uued väljad ei ole otsitavad ega filtreeritavad → seadeid ei muudeta, aga
+  olemasolevad dokumendid vajavad taasehitust (`server_seed_data.sh`). Enne seda
+  on rida ilma ribata ja katke sildita — lehte ei oletata.
