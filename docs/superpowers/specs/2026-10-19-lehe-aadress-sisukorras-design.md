@@ -1,7 +1,7 @@
 # Lehe aadress sisukorras — spekk 2 (#630, ADR 0070)
 
 **Kuupäev:** 2026-10-19
-**Staatus:** mustand, ülevaatusringid enne teostust (kasutaja nõue, ADR 0070); ülevaatus 1 (ehitaja-kontroll) ja 2 (kasutaja kaudu) sisse viidud 2026-10-19
+**Staatus:** mustand, ülevaatusringid enne teostust (kasutaja nõue, ADR 0070); ülevaatused 1–3 sisse viidud 2026-10-19
 **Eelneb:** spekk 1 `2026-10-16-lehe-tahistus-tagid-design.md` — tägid `<fw>`/`<sig>`/`<catch>`/`<rh>`,
 `page_marks`, paneel (tootmises 17.10, PR #631–636).
 
@@ -68,6 +68,10 @@ paginatsiooni pole. Skeem on selgesõnaline, et route ei peaks kogu teost skanee
 - Õigus: sama mis muudel metaandmetel — `/update-work-metadata` ja `MetadataModal` on
   praegu **admin**. v1 seda ei muuda. *Minu otsus.*
 - Ei indekseerita Meili (ADR 0006 — ei ole otsingu- ega filtriväli).
+- UI: väli tuleb lisada **mõlemasse** loendisse: laadimine (`fetchServerMetadata`) ja
+  payload (`src/utils/buildMetadataPayload.ts`); payload saadab välja ainult siis, kui ta
+  laeti (olemasolev `!== undefined` muster) — muidu kustutab iga metaandmete salvestus
+  skeemi. Test „salvestus säilitab skeemi". (Ülevaatus 3.)
 - UI: `MetadataModal` — valik „Lehenummerdus: — / foliatsioon / paginatsioon / signatuurid", i18n
   mõlemasse keelde (ADR 0011). `types.ts` väli.
 - Skeem on **teose** tasemel. Osa tasemel skeemi v1-s ei ole.
@@ -105,14 +109,21 @@ liiki tähistused samal lehel ei lähe arvesse (ADR 0070 p. 7 v1 piirang).
 - **Paginatsioon:** araabia `^\d+$` või rooma `^[ivxlcdm]+$` / `^[IVXLCDM]+$` (lõpu-`j` = `i`)
   → `{n, kind}`, kus **numeratsiooniliik** `kind` ∈ `arabic | roman_lower | roman_upper`.
   Kuva nagu lehel (`12`, `xii`). Segatud suurtähtedega rooma (`Xii`) on parsimatu.
+- **Rooma numbri grammatika** (üks parser paginatsioonile ja signatuuri numbriosale):
+  liitev kirjaviis + standardsed lahutuspaarid (`iv`, `ix`, `xl`, `xc`, `cd`, `cm`),
+  `iiii`/`iiij` lubatud (vanad trükised), lõpu-`j` = `i`. Muu kuju (`vx`, `iiv`, `ic`,
+  `il`) on **parsimatu**. (Ülevaatus 3.)
 - **Signatuur:** `tüvi + valikuline number` ADR 0070 p. 7 järgi (`A ij` → `A2`, `B` → `B1`,
   `)(` → `)(1`); signatuur tähistab recto't → `A2r`. Tüvi ilma numbrita = poogna 1. leht;
   `<sig>C</sig>` on poogen C, mitte rooma 100.
-  Tüve ja numbri piir: tühiku olemasolul tühik (`A ij`, `Aa 3`). Tühikuta kujul (`Ciij`,
-  `Aaij`, `ci`) on tüvi **lühim eesliide, mille järel ülejäänu on tühi, araabia number või
-  väiketäheline rooma number** (`j` = `i`): `Ciij` → `C3`, `Aaij` → `Aa2`, `ci` → `c1`,
-  `Bb` → `Bb1` (`b` ei ole rooma). Tüvi peab olema mittetühi. Suurtäheline numbriosa
-  (`CIII`) on parsimatu. *Minu otsus (ülevaatus 1); fikstuurides kõik need kujud.*
+  Tüve ja numbri piir: tühiku olemasolul tühik (`A ij`, `Aa 3`). Tühikuta kujul on tüvi
+  **sama tähe pikim jada** (tõstu arvestamata: `Cc`, `Aaa`) või sümbolite jada (`)(`, `**`);
+  ülejäänu peab olema tühi, araabia number või rooma number **ainult `i`/`v`/`x`-st**
+  (`j` = `i`), väärtus ≤ 16. Muu → parsimatu. `Ciij` → `C3`, `Aaij` → `Aa2`, `ci` → `c1`,
+  `Cc` → `Cc1` (mitte `C100`), `Ccij` → `Cc2`, `Vvij` → `Vv2`, `Mm` → `Mm1`.
+  Suurtäheline numbriosa (`CIII`) on parsimatu. (Ülevaatus 1 ja 3; fikstuurides kõik need kujud.)
+- **Lehel päriselt olevad nurksulud** (`<fw>[12]</fw>`, arhiivi pliiatsinumber) → parsimatu
+  v1-s: kuval läheks ta segi tuletatud aadressi nurksulgudega. *Minu otsus (ülevaatus 3).*
 - Lehel on seega kolm olekut: **tähistus puudub** (valitud liigi kehtivat tähistust pole),
   **parsitud** (nähtav aadress) ja **parsimatu** (tähistus on, nt `<fw>Fol. 3a</fw>`, aga
   skeemi järgi ei parsi). Parsimatu leht ei saa aadressi, **ei saa ka tuletatud aadressi**
@@ -121,7 +132,8 @@ liiki tähistused samal lehel ei lähe arvesse (ADR 0070 p. 7 v1 piirang).
 
 ### Tuletus (ainult lehele, mille olek on „tähistus puudub")
 
-Tuletus vaatab **ainult otsest naabrit**; mitme lehe kaugusele ei loendata.
+Tuletus vaatab **ainult eelmist lehte** ja käib **ainult edasi** — kõigis skeemides
+(ADR 0070 p. 7 „tagasi ei loendata"; ülevaatus 3). Mitme lehe kaugusele ei loendata.
 
 - **Foliatsioon ja signatuur:** ainult **eelmisest** lehest. Kui eelmise lehe nähtav
   aadress on **recto** (`Nr`), on see leht `[Nv]`. Järgmisest lehest ei tuletata kunagi:
@@ -130,12 +142,14 @@ Tuletus vaatab **ainult otsest naabrit**; mitme lehe kaugusele ei loendata.
   recto on juba teine leht.
 - Eelmine leht on ise verso (nähtav `Nv` või tuletatud) või puudub → **ei tuletata**
   (signeerimata/foliieerimata recto on ebatavaline; pigem tühi kui vale).
-- **Paginatsioon:** eelmine `n` → kandidaat `[n+1]`; järgmine `m` → kandidaat `[m−1]`.
-  Kandidaat kannab allika numeratsiooniliiki ja kirjaviisi (`xii` → `[xiii]`, `XII` → `[XIII]`).
-  Üks kandidaat → see. Kaks kandidaati on kokkulangevad ainult siis, kui **väärtus JA
-  liik** on samad; muidu → **ei tuletata**. Nii ei anna `iv`, tühi, `6` (eelmäng → põhiosa)
-  ei `[v]`-d ega `[5]`-t. Kandidaat `< 1` (järgmine leht on `1` või `i`) → kandidaati pole —
-  1-st tagasi ei tuletata. (Ülevaatus 2.)
+- **Paginatsioon:** eelmise lehe nähtav `n` → `[n+1]`, sama numeratsiooniliigi ja
+  kirjaviisiga (`xii` → `[xiii]`). **Kontroll järgmise lehega:** kui järgmisel lehel on
+  nähtav aadress ja see ei ole `n+2` sama liigiga, siis **ei tuletata** — naabrid
+  näitavad, et vahel on hüpe, liigivahetus või taaskäivitus (`iv`, tühi, `6` → `?`;
+  `5`, tühi, `12` → `?`). Järgmisest lehest üksi ei tuletata kunagi (`[m−1]` ei ole):
+  laotus-/parsimatu leht + tühi + `261` andis muidu vaikse `[260]`. (Ülevaatus 2 ja 3.)
+- Foliatsioonis ja signatuuris sama kontroll: kui järgmise lehe nähtav aadress ei ole
+  `[Nv]` järglane (`(N+1)r` / uus tüvi reeglite järgi), siis **ei tuletata**.
 - Tuletatud aadressist ei tuletata edasi (ainult üks samm).
 - **Laotuspilt** (lehel on `<pb/>`, ADR 0070 p. 4): v1-s ei saa ta nähtavat ega tuletatud
   aadressi ega ole naabrile allikas. *Minu otsus — füüsilise lehekülje identiteet on
@@ -157,8 +171,11 @@ araabia, ja konvoluudis uus algus `1`-st (kasutaja 2026-10-19) — need peavad v
    - foliatsioon: `Nr → Nv → (N+1)r`;
    - paginatsioon: `n → n+1` **sama liigi** piires (liigi vahetus `iv → 1`, taaskäivitus
      `40 → 1`, hüpe `12 → 30` = uus aadressilõik);
-   - signatuur: `XNr → XNv → X(N+1)r`; `Xkv → Y1r` (uus tüvi poogna 1. lehena) loetakse
-     järglaseks, sest poogna pikkust ei teata (ADR 0070 p. 7 „lubatud uus algus");
+   - signatuur: `XNr → XNv → X(N+1)r`; `Xkv → Y1r` (uus tüvi poogna 1. lehena) on
+     järglane ainult siis, kui `Y` on **tähestikus järgmine tüvi** (vahele võib jääda
+     `I`/`J`, `U`/`V`, `W`; `Z` järel `Aa`, `Zz` järel `Aaa`; sümboltüvelt võib minna `A`-le),
+     sest poogna pikkust ei teata (ADR 0070 p. 7 „lubatud uus algus"). Muu tüvevahetus
+     (`A2r, [A2v], Q1r`) = uus aadressilõik. (Ülevaatus 3.)
    - teadmata aadressiga leht (tähistus puudub ja tuletus ei õnnestunud, parsimatu,
      laotuspilt) katkestab alati ja kuvatakse `?`; järjestikused teadmata lehed = üks `?`.
 3. Kuju: `prefiks alõik, alõik` — prefiks `fol.` / `p.` / `sig.` (sama mõlemas UI keeles),
@@ -180,7 +197,9 @@ sisukord ja MCP sama teksti ilma kahe vormindajata. Lisaks antakse struktureerit
 
 ### `GET /works/{work_id}/parts` (`server/routers/work_parts.py`)
 
-Juurde (olemasolevate võtmete kõrvale, ligipääsukontroll sama):
+Juurde **ainult päringuparameetriga `?addresses=1`** (olemasolevate võtmete kõrvale,
+ligipääsukontroll sama). Seda kasutavad `WorkPartsPanel` ja MCP `get_work_parts`;
+`PartRedirect` ja MCP ettepanekuvoog (`pages_version`) ei maksa lugemise eest. (Ülevaatus 3.)
 
 ```json
 "page_numbering": "foliation",
@@ -211,12 +230,13 @@ jäävad alles.
   nagu `meili_doc.py`; I/O teeb route.
 - Route on sync `def` (ADR 0002). Lugeda tuleb **kõik osades olevad lehed + iga VUTT-i
   lõigu otsene eel- ja järelnaaber** (kontrollitud vahemik vajab sisemisi lehti); skeem
-  tuleb metaandmetest. Kirjakogus (`o17ekb`) on see praktiliselt kogu teos (512 `.txt`)
-  igal `/parts` päringul — **mõõda** enne ja pärast (ka MCP ja avalik sisukord kutsuvad).
-  Kui vaja, protsessi-lokaalne parsitud tähistuste vahemälu võtmega
-  `(tee, mtime_ns, size)`: värske konstruktsiooni poolest (salvestus muudab `mtime`-i),
-  ei vaja invalideerimist ja ei ole kasutajapõhine (ligipääs kontrollitakse enne) —
-  seega ei riku ADR 0042 `cache.py` reeglit. `stat` jääb iga lehe kohta alles.
+  tuleb metaandmetest.
+- **Mõõdetud tootmises 2026-10-19** (`vutt-backend`, soe lehevahemälu): kõigi `.txt`
+  lugemine + `page_mark_entries` — `o17ekb` 512 lk **17 ms**, suurim teos (706 lk) **24 ms**;
+  `stat` 512 faili 3 ms. Võrdluseks: olemasolev `list_parts` kutsub `page_stems`-i
+  **kaks korda** (~20 ms kumbki) — selle ühekordseks tegemine korvab lisanduse. Tuletus ise
+  on puhas CPU ≤ 706 elemendil (mikrosekundid). Külma ketta aega ei saanud mõõta
+  (`drop_caches` vajab root'i). **Vahemälu v1-s ei tehta.**
 
 ### Sisukord (`src/components/editor/WorkPartsPanel.tsx`)
 
@@ -234,14 +254,18 @@ numbriks. Uuenda `mcp/README.md`.
 ## Testid
 
 - Puhas moodul: tabelitestid kõigile reeglitele — ülaltoodud `o17ekb`/`t9zd42`/`04na2fu4`
-  juhtumid fikstuurina (lehtede tekst lõigetena), sh `t9zd42` auk (lk 4 = `[247v]`, mitte
-  `[260v]`), paginatsiooni lahknevad naabrid, laotuspilt, parsimatu `<fw>` (ei tuletu ise
+  juhtumid fikstuurina (lehtede tekst lõigetena), sh `t9zd42` auk **sünteetilise
+  fikstuurina** (päris lk 4 kannab nähtavat `247v`; fikstuuris lk 4 tähistuseta →
+  `[247v]`, mitte `[260v]`), paginatsiooni lahknevad naabrid, laotuspilt, parsimatu `<fw>` (ei tuletu ise
   ega naabrile: `10` → `Fol. 3a`), skeemita teos (viidet pole), `pagination`-teos ainult
   `<sig>`-iga (viidet pole), rooma paginatsioon, `<sig>C</sig>`, tühikuta signatuurid.
   Kontrollitud vahemik: `10r,10v,25r,25v` → kaks aadressilõiku; `iv`, tühi, `6` → tühi
   jääb `?`; eelmäng → põhiosa (`xiv → 1`); konvoluudi taaskäivitus (`40 → 1`); `1` ees
   olev tühi leht (kandidaat 0 → `?`); signatuuri tüvevahetus `A4v → B1r` = järglane;
-  struktureeritud kuju: ühe lehe lõik vs `?`-lõik eristuvad.
+  struktureeritud kuju: ühe lehe lõik vs `?`-lõik eristuvad; rooma grammatika tabel
+  (`iiij` ok, `vx` parsimatu); topelttähe tüved (`Cc`, `Ccij`, `Mm`); tüvejärjestus
+  (`A4v → B1r` järglane, `A2v → Q1r` katkestus, `Zz → Aaa`); `5, ∅, 12` → `?`;
+  `<fw>[12]</fw>` parsimatu; `?addresses=1` puudumisel võtmeid pole.
 - Route: `part_addresses` + `page_numbering` vastuses; ligipääsuta 403 nagu enne.
 - `page_numbering` valideerimine `/update-work-metadata`-s.
 - `WorkPartsPanel` komponenditest (jsdom-päis) — viide kuvatakse; ilma viiteta sulgusid pole.
@@ -253,6 +277,7 @@ numbriks. Uuenda `mcp/README.md`.
 - ADR 0070: punkt 7 märkida „v1 = naabertuletus (spekk 2), täisloendus edasi lükatud";
   lahtistest küsimustest suletuks: recto kuva (`10r`), mitme numeratsiooni eelistus
   (paginatsioon > signatuur teose tasemel), kasutuskoht (sisukord + MCP).
+- `list_parts`: `page_stems` üks kord (praegu kaks).
 - ADR 0070 p. 7 „loendus … kuni osa piirini" ei kehti v1 naabertuletusele: naaber on
   teose, mitte osa tasemel (`47w6yr` lk 22 ← lk 21). Märkida ADR-i.
 - `o17ekb` skeemiks `foliation` (admin, `MetadataModal` kaudu).
