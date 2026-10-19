@@ -6,6 +6,7 @@ EXPECTED_TOOLS = {
     "search_persons", "get_person", "get_person_enrichment_context", "search_enrichment_registry",
     "submit_person_enrichment_proposal", "list_filter_values",
     "get_work_parts", "submit_work_parts_proposal",
+    "get_page_source", "submit_page_text_proposal",
 }
 
 
