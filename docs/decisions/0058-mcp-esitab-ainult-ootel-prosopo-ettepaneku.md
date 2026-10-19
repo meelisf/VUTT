@@ -130,3 +130,26 @@ mida toimetaja ei saa VUTT-is kontrollida. Muudetud:
   loomist kukkunud kinnitus tagastab `created_registry_entries` ja kordus seob nendega.
 - `literature`-tõend kannab loetavat `citation`-i; selle kirjutab MCP kirjanduskogu
   reast (agendi oma asendatakse). Tõendid on isikulehel joonealuste viidetena näha.
+
+## Täiendus 2026-10-19 (#641): lehe teksti ettepanek
+
+Sama piir kehtib lehe tekstile. Spekk:
+`docs/superpowers/specs/2026-10-19-mcp-lehe-teksti-ettepanek-design.md`.
+
+- MCP kirjutab ka lehe teksti AINULT ootel ettepanekuna
+  (`state/page_text_proposals.sqlite3`). Kood antakse ühele teosele või kõigile
+  teostele (8 h, 20 esitust). Kõik otsused ja koodid on ainult superadminil. Iga
+  superadmin näeb kõiki ettepanekuid. Piiratud teos on lubatud. Toortekst
+  (`/works/text-proposals/source`) väljastatakse AINULT kehtiva koodiga, sest
+  `/api/files/` on avalik.
+- Agent loeb toorteksti KETTALT (mitte Meilist, mis jääb maha). Esitusel kannab ta
+  lehe tüve ja toorbaitide räsi. Asendused (`old` → `new`, `old` täpselt üks kord)
+  rakenduvad toortekstile, normaliseerimine tuleb alles nende järel.
+- Muudatus ei tohi tekitada UUSI märgendusvigu (`vutt_tags.new_markup_errors`; vana
+  viga kettal ei blokeeri). `ann`-tokeneid asendus ei puuduta (`anchor_touched`).
+- Ülevaatus liidab ettepaneku ketta praeguse tekstiga ÜHE `page_lock`-i all ja
+  kontrollib märgendust uuesti, sest `merge_text` võib konfliktita jätta üksiku `</i>`.
+  Kokkupõrge → `stale`. Kinnitus käib `/save` + `proposal`-viite kaudu või paki
+  taustatööna ÜHE commit'iga. Git-vea korral taastatakse ketas lukke vabastamata.
+- Lukkude järjekord: ettepanekulukk (id) → `page_lock` (tüvi) → `_git_write_lock`.
+- Kinnitus ei muuda lehe seisundit ega JSON-välju.

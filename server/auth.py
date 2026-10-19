@@ -453,8 +453,8 @@ def _revoke_agent_handoffs(username):
     Ootel ettepanekud jäävad: neid kinnitab sisselogitud toimetaja. Tõrge ei
     katkesta haldustoimingut — kood aegub niikuinii."""
     from .prosopography import enrichment_proposals
-    from . import work_part_proposals
-    for module in (enrichment_proposals, work_part_proposals):
+    from . import page_text_proposals, work_part_proposals
+    for module in (enrichment_proposals, work_part_proposals, page_text_proposals):
         try:
             module.revoke_handoffs(username)
         except Exception as e:

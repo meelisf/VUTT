@@ -358,6 +358,9 @@ ettepaneku kinnitus `registries.ensure` kaudu (luku all, sama Q → seotakse).
 kinnitus käib olemasolevate valideeritud kirjutusteede kaudu (`create_part`,
 isikukaardi salvestus). Üleandmiskood on ulatusega (8 h, piiratud esitused) ja seotud
 KASUTAJAGA, mitte sessiooniga. Osade ettepanekud on esialgu ainult superadmin.
+Lehe teksti ettepanek (#641): agent saab toorteksti AINULT koodiga, esitab asendused
+räsi vastu; ülevaatus liidab ketta vastu ühe `page_lock`-i all (`review_page`), pakk on
+ÜKS commit, lukud ettepanek → leht → git. Kinnitus ei muuda lehe seisundit.
 
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on

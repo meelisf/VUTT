@@ -532,3 +532,11 @@ def apply_pack(proposal_id: str, work_dir: str, username: str, progress=None) ->
     if writes:
         _sync_meili(work_dir)
     return {"accepted": sorted(accepted), "stale": sorted(stale), "skipped": sorted(skipped)}
+
+
+def pack_work_id(proposal_id: str) -> str:
+    with _db() as db:
+        row = db.execute("SELECT work_id FROM proposal WHERE id=?", (proposal_id,)).fetchone()
+    if row is None:
+        raise ProposalError("unknown_proposal")
+    return row["work_id"]
