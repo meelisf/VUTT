@@ -82,8 +82,8 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
     try {
       const tulemus = await adaLookup(adaHandle.trim(), authToken);
       setAdaResult(tulemus);
-      // Pealkiri on ADA oma; ingliskeelne masintõlge läheb `title_en`-i
-      // (ADR 0064, buildAdaCreateExtras) ja on nähtav allpool märgistatult.
+      // Pealkiri on ADA oma; ingliskeelne masintõlge läheb `title_en`-i AINULT
+      // käsikirja korral (koostatud pealkiri; ADR 0064, buildAdaCreateExtras).
       const adaValjad: Partial<Record<AdaVormiVali, string>> = {
         title: tulemus.meta.title,
         year: tulemus.meta.year,
@@ -178,7 +178,8 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
             placeholder={t('step1.titlePlaceholder')}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
-          {adaResult?.title_en_suggestion && (
+          {/* Tõlge ainult koostatud (käsikirja) pealkirjale — trükise pealkiri on originaal (ADR 0064) */}
+          {adaResult?.title_en_suggestion && workType.id === typeHand.id && (
             <p className="text-xs text-amber-700 mt-1">
               {t('ada.titleEnSuggestion', { title: adaResult.title_en_suggestion })}
             </p>

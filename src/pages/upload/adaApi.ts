@@ -42,7 +42,7 @@ export async function adaFetch(uploadId: string, token: string | null): Promise<
  * kanna kunagi ADA-välju kaasa (Task 11 review'st: puudus test, mis seda
  * kinnitaks, vt `adaCreatePayload.test.ts`).
  */
-export function buildAdaCreateExtras(adaResult: AdaLookupResult | null): AdaCreateExtras {
+export function buildAdaCreateExtras(adaResult: AdaLookupResult | null, titleDevised = false): AdaCreateExtras {
   if (!adaResult) return {};
   return {
     ada: {
@@ -60,8 +60,10 @@ export function buildAdaCreateExtras(adaResult: AdaLookupResult | null): AdaCrea
     ester_id: adaResult.meta.ester_id,
     archive_refs: adaResult.meta.archive_refs,
     external_url: adaResult.meta.external_url,
-    // Masintõlge OMA väljal (ADR 0064) — sammu 3 vormis kontrollitav
-    ...(adaResult.title_en_suggestion ? { title_en: adaResult.title_en_suggestion } : {}),
+    // Masintõlge OMA väljal (ADR 0064) AINULT koostatud pealkirjale (käsikiri):
+    // trükise pealkiri on allikast transkribeeritud originaal, seda ei tõlgita.
+    // Tüüp selgub alles sammu 1 lõpus, seega otsustab kutsuja loomise hetkel.
+    ...(titleDevised && adaResult.title_en_suggestion ? { title_en: adaResult.title_en_suggestion } : {}),
   };
 }
 

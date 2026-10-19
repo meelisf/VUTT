@@ -338,7 +338,7 @@ export function useUploadWizard() {
             // Käsikirja pealkiri on enamasti koostatud (ADR 0064) — vaikimisi
             // sees, sammu 3 vormis maha võetav. Salvestatud otsus, mitte tuletus.
             title_devised: workType.id === TYPE_HAND.id,
-            ...buildAdaCreateExtras(adaResult ?? null),
+            ...buildAdaCreateExtras(adaResult ?? null, workType.id === TYPE_HAND.id),
           }, authToken);
           // Backend küpsetab work_id slug'i → kuva reaalne kaustanimi (data/{slug}-{work_id}/)
           if (d.upload?.meta?.slug) setSlug(d.upload.meta.slug);
