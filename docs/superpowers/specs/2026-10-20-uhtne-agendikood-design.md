@@ -96,11 +96,18 @@ kolmandale hoidlale (`prosopography/enrichment_proposals.issue_handoff`, scope `
 - `/review`: `AgentProposalsSection` asendub ühe jaotisega (sama koht lehel, sama
   „ootel ettepanekuteta jaotist ei näidata" reegel, aga **koodinupp on alati näha**).
   Rida: liigi märk, `target_label`, ootel/vananenud arv, kuupäev. Klikk:
-  - tekst → `/work/{work_id}/{lk}`, kus `lk` on esimese ootel/vananenud lehe tüve
-    **praegune** leheküljenumber. Hoidla `page_no` pärineb esitamise hetkest ja
-    lehtede lisamise või ümberjärjestamise järel viiks valele lehele — server leiab
-    tüve praeguse positsiooni teose lehtede järjekorrast. Kui tüve enam ei ole,
-    viib link teose 1. lehele;
+  - tekst → `/work/{work_id}/{lk}?proposal={proposal_id}`. Link kannab paki
+    **alati**: redaktor valib praegu paki aktiivse lehe tüve järgi
+    (`useTextProposal.ts`, `packs.find(...) ?? packs[0]`), nii et mitme paki korral
+    (sama tüvi kahes pakis või tüvi kadunud) avaneks teine pakk ja „Kinnita pakk" /
+    „Lükka pakk tagasi" rakenduksid sellele. Redaktor eelistab `proposal`-parameetri
+    pakki, kui see on teose ootel pakkide seas.
+    `lk` valitakse nii: **sama paki** esimene ootel/vananenud leht, mille tüvi on teoses
+    alles, tema **praeguse** leheküljenumbriga (hoidla `page_no` pärineb esitamise
+    hetkest ja võib lehtede lisamise/ümberjärjestamise järel viia valele lehele —
+    server leiab tüve positsiooni teose praegusest lehtede järjekorrast). Kui ühtegi
+    sellist ei ole, `lk` = 1 ja redaktor avab sama paki teatega, et paki lehed on
+    teosest kadunud (pakki saab siis tagasi lükata);
   - osad → teose halduse „Osad" vahekaart;
   - isik → isiku muutmisvaade, agendipaneel lahti.
 - Koodi näitamine/kopeerimine kolib praegusest `PartsTab`-ist / `AgentEnrichmentPanel`-ist
