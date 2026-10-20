@@ -324,10 +324,19 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
         except ProposalError as error:
             raise ProposalError(f"items[{index}]: {error}") from None
     _check_registry_entries(items)
-    for item in items:
+    for index, item in enumerate(items):
         for _, field, key_field in _ENTRY_FIELDS:
             if item.get(field):
                 item[key_field] = item[field]["key"]
+        # Seosereegel (ADR 0059) ka esitusel, mitte alles kinnitamisel: muidu jõuab
+        # rida ülevaatusse kinnitamatuna. Võtmed on siin juba täidetud.
+        if item.get("institution_key") and item.get("place_key"):
+            raise ProposalError(
+                f"items[{index}]: institution_and_place_are_exclusive: asutusega ametil "
+                "jäta place_key ära — koht tuleb asutuse registrikirjest (place_periods)")
+        if item["kind"] == "education" and (item.get("occupation_key") or item.get("place_key")):
+            raise ProposalError(
+                f"items[{index}]: invalid_education_links: haridusel on ainult institution_key")
     payload = json.dumps(items, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")

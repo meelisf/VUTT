@@ -516,6 +516,20 @@ def test_vigane_registrikirje_lukatakse_esitusel_tagasi(
     assert response.json()["detail"].startswith("items[0]")
 
 
+# Seosereegel (ADR 0059) kontrolliti varem alles kinnitamisel: vigane rida võeti
+# vastu ja jõudis ülevaatusse kinnitamatuna („Rida ei saa kinnitada").
+@pytest.mark.parametrize("item, viga", [
+    (_item(place_key="tartu"), "institution_and_place_are_exclusive"),
+    (_item(kind="education", raw_institution="AGC", occupation_key=None,
+           institution_key=None, place_key="tartu"),
+     "invalid_education_links"),
+])
+def test_seosereegel_kontrollitakse_esitusel(client, login, prosopo_env, registrid, item, viga):
+    response, _ = _esita(client, login, prosopo_env, [item])
+    assert response.status_code == 400
+    assert response.json()["detail"].startswith(f"items[0]: {viga}")
+
+
 def test_asutusekirje_vajab_liiki(client, login, prosopo_env, registrid):
     item = {"kind": "education", "match_status": "new_registry_candidate",
             "raw_institution": "Academia Rostochiensis",

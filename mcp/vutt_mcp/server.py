@@ -643,7 +643,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           Småland"); koht, asutus ja aeg lähevad oma väljadele
         - occupation_key, institution_key, place_key: registrivõtmed
           search_enrichment_registry'st; occupation_variant /
-          institution_variant ainult koos vastava võtmega
+          institution_variant ainult koos vastava võtmega. Ametil on KAS
+          institution_key VÕI place_key, mitte mõlemad — asutuse koht tuleb
+          asutuse kirjest; haridusel ainult institution_key
         - edu_type: rida ise tähendab, et isik õppis seal. Pane "imm."
           ainult siis, kui allikas ütleb immatrikuleerimist; muidu jäta
           välja. Akadeemilisele kraadile (magister, doktor) välja ei ole —
