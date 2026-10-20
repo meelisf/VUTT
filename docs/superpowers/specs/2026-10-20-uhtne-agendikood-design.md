@@ -56,6 +56,11 @@ kolmandale hoidlale (`prosopography/enrichment_proposals.issue_handoff`, scope `
   annab vea — osaliselt kehtivat koodi kasutajale ei näidata. *(Claude'i otsus.)*
 - `enrichment_proposals.issue_handoff` peab vastu võtma ette antud `code`-i (nagu
   kaks teist juba võtavad).
+- `work_part_proposals.issue_handoff` nõuab praegu `work_dir`-i ja tagastab ka
+  „kõik" ulatusel selle teose `pages_version`-i. `/review` kaudu teost ei ole:
+  üldkoodi väljastus **eemaldatakse sellest sõltuvusest** (ei `work_dir`-i ega
+  `pages_version`-i vastuses). Teose versiooni küsib agent alles ettepaneku
+  koostamisel (`get_work_parts` annab selle juba praegu).
 - **MCP tööriistu ei muudeta** — iga submit kontrollib koodi räsi oma hoidlas, sama
   kood läbib kõik kolm. MCP tööriistade kirjeldustes viide „kood teose halduses" /
   „kood isikuvormis" → „kood `/review` lehelt".
@@ -68,20 +73,34 @@ kolmandale hoidlale (`prosopography/enrichment_proposals.issue_handoff`, scope `
 
 - Uus otspunkt **`GET /agent-proposals`** (`require_role("superadmin")`) tagastab
   ühtse loendi:
-  `{kind: "text"|"parts"|"person", target_id, target_label, pending, stale, created_at, proposal_id}`.
+  `{kind: "text"|"parts"|"person", proposal_id, target_id, target_label, target_url,
+  pending, stale, created_at}`.
   `target_label` = teose pealkiri (metaandmetest) või isiku kanooniline nimi.
+  `target_url` on **serveri koostatud valmis link** (vt allpool), klient seda ei tuleta.
 - Iga hoidla saab funktsiooni, mis loetleb ootel ettepanekud **ilma sihtmärgita**:
   tekstil on see olemas (`page_text_proposals.list_pending()`); osadele ja isikutele
-  tuleb lisada (praegune `list_pending` võtab `work_id` / `person_id`). Loend ei
-  arvuta rea `review_state`-i täies mahus kaardi vastu, kui see on kallis — piisab
-  ridade arvust; täpne olek on sihtvaates.
+  tuleb lisada (praegune `list_pending` võtab `work_id` / `person_id`).
+- **`pending` / `stale` liigiti** (täpne rea olek jääb sihtvaatesse):
+  - tekst — salvestatud lehe-olekute loendus (`pending`, `stale`), nagu praegu;
+  - osad — `pending` = otsustamata osade arv; `stale` ei ole ridade arv, vaid
+    ettepaneku tasemel `pages_changed` (lehtede järjekord muutus pärast esitust):
+    `stale` = `pending` kui `pages_changed`, muidu 0. UI näitab seda märgina
+    „lehed muutunud", mitte arvuna;
+  - isik — `pending` = otsustamata ridade arv, `stale: null`. Isikukaardi muutunud
+    `updated_at` üksi ei tähenda vananemist (read hinnatakse elava kaardi vastu alles
+    sihtvaates, ADR 0058 2026-09-29), seega loendis seda ei arvutata ega näidata.
+  UI näitab vananemist ainult siis, kui `stale` ei ole `null`.
 - **Nähtavus järgib hoidla praegust reeglit**, et klikk ei viiks tühja vaatesse:
   tekst — kõik superadminid näevad kõiki; osad ja isikud — ainult koodi loonud
   kasutaja omad (`username`), sest sihtvaated filtreerivad samamoodi.
 - `/review`: `AgentProposalsSection` asendub ühe jaotisega (sama koht lehel, sama
   „ootel ettepanekuteta jaotist ei näidata" reegel, aga **koodinupp on alati näha**).
   Rida: liigi märk, `target_label`, ootel/vananenud arv, kuupäev. Klikk:
-  - tekst → `/work/{work_id}/{esimene ootel lehekülg}` (nagu praegu);
+  - tekst → `/work/{work_id}/{lk}`, kus `lk` on esimese ootel/vananenud lehe tüve
+    **praegune** leheküljenumber. Hoidla `page_no` pärineb esitamise hetkest ja
+    lehtede lisamise või ümberjärjestamise järel viiks valele lehele — server leiab
+    tüve praeguse positsiooni teose lehtede järjekorrast. Kui tüve enam ei ole,
+    viib link teose 1. lehele;
   - osad → teose halduse „Osad" vahekaart;
   - isik → isiku muutmisvaade, agendipaneel lahti.
 - Koodi näitamine/kopeerimine kolib praegusest `PartsTab`-ist / `AgentEnrichmentPanel`-ist
