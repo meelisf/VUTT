@@ -5,6 +5,7 @@ import type { Annotation } from '../../types';
 import { isAtLeast } from '../../utils/roleUtils';
 import MarkdownEditor from '../MarkdownEditor';
 import MarkdownView from '../MarkdownView';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface EditablePostProps {
   text: string;
@@ -83,7 +84,7 @@ const EditablePost: React.FC<EditablePostProps> = ({
       </div>
       <div className="flex justify-between items-center text-xs text-gray-500">
         <span className="font-semibold text-primary-700">{author}</span>
-        <span>{new Date(createdAt).toLocaleString('et-EE')}</span>
+        <span>{parseServerDate(createdAt).toLocaleString('et-EE')}</span>
       </div>
       {(extraActions || canModify) && (
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 rounded-md shadow-sm border border-gray-100 px-1 py-0.5">

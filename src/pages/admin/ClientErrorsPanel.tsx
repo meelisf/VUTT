@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface ClientError {
   received_at: string;
@@ -53,8 +54,8 @@ const ClientErrorsPanel: React.FC<{ token?: string }> = ({ token }) => {
 
   const formatTime = (iso: string) => {
     try {
-      // Server kirjutab UTC (konteiner on UTC, host EEST) — kuva kohalikus ajas.
-      return new Date(iso).toLocaleString(i18n.language === 'en' ? 'en-GB' : 'et-EE');
+      // Server kirjutab UTC (konteiner on UTC, host EEST); parseServerDate katab ka ajavööndita kirjed.
+      return parseServerDate(iso).toLocaleString(i18n.language === 'en' ? 'en-GB' : 'et-EE');
     } catch {
       return iso;
     }

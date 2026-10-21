@@ -22,6 +22,7 @@ import {
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { apiPost } from '../../services/apiClient';
+import { formatDateTime } from '../../utils/formatDateTime';
 
 interface Registration {
   id: string;
@@ -233,15 +234,6 @@ const Registrations: React.FC = () => {
     }
   };
 
-  const formatDate = (isoString: string) => {
-    return new Date(isoString).toLocaleDateString('et-EE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   const pendingRegistrations = registrations.filter(r => r.status === 'pending');
   const processedRegistrations = registrations.filter(r => r.status !== 'pending');
@@ -340,7 +332,7 @@ const Registrations: React.FC = () => {
                   </p>
                 )}
                 <p className="text-xs text-green-600 mt-2">
-                  {t('registrations.expires')}: {formatDate(inviteResult.expires_at)}
+                  {t('registrations.expires')}: {formatDateTime(inviteResult.expires_at)}
                 </p>
               </div>
               <button
@@ -389,7 +381,7 @@ const Registrations: React.FC = () => {
                           )}
                           <span className="flex items-center gap-1">
                             <Clock size={14} />
-                            {formatDate(reg.submitted_at)}
+                            {formatDateTime(reg.submitted_at)}
                           </span>
                         </div>
                         <div className="mt-3 p-3 bg-gray-50 rounded-lg">
@@ -523,7 +515,7 @@ const Registrations: React.FC = () => {
                       <tr key={reg.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm text-gray-900">{reg.name}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{reg.email}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{formatDate(reg.submitted_at)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(reg.submitted_at)}</td>
                         <td className="px-4 py-3">
                           {reg.status === 'approved' ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">

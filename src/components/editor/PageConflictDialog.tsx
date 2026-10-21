@@ -5,6 +5,7 @@ import {
   wordDiff,
   type ChunkChoice, type DiffSegment, type PageFields, type TextChunk, type TheirsLast,
 } from './pageConflict';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 export interface PageConflictDialogProps {
   conflict: {
@@ -127,7 +128,7 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
   const theirsLast = conflict.theirsLast;
   const theirsTime = (() => {
     if (!theirsLast) return '';
-    const d = new Date(theirsLast.date);
+    const d = parseServerDate(theirsLast.date);
     if (Number.isNaN(d.getTime())) return '';
     return new Intl.DateTimeFormat(i18n.language, { dateStyle: 'short', timeStyle: 'short' }).format(d);
   })();

@@ -28,6 +28,7 @@ import { parseRestoreResponse, type RestoreResult } from './pageRestore';
 import { canRestoreVersion, hasTextChange, type PageChanges } from './historyChanges';
 import { HistoryChangeBadges, HistoryChangeDetails } from './HistoryChanges';
 import { pageFileFromImageUrl } from '../../services/workImageService';
+import { formatDateTime, parseServerDate } from '../../utils/formatDateTime';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
@@ -377,8 +378,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
 
     const confirmMsg = entry.is_original
-      ? `${t('history.restoreOriginalConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${entry.formatted_date}\n\n${t('history.restoreNote')}`
-      : `${t('history.restoreConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${entry.formatted_date}\n\n${t('history.restoreNote')}`;
+      ? `${t('history.restoreOriginalConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${formatDateTime(entry.date)}\n\n${t('history.restoreNote')}`
+      : `${t('history.restoreConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${formatDateTime(entry.date)}\n\n${t('history.restoreNote')}`;
 
     if (!confirm(confirmMsg)) {
       return;
@@ -404,7 +405,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       const result = parseRestoreResponse(data);
       if (result) {
         onRestore(result);
-        const done = t('history.restoreSuccess', { date: entry.formatted_date, author: entry.author });
+        const done = t('history.restoreSuccess', { date: formatDateTime(entry.date), author: entry.author });
         // Failid on kettal, aga ajaloo commit puudub — seda ei tohi edu alla peita.
         alert(result.gitWarning
           ? `${done}\n\n${t('history.restoreGitWarning', { error: result.gitWarning })}`
@@ -544,7 +545,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                       {/* Kuupäev */}
                       <div className="flex items-center gap-1 text-sm text-gray-600 flex-shrink-0">
                         <Clock size={12} className="text-gray-400" />
-                        {new Date(entry.date).toLocaleString('et-EE', {
+                        {parseServerDate(entry.date).toLocaleString('et-EE', {
                           day: '2-digit',
                           month: '2-digit',
                           year: 'numeric',
