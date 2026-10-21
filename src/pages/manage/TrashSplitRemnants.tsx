@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Info } from 'lucide-react';
 import type { DeletedWorkPage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface Props {
   pages: DeletedWorkPage[];
@@ -47,7 +48,7 @@ const TrashSplitRemnants: React.FC<Props> = ({ pages, workId, token, t }) => {
                   <p className="text-sm text-gray-700 font-mono truncate">{p.filename}</p>
                   {p.deleted_at && (
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {new Date(p.deleted_at).toLocaleString('et-EE', {
+                      {parseServerDate(p.deleted_at).toLocaleString('et-EE', {
                         day: '2-digit', month: '2-digit', year: 'numeric',
                         hour: '2-digit', minute: '2-digit',
                       })}

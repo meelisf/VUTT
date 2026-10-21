@@ -2,6 +2,7 @@ import React from 'react';
 import { Loader2, RotateCcw } from 'lucide-react';
 import type { ModifiedImage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface Props {
   images: ModifiedImage[];
@@ -77,7 +78,7 @@ const TrashModifiedImages: React.FC<Props> = ({
               <p className="text-xs text-gray-400 mt-0.5 font-mono truncate">{i.filename}</p>
               {i.at && (
                 <p className="text-xs text-gray-400">
-                  {new Date(i.at).toLocaleString('et-EE', {
+                  {parseServerDate(i.at).toLocaleString('et-EE', {
                     day: '2-digit', month: '2-digit', year: 'numeric',
                     hour: '2-digit', minute: '2-digit',
                   })}

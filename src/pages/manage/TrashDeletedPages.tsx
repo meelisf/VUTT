@@ -2,6 +2,7 @@ import React from 'react';
 import { Loader2, RotateCcw, HelpCircle } from 'lucide-react';
 import type { DeletedWorkPage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface Props {
   pages: DeletedWorkPage[];
@@ -40,7 +41,7 @@ const TrashDeletedPages: React.FC<Props> = ({
               <p className="text-sm font-medium text-gray-700 font-mono truncate">{p.filename}</p>
               {p.deleted_at && (
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {t('manage.trash.deletedAt')}: {new Date(p.deleted_at).toLocaleString('et-EE', {
+                  {t('manage.trash.deletedAt')}: {parseServerDate(p.deleted_at).toLocaleString('et-EE', {
                     day: '2-digit', month: '2-digit', year: 'numeric',
                     hour: '2-digit', minute: '2-digit',
                   })}

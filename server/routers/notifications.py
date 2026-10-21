@@ -20,7 +20,7 @@ import os
 import json
 import unicodedata
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 from starlette.concurrency import run_in_threadpool
@@ -75,7 +75,7 @@ def _apply_reply_sync(catalog, filename, comment_id, reply_text, work_id, page_n
         if target_comment is None:
             raise HTTPException(status_code=404, detail="Kommentaari ei leitud")
 
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         reply = {
             "id": uuid.uuid4().hex,
             "text": reply_text,
@@ -297,7 +297,7 @@ def mark_notification_read(notification_id: str, user=Depends(get_user)):
     """Märgib teatise loetuks (idempotentne: juba loetud teatis jääb loetuks)."""
     with _notifications_lock:
         notifications = load_notifications(user['username'])
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         for notification in notifications:
             if notification.get('id') == notification_id:
                 notification['read_at'] = notification.get('read_at') or now
