@@ -155,3 +155,34 @@ Sama piir kehtib lehe tekstile. Spekk:
   taustatööna ÜHE commit'iga. Git-vea korral taastatakse ketas lukke vabastamata.
 - Lukkude järjekord: ettepanekulukk (id) → `page_lock` (tüvi) → `_git_write_lock`.
 - Kinnitus ei muuda lehe seisundit ega JSON-välju.
+
+## Täiendus 2026-10-20: üks agendikood, ülevaade `/review`-l
+
+Spekk: `docs/superpowers/specs/2026-10-20-uhtne-agendikood-design.md`. Asendab
+2026-10-19 täienduse koodi asukoha („Osad" → „Kood agendile") ja #492 isikuvormi
+koodinupud.
+
+- **Üks kood kolmele hoidlale.** `POST /agent-handoff` (superadmin, rate-limit
+  kasutaja kaupa) genereerib koodi ja registreerib selle SAMA räsiga lehe teksti,
+  teose osade ja isikukaartide hoidlas, ulatus alati „kõik teosed + kõik isikud".
+  Iga hoidla hoiab oma lage (tekst 20, osad 20, isikud `ANY_MAX_USES`) ja TTL-i (8 h).
+  Hoidlad jäävad eraldi SQLite-failideks (`server/agent_proposals.py` koondab).
+- **Kompensatsioon, mitte tehing.** Kolm faili ühist tehingut ei anna: kui mõni
+  registreerimine viskab, tühistatakse kood (`revoke_code`, räsi järgi) juba
+  õnnestunud hoidlatest ja otspunkt annab 503 `agent_handoff_failed`. Osaliselt
+  kehtivat koodi kasutajale ei näidata.
+- **Ühtne loend.** `GET /agent-proposals` (superadmin) annab read kujul
+  `{kind, proposal_id, target_id, target_label, target_url, pending, stale, created_at}`.
+  **`target_url` koostab server** — klient ei tuleta sihtlehte. Tekst →
+  `/work/{id}/{lk}?proposal={id}` (lk = paki esimese ülevaatust vajava ja teoses
+  alles oleva tüve PRAEGUNE positsioon, muidu 1; redaktor eelistab `proposal`-
+  parameetri pakki), osad → `/work/{id}/manage?tab=parts`, isik →
+  `/persons/{id}/edit?agent=1`. `stale`: tekst = lehtede loendus, osad = `pending`
+  kui `pages_version` muutus, isik = `null` (vananemine hinnatakse vormis).
+- **Nähtavus järgib sihtvaadet**, et klikk ei viiks tühja vaatesse: tekstipakke
+  näevad kõik superadminid, osi ja isikuid ainult koodi loonud kasutaja.
+- **Vanad otspunktid eemaldatud** (`/works/{id}/parts/handoff`,
+  `/prosopography/enrichment-handoff[/{id}]`). Hoidlate skeem ei muutunud, seega juba
+  antud kitsa ulatusega koodid kehtivad oma 8 h lõpuni (ulatuse kontrollid `submit`-is
+  jäävad). MCP tööriistade signatuurid ei muutunud.
+- `/review`-l ei otsustata — otsus jääb redaktorisse, „Osad" vahekaardile ja isikuvormi.

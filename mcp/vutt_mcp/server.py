@@ -493,8 +493,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     ) -> str:
         """Esitab teose osade (sisukorra) ettepaneku toimetaja ülevaatuseks.
 
-        handoff_code tuleb toimetajalt (teose haldus → „Osad" → kood agendile); see
-        kehtib 8 h ja ainult sellele teosele. pages_version tuleb get_work_parts'ist;
+        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review → „Loo
+        agendikood"); üks kood kehtib osade, lehe teksti ja isikukaartide
+        ettepanekutele, kõigis teostes, 8 h. pages_version tuleb get_work_parts'ist;
         kui lehti on vahepeal muudetud, lükatakse ettepanek tagasi (stale_pages) —
         loe osad uuesti.
 
@@ -549,8 +550,8 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         tühikuks, poolitused liidetud, märgendus eemaldatud, ß → ss). Parandus selle
         põhjal kustutaks lehe struktuuri.
 
-        handoff_code tuleb superadminilt (teose haldus → „Osad" → „Kood agendile"); sama
-        kood kehtib ka osade ettepanekutele, 8 h, ühele teosele või kõigile. page = VUTT-i 1-põhine
+        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review); sama kood
+        kehtib ka osade ja isikukaartide ettepanekutele, 8 h, kõigis teostes. page = VUTT-i 1-põhine
         järjestusnumber nagu get_pages'is. Vastuses: stem (lehe püsiv tunnus), text_hash
         (räsi täpselt sellest tekstist), status, text ja tags — VUTT-i lubatud tägid
         (paired=false: üksiktäg nagu <pb/>). Muid tägisid ära leiuta (nt tabelit pole).
@@ -618,9 +619,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     ) -> str:
         """Esitab ootel ameti-/haridusettepaneku VUTT-i isikuvormis ülevaatuseks.
 
-        handoff_code tuleb toimetaja isikuvormist. Kood kehtib tööpäeva (8 h)
-        ja lubab mitu esitust: kas ühele isikule või („Kood kõigile isikutele")
-        igale isikule, kuni esituste laeni. Ära kasuta selleks editori
+        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review); sama kood
+        kehtib ka lehe teksti ja teose osade ettepanekutele. Kood kehtib tööpäeva (8 h)
+        ja lubab mitu esitust igale isikule, kuni esituste laeni. Ära kasuta selleks editori
         sessioonitokenit. `base_updated_at` tuleb iga isiku kohta värskest
         get_person_enrichment_context vastusest — aegunud versioon lükatakse
         tagasi (stale_person) ega kuluta koodi. Üks kutse kuni 20 kirjet.
