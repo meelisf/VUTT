@@ -312,12 +312,7 @@
     "parts": {
       "proposals": {
         "title": "Agendi ettepanekud",
-        "createCode": "Kood agendile (see teos)",
         "refresh": "Värskenda",
-        "codeHelp": "Anna see kood MCP-vestluses agendile koos juhisega, nt „Tee teose {{workId}} osade sisukord” või „Märgenda foliatsioon”. Kood kehtib osade ja lehe teksti ettepanekutele, 8 tundi ja ainult sellele teosele, kuni {{max}} esitust.",
-        "copy": "Kopeeri",
-        "copied": "Kopeeritud",
-        "expires": "Aegub",
         "pagesChanged": "Teose lehti on pärast ettepanekut muudetud — kontrolli lehti enne vastuvõttu.",
         "pages": "lk {{pages}}",
         "missingPages_one": "{{count}} leht on vahepeal kustutatud",
@@ -348,12 +343,11 @@
         "accept": "Lisa",
         "edit": "Muuda ja lisa",
         "reject": "Lükka tagasi",
-        "empty": "Ootel ettepanekuid pole. Loo kood ja anna see agendile, et ta pakuks osad (kirjad, istungid jm) välja.",
+        "empty": "Ootel ettepanekuid pole. Agendikoodi saab ülevaatuse lehelt; anna see agendile, et ta pakuks osad (kirjad, istungid jm) välja.",
         "working": "Salvestan…",
         "accepting_one": "Lisan {{count}} osa…",
         "accepting_other": "Lisan {{count}} osa…",
-        "createCodeAll": "Kood agendile (kõik teosed)",
-        "codeHelpAll": "Anna see kood MCP-vestluses agendile koos juhisega. Kood kehtib osade ja lehe teksti ettepanekutele KÕIGIS teostes, 8 tundi, kuni {{max}} esitust."
+        "codeOnReview": "Agendikood ja kõik ootel ettepanekud: ülevaatuse leht →"
       },
       "kinds": {
         "letter": "Kiri",

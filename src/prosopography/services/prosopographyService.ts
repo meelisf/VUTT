@@ -99,17 +99,6 @@ async function enrichmentResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-/** Esituskood agendile: ühele isikule või (`null`) kõigile isikutele (#492). */
-export async function createEnrichmentHandoff(personId: string | null, token: string): Promise<{
-  code: string; expires_at: number; base_updated_at?: string; scope?: 'person' | 'any'; max_uses?: number;
-}> {
-  const path = personId ? `/enrichment-handoff/${encodeURIComponent(personId)}` : '/enrichment-handoff';
-  const response = await fetchWithTimeout(`${BASE}${path}`, {
-    method: 'POST', headers: getAuthHeaders(token), timeout: 10000,
-  });
-  return enrichmentResponse(response);
-}
-
 export async function listEnrichmentProposals(personId: string, token: string): Promise<EnrichmentProposal[]> {
   const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}`, {
     headers: getAuthHeaders(token), timeout: 10000,

@@ -45,9 +45,14 @@ describe('partsModel: tundmatud väljad ei kao (arvustuse I1)', () => {
 });
 
 describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
-  it('avaneb alati lehtede vahekaardil — osad on teisel kohal', () => {
-    expect(initialManageTab(7)).toBe('pages');
-    expect(initialManageTab(null)).toBe('pages');
+  it('avaneb vaikimisi lehtede vahekaardil — osad on teisel kohal', () => {
+    expect(initialManageTab(7, null)).toBe('pages');
+    expect(initialManageTab(null, null)).toBe('pages');
+  });
+  it('?tab=parts (/review link) avab osad, aga fookus vajab lehti', () => {
+    expect(initialManageTab(null, 'parts')).toBe('parts');
+    expect(initialManageTab(3, 'parts')).toBe('pages');
+    expect(initialManageTab(null, 'muu')).toBe('pages');
   });
   it('vahekaardi vahetust kaitstakse ainult osade mustandi korral', () => {
     const guarded: string[] = [];

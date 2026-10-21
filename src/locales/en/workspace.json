@@ -312,12 +312,7 @@
     "parts": {
       "proposals": {
         "title": "Agent proposals",
-        "createCode": "Code for agent (this work)",
         "refresh": "Refresh",
-        "codeHelp": "Give this code to the agent in the MCP conversation with an instruction, e.g. “Make the table of contents for work {{workId}}” or “Mark the foliation”. Valid for part and page-text proposals, 8 hours, for this work only, up to {{max}} submissions.",
-        "copy": "Copy",
-        "copied": "Copied",
-        "expires": "Expires",
         "pagesChanged": "The work's pages changed after the proposal — check the pages before accepting.",
         "pages": "p. {{pages}}",
         "missingPages_one": "{{count}} page has since been deleted",
@@ -348,12 +343,11 @@
         "accept": "Add",
         "edit": "Edit and add",
         "reject": "Reject",
-        "empty": "No pending proposals. Create a code and give it to the agent to propose parts (letters, sessions etc.).",
+        "empty": "No pending proposals. Get the agent code from the review page and give it to the agent to propose parts (letters, sessions etc.).",
         "working": "Saving…",
         "accepting_one": "Adding {{count}} part…",
         "accepting_other": "Adding {{count}} parts…",
-        "createCodeAll": "Code for agent (all works)",
-        "codeHelpAll": "Give this code to the agent in the MCP conversation with an instruction. Valid for part and page-text proposals in ALL works, 8 hours, up to {{max}} submissions."
+        "codeOnReview": "Agent code and all pending proposals: review page →"
       },
       "kinds": {
         "letter": "Letter",

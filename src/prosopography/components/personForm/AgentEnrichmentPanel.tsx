@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProsopoRecord } from '../../types';
 import {
-  applyEnrichmentProposal, createEnrichmentHandoff, EnrichmentApplyError, listEnrichmentProposals,
+  applyEnrichmentProposal, EnrichmentApplyError, listEnrichmentProposals,
   rejectEnrichmentProposal, type EnrichmentDate, type EnrichmentItem, type EnrichmentProposal,
 } from '../../services/prosopographyService';
 import EvidenceList from '../EvidenceList';
 import BusyNote from '../../../components/BusyNote';
-import CopyButton from '../../../components/CopyButton';
+import { Link } from 'react-router-dom';
 import { useWorkTitles } from '../../hooks/useWorkTitles';
 import { evidenceWorkIds } from '../../utils/evidenceRef';
 
@@ -35,9 +35,6 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
   const { t } = useTranslation('prosopography');
   const tr = (key: string, options?: Record<string, unknown>) => t(`agentEnrichment.${key}`, options);
   const [proposals, setProposals] = useState<EnrichmentProposal[]>([]);
-  const [code, setCode] = useState('');
-  const [codeExpiry, setCodeExpiry] = useState(0);
-  const [codeScope, setCodeScope] = useState<{ any: boolean; max: number }>({ any: false, max: 0 });
   const [busy, setBusy] = useState(false);
   // Käimasolev otsus: näitab, millise ettepaneku juures töö käib (kinnitus võtab sekundeid).
   const [working, setWorking] = useState<{ proposalId: string; count: number; confirm: boolean } | null>(null);
@@ -53,17 +50,7 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
     catch (err) { setError((err as Error).message); }
   }, [person.id, token]);
 
-  useEffect(() => { setCode(''); setError(''); void refresh(); }, [refresh]);
-
-  const createCode = async (anyPerson = false) => {
-    setBusy(true); setError(''); setMessage('');
-    try {
-      const result = await createEnrichmentHandoff(anyPerson ? null : person.id, token);
-      setCode(result.code); setCodeExpiry(result.expires_at);
-      setCodeScope({ any: result.scope === 'any', max: result.max_uses ?? 0 });
-    } catch (err) { setError((err as Error).message); }
-    finally { setBusy(false); }
-  };
+  useEffect(() => { setError(''); void refresh(); }, [refresh]);
 
   const decide = async (proposal: EnrichmentProposal, indices: number[], confirm: boolean) => {
     if (busy || isDirty || !indices.length) return;
@@ -103,27 +90,18 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
   };
 
   return (
-    <section className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3" aria-label={tr('title')}>
+    <section id="agent-enrichment" className="rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3" aria-label={tr('title')}>
       <h3 className="font-semibold text-sm">{tr('title')}</h3>
       <p className="text-xs text-gray-600">{tr('intro')}</p>
+      {/* Agendikood on ÜKS ja elab ülevaatuse lehel (ADR 0058, 2026-10-20). */}
+      <p className="text-xs">
+        <Link to="/review" className="text-blue-800 underline hover:text-blue-950">{tr('codeOnReview')}</Link>
+      </p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => void createCode()} disabled={busy || isDirty}
-          className="px-3 py-1.5 rounded bg-blue-700 text-white text-sm disabled:opacity-50">{tr('createCode')}</button>
-        <button type="button" onClick={() => void createCode(true)} disabled={busy}
-          className="px-3 py-1.5 rounded border border-blue-700 text-blue-800 text-sm disabled:opacity-50">{tr('createCodeAny')}</button>
         <button type="button" onClick={() => void refresh()} disabled={busy}
           className="px-3 py-1.5 rounded border border-blue-300 text-sm disabled:opacity-50">{tr('refresh')}</button>
       </div>
       {isDirty && <p className="text-sm text-amber-800">{tr('unsaved')}</p>}
-      {code && <div className="rounded border bg-white p-3 text-sm">
-        <p>{codeScope.any ? tr('codeHelpAny', { max: codeScope.max }) : tr('codeHelp', { max: codeScope.max })}</p>
-        <div className="flex items-center gap-2 mt-2">
-          <code className="break-all select-all">{code}</code>
-          <CopyButton text={code} label={tr('copy')} copiedLabel={tr('copied')}
-            className="flex shrink-0 items-center gap-1 px-2 py-1 rounded border text-xs" />
-        </div>
-        <p className="text-xs text-gray-500 mt-1">{tr('expires')}: {new Date(codeExpiry * 1000).toLocaleString()}</p>
-      </div>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {message && <p role="status" className="text-sm text-green-700">{message}</p>}
       {proposals.length === 0 && <p className="text-sm text-gray-500">{tr('empty')}</p>}

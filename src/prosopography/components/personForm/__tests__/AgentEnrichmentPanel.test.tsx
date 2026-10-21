@@ -5,15 +5,15 @@ import { MemoryRouter } from 'react-router-dom';
 import '../../relations/__tests__/testI18n';
 import type { ProsopoRecord } from '../../../types';
 
-const { handoff, list, apply, reject, titles } = vi.hoisted(() => ({
-  handoff: vi.fn(), list: vi.fn(), apply: vi.fn(), reject: vi.fn(), titles: vi.fn(),
+const { list, apply, reject, titles } = vi.hoisted(() => ({
+  list: vi.fn(), apply: vi.fn(), reject: vi.fn(), titles: vi.fn(),
 }));
 vi.mock('../../../services/prosopographyService', async () => {
   const actual = await vi.importActual<typeof import('../../../services/prosopographyService')>(
     '../../../services/prosopographyService');
   return {
     EnrichmentApplyError: actual.EnrichmentApplyError,
-    createEnrichmentHandoff: handoff, listEnrichmentProposals: list,
+    listEnrichmentProposals: list,
     applyEnrichmentProposal: apply, rejectEnrichmentProposal: reject, getWorkTitles: titles,
   };
 });
@@ -42,12 +42,11 @@ const renderPanel = (onApplied = vi.fn(), isDirty = false) => render(<MemoryRout
   <AgentEnrichmentPanel person={person} token="tok" isDirty={isDirty} onApplied={onApplied} /></MemoryRouter>);
 
 beforeEach(() => {
-  for (const fn of [handoff, list, apply, reject, titles]) fn.mockReset();
+  for (const fn of [list, apply, reject, titles]) fn.mockReset();
   list.mockResolvedValue([proposal]);
   titles.mockResolvedValue({ w1: { title: 'Consuetudines', year: 1632, restricted: false } });
   apply.mockResolvedValue({ ...person, updated_at: 'v2' });
   reject.mockResolvedValue({ proposal_id: 'p1', remaining: 3 });
-  handoff.mockResolvedValue({ code: 'code-1', expires_at: 9999999999 });
 });
 
 describe('agendi ettepanekute ülevaatus', () => {
@@ -121,11 +120,11 @@ describe('agendi ettepanekute ülevaatus', () => {
     expect((screen.getByRole('button', { name: 'Kinnita kõik (3)' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('kood kõigile isikutele', async () => {
-    handoff.mockResolvedValue({ code: 'any-code', expires_at: 9999999999, scope: 'any', max_uses: 200 });
+  it('paneelis ei ole koodinuppe, on viide /review-le', async () => {
     renderPanel();
-    fireEvent.click(await screen.findByRole('button', { name: 'Kood kõigile isikutele' }));
-    await waitFor(() => expect(handoff).toHaveBeenCalledWith(null, 'tok'));
-    expect(await screen.findByText('any-code')).toBeTruthy();
+    await screen.findAllByText('registris');
+    expect(screen.queryByRole('button', { name: 'Kood kõigile isikutele' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Loo üleandmiskood' })).toBeNull();
+    expect(screen.getByRole('link', { name: /ülevaatuse leht/ }).getAttribute('href')).toBe('/review');
   });
 });

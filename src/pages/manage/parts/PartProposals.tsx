@@ -6,14 +6,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bot, Check, Pencil, RefreshCw, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
-  acceptPartProposals, createPartsHandoff, decidePartProposal, listPartProposals,
-  type PartProposal, type PartProposalItem, type PartsHandoff, type WorkPart,
+  acceptPartProposals, decidePartProposal, listPartProposals,
+  type PartProposal, type PartProposalItem, type WorkPart,
 } from '../../../services/workPartsApi';
 import { compactNumbers } from '../partsModel';
 import ProposedPersons from './ProposedPersons';
 import BusyNote from '../../../components/BusyNote';
-import CopyButton from '../../../components/CopyButton';
 
 interface Props {
   workId: string;
@@ -31,7 +31,6 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
   const { t, i18n } = useTranslation(['workspace']);
   const tp = (key: string, opts?: Record<string, unknown>) => t(`manage.parts.proposals.${key}`, opts);
   const [proposals, setProposals] = useState<PartProposal[]>([]);
-  const [handoff, setHandoff] = useState<PartsHandoff | null>(null);
   const [busy, setBusy] = useState(false);
   // „Lisa kõik" käib: märgi tekst kannab osade arvu.
   const [acceptingCount, setAcceptingCount] = useState(0);
@@ -96,33 +95,16 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
             <Check size={14} /> {tp('acceptAll', { count: pending.length })}
           </button>
         )}
-        {/* ÜKS agendikood (#641): osad + lehe teksti parandused; ulatus see teos või kõik. */}
-        <button type="button" disabled={busy} onClick={() => run(async () => setHandoff(await createPartsHandoff(workId, token, 'work')))}
-          className={`${pending.length > 1 ? '' : 'ml-auto '}rounded border border-violet-300 bg-white px-2.5 py-1 text-violet-800 hover:bg-violet-100 disabled:opacity-50`}>
-          {tp('createCode')}
-        </button>
-        <button type="button" disabled={busy} onClick={() => run(async () => setHandoff(await createPartsHandoff(workId, token, 'all')))}
-          className="rounded border border-violet-300 bg-white px-2.5 py-1 text-violet-800 hover:bg-violet-100 disabled:opacity-50">
-          {tp('createCodeAll')}
-        </button>
         <button type="button" disabled={busy} onClick={() => void run(load)} aria-label={tp('refresh')} title={tp('refresh')}
-          className="rounded p-1.5 text-violet-700 hover:bg-violet-100 disabled:opacity-50">
+          className={`${pending.length > 1 ? '' : 'ml-auto '}rounded p-1.5 text-violet-700 hover:bg-violet-100 disabled:opacity-50`}>
           <RefreshCw size={14} />
         </button>
       </div>
 
-      {handoff && (
-        <div className="mt-2 rounded border border-violet-200 bg-white p-2">
-          <p className="text-xs text-gray-600">
-            {tp(handoff.scope === 'all' ? 'codeHelpAll' : 'codeHelp', { workId, max: handoff.max_uses })}
-          </p>
-          <div className="mt-1 flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all select-all text-xs">{handoff.code}</code>
-            <CopyButton text={handoff.code} label={tp('copy')} copiedLabel={tp('copied')} />
-          </div>
-          <p className="mt-1 text-xs text-gray-500">{tp('expires')}: {new Date(handoff.expires_at * 1000).toLocaleString()}</p>
-        </div>
-      )}
+      {/* Agendikood on ÜKS ja elab ülevaatuse lehel (ADR 0058, 2026-10-20). */}
+      <p className="mt-1 text-xs">
+        <Link to="/review" className="text-violet-800 underline hover:text-violet-950">{tp('codeOnReview')}</Link>
+      </p>
 
       {busy && <BusyNote className="mt-2">
         {acceptingCount ? tp('accepting', { count: acceptingCount }) : tp('working')}
@@ -189,7 +171,7 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
           ))}
         </ul>
       )}
-      {pending.length === 0 && !handoff && <p className="mt-1 text-xs text-gray-600">{tp('empty')}</p>}
+      {pending.length === 0 && <p className="mt-1 text-xs text-gray-600">{tp('empty')}</p>}
     </section>
   );
 };
