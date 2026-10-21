@@ -736,6 +736,7 @@
     "jobError": "Paki kinnitus ebaõnnestus: {{error}}",
     "alreadyRunning": "Selle teose paki kinnitus juba käib.",
     "error": "Toiming ebaõnnestus: {{error}}",
-    "handoffAll": "Kood agendile (kõik teosed)"
+    "handoffAll": "Kood agendile (kõik teosed)",
+    "packPagesGone": "Paki lehed on teosest kadunud — pakki saab tagasi lükata."
   }
 }

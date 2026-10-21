@@ -36,7 +36,7 @@ const REVIEW = (over = {}) => ({
 
 const nav = { runGuarded: vi.fn((fn: () => void) => fn()), navigateToPage: vi.fn(), navigateAfterSave: vi.fn(), refreshed: vi.fn() };
 
-function useHarness(page: Page, enabled = true) {
+function useHarness(page: Page, enabled = true, preferredProposalId: string | null = null) {
   const viewRef = useRef<EditorView | null>(null);
   if (!viewRef.current) {
     viewRef.current = new EditorView({ state: EditorState.create({
@@ -44,7 +44,7 @@ function useHarness(page: Page, enabled = true) {
   }
   const st = useEditorState({ page, viewRef });
   const tp = useTextProposal({
-    page, viewRef, enabled, token: 't', hasUnsavedChanges: st.hasUnsavedChanges,
+    page, viewRef, enabled, token: 't', hasUnsavedChanges: st.hasUnsavedChanges, preferredProposalId,
     setSavedState: st.setSavedState, setComments: st.setComments,
     setTextAnnotations: st.setTextAnnotations, setPageTags: st.setPageTags, setIsDirty: st.setIsDirty,
     runGuarded: nav.runGuarded, navigateToPage: nav.navigateToPage, navigateAfterSave: nav.navigateAfterSave,
@@ -245,5 +245,62 @@ describe('useTextProposal — lõppülevaatuse parandused', () => {
     const n = svc.getJobStatus.mock.calls.length;
     await new Promise(r => setTimeout(r, 30));
     expect(svc.getJobStatus.mock.calls.length).toBeLessThanOrEqual(n + 1);
+  });
+});
+
+// `/review` link kannab paki ID-d (ADR 0058, 2026-10-20): sama tüvi võib olla mitmes pakis.
+describe('useTextProposal — ?proposal= eelistus', () => {
+  const PACK2 = { ...PACK, proposal_id: 'p2', note: 'teine' };
+
+  it('eelistab proposal-parameetri pakki', async () => {
+    svc.listPacks.mockResolvedValue([PACK, PACK2]);
+    svc.getReviewPage.mockResolvedValue(REVIEW({ proposal_id: 'p2' }));
+    const { result } = renderHook(() => useHarness(mkPage('a', 1), true, 'p2'));
+    await waitFor(() => expect(result.current.tp.pack?.proposal_id).toBe('p2'));
+    await waitFor(() => expect(svc.getReviewPage).toHaveBeenCalledWith('t', 'w1', 'p2', 't-001'));
+    expect(result.current.tp.packPagesGone).toBe(false);
+  });
+
+  it('eelistus püsib lehevahetusel', async () => {
+    svc.listPacks.mockResolvedValue([PACK, PACK2]);
+    svc.getReviewPage.mockResolvedValue(REVIEW({ proposal_id: 'p2' }));
+    const { result, rerender } = renderHook(({ p, pref }) => useHarness(p, true, pref),
+      { initialProps: { p: mkPage('a', 1), pref: 'p2' as string | null } });
+    await waitFor(() => expect(result.current.tp.pack?.proposal_id).toBe('p2'));
+    svc.getReviewPage.mockClear();
+    svc.getReviewPage.mockResolvedValue(REVIEW({ proposal_id: 'p2', stem: 't-003', page_no: 3 }));
+    rerender({ p: mkPage('c', 3), pref: null });
+    await waitFor(() => expect(svc.getReviewPage).toHaveBeenCalledWith('t', 'w1', 'p2', 't-003'));
+    expect(result.current.tp.pack?.proposal_id).toBe('p2');
+  });
+
+  it('eelistatud pakk teisel lehel ei laadi selle lehe ettepanekut', async () => {
+    const other = { ...PACK, proposal_id: 'p3', pages: [{ stem: 't-002', page_no: 2, state: 'pending' }] };
+    svc.listPacks.mockResolvedValue([PACK, other]);
+    svc.getReviewPage.mockResolvedValue(REVIEW({ proposal_id: 'p3', stem: 't-002', page_no: 2 }));
+    const { result } = renderHook(() => useHarness(mkPage('a', 1), true, 'p3'));
+    await waitFor(() => expect(result.current.tp.pack?.proposal_id).toBe('p3'));
+    await waitFor(() => expect(svc.getReviewPage).toHaveBeenCalledWith('t', 'w1', 'p3', 't-002'));
+    expect(svc.getReviewPage).not.toHaveBeenCalledWith('t', 'w1', 'p1', 't-001');
+    expect(result.current.tp.review).toBeNull();
+    expect(result.current.tp.packPagesGone).toBe(false);
+    expect(doc(result.current.viewRef.current)).toBe('leht vana\n');
+  });
+
+  it('eelistatud paki lehed kadunud', async () => {
+    const gone = { ...PACK, proposal_id: 'p4', pages: [{ stem: 't-099', page_no: 9, state: 'pending' }] };
+    svc.listPacks.mockResolvedValue([PACK, gone]);
+    svc.getReviewPage.mockResolvedValue(REVIEW({ proposal_id: 'p4', stem: 't-099', page: null, proposed_now: null, state: 'stale' }));
+    const { result } = renderHook(() => useHarness(mkPage('a', 1), true, 'p4'));
+    await waitFor(() => expect(result.current.tp.packPagesGone).toBe(true));
+    expect(result.current.tp.pack?.proposal_id).toBe('p4');
+    expect(result.current.tp.review).toBeNull();
+  });
+
+  it('tundmatu eelistus → vana käitumine', async () => {
+    svc.listPacks.mockResolvedValue([PACK, PACK2]);
+    const { result } = renderHook(() => useHarness(mkPage('a', 1), true, 'puudub'));
+    await waitFor(() => expect(result.current.tp.pack?.proposal_id).toBe('p1'));
+    await waitFor(() => expect(svc.getReviewPage).toHaveBeenCalledWith('t', 'w1', 'p1', 't-001'));
   });
 });

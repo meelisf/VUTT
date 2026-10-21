@@ -736,6 +736,7 @@
     "jobError": "Accepting the batch failed: {{error}}",
     "alreadyRunning": "A batch is already being accepted for this work.",
     "error": "Action failed: {{error}}",
-    "handoffAll": "Code for agent (all works)"
+    "handoffAll": "Code for agent (all works)",
+    "packPagesGone": "The pack's pages are no longer in the work — the pack can be rejected."
   }
 }
