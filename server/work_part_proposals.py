@@ -119,20 +119,25 @@ def revoke_handoffs(username: str) -> int:
 ALL_WORKS = "*"   # ulatus „kõik teosed" (veerg on NOT NULL)
 
 
-def issue_handoff(work_id: str, work_dir: str, username: str, code: Optional[str] = None,
-                  all_works: bool = False) -> dict:
-    """Kood osade ettepanekuteks; `can_write_work` kontrollib router. `code` antakse
-    ette, kui sama kood registreeritakse ka tekstiettepanekutele (ühtne agendikood)."""
+def issue_handoff(username: str, code: Optional[str] = None, work_id: Optional[str] = None) -> dict:
+    """Kood osade ettepanekuteks; `work_id=None` = kõik teosed. Õiguse kontrollib
+    kutsuja. `code` antakse ette ühtse agendikoodi korral (`agent_proposals`)."""
     code = code or secrets.token_urlsafe(32)
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
         db.execute("INSERT INTO handoff VALUES (?, ?, ?, ?, ?, 0)",
-                   (hashlib.sha256(code.encode()).hexdigest(), ALL_WORKS if all_works else work_id,
+                   (hashlib.sha256(code.encode()).hexdigest(), work_id or ALL_WORKS,
                     username, now + CODE_TTL, MAX_USES))
-    return {"code": code, "expires_at": now + CODE_TTL, "max_uses": MAX_USES,
-            "work_id": None if all_works else work_id, "scope": "all" if all_works else "work",
-            "pages_version": pages_version(work_dir)}
+    return {"code": code, "expires_at": now + CODE_TTL, "max_uses": MAX_USES}
+
+
+def revoke_code(code: str) -> None:
+    """Kustutab ühe koodi räsi järgi (ühtse koodi kompensatsioon)."""
+    if not os.path.exists(DB_PATH):
+        return                   # ära loo andmebaasi
+    with _db() as db:
+        db.execute("DELETE FROM handoff WHERE code_hash=?", (hashlib.sha256(code.encode()).hexdigest(),))
 
 
 def _short(value, limit: int) -> bool:
@@ -435,6 +440,25 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
         out.append({"proposal_id": row["id"], "created_at": row["created_at"],
                     "expires_at": row["expires_at"], "pages_changed": row["pages_version"] != current,
                     "items": items, "persons": persons})
+    return out
+
+
+def list_pending_summary(username: str) -> list[dict]:
+    """Kasutaja otsustamata ettepanekud kõigis teostes (ülevaatuse loend). Teose
+    kausta ei loe — vananemise arvutab kutsuja `pages_version` järgi."""
+    now = int(time.time())
+    with _db() as db:
+        _clean(db, now)
+        rows = db.execute("SELECT * FROM proposal WHERE username=? ORDER BY created_at DESC",
+                          (username,)).fetchall()
+    out = []
+    for row in rows:
+        items, _ = _load(row["payload"])
+        pending = sum(1 for it in items if it["status"] == "pending")
+        if pending:
+            out.append({"proposal_id": row["id"], "work_id": row["work_id"],
+                        "created_at": row["created_at"], "pages_version": row["pages_version"],
+                        "pending": pending})
     return out
 
 

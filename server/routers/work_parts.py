@@ -108,9 +108,10 @@ def parts_handoff(work_id: str, body: dict = Body(default={}), user=Depends(requ
     if not allowed:
         raise HTTPException(status_code=429, detail="Liiga palju koode", headers={"Retry-After": str(retry)})
     path = _writable(work_id, user)
-    out = _wpp(wpp.issue_handoff, work_id, path, user["username"], None, scope == "all")
+    out = _wpp(wpp.issue_handoff, user["username"], None, None if scope == "all" else work_id)
     ptp.issue_handoff(None if scope == "all" else work_id, user["username"], code=out["code"])
-    return out
+    return {**out, "work_id": None if scope == "all" else work_id, "scope": scope,
+            "pages_version": wpp.pages_version(path)}
 
 
 @router.get("/works/{work_id}/parts/proposals")

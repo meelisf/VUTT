@@ -771,3 +771,24 @@ def test_sama_uus_fakt_teisel_real_on_loetelus_blokeeritud(client, login, prosop
     rows = _loetelu(client, token)[0]["items"]
     assert rows[0]["review_state"] == {"state": "applicable"}
     assert rows[1]["review_state"] == {"state": "blocked", "reason": "duplicate_entry"}
+
+
+# ── Ühtne agendikood /review-l (2026-10-20): hoidla primitiivid ──────────────
+
+def test_ette_antud_kood_tuhistus_ja_kokkuvote(monkeypatch):
+    from server.prosopography import person_crud
+    monkeypatch.setattr(person_crud, "get_person", lambda pid: {"updated_at": "t"})
+    h = proposals.issue_handoff(None, "superadmin", "fp", code="yks-kood")
+    assert h["code"] == "yks-kood" and h["max_uses"] == proposals.ANY_MAX_USES
+    proposals.submit("yks-kood", "vutt:Pabc", "t", [_item(), _item(raw_occupation="Pastor")])
+    (row,) = proposals.list_pending_summary("superadmin")
+    assert row["person_id"] == "vutt:Pabc" and row["pending"] == 2 and row["proposal_id"]
+    assert proposals.list_pending_summary("keegi") == []
+    proposals.revoke_code("yks-kood")
+    with pytest.raises(proposals.ProposalError, match="invalid_or_expired_handoff"):
+        proposals.submit("yks-kood", "vutt:Pabc", "t", [_item()])
+
+
+def test_tuhistus_ilma_andmebaasita_ei_loo_faili():
+    proposals.revoke_code("mis-iganes")
+    assert not os.path.exists(proposals.DB_PATH)

@@ -122,8 +122,8 @@ def proposal_lock(proposal_id: str):
 # ── Kood ──────────────────────────────────────────────────────────────────
 
 def issue_handoff(work_id: Optional[str], username: str, code: Optional[str] = None) -> dict:
-    """Kood agendile: üks teos või (`None`) kõik teosed. Õiguse kontrollib router.
-    Kood antakse teose halduses koos osade koodiga (`/works/{id}/parts/handoff`)."""
+    """Kood agendile: üks teos või (`None`) kõik teosed. Õiguse kontrollib kutsuja.
+    Kood antakse ühtse agendikoodina (`POST /agent-handoff`, `agent_proposals`)."""
     code = code or secrets.token_urlsafe(32)
     now = int(time.time())
     with _db() as db:
@@ -139,6 +139,14 @@ def revoke_handoffs(username: str) -> int:
         return 0
     with _db() as db:
         return db.execute("DELETE FROM handoff WHERE username=?", (username,)).rowcount
+
+
+def revoke_code(code: str) -> None:
+    """Kustutab ühe koodi räsi järgi (ühtse koodi kompensatsioon)."""
+    if not os.path.exists(DB_PATH):
+        return
+    with _db() as db:
+        db.execute("DELETE FROM handoff WHERE code_hash=?", (_digest(code),))
 
 
 def check_code(code: str, work_id: str) -> sqlite3.Row:

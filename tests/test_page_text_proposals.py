@@ -349,3 +349,18 @@ def test_slug_kanoniseeritakse_nanoidiks(work):
                                               "edits": [{"old": "vana", "new": "uus"}]}], "")
     assert res["work_id"] == "w1"
     assert [p["proposal_id"] for p in ptp.list_pending("w1")] == [res["proposal_id"]]
+
+
+# ── Ühtne agendikood /review-l (2026-10-20) ──────────────────────────────────
+
+def test_revoke_code(work):
+    ptp.issue_handoff(None, "su", code="k")
+    ptp.check_code("k", "w1")
+    ptp.revoke_code("k")
+    with pytest.raises(ptp.ProposalError):
+        ptp.check_code("k", "w1")
+
+
+def test_tuhistus_ilma_andmebaasita_ei_loo_faili(work):
+    ptp.revoke_code("mis-iganes")
+    assert not os.path.exists(ptp.DB_PATH)

@@ -50,7 +50,7 @@ LETTER = {"kind": "letter", "title": "Kiri Fischerile", "pages": [2, 3],
 
 
 def _submit(work, parts, version=None, code=None):
-    code = code or wpp.issue_handoff("w1", work, "ed")["code"]
+    code = code or wpp.issue_handoff("ed", work_id="w1")["code"]
     return wpp.submit(code, "w1", work, version or wpp.pages_version(work), parts)
 
 
@@ -74,7 +74,7 @@ def test_esitus_ei_muuda_teost_ja_numbrid_teisendatakse_tuvedeks(work):
     ({**LETTER, "id": "zzz"}, "invalid_part"),
 ])
 def test_vigane_osa_lukatakse_tagasi_ja_kood_ei_kulu(work, bad, code):
-    h = wpp.issue_handoff("w1", work, "ed")
+    h = wpp.issue_handoff("ed", work_id="w1")
     with pytest.raises(wpp.ProposalError, match=code):
         _submit(work, [bad], code=h["code"])
     assert _submit(work, [LETTER], code=h["code"])["status"] == "pending"
@@ -86,11 +86,11 @@ def test_lehtede_versioon_peab_klappima(work):
 
 
 def test_kood_kehtib_ainult_oma_teosele_ja_kasutuste_lagi(work, monkeypatch):
-    h = wpp.issue_handoff("w1", work, "ed")
+    h = wpp.issue_handoff("ed", work_id="w1")
     with pytest.raises(wpp.ProposalError, match="invalid_or_expired_handoff"):
         wpp.submit(h["code"], "w2", work, wpp.pages_version(work), [LETTER])
     monkeypatch.setattr(wpp, "MAX_USES", 1)
-    h2 = wpp.issue_handoff("w1", work, "ed")
+    h2 = wpp.issue_handoff("ed", work_id="w1")
     _submit(work, [LETTER], code=h2["code"])
     with pytest.raises(wpp.ProposalError, match="handoff_used_up"):
         _submit(work, [LETTER], code=h2["code"])
@@ -292,7 +292,7 @@ LETTER_REF = {**LETTER, "creators": [{"person_ref": "np1", "role": "addressee"},
 
 
 def _submit_p(work, parts, persons, code=None):
-    code = code or wpp.issue_handoff("w1", work, "ed")["code"]
+    code = code or wpp.issue_handoff("ed", work_id="w1")["code"]
     return wpp.submit(code, "w1", work, wpp.pages_version(work), parts, persons)
 
 
@@ -576,3 +576,35 @@ def test_kood_koigile_teostele(client, work, monkeypatch, tmp_path):
 
 def test_vale_ulatus_400(client):
     assert client.post("/works/w1/parts/handoff", json={"scope": "kõik"}).status_code == 400
+
+
+# ── Ühtne agendikood /review-l (2026-10-20): hoidla primitiivid ──────────────
+
+def test_yldkood_ilma_teoseta(work):
+    h = wpp.issue_handoff("ed")
+    assert set(h) == {"code", "expires_at", "max_uses"} and h["max_uses"] == wpp.MAX_USES
+    assert wpp.submit(h["code"], "w1", work, wpp.pages_version(work), [LETTER])["status"] == "pending"
+
+
+def test_ette_antud_kood_ja_tuhistus(work):
+    wpp.issue_handoff("ed", code="sama-kood")
+    wpp.revoke_code("sama-kood")
+    with pytest.raises(wpp.ProposalError, match="invalid_or_expired_handoff"):
+        _submit(work, [LETTER], code="sama-kood")
+
+
+def test_tuhistus_ilma_andmebaasita_ei_loo_faili(work):
+    import os
+    wpp.revoke_code("mis-iganes")
+    assert not os.path.exists(wpp.DB_PATH)
+
+
+def test_kokkuvote_kasutaja_kaupa(work):
+    _submit(work, [LETTER, POEM])
+    wpp.submit(wpp.issue_handoff("teine")["code"], "w1", work, wpp.pages_version(work), [LETTER])
+    (row,) = wpp.list_pending_summary("ed")
+    assert row["work_id"] == "w1" and row["pending"] == 2 and row["pages_version"] == wpp.pages_version(work)
+    wpp.decide(row["proposal_id"], "w1", work, "ed", 0, "reject")
+    assert wpp.list_pending_summary("ed")[0]["pending"] == 1
+    wpp.decide(row["proposal_id"], "w1", work, "ed", 1, "reject")
+    assert wpp.list_pending_summary("ed") == []
