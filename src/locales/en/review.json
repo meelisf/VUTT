@@ -94,6 +94,18 @@
   "proposals": {
     "title": "Agent proposals",
     "error": "Action failed: {{error}}",
-    "counts": "pending {{pending}}, stale {{stale}}"
+    "createCode": "Create agent code",
+    "codeHelp": "The code is valid for all works and persons: page text (up to {{text}} submissions), work parts (up to {{parts}}) and person records (up to {{persons}}). Give it to the agent.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "expires": "Expires",
+    "kind": {
+      "text": "Text",
+      "parts": "Parts",
+      "person": "Person"
+    },
+    "pending": "pending {{count}}",
+    "stale": "stale {{count}}",
+    "pagesChanged": "pages changed"
   }
 }
