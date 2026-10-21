@@ -23,7 +23,7 @@ import os
 import json
 import uuid
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
@@ -112,7 +112,7 @@ def create_notification(
     ``actor`` on valikuline dict kasutaja kohta (``{"username", "name"}``) —
     kasutatakse teatise ``actor_username`` ja ``actor_name`` väljade täitmiseks.
     """
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     notification = {
         "id": uuid.uuid4().hex,
         "type": notification_type,
