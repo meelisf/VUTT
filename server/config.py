@@ -298,9 +298,7 @@ RATE_LIMITS = {
     # Tõlge: võti on KASUTAJANIMI, mitte IP (pöördproksi tõttu jagaksid kõik
     # toimetajad ühte eelarvet). 60 tõlget tunnis kasutaja kohta.
     '/prosopography/translate': (60, 3600),
-    '/prosopography/enrichment-handoff': (30, 3600),
     '/prosopography/enrichment-proposal-submit': (30, 300),
-    '/works/parts-handoff': (30, 3600),
     # Ühtne agendikood /review-l (ADR 0058, 2026-10-20): võti on kasutajanimi.
     '/agent-handoff': (30, 3600),
     '/works/parts-proposals-submit': (30, 300),

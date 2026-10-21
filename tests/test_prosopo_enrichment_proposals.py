@@ -8,7 +8,11 @@ from server.prosopography import enrichment_proposals as proposals, registries
 
 @pytest.fixture(autouse=True)
 def proposal_db(tmp_path, monkeypatch):
+    from server import page_text_proposals, work_part_proposals
     monkeypatch.setattr(proposals, "DB_PATH", str(tmp_path / "proposals.sqlite3"))
+    # Ühtne kood (`/agent-handoff`) registreerib ka teksti- ja osade hoidlas.
+    monkeypatch.setattr(page_text_proposals, "DB_PATH", str(tmp_path / "ptp.sqlite3"))
+    monkeypatch.setattr(work_part_proposals, "DB_PATH", str(tmp_path / "wpp.sqlite3"))
 
 
 @pytest.fixture(autouse=True)
@@ -39,14 +43,18 @@ def _headers(token):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _kood(client, token):
+    """Ühtne agendikood (ADR 0058, 2026-10-20): ulatus kõik isikud."""
+    return client.post("/agent-handoff", headers=_headers(token)).json()["code"]
+
+
 def test_isikukood_lubab_mitu_esitust_ja_isikukaart_jaab_puutumata(client, login, prosopo_env):
     """#492: kood kehtib tööpäeva, lubab ulatuse piires mitu esitust kuni laeni."""
     before = prosopo_env.write("abc", occupations=[])
     token = login("superadmin", "superpass")
-    handoff = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
-                          headers=_headers(token))
+    handoff = client.post("/agent-handoff", headers=_headers(token))
     assert handoff.status_code == 200
-    assert handoff.json()["scope"] == "person" and handoff.json()["max_uses"] > 1
+    assert handoff.json()["max_uses"]["persons"] > 1
     code = handoff.json()["code"]
     body = {"code": code, "person_id": "vutt:Pabc",
             "base_updated_at": before["updated_at"], "items": [_item()]}
@@ -66,7 +74,8 @@ def test_isikukood_ei_kehti_teisele_isikule(client, login, prosopo_env):
     prosopo_env.write("abc")
     other = prosopo_env.write("oth")
     token = login("superadmin", "superpass")
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc", headers=_headers(token)).json()["code"]
+    # Isikukoodi enam ei väljastata, aga juba antud koodid kehtivad oma 8 h.
+    code = proposals.issue_handoff("vutt:Pabc", "superadmin", "fp", "t")["code"]
     assert client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Poth", "base_updated_at": other["updated_at"],
         "items": [_item()]}).status_code == 400
@@ -76,16 +85,16 @@ def test_uldkood_kehtib_koigile_isikutele_ja_kasutuste_lagi(client, login, proso
     a = prosopo_env.write("abc")
     b = prosopo_env.write("oth")
     token = login("superadmin", "superpass")
-    assert client.post("/prosopography/enrichment-handoff").status_code == 401
-    handoff = client.post("/prosopography/enrichment-handoff", headers=_headers(token))
-    assert handoff.status_code == 200 and handoff.json()["scope"] == "any"
+    assert client.post("/agent-handoff").status_code == 401
+    handoff = client.post("/agent-handoff", headers=_headers(token))
+    assert handoff.status_code == 200 and handoff.json()["max_uses"]["persons"] == proposals.ANY_MAX_USES
     code = handoff.json()["code"]
     for card in (a, b):
         assert client.post("/prosopography/enrichment-proposals/submit", json={
             "code": code, "person_id": card["id"], "base_updated_at": card["updated_at"],
             "items": [_item()]}).status_code == 200
     monkeypatch.setattr(proposals, "ANY_MAX_USES", 2)
-    code2 = client.post("/prosopography/enrichment-handoff", headers=_headers(token)).json()["code"]
+    code2 = _kood(client, token)
     body = {"code": code2, "person_id": a["id"], "base_updated_at": a["updated_at"], "items": [_item()]}
     assert client.post("/prosopography/enrichment-proposals/submit", json=body).status_code == 200
     assert client.post("/prosopography/enrichment-proposals/submit", json=body).status_code == 200
@@ -96,14 +105,12 @@ def test_uldkood_kehtib_koigile_isikutele_ja_kasutuste_lagi(client, login, proso
 def test_ettepanek_on_kasutaja_oma_mitte_seansi(client, login, prosopo_env):
     """#492: uus sisselogimine ei peida ootel ettepanekut; teine kasutaja ei näe."""
     prosopo_env.write("abc")
-    assert client.post("/prosopography/enrichment-handoff/vutt:Pabc").status_code == 401
+    assert client.post("/agent-handoff").status_code == 401
     contrib = login("contrib", "contribpass")
-    assert client.post("/prosopography/enrichment-handoff/vutt:Pabc",
-                       headers=_headers(contrib)).status_code == 401
+    assert client.post("/agent-handoff", headers=_headers(contrib)).status_code == 401
     token1 = login("superadmin", "superpass")
     token2 = login("superadmin", "superpass")
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
-                       headers=_headers(token1)).json()["code"]
+    code = _kood(client, token1)
     client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Pabc",
         "base_updated_at": "2026-01-01T00:00:00+00:00", "items": [_item()],
@@ -129,8 +136,7 @@ def test_ettepanek_on_kasutaja_oma_mitte_seansi(client, login, prosopo_env):
 def test_vigane_ettepanek_ei_kuluta_koodi(client, login, prosopo_env, change):
     prosopo_env.write("abc")
     token = login("superadmin", "superpass")
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
-                       headers=_headers(token)).json()["code"]
+    code = _kood(client, token)
     body = {"code": code, "person_id": "vutt:Pabc",
             "base_updated_at": "2026-01-01T00:00:00+00:00", "items": [_item()]}
     body.update(change)
@@ -144,8 +150,7 @@ def test_aegunud_kood_keeldub(client, login, prosopo_env, monkeypatch):
     prosopo_env.write("abc")
     token = login("superadmin", "superpass")
     monkeypatch.setattr(proposals.time, "time", lambda: 1000)
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
-                       headers=_headers(token)).json()["code"]
+    code = _kood(client, token)
     monkeypatch.setattr(proposals.time, "time", lambda: 1000 + proposals.CODE_TTL + 1)
     response = client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Pabc",
@@ -170,10 +175,9 @@ def test_ajutine_andmebaas_on_varundusele_loetav(tmp_path):
 def test_vigane_isiku_id_ja_suur_sisu_keelatakse(client, login, prosopo_env):
     prosopo_env.write("abc")
     token = login("superadmin", "superpass")
-    assert client.post("/prosopography/enrichment-handoff/%2E%2E",
-                       headers=_headers(token)).status_code == 400
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
-                       headers=_headers(token)).json()["code"]
+    with pytest.raises(proposals.ProposalError):
+        proposals.issue_handoff("..", "superadmin", "fp")
+    code = _kood(client, token)
     body = {"code": code, "person_id": "vutt:Pabc",
             "base_updated_at": "2026-01-01T00:00:00+00:00", "items": [_item()]}
     body["items"][0]["raw_occupation"] = "x" * proposals.MAX_BODY_BYTES
@@ -182,9 +186,7 @@ def test_vigane_isiku_id_ja_suur_sisu_keelatakse(client, login, prosopo_env):
 
 
 def _submit_for_review(client, token, card, items):
-    headers = _headers(token)
-    code = client.post(f'/prosopography/enrichment-handoff/{card["id"]}',
-                       headers=headers).json()["code"]
+    code = _kood(client, token)
     result = client.post('/prosopography/enrichment-proposals/submit', json={
         'code': code, 'person_id': card['id'], 'base_updated_at': card['updated_at'],
         'items': items,
@@ -481,8 +483,7 @@ def _uus_amet(**extra):
 def _esita(client, login, prosopo_env, items):
     card = prosopo_env.write("abc", occupations=[], education=[])
     token = login("superadmin", "superpass")
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc",
-                       headers=_headers(token)).json()["code"]
+    code = _kood(client, token)
     return client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Pabc", "base_updated_at": card["updated_at"],
         "items": items}), token
@@ -544,8 +545,7 @@ def test_toend_lubab_citationi():
 
 
 @pytest.mark.parametrize("method, path", [
-    ("post", "/prosopography/enrichment-handoff"),
-    ("post", "/prosopography/enrichment-handoff/vutt:Pabc"),
+    ("post", "/agent-handoff"),
     ("get", "/prosopography/enrichment-proposals/vutt:Pabc"),
     ("post", "/prosopography/enrichment-proposals/vutt:Pabc/apply"),
 ])
@@ -566,7 +566,7 @@ def test_review_state_kolm_olekut(client, login, prosopo_env, registrid):
     card = prosopo_env.write("abc", occupations=[
         {"label": "Feldprediger", "occupation_key": "kaplan", "id": "Q208762"}], education=[])
     token = login("superadmin", "superpass")
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc", headers=_headers(token)).json()["code"]
+    code = _kood(client, token)
     ev = [{"source_kind": "vutt_page", "work_id": "w1", "page": 3}]
     items = [
         {"kind": "occupation", "match_status": "already_present", "raw_occupation": "Feldprediger",
@@ -640,7 +640,7 @@ def test_registrikonflikt_parast_esitust_blokeerib_rea(registrid):
 def _esitatud(client, login, prosopo_env, items, **card):
     card = prosopo_env.write("abc", **{"occupations": [], "education": [], **card})
     token = login("superadmin", "superpass")
-    code = client.post("/prosopography/enrichment-handoff/vutt:Pabc", headers=_headers(token)).json()["code"]
+    code = _kood(client, token)
     submitted = client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Pabc", "base_updated_at": card["updated_at"],
         "items": items})
@@ -792,3 +792,11 @@ def test_ette_antud_kood_tuhistus_ja_kokkuvote(monkeypatch):
 def test_tuhistus_ilma_andmebaasita_ei_loo_faili():
     proposals.revoke_code("mis-iganes")
     assert not os.path.exists(proposals.DB_PATH)
+
+
+def test_vanad_isiku_koodiotspunktid_kadunud(client, login, prosopo_env):
+    prosopo_env.write("abc")
+    token = login("superadmin", "superpass")
+    assert client.post("/prosopography/enrichment-handoff", headers=_headers(token)).status_code in (404, 405)
+    assert client.post("/prosopography/enrichment-handoff/vutt:Pabc",
+                       headers=_headers(token)).status_code in (404, 405)

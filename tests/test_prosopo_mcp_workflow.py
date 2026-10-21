@@ -10,6 +10,9 @@ from server.prosopography import enrichment_proposals as proposals, registries
 @pytest.fixture(autouse=True)
 def proposal_db(tmp_path, monkeypatch):
     monkeypatch.setattr(proposals, "DB_PATH", str(tmp_path / "proposals.sqlite3"))
+    from server import page_text_proposals, work_part_proposals
+    monkeypatch.setattr(page_text_proposals, "DB_PATH", str(tmp_path / "ptp.sqlite3"))
+    monkeypatch.setattr(work_part_proposals, "DB_PATH", str(tmp_path / "wpp.sqlite3"))
 
 
 @pytest.mark.asyncio
@@ -76,8 +79,7 @@ async def test_mcp_ettepanekust_toimetaja_kinnitamiseni(
     institution_variant = json.loads(institution_match.content[0].text)["results"][0]["matched_variant"]
     assert (occupation_key, institution_key) == ("professor", "agc")
 
-    handoff = client.post(f'/prosopography/enrichment-handoff/{card["id"]}',
-                          headers={"Authorization": f"Bearer {token}"})
+    handoff = client.post('/agent-handoff', headers={"Authorization": f"Bearer {token}"})
     assert handoff.status_code == 200
     items = [
         {"kind": "occupation", "match_status": "matched", "raw_occupation": "Prof. theol.",

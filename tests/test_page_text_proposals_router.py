@@ -44,7 +44,7 @@ def client(work, monkeypatch):
 
 
 def _code(client, work_id="w1"):
-    # Kood antakse teose halduses (/works/{id}/parts/handoff) — siin otse moodulist.
+    # Kood antakse ühtse agendikoodina (/agent-handoff) — siin otse moodulist.
     return ptp.issue_handoff(work_id, "su")["code"]
 
 
