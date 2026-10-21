@@ -14,6 +14,7 @@ import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface DeletedWork {
   work_id: string;
@@ -187,7 +188,7 @@ const Trash: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {item.deleted_at
-                          ? new Date(item.deleted_at).toLocaleString('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                          ? parseServerDate(item.deleted_at).toLocaleString('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                           : t('trash.unknownDate')}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">

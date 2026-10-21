@@ -42,6 +42,7 @@ import AgentProposalsSection from './review/AgentProposalsSection';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { parseServerDate } from '../utils/formatDateTime';
 
 interface RecentCommit {
   commit_hash: string;
@@ -944,7 +945,7 @@ const Review: React.FC = () => {
                         <div className="col-span-2 flex items-center gap-2 text-sm text-gray-600">
                           <Clock size={14} className="text-gray-400 hidden sm:block" />
                           <span className="sm:hidden text-xs text-gray-400">{t('table.when')}:</span>
-                          {new Date(commit.date).toLocaleString('et-EE', {
+                          {parseServerDate(commit.date).toLocaleString('et-EE', {
                             day: '2-digit',
                             month: '2-digit',
                             year: 'numeric',

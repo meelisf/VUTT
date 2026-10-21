@@ -664,7 +664,7 @@ export async function mergePlaces(
 export async function fetchPersonHistory(
   personId: string,
   token: string | null
-): Promise<{ hash: string; full_hash: string; author: string; formatted_date: string; message: string; is_original: boolean }[]> {
+): Promise<{ hash: string; full_hash: string; author: string; date: string; formatted_date: string; message: string; is_original: boolean }[]> {
   const encoded = encodeURIComponent(personId);
   const resp = await fetchWithTimeout(`${BASE}/${encoded}/history`, {
     headers: getAuthHeaders(token),

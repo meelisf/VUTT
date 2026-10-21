@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Edit3, SquarePen, Trash2, X } from 'lucide-react';
 import type { TextAnnotation } from '../../types';
 import { extractHighlightedText } from '../../utils/annUtils';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface TextAnnotationsPanelProps {
   textAnnotations: TextAnnotation[];
@@ -87,7 +88,7 @@ const TextAnnotationsPanel: React.FC<TextAnnotationsPanelProps> = ({
                   <p className="text-gray-800 text-sm mb-2 leading-relaxed pr-5">{ann.comment}</p>
                   <div className="flex justify-between items-center text-xs text-gray-500">
                     <span className="font-semibold text-primary-700">{ann.author}</span>
-                    <span>{new Date(ann.created_at).toLocaleString('et-EE')}</span>
+                    <span>{parseServerDate(ann.created_at).toLocaleString('et-EE')}</span>
                   </div>
                   {!readOnly && (
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

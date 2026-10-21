@@ -15,13 +15,14 @@ import {
   sendNotification,
 } from '../services/notificationService';
 import { isSentNotification, notificationTitle } from '../utils/notificationText';
+import { parseServerDate } from '../utils/formatDateTime';
 import { isGroupSelected, RECIPIENT_GROUPS, shortenNames, toggleGroup } from '../utils/notificationGroups';
 
 // Teavitusi on kasutaja kohta kuni 200 (server kärbib), seega lehitsus käib kliendis.
 const NOTIFICATIONS_PER_PAGE = 20;
 
 const formatDate = (value: string) => {
-  const date = new Date(value);
+  const date = parseServerDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('et-EE', {
     day: '2-digit',

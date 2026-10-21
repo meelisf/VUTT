@@ -31,6 +31,7 @@ import { evidenceRef, evidenceWorkIds, type EvidenceRef } from '../utils/evidenc
 import type { EnrichmentEvidence } from '../services/prosopographyService';
 import { useWorkTitles } from '../hooks/useWorkTitles';
 import { quoteFilterValue } from '../../utils/filterUtils';
+import { formatDateTime } from '../../utils/formatDateTime';
 
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
 const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
@@ -322,7 +323,7 @@ const PersonDetailPage: React.FC = () => {
   // Isikutel juba kasutusel olevad märksõnad — soovitused märksõna-pickerile.
   const tagSuggestions = usePersonTagSuggestions(lang, canEdit, token);
 
-  const [history, setHistory] = useState<{ hash: string; full_hash: string; author: string; formatted_date: string; message: string; is_original: boolean }[]>([]);
+  const [history, setHistory] = useState<{ hash: string; full_hash: string; author: string; date: string; formatted_date: string; message: string; is_original: boolean }[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
@@ -907,7 +908,7 @@ const PersonDetailPage: React.FC = () => {
                           : <ChevronRight size={16} className="text-gray-400" />}
                       </button>
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <span className="text-xs text-gray-400 font-mono flex-shrink-0">{commit.formatted_date}</span>
+                        <span className="text-xs text-gray-400 font-mono flex-shrink-0">{formatDateTime(commit.date)}</span>
                         <span className="text-xs text-gray-500 flex-shrink-0">{commit.author}</span>
                         <span className="text-sm text-gray-700 truncate">{commit.message}</span>
                         {commit.is_original && (

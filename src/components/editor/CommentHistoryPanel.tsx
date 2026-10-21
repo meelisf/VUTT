@@ -6,6 +6,7 @@ import { canEditWork } from '../../utils/roleUtils';
 import { fetchCommentHistory, restoreComment, type CommentHistory } from '../../services/commentHistoryService';
 import { lineDiff } from '../../utils/lineDiff';
 import MarkdownView from '../MarkdownView';
+import { parseServerDate } from '../../utils/formatDateTime';
 
 interface CommentHistoryPanelProps {
   page: Page;
@@ -135,7 +136,7 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
                                   ))}
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-400 px-2 py-1 bg-white border-t border-gray-100">
-                                  <span>{v.author} · {new Date(v.timestamp).toLocaleString('et-EE')}</span>
+                                  <span>{v.author} · {parseServerDate(v.timestamp).toLocaleString('et-EE')}</span>
                                   <button
                                     onClick={() => doRestore('version', cid, v.commit_hash)}
                                     className="text-primary-600 hover:text-primary-800 font-medium"
@@ -168,7 +169,7 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
                           <MarkdownView content={d.text} softBreaks />
                         </div>
                         <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
-                          <span>{d.author} · {new Date(d.created_at).toLocaleString('et-EE')}</span>
+                          <span>{d.author} · {parseServerDate(d.created_at).toLocaleString('et-EE')}</span>
                           <button
                             onClick={() => doRestore('deleted', d.id, d.last_seen_commit)}
                             className="text-primary-600 hover:text-primary-800 font-medium"
