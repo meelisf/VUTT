@@ -107,6 +107,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
     yearInput: initialYear,
     collections: initialCollections,
   });
+  // Viimati laaditud/salvestatud vorm — nupp on oranž ainult salvestamata muudatusel
+  const [savedForm, setSavedForm] = useState(() => JSON.stringify(form));
+  const isDirty = JSON.stringify(form) !== savedForm;
 
   // Aasta-välja invariant (reegel 4): staging-meta laadimisel snap-shotitud algne
   // { year, year_display }. Kui kasutaja kuvastringi ei muuda, säilitatakse olemasolev
@@ -152,7 +155,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         existingYearRef.current = { year: metaYear, year_display: metaYearDisplay };
         if (!cancelled) {
           setMetaWorkId(typeof m.work_id === 'string' && m.work_id ? m.work_id : null);
-          setForm({
+          const loaded: MetaForm = {
             title: m.title || initialTitle,
             title_en: m.title_en ?? '',
             title_original: m.title_original ?? '',
@@ -174,7 +177,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             ester_id: m.ester_id ?? '',
             external_url: m.external_url ?? '',
             archive_refs: m.archive_refs ?? [],
-          });
+          };
+          setForm(loaded);
+          setSavedForm(JSON.stringify(loaded));
         }
       } catch {
         // Kasuta algväärtusi
@@ -232,6 +237,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
     setSaving(true);
     setSaveOk(false);
     setSaveError('');
+    const submitted = JSON.stringify(form);
 
     const { year, year_display } = deriveYearFields(form.yearInput, existingYearRef.current);
 
@@ -267,6 +273,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         }
       );
       if (r.ok) {
+        setSavedForm(submitted);
         setSaveOk(true);
         setTimeout(() => setSaveOk(false), 3000);
       } else {
@@ -619,7 +626,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         <button
           onClick={handleSave}
           disabled={saving || !form.title.trim()}
-          className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
+          className={`flex items-center gap-2 disabled:bg-gray-300 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors ${
+            isDirty ? 'bg-amber-500 hover:bg-amber-600' : 'bg-primary-600 hover:bg-primary-700'
+          }`}
         >
           {saving ? (
             <Loader2 size={15} className="animate-spin" />
