@@ -85,6 +85,7 @@ describe('EntityPicker — märksõnaväli otsib VUTT-i isikuid esmalt', () => {
   const lemcken = { id: 'vutt:Pcat1yo', label: 'Margaretha Lemcken', work_count: 0 };
 
   beforeEach(async () => {
+    mockUserRole = 'editor';
     const prosopo = await import('../../prosopography/services/prosopographyService');
     (prosopo.listPersons as any).mockReset().mockResolvedValue({ results: [lemcken] });
     const wikidataService = await import('../../services/wikidataService');
@@ -110,6 +111,28 @@ describe('EntityPicker — märksõnaväli otsib VUTT-i isikuid esmalt', () => {
     fireEvent.focus(screen.getByRole('textbox'));
     await screen.findByText('Lemcken (WD)');
     expect(screen.getAllByText('Margaretha Lemcken')).toHaveLength(1);
+  });
+
+  it('märksõnaväljal lülitit ei ole; „Lisa isik" ja laiendatud otsing on loendi lõpus', async () => {
+    const gnd = await import('../../services/gndService');
+    (gnd.searchGnd as any).mockResolvedValue([{ id: 'GND:123', label: 'Lemcken, Margaretha', description: '', url: '' }]);
+    render(<EntityPicker type="topic" value={null} onChange={vi.fn()} showPersonToggle token="t" />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Lemcken' } });
+    fireEvent.focus(screen.getByRole('textbox'));
+    await screen.findByText('Margaretha Lemcken');
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByText('entityPicker.extendedPersonSearch'));
+    expect(await screen.findByText('Lemcken, Margaretha')).toBeTruthy();
+    expect(gnd.searchGnd).toHaveBeenCalledWith('Lemcken');
+    fireEvent.click(screen.getByText('prosopography.panel.openButton'));
+    expect((await screen.findByTestId('panel')).dataset.query).toBe('Lemcken');
+  });
+
+  it('isikuväljal (vaikimisi isikuotsing) lüliti jääb', async () => {
+    render(<EntityPicker type="person" value="" onChange={vi.fn()} showPersonToggle defaultPersonSearch token="t" />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Lemcken' } });
+    fireEvent.focus(screen.getByRole('textbox'));
+    expect(await screen.findByRole('checkbox')).toBeTruthy();
   });
 
   it('isikulülitita väli (nt žanr) isikuregistrit ei päri', async () => {
