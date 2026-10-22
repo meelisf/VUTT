@@ -109,7 +109,7 @@ def revoke_handoffs(username: str) -> int:
 
 
 def issue_handoff(person_id: Optional[str], username: str, session_fingerprint: str,
-                  updated_at: str = "") -> dict:
+                  updated_at: str = "", code: Optional[str] = None) -> dict:
     """Esituskood ühele isikule (`person_id`) või kõigile isikutele (`None`).
 
     Editori rolli kontrollib router. Kood on seotud kasutajaga: ettepanekud näeb ja
@@ -119,7 +119,7 @@ def issue_handoff(person_id: Optional[str], username: str, session_fingerprint: 
     if (scope == "person" and not valid_person_id(person_id)) or not session_fingerprint:
         raise ProposalError("invalid_person_or_version")
     max_uses = PERSON_MAX_USES if scope == "person" else ANY_MAX_USES
-    code = secrets.token_urlsafe(32)
+    code = code or secrets.token_urlsafe(32)
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
@@ -131,6 +131,14 @@ def issue_handoff(person_id: Optional[str], username: str, session_fingerprint: 
         )
     return {"code": code, "expires_at": now + CODE_TTL, "scope": scope, "max_uses": max_uses,
             "person_id": person_id, "base_updated_at": updated_at}
+
+
+def revoke_code(code: str) -> None:
+    """Kustutab ühe koodi räsi järgi (ühtse koodi kompensatsioon)."""
+    if not os.path.exists(DB_PATH):
+        return
+    with _db() as db:
+        db.execute("DELETE FROM handoff WHERE code_hash=?", (hashlib.sha256(code.encode()).hexdigest(),))
 
 
 def _short_string(value, limit: int = 500) -> bool:
@@ -421,6 +429,21 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
                        "created_at": row["created_at"], "expires_at": row["expires_at"],
                        "items": items})
     return result
+
+
+def list_pending_summary(username: str) -> list[dict]:
+    """Kasutaja otsustamata ettepanekud kõigil isikutel (ülevaatuse loend). Kaarti
+    ei loe: read hinnatakse elava kaardi vastu alles isikuvormis."""
+    now = int(time.time())
+    with _db() as db:
+        _clean(db, now)
+        rows = db.execute(
+            "SELECT id, person_id, created_at, payload FROM proposal"
+            " WHERE username=? AND applied_at IS NULL ORDER BY created_at DESC", (username,),
+        ).fetchall()
+    # Otsustatud read eemaldab `_close_rows` — alles jäänud on otsustamata.
+    return [{"proposal_id": r["id"], "person_id": r["person_id"], "created_at": r["created_at"],
+             "pending": len(json.loads(r["payload"]))} for r in rows]
 
 
 def _registry_entry(filename: str, key: str) -> Optional[dict]:

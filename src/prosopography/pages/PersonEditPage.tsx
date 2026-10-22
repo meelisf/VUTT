@@ -68,7 +68,10 @@ const PersonEditPage: React.FC = () => {
   // Uue isiku voog algab isikupaneeliga (NewPersonStart); see lipp avab käsitsi tühja vormi.
   const [manualMode, setManualMode] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
-  const [occupOpen, setOccupOpen] = useState(false);
+  // `?agent=1` tuleb `/review` agendi ettepanekute loendist (ADR 0058, 2026-10-20):
+  // ametite plokk lahti ja agendipaneel nähtavale.
+  const agentFocus = searchParams.get('agent') === '1';
+  const [occupOpen, setOccupOpen] = useState(agentFocus);
   // Tõendiviidete teoste pealkirjad (ametite ja hariduse tõendite loend).
   const evidenceTitles = useWorkTitles(evidenceWorkIds([...draft.occupations, ...draft.education]), token);
   const [relOpen, setRelOpen] = useState(false);
@@ -125,6 +128,14 @@ const PersonEditPage: React.FC = () => {
       setDeleting(false);
     }
   };
+
+  // Agendipaneel renderdub alles kaardi laadimise järel — keri sinna üks kord.
+  const agentScrolledRef = useRef(false);
+  useEffect(() => {
+    if (!agentFocus || !original || agentScrolledRef.current) return;
+    agentScrolledRef.current = true;
+    document.getElementById('agent-enrichment')?.scrollIntoView({ block: 'start' });
+  }, [agentFocus, original]);
 
   // Suuna mitteeditor kasutaja tagasi
   useEffect(() => {

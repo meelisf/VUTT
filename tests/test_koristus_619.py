@@ -45,8 +45,8 @@ def test_kasutaja_kustutus_tuhistab_mcp_koodid(tmp_path, monkeypatch):
     monkeypatch.setattr(wpp, "DB_PATH", str(tmp_path / "wpp.sqlite3"))
     monkeypatch.setattr(ep, "DB_PATH", str(tmp_path / "ep.sqlite3"))
     d = tmp_path / "slug-w1"; d.mkdir()
-    wpp.issue_handoff("w1", str(d), "kadunud")
-    wpp.issue_handoff("w1", str(d), "teine")
+    wpp.issue_handoff("kadunud", work_id="w1")
+    wpp.issue_handoff("teine", work_id="w1")
     ep.issue_handoff(None, "kadunud", "s", "")
     auth._revoke_agent_handoffs("kadunud")
     with wpp._db() as db:

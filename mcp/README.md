@@ -96,14 +96,18 @@ Kolm asja, mis üllatavad:
 | `list_filter_values` | Legaalsed filtriväärtused |
 
 `get_person_enrichment_context` ei kärbi ameti- ega hariduskirjeid vaikselt:
-väga suure või vigase kaardi korral annab vea. `submit_person_enrichment_proposal`
-kasutab toimetaja autentitud `POST /api/files/prosopography/enrichment-handoff[/{person_id}]`
-kaudu loodud koodi (8 h, mitu esitust; ADR 0058 täiendus #492); ta talletab ainult ajutise
-ettepaneku. Ootel kirjed näeb sama kasutaja `GET /api/files/prosopography/enrichment-proposals/{person_id}`.
-`submit_work_parts_proposal` kasutab teose koodi (`POST /api/files/works/{id}/parts/handoff`);
-toimetaja otsustab osa kaupa teose halduse „Osad" vahekaardil.
-Koodi ei panda MCP seadistusse. Toimetaja loob koodi isikuvormi „Ametid ja
-haridus” jaotises, värskendab seal ootel ettepanekuid, valib vajadusel teise
+väga suure või vigase kaardi korral annab vea.
+
+**Agendikood on ÜKS** (ADR 0058 täiendus 2026-10-20): superadmin loob selle VUTT-i
+ülevaatuse lehel (`/review` → „Loo agendikood", `POST /api/files/agent-handoff`) ja
+sama kood kehtib `submit_person_enrichment_proposal`-ile, `submit_work_parts_proposal`-ile
+ning `get_page_source` / `submit_page_text_proposal`-ile — kõigis teostes ja kõigil
+isikutel, 8 h, iga liigi esituste lae piires. Tööriistad talletavad ainult ajutise
+ettepaneku. Kõik ootel ettepanekud on samal lehel ühes loendis
+(`GET /api/files/agent-proposals`); rida viib sinna, kus otsustatakse: lehe tekst
+redaktorisse, osad teose halduse „Osad" vahekaardile, isiku kirjed isikuvormi.
+Koodi ei panda MCP seadistusse. Toimetaja värskendab isikuvormi „Ametid ja
+haridus” jaotises ootel ettepanekuid, valib vajadusel teise
 registrivaste, parandab aja või allikakoha ning kinnitab valitud kirjed või
 lisab tõendi olemasolevale kirjele. Kinnitamine nõuab sama sessiooni
 ja värsket kaardiversiooni; MCP-le kinnitamise tööriista ei ole. Puuduva

@@ -50,7 +50,7 @@ LETTER = {"kind": "letter", "title": "Kiri Fischerile", "pages": [2, 3],
 
 
 def _submit(work, parts, version=None, code=None):
-    code = code or wpp.issue_handoff("w1", work, "ed")["code"]
+    code = code or wpp.issue_handoff("ed", work_id="w1")["code"]
     return wpp.submit(code, "w1", work, version or wpp.pages_version(work), parts)
 
 
@@ -74,7 +74,7 @@ def test_esitus_ei_muuda_teost_ja_numbrid_teisendatakse_tuvedeks(work):
     ({**LETTER, "id": "zzz"}, "invalid_part"),
 ])
 def test_vigane_osa_lukatakse_tagasi_ja_kood_ei_kulu(work, bad, code):
-    h = wpp.issue_handoff("w1", work, "ed")
+    h = wpp.issue_handoff("ed", work_id="w1")
     with pytest.raises(wpp.ProposalError, match=code):
         _submit(work, [bad], code=h["code"])
     assert _submit(work, [LETTER], code=h["code"])["status"] == "pending"
@@ -86,11 +86,11 @@ def test_lehtede_versioon_peab_klappima(work):
 
 
 def test_kood_kehtib_ainult_oma_teosele_ja_kasutuste_lagi(work, monkeypatch):
-    h = wpp.issue_handoff("w1", work, "ed")
+    h = wpp.issue_handoff("ed", work_id="w1")
     with pytest.raises(wpp.ProposalError, match="invalid_or_expired_handoff"):
         wpp.submit(h["code"], "w2", work, wpp.pages_version(work), [LETTER])
     monkeypatch.setattr(wpp, "MAX_USES", 1)
-    h2 = wpp.issue_handoff("w1", work, "ed")
+    h2 = wpp.issue_handoff("ed", work_id="w1")
     _submit(work, [LETTER], code=h2["code"])
     with pytest.raises(wpp.ProposalError, match="handoff_used_up"):
         _submit(work, [LETTER], code=h2["code"])
@@ -239,9 +239,9 @@ def client(work, monkeypatch):
 
 
 def test_otspunktide_voog(client, work):
-    h = client.post("/works/w1/parts/handoff").json()
+    # Kood tuleb ühtsest `/agent-handoff`-ist (testitud test_agent_proposals.py-s).
+    h = wpp.issue_handoff("ed")
     version = client.get("/works/w1/parts").json()["pages_version"]
-    assert h["pages_version"] == version
     r = client.post("/works/parts-proposals/submit", json={
         "code": h["code"], "work_id": "w1", "pages_version": version, "parts": [LETTER]})
     assert r.status_code == 200 and r.json()["parts"] == 1
@@ -252,9 +252,9 @@ def test_otspunktide_voog(client, work):
 
 
 def test_otspunkt_hulgikinnitus_meili_taustal(client, work):
-    h = client.post("/works/w1/parts/handoff").json()
+    h = wpp.issue_handoff("ed")
     client.post("/works/parts-proposals/submit", json={
-        "code": h["code"], "work_id": "w1", "pages_version": h["pages_version"], "parts": [LETTER, POEM]})
+        "code": h["code"], "work_id": "w1", "pages_version": wpp.pages_version(work), "parts": [LETTER, POEM]})
     (p,) = client.get("/works/w1/parts/proposals").json()
     CALLS.clear()
     r = client.post("/works/w1/parts/proposals/accept",
@@ -267,18 +267,16 @@ def test_otspunkt_hulgikinnitus_meili_taustal(client, work):
 
 def test_otspunktide_piirid(client, work):
     assert client.post("/works/parts-proposals/submit", json={"code": "x"}).status_code == 400
-    h = client.post("/works/w1/parts/handoff").json()
+    h = wpp.issue_handoff("ed")
     stale = client.post("/works/parts-proposals/submit", json={
         "code": h["code"], "work_id": "w1", "pages_version": "vana", "parts": [LETTER]})
     assert stale.status_code == 409 and stale.json()["detail"] == "stale_pages"
     client.state["write"] = False
-    assert client.post("/works/w1/parts/handoff").status_code == 403
     assert client.get("/works/w1/parts/proposals").status_code == 403
 
 
 def test_ettepanekud_ainult_superadminile(client):
     client.state["user"] = {"username": "ed", "role": "admin"}
-    assert client.post("/works/w1/parts/handoff").status_code == 403
     assert client.get("/works/w1/parts/proposals").status_code == 403
 
 
@@ -292,7 +290,7 @@ LETTER_REF = {**LETTER, "creators": [{"person_ref": "np1", "role": "addressee"},
 
 
 def _submit_p(work, parts, persons, code=None):
-    code = code or wpp.issue_handoff("w1", work, "ed")["code"]
+    code = code or wpp.issue_handoff("ed", work_id="w1")["code"]
     return wpp.submit(code, "w1", work, wpp.pages_version(work), parts, persons)
 
 
@@ -383,9 +381,9 @@ def test_vana_ettepanek_ilma_isikuteta_loetav(work):
 
 
 def test_isikute_otspunktid(client, work, created):
-    h = client.post("/works/w1/parts/handoff").json()
+    h = wpp.issue_handoff("ed")
     r = client.post("/works/parts-proposals/submit", json={
-        "code": h["code"], "work_id": "w1", "pages_version": h["pages_version"],
+        "code": h["code"], "work_id": "w1", "pages_version": wpp.pages_version(work),
         "parts": [LETTER_REF], "persons": [PERSON]})
     assert r.status_code == 200 and r.json()["persons"] == 1
     (p,) = client.get("/works/w1/parts/proposals").json()
@@ -547,32 +545,39 @@ def test_otsused_on_jarjestatud():
         assert getattr(fn, "__wrapped__", None) is not None, fn.__name__
 
 
-# ── Ühtne agendikood (#641 järg): üks kood teose halduses, osad + tekst ──────
+# ── Vana koodiotspunkt eemaldatud (kood on /review-l, ADR 0058 2026-10-20) ──
 
-def test_uks_kood_kehtib_osadele_ja_tekstile(client, work, monkeypatch, tmp_path):
-    from server import page_text_proposals as ptp
-    monkeypatch.setattr(ptp, "DB_PATH", str(tmp_path / "ptp.sqlite3"))
-    with open(f"{work}/t-001.txt", "w", encoding="utf-8") as f:
-        f.write("vana tekst\n")
-    h = client.post("/works/w1/parts/handoff", json={}).json()
-    assert h["scope"] == "work"
-    r = client.post("/works/parts-proposals/submit", json={
-        "code": h["code"], "work_id": "w1", "pages_version": h["pages_version"], "parts": [LETTER]})
-    assert r.status_code == 200
-    src = ptp.read_source(h["code"], "w1", work, 1)
-    assert src["text"] == "vana tekst\n"
+def test_vanad_koodiotspunktid_kadunud(client):
+    assert client.post("/works/w1/parts/handoff").status_code in (404, 405)
 
 
-def test_kood_koigile_teostele(client, work, monkeypatch, tmp_path):
-    from server import page_text_proposals as ptp
-    monkeypatch.setattr(ptp, "DB_PATH", str(tmp_path / "ptp.sqlite3"))
-    h = client.post("/works/w1/parts/handoff", json={"scope": "all"}).json()
-    assert h["scope"] == "all" and h["work_id"] is None
-    # Teise teose osade ettepanek sama koodiga: kood kehtib, peatab alles versioon.
-    with pytest.raises(wpp.ProposalError, match="stale_pages"):
-        wpp.submit(h["code"], "muu", work, "vale-versioon", [LETTER])
-    assert ptp.check_code(h["code"], "suvaline")["work_id"] is None
+# ── Ühtne agendikood /review-l (2026-10-20): hoidla primitiivid ──────────────
+
+def test_yldkood_ilma_teoseta(work):
+    h = wpp.issue_handoff("ed")
+    assert set(h) == {"code", "expires_at", "max_uses"} and h["max_uses"] == wpp.MAX_USES
+    assert wpp.submit(h["code"], "w1", work, wpp.pages_version(work), [LETTER])["status"] == "pending"
 
 
-def test_vale_ulatus_400(client):
-    assert client.post("/works/w1/parts/handoff", json={"scope": "kõik"}).status_code == 400
+def test_ette_antud_kood_ja_tuhistus(work):
+    wpp.issue_handoff("ed", code="sama-kood")
+    wpp.revoke_code("sama-kood")
+    with pytest.raises(wpp.ProposalError, match="invalid_or_expired_handoff"):
+        _submit(work, [LETTER], code="sama-kood")
+
+
+def test_tuhistus_ilma_andmebaasita_ei_loo_faili(work):
+    import os
+    wpp.revoke_code("mis-iganes")
+    assert not os.path.exists(wpp.DB_PATH)
+
+
+def test_kokkuvote_kasutaja_kaupa(work):
+    _submit(work, [LETTER, POEM])
+    wpp.submit(wpp.issue_handoff("teine")["code"], "w1", work, wpp.pages_version(work), [LETTER])
+    (row,) = wpp.list_pending_summary("ed")
+    assert row["work_id"] == "w1" and row["pending"] == 2 and row["pages_version"] == wpp.pages_version(work)
+    wpp.decide(row["proposal_id"], "w1", work, "ed", 0, "reject")
+    assert wpp.list_pending_summary("ed")[0]["pending"] == 1
+    wpp.decide(row["proposal_id"], "w1", work, "ed", 1, "reject")
+    assert wpp.list_pending_summary("ed") == []

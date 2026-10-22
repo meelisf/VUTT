@@ -402,51 +402,8 @@ _ALLOWED_CREATED_VIA = ("picker", "form")
 
 
 # Agendi rikastuse töövoog on ainult superadminil, kuni see on silutud (spekk
-# 2026-09-28). Rolli langetamine = need viis otspunkti (kaks koodi, loetelu,
-# apply, reject) + paneeli nähtavus PersonEditPage'is.
-@router.post("/enrichment-handoff")
-async def prosopography_enrichment_handoff_any(
-    request: Request, user=Depends(require_role("superadmin")),
-):
-    """Kood kõigi isikute ettepanekuteks (#492): tööpäev, piiratud esituste arv."""
-    allowed, retry_after = check_rate_limit(
-        user["username"], '/prosopography/enrichment-handoff')
-    if not allowed:
-        raise HTTPException(status_code=429, detail="Liiga palju üleandmisi",
-                            headers={"Retry-After": str(retry_after)})
-    try:
-        return await run_in_threadpool(
-            enrichment_proposals.issue_handoff, None, user["username"],
-            request.state.session_fingerprint,
-        )
-    except enrichment_proposals.ProposalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/enrichment-handoff/{person_id}")
-async def prosopography_enrichment_handoff(
-    person_id: str, request: Request, user=Depends(require_role("superadmin")),
-):
-    """Ühe isiku esituskood (#492: tööpäev, mitu esitust, seotud kasutajaga)."""
-    if not enrichment_proposals.valid_person_id(person_id):
-        raise HTTPException(status_code=400, detail="Vigane person_id")
-    allowed, retry_after = check_rate_limit(
-        user["username"], '/prosopography/enrichment-handoff')
-    if not allowed:
-        raise HTTPException(status_code=429, detail="Liiga palju üleandmisi",
-                            headers={"Retry-After": str(retry_after)})
-    person = await run_in_threadpool(get_person, person_id)
-    if person is None or person.get("record_status") == "tombstone" or person.get("merged_into"):
-        raise HTTPException(status_code=404, detail="Isikut ei leitud")
-    try:
-        return await run_in_threadpool(
-            enrichment_proposals.issue_handoff, person_id, user["username"],
-            request.state.session_fingerprint, person["updated_at"],
-        )
-    except enrichment_proposals.ProposalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
+# 2026-09-28). Rolli langetamine = need kolm otspunkti (loetelu, apply, reject),
+# ühtne kood (`/agent-handoff`, ADR 0058 2026-10-20) + paneeli nähtavus PersonEditPage'is.
 @router.get("/enrichment-proposals/{person_id}")
 async def prosopography_enrichment_proposals(
     person_id: str, request: Request, user=Depends(require_role("superadmin")),

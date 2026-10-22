@@ -82,12 +82,6 @@ export interface PartProposal {
   pages_changed: boolean; items: PartProposalItem[]; persons?: ProposedPerson[];
 }
 /** Ühtne agendikood (#641): kehtib osade JA lehe teksti ettepanekutele. */
-export interface PartsHandoff {
-  code: string; expires_at: number; max_uses: number; work_id: string | null; scope: 'work' | 'all'; pages_version: string;
-}
-
-export const createPartsHandoff = (workId: string, token: string | null, scope: 'work' | 'all' = 'work') =>
-  apiPost<PartsHandoff>(`${base(workId)}/handoff`, { scope }, opts(token));
 export async function listPartProposals(workId: string, token: string | null): Promise<PartProposal[]> {
   return apiGet<PartProposal[]>(`${base(workId)}/proposals`, opts(token));
 }

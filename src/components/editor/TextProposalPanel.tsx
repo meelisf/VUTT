@@ -8,6 +8,8 @@ interface TextProposalPanelProps {
   review: ProposalPageReview | null;
   pack: TextProposalPack | null;
   pendingNotLoaded: boolean;
+  /** `?proposal=` pakk, mille ükski ülevaatust vajav leht ei ole enam teoses. */
+  packPagesGone: boolean;
   loaded: boolean;
   job: ProposalJob | null;
   error: string | null;
@@ -86,6 +88,7 @@ export default function TextProposalPanel(p: TextProposalPanelProps) {
         </div>
       </div>
 
+      {p.packPagesGone && <div className="text-amber-800">{t('proposal.packPagesGone')}</div>}
       {p.pack?.note && <div>{t('proposal.packNote', { note: p.pack.note })}</div>}
       {p.review?.note && <div>{t('proposal.pageNote', { note: p.review.note })}</div>}
       {p.loaded && <div>{t('proposal.loaded')}</div>}

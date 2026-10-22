@@ -141,6 +141,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     hasUnsavedChanges, setSavedState, setComments, setTextAnnotations, setPageTags, setIsDirty,
     runGuarded, navigateToPage: onNavigateToPage, navigateAfterSave: onNavigateAfterSave,
     onPageRefreshedRef: pageRefreshedRef, saveWithDraftsRef,
+    preferredProposalId: searchParams.get('proposal'),
   });
   const proposalRefRef = useRef(proposal.activeRef);
   proposalRefRef.current = proposal.activeRef;
@@ -340,6 +341,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             review={proposal.review}
             pack={proposal.pack}
             pendingNotLoaded={proposal.pendingNotLoaded}
+            packPagesGone={proposal.packPagesGone}
             loaded={proposal.loaded}
             job={proposal.job}
             error={proposal.error}

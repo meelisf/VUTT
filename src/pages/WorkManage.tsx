@@ -86,7 +86,7 @@ const WorkManage: React.FC = () => {
 
   // „Osad" on esimene ja vaikimisi aktiivne (#464): lehtede haldus on teisejärguline,
   // sest põhitöö (poolitus jms) tehakse juba sisestamisel.
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => initialManageTab(focus));
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => initialManageTab(focus, searchParams.get('tab')));
   const [partsDirty, setPartsDirty] = useState(false);
   const partsSaveRef = useRef<() => Promise<boolean>>(async () => true);
   const [pages, setPages] = useState<PageInfo[]>([]);

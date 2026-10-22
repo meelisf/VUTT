@@ -44,6 +44,8 @@ interface UseTextProposalParams {
   /** `handlePageRestored` (useEditorSave luuakse hiljem, seega ref). */
   onPageRefreshedRef: MutableRefObject<((r: RestoreResult) => void) | null>;
   saveWithDraftsRef: MutableRefObject<(() => Promise<boolean>) | null>;
+  /** `?proposal=` (`/review` link): see pakk võidab, kui ta on teose ootel pakkide seas. */
+  preferredProposalId?: string | null;
   pollMs?: number;
 }
 
@@ -55,7 +57,8 @@ export const pageStem = (page: Page) => pageFileFromImageUrl(page.image_url || '
 export function useTextProposal({
   page, viewRef, enabled, token, hasUnsavedChanges,
   setSavedState, setComments, setTextAnnotations, setPageTags, setIsDirty,
-  runGuarded, navigateToPage, navigateAfterSave, onPageRefreshedRef, saveWithDraftsRef, pollMs = 1500,
+  runGuarded, navigateToPage, navigateAfterSave, onPageRefreshedRef, saveWithDraftsRef,
+  preferredProposalId = null, pollMs = 1500,
 }: UseTextProposalParams) {
   const [job, setJob] = useState<ProposalJob | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +66,7 @@ export function useTextProposal({
   const [review, setReview] = useState<ProposalPageReview | null>(null);
   const [pendingNotLoaded, setPendingNotLoaded] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [packPagesGone, setPackPagesGone] = useState(false);
   const tokenRef = useRef(token);
   tokenRef.current = token;
   const dirtyRef = useRef(hasUnsavedChanges);
@@ -73,6 +77,13 @@ export function useTextProposal({
 
   const workId = page.work_id;
   const stem = pageStem(page);
+  // Eelistus elab ref'is koos teosega: lehepööre kaotab `?proposal=` URL-ist, aga
+  // hook ei remount'u (ADR 0010) — eelistus püsib sama teose sees, teine teos lähtestab.
+  const preferredRef = useRef<{ workId: string; id: string } | null>(null);
+  if (preferredProposalId) preferredRef.current = { workId, id: preferredProposalId };
+  const preferredId = preferredRef.current?.workId === workId ? preferredRef.current.id : null;
+  const choosePack = useCallback((packs: TextProposalPack[]) =>
+    packs.find(p => p.proposal_id === preferredId) ?? packs[0] ?? null, [preferredId]);
 
   const apply = useCallback((r: ProposalPageReview) => {
     const view = viewRef.current;
@@ -104,8 +115,24 @@ export function useTextProposal({
     if (!enabled || !t || !workId) return;
     const packs = await listPacks(t, workId).catch(() => [] as TextProposalPack[]);
     if (pageIdRef.current !== forPage) return;
-    const own = packs.find(p => p.pages.some(pg => pg.stem === stem && REVIEW_STATES.has(pg.state))) ?? null;
-    setPack(own ?? packs[0] ?? null);
+    const hasStem = (p: TextProposalPack) => p.pages.some(pg => pg.stem === stem && REVIEW_STATES.has(pg.state));
+    const preferred = packs.find(p => p.proposal_id === preferredId) ?? null;
+    let own: TextProposalPack | null;
+    if (preferred) {
+      // Paki nupud ja redaktori sisu peavad kuuluma SAMALE pakile: teise paki lehte ei laadita.
+      setPack(preferred);
+      own = hasStem(preferred) ? preferred : null;
+      if (!own) {
+        const first = preferred.pages.find(pg => REVIEW_STATES.has(pg.state));
+        if (!first) return;
+        const r = await getReviewPage(t, workId, preferred.proposal_id, first.stem).catch(() => null);
+        if (r && r.page === null && pageIdRef.current === forPage) setPackPagesGone(true);
+        return;
+      }
+    } else {
+      own = packs.find(hasStem) ?? null;
+      setPack(own ?? packs[0] ?? null);
+    }
     if (!own) return;
     const r = await getReviewPage(t, workId, own.proposal_id, stem).catch(() => null);
     if (!r || pageIdRef.current !== forPage) return;
@@ -114,7 +141,7 @@ export function useTextProposal({
       if (dirtyRef.current) setPendingNotLoaded(true);
       else apply(r);
     }
-  }, [enabled, page.id, workId, stem, apply]);
+  }, [enabled, page.id, workId, stem, apply, preferredId]);
 
   useEffect(() => {
     setPack(null);
@@ -122,6 +149,7 @@ export function useTextProposal({
     setError(null);
     setLoaded(false);
     setPendingNotLoaded(false);
+    setPackPagesGone(false);
     clearDiff();
     void load();
     // Ainult lehe vahetus (ADR 0060): token/kasutaja uuendus ei laadi uuesti.
@@ -167,8 +195,8 @@ export function useTextProposal({
     setLoaded(false);
     setPendingNotLoaded(false);
     const t2 = tokenRef.current;
-    if (t2 && workId) setPack((await listPacks(t2, workId).catch(() => []))[0] ?? null);
-  }, [review, loaded, viewRef, setIsDirty, clearDiff, workId]);
+    if (t2 && workId) setPack(choosePack(await listPacks(t2, workId).catch(() => [])));
+  }, [review, loaded, viewRef, setIsDirty, clearDiff, workId, choosePack]);
 
   /** Pärast edukat salvestust viitega: ettepanek on otsustatud, diff välja. */
   const afterSave = useCallback(async () => {
@@ -176,8 +204,8 @@ export function useTextProposal({
     setReview(null);
     setLoaded(false);
     const t = tokenRef.current;
-    if (t && workId) setPack((await listPacks(t, workId).catch(() => []))[0] ?? null);
-  }, [clearDiff, workId]);
+    if (t && workId) setPack(choosePack(await listPacks(t, workId).catch(() => [])));
+  }, [clearDiff, workId, choosePack]);
 
   // Ülevaatust vajavad lehed teose järjekorras; praegune leht välja jäetud.
   const others = (pack?.pages ?? []).filter(pg => REVIEW_STATES.has(pg.state) && pg.stem !== stem);
@@ -284,7 +312,7 @@ export function useTextProposal({
   }, [pack, workId, viewRef, loaded, review, setIsDirty, clearDiff, load]);
 
   return {
-    pack, review, pendingNotLoaded, loaded, activeRef, job, error,
+    pack, review, pendingNotLoaded, packPagesGone, loaded, activeRef, job, error,
     loadIntoEditor, reject, rejectPack, acceptPack, saveAndNext, next, prev, afterSave, reload: load,
   };
 }
