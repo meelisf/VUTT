@@ -282,7 +282,10 @@
   "entityPicker": {
     "viewPersonProfile": "Vaata isiku profiili",
     "viewInDatabase": "Vaata andmebaasis",
-    "prosopographySource": "Prosopograafia"
+    "prosopographySource": "Prosopograafia",
+    "extendedPersonSearch": "Laiendatud isikuotsing (Wikidata / GND / VIAF)…",
+    "extendedPersonSearchActive": "Laiendatud isikuotsing",
+    "backToKeywordSearch": "← Tagasi märksõnaotsingule"
   },
   "dating": {
     "label": "Dateering",

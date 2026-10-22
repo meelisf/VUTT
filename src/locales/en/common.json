@@ -282,7 +282,10 @@
   "entityPicker": {
     "viewPersonProfile": "View person profile",
     "viewInDatabase": "View in external database",
-    "prosopographySource": "Prosopography"
+    "prosopographySource": "Prosopography",
+    "extendedPersonSearch": "Extended person search (Wikidata / GND / VIAF)…",
+    "extendedPersonSearchActive": "Extended person search",
+    "backToKeywordSearch": "← Back to keyword search"
   },
   "dating": {
     "label": "Date",

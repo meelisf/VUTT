@@ -185,14 +185,23 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Märksõnaväli (isikulüliti olemas, aga väljas): VUTT-i isikud otsitakse
-  // ikkagi kaasa ja näidatakse Wikidata vastete ees — lülitit on kerge
-  // märkamata jätta ja isik jäi siis üldse leidmata.
-  const mixedPersonSearch = showPersonToggle && !isPersonSearch;
+  // Märksõnaväli (isikutugi, aga vaikimisi märksõnaotsing): VUTT-i isikud
+  // otsitakse alati kaasa ja näidatakse Wikidata vastete ees. Lülitit siin ei
+  // ole — seda oli kerge märkamata jätta; isikurežiimi (GND/VIAF, „Lisa isik")
+  // viivad loendi lõpu nupud ja see kestab ainult kuni rippmenüü sulgumiseni.
+  const isTagField = showPersonToggle && !defaultPersonSearch;
+  const mixedPersonSearch = isTagField && !isPersonSearch;
   const mixedProsopo = mixedPersonSearch ? prosopoResults : [];
   // Kohalikes soovitustes võib sama isik juba olla (teiselt teoselt lisatud) — ära näita kaks korda
   const mixedIds = new Set(mixedProsopo.map(p => p.id));
   const topicSuggestions = mixedIds.size ? suggestions.filter(s => !mixedIds.has(s.id)) : suggestions;
+
+  useEffect(() => {
+    if (isTagField && !showSuggestions) {
+      setIsPersonSearch(false);
+      setShowExternalSearch(false);
+    }
+  }, [isTagField, showSuggestions]);
 
   // Prosopograafia otsing (person-režiimis ja märksõnaväljal)
   useEffect(() => {
@@ -548,6 +557,12 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   const entitySource = value && typeof value !== 'string' ? value.source : undefined;
   const entityUrl = entityId?.startsWith('vutt:P') ? null : getEntityUrl(entityId, entitySource);
 
+  const openExtendedPersonSearch = () => {
+    setIsPersonSearch(true);
+    setShowExternalSearch(true);
+    setSelectedIndex(0);
+  };
+
   const togglePersonSearch = () => {
     setIsPersonSearch(p => !p);
     setShowExternalSearch(false);
@@ -659,7 +674,19 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden max-h-80 flex flex-col">
 
           {/* Person-toggle */}
-          {showPersonToggle && (
+          {isTagField && isPersonSearch && (
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border-b border-gray-100"
+              onMouseDown={(e) => { e.preventDefault(); justSelectedRef.current = true; }}
+            >
+              <User size={11} className="text-blue-600" />
+              <span className="text-[11px] font-medium text-blue-700">{t('entityPicker.extendedPersonSearchActive')}</span>
+              <button type="button" onClick={togglePersonSearch} className="ml-auto text-[11px] text-gray-500 hover:text-gray-800">
+                {t('entityPicker.backToKeywordSearch')}
+              </button>
+            </div>
+          )}
+          {showPersonToggle && !isTagField && (
             <div
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border-b border-gray-100"
               onMouseDown={(e) => { e.preventDefault(); justSelectedRef.current = true; }}
@@ -846,6 +873,30 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                     </div>
                   );
                 })}
+
+                {/* Märksõnaväljal: laiendatud isikuotsing ja uue isiku lisamine */}
+                {isTagField && (
+                  <button
+                    type="button"
+                    onMouseDown={() => { justSelectedRef.current = true; }}
+                    onClick={openExtendedPersonSearch}
+                    className="w-full px-4 py-2.5 text-left flex items-center gap-2 text-gray-500 hover:bg-gray-50 border-b border-gray-100 text-xs"
+                  >
+                    <Users size={12} className="text-indigo-400 shrink-0" />
+                    <span>{t('entityPicker.extendedPersonSearch')}</span>
+                  </button>
+                )}
+                {isTagField && canCreatePerson && (
+                  <button
+                    type="button"
+                    onMouseDown={() => { justSelectedRef.current = true; }}
+                    onClick={() => setPersonPanel({})}
+                    className="w-full px-4 py-2.5 flex items-center gap-2 text-gray-500 hover:bg-green-50 hover:text-green-700 text-xs transition-colors border-b border-gray-100"
+                  >
+                    <UserPlus size={12} className="text-green-500 shrink-0" />
+                    <span>{t('prosopography.panel.openButton')}</span>
+                  </button>
+                )}
 
                 {/* Käsitsi sisestus */}
                 <button
