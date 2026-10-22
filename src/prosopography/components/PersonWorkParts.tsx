@@ -24,7 +24,7 @@ const PersonWorkParts: React.FC<Props> = ({ workId, parts, linked }) => {
           part?.pages.length ? t('network.pages', { pages: compactNumbers(part.pages) }) : null,
         ].filter(Boolean).join(' · ');
         const roleLabel = roles.map(r => t(`workspace:metadata.roles.${r}`, { defaultValue: r })).join(', ');
-        const label = <span className="truncate">{bits || part_id}</span>;
+        const label = <span className="truncate" title={bits || part_id}>{bits || part_id}</span>;
         return (
           <li key={part_id} className="flex items-center justify-between gap-3 py-0.5 text-xs">
             {linked
