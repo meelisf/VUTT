@@ -13,6 +13,7 @@ import time
 from ..config import BASE_DIR, OCR_SERVER_PATH, get_logger
 from ..macron import convert_ocr_text
 from ..marginalia_normalize import normalize_marginalia_tags
+from ..metadata_ops import normalize_title_fields
 from ..utils import generate_nanoid, derive_year_fields
 from .file_detection import extract_page_num, page_base_name
 from .state import get_upload_lock, read_state, write_state
@@ -438,6 +439,8 @@ def _teosta_import(
     # Puudumine = false (ADR 0064) — `false`-i ei kirjutata.
     if meta.get("title_devised") is True:
         metadata["title_devised"] = True
+    # Pealkirjaväljad trimmitud nagu vormisalvestusel (kopeeritud pealkirja ees tühik)
+    normalize_title_fields(metadata)
     # tags ja creators peavad alati olemas olema (tühi list kui puudub)
     metadata.setdefault("tags", [])
     metadata.setdefault("creators", [])
