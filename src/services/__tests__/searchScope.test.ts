@@ -97,3 +97,19 @@ describe('kitsamad ulatused jäävad kitsaks', () => {
     expect(searchedFields()).toContain('text_annotations_text');
   });
 });
+
+// Akordion („Näita veel N vastet") laadib teose vasted searchWorkHits-iga.
+// Loendur N tuleb põhiotsingu work_id facetist — kui sobitusreegel erineb,
+// lubab loendur vasteid, mida akordion ei leia (avanes tühjana).
+describe('sisuotsingu sobitusreegel on kõigis päringutes sama', () => {
+  it('põhiotsingu kõik päringud, teose piires otsing ja akordion', async () => {
+    await searchContent(mockIndex, 'Auseen rector');
+    await searchContent(mockIndex, 'Auseen rector', 1, { workId: 'work1' });
+    await searchWorkHits(mockIndex, 'Auseen rector', 'work1');
+    const strategies = mockSearch.mock.calls
+      .filter(([q]) => q)
+      .map(([, params]) => params.matchingStrategy);
+    expect(strategies.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(strategies)).toEqual(new Set(['frequency']));
+  });
+});

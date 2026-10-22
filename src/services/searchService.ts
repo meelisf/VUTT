@@ -682,6 +682,12 @@ async function fetchWorkLevelFacets(
 // Täisteksti otsing
 // Kui workId on määratud - otsib ainult sellest teosest (kõik vasted, ilma distinct'ita)
 // Muidu - tagastab 10 teost (distinct), iga teose kohta 1 esinduslik vaste
+// Sisuotsingu sobitusreegel — PEAB olema sama põhiotsingus (ka teose
+// vastete loenduris), teose piires otsingus ja akordionis (searchWorkHits).
+// Põhiotsingust puudus see ja Meili vaikimisi 'last' andis loenduri
+// („Näita veel 42 vastet"), millele akordioni 'frequency' leidis 0 lehte.
+const CONTENT_MATCHING_STRATEGY = 'frequency' as unknown as MatchingStrategies;
+
 export const searchContent = async (index: Index, rawQuery: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
   checkMixedContent();
   const query = normalizeSearchQuery(rawQuery);
@@ -755,7 +761,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
         highlightPreTag: HIGHLIGHT_PRE_TAG,
         highlightPostTag: HIGHLIGHT_POST_TAG,
         attributesToSearchOn: attributesToSearchOn,
-        matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies
+        matchingStrategy: (query ? CONTENT_MATCHING_STRATEGY : 'last') as unknown as MatchingStrategies
       }, requestConfig);
 
       const totalHits = response.estimatedTotalHits || 0;
@@ -860,7 +866,8 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
           attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
           highlightPreTag: HIGHLIGHT_PRE_TAG,
           highlightPostTag: HIGHLIGHT_POST_TAG,
-          attributesToSearchOn: attributesToSearchOn
+          attributesToSearchOn: attributesToSearchOn,
+          matchingStrategy: CONTENT_MATCHING_STRATEGY
         }, requestConfig),
         // Päring 2: Lehekülgede arvud teoste kaupa (work_id facet).
         // Sama päring annab ka kõigi vastavate teoste ID-d ja täpsed koguarvud.
@@ -868,7 +875,8 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
           filter,
           limit: 0,
           facets: ['work_id'],
-          attributesToSearchOn: attributesToSearchOn
+          attributesToSearchOn: attributesToSearchOn,
+          matchingStrategy: CONTENT_MATCHING_STRATEGY
         }, requestConfig)
       ]);
 
@@ -954,7 +962,7 @@ export const searchWorkHits = async (index: Index, rawQuery: string, workId: str
       highlightPostTag: HIGHLIGHT_POST_TAG,
       sort: ['lehekylje_number:asc'],
       attributesToSearchOn: attributesToSearchOn,
-      matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies
+      matchingStrategy: (query ? CONTENT_MATCHING_STRATEGY : 'last') as unknown as MatchingStrategies
     });
 
     return response.hits.map(normalizeContentSearchHit);
