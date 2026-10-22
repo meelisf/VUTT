@@ -80,3 +80,44 @@ describe('EntityPicker — kohalikud soovitused', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'Q13972', label: 'Tartu' })));
   });
 });
+
+describe('EntityPicker — märksõnaväli otsib VUTT-i isikuid esmalt', () => {
+  const lemcken = { id: 'vutt:Pcat1yo', label: 'Margaretha Lemcken', work_count: 0 };
+
+  beforeEach(async () => {
+    const prosopo = await import('../../prosopography/services/prosopographyService');
+    (prosopo.listPersons as any).mockReset().mockResolvedValue({ results: [lemcken] });
+    const wikidataService = await import('../../services/wikidataService');
+    (wikidataService.searchWikidata as any).mockResolvedValue([{ id: 'Q1', label: 'Lemcken (WD)', url: '' }]);
+  });
+
+  it('isikulüliti väljas: VUTT-i isik tuleb Wikidata vaste ette ja Enter valib ta', async () => {
+    const onChange = vi.fn();
+    render(<EntityPicker type="topic" value={null} onChange={onChange} showPersonToggle token="t" />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Lemcken' } });
+    fireEvent.focus(screen.getByRole('textbox'));
+    const person = await screen.findByText('Margaretha Lemcken');
+    const wd = await screen.findByText('Lemcken (WD)');
+    expect(person.compareDocumentPosition(wd) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'vutt:Pcat1yo', entity_type: 'person' }));
+  });
+
+  it('sama isik kohalikest soovitustest ei kordu', async () => {
+    render(<EntityPicker type="topic" value={null} onChange={vi.fn()} showPersonToggle token="t"
+      localSuggestions={[{ label: 'Margaretha Lemcken', id: 'vutt:Pcat1yo' }]} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Lemcken' } });
+    fireEvent.focus(screen.getByRole('textbox'));
+    await screen.findByText('Lemcken (WD)');
+    expect(screen.getAllByText('Margaretha Lemcken')).toHaveLength(1);
+  });
+
+  it('isikulülitita väli (nt žanr) isikuregistrit ei päri', async () => {
+    const prosopo = await import('../../prosopography/services/prosopographyService');
+    render(<EntityPicker type="genre" value={null} onChange={vi.fn()} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Lemcken' } });
+    fireEvent.focus(screen.getByRole('textbox'));
+    await screen.findByText('Lemcken (WD)');
+    expect(prosopo.listPersons).not.toHaveBeenCalled();
+  });
+});

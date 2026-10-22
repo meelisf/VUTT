@@ -185,9 +185,18 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Prosopograafia otsing (person-režiimis)
+  // Märksõnaväli (isikulüliti olemas, aga väljas): VUTT-i isikud otsitakse
+  // ikkagi kaasa ja näidatakse Wikidata vastete ees — lülitit on kerge
+  // märkamata jätta ja isik jäi siis üldse leidmata.
+  const mixedPersonSearch = showPersonToggle && !isPersonSearch;
+  const mixedProsopo = mixedPersonSearch ? prosopoResults : [];
+  // Kohalikes soovitustes võib sama isik juba olla (teiselt teoselt lisatud) — ära näita kaks korda
+  const mixedIds = new Set(mixedProsopo.map(p => p.id));
+  const topicSuggestions = mixedIds.size ? suggestions.filter(s => !mixedIds.has(s.id)) : suggestions;
+
+  // Prosopograafia otsing (person-režiimis ja märksõnaväljal)
   useEffect(() => {
-    if (!isPersonSearch || !showSuggestions) {
+    if (!(isPersonSearch || mixedPersonSearch) || !showSuggestions) {
       setProsopoResults([]);
       return;
     }
@@ -214,7 +223,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [inputValue, showSuggestions, isPersonSearch, value]);
+  }, [inputValue, showSuggestions, isPersonSearch, mixedPersonSearch, value]);
 
   // Väline otsing (Wikidata/GND/VIAF) — person-režiimis ainult nõudmisel, muidu automaatne
   useEffect(() => {
@@ -503,7 +512,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       if (isPersonSearch) {
         setSelectedIndex(prev => Math.min(prev + 1, prosopoResults.length + externalResults.length));
       } else {
-        setSelectedIndex(prev => Math.min(prev + 1, suggestions.length));
+        setSelectedIndex(prev => Math.min(prev + 1, mixedProsopo.length + topicSuggestions.length));
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -515,7 +524,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         else if (selectedIndex < prosopoResults.length + externalResults.length) handleSelect(externalResults[selectedIndex - prosopoResults.length]);
         else handleManualEntry();
       } else {
-        if (selectedIndex < suggestions.length) handleSelect(suggestions[selectedIndex]);
+        if (selectedIndex < mixedProsopo.length) handleSelectProsopo(mixedProsopo[selectedIndex]);
+        else if (selectedIndex < mixedProsopo.length + topicSuggestions.length) handleSelect(topicSuggestions[selectedIndex - mixedProsopo.length]);
         else handleManualEntry();
       }
     } else if (e.key === 'Escape') {
@@ -548,7 +558,37 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
   const hasResults = isPersonSearch
     ? (prosopoResults.length > 0 || externalResults.length > 0)
-    : suggestions.length > 0;
+    : (mixedProsopo.length > 0 || topicSuggestions.length > 0);
+
+  // Prosopograafia tulemuse rida — sama nii isikurežiimis kui märksõnaväljal
+  const renderProsopoRow = (entry: ProsopoIndexEntry, idx: number) => (
+    <div
+      key={entry.id}
+      className={`w-full px-3 py-2 border-b border-gray-50 flex items-start gap-2 cursor-pointer ${
+        idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' : 'bg-indigo-50/40 hover:bg-indigo-100/40'
+      }`}
+      onMouseDown={() => { justSelectedRef.current = true; }}
+      onClick={() => handleSelectProsopo(entry)}
+    >
+      <User size={12} className="mt-0.5 shrink-0 text-indigo-500" />
+      <span className="flex-1 min-w-0">
+        <span className="font-medium text-gray-900 text-sm block truncate">{entry.label}</span>
+        <span className="text-[10px] text-indigo-500/80 italic flex items-center gap-1.5">
+          <span>{entry.id}</span>
+          {entry.birth_year && <span>*{entry.birth_year}</span>}
+          {entry.death_year && <span>†{entry.death_year}</span>}
+          {entry.has_wikidata && <span className="text-blue-400">WD</span>}
+          {entry.has_gnd && <span className="text-orange-400">GND</span>}
+          {/* Teeb järjestuse loetavaks; 0 jäetakse välja (enamik kirjeid). */}
+          {entry.work_count > 0 && (
+            <span className="text-gray-500 not-italic">
+              {entry.work_count} {t('prosopography.works', { count: entry.work_count })}
+            </span>
+          )}
+        </span>
+      </span>
+    </div>
+  );
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
@@ -648,34 +688,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             {isPersonSearch ? (
               <>
                 {/* Prosopograafia tulemused */}
-                {prosopoResults.map((entry, idx) => (
-                  <div
-                    key={entry.id}
-                    className={`w-full px-3 py-2 border-b border-gray-50 flex items-start gap-2 cursor-pointer ${
-                      idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' : 'bg-indigo-50/40 hover:bg-indigo-100/40'
-                    }`}
-                    onMouseDown={() => { justSelectedRef.current = true; }}
-                    onClick={() => handleSelectProsopo(entry)}
-                  >
-                    <User size={12} className="mt-0.5 shrink-0 text-indigo-500" />
-                    <span className="flex-1 min-w-0">
-                      <span className="font-medium text-gray-900 text-sm block truncate">{entry.label}</span>
-                      <span className="text-[10px] text-indigo-500/80 italic flex items-center gap-1.5">
-                        <span>{entry.id}</span>
-                        {entry.birth_year && <span>*{entry.birth_year}</span>}
-                        {entry.death_year && <span>†{entry.death_year}</span>}
-                        {entry.has_wikidata && <span className="text-blue-400">WD</span>}
-                        {entry.has_gnd && <span className="text-orange-400">GND</span>}
-                        {/* Teeb järjestuse loetavaks; 0 jäetakse välja (enamik kirjeid). */}
-                        {entry.work_count > 0 && (
-                          <span className="text-gray-500 not-italic">
-                            {entry.work_count} {t('prosopography.works', { count: entry.work_count })}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  </div>
-                ))}
+                {prosopoResults.map(renderProsopoRow)}
 
                 {/* Wikidata sekundaarne otsing */}
                 {!showExternalSearch ? (
@@ -768,8 +781,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               </>
             ) : (
               <>
-                {/* Tavaline režiim */}
-                {suggestions.map((result, idx) => {
+                {/* Tavaline režiim; märksõnaväljal VUTT-i isikud eespool */}
+                {mixedProsopo.map(renderProsopoRow)}
+                {topicSuggestions.map((result, sIdx) => {
+                  const idx = mixedProsopo.length + sIdx;
                   const isLocal = result.isLocal;
                   const isRegister = result.isRegister;
                   const isGnd = result.isGnd || result.id.startsWith('GND:');
@@ -837,7 +852,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                   onMouseDown={() => { justSelectedRef.current = true; }}
                   onClick={handleManualEntry}
                   className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-gray-600 italic ${
-                    selectedIndex === suggestions.length ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' : ''
+                    selectedIndex === mixedProsopo.length + topicSuggestions.length ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' : ''
                   }`}
                 >
                   <Tag size={14} className="opacity-50" />
@@ -864,6 +879,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 </>
               ) : (
                 <>
+                  {mixedPersonSearch && <span className="flex items-center gap-1"><User size={10} className="text-indigo-400" /> {t('entityPicker.prosopographySource')}</span>}
                   <span className="flex items-center gap-1"><Globe size={10} /> Wikidata</span>
                   {(type === 'person' || type === 'printer') && <>
                     <span className="flex items-center gap-1"><BookMarked size={10} className="text-orange-500" /> GND</span>
