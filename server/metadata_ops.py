@@ -62,7 +62,11 @@ def normalize_title_fields(meta: dict) -> None:
 
     Puudumine = tühi / `false` (ADR 0064). Nii ei lisa iga vormisalvestus teosele
     `null`-võtmeid ja muutusteta salvestus jääb no-op'iks (ADR 0012).
+    Põhipealkiri trimmitakse, aga võtit ei eemaldata — kopeeritud pealkirja
+    ette jäi sageli tühik.
     """
+    if isinstance(meta.get("title"), str):
+        meta["title"] = meta["title"].strip()
     for field in TITLE_TEXT_FIELDS:
         value = meta.get(field)
         value = value.strip() if isinstance(value, str) else ""

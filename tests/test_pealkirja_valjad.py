@@ -41,3 +41,13 @@ def test_vormi_korduv_salvestus_on_no_op():
     meta.update({"title_en": None, "title_original": None, "title_devised": False})
     normalize_title_fields(meta)
     assert metadata_unchanged(previous, meta)
+
+
+def test_pohipealkiri_trimmitakse_aga_jaab():
+    # Kopeeritud pealkirja ette/taha jäänud tühik ei jõua faili
+    meta = {"title": "  \tTrost-Zeilen \n"}
+    normalize_title_fields(meta)
+    assert meta["title"] == "Trost-Zeilen"
+    meta = {"title": "   "}
+    normalize_title_fields(meta)
+    assert meta == {"title": ""}
