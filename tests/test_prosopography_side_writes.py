@@ -1,7 +1,16 @@
 """Prosopograafia kõrvalkirjutuste git- ja tehniliste väljade regressioonitestid."""
+import io
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
+
+from PIL import Image
+
+
+def _jpeg():
+    buf = io.BytesIO()
+    Image.new("RGB", (4, 4)).save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 def _person(person_id="vutt:Pabc123"):
@@ -45,7 +54,7 @@ def test_image_metadata_changes_use_git(monkeypatch, tmp_path):
     save = _saving_mock(path)
     monkeypatch.setattr(crud.state, "save_with_git", save)
 
-    result = crud.upload_person_image("vutt:Pabc123", b"jpeg", "image/jpeg", "editor")
+    result = crud.upload_person_image("vutt:Pabc123", _jpeg(), "image/jpeg", "editor")
     assert result["image_url"]
     assert save.call_count == 1
     assert "pildi lisamine" in save.call_args.kwargs["message"]

@@ -39,7 +39,9 @@ def _variant_dir(source_path: str) -> str:
 
 def _render_variant(source_path: str, target_path: str, width: int) -> bool:
     """Kirjutab vähendatud JPEG-i. False = lähtepilt on kitsam kui `width`."""
-    with Image.open(source_path) as img:
+    # Salvestatud on ainult .jpg/.webp; piirang hoiab avaliku päringu eemal
+    # muudest dekoodritest ka siis, kui kettal on varasem kontrollimata fail.
+    with Image.open(source_path, formats=["JPEG", "WEBP"]) as img:
         # draft() laseb JPEG-dekoodril kohe väiksemas mõõdus lugeda.
         img.draft("RGB", (width, width * 4))
         img = ImageOps.exif_transpose(img)
