@@ -508,18 +508,33 @@ def _person_image_path(person_id: str, ext: str) -> str:
     return path
 
 
+_PERSON_IMAGE_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
+
+
 def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, username: str) -> dict:
     """Salvestab isiku pildi ja uuendab image_url kirjes."""
     sync_from_facade()
 
-    if content_type not in ("image/jpeg", "image/png", "image/webp"):
+    pil_format = _PERSON_IMAGE_FORMATS.get(content_type)
+    if pil_format is None:
         raise ValueError("Toetatud formaadid: JPEG, PNG, WebP")
+
+    from PIL import Image, UnidentifiedImageError
+    import io
+
+    # content_type tuleb kliendilt. Ilma formats-piiranguta tuvastab Image.open
+    # vormingu baitidest ja „PNG-na" saadetud TIFF/BMP jõuaks dekoodrini, mis
+    # on läbinud hulga mälu- ja DoS-vigu. Variandid dekodeeritakse hiljem
+    # AVALIKU päringu peale — seepärast kontroll juba siin.
+    try:
+        with Image.open(io.BytesIO(file_bytes), formats=[pil_format]):
+            pass
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise ValueError(f"Fail ei ole {pil_format}-vormingus pilt")
 
     if content_type == "image/png":
         try:
-            from PIL import Image
-            import io
-            img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            img = Image.open(io.BytesIO(file_bytes), formats=["PNG"]).convert("RGB")
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=90)
             file_bytes = buf.getvalue()

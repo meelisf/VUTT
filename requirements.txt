@@ -1,14 +1,15 @@
 # VUTT Backend dependencies
-GitPython>=3.1.40
+GitPython>=3.2.1
 meilisearch>=0.28.0
 requests>=2.31.0
 osm2geojson>=0.3.2
-Pillow>=10.0.0
+Pillow>=13.0.0
 python-dotenv>=1.0.0
 tqdm>=4.66.0
 paramiko>=3.0.0
 fastapi>=0.115.0
 uvicorn>=0.30.0
 python-multipart>=0.0.9
-PyJWT>=2.0
+PyJWT>=2.15
 bcrypt>=4.0.0
+certifi>=2026.10.19  # emSign juur eemaldatud (PYSEC-2026-4320)

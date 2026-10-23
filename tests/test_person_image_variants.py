@@ -110,8 +110,46 @@ def test_lubamatu_laius_viskab(crud):
 
 
 def test_vigane_lahtepilt_annab_originaali(crud):
-    crud.upload_person_image(PID, b"pole pilt", "image/jpeg", "editor")
+    # Üleslaadimine lükkab vigase faili tagasi; kettal võib see olla varasemast.
+    crud.upload_person_image(PID, _jpeg(1000, 1000), "image/jpeg", "editor")
+    with open(crud.get_person_image_path(PID), "wb") as f:
+        f.write(b"pole pilt")
+    crud.image_variants.remove_variants(os.path.dirname(crud.get_person_image_path(PID)), "abc123")
     assert crud.get_person_image_variant(PID, 160) == crud.get_person_image_path(PID)
+
+
+def _encode(fmt, size=(1000, 1000)):
+    buf = io.BytesIO()
+    Image.new("RGB", size, (10, 120, 30)).save(buf, format=fmt)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("content_type", ["image/jpeg", "image/png", "image/webp"])
+def test_teise_vormingu_baidid_lykatakse_tagasi(crud, content_type):
+    # content_type tuleb kliendilt: TIFF/BMP ei tohi „PNG-na" dekoodrini jõuda.
+    for fmt in ("TIFF", "BMP"):
+        with pytest.raises(ValueError):
+            crud.upload_person_image(PID, _encode(fmt), content_type, "editor")
+    with pytest.raises(ValueError):
+        crud.upload_person_image(PID, b"pole pilt", content_type, "editor")
+
+
+def test_deklareeritud_vorming_laheb_labi(crud):
+    crud.upload_person_image(PID, _encode("PNG"), "image/png", "editor")
+    assert crud.get_person_image_path(PID).endswith(".jpg")
+    crud.upload_person_image(PID, _encode("WEBP"), "image/webp", "editor")
+    assert crud.get_person_image_path(PID).endswith(".webp")
+
+
+def test_variant_ei_dekodeeri_muud_vormingut(crud):
+    # Varasem kontrollimata fail kettal: avalik variandipäring annab originaali,
+    # mitte ei käivita TIFF-dekoodrit.
+    crud.upload_person_image(PID, _jpeg(1000, 1000), "image/jpeg", "editor")
+    path = crud.get_person_image_path(PID)
+    crud.image_variants.remove_variants(os.path.dirname(path), "abc123")
+    with open(path, "wb") as f:
+        f.write(_encode("TIFF"))
+    assert crud.get_person_image_variant(PID, 160) == path
 
 
 def test_image_url_kannab_versiooni(crud):
