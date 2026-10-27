@@ -1,6 +1,6 @@
 // src/prosopography/utils/__tests__/network.test.ts
 import { describe, it, expect } from 'vitest';
-import { applyFilters, coEdges, evidenceTarget, familyLabel, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
+import { applyFilters, coEdges, evidenceTarget, familyLabel, lineKinds, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
 import type { PersonNetwork, NetworkEdge } from '../../services/networkService';
 
 const F = 'vutt:Pfocus';
@@ -40,6 +40,33 @@ describe('applyFilters', () => {
     expect(v.persons.find(p => p.id === 'a')!.kind).toBe('academic');
     // b: mention (w1) + cotext (w2); KIND_ORDER-is on cotext tugevam kui mention
     expect(v.persons.find(p => p.id === 'b')!.kind).toBe('cotext');
+  });
+
+  it('sugulus võidab akadeemilise seose (näälk on ühtlasi respondens)', () => {
+    const net: PersonNetwork = {
+      ...NET,
+      persons: [P('s')],
+      edges: [E('academic', 's', 'w1'),
+              { kind: 'family', from: 's', to: F, directed: false, year: null, place: null, evidence: null,
+                records: [{ source_id: F, target_id: 's', type: 'näälk' }] }],
+    };
+    const v = applyFilters(net, DEFAULT_FILTER);
+    expect(v.persons[0].kind).toBe('family');
+    expect(v.counts.family).toBe(1);
+    expect(v.counts.academic).toBe(0);
+  });
+
+  it('ringvaate jooned: sugulane + respondens → kaks liiki, nõrk isik → oma liik', () => {
+    const net: PersonNetwork = {
+      ...NET,
+      persons: [P('s'), P('c')],
+      edges: [E('academic', 's', 'w1'), E('cotext', 's', 'w2'), E('cotext', 'c', 'w2'),
+              { kind: 'family', from: 's', to: F, directed: false, year: null, place: null, evidence: null,
+                records: [{ source_id: F, target_id: 's', type: 'näälk' }] }],
+    };
+    const v = applyFilters(net, DEFAULT_FILTER);
+    expect(lineKinds(v.persons.find(p => p.id === 's')!)).toEqual(['family', 'academic']);
+    expect(lineKinds(v.persons.find(p => p.id === 'c')!)).toEqual(['cotext']);
   });
 
   it('peidetud tugevaim serv → liik järgmisest nähtavast', () => {
