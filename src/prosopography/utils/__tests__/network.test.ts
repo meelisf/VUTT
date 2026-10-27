@@ -1,6 +1,6 @@
 // src/prosopography/utils/__tests__/network.test.ts
 import { describe, it, expect } from 'vitest';
-import { applyFilters, coEdges, evidenceTarget, familyLabel, lineKinds, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
+import { applyFilters, coEdges, evidenceTarget, familyLabel, personKinds, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
 import type { PersonNetwork, NetworkEdge } from '../../services/networkService';
 
 const F = 'vutt:Pfocus';
@@ -42,7 +42,7 @@ describe('applyFilters', () => {
     expect(v.persons.find(p => p.id === 'b')!.kind).toBe('cotext');
   });
 
-  it('sugulus võidab akadeemilise seose (näälk on ühtlasi respondens)', () => {
+  it('sugulane-respondens: sõlm akadeemiline, loendur mõlemas liigis', () => {
     const net: PersonNetwork = {
       ...NET,
       persons: [P('s')],
@@ -51,9 +51,9 @@ describe('applyFilters', () => {
                 records: [{ source_id: F, target_id: 's', type: 'näälk' }] }],
     };
     const v = applyFilters(net, DEFAULT_FILTER);
-    expect(v.persons[0].kind).toBe('family');
+    expect(v.persons[0].kind).toBe('academic');
     expect(v.counts.family).toBe(1);
-    expect(v.counts.academic).toBe(0);
+    expect(v.counts.academic).toBe(1);
   });
 
   it('ringvaate jooned: sugulane + respondens → kaks liiki, nõrk isik → oma liik', () => {
@@ -65,8 +65,8 @@ describe('applyFilters', () => {
                 records: [{ source_id: F, target_id: 's', type: 'näälk' }] }],
     };
     const v = applyFilters(net, DEFAULT_FILTER);
-    expect(lineKinds(v.persons.find(p => p.id === 's')!)).toEqual(['family', 'academic']);
-    expect(lineKinds(v.persons.find(p => p.id === 'c')!)).toEqual(['cotext']);
+    expect(personKinds(v.persons.find(p => p.id === 's')!)).toEqual(['academic', 'family']);
+    expect(personKinds(v.persons.find(p => p.id === 'c')!)).toEqual(['cotext']);
   });
 
   it('peidetud tugevaim serv → liik järgmisest nähtavast', () => {
