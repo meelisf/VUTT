@@ -7,7 +7,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VisibleNetwork } from '../../utils/network';
-import { coEdges, radialLayout, STRONG } from '../../utils/network';
+import { coEdges, lineKinds, radialLayout, STRONG } from '../../utils/network';
 import { KIND_COLOR, KindMark } from './kindStyle';
 import type { usePopover } from './RelationPopover';
 
@@ -52,12 +52,22 @@ const RelationsGraph: React.FC<Props> = ({ net, popover, highlight, onHighlight 
           })}
         </g>
         <g>
-          {layout.nodes.map(n => (
-            <line key={n.person.id} x1={layout.cx} y1={layout.cy} x2={n.x} y2={n.y}
-              stroke={KIND_COLOR[n.person.kind]} strokeOpacity={(STRONG.has(n.person.kind) ? 0.55 : 0.3) * dim([n.person.id])}
-              strokeWidth={1 + (n.person.workCount / maxW) * 4}
-              strokeDasharray={n.person.kind === 'family' ? '4 3' : n.person.kind === 'mention' ? '2 3' : undefined} />
-          ))}
+          {layout.nodes.flatMap(n => {
+            // Mitu tugevat liiki (nt sugulane + respondens) → paralleeljooned risti raadiusega.
+            const kinds = lineKinds(n.person);
+            const w = 1 + (n.person.workCount / maxW) * 4;
+            const nx = -Math.sin(n.angle); const ny = Math.cos(n.angle);
+            return kinds.map((kind, i) => {
+              const off = (i - (kinds.length - 1) / 2) * (w + 1.5);
+              return (
+                <line key={`${n.person.id}|${kind}`} x1={layout.cx + nx * off} y1={layout.cy + ny * off}
+                  x2={n.x + nx * off} y2={n.y + ny * off}
+                  stroke={KIND_COLOR[kind]} strokeOpacity={(STRONG.has(kind) ? 0.55 : 0.3) * dim([n.person.id])}
+                  strokeWidth={w}
+                  strokeDasharray={kind === 'family' ? '4 3' : kind === 'mention' ? '2 3' : undefined} />
+              );
+            });
+          })}
         </g>
         <g>
           {layout.nodes.map(n => {
