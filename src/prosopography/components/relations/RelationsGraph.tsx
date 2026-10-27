@@ -18,6 +18,8 @@ interface Props {
   onHighlight: (id: string | null) => void;
 }
 
+const FAMILY_WIDTH = 2.5;
+
 const RelationsGraph: React.FC<Props> = ({ net, popover, highlight, onHighlight }) => {
   const { t } = useTranslation(['prosopography']);
   const [showCo, setShowCo] = useState(true);
@@ -54,16 +56,18 @@ const RelationsGraph: React.FC<Props> = ({ net, popover, highlight, onHighlight 
         <g>
           {layout.nodes.flatMap(n => {
             // Mitu tugevat liiki (nt sugulane + respondens) → paralleeljooned risti raadiusega.
+            // Pereserval teost ei ole — jämedus on püsiv, muidu sõltuks see kõrvalseose teostest.
             const kinds = lineKinds(n.person);
-            const w = 1 + (n.person.workCount / maxW) * 4;
+            const width = (kind: string) => (kind === 'family' ? FAMILY_WIDTH : 1 + (n.person.workCount / maxW) * 4);
+            const gap = Math.max(...kinds.map(width)) + 1.5;
             const nx = -Math.sin(n.angle); const ny = Math.cos(n.angle);
             return kinds.map((kind, i) => {
-              const off = (i - (kinds.length - 1) / 2) * (w + 1.5);
+              const off = (i - (kinds.length - 1) / 2) * gap;
               return (
                 <line key={`${n.person.id}|${kind}`} x1={layout.cx + nx * off} y1={layout.cy + ny * off}
                   x2={n.x + nx * off} y2={n.y + ny * off}
                   stroke={KIND_COLOR[kind]} strokeOpacity={(STRONG.has(kind) ? 0.55 : 0.3) * dim([n.person.id])}
-                  strokeWidth={w}
+                  strokeWidth={width(kind)}
                   strokeDasharray={kind === 'family' ? '4 3' : kind === 'mention' ? '2 3' : undefined} />
               );
             });
