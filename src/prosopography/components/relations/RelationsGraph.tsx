@@ -7,7 +7,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VisibleNetwork } from '../../utils/network';
-import { coEdges, lineKinds, radialLayout, STRONG } from '../../utils/network';
+import { coEdges, personKinds, radialLayout, STRONG } from '../../utils/network';
 import { KIND_COLOR, KindMark } from './kindStyle';
 import type { usePopover } from './RelationPopover';
 
@@ -57,7 +57,7 @@ const RelationsGraph: React.FC<Props> = ({ net, popover, highlight, onHighlight 
           {layout.nodes.flatMap(n => {
             // Mitu tugevat liiki (nt sugulane + respondens) → paralleeljooned risti raadiusega.
             // Pereserval teost ei ole — jämedus on püsiv, muidu sõltuks see kõrvalseose teostest.
-            const kinds = lineKinds(n.person);
+            const kinds = personKinds(n.person);
             const width = (kind: string) => (kind === 'family' ? FAMILY_WIDTH : 1 + (n.person.workCount / maxW) * 4);
             const gap = Math.max(...kinds.map(width)) + 1.5;
             const nx = -Math.sin(n.angle); const ny = Math.cos(n.angle);

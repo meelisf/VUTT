@@ -5,8 +5,9 @@
  */
 import type { NetworkEdge, NetworkPart, NetworkPerson, NetworkWork, PersonNetwork, RelationKind } from '../services/networkService';
 
-// Perekond on esimene: sugulane, kes on ühtlasi respondens vms, kuvatakse ikka sugulasena.
-export const KIND_ORDER: RelationKind[] = ['family', 'academic', 'dedicated', 'cotext', 'mention', 'printer'];
+// Isiku liik (sõlm) = tugevaim liik selles järjekorras. Perekond on teostest tulenevate
+// seoste järel: sugulus, millel on kõrval teoseseos, on lisatunnus (joon, tekst), mitte sõlm.
+export const KIND_ORDER: RelationKind[] = ['academic', 'dedicated', 'family', 'cotext', 'mention', 'printer'];
 export const STRONG: ReadonlySet<RelationKind> = new Set<RelationKind>(['academic', 'dedicated', 'family']);
 
 export type KindFilter = Record<'cotext' | 'mention' | 'printer', boolean>;
@@ -55,16 +56,18 @@ export function applyFilters(net: PersonNetwork, filter: KindFilter): VisibleNet
     const kind = pe.reduce<RelationKind>((k, e) => (rank(e.kind) < rank(k) ? e.kind : k), 'printer');
     const workIds = new Set(pe.map(e => e.evidence?.work_id).filter((w): w is string => !!w));
     const years = pe.map(e => e.year).filter((y): y is number => typeof y === 'number');
-    persons.push({ ...p, kind, workCount: workIds.size, edges: pe, firstYear: years.length ? Math.min(...years) : null });
-    counts[kind] += 1;
+    const person: VisiblePerson = { ...p, kind, workCount: workIds.size, edges: pe, firstYear: years.length ? Math.min(...years) : null };
+    persons.push(person);
+    // Loendur = mitmel isikul see seos on; sugulane-respondens loetakse mõlemasse.
+    for (const k of personKinds(person)) counts[k] += 1;
   }
   return { focus: net.focus, persons, edges, works: new Map(net.works.map(w => [w.work_id, w])),
            parts: new Map((net.parts ?? []).map(p => [p.part_id, p])), counts };
 }
 
-/** Ringvaate joone liigid: isiku kõik nähtavad tugevad liigid KIND_ORDER-i järjekorras
- *  (sugulane, kes on ühtlasi respondens → kaks paralleeljoont); nõrga isiku puhul tema liik. */
-export function lineKinds(p: VisiblePerson): RelationKind[] {
+/** Isiku kõik nähtavad tugevad liigid KIND_ORDER-i järjekorras, nõrga isiku puhul tema liik.
+ *  Sugulane, kes on ühtlasi respondens → ringvaates kaks paralleeljoont, tabelis mõlemad liigid. */
+export function personKinds(p: VisiblePerson): RelationKind[] {
   const strong = KIND_ORDER.filter(k => STRONG.has(k) && p.edges.some(e => e.kind === k));
   return strong.length ? strong : [p.kind];
 }

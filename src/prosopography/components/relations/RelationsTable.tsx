@@ -4,7 +4,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { VisibleNetwork } from '../../utils/network';
-import { evidenceTarget } from '../../utils/network';
+import { evidenceTarget, personKinds } from '../../utils/network';
 
 const RelationsTable: React.FC<{ net: VisibleNetwork }> = ({ net }) => {
   const { t } = useTranslation(['prosopography', 'workspace']);
@@ -40,7 +40,7 @@ const RelationsTable: React.FC<{ net: VisibleNetwork }> = ({ net }) => {
                 <td className="py-1.5 pr-3"><Link to={`/persons/${p.id}`} className="text-primary-700 hover:underline">{p.label}</Link></td>
                 <td className="py-1.5 pr-3 tabular-nums">{p.birth_year || p.death_year ? `${p.birth_year ?? '?'}–${p.death_year ?? '?'}` : '—'}</td>
                 <td className="py-1.5 pr-3">{p.origin?.place ?? '—'}</td>
-                <td className="py-1.5 pr-3">{t(`network.kinds.${p.kind}`)}</td>
+                <td className="py-1.5 pr-3">{personKinds(p).map(k => t(`network.kinds.${k}`)).join(', ')}</td>
                 <td className="py-1.5 pr-3 tabular-nums">{p.workCount}</td>
                 <td className="py-1.5 pr-3 tabular-nums">{span}</td>
                 <td className="py-1.5 pr-3">{roles.join(', ') || '—'}</td>
