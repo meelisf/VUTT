@@ -20,7 +20,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import { getWorkSetWorkIds } from '../services/workSetService';
 import { collectionForWorkSearch } from '../utils/workSearchSelection';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
-import { needsPageLoad, pageLoadKey } from './workspacePageLoad';
+import { createLatestRequest, needsPageLoad, pageLoadKey } from './workspacePageLoad';
 import MetadataModal from '../components/MetadataModal';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogIn, Copy, Check, LayoutGrid } from 'lucide-react';
 import UserMenu from '../components/UserMenu';
@@ -57,6 +57,8 @@ const Workspace: React.FC = () => {
   // Meili tokeni uuendus, sessiooni olek, uuesti sisselogimine — lehte EI lae:
   // see kirjutaks redaktori salvestamata teksti üle (vt workspacePageLoad.ts).
   const loadedPageKeyRef = useRef<string | null>(null);
+  // Hilinenud vastus (eelmise lehe päring) ei tohi uut lehte üle kirjutada.
+  const latestPageRequestRef = useRef(createLatestRequest());
   const [error, setError] = useState<string | null>(null);
   const [errorRequiresLogin, setErrorRequiresLogin] = useState(false);
   const [page, setPage] = useState<Page | null>(null);
@@ -180,7 +182,15 @@ const Workspace: React.FC = () => {
     // sisse" vilkumine. `loading` jääb true (spinner). Effect jookseb uuesti kui
     // authInitializing → false (dep-listis).
     if (authInitializing) return;
-    if (workId && !needsPageLoad(loadedPageKeyRef.current, pageLoadKey(workId, currentPageNum, viewerToken))) return;
+    if (workId && !needsPageLoad(loadedPageKeyRef.current, pageLoadKey(workId, currentPageNum, viewerToken))) {
+      // Tagasi juba laetud lehele, kuni teise lehe päring veel käib: see päring
+      // tühistatakse, muidu kirjutaks tema vastus kuvatud lehe üle.
+      latestPageRequestRef.current.invalidate();
+      setPageLoading(false);
+      return;
+    }
+    const requestId = latestPageRequestRef.current.begin();
+    const isStale = () => !latestPageRequestRef.current.isCurrent(requestId);
     const loadData = async () => {
       if (!workId) {
         setError(t('errors.workIdMissing'));
@@ -198,6 +208,7 @@ const Workspace: React.FC = () => {
       setErrorRequiresLogin(false);
       try {
         const pageData = await getPage(effectiveIndex, workId, currentPageNum);
+        if (isStale()) return;
 
         // Shareable fallback: teos on piiratud kollektsioonis aga võib olla jagatud.
         // Saadame ka Authorization päise — kui Meili indeks on (veel/taas) anonüümses
@@ -208,8 +219,10 @@ const Workspace: React.FC = () => {
           const r = await fetch(`${FILE_API_URL}/work/${workId}/viewer-token`, {
             headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
           });
+          if (isStale()) return;
           if (r.ok) {
             const data = await r.json();
+            if (isStale()) return;
             setViewerToken(data.token);
             if (data.image_exp && data.image_sig) {
               setImageToken({ exp: data.image_exp, sig: data.image_sig });
@@ -246,12 +259,16 @@ const Workspace: React.FC = () => {
           }
         }
       } catch (e: any) {
+        if (isStale()) return;
         loadedPageKeyRef.current = null;
         console.error("Failed to load page", e);
         setError(e.message || t('errors.loadFailed'));
       } finally {
-        setLoading(false);
-        setPageLoading(false);
+        // Aegunud päring ei puutu laadimisolekut — uus päring haldab seda ise.
+        if (!isStale()) {
+          setLoading(false);
+          setPageLoading(false);
+        }
       }
     };
     loadData();

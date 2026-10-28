@@ -204,6 +204,8 @@
         "applied": "{{count}} lehte rakendatud",
         "appliedPartial": "{{applied}} lehte rakendatud, {{failed}} ebaõnnestus",
         "gitWarning": "Tekst salvestati, aga Git-commit ebaõnnestus.",
+        "applying": "Rakendan tulemusi ja uuendan otsinguindeksit… Suure teose puhul võib see võtta kuni paar minutit.",
+        "indexPending": "Otsinguindeks uueneb veel taustal — teose vaates võib vana tekst mõne aja paista.",
         "discarded": "{{count}} tulemust kustutatud",
         "applyError": "Rakendamine ebaõnnestus.",
         "discardError": "Kustutamine ebaõnnestus."

@@ -204,6 +204,8 @@
         "applied": "{{count}} pages applied",
         "appliedPartial": "{{applied}} pages applied, {{failed}} failed",
         "gitWarning": "Text was saved, but the Git commit failed.",
+        "applying": "Applying results and updating the search index… For a large work this can take up to a couple of minutes.",
+        "indexPending": "The search index is still updating in the background — the work view may show the old text for a while.",
         "discarded": "{{count}} results deleted",
         "applyError": "Applying failed.",
         "discardError": "Deleting failed."

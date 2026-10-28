@@ -459,6 +459,9 @@ _meilisearch_executor = ThreadPoolExecutor(
     thread_name_prefix="meili_sync"
 )
 _meili_sync_lock = threading.Lock()
+# Teavitab ootajaid (`sync_work_to_meilisearch_and_wait`), kui teos lahkub
+# aktiivsete hulgast. Sama lukk, et olekukontroll ja ootamine oleksid atomaarsed.
+_meili_sync_done = threading.Condition(_meili_sync_lock)
 _meili_sync_pending = 0
 _meili_sync_last_error = None
 _meili_sync_last_error_at = None
@@ -471,6 +474,7 @@ _meili_sync_completed = 0
 # seega kannab kõigi vahepealsete salvestuste tulemuse korraga.
 _meili_active_syncs = set()   # dir_name'id, mille sünk parasjagu käib
 _meili_dirty_syncs = set()    # dir_name'id, mis vajavad järeljooksu
+_meili_last_ok = {}           # dir_name → viimase lõpuni jõudnud sünki tulemus (ootajale)
 _meili_sync_requested = 0
 _meili_sync_coalesced = 0
 register_job("meilisearch_async_sync", description="Asünkroonne teoste sünkroonimine Meilisearchi")
@@ -480,6 +484,7 @@ register_job("metadata_watcher", interval_seconds=60, description="Uute teosekau
 def _sync_work_task(dir_name):
     """Meilisearch sync task (käivitatakse pool'is)."""
     global _meili_sync_pending, _meili_sync_last_error, _meili_sync_last_error_at, _meili_sync_last_success_at, _meili_sync_completed
+    ok = False
     try:
         ok = sync_work_to_meilisearch(dir_name)
         with _meili_sync_lock:
@@ -507,6 +512,8 @@ def _sync_work_task(dir_name):
                 _meili_sync_pending += 1  # teos jääb aktiivseks järeljooksu ajaks
             else:
                 _meili_active_syncs.discard(dir_name)
+                _meili_last_ok[dir_name] = bool(ok)
+                _meili_sync_done.notify_all()
         if rerun:
             logger.info(f"MEILI COALESCING: järeljooks ({dir_name})")
             _meilisearch_executor.submit(_sync_work_task, dir_name)
@@ -554,12 +561,32 @@ def sync_work_to_meilisearch_async(dir_name):
     _meilisearch_executor.submit(_sync_work_task, dir_name)
 
 
+def sync_work_to_meilisearch_and_wait(dir_name, timeout=90):
+    """Sünk sama koondamise kaudu (ADR 0013), aga kutsuja ootab selle lõppu.
+
+    Mõeldud teadlikele admin-toimingutele (re-OCR rakendamine), mille järel
+    kasutaja läheb kohe teose juurde: Workspace loeb lehe Meilist ja näitaks
+    muidu vana teksti. Otsekutse `sync_work_to_meilisearch` mööduks koondamisest
+    ja võiks paralleelse sünkiga võidu joosta; siin katab muudatuse kas uus töö
+    või aktiivse töö järeljooks.
+
+    Tagastab True ainult siis, kui sünk lõppes enne `timeout`-i JA õnnestus.
+    False korral jätkab sünk taustal — kutsuja ütleb kasutajale, et indeks uueneb.
+    """
+    sync_work_to_meilisearch_async(dir_name)
+    with _meili_sync_done:
+        finished = _meili_sync_done.wait_for(
+            lambda: dir_name not in _meili_active_syncs, timeout=timeout)
+        return finished and _meili_last_ok.get(dir_name, False)
+
+
 def _reset_sync_state_for_tests():
     """Nullib coalescing-oleku ja loendurid. Ainult testide jaoks."""
     global _meili_sync_pending, _meili_sync_requested, _meili_sync_coalesced, _meili_sync_completed
     with _meili_sync_lock:
         _meili_active_syncs.clear()
         _meili_dirty_syncs.clear()
+        _meili_last_ok.clear()
         _meili_sync_pending = 0
         _meili_sync_requested = 0
         _meili_sync_coalesced = 0

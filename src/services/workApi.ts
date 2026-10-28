@@ -211,6 +211,8 @@ export interface ReocrApplyResponse extends ApiStatusResponse {
   failed?: ReocrFailure[];
   commit_hash?: string;
   git_committed?: boolean;
+  /** false = Meili sünk ei jõudnud ajalimiidiks valmis (jätkub taustal); null = midagi ei rakendatud */
+  meili_synced?: boolean | null;
 }
 
 export interface ReocrDiscardResponse extends ApiStatusResponse {
@@ -223,11 +225,12 @@ export function applyReocrResults(
   token: string,
   pageFilenames: string[],
 ): Promise<ReocrApplyResponse> {
-  // Pikk timeout: suure teose puhul kirjutatakse sadu faile + üks git-commit.
+  // Pikk timeout: suure teose puhul kirjutatakse sadu faile + üks git-commit,
+  // seejärel ootab server Meili sünki (kuni 90 s).
   return apiPost<ReocrApplyResponse>(
     `/admin/work/${workId}/reocr-apply`,
     { page_filenames: pageFilenames },
-    authJson(token, { timeout: 120000 }),
+    authJson(token, { timeout: 240000 }),
   );
 }
 

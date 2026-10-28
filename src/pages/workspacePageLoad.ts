@@ -13,3 +13,19 @@ export function pageLoadKey(workId: string, pageNum: number, viewerToken: string
 export function needsPageLoad(loadedKey: string | null, key: string): boolean {
   return loadedKey !== key;
 }
+
+/**
+ * Lehepäringute järjekorrakaitse. Päringud ei tühistu ise: kui eelmise lehe
+ * vastus saabub pärast uue oma, näidataks vana lehte uue URL-i all ja
+ * `loadedPageKey` jääks valeks — leht vahetuks alles mõne muu sõltuvuse
+ * muutusel. Kehtib ainult viimati alustatud päring.
+ */
+export function createLatestRequest() {
+  let seq = 0;
+  return {
+    begin: (): number => ++seq,
+    isCurrent: (id: number): boolean => id === seq,
+    /** Pooleli päring kehtetuks ilma uut alustamata (nt tagasi juba laetud lehele). */
+    invalidate: (): void => { seq++; },
+  };
+}

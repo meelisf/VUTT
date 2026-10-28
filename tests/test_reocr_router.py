@@ -89,7 +89,8 @@ def test_reocr_apply_sunkib_meili_uks_kord(client, login, tmp_path, monkeypatch)
         },
     )
     synced = []
-    monkeypatch.setattr(reocr_router, "sync_work_to_meilisearch_async", lambda slug: synced.append(slug))
+    monkeypatch.setattr(reocr_router, "sync_work_to_meilisearch_and_wait",
+                        lambda slug: synced.append(slug) or True)
 
     token = login("admin", "adminpass")
     response = client.post(
@@ -101,6 +102,31 @@ def test_reocr_apply_sunkib_meili_uks_kord(client, login, tmp_path, monkeypatch)
     assert response.status_code == 200
     assert response.json()["applied"] == ["a.jpg", "b.jpg", "c.jpg"]
     assert synced == ["1690-w1"]  # ÜKS sünk, slug (kaustanimi)
+    # Vastus tuleb alles pärast sünki: Workspace loeb lehe Meilist (vana OCR muidu)
+    assert response.json()["meili_synced"] is True
+
+
+def test_reocr_apply_meili_ajalimiit_antakse_kliendile(client, login, tmp_path, monkeypatch):
+    """Sünk ei jõudnud ajalimiidiks valmis → rakendus õnnestus, klient saab teada."""
+    reocr_router, _ = _apply_setup(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        reocr_router, "apply_ocr_results",
+        lambda path, filenames, username: {
+            "applied": list(filenames), "failed": [],
+            "commit_hash": "abc12345", "git_committed": True,
+        },
+    )
+    monkeypatch.setattr(reocr_router, "sync_work_to_meilisearch_and_wait", lambda slug: False)
+
+    token = login("admin", "adminpass")
+    response = client.post(
+        "/admin/work/wid/reocr-apply",
+        json={"page_filenames": ["a.jpg"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["meili_synced"] is False
 
 
 def test_reocr_apply_ilma_rakendatuta_ei_sungi(client, login, tmp_path, monkeypatch):
@@ -113,7 +139,8 @@ def test_reocr_apply_ilma_rakendatuta_ei_sungi(client, login, tmp_path, monkeypa
         },
     )
     synced = []
-    monkeypatch.setattr(reocr_router, "sync_work_to_meilisearch_async", lambda slug: synced.append(slug))
+    monkeypatch.setattr(reocr_router, "sync_work_to_meilisearch_and_wait",
+                        lambda slug: synced.append(slug) or True)
 
     token = login("admin", "adminpass")
     response = client.post(

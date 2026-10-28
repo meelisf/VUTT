@@ -483,6 +483,7 @@ const WorkManage: React.FC = () => {
         ? t('manage.reocr.pending.appliedPartial', { applied, failed })
         : t('manage.reocr.pending.applied', { count: applied });
       if (res.git_committed === false) msg += ` ${t('manage.reocr.pending.gitWarning')}`;
+      if (res.meili_synced === false) msg += ` ${t('manage.reocr.pending.indexPending')}`;
       setPendingResult(msg);
       setPendingConfirm(null);
       await loadPages();                 // has_text uueneb
@@ -1078,6 +1079,13 @@ const WorkManage: React.FC = () => {
                             {t('common:buttons.cancel')}
                           </button>
                         </div>
+                        {/* Rakendus ootab ka Meili sünki — pikal tööl peab olema näha, et midagi käib */}
+                        {pendingBusy && (
+                          <p className="mt-2 flex items-center gap-2 text-amber-900">
+                            <Loader2 size={14} className="animate-spin shrink-0" />
+                            {t('manage.reocr.pending.applying')}
+                          </p>
+                        )}
                       </div>
                     )}
 

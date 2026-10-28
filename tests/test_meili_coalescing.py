@@ -135,3 +135,43 @@ def test_work_leaves_active_set_when_done(sync_state):
 
     assert _wait_until(lambda: mo.get_meilisearch_sync_status()["active"] == 0)
     assert mo.get_meilisearch_sync_status()["dirty"] == 0
+
+
+def test_and_wait_returns_after_sync_finishes(sync_state):
+    """Ootav sünk tagastab alles siis, kui teose sünk on lõppenud."""
+    result = {}
+    t = threading.Thread(target=lambda: result.update(ok=mo.sync_work_to_meilisearch_and_wait("teos-a", timeout=5)))
+    t.start()
+    assert sync_state["started"].acquire(timeout=5)
+    time.sleep(0.05)
+    assert t.is_alive()  # sünk veel käib → ootaja ootab
+
+    sync_state["gate"].set()
+    t.join(timeout=5)
+    assert result == {"ok": True}
+
+
+def test_and_wait_covers_followup_of_active_sync(sync_state):
+    """Aktiivse sünki ajal kutsutud ootaja ootab ka järeljooksu (mis loeb tema muudatuse)."""
+    mo.sync_work_to_meilisearch_async("teos-a")
+    assert sync_state["started"].acquire(timeout=5)
+
+    result = {}
+    t = threading.Thread(target=lambda: result.update(ok=mo.sync_work_to_meilisearch_and_wait("teos-a", timeout=5)))
+    t.start()
+    time.sleep(0.05)
+    sync_state["gate"].set()
+    t.join(timeout=5)
+
+    assert result == {"ok": True}
+    assert sync_state["calls"] == ["teos-a", "teos-a"]
+
+
+def test_and_wait_timeout_returns_false(sync_state):
+    assert mo.sync_work_to_meilisearch_and_wait("teos-a", timeout=0.1) is False
+
+
+def test_and_wait_failed_sync_returns_false(sync_state):
+    sync_state["raise_on"].add("teos-a")
+    sync_state["gate"].set()
+    assert mo.sync_work_to_meilisearch_and_wait("teos-a", timeout=5) is False
