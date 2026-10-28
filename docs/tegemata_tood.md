@@ -120,6 +120,8 @@ logimisel vältida tokenitega URL-e.
 90 viidet, ≥5 sõltumatut teostust: `git_ops.py:181`, `admin_page_ops.py:164`,
 `scripts/sync_meilisearch.py:134`, `image_server.py:451,490,526` (3× ühes failis),
 `prosopography/router.py:327` (`_load_work_meta`).
+**2026-10-28:** lisandus `work_sets_access.py:17 load_work_metadata_by_id` — `try` puudub,
+rikutud fail tõstab erindi (500), mitte `None`.
 
 `server/work_meta.py:19 load_work_metadata` **ongi selleks** ja eksisteerib — teda ei
 kasutata järjekindlalt. Ühendamine ei ole mehaaniline: praegune loader **ei erista**
