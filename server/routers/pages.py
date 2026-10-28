@@ -29,7 +29,7 @@ from ..admin_page_ops import (
 from ..config import BASE_DIR, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import delete_page_from_git, save_with_git
-from .. import page_ops_jobs
+from .. import add_pdf_pages, page_ops_jobs
 from ..image_server import generate_thumbnail, invalidate_cover
 from ..meilisearch_ops import sync_work_to_meilisearch
 from ..prosopography.relations import refresh_work_mentions
@@ -328,6 +328,41 @@ def admin_add_pages(
     if not result.get("found", True):
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     return {"status": "success", **result}
+
+
+@router.post("/admin/work/{work_id}/add-pdf")
+def admin_add_pdf(
+    work_id: str,
+    file: UploadFile = File(...),
+    after: str = Form("end"),
+    user=Depends(require_role("admin")),
+):
+    """Lisab teosele PDF-i lehed TAUSTATÖÖNA (ADR 0074).
+
+    Body: multipart — file (PDF), after ("start" | "end" | pildifaili nimi, mille järele).
+    Vigane PDF → 400; ankrut ei ole / teose töö juba käib → 409.
+    Edenemine: GET …/page-ops/status (`kind: "add_pdf"`).
+    """
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    if not add_pdf_pages.anchor_exists(path, after):
+        raise HTTPException(status_code=409, detail="Lehte, mille järele sisestada, ei ole enam teoses")
+    try:
+        tmp_dir, page_count = add_pdf_pages.prepare_pdf(path, file.file)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    username = user["username"]
+    started = page_ops_jobs.start_job(
+        work_id, "add_pdf", page_count, username,
+        lambda progress: add_pdf_pages.run_add_pdf(work_id, tmp_dir, page_count, after, username, progress),
+        on_error=add_pdf_pages.error_fields,
+    )
+    if not started:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise HTTPException(status_code=409, detail="Selle teose taustatöö juba käib")
+    return {"status": "started", "total": page_count}
 
 
 @router.post("/admin/work/{work_id}/page/{page_num}/split")
