@@ -26,6 +26,8 @@ import {
   startWorkPageOps,
   getWorkPageOpsStatus,
   PageOpsStatus,
+  WorkJobKind,
+  addWorkPdf,
   deleteWork,
   deleteWorkPages,
   DeletedWorkPage,
@@ -57,6 +59,8 @@ import {
   PendingPageOps, clearPendingAdjust, pendingCount, pruneMissing, rotatePending, setPendingEdit,
   dropApplied, setPendingSplit, setPendingSplitX, toRequest,
 } from './manage/pageOpsPlan';
+import { jobConflictAction, resumeFollower } from './manage/jobKind';
+import { afterToAnchor, classifyAddFiles } from './manage/addFiles';
 import type { PageAdjust } from './upload/types';
 import { clampSplitX } from '../components/pagePrep/geometry';
 import { mapReocrState, selectableNoTextFiles, applicableReocrPages, ReocrStatusResponse } from '../utils/reocrStatus';
@@ -108,6 +112,11 @@ const WorkManage: React.FC = () => {
   const cancelRef = useRef(false);
   const [addingPage, setAddingPage] = useState(false);
   const [addPageError, setAddPageError] = useState<string | null>(null);
+  const [addPageResult, setAddPageResult] = useState<string | null>(null);
+  // PDF-i renderduse edenemine (ADR 0074) — eraldi piltide üleslaadimise tükkidest.
+  const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
+  // Äsja PDF-ist lisatud lehed: vaate olek, ei salvestata.
+  const [highlightedFiles, setHighlightedFiles] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Prügikast (kustutatud leheküljed)
@@ -573,16 +582,24 @@ const WorkManage: React.FC = () => {
   const handleReorderSave = () => { setReorderConfirmOpen(true); };
 
   /**
-   * Jälgib taustatööd kuni lõpuni (#431). Pakk-poolitus võib kesta minuteid —
-   * riba näitab „12 / 65 lehte". Lõpus laetakse nimekiri alati uuesti: ketas
-   * võis muutuda ka vea korral (osaline tulemus).
+   * Jälgib teose taustatööd kuni lõpuni (#431, ADR 0074). Pakk-poolitus või PDF-i
+   * renderdus võib kesta minuteid — riba näitab „12 / 65 lehte". Lõpu käsitlus
+   * sõltub liigist: ainult lehetoimingute lõpp puudutab ootel plaani.
    */
-  const followPageOps = async (total: number): Promise<boolean> => {
+  const followJob = async (kind: WorkJobKind, total: number): Promise<boolean> => {
     if (!workId || !authToken) return false;
-    setPageOpsSaving(true);
-    setPageOpsProgress({ done: 0, total });
+    const isPdf = kind === 'add_pdf';
+    if (isPdf) {
+      setAddingPage(true);
+      setUploadProgress(null);
+      setPdfProgress({ done: 0, total });
+    } else {
+      setPageOpsSaving(true);
+      setPageOpsProgress({ done: 0, total });
+    }
     let ok = false;
     let keep: Pick<PageOpsStatus, 'applied' | 'transformed'> | null = null;
+    let inserted: string[] = [];
     try {
       for (;;) {
         await new Promise((r) => setTimeout(r, 1000));
@@ -594,10 +611,23 @@ const WorkManage: React.FC = () => {
           continue;   // ajutine võrgutõrge — töö käib serveris edasi
         }
         if (st.state === 'running') {
-          setPageOpsProgress({ done: st.done ?? 0, total: st.total ?? total });
+          const p = { done: st.done ?? 0, total: st.total ?? total };
+          if (isPdf) setPdfProgress(p); else setPageOpsProgress(p);
           continue;
         }
-        if (st.state === 'done') {
+        if (isPdf) {
+          if (st.state === 'done') {
+            inserted = (st.result?.inserted ?? []).map((it) => it.filename);
+            setAddPageResult(t('manage.addPdf.done', { count: inserted.length }));
+            ok = true;
+          } else if (st.state === 'error') {
+            setAddPageError(st.code === 'anchor_missing'
+              ? t('manage.addPdf.anchorMissing')
+              : (st.error || t('manage.addPageError')));
+          } else {
+            setAddPageError(t('manage.pageOps.interrupted'));
+          }
+        } else if (st.state === 'done') {
           const r = st.result ?? {};
           setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, adjusted: r.adjusted ?? 0, split: r.split ?? 0 }));
           ok = true;
@@ -611,35 +641,53 @@ const WorkManage: React.FC = () => {
       }
     } finally {
       if (pageOpsPollAlive.current) {
-        // Vea korral jääb tegemata osa plaanist alles (server ütleb, mis tehti) —
-        // sadade lehtede uuesti märkimine oli 2026-10-12 tegelik kahju. Kui
-        // server seda ei tea (katkestus, ootamatu viga), plaan tühjaks: osaliselt
-        // tehtud pööre oleks uuel „Rakenda"-l teist korda pööratud.
-        const k = keep;
-        setPendingOps((ops) => (k ? dropApplied(ops, k.applied ?? [], k.transformed ?? []) : {}));
-        handleClearSelection();
-        await loadPages();
-        setThumbCacheBust(Date.now());
-        setPageOpsProgress(null);
-        setPageOpsSaving(false);
+        if (isPdf) {
+          // Lisatud lehed jäävad valituks ja esile: pööre, poolitus ja OCR
+          // käivad kohe nende peal. Ootel lehetoimingute plaani EI puudutata.
+          await loadPages();
+          if (ok) {
+            setSelectedFiles(new Set(inserted));
+            setHighlightedFiles(new Set(inserted));
+            closeAddForm();
+          }
+          setPdfProgress(null);
+          setAddingPage(false);
+        } else {
+          // Vea korral jääb tegemata osa plaanist alles (server ütleb, mis tehti) —
+          // sadade lehtede uuesti märkimine oli 2026-10-12 tegelik kahju. Kui
+          // server seda ei tea (katkestus, ootamatu viga), plaan tühjaks: osaliselt
+          // tehtud pööre oleks uuel „Rakenda"-l teist korda pööratud.
+          const k = keep;
+          setPendingOps((ops) => (k ? dropApplied(ops, k.applied ?? [], k.transformed ?? []) : {}));
+          handleClearSelection();
+          await loadPages();
+          setThumbCacheBust(Date.now());
+          setPageOpsProgress(null);
+          setPageOpsSaving(false);
+        }
       }
     }
     return ok;
   };
 
   /** Käivitab ootel pöörded ja poolitused taustatööna (kinnituse järel). */
-  const savePageOps = async (): Promise<boolean> => {
+  const savePageOps = async (retried = false): Promise<boolean> => {
     if (!workId || !authToken || pageOpsCount === 0) return false;
     setPageOpsConfirmOpen(false);
     setPageOpsError(null);
     setPageOpsResult(null);
     try {
       const r = await startWorkPageOps(workId, authToken, toRequest(pendingOps, splitX));
-      return await followPageOps(r.total);
+      return await followJob('page_ops', r.total);
     } catch (e: any) {
       if (e instanceof ApiError && e.status === 409) {
-        // Sama teose töö juba käib (teine sakk, topeltklikk) — jälgi seda.
-        return await followPageOps(pageOpsCount);
+        // Teose töö juba käib (teine sakk, topeltklikk) — jälgi ainult oma liiki.
+        const st = await getWorkPageOpsStatus(workId, authToken).catch(() => null);
+        const action = st ? jobConflictAction(st, 'page_ops') : 'other';
+        if (action === 'follow') return await followJob('page_ops', st?.total ?? pageOpsCount);
+        if (action === 'retry' && !retried) return await savePageOps(true);
+        setPageOpsError(t('manage.jobs.otherRunning'));
+        return false;
       }
       setPageOpsError(e?.message || t('manage.pageOps.error'));
       return false;
@@ -647,11 +695,14 @@ const WorkManage: React.FC = () => {
   };
 
   // Lehe avamisel: kui selle teose töö juba käib (lehe värskendus keset tööd),
-  // jätka jälgimist, muidu tunduks, et midagi ei toimu.
+  // jätka jälgimist õige liigi jälgijaga, muidu tunduks, et midagi ei toimu.
   useEffect(() => {
     if (!workId || !authToken || !isAdmin) return;
     getWorkPageOpsStatus(workId, authToken)
-      .then((st) => { if (st.state === 'running') void followPageOps(st.total ?? 0); })
+      .then((st) => {
+        const kind = resumeFollower(st);
+        if (kind) void followJob(kind, st.total ?? 0);
+      })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workId, authToken, isAdmin]);
@@ -661,7 +712,7 @@ const WorkManage: React.FC = () => {
   // Osade vormi mustand (#464) käib sama dialoogi kaudu — teist confirm-varianti ei tehta.
   const { dialogProps, runGuarded } = useUnsavedChangesGuard({
     isDirty: partsDirty || changedCount > 0 || pageOpsCount > 0,
-    onSave: partsDirty ? () => partsSaveRef.current() : pageOpsCount > 0 ? savePageOps : saveReorder,
+    onSave: partsDirty ? () => partsSaveRef.current() : pageOpsCount > 0 ? () => savePageOps() : saveReorder,
   });
   const switchTab = (tab: ActiveTab) => tabSwitch(partsDirty, runGuarded, () => setActiveTab(tab));
 
@@ -716,10 +767,50 @@ const WorkManage: React.FC = () => {
     await loadPages();
   };
 
-  const handleAddPage = async () => {
-    if (!workId || !authToken || addFiles.length === 0) return;
+  const closeAddForm = () => {
+    setShowAddForm(false);
+    setAddFiles([]);
+    setAddAfterPage(-1);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  /** PDF-i lisamine taustatööna (ADR 0074): server renderdab, klient jälgib. */
+  const handleAddPdf = async (file: File, retried = false) => {
+    if (!workId || !authToken) return;
     setAddingPage(true);
     setAddPageError(null);
+    setAddPageResult(null);
+    setHighlightedFiles(new Set());
+    try {
+      const r = await addWorkPdf(workId, authToken, file, afterToAnchor(addAfterPage, pages));
+      await followJob('add_pdf', r.total);
+    } catch (e: any) {
+      setAddingPage(false);
+      if (e instanceof ApiError && e.status === 409) {
+        const st = await getWorkPageOpsStatus(workId, authToken).catch(() => null);
+        const action = st ? jobConflictAction(st, 'add_pdf') : 'other';
+        if (action === 'follow') { await followJob('add_pdf', st?.total ?? 0); return; }
+        if (action === 'retry' && !retried && st?.state !== 'idle') { await handleAddPdf(file, true); return; }
+        // Töö ei käi → 409 tuli kadunud ankrust (leht kustutati/poolitati vahepeal).
+        setAddPageError(action === 'other' ? t('manage.jobs.otherRunning') : t('manage.addPdf.anchorMissing'));
+        await loadPages();
+        return;
+      }
+      setAddPageError(e?.message || t('manage.addPageError'));
+    }
+  };
+
+  const handleAddPage = async () => {
+    if (!workId || !authToken || addFiles.length === 0) return;
+    const picked = classifyAddFiles(addFiles);
+    if (picked.kind === 'invalid') {
+      setAddPageError(t(picked.reason === 'mixed' ? 'manage.addPdf.mixed' : 'manage.addPdf.multiplePdf'));
+      return;
+    }
+    if (picked.kind === 'pdf') { await handleAddPdf(picked.file); return; }
+    setAddingPage(true);
+    setAddPageError(null);
+    setAddPageResult(null);
     cancelRef.current = false;
 
     const sorted = [...addFiles].sort((a, b) => naturalCompare(a.name, b.name));
@@ -743,12 +834,7 @@ const WorkManage: React.FC = () => {
       }
 
       await loadPages();
-      if (!cancelRef.current) {
-        setShowAddForm(false);
-        setAddFiles([]);
-        setAddAfterPage(-1);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
+      if (!cancelRef.current) closeAddForm();
       if (meiliWarned && !cancelRef.current) setAddPageError(t('manage.addPagesMeiliWarning'));
     } catch (e: any) {
       await loadPages(); // peegelda osaline tulemus
@@ -1162,6 +1248,7 @@ const WorkManage: React.FC = () => {
                         onEdit={(tab) => setEditorTarget({ index: page.page_num - 1, tab })}
                         pendingOp={pendingOps[page.filename]}
                         splitX={splitX}
+                        isHighlighted={highlightedFiles.has(page.filename)}
                       />
                     );
                   })}
@@ -1196,6 +1283,20 @@ const WorkManage: React.FC = () => {
 
             {/* Lisa leht */}
             <div className="px-5 py-4 border-t border-gray-100">
+              {/* PDF-töö olek on nähtav ka suletud vormiga: töö võib olla
+                  üles võetud lehe värskenduse järel (resumeFollower). */}
+              {pdfProgress && (
+                <p className="text-sm text-gray-600 flex items-center gap-2 mb-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  {t('manage.addPdf.progress', pdfProgress)}
+                </p>
+              )}
+              {addPageResult && !showAddForm && (
+                <p className="text-sm text-green-700 mb-2">{addPageResult}</p>
+              )}
+              {addPageError && !showAddForm && (
+                <p className="text-sm text-red-600 mb-2">{addPageError}</p>
+              )}
               {!showAddForm ? (
                 <button
                   onClick={() => setShowAddForm(true)}
@@ -1213,7 +1314,7 @@ const WorkManage: React.FC = () => {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/jpeg,image/png"
+                      accept="image/jpeg,image/png,application/pdf"
                       multiple
                       disabled={addingPage}
                       onChange={(e) => {
@@ -1275,6 +1376,7 @@ const WorkManage: React.FC = () => {
                   {addPageError && (
                     <p className="text-sm text-red-600">{addPageError}</p>
                   )}
+
 
                   <div className="flex flex-wrap items-center gap-2">
                     <button

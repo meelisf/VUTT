@@ -7,7 +7,7 @@ jätkus, aga UI näitas viga). Nüüd: POST käivitab lõime, klient pollib olek
 Olek elab PROTSESSI mälus (üks uvicorn-worker, sama eeldus mis
 `RENDER_SEMAPHORE`-il). Serveri restart keset tööd → olek „idle"; klient
 laeb siis nimekirja uuesti ja näeb, mis kettale jõudis. Teose kohta korraga
-üks töö — teine start saab 409.
+üks töö sõltumata liigist (`page_ops`, `add_pdf`) — teine start saab 409.
 """
 import threading
 import time
@@ -37,37 +37,56 @@ def get_status(work_id: str) -> dict:
     return job
 
 
-def start(work_id: str, ops, username: str, total: int) -> bool:
-    """False = selle teose töö juba käib."""
+def start_job(work_id: str, kind: str, total: int, username: str, fn, on_error=None) -> bool:
+    """Käivitab teose taustatöö. False = selle teose MISTAHES liigi töö juba käib.
+
+    Teose kohta on korraga üks töö sõltumata liigist (`page_ops`, `add_pdf`):
+    mõlemad võtavad `work_lock`-i ja muudavad failinimede loendit. `kind` on
+    olekus, et klient jälgiks ainult oma liiki tööd ja käsitleks lõppu õigesti —
+    PDF-töö lõpp ei tohi tühjendada ootel lehetoimingute plaani.
+
+    fn(progress) tagastab `result`; progress(done, total). Erindi korral
+    lisatakse olekusse `on_error(e)` väljad.
+    """
     with _lock:
         if (_jobs.get(work_id) or {}).get("state") == "running":
             return False
-        _jobs[work_id] = {"state": "running", "done": 0, "total": total,
+        _jobs[work_id] = {"state": "running", "kind": kind, "done": 0, "total": total,
                           "username": username, "started_at": time.time()}
 
     def run():
         try:
-            result = apply_page_ops(work_id, ops, username,
-                                    progress=lambda d, t: _set(work_id, done=d, total=t))
+            result = fn(lambda d, t: _set(work_id, done=d, total=t))
             _set(work_id, state="done", result=result, finished_at=time.time())
         except Exception as e:
-            # ValueError (leht kadus vahepeal) ja RuntimeError (osaline) on
-            # kasutajale mõeldud sõnumid; muu logitakse ka.
+            # ValueError ja RuntimeError on kasutajale mõeldud sõnumid; muu logitakse ka.
             if not isinstance(e, (ValueError, RuntimeError)):
-                logger.exception(f"PAGE-OPS töö {work_id} kukkus")
-            # `applied`/`transformed` ütlevad kliendile, mis plaanist maha võtta;
-            # ValueError tuleb enne muutmist → midagi ei tehtud. Puuduv väli =
-            # teadmata (ootamatu erind) → klient tühjendab plaani.
-            if isinstance(e, PageOpsPartialError):
-                extra = {"applied": e.applied, "transformed": e.transformed}
-            elif isinstance(e, ValueError):
-                extra = {"applied": [], "transformed": []}
-            else:
-                extra = {}
+                logger.exception(f"{kind} töö {work_id} kukkus")
+            extra = on_error(e) if on_error else {}
             _set(work_id, state="error", error=str(e), finished_at=time.time(), **extra)
 
-    threading.Thread(target=run, daemon=True, name=f"page-ops-{work_id}").start()
+    threading.Thread(target=run, daemon=True, name=f"{kind}-{work_id}").start()
     return True
+
+
+def _page_ops_error_fields(e: Exception) -> dict:
+    # `applied`/`transformed` ütlevad kliendile, mis plaanist maha võtta;
+    # ValueError tuleb enne muutmist → midagi ei tehtud. Puuduv väli =
+    # teadmata (ootamatu erind) → klient tühjendab plaani.
+    if isinstance(e, PageOpsPartialError):
+        return {"applied": e.applied, "transformed": e.transformed}
+    if isinstance(e, ValueError):
+        return {"applied": [], "transformed": []}
+    return {}
+
+
+def start(work_id: str, ops, username: str, total: int) -> bool:
+    """Ootel lehetoimingute töö. False = selle teose töö juba käib."""
+    return start_job(
+        work_id, "page_ops", total, username,
+        lambda progress: apply_page_ops(work_id, ops, username, progress=progress),
+        on_error=_page_ops_error_fields,
+    )
 
 
 def _reset_for_tests() -> None:

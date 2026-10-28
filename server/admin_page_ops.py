@@ -909,9 +909,11 @@ def restore_original_page_image(work_id, filename, username="admin"):
         }
 
 
-def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, seq):
+def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, seq, src_path=None):
     """Kirjutab uue lehe pildi + tühja .txt + minimaalse .json kausta staging_dir.
 
+    `src_path` antud → pilt liigutatakse sealt (`os.replace`, sama FS), `content`
+    jäetakse kõrvale; nii ei pea suuri renderdusi mällu lugema.
     Nimekollisiooni kontroll käib nii work_dir kui staging_dir suhtes. EI committi.
     """
     new_id = generate_nanoid()
@@ -928,8 +930,11 @@ def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, se
     page_meta = {'sequence': seq, 'status': 'Toores'}
     json_str = json.dumps(page_meta, indent=2, ensure_ascii=False)
 
-    with open(img_path, 'wb') as f:
-        f.write(content)
+    if src_path is not None:
+        os.replace(src_path, img_path)
+    else:
+        with open(img_path, 'wb') as f:
+            f.write(content)
     os.chmod(img_path, 0o644)
     with open(txt_path, 'w', encoding='utf-8') as f:
         f.write('')
@@ -1001,25 +1006,33 @@ MAX_REQUEST_BYTES = 200 * 1024 * 1024
 MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024
 
 
+class AnchorMissing(ValueError):
+    """Sisestuskoha ankrut (lehe failinime) ei ole enam teoses — keegi kustutas
+    või poolitas selle lehe sel ajal, kui sisestatavad lehed valmisid."""
+
+    code = "anchor_missing"
+
+
 def add_pages(work_id, files, after_page_num, username):
     """Lisab mitu pildifaili teosele valitud positsioonile (nimejärgi sorteeritud).
 
     files: list of (filename, bytes). Tagastab dict (vt Interfaces). Viskab
     ValueError valideerimisvigade korral; found=False kui teost pole.
 
-    Atomaarsus: üks väljakutse = ÜKS git-commit (kõik uued lehed + ümbernummerdatud
-    olemasolevad). Osalise vea korral (mõni fail kirjutatud, siis viga) teeb
-    `_cleanup_bulk` täieliku tagasipööramise. NB: frontend tükeldab suured partiid
-    (>MAX_FILES_PER_REQUEST / >MAX_REQUEST_BYTES) mitmeks päringuks — iga tükk on
-    eraldi commit, seega tükkide-ülest atomaarsust EI ole (vahepealse tüki viga jätab
-    varasemad tükid sisse). Vt WorkManage.tsx handleAddPage.
+    See on pildi-HTTP tee VÄLISKIHT: piirid + teisendus. Teisendatud JPEG-id
+    kirjutatakse teose kausta ajutisse alamkausta ja sisestus käib
+    `insert_prepared_pages` kaudu (sama sisekiht mis PDF-i teel).
+
+    Atomaarsus: üks väljakutse = ÜKS git-commit. NB: frontend tükeldab suured
+    partiid (>MAX_FILES_PER_REQUEST / >MAX_REQUEST_BYTES) mitmeks päringuks — iga
+    tükk on eraldi commit, seega tükkide-ülest atomaarsust EI ole (vahepealse tüki
+    viga jätab varasemad tükid sisse). Vt WorkManage.tsx handleAddPage.
     """
     path = find_directory_by_id(work_id)
     if not path:
         return {"found": False}
-    folder_name = os.path.basename(path)
 
-    # --- Limiidi-kontroll (enne luku võtmist) ---
+    # --- Limiidi-kontroll ---
     if not files:
         raise ValueError("Faile pole")
     if len(files) > MAX_FILES_PER_REQUEST:
@@ -1032,7 +1045,7 @@ def add_pages(work_id, files, after_page_num, username):
     if total > MAX_REQUEST_BYTES:
         raise ValueError("Partii kogumaht liiga suur")
 
-    # --- Valideeri + teisenda KÕIK enne kirjutamist (enne luku võtmist) ---
+    # --- Valideeri + teisenda KÕIK enne kirjutamist ---
     converted = []  # (orig_name, jpeg_bytes, ext)
     for name, content in files:
         jpeg, ext = detect_and_convert_image(content, name)   # ValueError → katki
@@ -1040,12 +1053,58 @@ def add_pages(work_id, files, after_page_num, username):
 
     # --- Sorteeri nimejärgi (backend autoriteetne) ---
     converted.sort(key=lambda t: natural_sort_key(t[0]))
-    n = len(converted)
+
+    prepared_dir = os.path.join(path, f".tmp-prep-{uuid.uuid4().hex[:8]}")
+    os.makedirs(prepared_dir, exist_ok=True)
+    try:
+        prepared = []
+        for i, (_name, jpeg, ext) in enumerate(converted):
+            p = os.path.join(prepared_dir, f"{i:04d}{ext}")
+            with open(p, "wb") as f:
+                f.write(jpeg)
+            prepared.append(p)
+        del converted
+        return insert_prepared_pages(work_id, prepared, after_page_num, username)
+    finally:
+        shutil.rmtree(prepared_dir, ignore_errors=True)
+
+
+def insert_prepared_pages(work_id, jpeg_paths, after, username):
+    """Sisestab kettal olevad valmis pildid teosele ühe git-commit'iga.
+
+    jpeg_paths: failiteed sisestusjärjekorras (EI sorteerita). Failid LIIGUTATAKSE
+    (`os.replace`), seega peavad nad olema teose kaustaga samal failisüsteemil.
+    after: int = vana `after_page_num` (-1 lõppu, 0 algusesse, 1..M lehe järele);
+    str = "start" | "end" | olemasoleva pildifaili nimi, mille järele sisestada.
+    Mõlemad lahendatakse `work_lock`-i all — sisestatavad lehed võivad olla
+    valminud minuteid (PDF-i renderdus) ja lehtede loend vahepeal muutunud.
+    Puuduv ankur → AnchorMissing, midagi ei kirjutata.
+
+    Osalise vea korral teeb `_cleanup_bulk` täieliku tagasipööramise.
+    """
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"found": False}
+    folder_name = os.path.basename(path)
+    if not jpeg_paths:
+        raise ValueError("Faile pole")
+    n = len(jpeg_paths)
 
     with work_lock(folder_name, path):
-        # --- Vahemikukontroll (lukus — sequence loeb värsket olekut) ---
         images = get_sorted_images(path)
         page_count = len(images)
+        if isinstance(after, str):
+            if after == "start":
+                after_page_num = 0
+            elif after == "end":
+                after_page_num = -1
+            elif after in images:
+                after_page_num = images.index(after) + 1
+            else:
+                raise AnchorMissing(f"Lehte, mille järele sisestada, ei ole enam teoses: {after}")
+        else:
+            after_page_num = after
+        # --- Vahemikukontroll (lukus — sequence loeb värsket olekut) ---
         if not (after_page_num == -1 or 0 <= after_page_num <= page_count):
             raise ValueError(f"Vigane positsioon: {after_page_num}")
 
@@ -1070,9 +1129,11 @@ def add_pages(work_id, files, after_page_num, username):
         json_backups = {}         # olemasoleva json_path -> originaalsisu (restore jaoks)
 
         try:
-            # Kirjuta uued lehed staging-kausta
-            for (name, jpeg, ext), seq in zip(converted, new_seqs):
-                page = write_new_page(path, staging, folder_name, work_id, jpeg, ext, seq)
+            # Kirjuta uued lehed staging-kausta (pilt liigutatakse, mitte ei loeta mällu)
+            for src, seq in zip(jpeg_paths, new_seqs):
+                ext = os.path.splitext(src)[1].lower() or ".jpg"
+                page = write_new_page(path, staging, folder_name, work_id, None, ext, seq,
+                                      src_path=src)
                 written_pages.append(page)
 
             # Liiguta uued failid (img+txt+json) lõppasukohta (os.replace = atomaarne/FS)

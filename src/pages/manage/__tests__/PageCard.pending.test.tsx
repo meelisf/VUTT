@@ -56,3 +56,12 @@ describe('PageCard kärbe (ADR 0061)', () => {
     expect(img.style.transform).toBe('');
   });
 });
+
+describe('PageCard esiletõst (ADR 0074)', () => {
+  it('isHighlighted märgib äsja lisatud lehe', () => {
+    const { rerender } = render(<PageCard {...base} />);
+    expect(screen.queryByTestId('page-card-new')).toBeNull();
+    rerender(<PageCard {...base} isHighlighted />);
+    expect(screen.getByTestId('page-card-new')).toBeTruthy();
+  });
+});
