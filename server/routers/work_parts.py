@@ -13,6 +13,7 @@ from ..access_ops import can_read_work, can_write_work
 from ..deps import optional_user, require_role
 from ..utils import find_directory_by_id
 from ..work_sets_access import load_work_metadata_by_id
+from .. import page_address
 from .. import work_parts as wp
 from .. import work_part_proposals as wpp
 from ..rate_limit import check_rate_limit, get_client_ip
@@ -44,20 +45,42 @@ def _writable(work_id: str, user: dict) -> str:
     return path
 
 
+def _read_texts(path: str, stems) -> dict:
+    """Tüve → `.txt` sisu; puuduv/loetamatu fail jääb välja (aadress = teadmata)."""
+    out = {}
+    for s in stems:
+        try:
+            with open(os.path.join(path, s + ".txt"), "r", encoding="utf-8") as f:
+                out[s] = f.read()
+        except OSError:
+            pass
+    return out
+
+
 @router.get("/works/{work_id}/parts")
-def list_parts(work_id: str, user=Depends(optional_user)):
+def list_parts(work_id: str, addresses: bool = False, user=Depends(optional_user)):
     path, meta = _dir_and_meta(work_id)
     if not can_read_work(meta, user):
         raise HTTPException(status_code=403, detail="Puudub ligipääs")
     parts = meta.get("parts") or []
+    stems = wp.page_stems(path)
     # Lehenumbrid (/work/{id}/{nr}) ainult osades olevatele tüvedele — töölaua sisukord
     # ei tea lehtede loendit. Sama järjekord mis indekseerijal (page_stems).
     used = {s for p in parts for s in p.get("pages") or []}
-    numbers = {s: i + 1 for i, s in enumerate(wp.page_stems(path)) if s in used} if used else {}
-    stems = wp.page_stems(path)
+    numbers = {s: i + 1 for i, s in enumerate(stems) if s in used} if used else {}
     # `pages_version` + `page_count`: agendi osade ettepanek (#492) viitab lehtedele numbritega.
-    return {"parts": parts, "page_numbers": numbers, "page_count": len(stems),
+    body = {"parts": parts, "page_numbers": numbers, "page_count": len(stems),
             "pages_version": wpp.pages_version(path)}
+    if addresses:
+        # Käsikirja aadressiviide (#630 spekk 2): kettalt, mitte Meilist — vastus peab
+        # peegeldama salvestatud teksti. Trükisel/skeemita teosel lehti ei loeta.
+        scheme = page_address.work_scheme(meta)
+        body["page_numbering"] = meta.get("page_numbering")
+        body["part_addresses"] = (
+            page_address.part_addresses(
+                stems, _read_texts(path, page_address.needed_stems(stems, parts)), parts, scheme)
+            if scheme and parts else {})
+    return body
 
 
 @router.post("/works/{work_id}/parts", status_code=201)

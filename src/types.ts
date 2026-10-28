@@ -93,6 +93,9 @@ export interface Relation {
  * Meilisearch kasutab sisemiselt eestikeelseid välju (koht, trükkal),
  * aga meiliService.ts kaardistab need v2 väljadele (location, publisher).
  */
+/** Käsikirja lehenummerduse skeem (#630 spekk 2): `<fw>` tähendus aadressiviites. */
+export type PageNumbering = 'foliation' | 'pagination';
+
 export interface Work {
   // =========================================================
   // V2/V3 VÄLJAD - KASUTA NEID UUES KOODIS
@@ -107,6 +110,7 @@ export interface Work {
   title_en?: string;        // Pealkirja ingliskeelne vaste (ADR 0064)
   title_original?: string;  // Allikast transkribeeritud pealkiri (ADR 0064)
   title_devised?: boolean;  // true = pealkiri on koostatud, mitte transkribeeritud
+  page_numbering?: PageNumbering | null; // Käsikirja lehenummerduse skeem (#630 spekk 2)
   year: number | null;      // Ilmumisaasta (number filtri/sortimise jaoks)
   dating?: WorkDating | null;
   year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")

@@ -483,6 +483,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         keeltega), teose lehtede arvu (`page_count`) ja `pages_version`-i — see
         seob osade ettepaneku nähtud lehtede järjekorraga.
         Kasuta enne submit_work_parts_proposal'it, et mitte pakkuda juba olemasolevat osa.
+        `address` on käsikirja enda viide (ainult käsikirjadel, kui teosel on
+        `page_numbering`; nt "fol. 10r–[10v]"): nurksulgudes osa on tuletatud,
+        `?` = aadress teadmata; `pages` jääb VUTT-i leheküljenumbriks.
         """
         return work_parts_mod.work_parts(client, work_id)
 

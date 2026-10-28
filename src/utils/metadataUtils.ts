@@ -39,3 +39,8 @@ export function getLabel(
   return capitalizeFirst(label);
 }
 
+
+/** Käsikiri = `type` kannab Q-koodi Q87167 (CLAUDE.md, Domeen). Paljas string ei ole väide. */
+export function isManuscriptType(type: unknown): boolean {
+  return !!type && typeof type === 'object' && (type as { id?: unknown }).id === 'Q87167';
+}

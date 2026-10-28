@@ -17,6 +17,7 @@ class FakeClient:
 
     def api_get(self, path, params=None):
         assert path == "/works/w1ab/parts"
+        self.params = params
         return self.data
 
     def api_post_once(self, path, body):
@@ -28,6 +29,16 @@ def test_osad_numbritega_ja_versiooniga():
     out = json.loads(parts.work_parts(FakeClient(), "w1ab"))
     assert out["pages_version"] == "abc123" and out["page_count"] == 6
     assert out["parts"][0]["pages"] == [2, 3]
+
+
+def test_kasikirja_aadress_kaasas():
+    """#630 spekk 2: aadressiviide küsitakse ja antakse osa juurde."""
+    c = FakeClient()
+    c.data.update(page_numbering="foliation", part_addresses={"k1": {"text": "fol. 10r–[10v]", "ranges": []}})
+    out = json.loads(parts.work_parts(c, "w1ab"))
+    assert c.params == {"addresses": 1}
+    assert out["page_numbering"] == "foliation" and out["parts"][0]["address"] == "fol. 10r–[10v]"
+    assert json.loads(parts.work_parts(FakeClient(), "w1ab"))["parts"][0]["address"] is None
 
 
 def test_osa_tekstivaljad_kaasas():

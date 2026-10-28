@@ -379,3 +379,15 @@ describe('buildMetadataPayload — pealkirja lisaväljad', () => {
     expect(m.title_devised).toBe(true);
   });
 });
+
+describe('buildMetadataPayload — lehenummerdus (#630 spekk 2)', () => {
+  it('laadimata skeem (undefined) jääb payloadist välja → salvestus säilitab skeemi', () => {
+    const m = buildMetadataPayload(baseForm(), 'w1').metadata;
+    expect('page_numbering' in m).toBe(false);
+  });
+
+  it('laetud skeem ja tühjendus saadetakse', () => {
+    expect(buildMetadataPayload({ ...baseForm(), page_numbering: 'foliation' }, 'w1').metadata.page_numbering).toBe('foliation');
+    expect(buildMetadataPayload({ ...baseForm(), page_numbering: null }, 'w1').metadata.page_numbering).toBeNull();
+  });
+});

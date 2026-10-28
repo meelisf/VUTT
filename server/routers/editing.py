@@ -34,6 +34,7 @@ from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..page_history import build_page_history
 from ..page_locks import page_lock
 from ..page_merge import PAGE_FIELDS, merge_page, read_page_view, text_conflict_chunks
+from ..page_address import clean_page_numbering
 from ..page_paths import check_page_filename, require_existing_page
 from ..page_text import normalize_page_text
 from .. import page_text_proposals
@@ -326,6 +327,9 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
         raise HTTPException(status_code=400, detail="Osi muudetakse /works/{id}/parts kaudu")
     try:
         data['metadata'] = dating_updates(data.get('metadata', {}))
+        # Käsikirja lehenummerduse skeem (#630 spekk 2): ainult foliation | pagination | null.
+        if 'page_numbering' in data['metadata']:
+            data['metadata']['page_numbering'] = clean_page_numbering(data['metadata']['page_numbering'])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))

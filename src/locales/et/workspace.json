@@ -483,6 +483,10 @@
     "genre": "Žanr",
     "languages": "Keeled",
     "typePlaceholder": "nt: trükis, käsikiri",
+    "pageNumbering": "Lehenummerdus",
+    "pageNumberingFoliation": "foliatsioon (lehed, r/v)",
+    "pageNumberingPagination": "paginatsioon (leheküljed)",
+    "pageNumberingHint": "Lehe <fw> tähendus osa aadressiviites (fol. / p.).",
     "viewPersonPage": "Vaata isiku lehte",
     "noGenres": "Žanrid puuduvad",
     "genrePlaceholder": "Lisa žanr..."
@@ -543,6 +547,7 @@
     "noImage": "Pilt puudub",
     "toc": "Sisukord",
     "tocDetails": "Näita osa andmeid",
+    "tocAddressHint": "Nurksulgudes aadress on tuletatud eelmiselt lehelt; ? = aadress teadmata",
     "tocAttachments": "Lisad",
     "tocEdit": "Muuda osa",
     "tocCopyLink": "Kopeeri link",

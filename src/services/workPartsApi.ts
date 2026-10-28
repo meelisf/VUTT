@@ -35,10 +35,23 @@ export async function listParts(workId: string, token: string | null): Promise<W
   const r = await apiGet<{ parts: WorkPart[] }>(base(workId), opts(token));
   return r.parts ?? [];
 }
-/** Töölaua sisukord: osad + nende lehtede numbrid (/work/{id}/{nr}). */
-export async function getPartsToc(workId: string, token: string | null): Promise<{ parts: WorkPart[]; pageNumbers: Record<string, number> }> {
-  const r = await apiGet<{ parts: WorkPart[]; page_numbers?: Record<string, number> }>(base(workId), opts(token));
-  return { parts: r.parts ?? [], pageNumbers: r.page_numbers ?? {} };
+/** Käsikirja aadress (#630 spekk 2): `null` = teadmata (`?` lõik). */
+export interface PageAddress { scheme: 'foliation' | 'pagination'; n: number; side?: 'r' | 'v'; derived: boolean; }
+export interface PartAddressRange {
+  from_page: number; to_page: number; from_stem: string; to_stem: string;
+  from: PageAddress | null; to: PageAddress | null;
+}
+/** Osa aadressiviide: valmis tekst (server vormindab, sama mis MCP-l) + struktuur. */
+export interface PartAddress { text: string; ranges: PartAddressRange[]; }
+
+/** Töölaua sisukord: osad + nende lehtede numbrid (/work/{id}/{nr}).
+ *  `addresses` — ka käsikirja aadressiviited (server loeb siis lehtede teksti). */
+export async function getPartsToc(workId: string, token: string | null, { addresses = false } = {}): Promise<{
+  parts: WorkPart[]; pageNumbers: Record<string, number>; partAddresses: Record<string, PartAddress>;
+}> {
+  const r = await apiGet<{ parts: WorkPart[]; page_numbers?: Record<string, number>; part_addresses?: Record<string, PartAddress> }>(
+    addresses ? `${base(workId)}?addresses=1` : base(workId), opts(token));
+  return { parts: r.parts ?? [], pageNumbers: r.page_numbers ?? {}, partAddresses: r.part_addresses ?? {} };
 }
 export const createPart = (workId: string, part: PartInput, token: string | null) =>
   apiPost<WorkPart>(base(workId), part, opts(token));

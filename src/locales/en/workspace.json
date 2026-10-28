@@ -483,6 +483,10 @@
     "genre": "Genre",
     "languages": "Languages",
     "typePlaceholder": "e.g. print, manuscript",
+    "pageNumbering": "Page numbering",
+    "pageNumberingFoliation": "foliation (leaves, r/v)",
+    "pageNumberingPagination": "pagination (pages)",
+    "pageNumberingHint": "Meaning of the page's <fw> in the part's address reference (fol. / p.).",
     "viewPersonPage": "View person page",
     "noGenres": "No genres",
     "genrePlaceholder": "Add a genre..."
@@ -543,6 +547,7 @@
     "noImage": "No image",
     "toc": "Contents",
     "tocDetails": "Show part details",
+    "tocAddressHint": "An address in square brackets is derived from the preceding page; ? = address unknown",
     "tocAttachments": "Attachments",
     "tocEdit": "Edit part",
     "tocCopyLink": "Copy link",

@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Edit3, X, Save, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
 import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
-import { Creator, Page, Work, ArchiveRef } from '../types';
+import { Creator, Page, Work, ArchiveRef, PageNumbering } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
-import { getLabel } from '../utils/metadataUtils';
+import { getLabel, isManuscriptType } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
@@ -39,6 +39,7 @@ interface MetadataForm {
   title_en: string;           // ADR 0064
   title_original: string;
   title_devised: boolean;
+  page_numbering?: PageNumbering | null;  // #630: ainult serverist laetuna (muidu kustutaks salvestus skeemi)
   dating?: WorkDating | null;
   yearInput: string;                  // Üks tekstilahter: 1680 | ca. 1680 | 1670–1690 | 17. saj (vt deriveYearFields)
   type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
@@ -376,6 +377,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           title_en: m.title_en || '',
           title_original: m.title_original || '',
           title_devised: m.title_devised === true,
+          page_numbering: m.page_numbering ?? null,
           yearInput: m.year_display || (year ? String(year) : ''),
           dating: m.dating ?? null,
           type: m.type || null,
@@ -634,6 +636,23 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 localSuggestions={suggestions.types}
               />
             </div>
+            {/* Lehenummerdus (#630): ainult käsikirjal ja serverist laetuna */}
+            {isManuscriptType(metaForm.type) && metaForm.page_numbering !== undefined && (
+              <div className="w-1/3">
+                <label htmlFor="meta-page-numbering" className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.pageNumbering')}</label>
+                <select
+                  id="meta-page-numbering"
+                  value={metaForm.page_numbering ?? ''}
+                  onChange={e => setMetaForm({ ...metaForm, page_numbering: (e.target.value || null) as PageNumbering | null })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                >
+                  <option value="">—</option>
+                  <option value="foliation">{t('metadata.pageNumberingFoliation')}</option>
+                  <option value="pagination">{t('metadata.pageNumberingPagination')}</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-400">{t('metadata.pageNumberingHint')}</p>
+              </div>
+            )}
             {/* Keeled */}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.languages', 'Keeled')}</label>
