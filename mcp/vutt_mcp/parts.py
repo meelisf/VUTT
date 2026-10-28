@@ -22,15 +22,17 @@ def _check_work_id(work_id: str) -> None:
 
 
 def work_parts(client, work_id: str) -> str:
-    """Olemasolevad osad leheküljenumbritega + lehtede arv ja `pages_version`."""
+    """Olemasolevad osad leheküljenumbritega + lehtede arv ja `pages_version`.
+    Käsikirjal määratud lehenummerdusega ka osa aadressiviide (`address`, #630)."""
     _check_work_id(work_id)
     try:
-        data = client.api_get(f"/works/{quote(work_id, safe='')}/parts")
+        data = client.api_get(f"/works/{quote(work_id, safe='')}/parts", params={"addresses": 1})
     except VuttNotFound as exc:
         raise VuttNotFound(f"Teost work_id={work_id} ei leitud või pole avalik.") from exc
     if not isinstance(data, dict) or "pages_version" not in data:
         raise VuttError("VUTT ei tagastanud teose osi.")
     numbers = data.get("page_numbers") or {}
+    addresses = data.get("part_addresses") or {}
     parts = []
     for p in data.get("parts") or []:
         parts.append({
@@ -41,9 +43,11 @@ def work_parts(client, work_id: str) -> str:
             "creators": p.get("creators") or [], "dating": p.get("dating"),
             "place": p.get("place"), "place_to": p.get("place_to"),
             "attached_to": p.get("attached_to"),
+            "address": (addresses.get(p.get("id")) or {}).get("text"),
         })
     return json.dumps({"work_id": work_id, "page_count": data.get("page_count"),
-                       "pages_version": data["pages_version"], "parts": parts},
+                       "pages_version": data["pages_version"],
+                       "page_numbering": data.get("page_numbering"), "parts": parts},
                       ensure_ascii=False, indent=1)
 
 

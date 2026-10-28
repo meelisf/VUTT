@@ -1,5 +1,5 @@
 import { datingError, WorkDating } from './workDating';
-import { Creator, CreatorRole, ArchiveRef } from '../types';
+import { Creator, CreatorRole, ArchiveRef, PageNumbering } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { deriveYearFields } from './yearDisplayUtils';
 
@@ -9,6 +9,8 @@ export interface MetadataFormData {
   title_en?: string;
   title_original?: string;
   title_devised?: boolean;
+  // Käsikirja lehenummerdus (#630). Puuduv = serverist laadimata → ära puutu.
+  page_numbering?: PageNumbering | null;
   dating?: WorkDating | null;
   yearInput: string;          // Üks tekstilahter: puhas aasta, ca., vahemik või sajand (vt deriveYearFields)
   type: string | LinkedEntity | null;
@@ -39,6 +41,7 @@ export interface MetadataPayload {
     title_en?: string | null;
     title_original?: string | null;
     title_devised?: boolean;
+    page_numbering?: PageNumbering | null;
     year: number;
     year_display: string | null;
     dating?: WorkDating | null;
@@ -117,6 +120,7 @@ export function buildMetadataPayload(
       ...(form.title_en !== undefined ? { title_en: form.title_en.trim() || null } : {}),
       ...(form.title_original !== undefined ? { title_original: form.title_original.trim() || null } : {}),
       ...(form.title_devised !== undefined ? { title_devised: form.title_devised } : {}),
+      ...(form.page_numbering !== undefined ? { page_numbering: form.page_numbering } : {}),
       year,
       year_display: year_display || null,
       ...(form.dating !== undefined ? { dating: form.dating } : {}),

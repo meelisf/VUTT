@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, ListOrdered, Pencil } from 'lucide-react';
-import { deletePart, getPartsToc, updatePart, type WorkPart } from '../../services/workPartsApi';
+import { deletePart, getPartsToc, updatePart, type PartAddress, type WorkPart } from '../../services/workPartsApi';
 import { draftFromPart, PartDatingError, partFromDraft, sharedStems as sharedStemsOf, type PartDraft } from '../../pages/manage/partsModel';
 import PartForm from '../../pages/manage/parts/PartForm';
 import PartPanel from '../../pages/manage/parts/PartPanel';
@@ -47,6 +47,7 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
   const { t } = useTranslation(['workspace']);
   const [parts, setParts] = useState<WorkPart[]>([]);
   const [nums, setNums] = useState<Map<string, number>>(new Map());
+  const [addresses, setAddresses] = useState<Record<string, PartAddress>>({});
   const [open, setOpen] = useState(readOpen);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleRow = (id: string) => setExpanded(prev => {
@@ -58,8 +59,8 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
   const load = useCallback(async (isCancelled: () => boolean = () => false) => {
     if (!workId) return;
     try {
-      const r = await getPartsToc(workId, token);
-      if (!isCancelled()) { setParts(r.parts); setNums(new Map(Object.entries(r.pageNumbers))); }
+      const r = await getPartsToc(workId, token, { addresses: true });
+      if (!isCancelled()) { setParts(r.parts); setNums(new Map(Object.entries(r.pageNumbers))); setAddresses(r.partAddresses); }
     } catch {
       if (!isCancelled()) setParts([]);   // sisukord on lisainfo — tõrge peidab paneeli
     }
@@ -185,7 +186,7 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
                   {p.title && who && <span className="block text-xs text-gray-500">{who}</span>}
                   {p.incipit && <span className="block truncate text-xs italic text-gray-400">{p.incipit}</span>}
                 </button>
-                <div className="shrink-0 text-xs tabular-nums text-gray-500">
+                <div className="shrink-0 max-w-[45%] text-right text-xs tabular-nums text-gray-500">
                   {t('info.tocPages')}{' '}
                   {ranges.map((r, k) => (
                     <React.Fragment key={r.from}>
@@ -195,6 +196,13 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
                       </Link>
                     </React.Fragment>
                   ))}
+                  {/* Käsikirja enda aadress (#630): tavaline kopeeritav tekst, pikk viide lõigatakse. */}
+                  {addresses[p.id] && (
+                    <span className="block truncate text-[11px] text-gray-400"
+                      title={`${addresses[p.id].text} — ${t('info.tocAddressHint')}`}>
+                      ({addresses[p.id].text})
+                    </span>
+                  )}
                 </div>
                 {/* Üksikasjad on alati avatavad: seal on vähemalt osa püsilink. */}
                 <button type="button" onClick={() => toggleRow(p.id)} aria-expanded={isOpen}

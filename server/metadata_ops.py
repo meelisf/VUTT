@@ -30,6 +30,8 @@ ALLOWED_METADATA_FIELDS = {
     "series", "relations", "archive_refs", "shareable",
     # Pealkirja tõlge, originaal ja tekkeviis (ADR 0064).
     *TITLE_TEXT_FIELDS, "title_devised",
+    # Käsikirja lehenummerduse skeem (#630 spekk 2); valideerib /update-work-metadata.
+    "page_numbering",
     # Osad (#464): muudetakse AINULT work_parts otspunktidega; üldine route lükkab tagasi.
     "parts",
 }

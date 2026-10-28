@@ -272,6 +272,43 @@ def test_get_ilma_osadeta_tuhi_numbrikaart(client):
     assert body["page_count"] == 4 and len(body["pages_version"]) == 16   # agendi ettepanekuteks (#492)
 
 
+def _set_meta(work, **kw):
+    m = _meta(work)
+    m.update(kw)
+    open(f"{work}/_metadata.json", "w", encoding="utf-8").write(json.dumps(m))
+
+
+MS = {"id": "Q87167", "label": "käsikiri"}
+
+
+def test_get_aadressid_ainult_parameetriga(client, work):
+    """#630 spekk 2: ilma `?addresses=1`-ta uusi võtmeid ei ole."""
+    _set_meta(work, type=MS, page_numbering="foliation")
+    client.post("/works/w1/parts", json={"kind": "letter", "pages": ["t-001", "t-002"]})
+    assert "part_addresses" not in client.get("/works/w1/parts").json()
+
+
+def test_get_aadressid_kasikirjal(client, work):
+    _set_meta(work, type=MS, page_numbering="foliation")
+    open(f"{work}/t-001.txt", "w", encoding="utf-8").write("Hochedler\n<fw>10</fw>")
+    open(f"{work}/t-002.txt", "w", encoding="utf-8").write("tekst")
+    open(f"{work}/t-003.txt", "w", encoding="utf-8").write("<fw>11</fw>")
+    pid = client.post("/works/w1/parts", json={"kind": "letter", "pages": ["t-001", "t-002"]}).json()["id"]
+    body = client.get("/works/w1/parts?addresses=1").json()
+    assert body["page_numbering"] == "foliation"
+    assert body["part_addresses"][pid]["text"] == "fol. 10r–[10v]"
+
+
+def test_get_aadressid_trukisel_lehti_ei_loeta(client, work, monkeypatch):
+    from server.routers import work_parts as r
+    _set_meta(work, type={"id": "Q1261026"}, page_numbering="foliation")
+    client.post("/works/w1/parts", json={"kind": "letter", "pages": ["t-001"]})
+    def boom(*a, **k): raise AssertionError("trükise lehti ei loeta")
+    monkeypatch.setattr(r, "_read_texts", boom)
+    body = client.get("/works/w1/parts?addresses=1").json()
+    assert body["part_addresses"] == {} and body["page_numbering"] == "foliation"
+
+
 def test_endpointide_vead(client):
     assert client.post("/works/w1/parts", json={"kind": "x", "pages": ["t-001"]}).status_code == 400
     assert client.put("/works/w1/parts/nope", json={"kind": "letter", "pages": ["t-001"]}).status_code == 404
@@ -303,6 +340,24 @@ def test_uldine_metaandmete_salvestus_lukkab_parts_tagasi():
         asyncio.run(editing.update_work_metadata(FakeRequest(), None, user={"username": "a", "role": "admin"}))
     assert e.value.status_code == 400
     assert "parts" in ALLOWED_METADATA_FIELDS
+
+
+def test_page_numbering_valideeritakse_ja_lubatud():
+    """#630 spekk 2: tundmatu skeem → 400; väli on lubatud (muidu heidetaks vaikselt kõrvale)."""
+    import asyncio
+    from fastapi import HTTPException
+    from server.routers import editing
+    from server.metadata_ops import ALLOWED_METADATA_FIELDS
+
+    class FakeRequest:
+        headers = {}
+        async def json(self):
+            return {"work_id": "w1", "metadata": {"page_numbering": "signatures"}}
+
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(editing.update_work_metadata(FakeRequest(), None, user={"username": "a", "role": "admin"}))
+    assert e.value.status_code == 400
+    assert "page_numbering" in ALLOWED_METADATA_FIELDS
 
 
 # ── Arvustuse leiud (lukk, vananenud tüved) ───────────────────────────────────

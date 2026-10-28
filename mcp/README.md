@@ -89,7 +89,7 @@ Kolm asja, mis üllatavad:
 | `get_person_enrichment_context` | Ühe isiku ametite ja hariduse täielikud JSON-kirjed + `updated_at` ettepaneku koostamiseks |
 | `search_enrichment_registry` | Ametite või asutuste registrikandidaadid püsivõtme, Q-koodi ja nimevariandi järgi; eristab puuduva registri tühjast tulemusest |
 | `submit_person_enrichment_proposal` | Toimetaja koodiga (8 h; üks isik või kõik isikud) ootel ettepanek VUTT-i ülevaatuseks; kaarti ei muuda |
-| `get_work_parts` | Teose olemasolevad osad leheküljenumbritega, lehtede arv ja `pages_version` |
+| `get_work_parts` | Teose olemasolevad osad leheküljenumbritega, lehtede arv ja `pages_version`; käsikirjal määratud lehenummerdusega ka osa `address` (nt `fol. 10r–[10v]`, nurksulgudes tuletatud; #630) |
 | `submit_work_parts_proposal` | Teose osade (kirjad, istungid jm) ootel ettepanek toimetaja koodiga; teost ei muuda |
 | `get_page_source` | Lehe toortekst (märgendus, reavahetused) + `stem` + `text_hash` + lubatud tägid; nõuab superadmini koodi (#641) |
 | `submit_page_text_proposal` | Lehe teksti asendused (`old` → `new`) ootel ettepanekuna; superadmin vaatab Workspace'is pildi kõrval üle; lehti ei muuda |

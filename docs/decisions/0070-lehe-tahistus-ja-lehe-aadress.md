@@ -154,6 +154,25 @@ plaan `docs/superpowers/plans/2026-10-17-lehe-tahistus-tagid.md` — tägid, ots
    (`page-number`, `signature-mark`, `catch-word`). Praegu kirjutab OCR tähistuse
    omaette reale või jätab pliiatsinumbri välja.
 
+## Täiendus 2026-10-28 — spekk 2 teostatud (v1)
+
+Spekk `docs/superpowers/specs/2026-10-19-lehe-aadress-sisukorras-design.md`:
+
+- **v1 = käsikirjad** (`type.id == Q87167`) + teose väli `page_numbering`
+  (`foliation` | `pagination`, admin, `/update-work-metadata`). Trükised, signatuurid,
+  täisloendus, `conflict`-lipp, käsitsi aadress ja read-model on edasi lükatud.
+- Aadress = lehe esimene `<fw>` + **ühe sammu edasituletus** eelmiselt nähtavalt lehelt
+  (foliatsioonis ainult rectolt); järgmine nähtav leht, mis ei ole järglane, keelab
+  tuletuse (`?`). **Üldreegel (kasutaja 2026-10-28):** segaduse korral tuletus ei arva —
+  kahtlased lehed märgendatakse käsitsi (nähtav number `<fw>`-ga, muu käsitsi aadressiga,
+  p. 5; viimane on veel teostamata). Arvutus kettalt päringu ajal (`server/page_address.py`,
+  `GET /works/{id}/parts?addresses=1`), mitte Meilist.
+- p. 7 „loendus … kuni osa piirini" ei kehti v1-le: naaber on **teose** tasemel
+  (`47w6yr` lk 22 ← lk 21).
+- Suletud lahtistest: recto kuva `10r`; kasutuskoht = Workspace'i sisukord + MCP
+  `get_work_parts` (`address`).
+- Uus juhtum lahtiste juurde: `rzk0ws` signatuur `)2(` (number tüve sees).
+
 ## Lahtised küsimused (spekki)
 
 - **Tägide nimed** (`<fw>`/`<sig>`/`<catch>` vs lühemad või eestikeelsed).

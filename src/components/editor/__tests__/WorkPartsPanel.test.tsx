@@ -4,12 +4,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '../../../pages/manage/parts/__tests__/testI18n';
 
-const { api } = vi.hoisted(() => ({ api: { parts: [] as any[], nums: {} as Record<string, number>, fail: false, updates: [] as any[] } }));
+const { api } = vi.hoisted(() => ({ api: { parts: [] as any[], nums: {} as Record<string, number>, addr: {} as Record<string, any>, fail: false, updates: [] as any[] } }));
 vi.mock('../../../services/workPartsApi', async (orig) => ({
   ...(await orig<typeof import('../../../services/workPartsApi')>()),
   getPartsToc: async () => {
     if (api.fail) throw new Error('403');
-    return { parts: api.parts, pageNumbers: api.nums };
+    return { parts: api.parts, pageNumbers: api.nums, partAddresses: api.addr };
   },
   updatePart: async (_w: string, id: string, part: any) => {
     api.updates.push({ id, part });
@@ -34,11 +34,25 @@ const renderPanel = (page = 1, canEdit = false) => render(
 );
 
 beforeEach(() => {
-  api.parts = [POEM, LETTER]; api.nums = { s2: 2, s3: 3, s5: 5, s7: 7 }; api.fail = false; api.updates = [];
+  api.parts = [POEM, LETTER]; api.nums = { s2: 2, s3: 3, s5: 5, s7: 7 }; api.addr = {}; api.fail = false; api.updates = [];
   try { localStorage.clear(); } catch { /* */ }
 });
 
 describe('WorkPartsPanel', () => {
+  it('käsikirja aadressiviide lehenumbrite järel sulgudes (#630); ilma viiteta sulgusid pole', async () => {
+    api.addr = { a: { text: 'fol. 10r–[10v], [11v]', ranges: [] } };
+    try { localStorage.setItem('vutt_parts_toc_open', '1'); } catch { /* */ }
+    renderPanel();
+    const row = await waitFor(() => {
+      const el = document.querySelector('[data-part-id="a"]') as HTMLElement;
+      expect(el).toBeTruthy();
+      return el;
+    });
+    expect(row.textContent).toContain('(fol. 10r–[10v], [11v])');
+    expect(document.querySelector('[data-part-id="b"]')?.textContent).not.toContain('(');
+  });
+
+
   it('?part= (kirjaotsingu link, #526) avab paneeli ja selle osa üksikasjad', async () => {
     render(
       <MemoryRouter initialEntries={['/work/w1/2?part=a']}>

@@ -1,7 +1,7 @@
 # Lehe aadress sisukorras, käsikirjad — spekk 2 (#630, ADR 0070)
 
 **Kuupäev:** 2026-10-19
-**Staatus:** mustand, ülevaatusringid enne teostust (kasutaja nõue, ADR 0070); ülevaatused 1–3
+**Staatus:** teostatud 2026-10-28 (vt „Teostuse märkused"); ülevaatused 1–3
 sisse viidud, ulatus kitsendatud käsikirjadele 2026-10-19
 **Eelneb:** spekk 1 `2026-10-16-lehe-tahistus-tagid-design.md` — tägid `<fw>`/`<sig>`/`<catch>`/`<rh>`,
 `page_marks`, paneel (tootmises 17.10, PR #631–636).
@@ -131,7 +131,9 @@ Tuletatud aadressist edasi ei tuletata.
 - **Foliatsioon:** eelmine leht on **nähtav recto** `Nr` → see leht on `[Nv]`.
   Eelmine leht on verso, tähistuseta, parsimatu, laotus või puudub → ei tuletata.
   Järgmisest lehest ei tuletata kunagi: `t9zd42` lk 5 (`261`) eelneb köites auk —
-  tagasisuunas pakuks ta tähistuseta lk 4-le `[260v]`, õige on `[247v]` (lk 3 `247`).
+  tagasisuunas pakuks ta tähistuseta lk 4-le `[260v]`. Edasisuunas `[247v]` (lk 3 `247`)
+  aga ka ei tule: järgmise lehe kontroll näeb hüpet `247r → 261r` ja annab `?`
+  (teostuse täpsustus 2026-10-28, vt „Teostuse märkused").
   Verso ja tema recto on sama füüsiline leht; järgmine recto on juba teine leht.
 - **Paginatsioon:** eelmine leht on nähtav `n` → see leht on `[n+1]`.
 - **Kontroll järgmise lehega** (mõlemad skeemid): kui järgmine leht on **nähtav** ja ei
@@ -158,8 +160,9 @@ ei taga katkematut aadressijada (`10r, 10v, 25r, 25v` ei tohi anda `fol. 10r–2
    aadressilõik `algus–lõpp` või ühe lehe korral `algus`; tuletatud nurksulgudes. Näited:
    - lk `19–20, 22` → `fol. 10r–[10v], [11v]`
    - lk `1–4` (t9zd42) → `fol. 246r–247v`
-   - aadressid `10r, 10v, 25r, 25v` ühes VUTT-i lõigus → `fol. 10r–[10v], 25r–[25v]`
-   - lk 12 teadmata → `fol. 10r–11v, ?, 13r–14v`
+   - aadressid `10r, 10v, 25r, [25v]` ühes VUTT-i lõigus (10v nähtav) → `fol. 10r–10v, 25r–[25v]`
+     (tähistuseta 10v tuletust ei saaks: järgmine nähtav `25r` ≠ `11r` → `fol. 10r, ?, 25r–[25v]`)
+   - lk 5–6 teadmata (12r ja 12v) → `fol. 10r–11v, ?, 13r–13v`
 4. Kui osa **ühelgi** lehel pole aadressi → viidet pole (sulud jäävad ära). *Minu otsus.*
 5. Kokkutõmbeid (`10r–v`) v1 ei tee. Pikk viide lõigatakse sisukorras CSS-iga
    (`truncate` + `title`), mitte andmes. *Minu otsus.*
@@ -174,7 +177,10 @@ saavad sama teksti ilma kahe vormindajata. Lisaks struktureeritud kuju (eesmärk
 
 Juurde **ainult päringuparameetriga `?addresses=1`** (olemasolevate võtmete kõrvale,
 ligipääsukontroll sama). Seda kasutavad `WorkPartsPanel` ja MCP `get_work_parts`;
-`PartRedirect` ja MCP ettepanekuvoog (`pages_version`) ei maksa lugemise eest.
+`PartRedirect` ei maksa lugemise eest (`getPartsToc(…, { addresses })` on valikuline
+argument, sama klientfunktsioon). MCP `get_work_parts` annab ka `pages_version`-i —
+ettepanekuvoog maksab seega sama päringu eest (mõõdetud ~20 ms, aktsepteeritav);
+`submit_parts` ise `/parts`-i ei kutsu.
 Trükisel või skeemita teosel: `page_numbering` nagu metaandmetes, `part_addresses: {}`,
 lehti ei loeta.
 
@@ -231,7 +237,7 @@ tuletatud, `pages` jääb VUTT-i numbriks. Uuenda `mcp/README.md`.
 - Puhas moodul, tabelitestid:
   - `o17ekb` `47w6yr` (sihtpilt) ja `t9zd42` lk 1–4 (`fol. 246r–247v`, päris andmed);
   - `t9zd42` auk **sünteetilise fikstuurina** (päris lk 4 kannab nähtavat `247v`;
-    fikstuuris lk 4 tähistuseta → `[247v]`, mitte `[260v]`);
+    fikstuuris lk 4 tähistuseta → mitte `[260v]`; lk 5 `261` järel `?`, ilma lk 5-ta `[247v]`);
   - neli olekut: laotus (`<pb/>`), parsimatu (`Fol. 3a`, `xii`, `[12]`, `86a`, `0`),
     nähtav, tähistuseta; parsimatu ei tuletu ise ega naabrile (`10` → `Fol. 3a`);
   - tuletus ainult nähtavalt rectolt (verso → verso ei tule); tuletatust ei tuletata;
@@ -258,6 +264,19 @@ tuletatud, `pages` jääb VUTT-i numbriks. Uuenda `mcp/README.md`.
 - `list_parts`: `page_stems` üks kord (praegu kaks).
 - `o17ekb` ja `t9zd42` skeemiks `foliation` (admin, `MetadataModal` kaudu).
 - MCP `get_pages`: `<pb/>` nähtavaks (eraldi väike parandus, mitte see spekk).
+
+## Teostuse märkused (2026-10-28)
+
+- **Vastuolu lahendus:** järgmise lehe kontroll (p. „Tuletus") on kirja pandud reegel ja
+  kehtib; kaks näidet (`t9zd42` auk → `[247v]`, `10r, ∅, 25r` → `[10v]`) olid sellega
+  vastuolus ja on parandatud. Tagajärg: kirjakogus, kus kirja viimane verso on
+  tähistuseta ja järgmine kiri algab hüppega, on viimane leht `?`.
+  **Kasutaja otsus 2026-10-28:** jääb nii. Üldreegel: kui naabrid tekitavad segaduse,
+  ei arva tuletus, vaid **kahtlased lehed märgendatakse käsitsi**. Lehel nähtav number →
+  `<fw>`; lehel numbrit ei ole → käsitsi aadress (ADR 0070 p. 5), mida v1-s veel ei ole —
+  seni jääb sinna `?`.
+- Puuduv/loetamatu `.txt` = aadress teadmata (`?`), mitte „tähistuseta".
+- Puhas moodul: `server/page_address.py`; testid `tests/test_page_address.py`.
 
 ## Ehitajale jäetud
 
