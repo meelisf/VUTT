@@ -180,12 +180,18 @@ def process(root: str, work_id: str, apply: bool, median_tol: float = MEDIAN_TOL
         print(f"   kuivkäivitus: {len(todo)} lehte, {before / 1e9:.2f} GB → ~{before / 8 / 1e9:.2f} GB")
         return True
 
+    if not os.access(wd, os.W_OK):
+        print(f"   VAHELE: kaust ei ole kirjutatav (omanik uid {os.stat(wd).st_uid}) — "
+              "käivita konteineris (`docker exec -i vutt-backend python3 - ...`)")
+        return False
     after, failed = 0, []
     for i, (p, _) in enumerate(todo, 1):
         try:
             after += downscale(p)
         except Exception as e:  # üks leht ei peata ülejäänuid
-            failed.append((os.path.basename(p), e))
+            # Ainult tekst: erindi traceback hoiaks dekodeeritud ~200 MB pildi
+            # elus ja iga ebaõnnestunud leht kasvataks mälu (OOM 0arsyg peal).
+            failed.append((os.path.basename(p), f"{type(e).__name__}: {e}"))
         if i % 20 == 0:
             print(f"   {i}/{len(todo)}", flush=True)
     print(f"   valmis: {len(todo) - len(failed)} lehte, {before / 1e9:.2f} GB → {after / 1e9:.2f} GB")
