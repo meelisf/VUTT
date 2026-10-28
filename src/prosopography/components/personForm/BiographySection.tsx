@@ -14,6 +14,7 @@ import {
 } from '../../utils/translationFlow';
 import type { FormDraft } from './types';
 
+import { useConfirm } from '../../../contexts/FeedbackContext';
 interface Props {
   draft: FormDraft;
   set: (patch: Partial<FormDraft>) => void;
@@ -39,6 +40,7 @@ const BiographySection: React.FC<Props> = ({
   draft, set, personId, anchors, token, canEdit,
 }) => {
   const { t } = useTranslation(['prosopography']);
+  const askConfirm = useConfirm();
   const [tab, setTab] = useState<BioField>('biography_et');
   const [translating, setTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ const BiographySection: React.FC<Props> = ({
     setError(null);
     setStale(null);
     if (needsOverwriteConfirm(draft[tab])
-        && !window.confirm(t('form.translateOverwriteConfirm'))) {
+        && !(await askConfirm(t('form.translateOverwriteConfirm')))) {
       return;   // päringut EI saadeta
     }
     const snapshot = {

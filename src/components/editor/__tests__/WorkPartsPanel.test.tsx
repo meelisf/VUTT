@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '../../../pages/manage/parts/__tests__/testI18n';
 
 const { api } = vi.hoisted(() => ({ api: { parts: [] as any[], nums: {} as Record<string, number>, addr: {} as Record<string, any>, fail: false, updates: [] as any[] } }));
+vi.mock('../../../contexts/FeedbackContext', () => ({ useConfirm: () => async () => true, useNotify: () => () => {} }));
 vi.mock('../../../services/workPartsApi', async (orig) => ({
   ...(await orig<typeof import('../../../services/workPartsApi')>()),
   getPartsToc: async () => {

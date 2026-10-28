@@ -484,7 +484,10 @@ ehk teadlikult päise all. `z-50` EI OLE piisav.
 
 **Frontend, muu** — number-sisenditel `type="text" + inputMode="numeric"` (mitte `type="number"`,
 tühjendamine katki). Salvestamata muudatuste jaoks on ÜKS dialoog (`UnsavedChangesDialog` +
-`useUnsavedChangesGuard`) — ära lisa uut confirm-varianti. Kerib AKEN, mitte konteiner (v.a
+`useUnsavedChangesGuard`) — ära lisa uut confirm-varianti. Muu tagasiside käib AINULT
+`FeedbackContext`-i kaudu: kinnitus `useConfirm()` (`await askConfirm(…)`), teade `useNotify()`
+(viga / `'warning'` nt `git_committed === false` / `'success'`); natiivset `alert`/`confirm`
+EI kasutata (valvur `noNativeDialogsGuard.test.ts`, #672). Kerib AKEN, mitte konteiner (v.a
 Workspace). `LoginModal` `isOpen` EI TOHI olla seotud `sessionExpired`-iga.
 
 ## Domeen

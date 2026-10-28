@@ -33,6 +33,7 @@ import { useWorkTitles } from '../hooks/useWorkTitles';
 import { quoteFilterValue } from '../../utils/filterUtils';
 import { formatDateTime } from '../../utils/formatDateTime';
 
+import { useConfirm, useNotify } from '../../contexts/FeedbackContext';
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
 const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
 
@@ -299,6 +300,8 @@ const PersonDetailPage: React.FC = () => {
   const location = useLocation();
   const backTo: string = (location.state as any)?.from ?? '/persons';
   const { t, i18n } = useTranslation(['prosopography', 'common']);
+  const askConfirm = useConfirm();
+  const notify = useNotify();
   const getLabel = useEntityLabel();
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const { user, authToken } = useUser();
@@ -357,14 +360,14 @@ const PersonDetailPage: React.FC = () => {
 
   const handleRestore = async (commitHash: string) => {
     if (!id || !token) return;
-    if (!window.confirm(t('historyPanel.restoreConfirm'))) return;
+    if (!(await askConfirm(t('historyPanel.restoreConfirm')))) return;
     setRestoring(commitHash);
     try {
       await restorePerson(id, commitHash, token);
       window.location.reload();
     } catch (e) {
       console.error('Taastamine ebaõnnestus:', e);
-      alert(t('historyPanel.restoreError'));
+      notify(t('historyPanel.restoreError'));
     } finally {
       setRestoring(null);
     }

@@ -11,6 +11,7 @@ import { translateText } from '../../../prosopography/services/prosopographyServ
 import { textHash } from '../../../prosopography/utils/textHash';
 import type { PartDraft } from '../partsModel';
 
+import { useConfirm } from '../../../contexts/FeedbackContext';
 type Lang = 'et' | 'en';
 
 interface Props {
@@ -22,6 +23,7 @@ interface Props {
 const PartAbstractSection: React.FC<Props> = ({ draft, set, token }) => {
   // prosopography: ühised tõlke-dialoogi tekstid (sama vool mis eluloo vormis).
   const { t } = useTranslation(['workspace', 'prosopography']);
+  const askConfirm = useConfirm();
   const tp = (key: string) => t(`manage.parts.${key}`);
   const [tab, setTab] = useState<Lang>('et');
   const [translating, setTranslating] = useState(false);
@@ -43,7 +45,7 @@ const PartAbstractSection: React.FC<Props> = ({ draft, set, token }) => {
 
   const translate = async () => {
     if (!token) return;
-    if (draft.abstract_en.trim() && !window.confirm(t('prosopography:form.translateOverwriteConfirm'))) return;
+    if (draft.abstract_en.trim() && !(await askConfirm(t('prosopography:form.translateOverwriteConfirm')))) return;
     const before = draft.abstract_et;
     setTranslating(true);
     setError(null);

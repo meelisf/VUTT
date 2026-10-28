@@ -9,6 +9,7 @@ const { api } = vi.hoisted(() => ({ api: {
   parts: [] as any[], calls: [] as string[], fail: null as null | { status: number; message: string },
   proposals: [] as any[], personExists: false, hold: null as null | Promise<void>,
 } }));
+vi.mock('../../../../contexts/FeedbackContext', () => ({ useConfirm: () => async () => true, useNotify: () => () => {} }));
 vi.mock('../../../../services/workPartsApi', async (orig) => ({
   ...(await orig<typeof import('../../../../services/workPartsApi')>()),
   listParts: async () => api.parts,

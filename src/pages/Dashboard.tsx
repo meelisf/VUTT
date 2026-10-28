@@ -41,6 +41,7 @@ import { sortAfterQueryChange, createUrlEchoGuard } from './dashboardQuerySync';
 import { useWorkFilterModel } from '../components/workFilters/useWorkFilterModel';
 import WorkListRow from '../components/WorkListRow';
 
+import { useNotify } from '../contexts/FeedbackContext';
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 const RETURN_URL_KEY = 'vutt_return_url';
@@ -52,6 +53,7 @@ const HINT_FILTER_KEY = { genre: 'genre', tag: 'tags', type: 'type', language: '
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
+  const notify = useNotify();
   const { user } = useUser();
   const { selectedCollection, setSelectedCollection, setSelection, collections, workSets, refreshWorkSets, isLoading: collectionsLoading } = useCollection();
   // Töökollektsiooni ID-loend tuleb serverilt; kuni ta ei ole kohal, ei tohi
@@ -660,18 +662,18 @@ const Dashboard: React.FC = () => {
       const result = await bulkAssignCollection(token, Array.from(selectedWorkIds), collectionId);
       if (result.status === 'success') {
         // Salvestatud, aga versiooniajalugu puudu (#418)
-        if (result.git_committed === false) alert(t('common:error.gitCommitFailed'));
+        if (result.git_committed === false) notify(t('common:error.gitCommitFailed'), 'warning');
         // Tühjenda valik ja uuenda otsing
         setSelectedWorkIds(new Set());
         setSelectMode(false);
         // Trigger re-fetch by incrementing refresh counter
         setRefreshCounter(prev => prev + 1);
       } else {
-        alert(result.message || t('dashboard:bulkAssign.error'));
+        notify(result.message || t('dashboard:bulkAssign.error'));
       }
     } catch (e) {
       console.error('Bulk assign failed:', e);
-      alert(t('dashboard:bulkAssign.error'));
+      notify(t('dashboard:bulkAssign.error'));
     } finally {
       setBulkAssignLoading(false);
       setShowBulkCollectionPicker(false);
@@ -688,16 +690,16 @@ const Dashboard: React.FC = () => {
       const result = await bulkAssignTags(token, Array.from(selectedWorkIds), tags, mode);
       if (result.status === 'success') {
         // Salvestatud, aga versiooniajalugu puudu (#418)
-        if (result.git_committed === false) alert(t('common:error.gitCommitFailed'));
+        if (result.git_committed === false) notify(t('common:error.gitCommitFailed'), 'warning');
         setSelectedWorkIds(new Set());
         setSelectMode(false);
         setRefreshCounter(prev => prev + 1);
       } else {
-        alert(result.message || t('dashboard:bulkAssign.tagsError'));
+        notify(result.message || t('dashboard:bulkAssign.tagsError'));
       }
     } catch (e) {
       console.error('Bulk tags assign failed:', e);
-      alert(t('dashboard:bulkAssign.tagsError'));
+      notify(t('dashboard:bulkAssign.tagsError'));
     } finally {
       setBulkAssignLoading(false);
       setShowBulkTagsPicker(false);
@@ -714,16 +716,16 @@ const Dashboard: React.FC = () => {
       const result = await bulkAssignGenre(token, Array.from(selectedWorkIds), genre);
       if (result.status === 'success') {
         // Salvestatud, aga versiooniajalugu puudu (#418)
-        if (result.git_committed === false) alert(t('common:error.gitCommitFailed'));
+        if (result.git_committed === false) notify(t('common:error.gitCommitFailed'), 'warning');
         setSelectedWorkIds(new Set());
         setSelectMode(false);
         setRefreshCounter(prev => prev + 1);
       } else {
-        alert(result.message || t('dashboard:bulkAssign.genreError'));
+        notify(result.message || t('dashboard:bulkAssign.genreError'));
       }
     } catch (e) {
       console.error('Bulk genre assign failed:', e);
-      alert(t('dashboard:bulkAssign.genreError'));
+      notify(t('dashboard:bulkAssign.genreError'));
     } finally {
       setBulkAssignLoading(false);
       setShowBulkGenrePicker(false);

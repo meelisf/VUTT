@@ -71,7 +71,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
         {/* Content */}
         <div className="px-6 py-4">
-          <p className="text-gray-600">{message}</p>
+          <p className="text-gray-600 whitespace-pre-line">{message}</p>
         </div>
 
         {/* Actions */}

@@ -29,6 +29,7 @@ import { canRestoreVersion, hasTextChange, type PageChanges } from './historyCha
 import { HistoryChangeBadges, HistoryChangeDetails } from './HistoryChanges';
 import { pageFileFromImageUrl } from '../../services/workImageService';
 import { formatDateTime, parseServerDate } from '../../utils/formatDateTime';
+import { useConfirm, useNotify } from '../../contexts/FeedbackContext';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
@@ -88,6 +89,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   collections
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
+  const askConfirm = useConfirm();
+  const notify = useNotify();
   const navigate = useNavigate();
 
   // Git ajaloo state
@@ -117,12 +120,12 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       if (response.ok && Array.isArray(data.comments)) {
         onCommentsRestored?.(data.comments);
         setRestoredAnns(prev => new Set(prev).add(key));
-        if (data.git_committed === false) alert(t('history.changes.restoreAsCommentGitWarning'));
+        if (data.git_committed === false) notify(t('history.changes.restoreAsCommentGitWarning'), 'warning');
       } else {
-        alert(`${t('history.restoreError')}: ${data.detail || data.message || response.status}`);
+        notify(`${t('history.restoreError')}: ${data.detail || data.message || response.status}`);
       }
     } catch (e: any) {
-      alert(`${t('history.restoreError')}: ${e.message || t('common:error.network')}`);
+      notify(`${t('history.restoreError')}: ${e.message || t('common:error.network')}`);
     } finally {
       setRestoringAnn(null);
     }
@@ -167,7 +170,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
 
     if (!authToken) {
-      alert(t('history.loginRequired'));
+      notify(t('history.loginRequired'));
       return;
     }
 
@@ -194,7 +197,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       } else {
         console.error("Git ajaloo laadimine ebaõnnestus:", data.message);
         if (data.message?.includes('Autentimine') || data.message?.includes('parool')) {
-          alert(t('history.authError'));
+          notify(t('history.authError'));
         }
       }
     } catch (e) {
@@ -368,12 +371,12 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
   const handleGitRestore = async (entry: GitHistoryEntry) => {
     if (!page.original_path || !page.image_url) {
-      alert(t('history.restoreError'));
+      notify(t('history.restoreError'));
       return;
     }
 
     if (!authToken) {
-      alert(t('history.loginRequired'));
+      notify(t('history.loginRequired'));
       return;
     }
 
@@ -381,7 +384,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       ? `${t('history.restoreOriginalConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${formatDateTime(entry.date)}\n\n${t('history.restoreNote')}`
       : `${t('history.restoreConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${formatDateTime(entry.date)}\n\n${t('history.restoreNote')}`;
 
-    if (!confirm(confirmMsg)) {
+    if (!(await askConfirm(confirmMsg))) {
       return;
     }
 
@@ -407,16 +410,15 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
         onRestore(result);
         const done = t('history.restoreSuccess', { date: formatDateTime(entry.date), author: entry.author });
         // Failid on kettal, aga ajaloo commit puudub — seda ei tohi edu alla peita.
-        alert(result.gitWarning
-          ? `${done}\n\n${t('history.restoreGitWarning', { error: result.gitWarning })}`
-          : done);
+        if (result.gitWarning) notify(`${done}\n\n${t('history.restoreGitWarning', { error: result.gitWarning })}`, 'warning');
+        else notify(done, 'success');
         loadGitHistory();
       } else {
-        alert(`${t('history.restoreError')}: ${data.message || t('common:error.unknown')}`);
+        notify(`${t('history.restoreError')}: ${data.message || t('common:error.unknown')}`);
       }
     } catch (e: any) {
       console.error("Taastamine ebaõnnestus:", e);
-      alert(`${t('history.restoreError')}: ${e.message || t('common:error.network')}`);
+      notify(`${t('history.restoreError')}: ${e.message || t('common:error.network')}`);
     } finally {
       setIsRestoring(false);
     }

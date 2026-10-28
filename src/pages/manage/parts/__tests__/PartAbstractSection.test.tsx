@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import './testI18n';
 
 const { translate } = vi.hoisted(() => ({ translate: vi.fn() }));
+vi.mock('../../../../contexts/FeedbackContext', () => ({ useConfirm: () => async () => true, useNotify: () => () => {} }));
 vi.mock('../../../../prosopography/services/prosopographyService', () => ({ translateText: translate }));
 import PartAbstractSection from '../PartAbstractSection';
 import { emptyDraft, type PartDraft } from '../../partsModel';
