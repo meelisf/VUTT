@@ -28,7 +28,7 @@ from .person_crud import (
     IdentifierConflict,
     restore_person,
 )
-from .person_search import list_persons, get_person_map_markers, get_person_facets, _normalize_tag_query
+from .person_search import PersonFilters, list_persons, get_person_map_markers, get_person_facets, _normalize_tag_query
 from .historical_regions import HistoricalRegionsError, get_historical_regions
 from .relations import get_person_with_works, get_relation_type_suggestions
 from .merge_ops import merge_person, delete_person
@@ -95,13 +95,7 @@ def _resolve_work_set_ids(set_id, request: Request):
     return search_visible_work_ids(ws, user)
 
 
-# =========================================================
-# ENDPOINTID
-# =========================================================
-
-@router.get("")
-def prosopography_list(
-    request: Request,
+def person_filters(
     q: str = None,
     gender: str = None,
     occupation: str = None,
@@ -115,9 +109,29 @@ def prosopography_list(
     year_to: int = None,
     imm_year_from: int = None,
     imm_year_to: int = None,
+    tag: Optional[List[str]] = Query(None),
+) -> PersonFilters:
+    """Isikufiltrid URL-ist — loend ja kaart loevad neid SIIT (#670)."""
+    return PersonFilters(
+        q=q, gender=gender, occupation=occupation, origin_group=origin_group,
+        origin_place=origin_place, institution=institution, status_id=status_id,
+        source=source, verification_level=verification_level,
+        year_from=year_from, year_to=year_to,
+        imm_year_from=imm_year_from, imm_year_to=imm_year_to,
+        tags=_normalize_tag_query(tag),
+    )
+
+
+# =========================================================
+# ENDPOINTID
+# =========================================================
+
+@router.get("")
+def prosopography_list(
+    request: Request,
+    filters: PersonFilters = Depends(person_filters),
     sort_by: str = None,
     ids: str = None,
-    tag: Optional[List[str]] = Query(None),
     collection: str = None,
     work_set: str = None,
     limit: int = 48,
@@ -127,22 +141,9 @@ def prosopography_list(
     id_list = [i for i in ids.split(",") if i] if ids else None
     work_set_ids = _resolve_work_set_ids(work_set, request)
     return list_persons(
-        q=q,
-        gender=gender,
-        occupation=occupation,
-        origin_group=origin_group,
-        origin_place=origin_place,
-        institution=institution,
-        status_id=status_id,
-        source=source,
-        verification_level=verification_level,
-        year_from=year_from,
-        year_to=year_to,
-        imm_year_from=imm_year_from,
-        imm_year_to=imm_year_to,
+        filters,
         sort_by=sort_by,
         ids=id_list,
-        tags=_normalize_tag_query(tag),
         collection=collection,
         work_set_ids=work_set_ids,
         limit=limit,
@@ -160,21 +161,9 @@ async def prosopography_query(request: Request):
     work_set_ids = _resolve_work_set_ids(data.get("work_set"), request)
     return await run_in_threadpool(
         list_persons,
-        q=data.get("q"),
-        gender=data.get("gender"),
-        occupation=data.get("occupation"),
-        origin_group=data.get("origin_group"),
-        institution=data.get("institution"),
-        status_id=data.get("status_id"),
-        source=data.get("source"),
-        verification_level=data.get("verification_level"),
-        year_from=data.get("year_from"),
-        year_to=data.get("year_to"),
-        imm_year_from=data.get("imm_year_from"),
-        imm_year_to=data.get("imm_year_to"),
+        PersonFilters.from_body(data),
         sort_by=data.get("sort_by"),
         ids=data.get("ids"),
-        tags=_normalize_tag_query(data.get("tag")),
         collection=data.get("collection"),
         work_set_ids=work_set_ids,
         limit=data.get("limit", 48),
@@ -185,20 +174,8 @@ async def prosopography_query(request: Request):
 @router.get("/map")
 def prosopography_map(
     request: Request,
-    q: str = None,
-    gender: str = None,
-    occupation: str = None,
-    origin_group: str = None,
-    institution: str = None,
-    status_id: str = None,
-    source: str = None,
-    verification_level: str = None,
-    year_from: int = None,
-    year_to: int = None,
-    imm_year_from: int = None,
-    imm_year_to: int = None,
+    filters: PersonFilters = Depends(person_filters),
     ids: str = None,
-    tag: Optional[List[str]] = Query(None),
     related_to: str = None,
     collection: str = None,
     work_set: str = None,
@@ -207,20 +184,8 @@ def prosopography_map(
     id_list = [i for i in ids.split(",") if i] if ids else None
     work_set_ids = _resolve_work_set_ids(work_set, request)
     return get_person_map_markers(
-        q=q,
-        gender=gender,
-        occupation=occupation,
-        origin_group=origin_group,
-        institution=institution,
-        status_id=status_id,
-        source=source,
-        verification_level=verification_level,
-        year_from=year_from,
-        year_to=year_to,
-        imm_year_from=imm_year_from,
-        imm_year_to=imm_year_to,
+        filters,
         ids=id_list,
-        tags=_normalize_tag_query(tag),
         related_to=related_to,
         collection=collection,
         work_set_ids=work_set_ids,

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import unicodedata
+from dataclasses import dataclass, fields
 from functools import lru_cache
 from typing import Optional
 
@@ -296,25 +297,59 @@ def _relevance_key(entry: dict, q_lower: str, aliases_data: Optional[dict] = Non
     return (tier, -work_count, sort_cf, entry.get("id") or "")
 
 
+@dataclass(frozen=True)
+class PersonFilters:
+    """Isikuloendi ja kaardi ühised filtrid — ÜKS loend (#670).
+
+    Enne olid filtrid igas endpointis ja funktsioonis käsitsi välja kirjutatud
+    ja kaardi haru kaotas `origin_place`-i kõigis kihtides. Uus filter lisatakse
+    AINULT siia ja `_filter_index_entries`-i; router (`person_filters`) ja
+    frontendi `PersonFilterParams` peavad kattuma (valvur `test_person_filters.py`).
+    Ulatus (`ids`, kogu, töökollektsioon, `related_to`) ei ole filter.
+    """
+    q: Optional[str] = None
+    gender: Optional[str] = None
+    occupation: Optional[str] = None
+    origin_group: Optional[str] = None
+    origin_place: Optional[str] = None
+    institution: Optional[str] = None
+    status_id: Optional[str] = None
+    source: Optional[str] = None
+    verification_level: Optional[str] = None
+    year_from: Optional[int] = None
+    year_to: Optional[int] = None
+    imm_year_from: Optional[int] = None
+    imm_year_to: Optional[int] = None
+    tags: Optional[list] = None
+
+    @classmethod
+    def from_body(cls, data: dict) -> "PersonFilters":
+        """`POST /query` keha: väljanimed samad, märksõnad võtmega `tag` nagu URL-is."""
+        values = {f.name: data.get(f.name) for f in fields(cls) if f.name != "tags"}
+        return cls(**values, tags=_normalize_tag_query(data.get("tag")))
+
+
+def _resolve_filters(filters: Optional[PersonFilters], filter_fields: dict) -> PersonFilters:
+    """Kas valmis `PersonFilters` või üksikud väljad nimeliselt (tundmatu nimi → TypeError)."""
+    if filters is not None and filter_fields:
+        raise TypeError("anna kas filters või üksikud filtriväljad, mitte mõlemad")
+    return filters if filters is not None else PersonFilters(**filter_fields)
+
+
 def _filter_index_entries(
-    q: Optional[str] = None,
-    gender: Optional[str] = None,
-    occupation: Optional[str] = None,
-    origin_group: Optional[str] = None,
-    origin_place: Optional[str] = None,
-    institution: Optional[str] = None,
-    status_id: Optional[str] = None,
-    source: Optional[str] = None,
-    verification_level: Optional[str] = None,
-    year_from: Optional[int] = None,
-    year_to: Optional[int] = None,
-    imm_year_from: Optional[int] = None,
-    imm_year_to: Optional[int] = None,
+    filters: Optional[PersonFilters] = None,
+    *,
     ids: Optional[list] = None,
-    tags: Optional[list] = None,
     aliases_data: Optional[dict] = None,
+    **filter_fields,
 ) -> list[dict]:
     sync_from_facade()
+    f = _resolve_filters(filters, filter_fields)
+    q, gender, occupation = f.q, f.gender, f.occupation
+    origin_group, origin_place, institution = f.origin_group, f.origin_place, f.institution
+    status_id, source, verification_level = f.status_id, f.source, f.verification_level
+    year_from, year_to = f.year_from, f.year_to
+    imm_year_from, imm_year_to, tags = f.imm_year_from, f.imm_year_to, f.tags
     index = _load_index()
     results = [
         e for e in index.get("entries", [])
@@ -403,26 +438,15 @@ def _filter_index_entries(
 
 
 def list_persons(
-    q: Optional[str] = None,
-    gender: Optional[str] = None,
-    occupation: Optional[str] = None,
-    origin_group: Optional[str] = None,
-    origin_place: Optional[str] = None,
-    institution: Optional[str] = None,
-    status_id: Optional[str] = None,
-    source: Optional[str] = None,
-    verification_level: Optional[str] = None,
-    year_from: Optional[int] = None,
-    year_to: Optional[int] = None,
-    imm_year_from: Optional[int] = None,
-    imm_year_to: Optional[int] = None,
+    filters: Optional[PersonFilters] = None,
+    *,
     sort_by: Optional[str] = None,
     ids: Optional[list] = None,
-    tags: Optional[list] = None,
     collection: Optional[str] = None,
     work_set_ids: Optional[list] = None,
     limit: int = 48,
     offset: int = 0,
+    **filter_fields,
 ) -> dict:
     """Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult.
 
@@ -431,6 +455,8 @@ def list_persons(
     tühi loend = null tulemust (tühi kogu EI OLE sama mis puuduv filter).
     """
     sync_from_facade()
+    filters = _resolve_filters(filters, filter_fields)
+    q = filters.q
     if collection:
         collection_ids = _persons_in_collection(collection)
         if ids is not None:
@@ -452,24 +478,7 @@ def list_persons(
     # teistkordne parsimine iga klahvivajutuse peale oleks puhas raiskamine.
     aliases_data = _load_person_aliases() if (q and sort_by == "relevance") else None
 
-    results = _filter_index_entries(
-        q=q,
-        gender=gender,
-        occupation=occupation,
-        origin_group=origin_group,
-        origin_place=origin_place,
-        institution=institution,
-        status_id=status_id,
-        source=source,
-        verification_level=verification_level,
-        year_from=year_from,
-        year_to=year_to,
-        imm_year_from=imm_year_from,
-        imm_year_to=imm_year_to,
-        ids=ids,
-        tags=tags,
-        aliases_data=aliases_data,
-    )
+    results = _filter_index_entries(filters, ids=ids, aliases_data=aliases_data)
 
     if sort_by == "relevance" and q:
         # Relevantsus ilma päringuta ei ole olek — siis jääb tähestik.
@@ -493,26 +502,17 @@ def list_persons(
 
 
 def get_person_map_markers(
-    q: Optional[str] = None,
-    gender: Optional[str] = None,
-    occupation: Optional[str] = None,
-    origin_group: Optional[str] = None,
-    institution: Optional[str] = None,
-    status_id: Optional[str] = None,
-    source: Optional[str] = None,
-    verification_level: Optional[str] = None,
-    year_from: Optional[int] = None,
-    year_to: Optional[int] = None,
-    imm_year_from: Optional[int] = None,
-    imm_year_to: Optional[int] = None,
+    filters: Optional[PersonFilters] = None,
+    *,
     ids: Optional[list] = None,
-    tags: Optional[list] = None,
     related_to: Optional[str] = None,
     collection: Optional[str] = None,
     work_set_ids: Optional[list] = None,
+    **filter_fields,
 ) -> dict:
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
     sync_from_facade()
+    filters = _resolve_filters(filters, filter_fields)
     if related_to:
         # Üks tõde (#461): kogu filtreerib ühiseid teoseid ehitajas, mitte isikuid
         # pärast (_persons_in_collection vaatab isiku KÕIKI teoseid ja andis teise hulga).
@@ -540,22 +540,7 @@ def get_person_map_markers(
             # Tühi loend = null markerit, mitte „filtrit ei ole".
             return {"markers": [], "total": 0}
 
-    entries = _filter_index_entries(
-        q=q,
-        gender=gender,
-        occupation=occupation,
-        origin_group=origin_group,
-        institution=institution,
-        status_id=status_id,
-        source=source,
-        verification_level=verification_level,
-        year_from=year_from,
-        year_to=year_to,
-        imm_year_from=imm_year_from,
-        imm_year_to=imm_year_to,
-        ids=ids,
-        tags=tags,
-    )
+    entries = _filter_index_entries(filters, ids=ids)
 
     markers_by_place: dict[str, dict] = {}
     without_coordinates = 0
@@ -851,4 +836,4 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     }
 
 
-__all__ = ['list_persons', '_filter_index_entries', '_relevance_key', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations', '_entry_tags', '_normalize_tag_query', '_tag_match_keys']
+__all__ = ['PersonFilters', 'list_persons', '_filter_index_entries', '_relevance_key', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations', '_entry_tags', '_normalize_tag_query', '_tag_match_keys']
