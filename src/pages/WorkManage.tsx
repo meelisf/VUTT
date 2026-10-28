@@ -1283,8 +1283,19 @@ const WorkManage: React.FC = () => {
 
             {/* Lisa leht */}
             <div className="px-5 py-4 border-t border-gray-100">
+              {/* PDF-töö olek on nähtav ka suletud vormiga: töö võib olla
+                  üles võetud lehe värskenduse järel (resumeFollower). */}
+              {pdfProgress && (
+                <p className="text-sm text-gray-600 flex items-center gap-2 mb-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  {t('manage.addPdf.progress', pdfProgress)}
+                </p>
+              )}
               {addPageResult && !showAddForm && (
                 <p className="text-sm text-green-700 mb-2">{addPageResult}</p>
+              )}
+              {addPageError && !showAddForm && (
+                <p className="text-sm text-red-600 mb-2">{addPageError}</p>
               )}
               {!showAddForm ? (
                 <button
@@ -1365,12 +1376,7 @@ const WorkManage: React.FC = () => {
                   {addPageError && (
                     <p className="text-sm text-red-600">{addPageError}</p>
                   )}
-                  {pdfProgress && (
-                    <p className="text-sm text-gray-600 flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin" />
-                      {t('manage.addPdf.progress', pdfProgress)}
-                    </p>
-                  )}
+
 
                   <div className="flex flex-wrap items-center gap-2">
                     <button
