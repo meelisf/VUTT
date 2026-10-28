@@ -15,6 +15,7 @@ import { FilterChip } from '../../components/workFilters/WorkFilterChips';
 import ResultsViewToggle from '../../components/ResultsViewToggle';
 import { useFilterSidebarOpen, useResultsView } from '../../hooks/useResultsView';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
+import type { PersonFilterParams } from '../services/personFilterParams';
 import { getVocabularies, isCollectionAllowed, isCollectionRestricted } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -211,9 +212,9 @@ const PersonsPage: React.FC = () => {
   // (#425), sest tema isikud ei pruugi uues ulatuses nähtavad olla.
   const scopeKey = JSON.stringify([effectiveSelectedCollection, workSetParam, user?.username ?? null, token]);
 
-  // Päringu parameetrid ÜHES objektis: võti tuletatakse neist, seega ei saa
-  // ükski filter päringu käivitajast välja jääda (#421: origin_place jäi).
-  const listParams = {
+  // Filtrid ÜHES objektis, mida loend JA kaart jagavad: päringuvõti tuletatakse
+  // neist (#421) ja kaart ei saa ühtki filtrit kaotada (#670: origin_place jäi).
+  const filterParams: PersonFilterParams = {
     q: query || undefined,
     origin_group: originGroup || undefined,
     origin_place: originPlace || undefined,
@@ -226,6 +227,9 @@ const PersonsPage: React.FC = () => {
     imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
     status_id: statusId || undefined,
     tag: tags.length ? tags : undefined,
+  };
+  const listParams = {
+    ...filterParams,
     sort_by: sortBy !== 'alpha' ? sortBy : undefined,
     collection: effectiveSelectedCollection || undefined,
     work_set: workSetParam,
@@ -303,17 +307,7 @@ const PersonsPage: React.FC = () => {
   });
   // Kogu-pill ei rakendu ainult kaardivaates; loend ignoreerib related_to-d.
   const mapFilters = {
-    q: query || undefined,
-    origin_group: originGroup || undefined,
-    institution: institution || undefined,
-    source: source || undefined,
-    gender: gender || undefined,
-    year_from: hasExplicitYearRange && yearFrom ? parseInt(yearFrom) : undefined,
-    year_to: hasExplicitYearRange && yearTo ? parseInt(yearTo) : undefined,
-    imm_year_from: !hasExplicitYearRange && legacyImmYearFrom ? parseInt(legacyImmYearFrom) : undefined,
-    imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
-    status_id: statusId || undefined,
-    tag: tags.length ? tags : undefined,
+    ...filterParams,
     related_to: relatedTo || undefined,
     ...mapScope.filters,
   };

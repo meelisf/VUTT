@@ -12,20 +12,8 @@ import { FitToPoints, resolveLabel, spreadOverlapping } from './map/mapBase';
 import type { ProsopoMapResponse } from '../types';
 
 interface PersonsMapProps {
-  filters: {
-    q?: string;
-    gender?: string;
-    origin_group?: string;
-    institution?: string;
-    status_id?: string;
-    source?: string;
-    year_from?: number;
-    year_to?: number;
-    imm_year_from?: number;
-    imm_year_to?: number;
-    related_to?: string;
-    collection?: string;
-  };
+  // Sama kuju mis päringul — filtriloend elab `PersonFilterParams`-is (#670).
+  filters: NonNullable<Parameters<typeof fetchPersonMapMarkers>[0]>;
   token?: string;
   focusPlace?: string;
   // Fookus-isiku andmed (ainult related_to päringul) antakse vanemale tagasi,

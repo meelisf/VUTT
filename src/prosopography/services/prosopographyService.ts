@@ -1,6 +1,6 @@
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
-import { appendTagParams } from './tagParams';
+import { appendPersonFilterParams, type PersonFilterParams } from './personFilterParams';
 import type { HistoricalRegionsResponse, ProsopoIndexEntry, ProsopoMapResponse, ProsopoRecord, PlaceEntry } from '../types';
 
 const BASE = `${FILE_API_URL}/prosopography`;
@@ -137,21 +137,7 @@ export async function rejectEnrichmentProposal(personId: string, proposalId: str
   return enrichmentResponse(response);
 }
 
-export async function listPersons(params?: {
-  q?: string;
-  gender?: string;
-  occupation?: string;
-  origin_group?: string;
-  origin_place?: string;
-  institution?: string;
-  status_id?: string;
-  tag?: string | string[];
-  source?: string;
-  verification_level?: string;
-  year_from?: number;
-  year_to?: number;
-  imm_year_from?: number;
-  imm_year_to?: number;
+export async function listPersons(params?: PersonFilterParams & {
   sort_by?: string;
   ids?: string[];
   collection?: string;
@@ -172,20 +158,7 @@ export async function listPersons(params?: {
   }
 
   const url = new URL(BASE, window.location.origin);
-  if (params?.q) url.searchParams.set('q', params.q);
-  if (params?.gender) url.searchParams.set('gender', params.gender);
-  if (params?.occupation) url.searchParams.set('occupation', params.occupation);
-  if (params?.origin_group) url.searchParams.set('origin_group', params.origin_group);
-  if (params?.origin_place) url.searchParams.set('origin_place', params.origin_place);
-  if (params?.institution) url.searchParams.set('institution', params.institution);
-  if (params?.status_id) url.searchParams.set('status_id', params.status_id);
-  appendTagParams(url.searchParams, params?.tag);
-  if (params?.source) url.searchParams.set('source', params.source);
-  if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
-  if (params?.year_from != null) url.searchParams.set('year_from', String(params.year_from));
-  if (params?.year_to != null) url.searchParams.set('year_to', String(params.year_to));
-  if (params?.imm_year_from != null) url.searchParams.set('imm_year_from', String(params.imm_year_from));
-  if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
+  appendPersonFilterParams(url.searchParams, params);
   if (params?.sort_by) url.searchParams.set('sort_by', params.sort_by);
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
   if (params?.collection) url.searchParams.set('collection', params.collection);
@@ -201,39 +174,14 @@ export async function listPersons(params?: {
   return resp.json();
 }
 
-export async function fetchPersonMapMarkers(params?: {
-  q?: string;
-  gender?: string;
-  occupation?: string;
-  origin_group?: string;
-  institution?: string;
-  status_id?: string;
-  tag?: string | string[];
-  source?: string;
-  verification_level?: string;
-  year_from?: number;
-  year_to?: number;
-  imm_year_from?: number;
-  imm_year_to?: number;
+export async function fetchPersonMapMarkers(params?: PersonFilterParams & {
   ids?: string[];
   related_to?: string;
   collection?: string;
   work_set?: string;
 }, token?: string): Promise<ProsopoMapResponse> {
   const url = new URL(`${BASE}/map`, window.location.origin);
-  if (params?.q) url.searchParams.set('q', params.q);
-  if (params?.gender) url.searchParams.set('gender', params.gender);
-  if (params?.occupation) url.searchParams.set('occupation', params.occupation);
-  if (params?.origin_group) url.searchParams.set('origin_group', params.origin_group);
-  if (params?.institution) url.searchParams.set('institution', params.institution);
-  if (params?.status_id) url.searchParams.set('status_id', params.status_id);
-  appendTagParams(url.searchParams, params?.tag);
-  if (params?.source) url.searchParams.set('source', params.source);
-  if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
-  if (params?.year_from != null) url.searchParams.set('year_from', String(params.year_from));
-  if (params?.year_to != null) url.searchParams.set('year_to', String(params.year_to));
-  if (params?.imm_year_from != null) url.searchParams.set('imm_year_from', String(params.imm_year_from));
-  if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
+  appendPersonFilterParams(url.searchParams, params);
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
   if (params?.related_to) url.searchParams.set('related_to', params.related_to);
   if (params?.collection) url.searchParams.set('collection', params.collection);
