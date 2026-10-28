@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { UserProvider } from './contexts/UserContext';
 import { CollectionProvider } from './contexts/CollectionContext';
 import { ImageTokenProvider } from './contexts/ImageTokenContext';
+import { FeedbackProvider } from './contexts/FeedbackContext';
 import { MeilisearchProvider } from './contexts/MeilisearchContext';
 import { Loader2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
@@ -213,7 +214,9 @@ const App: React.FC = () => {
       <UserProvider>
         <ImageTokenProvider>
           <CollectionProvider>
-            <RouterProvider router={router} />
+            <FeedbackProvider>
+              <RouterProvider router={router} />
+            </FeedbackProvider>
           </CollectionProvider>
         </ImageTokenProvider>
       </UserProvider>

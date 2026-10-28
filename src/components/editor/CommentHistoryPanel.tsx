@@ -8,6 +8,7 @@ import { lineDiff } from '../../utils/lineDiff';
 import MarkdownView from '../MarkdownView';
 import { parseServerDate } from '../../utils/formatDateTime';
 
+import { useNotify } from '../../contexts/FeedbackContext';
 interface CommentHistoryPanelProps {
   page: Page;
   work?: Work;
@@ -30,6 +31,7 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
   user,
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
+  const notify = useNotify();
   const [commentHistory, setCommentHistory] = useState<CommentHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -63,7 +65,7 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
       );
       if (onCommentsRestored) onCommentsRestored(updated);
       else setComments(updated);
-      if (!gitCommitted) alert(t('info.restoreCommentGitWarning'));
+      if (!gitCommitted) notify(t('info.restoreCommentGitWarning'), 'warning');
       await loadHistory(true);   // värskenda ajaloo-kaart uue seisuga
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : t('info.restoreError'));

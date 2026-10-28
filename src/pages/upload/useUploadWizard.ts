@@ -43,6 +43,7 @@ import {
 } from './uploadApi';
 import type { AdaLookupResult, PartialUpload, PollResult, SavedUpload } from './types';
 
+import { useConfirm } from '../../contexts/FeedbackContext';
 /** Staatused, mille korral OCR-i pool on käigus → viisardi 4. samm. */
 // `importing` kuulub siia: import kestab suurel teosel minuteid ja
 // vahepealne lehe värskendus peab tooma kasutaja tagasi ülevaatusele,
@@ -51,6 +52,7 @@ const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done', 'importi
 
 export function useUploadWizard() {
   const { t, i18n } = useTranslation(['upload', 'common']);
+  const askConfirm = useConfirm();
   const lang = getLangCode(i18n.language);
   const { authToken } = useUser();
   const { workSets } = useCollection();
@@ -586,7 +588,7 @@ export function useUploadWizard() {
   // Tühistamine (DELETE — kustutab uploadi serverist)
   // ---------------------------------------------------------------------------
   async function handleCancel() {
-    if (!window.confirm(t('cancelConfirm'))) return;
+    if (!(await askConfirm({ message: t('cancelConfirm'), variant: 'danger' }))) return;
     stopPolling();
     if (uploadId && authToken) {
       await deleteUpload(uploadId, authToken).catch(() => {});
@@ -596,7 +598,7 @@ export function useUploadWizard() {
 
   // Poolelioleva üleslaadimise kustutamine nimekirjast (ei pruugi olla aktiivne)
   async function handleDeletePending(id: string) {
-    if (!window.confirm(t('cancelConfirm'))) return;
+    if (!(await askConfirm({ message: t('cancelConfirm'), variant: 'danger' }))) return;
     await deleteUpload(id, authToken).catch(() => {});
     setPendingUploads((prev) => prev.filter((p) => p.id !== id));
   }

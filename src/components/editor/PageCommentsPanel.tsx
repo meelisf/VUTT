@@ -7,6 +7,7 @@ import MarkdownEditor from '../MarkdownEditor';
 import MarkdownView from '../MarkdownView';
 import { parseServerDate } from '../../utils/formatDateTime';
 
+import { useConfirm } from '../../contexts/FeedbackContext';
 interface EditablePostProps {
   text: string;
   author: string;
@@ -137,6 +138,7 @@ const PageCommentsPanel: React.FC<PageCommentsPanelProps> = ({
   highlightedCommentId,
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
+  const askConfirm = useConfirm();
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -206,8 +208,8 @@ const PageCommentsPanel: React.FC<PageCommentsPanelProps> = ({
     if (onSaveAnnotations) await onSaveAnnotations(updated);
   };
 
-  const removeComment = (commentId: string) => {
-    if (!window.confirm(t('info.deleteCommentConfirm'))) return;
+  const removeComment = async (commentId: string) => {
+    if (!(await askConfirm({ message: t('info.deleteCommentConfirm'), variant: 'danger' }))) return;
     setComments(comments.filter(c => c.id !== commentId));
   };
 
@@ -268,7 +270,7 @@ const PageCommentsPanel: React.FC<PageCommentsPanelProps> = ({
   };
 
   const removeReply = async (commentId: string, replyId: string) => {
-    if (!window.confirm(t('info.deleteCommentConfirm'))) return;
+    if (!(await askConfirm({ message: t('info.deleteCommentConfirm'), variant: 'danger' }))) return;
     const updated = comments.map(comment => comment.id === commentId
       ? { ...comment, replies: (comment.replies || []).filter(reply => reply.id !== replyId) }
       : comment);

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ReocrStatus } from './useReOcr';
 import { ocrErrorText } from '../../utils/ocrErrorText';
 
+import { useConfirm } from '../../contexts/FeedbackContext';
 interface ReocrPanelProps {
   status: ReocrStatus;
   text: string | null;
@@ -15,6 +16,7 @@ interface ReocrPanelProps {
 // Re-OCR oleku banner ja tulemuse/vea ülekate tekstiredaktoris.
 export default function ReocrPanel({ status, text, error, onApply, onDelete, variant }: ReocrPanelProps) {
   const { t } = useTranslation(['workspace', 'common']);
+  const askConfirm = useConfirm();
 
   if (variant === 'banner') {
     if (status !== 'uploading' && status !== 'processing') return null;
@@ -55,8 +57,8 @@ export default function ReocrPanel({ status, text, error, onApply, onDelete, var
               </div>
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 shrink-0">
                 <button
-                  onClick={() => {
-                    if (window.confirm(t('editor.reocr.deleteConfirm'))) onDelete();
+                  onClick={async () => {
+                    if (await askConfirm({ message: t('editor.reocr.deleteConfirm'), variant: 'danger' })) onDelete();
                   }}
                   className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
                 >

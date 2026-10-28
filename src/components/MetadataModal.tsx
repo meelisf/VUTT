@@ -22,6 +22,7 @@ import CreatorsEditor from './creators/CreatorsEditor';
 import { vocabularyRoleOptions } from './creators/roleOptions';
 import TitleVariantsFields from './TitleVariantsFields';
 
+import { useNotify } from '../contexts/FeedbackContext';
 interface MetadataModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -194,6 +195,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   onSaveSuccess
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
+  const notify = useNotify();
   const lang = getLangCode(i18n.language);
 
   const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
@@ -445,7 +447,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         };
         onSaveSuccess(successData as Partial<Page>, successData as Partial<Work>);
         // Salvestatud, aga versiooniajalugu puudu (#418)
-        if (data.git_committed === false) alert(t('common:error.gitCommitFailed'));
+        if (data.git_committed === false) notify(t('common:error.gitCommitFailed'), 'warning');
 
         setSaveStatus('success');
         // Lühike kinnitus on piisav; pikk viivitus jättis mulje, et salvestamine
