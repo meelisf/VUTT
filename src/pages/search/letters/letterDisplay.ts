@@ -2,6 +2,7 @@
  * Kirja tulemusrea kuvaloogika (#526) — puhas, et varukuva ahel oleks testitav.
  * Puuduvat välja ei näidata ega asendata oletusega („[teadmata]").
  */
+import { IMAGE_BASE_URL } from '../../../config';
 import type { LetterHit } from '../../../services/letterSearch';
 import type { WorkDating } from '../../../utils/workDating';
 
@@ -135,3 +136,7 @@ export function splitMarks(s: string): { text: string; mark: boolean }[] {
   if (last < s.length) out.push({ text: s.slice(last), mark: false });
   return out;
 }
+
+/** Kirja lehe pisipilt; piiratud teose allkirja lisab `PageThumbnail`. */
+export const letterThumbUrl = (workId: string, img: string) =>
+  `${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${encodeURIComponent(img)}`;

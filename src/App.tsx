@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { UserProvider } from './contexts/UserContext';
 import { CollectionProvider } from './contexts/CollectionContext';
+import { ImageTokenProvider } from './contexts/ImageTokenContext';
 import { MeilisearchProvider } from './contexts/MeilisearchContext';
 import { Loader2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
@@ -210,9 +211,11 @@ const App: React.FC = () => {
   return (
     <MeilisearchProvider>
       <UserProvider>
-        <CollectionProvider>
-          <RouterProvider router={router} />
-        </CollectionProvider>
+        <ImageTokenProvider>
+          <CollectionProvider>
+            <RouterProvider router={router} />
+          </CollectionProvider>
+        </ImageTokenProvider>
       </UserProvider>
     </MeilisearchProvider>
   );

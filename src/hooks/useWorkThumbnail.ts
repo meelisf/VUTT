@@ -2,9 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Work } from '../types';
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
-import { FILE_API_URL } from '../config';
+import { useImageTokenFetcher, withImageToken } from '../contexts/ImageTokenContext';
 import { isCollectionRestricted } from '../services/collectionService';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 /**
  * Teose pisipildi allikas koos piiratud kogu HMAC-tokeniga.
@@ -13,40 +12,14 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 export function useWorkThumbnail(work: Work, url: string = work.thumbnail_url) {
   const { collections } = useCollection();
   const { authToken } = useUser();
+  const getImageToken = useImageTokenFetcher();
   const [thumbnailSrc, setThumbnailSrc] = useState(url);
   const [thumbnailNeedsToken, setThumbnailNeedsToken] = useState(false);
-  const thumbnailTokenTriedRef = React.useRef(false);
 
   React.useEffect(() => {
     setThumbnailSrc(url);
     setThumbnailNeedsToken(false);
-    thumbnailTokenTriedRef.current = false;
   }, [url]);
-
-  const requestThumbnailToken = React.useCallback(async () => {
-    if (thumbnailTokenTriedRef.current || !work.work_id) return;
-
-    // AuthContext taastub lehe laadimisel asünkroonselt. Kui protected pildi 403 jõuab
-    // enne authToken state'i, kasuta localStorage fallback'i ja ära märgi katset tehtuks
-    // enne kui meil päriselt on token, millega viewer-token küsida.
-    const token = authToken || localStorage.getItem('vutt_token');
-    if (!token) return;
-
-    thumbnailTokenTriedRef.current = true;
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/work/${work.work_id}/viewer-token`, {
-        headers: getAuthHeaders(token),
-        timeout: 10000,
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      if (data.image_exp && data.image_sig) {
-        const sep = url.includes('?') ? '&' : '?';
-        setThumbnailSrc(`${url}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
-        setThumbnailNeedsToken(false);
-      }
-    } catch { /* thumbnail jääb placeholder-taustale */ }
-  }, [authToken, work.work_id, url]);
 
   const isRestrictedWork = useMemo(() => {
     const workCollections = work.collections || [];
@@ -57,14 +30,20 @@ export function useWorkThumbnail(work: Work, url: string = work.thumbnail_url) {
     return workCollections.every(cid => isCollectionRestricted(collections, cid));
   }, [collections, work.collections]);
 
+  // Allkirja küsitakse ainult sisselogituna. Auth taastub lehe laadimisel
+  // asünkroonselt: kui 403 jõuab enne `authToken`-it, käivitab tokeni saabumine
+  // (uus `getImageToken`) selle effecti uuesti. Vahemälu on ühine (#673) —
+  // sama teose kaart ja loendirida ei küsi kaks korda.
   React.useEffect(() => {
-    if (thumbnailNeedsToken || isRestrictedWork) void requestThumbnailToken();
-  }, [thumbnailNeedsToken, isRestrictedWork, requestThumbnailToken]);
+    if (!work.work_id || !authToken || !(thumbnailNeedsToken || isRestrictedWork)) return;
+    let cancelled = false;
+    void getImageToken(work.work_id).then(token => {
+      if (!cancelled && token) setThumbnailSrc(withImageToken(url, token));
+    });
+    return () => { cancelled = true; };
+  }, [thumbnailNeedsToken, isRestrictedWork, getImageToken, authToken, work.work_id, url]);
 
-  const handleThumbnailError = () => {
-    setThumbnailNeedsToken(true);
-    void requestThumbnailToken();
-  };
+  const handleThumbnailError = () => setThumbnailNeedsToken(true);
 
   return { thumbnailSrc, handleThumbnailError };
 }

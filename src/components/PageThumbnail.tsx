@@ -1,42 +1,61 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
-import { FILE_API_URL } from '../../config';
-import { useUser } from '../../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
-import { thumbRetryDelay, buildThumbUrl } from '../../utils/thumbRetry';
+import { useImageTokenFetcher, withImageToken, type ImageToken } from '../contexts/ImageTokenContext';
+import { thumbRetryDelay, buildThumbUrl } from '../utils/thumbRetry';
 
 type ThumbStatus = 'loading' | 'ok' | 'error';
 
-const PageThumb: React.FC<{
+/**
+ * Lehe pisipilt, mis tuleb piiratud teose pildiga ise toime (#673):
+ * viga → pildiallkiri (`useImageTokenFetcher`, ühine vahemälu) → uus katse.
+ * Kasutavad otsingutulemused, kirjaotsing ja teose haldus.
+ */
+const PageThumbnail: React.FC<{
   workId: string;
   src: string;
   className: string;
+  /** Teadaolevalt piiratud teos → küsi allkiri kohe, mitte alles esimese vea järel. */
+  restricted?: boolean;
+  /** Proovi kasvava viivitusega edasi (haldus: pisipilt võib alles genereeruda). */
+  retry?: boolean;
   /** Pildi kuvasuhe (laius/kõrgus) laadimisel — poolitusjoone paigutuseks kaardil. */
   onAspect?: (ratio: number) => void;
   /** Eelvaate teisendus (nt ootel pööre, #431). */
   imgStyle?: React.CSSProperties;
-}> = ({ workId, src, className, onAspect, imgStyle }) => {
-  const { authToken } = useUser();
+}> = ({ workId, src, className, restricted = false, retry = false, onAspect, imgStyle }) => {
   const { t } = useTranslation(['workspace']);
-  const [tokenQuery, setTokenQuery] = useState('');  // "&exp=..&sig=.." kui piiratud teos
+  const getImageToken = useImageTokenFetcher();
+  // Allkiri koos src-iga, millele ta käib — teise src-i jaoks ta ei kehti.
+  const [token, setToken] = useState<{ src: string; token: ImageToken } | null>(null);
   const [nonce, setNonce] = useState(0);             // muutub iga taaskatse korral → sunnib reloadi
   const [status, setStatus] = useState<ThumbStatus>('loading');
-  const tokenTriedRef = useRef(false);
   const retryRef = useRef(0);                         // taaskatsete loendur (backoffi jaoks)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const srcRef = useRef(src);
+  srcRef.current = src;
+
+  // Kutsuja võib allkirja ise src-i panna (haldus värskendab seda perioodiliselt).
+  const srcHasImageToken = src.includes('exp=') && src.includes('sig=');
+  const activeToken = token?.src === src ? token.token : null;
 
   useEffect(() => {
-    setTokenQuery('');
     setNonce(0);
     setStatus('loading');
-    tokenTriedRef.current = false;
     retryRef.current = 0;
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [src]);
 
-  const imgSrc = buildThumbUrl(src, tokenQuery, nonce);
-  const srcHasImageToken = src.includes('exp=') && src.includes('sig=');
+  useEffect(() => {
+    if (!restricted || srcHasImageToken || !workId) return;
+    let cancelled = false;
+    void getImageToken(workId).then(tok => {
+      if (!cancelled && tok) setToken({ src, token: tok });
+    });
+    return () => { cancelled = true; };
+  }, [restricted, srcHasImageToken, workId, src, getImageToken]);
+
+  const imgSrc = buildThumbUrl(withImageToken(src, activeToken), '', nonce);
 
   const scheduleReload = (delay: number) => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -44,42 +63,33 @@ const PageThumb: React.FC<{
   };
 
   const handleError = async () => {
-    // 1) Esimene viga: ehk piiratud teos → proovi signeeritud viewer-tokenit.
-    if (!srcHasImageToken && !tokenTriedRef.current && workId) {
-      try {
-        const r = await fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
-          headers: getAuthHeaders(authToken),
-          timeout: 10000,
-        });
-        if (r.ok) {
-          const d = await r.json();
-          if (d.image_exp && d.image_sig) {
-            tokenTriedRef.current = true;
-            setTokenQuery(`&exp=${d.image_exp}&sig=${d.image_sig}`);
-            return;
-          }
-          // 200, aga token puudub (nt avalik teos) → tokenist pole abi, ära küsi iga retry'ga uuesti.
-          tokenTriedRef.current = true;
-        } else if (r.status === 401 || r.status === 403 || r.status === 404) {
-          // Server ütleb päriselt "ei" (õigust pole / teost pole) → ära küsi iga retry'ga uuesti.
-          // Võrgu/timeout'i catch jätab lipu false'iks, et järgmine taustakatse prooviks uuesti.
-          tokenTriedRef.current = true;
-        }
-      } catch { /* transientne võrgutõrge — järgmine retry proovib tokenit uuesti */ }
+    // 1) Ehk piiratud teos (või allkiri aegus) → proovi allkirja. Vahemälu hoiab
+    //    serveri lõpliku „ei" meeles ja võrgutõrge proovib järgmisel korral uuesti,
+    //    seega iga kordus EI tee päringut.
+    if (!srcHasImageToken && workId) {
+      const failedSrc = src;
+      const tok = await getImageToken(workId);
+      if (srcRef.current !== failedSrc) return;
+      if (tok && (tok.exp !== activeToken?.exp || tok.sig !== activeToken?.sig)) {
+        setToken({ src: failedSrc, token: tok });
+        return;
+      }
     }
+    setStatus('error');
     // 2) Transientne viga (aeglane ühendus / serveri thumb-genereerimise viivitus):
     //    JÄTKA proovimist kasvava (kuni ~5s) viivitusega — <img> jääb monteerituks,
     //    nii laeb pisipilt ISE niipea kui ühendus/server jõuab. EI loobu jäädavalt.
-    setStatus('error');
-    retryRef.current += 1;
-    scheduleReload(thumbRetryDelay(retryRef.current));
+    if (retry) {
+      retryRef.current += 1;
+      scheduleReload(thumbRetryDelay(retryRef.current));
+    }
   };
 
   // Käsitsi kohene taaskatse (nullib backoffi). stopPropagation, et mitte vallandada valikut.
   const handleManualRetry = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (timerRef.current) clearTimeout(timerRef.current);
-    tokenTriedRef.current = false;
     retryRef.current = 0;
     setStatus('loading');
     setNonce((n) => n + 1);
@@ -102,8 +112,8 @@ const PageThumb: React.FC<{
         onError={handleError}
         className={`${className} ${status === 'error' ? 'invisible' : ''}`}
       />
-      {/* Veaolek: nähtav placeholder, mis proovib taustal edasi laadida. Keskel
-          ikoon on klõpsatav koheseks taaskatseks; ülejäänud ala laseb valikuklõpsu läbi. */}
+      {/* Veaolek: nähtav placeholder (retry-režiimis proovib taustal edasi). Keskel
+          ikoon on klõpsatav koheseks taaskatseks; ülejäänud ala laseb klõpsu läbi. */}
       {status === 'error' && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 pointer-events-none">
           <button
@@ -124,4 +134,4 @@ const PageThumb: React.FC<{
   );
 };
 
-export default PageThumb;
+export default PageThumbnail;

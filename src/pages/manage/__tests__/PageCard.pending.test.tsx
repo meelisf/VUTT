@@ -10,6 +10,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'et' } }),
 }));
 vi.mock('../../../contexts/UserContext', () => ({ useUser: () => ({ authToken: 't' }) }));
+vi.mock('../../../contexts/ImageTokenContext', async (orig) => ({
+  ...(await orig<typeof import('../../../contexts/ImageTokenContext')>()),
+  useImageTokenFetcher: () => () => Promise.resolve(null),
+}));
 
 const base = {
   workId: 'w1', filename: 'a.jpg', imageName: 'a.jpg', visiblePageNum: 1, status: 'Toores',

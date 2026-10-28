@@ -50,13 +50,6 @@ Sulge migratsiooniskriptiga või lisa diagnostiline hoiatus, et näha, kas neid 
 
 ## Frontend
 
-### `PageThumbnail` — duplikeeritud viewer-tokeni loogika
-
-Viewer-tokeni retry (piiratud kollektsioonide pisipildid: 403 → küsi token → lisa `exp`+`sig`)
-on kahes kohas eraldi: `src/pages/search/SearchResults.tsx` ja `src/pages/manage/PageThumb.tsx`.
-Kolmas pisipildivaade `src/components/ThumbnailGrid.tsx` ei kasuta viewer-tokenit üldse.
-**Parandus:** üks jagatud `src/components/PageThumbnail.tsx` kõigile kolmele.
-
 ### Normaliseerijad ei kata kõiki erijuhte (P2)
 
 `normalizePage` / `normalizeWork` (`meiliService.ts`) vs `pageService.ts` / `workService.ts`

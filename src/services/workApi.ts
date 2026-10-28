@@ -74,6 +74,7 @@ export interface WorkMetadataResponse extends ApiStatusResponse {
 }
 
 export interface ViewerTokenResponse {
+  token?: string;
   image_exp?: number;
   image_sig?: string;
 }
@@ -157,7 +158,7 @@ export function getWorkMetadata(workId: string, token: string): Promise<WorkMeta
   return apiPost<WorkMetadataResponse>('/get-work-metadata', { work_id: workId }, authJson(token));
 }
 
-export function getViewerToken(workId: string, token: string): Promise<ViewerTokenResponse> {
+export function getViewerToken(workId: string, token: string | null): Promise<ViewerTokenResponse> {
   return apiGet<ViewerTokenResponse>(`/work/${workId}/viewer-token`, auth(token, { timeout: 10000 }));
 }
 

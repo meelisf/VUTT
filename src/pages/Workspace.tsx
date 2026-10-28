@@ -16,6 +16,9 @@ import TextEditor from '../components/TextEditor';
 import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
+import { useImageToken, withImageToken } from '../contexts/ImageTokenContext';
+import { getViewerToken, type ViewerTokenResponse } from '../services/workApi';
+import { ApiError } from '../services/apiClient';
 import { useCollection } from '../contexts/CollectionContext';
 import { getWorkSetWorkIds } from '../services/workSetService';
 import { collectionForWorkSearch } from '../utils/workSearchSelection';
@@ -39,7 +42,6 @@ const Workspace: React.FC = () => {
   const { collections, selection, setSelectedCollection } = useCollection();
   const index = useMeiliIndex();
   const [viewerToken, setViewerToken] = useState<string | null>(null);
-  const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
   const effectiveIndex = useMemo(() => {
     if (viewerToken) return new MeiliSearch({ host: MEILI_HOST, apiKey: viewerToken }).index(MEILI_INDEX);
     return index;
@@ -124,23 +126,12 @@ const Workspace: React.FC = () => {
     setInputPage(pageNum || '1');
   }, [pageNum]);
 
-  // Sisselogitud kasutaja pildi HMAC token — laetakse üks kord teos kohta.
+  // Pildi HMAC-allkiri — üks kord teose kohta (ühine vahemälu, #673).
   // Vajalik piiratud kollektsioonide piltidele, kuna image server on eraldi server
-  // ja auth credentials-eid ei saa <img src> päringuga kaasa saata.
-  useEffect(() => {
-    if (!authToken || !workId) return;
-    setImageToken(null);
-    fetch(`${FILE_API_URL}/work/${workId}/viewer-token`, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .then(data => {
-        if (data?.image_exp && data?.image_sig) {
-          setImageToken({ exp: data.image_exp, sig: data.image_sig });
-        }
-      })
-      .catch(() => {});
-  }, [workId, authToken]);
+  // ja auth credentials-eid ei saa <img src> päringuga kaasa saata. Anonüümselt
+  // ainult jagatud teosele (viewer-token on siis olemas). `refresh` EI OLE sees:
+  // uus allkiri muudaks suure pildi src-i ja laeks selle keset tööd uuesti.
+  const imageToken = useImageToken(workId, { enabled: !!authToken || !!viewerToken });
 
   // Salvestus dialoogi jaoks: flush-variant, mis liidab ka kommentaari-mustandi.
   // Tagastab `false`, kui salvestamine ebaõnnestus — dialoog jääb siis avatuks.
@@ -216,19 +207,20 @@ const Workspace: React.FC = () => {
         // tagastab piiratud teose puhul null. Auth päisega saab autenditud admin/editor
         // siiski teose-skoobiga tokeni ja leht laeb; ilma selleta tuli "Ligipääs keelatud".
         if (!pageData && !viewerToken) {
-          const r = await fetch(`${FILE_API_URL}/work/${workId}/viewer-token`, {
-            headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-          });
+          let data: ViewerTokenResponse | null = null;
+          let status = 0;
+          try {
+            data = await getViewerToken(workId, authToken);
+          } catch (err) {
+            // Võrgutõrge läheb välimisse catch'i; HTTP-vastus jääb siin otsustada.
+            if (!(err instanceof ApiError)) throw err;
+            status = err.status;
+          }
           if (isStale()) return;
-          if (r.ok) {
-            const data = await r.json();
-            if (isStale()) return;
+          if (data?.token) {
             setViewerToken(data.token);
-            if (data.image_exp && data.image_sig) {
-              setImageToken({ exp: data.image_exp, sig: data.image_sig });
-            }
             return; // effectiveIndex uuendub → useEffect käivitub uuesti
-          } else if (r.status === 403) {
+          } else if (status === 403) {
             if (sessionExpired) {
               setError(t('errors.sessionExpiredProtectedWork'));
               setErrorRequiresLogin(true);
@@ -372,9 +364,7 @@ const Workspace: React.FC = () => {
   };
 
   const appendImageToken = useCallback((url: string): string => {
-    if (!imageToken) return url;
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}exp=${imageToken.exp}&sig=${imageToken.sig}`;
+    return withImageToken(url, imageToken);
   }, [imageToken]);
 
   const currentImageSrc = useMemo(() => {

@@ -11,7 +11,7 @@ import { ExternalLink } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../../../config';
 import type { WorkPageInfo } from '../../../services/workApi';
 import type { Badge } from '../partsModel';
-import PageThumb from '../PageThumb';
+import PageThumbnail from '../../../components/PageThumbnail';
 import { KIND_STYLE } from './kindStyle';
 
 interface Props {
@@ -56,7 +56,8 @@ const PartsGrid: React.FC<Props> = ({ workId, pages, badges, selected, activeSte
             }`}
           >
             <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
-              <PageThumb
+              <PageThumbnail
+                retry
                 workId={workId}
                 src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${imageName}?v=${thumbCacheBust}${tokenQuery}`}
                 className="h-full w-full object-contain"

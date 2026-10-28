@@ -19,6 +19,7 @@ import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import PageImageEditorModal from '../components/PageImageEditorModal';
 import { useUser } from '../contexts/UserContext';
+import { useImageToken } from '../contexts/ImageTokenContext';
 import { ApiError } from '../services/apiClient';
 import {
   addWorkPages,
@@ -35,7 +36,6 @@ import {
   getDeletedWorkPages,
   getModifiedImages,
   getReocrStatus,
-  getViewerToken,
   getWorkMetadata,
   getWorkPages,
   ModifiedImage,
@@ -182,7 +182,6 @@ const WorkManage: React.FC = () => {
   const [deleteWorkError, setDeleteWorkError] = useState<string | null>(null);
 
   // Pildi HMAC token piiratud teoste allalaadimiseks
-  const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
   const [editorTarget, setEditorTarget] = useState<{ index: number; tab: 'edit' | 'split' } | null>(null);
 
   const MIN_COLS = 3;
@@ -263,26 +262,11 @@ const WorkManage: React.FC = () => {
     if (isAdmin) loadPages();
   }, [workId, authToken, isAdmin]);
 
-  // Pildi viewer-token piiratud teoste thumbnailide jaoks. Server-tokeni TTL on 1h
-  // (public.py), seega värskendame seda perioodiliselt — muidu aeguks token pikalt
-  // lahti oleval manage-lehel ja thumbid jääksid 403-lõputusse retry'sse (token on
-  // src-is, PageThumb ei küsi seda ise uuesti). Värske token → src muutub → reload.
-  useEffect(() => {
-    if (!workId || !authToken || !isAdmin) return;
-    let cancelled = false;
-    const fetchToken = () => {
-      getViewerToken(workId, authToken)
-        .then(d => {
-          if (!cancelled && d?.image_exp && d?.image_sig) {
-            setImageToken({ exp: d.image_exp, sig: d.image_sig });
-          }
-        })
-        .catch(() => {});
-    };
-    fetchToken();
-    const timer = setInterval(fetchToken, 45 * 60 * 1000); // 45 min < 1h TTL
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [workId, authToken, isAdmin]);
+  // Pildi allkiri piiratud teoste pisipiltidele. Server-allkirja TTL on 1h
+  // (public.py), seega `refresh` — muidu aeguks see pikalt lahti oleval
+  // manage-lehel ja pisipildid jääksid 403-lõputusse retry'sse (allkiri on
+  // src-is, PageThumbnail ei küsi seda ise uuesti). Värske allkiri → src muutub → reload.
+  const imageToken = useImageToken(workId, { enabled: !!authToken && isAdmin, refresh: true });
 
   // Re-OCR koondstaatus: laeb korra (näitab .ocr-ootel märke), pollib ainult aktiivse batchi ajal.
   useEffect(() => {

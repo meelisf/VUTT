@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
-import PageThumb from './PageThumb';
+import PageThumbnail from '../../components/PageThumbnail';
 import { IMAGE_BASE_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
 import { ReocrState } from '../../utils/reocrStatus';
@@ -119,7 +119,8 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
             <AlertCircle size={12} className="text-red-600" />
           </span>
         )}
-        <PageThumb
+        <PageThumbnail
+          retry
           workId={p.workId}
           src={thumbSrc}
           /* `object-contain`, MITTE `cover` (sama kuju nagu upload'i kontaktlehel
