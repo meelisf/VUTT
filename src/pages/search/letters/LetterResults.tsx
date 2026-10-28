@@ -7,7 +7,8 @@ import { useUser } from '../../../contexts/UserContext';
 import { getLangCode } from '../../../utils/getLangCode';
 import { partAbstract } from '../../manage/partsModel';
 import { abstractSnippet, letterHeadline, letterPageExcerpts, splitMarks } from './letterDisplay';
-import { letterThumbUrl, useImageTokens } from './useImageTokens';
+import PageThumbnail from '../../../components/PageThumbnail';
+import { letterThumbUrl } from './letterDisplay';
 
 interface Props {
   hits: LetterHit[];
@@ -31,7 +32,6 @@ interface Excerpt { key: string; label: string | null; page?: number; text: stri
 const LetterResults: React.FC<Props> = ({ hits }) => {
   const { t, i18n } = useTranslation(['search', 'workspace']);
   const { authToken } = useUser();
-  const imageTokens = useImageTokens(hits, authToken);
   const lang = getLangCode(i18n.language);
   return (
     <ol className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
@@ -55,7 +55,6 @@ const LetterResults: React.FC<Props> = ({ hits }) => {
                 : summary.text, marked: false }]
               : [];
         const pages = [...(hit.pages ?? [])].sort((x, y) => x.n - y.n);
-        const tokenQuery = imageTokens.get(hit.work_id) ?? '';
         return (
           <li key={hit.id} className="px-4 py-3">
             <Link to={to} className="group flex items-start gap-2">
@@ -75,10 +74,13 @@ const LetterResults: React.FC<Props> = ({ hits }) => {
                   {pages.slice(0, MAX_THUMBS).map(p => (
                     <Link key={p.n} to={pageTo(p.n)} title={t('letters.page', { page: p.n })}
                       aria-label={t('letters.page', { page: p.n })}>
-                      <img src={letterThumbUrl(hit.work_id, p.img, tokenQuery)} alt="" loading="lazy"
-                        className={`h-16 w-12 rounded-sm border bg-gray-100 object-cover hover:border-primary-400 ${
-                          hitPages.includes(p.n) ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-gray-200'}`}
-                        onError={e => { e.currentTarget.style.display = 'none'; }} />
+                      {/* Mitteavalik teos vajab allkirja; väljalogitul pole millegagi küsida. */}
+                      <span className={`block h-16 w-12 overflow-hidden rounded-sm border bg-gray-100 hover:border-primary-400 ${
+                        hitPages.includes(p.n) ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-gray-200'}`}>
+                        <PageThumbnail workId={hit.work_id} src={letterThumbUrl(hit.work_id, p.img)}
+                          restricted={hit.is_public === false && !!authToken}
+                          className="h-full w-full object-cover" />
+                      </span>
                     </Link>
                   ))}
                   {pages.length > MAX_THUMBS && (

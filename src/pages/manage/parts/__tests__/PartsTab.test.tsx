@@ -47,7 +47,7 @@ vi.mock('../../../../services/workPartsApi', async (orig) => ({
     return api.parts.find(p => p.id === id);
   },
 }));
-vi.mock('../../PageThumb', () => ({ default: () => <div /> }));
+vi.mock('../../../../components/PageThumbnail', () => ({ default: () => <div /> }));
 const role = vi.hoisted(() => ({ value: 'superadmin' }));
 vi.mock('../../../../contexts/UserContext', () => ({ useUser: () => ({ user: { role: role.value } }) }));
 vi.mock('../../../../components/EntityPicker', () => ({ default: () => <input aria-label="entity" /> }));

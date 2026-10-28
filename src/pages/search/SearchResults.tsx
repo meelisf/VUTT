@@ -7,13 +7,11 @@ import { Vocabularies, getCollectionColorClasses } from '../../services/collecti
 import { searchWorkHits } from '../../services/searchService';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
-import { useUser } from '../../contexts/UserContext';
 import { getLabel } from '../../utils/metadataUtils';
 import { getLangCode } from '../../utils/getLangCode';
 import { workDisplayTitle } from '../../utils/workTitle';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
-import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import PageThumbnail from '../../components/PageThumbnail';
 import { parseYearDisplayRange, formatYearDisplay } from '../../utils/yearDisplayUtils';
 import SafeHtml from '../../components/SafeHtml';
 import {
@@ -21,55 +19,6 @@ import {
     ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
     Bookmark, FolderOpen, SquarePen
 } from 'lucide-react';
-
-const PageThumbnail: React.FC<{ workId: string; src: string; className: string }> = ({ workId, src, className }) => {
-    const { authToken } = useUser();
-    const [imgSrc, setImgSrc] = useState(src);
-    const [needsToken, setNeedsToken] = useState(false);
-    const triedRef = useRef(false);
-
-    useEffect(() => {
-        setImgSrc(src);
-        setNeedsToken(false);
-        triedRef.current = false;
-    }, [src]);
-
-    const requestImageToken = React.useCallback(async () => {
-        if (triedRef.current || !workId) return;
-
-        // AuthContext taastub lehe laadimisel asünkroonselt; protected pildi 403 võib
-        // jõuda enne authToken state'i. Kasuta localStorage fallback'i ja ära märgi
-        // katset tehtuks enne, kui token on tegelikult olemas.
-        const token = authToken || localStorage.getItem('vutt_token');
-        if (!token) return;
-
-        triedRef.current = true;
-        try {
-            const response = await fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
-                headers: getAuthHeaders(token),
-                timeout: 10000,
-            });
-            if (!response.ok) return;
-            const data = await response.json();
-            if (data.image_exp && data.image_sig) {
-                const sep = src.includes('?') ? '&' : '?';
-                setImgSrc(`${src}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
-                setNeedsToken(false);
-            }
-        } catch { /* thumbnail jääb tühjaks */ }
-    }, [authToken, src, workId]);
-
-    useEffect(() => {
-        if (needsToken) void requestImageToken();
-    }, [needsToken, requestImageToken]);
-
-    const handleError = () => {
-        setNeedsToken(true);
-        void requestImageToken();
-    };
-
-    return <img src={imgSrc} alt="" loading="lazy" className={className} onError={handleError} />;
-};
 
 interface WorkInfo {
     title: string;

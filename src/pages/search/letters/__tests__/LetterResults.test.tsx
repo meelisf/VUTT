@@ -11,6 +11,10 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../../../contexts/UserContext', () => ({ useUser: () => ({ authToken: null }) }));
+vi.mock('../../../../contexts/ImageTokenContext', async (orig) => ({
+  ...(await orig<typeof import('../../../../contexts/ImageTokenContext')>()),
+  useImageTokenFetcher: () => () => Promise.resolve(null),
+}));
 
 const fetchSpy = vi.fn();
 vi.stubGlobal('fetch', fetchSpy);
@@ -77,8 +81,8 @@ describe('LetterResults: üks kuju (lehtede riba + sildiga lõigud), kõik kirja
   it('otsides lehe tekstist: tabatud leht esile + lõik sildiga „lk N"', () => {
     const hit = { ...base, pages, letter_text, abstract_et: 'Regest', _matchesPosition: { letter_text: [{ start: 6 + 4, length: 1 }] } };
     const { container } = render(<MemoryRouter><LetterResults hits={[hit]} /></MemoryRouter>);
-    expect(screen.getByLabelText('letters.page:{"page":7}').querySelector('img')?.className).toContain('ring-');
-    expect(screen.getByLabelText('letters.page:{"page":8}').querySelector('img')?.className).not.toContain('ring-');
+    expect(screen.getByLabelText('letters.page:{"page":7}').firstElementChild?.className).toContain('ring-');
+    expect(screen.getByLabelText('letters.page:{"page":8}').firstElementChild?.className).not.toContain('ring-');
     expect(labels(container)).toEqual(['letters.page:{"page":7}']);
     expect(container.querySelector('mark')?.textContent).toBe('x');
     expect(container.textContent).not.toContain('Regest');
