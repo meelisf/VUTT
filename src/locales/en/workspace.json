@@ -112,7 +112,7 @@
     "addPageToEnd": "At the end",
     "addPageToBeginning": "First",
     "addPageAfter": "After page {{num}}",
-    "addPageFile": "Choose file (JPG/PNG)",
+    "addPageFile": "Images (JPG/PNG) or one PDF",
     "addPageSubmit": "Add page",
     "addPageError": "Failed to add page",
     "addPageSuccess": "Page added",
@@ -414,6 +414,17 @@
       "colWho": "Title / person",
       "colPages": "Pages",
       "openPart": "Open part: {{name}}"
+    },
+    "addPdf": {
+      "progress": "Rendering PDF: {{done}} / {{total}} pages",
+      "done": "Added {{count}} pages from the PDF — they are selected and marked “New”. Rotate, crop or split them if needed, then run OCR.",
+      "anchorMissing": "The page to insert the PDF after is no longer in the work (deleted or split meanwhile). Choose the position again.",
+      "mixed": "A PDF can't be added together with images — choose either one PDF or images.",
+      "multiplePdf": "Choose one PDF at a time.",
+      "newBadge": "New"
+    },
+    "jobs": {
+      "otherRunning": "Another background job is running on this work. Try again shortly."
     }
   },
   "metadata": {

@@ -112,7 +112,7 @@
     "addPageToEnd": "Lõppu",
     "addPageToBeginning": "Esimeseks",
     "addPageAfter": "Pärast lk {{num}}",
-    "addPageFile": "Vali fail (JPG/PNG)",
+    "addPageFile": "Pildid (JPG/PNG) või üks PDF",
     "addPageSubmit": "Lisa leht",
     "addPageError": "Lehe lisamine ebaõnnestus",
     "addPageSuccess": "Leht lisatud",
@@ -414,6 +414,17 @@
       "colWho": "Pealkiri / isik",
       "colPages": "Lehed",
       "openPart": "Ava osa: {{name}}"
+    },
+    "addPdf": {
+      "progress": "Renderdan PDF-i: {{done}} / {{total}} lehte",
+      "done": "PDF-ist lisati {{count}} lehte — need on valitud ja märgitud „Uus“. Pööra, kärbi või poolita vajadusel ja käivita siis OCR.",
+      "anchorMissing": "Lehte, mille järele PDF-i lisada, ei ole enam teoses (kustutati või poolitati vahepeal). Vali koht uuesti.",
+      "mixed": "PDF-i ei saa lisada koos piltidega — vali kas üks PDF või pildid.",
+      "multiplePdf": "Vali korraga üks PDF.",
+      "newBadge": "Uus"
+    },
+    "jobs": {
+      "otherRunning": "Sellel teosel käib praegu teine taustatöö. Proovi mõne aja pärast uuesti."
     }
   },
   "metadata": {

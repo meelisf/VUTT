@@ -251,15 +251,23 @@ export function reorderWorkPages(workId: string, token: string, order: string[])
 }
 
 export interface PageOpsResult {
+  /** `add_pdf` töö: lisatud lehed sisestusjärjekorras. */
+  inserted?: { filename: string; sequence: number }[];
   rotated?: number;
   adjusted?: number;
   split?: number;
   new_page_count?: number;
 }
 
+/** Teose taustatöö liik (ADR 0074): teose kohta käib korraga üks, liigist sõltumata. */
+export type WorkJobKind = 'page_ops' | 'add_pdf';
+
 /** Taustatöö olek (#431). `idle` = tööd ei ole (või server taaskäivitus). */
 export interface PageOpsStatus {
   state: 'idle' | 'running' | 'done' | 'error';
+  kind?: WorkJobKind;
+  /** Vea kood, nt `anchor_missing` (PDF-i sisestuskoha leht kadus vahepeal). */
+  code?: string;
   done?: number;
   total?: number;
   result?: PageOpsResult;
@@ -328,6 +336,22 @@ export function addWorkPages(
   files.forEach((file) => formData.append('file', file));
   formData.append('after_page_num', String(afterPageNum));
   return apiPost<AddPagesResponse>(`/admin/work/${workId}/add-pages`, formData, auth(token, { timeout: 120000 }));
+}
+
+/**
+ * Lisab PDF-i lehed taustatööna (ADR 0074); edenemine `getWorkPageOpsStatus`-ist
+ * (`kind: 'add_pdf'`). `after` = "start" | "end" | pildifaili nimi, mille järele.
+ */
+export function addWorkPdf(
+  workId: string,
+  token: string,
+  file: File,
+  after: string,
+): Promise<{ status: string; total: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('after', after);
+  return apiPost(`/admin/work/${workId}/add-pdf`, formData, auth(token, { timeout: 600000 }));
 }
 
 export function restoreDeletedWorkPage(

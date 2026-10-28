@@ -29,6 +29,8 @@ interface PageCardProps {
   pendingOp?: PendingPageOp;
   /** Üldjoon (0..1) ootel poolitusele. */
   splitX: number;
+  /** Äsja PDF-ist lisatud leht (ADR 0074) — vaate olek, ei salvestata. */
+  isHighlighted?: boolean;
 }
 
 /** Ootel pöörde eelvaade CSS-iga. 90°/270° juures skaleeritakse 3:4 kasti
@@ -66,7 +68,8 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
       className={`relative flex flex-col rounded-lg border overflow-hidden bg-white ${
         p.isFocused ? 'ring-2 ring-blue-500 motion-safe:animate-pulse'
           : p.isSelected ? 'border-primary-500 ring-2 ring-primary-400'
-          : p.isChanged || op ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
+          : p.isChanged || op ? 'border-amber-400 ring-1 ring-amber-300'
+          : p.isHighlighted ? 'border-sky-400 ring-1 ring-sky-300' : 'border-gray-200'
       }`}
     >
       {/* Kogu pisipildi-ala on valiku-sihtmärk: klõps valib, Shift+klõps vahemiku.
@@ -127,6 +130,15 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
           onAspect={setAspect}
           imgStyle={serverPreview ? undefined : rotateStyle(op?.rotate ?? 0)}
         />
+        {/* Äsja lisatud lehe märk — all vasakul (ülemised nurgad on valikul ja OCR-il). */}
+        {p.isHighlighted && (
+          <span
+            data-testid="page-card-new"
+            className="absolute bottom-1 left-1 z-10 px-1 py-0.5 rounded text-[10px] leading-none bg-sky-100 text-sky-800 border border-sky-400 shadow-sm"
+          >
+            {t('manage.addPdf.newBadge')}
+          </span>
+        )}
         {/* Ootel poolituse joon — sama värv ja kuju nagu upload'i kontaktlehel. */}
         {lineLeft !== null && (
           <div
