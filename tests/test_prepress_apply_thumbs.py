@@ -109,3 +109,24 @@ def test_poolitatud_leht_annab_kaks_pisipilti(apply_env):
     assert sent == 3
     assert sorted(os.listdir(uploads / "u1" / "thumbs")) == [
         "001.jpg", "002.jpg", "003.jpg"]
+
+
+def test_apply_kirjutab_renderduse_ppi_state_i(apply_env, monkeypatch):
+    """ADR 0073: valitud ppi + põhjus lehe kaupa state'i (diagnostika, mitte UI)."""
+    uploads, sftp = apply_env
+    src = prepress_apply.page_source.open_page_source("x")
+    algne = src.render_full
+
+    def render_full(n, dst):
+        algne(n, dst)
+        return {"dpi": 72, "reason": "skann"} if n == 1 else {"dpi": 300, "reason": "pilti ei ole"}
+
+    src.render_full = render_full
+    monkeypatch.setattr(prepress_apply.page_source, "open_page_source", lambda p: src)
+
+    prepress_apply._transfer_pages(
+        "u1", "1651-teos", ("/srv/st", "/srv/st/w"), "/srv/st/w", _plaan())
+
+    render = upload_state.read_state("u1")["prepress"]["render"]
+    assert render == {"1": {"dpi": 72, "reason": "skann"},
+                      "2": {"dpi": 300, "reason": "pilti ei ole"}}

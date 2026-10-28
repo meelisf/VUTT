@@ -316,6 +316,7 @@ def try_begin_applying(upload_id: str) -> bool:
         prepress = s.get("prepress")
         if isinstance(prepress, dict):
             prepress["page_map"] = {}
+            prepress["render"] = {}  # ADR 0073 diagnostika — samal põhjusel uuest
         write_state(upload_id, s)
         return True
 

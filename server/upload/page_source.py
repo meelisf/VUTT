@@ -6,6 +6,8 @@ mitmepildi-teekonna vahel.
 DPI ja JPEG-kvaliteet PEAVAD kattuma OCR-serveri valvurskripti väärtustega
 (~/Dokumendid/LLM/qwen3.5/kataloogi-jalgimine-ja-ocr.py: PDF_DPI = 300,
 img.save(..., quality=95)). Kui need seal muutuvad, tuleb muuta ka siin.
+`FULL_DPI` on lagi: kogu lehte katvat skannipilti ei venitata üle tema enda
+ppi (ADR 0073).
 """
 import glob
 import os
@@ -21,6 +23,7 @@ FULL_DPI = 300             # = OCR-serveri PDF_DPI
 JPEG_QUALITY = 95          # = OCR-serveri img.save(quality=95)
 PREVIEW_MAX_EDGE = 700     # pildikausta eelvaate pikim külg
 RENDER_TIMEOUT = 120       # ühe lehe renderduse ülempiir sekundites
+SCAN_COVER_MIN = 0.9       # pilt katab ≥ 90 % lehest → skannileht (ADR 0073)
 NICE_LEVEL = 10            # taustatöö ei tohi veebipäringuid näljutada
 
 
@@ -55,7 +58,8 @@ class PageSource:
     def render_preview(self, n: int, dst: str) -> None:
         raise NotImplementedError
 
-    def render_full(self, n: int, dst: str) -> None:
+    def render_full(self, n: int, dst: str) -> Optional[dict]:
+        """Kirjutab lehe täismõõdus. PDF tagastab `{"dpi", "reason"}` (diagnostika)."""
         raise NotImplementedError
 
     def source_file(self, n: int) -> Optional[str]:
@@ -86,6 +90,69 @@ def _pdfinfo_page_count(pdf_path: str) -> int:
         if line.startswith("Pages:"):
             return int(line.split(":", 1)[1].strip())
     raise RuntimeError("pdfinfo ei andnud lehtede arvu: {}".format(pdf_path))
+
+
+def _run_text(cmd: List[str]) -> str:
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+    if result.returncode != 0:
+        raise RuntimeError("{} exit={}".format(cmd[0], result.returncode))
+    return result.stdout.decode("utf-8", "replace")
+
+
+def parse_pdfimages_list(text: str) -> List[tuple]:
+    """`pdfimages -list` → [(laius, kõrgus, x_ppi, y_ppi)] ainult `image`-tüüpi ridadest.
+
+    `mask`/`smask`/`stencil` on läbipaistvuse kirjeldus, mitte omaette pilt.
+    Veerud: page num type width height color comp bpc enc interp object ID
+    x-ppi y-ppi size ratio (object ID on kaks veergu).
+    """
+    rows = []
+    for line in text.splitlines():
+        f = line.split()
+        if len(f) < 14 or not f[0].isdigit() or f[2] != "image":
+            continue
+        try:
+            rows.append((int(f[3]), int(f[4]), float(f[12]), float(f[13])))
+        except ValueError:
+            continue
+    return rows
+
+
+def parse_page_size(text: str, n: int) -> Optional[tuple]:
+    """`pdfinfo -f n -l n` → lehe suurus punktides (laius, kõrgus)."""
+    prefix = "Page {:>4} size:".format(n)
+    for line in text.splitlines():
+        if line.startswith(prefix) or line.startswith("Page {} size:".format(n)):
+            parts = line.split(":", 1)[1].split()
+            try:
+                return float(parts[0]), float(parts[2])
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
+def scan_render_dpi(images: List[tuple], page_pt: tuple) -> tuple:
+    """Renderduse ppi ja põhjus (ADR 0073).
+
+    Ainult ühe kogu lehte katva skannipildiga lehel `min(300, x_ppi, y_ppi)` —
+    PDF-i deklareeritud lehe suurus võib valetada (BSB märgib skanni 72 ppi-ks,
+    leht „on" 62 × 81 cm) ja 300 ppi venitaks skanni ~4× üles. Kõik muu jääb
+    300 peale: digitaalsel lehel on lehe suurus päris ja väikese foto ppi ei
+    tohi teksti renderdust alla tõmmata.
+    """
+    if not images:
+        return FULL_DPI, "pilti ei ole"
+    if len(images) > 1:
+        return FULL_DPI, "mitu pilti"
+    w, h, xppi, yppi = images[0]
+    if xppi <= 0 or yppi <= 0:
+        return FULL_DPI, "ppi puudub"
+    page_area = (page_pt[0] / 72.0) * (page_pt[1] / 72.0)
+    if page_area <= 0 or (w / xppi) * (h / yppi) < SCAN_COVER_MIN * page_area:
+        return FULL_DPI, "pilt katab osa lehest"
+    if abs(xppi - yppi) > 0.1 * max(xppi, yppi):
+        logger.warning("Skanni telgede ppi erineb: x=%s y=%s", xppi, yppi)
+    return max(1, min(FULL_DPI, int(min(xppi, yppi)))), "skann"
 
 
 class PdfPageSource(PageSource):
@@ -125,14 +192,30 @@ class PdfPageSource(PageSource):
         ])
         self._finish(base, n, dst)
 
-    def render_full(self, n: int, dst: str) -> None:
+    def _scan_dpi(self, n: int) -> tuple:
+        """Lehe renderduse ppi. Tuvastuse tõrge → 300 nagu enne, mitte apply viga."""
+        try:
+            images = parse_pdfimages_list(_run_text(
+                ["pdfimages", "-f", str(n), "-l", str(n), "-list", self.pdf_path]))
+            page_pt = parse_page_size(_run_text(
+                ["pdfinfo", "-f", str(n), "-l", str(n), self.pdf_path]), n)
+        except Exception as e:
+            logger.warning("Lehe %s pilditüübi tuvastus ebaõnnestus: %s", n, e)
+            return FULL_DPI, "tuvastus ebaõnnestus"
+        if not page_pt:
+            return FULL_DPI, "lehe suurus puudub"
+        return scan_render_dpi(images, page_pt)
+
+    def render_full(self, n: int, dst: str) -> dict:
+        dpi, reason = self._scan_dpi(n)
         base = self._base(dst)
         nice_run([
             "pdftoppm", "-jpeg", "-jpegopt", "quality={}".format(JPEG_QUALITY),
-            "-r", str(FULL_DPI), "-f", str(n), "-l", str(n),
+            "-r", str(dpi), "-f", str(n), "-l", str(n),
             self.pdf_path, base,
         ])
         self._finish(base, n, dst)
+        return {"dpi": dpi, "reason": reason}
 
 
 # --- Pildikaust (mitmepildi-upload) ---
