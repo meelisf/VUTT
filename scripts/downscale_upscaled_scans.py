@@ -138,7 +138,7 @@ def downscale(path: str) -> int:
     return os.path.getsize(path)
 
 
-def process(root: str, work_id: str, apply: bool) -> bool:
+def process(root: str, work_id: str, apply: bool, median_tol: float = MEDIAN_TOL) -> bool:
     wd = find_work_dir(root, work_id)
     with open(os.path.join(wd, "_metadata.json"), encoding="utf-8") as f:
         meta = json.load(f)
@@ -164,7 +164,7 @@ def process(root: str, work_id: str, apply: bool) -> bool:
     share = n_ok / len(pages) if pages else 0
     print(f"   {bsb}: {len(canvases)} lõuendit, {len(files)} lehte, venitatud {len(todo)}")
     print(f"   nihe {off:+d}: klapib {n_ok}/{len(pages)} ({share:.0%}), kõrgussuhte mediaan {med:.3f}")
-    if share < MIN_MATCH_SHARE or abs(med - 1) > MEDIAN_TOL:
+    if share < MIN_MATCH_SHARE or abs(med - 1) > median_tol:
         print("   VAHELE: 72 ppi allikas ei ole tõendatud")
         return False
 
@@ -199,9 +199,12 @@ def main():
     ap.add_argument("work_ids", nargs="+")
     ap.add_argument("--apply", action="store_true", help="kirjuta pildid (vaikimisi kuivkäivitus)")
     ap.add_argument("--data", help="teoste juurkaust (vaikimisi server.config.BASE_DIR)")
+    ap.add_argument("--median-tol", type=float, default=MEDIAN_TOL,
+                    help="kõrgussuhte mediaani lubatud kõrvalekalle; BSB PDF-i kaader võib "
+                         "IIIF-ist kõrguses mõne %% erineda (l6xrce: 0,969)")
     args = ap.parse_args()
     root = args.data or _data_root()
-    ok = all([process(root, w, args.apply) for w in args.work_ids])
+    ok = all([process(root, w, args.apply, args.median_tol) for w in args.work_ids])
     sys.exit(0 if ok else 1)
 
 
