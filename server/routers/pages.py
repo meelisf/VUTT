@@ -372,7 +372,8 @@ async def admin_apply_page_ops(work_id: str, request: Request, user=Depends(requ
 
 @router.get("/admin/work/{work_id}/page-ops/status")
 def admin_page_ops_status(work_id: str, user=Depends(require_role("admin"))):
-    """Taustatöö olek: {state: idle|running|done|error, done, total, result?, error?}."""
+    """Teose taustatöö olek (üks register kõigile liikidele):
+    {state: idle|running|done|error, kind: page_ops|add_pdf, done, total, result?, error?}."""
     return page_ops_jobs.get_status(work_id)
 
 
