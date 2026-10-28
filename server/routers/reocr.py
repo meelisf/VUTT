@@ -2,13 +2,13 @@ import json
 import os
 import shutil
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..auth import is_at_least
 from ..config import gemini_enabled
 from ..deps import get_json_data, require_role
-from ..meilisearch_ops import sync_work_to_meilisearch_async
+from ..meilisearch_ops import sync_work_to_meilisearch_and_wait
 from ..reocr_apply import apply_ocr_results, discard_ocr_results
 from ..reocr_ops import (
     REOCR_MAX_CONCURRENT,
@@ -242,7 +242,6 @@ def _validate_apply_pages(page_filenames) -> list:
 async def admin_reocr_apply(
     work_id: str,
     request: Request,
-    background_tasks: BackgroundTasks,
     user=Depends(require_role("admin")),
 ):
     """Rakendab ootel .ocr tulemused .txt failidesse: ÜKS git-commit, ÜKS Meili sünk.
@@ -258,9 +257,14 @@ async def admin_reocr_apply(
     result = await run_in_threadpool(
         apply_ocr_results, path, page_filenames, user["username"]
     )
+    # Ootame Meili sünki ära: Workspace loeb lehe Meilist ja näitaks muidu
+    # tagasi tulles vana OCR-i. Ajalimiidi korral jätkab sünk taustal ja klient
+    # ütleb seda kasutajale (`meili_synced: false`).
+    meili_synced = None
     if result["applied"]:
-        background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
-    return {"status": "success", **result}
+        meili_synced = await run_in_threadpool(
+            sync_work_to_meilisearch_and_wait, os.path.basename(path))
+    return {"status": "success", **result, "meili_synced": meili_synced}
 
 
 @router.post("/admin/work/{work_id}/reocr-discard")
