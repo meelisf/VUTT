@@ -206,7 +206,7 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
             # uploadi eelvaade terve 300 DPI läbikäigu taga (minuteid). Lõikamine
             # ja SFTP jäävad välja — võrguootel ei ole CPU-semaforis kohta.
             with prepress.RENDER_SEMAPHORE:
-                source.render_full(n, full)
+                render_info = source.render_full(n, full)
             try:
                 # Pööre ENNE laiuse mõõtmist ja lõikamist — vt _rotate_in_place.
                 _rotate_in_place(full, prepress_plan.rotate_of(plan, n))
@@ -233,9 +233,11 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
 
             upload_state.mutate_prepress(
                 upload_id,
-                lambda p, n=n, outs=lehe_valjundid: (
+                lambda p, n=n, outs=lehe_valjundid, info=render_info: (
                     p.update(applied_done=n),
                     p.setdefault("page_map", {}).update({str(n): outs}),
+                    # ADR 0073: valitud ppi + põhjus diagnostikaks, mitte UI-sse
+                    info and p.setdefault("render", {}).update({str(n): info}),
                 ),
             )
     finally:
