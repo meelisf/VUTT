@@ -270,10 +270,11 @@ tuletatud, `pages` jääb VUTT-i numbriks. Uuenda `mcp/README.md`.
 - **Vastuolu lahendus:** järgmise lehe kontroll (p. „Tuletus") on kirja pandud reegel ja
   kehtib; kaks näidet (`t9zd42` auk → `[247v]`, `10r, ∅, 25r` → `[10v]`) olid sellega
   vastuolus ja on parandatud. Tagajärg: kirjakogus, kus kirja viimane verso on
-  tähistuseta ja järgmine kiri algab hüppega, on viimane leht `?`. **Lahtine kasutajale:**
-  kas lubada tuletus ka siis, kui järgmine nähtav on suurem kui ootuspärane järglane
-  (hüpe edasi = teine jada, mitte puuduv skaneering), ja keelata ainult tagasihüpe või
-  topelt.
+  tähistuseta ja järgmine kiri algab hüppega, on viimane leht `?`.
+  **Kasutaja otsus 2026-10-28:** jääb nii. Üldreegel: kui naabrid tekitavad segaduse,
+  ei arva tuletus, vaid **kahtlased lehed märgendatakse käsitsi**. Lehel nähtav number →
+  `<fw>`; lehel numbrit ei ole → käsitsi aadress (ADR 0070 p. 5), mida v1-s veel ei ole —
+  seni jääb sinna `?`.
 - Puuduv/loetamatu `.txt` = aadress teadmata (`?`), mitte „tähistuseta".
 - Puhas moodul: `server/page_address.py`; testid `tests/test_page_address.py`.
 

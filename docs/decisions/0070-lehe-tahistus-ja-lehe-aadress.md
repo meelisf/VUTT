@@ -163,7 +163,9 @@ Spekk `docs/superpowers/specs/2026-10-19-lehe-aadress-sisukorras-design.md`:
   täisloendus, `conflict`-lipp, käsitsi aadress ja read-model on edasi lükatud.
 - Aadress = lehe esimene `<fw>` + **ühe sammu edasituletus** eelmiselt nähtavalt lehelt
   (foliatsioonis ainult rectolt); järgmine nähtav leht, mis ei ole järglane, keelab
-  tuletuse (`?`). Arvutus kettalt päringu ajal (`server/page_address.py`,
+  tuletuse (`?`). **Üldreegel (kasutaja 2026-10-28):** segaduse korral tuletus ei arva —
+  kahtlased lehed märgendatakse käsitsi (nähtav number `<fw>`-ga, muu käsitsi aadressiga,
+  p. 5; viimane on veel teostamata). Arvutus kettalt päringu ajal (`server/page_address.py`,
   `GET /works/{id}/parts?addresses=1`), mitte Meilist.
 - p. 7 „loendus … kuni osa piirini" ei kehti v1-le: naaber on **teose** tasemel
   (`47w6yr` lk 22 ← lk 21).
