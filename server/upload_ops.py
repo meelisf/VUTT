@@ -49,9 +49,7 @@ _ssh_connections = _ocr_client.ssh_connections
 _ssh_lock = _ocr_client.ssh_lock
 
 
-def _get_upload_lock(upload_id: str) -> threading.Lock:
-    """Tagastab konkreetsele upload_id-le vastava luku."""
-    return _upload_state.get_upload_lock(upload_id)
+_get_upload_lock = _upload_state.get_upload_lock
 
 
 def _upload_dir(upload_id: str) -> str:

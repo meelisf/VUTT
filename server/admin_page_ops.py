@@ -10,7 +10,6 @@ import shutil
 import io
 import math
 import re
-import threading
 import unicodedata
 import uuid
 from contextlib import contextmanager
@@ -20,6 +19,7 @@ from git.exc import GitCommandError
 from PIL import Image
 from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, git_write_lock, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
+from .keyed_locks import KeyedLocks
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import refresh_work_mentions
@@ -28,18 +28,8 @@ from .trash_reason import SPLIT_COMMIT_PREFIX, DELETE_COMMIT_PREFIX
 logger = get_logger(__name__)
 
 # --- Teose-tasemel lukustus (lõimedevaheline + protsessidevaheline) ---
-_work_thread_locks = {}
-_work_thread_locks_guard = threading.Lock()
-
-
-def _get_thread_lock(work_id):
-    """Tagastab olemasoleva või loob uue threading.Lock'i antud teose ID jaoks."""
-    with _work_thread_locks_guard:
-        lk = _work_thread_locks.get(work_id)
-        if lk is None:
-            lk = threading.Lock()
-            _work_thread_locks[work_id] = lk
-        return lk
+_work_thread_locks = KeyedLocks()
+_get_thread_lock = _work_thread_locks.get
 
 
 @contextmanager

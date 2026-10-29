@@ -10,14 +10,14 @@ from datetime import datetime
 from typing import Optional
 
 from ..config import UPLOADS_DIR, get_logger
+from ..keyed_locks import KeyedLocks
 from ..utils import atomic_write_json
 from . import page_status
 
 logger = get_logger(__name__)
 
 # Lock per upload_id — kaitseb samaaegset state.json lugemist/kirjutamist
-_upload_locks: dict = {}
-_locks_lock = threading.Lock()
+_upload_locks = KeyedLocks()
 
 # Mälupõhine SFTP progress. Kettale kirjutatakse alles pärast edastuse lõppu.
 upload_progress: dict = {}  # {upload_id: {"bytes_sent": 0, "bytes_total": 0, "error": None}}
@@ -29,16 +29,12 @@ UPLOAD_STALL_THRESHOLD = int(os.getenv("UPLOAD_STALL_THRESHOLD", "1800"))  # 30 
 
 def get_upload_lock(upload_id: str) -> threading.Lock:
     """Tagastab konkreetsele upload_id-le vastava luku."""
-    with _locks_lock:
-        if upload_id not in _upload_locks:
-            _upload_locks[upload_id] = threading.Lock()
-        return _upload_locks[upload_id]
+    return _upload_locks.get(upload_id)
 
 
 def remove_upload_lock(upload_id: str):
     """Eemaldab uploadi luku pärast staging-kausta kustutamist."""
-    with _locks_lock:
-        _upload_locks.pop(upload_id, None)
+    _upload_locks.remove(upload_id)
 
 
 def upload_dir(upload_id: str) -> str:

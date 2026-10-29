@@ -14,14 +14,13 @@ import json
 import os
 import secrets
 import sqlite3
-import threading
 import time
-import weakref
 from contextlib import ExitStack, contextmanager
 from typing import Optional
 
 from .config import STATE_DIR
 from . import agent_handoff
+from .keyed_locks import KeyedLocks
 from .page_locks import page_lock
 from .page_merge import annotation_link_errors, merge_text, read_page_view
 from .page_text import normalize_page_text, text_hash
@@ -87,27 +86,14 @@ def _clean(db, now: int) -> None:
 
 # ── Ettepaneku lukk ───────────────────────────────────────────────────────
 
-class _Lukk:
-    __slots__ = ("lock", "__weakref__")
-
-    def __init__(self):
-        self.lock = threading.Lock()
-
-
-_guard = threading.Lock()
-_locks: "weakref.WeakValueDictionary[str, _Lukk]" = weakref.WeakValueDictionary()
+_proposal_locks = KeyedLocks(weak=True)
 
 
 @contextmanager
 def proposal_lock(proposal_id: str):
     """Sama ettepaneku olekumuutused (kinnitus, tagasilükkamine, superseded)
     järjestatakse. Võetakse ENNE lehelukke."""
-    with _guard:
-        lukk = _locks.get(proposal_id)
-        if lukk is None:
-            lukk = _Lukk()
-            _locks[proposal_id] = lukk
-    with lukk.lock:
+    with _proposal_locks.get(proposal_id):
         yield
 
 

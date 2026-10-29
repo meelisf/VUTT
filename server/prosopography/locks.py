@@ -11,21 +11,16 @@ haarata mitu isikulukku, kuid need operatsioonid serialiseerib enne seda ühine
 ``merge_operation_lock``; nii ei saa kaks liitmist tekitada ristlukustust.
 """
 import threading
-from typing import Dict
 
-_registry_guard = threading.Lock()
-_person_locks: Dict[str, threading.Lock] = {}
+from ..keyed_locks import KeyedLocks
+
+_person_locks = KeyedLocks()
 merge_operation_lock = threading.Lock()
 
 
 def person_lock(person_id: str) -> threading.Lock:
     """Tagastab (ja vajadusel loob) person_id jaoks püsiva Lock objekti."""
-    with _registry_guard:
-        lock = _person_locks.get(person_id)
-        if lock is None:
-            lock = threading.Lock()
-            _person_locks[person_id] = lock
-        return lock
+    return _person_locks.get(person_id)
 
 
 # Väliste ID-de „broneerimise" lukk (spekk §4.6, ADR 0048). Iga tee, mis lisab
