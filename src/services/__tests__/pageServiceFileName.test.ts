@@ -21,7 +21,7 @@ const page = {
 
 beforeEach(() => {
   fetchMock.mockReset();
-  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'success', comments: [] }) });
+  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'success', comments: [] }), text: async () => JSON.stringify({ status: 'success', comments: [] }) });
 });
 
 const sentBody = () => JSON.parse(fetchMock.mock.calls.at(-1)![1].body);

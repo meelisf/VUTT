@@ -3,7 +3,7 @@
  * Mõlemad otspunktid on ainult superadminile; `target_url` koostab server.
  */
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiGet, apiPost } from './apiClient';
 
 export type AgentProposalKind = 'text' | 'parts' | 'person';
 
@@ -25,17 +25,11 @@ export interface AgentHandoff {
   max_uses: { text: number; parts: number; persons: number };
 }
 
-async function call<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetchWithTimeout(`${FILE_API_URL}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    timeout: 15000,
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(typeof body?.detail === 'string' ? body.detail : `HTTP ${response.status}`);
-  }
-  return body as T;
+function call<T>(token: string, path: string, init: { method?: 'POST' } = {}): Promise<T> {
+  const options = { token, timeout: 15000 };
+  return init.method === 'POST'
+    ? apiPost<T>(`${FILE_API_URL}${path}`, undefined, options)
+    : apiGet<T>(`${FILE_API_URL}${path}`, options);
 }
 
 export const listAgentProposals = (token: string) =>

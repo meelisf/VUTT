@@ -1,6 +1,6 @@
 import { Page, Annotation } from '../types';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiPost } from './apiClient';
 import { pageFileFromImageUrl } from './workImageService';
 
 export interface CommentVersion {
@@ -38,17 +38,8 @@ export async function fetchCommentHistory(
   page: Page,
   authToken?: string,
 ): Promise<CommentHistory> {
-  const response = await fetchWithTimeout(`${FILE_API_URL}/page-comments/history`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-    body: JSON.stringify(pageFileNames(page)),
-    timeout: 30000,
-  });
-  if (!response.ok) {
-    const e = await response.json().catch(() => ({}));
-    throw new Error(e.detail || `History failed: ${response.status}`);
-  }
-  const data = await response.json();
+  const data = await apiPost<any>(`${FILE_API_URL}/page-comments/history`, pageFileNames(page),
+    { token: authToken, timeout: 30000 });
   return {
     versions: data.versions || {},
     deleted: data.deleted || [],
@@ -61,17 +52,8 @@ export async function restoreComment(
   params: { mode: 'version' | 'deleted'; comment_id: string; commit_hash: string },
   authToken?: string,
 ): Promise<{ comments: Annotation[]; gitCommitted: boolean }> {
-  const response = await fetchWithTimeout(`${FILE_API_URL}/page-comments/restore`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-    body: JSON.stringify({ ...pageFileNames(page), ...params }),
-    timeout: 30000,
-  });
-  if (!response.ok) {
-    const e = await response.json().catch(() => ({}));
-    throw new Error(e.detail || `Restore failed: ${response.status}`);
-  }
-  const data = await response.json();
+  const data = await apiPost<any>(`${FILE_API_URL}/page-comments/restore`, { ...pageFileNames(page), ...params },
+    { token: authToken, timeout: 30000 });
   // Kommentaar on kettal ka siis, kui commit ebaõnnestus (#412 p1).
   return { comments: data.comments || [], gitCommitted: data.git_committed !== false };
 }

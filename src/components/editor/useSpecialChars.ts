@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { apiGet } from '../../services/apiClient';
 import { FILE_API_URL } from '../../config';
 
 export interface SpecialCharacter {
@@ -31,14 +32,11 @@ export function useSpecialChars(authToken: string | null): UseSpecialCharsReturn
     const loadSpecialCharacters = async () => {
       try {
         if (authToken) {
-          const response = await fetchWithTimeout(`${FILE_API_URL}/user-chars`, { headers: getAuthHeaders(authToken), timeout: 5000 });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.is_custom) {
-              setSpecialCharacters(data.characters || []);
-              setIsCustomChars(true);
-              return;
-            }
+          const data = await apiGet<any>(`${FILE_API_URL}/user-chars`, { token: authToken, timeout: 5000 }).catch(() => null);
+          if (data?.is_custom) {
+            setSpecialCharacters(data.characters || []);
+            setIsCustomChars(true);
+            return;
           }
         }
         const response = await fetchWithTimeout('/special_characters.json', { timeout: 5000 });

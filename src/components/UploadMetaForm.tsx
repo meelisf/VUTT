@@ -15,7 +15,7 @@ import { Collections, getVocabularies, Vocabularies } from '../services/collecti
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import CollectionTargetSelect from './CollectionTargetSelect';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiGet, apiPatch, apiPost } from '../services/apiClient';
 import { getLangCode } from '../utils/getLangCode';
 import { getLabel } from '../utils/metadataUtils';
 import { deriveYearFields } from '../utils/yearDisplayUtils';
@@ -141,13 +141,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
 
     const loadMeta = async () => {
       try {
-        const r = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/upload/${uploadId}/meta`,
-          { headers: getAuthHeaders(authToken) }
-        );
-        if (!r.ok || cancelled) return;
-        const d = await r.json();
-        const m = d.meta || {};
+        const d = await apiGet<any>(`${FILE_API_URL}/admin/upload/${uploadId}/meta`, { token: authToken });
+        if (cancelled) return;
+        const m = d?.meta || {};
         const metaYear = Number(m.year) || 0;
         const metaYearDisplay = m.year_display || '';
         // Üks tekstilahter: kuva eelistatult, muidu number (0-st ei teki "0" lahtris)
@@ -188,13 +184,8 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
 
     const loadSuggestions = async () => {
       try {
-        const r = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({ lang }),
-        });
-        const d = await r.json();
-        if (!cancelled && d.status === 'success') {
+        const d = await apiPost<any>(`${FILE_API_URL}/get-metadata-suggestions`, { lang }, { token: authToken });
+        if (!cancelled && d?.status === 'success') {
           setSuggestions({
             authors: d.authors || [],
             tags: d.tags || [],
@@ -209,17 +200,15 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
 
     const loadPeopleRegister = async () => {
       try {
-        const r = await fetchWithTimeout(`${FILE_API_URL}/people-register`);
-        const d = await r.json();
-        if (!cancelled && d.status === 'success') setPeopleRegister(d.people || []);
+        const d = await apiGet<any>(`${FILE_API_URL}/people-register`);
+        if (!cancelled && d?.status === 'success') setPeopleRegister(d.people || []);
       } catch {}
     };
 
     const loadArchives = async () => {
       try {
-        const r = await fetchWithTimeout(`${FILE_API_URL}/config/archives`);
-        const d = await r.json();
-        if (!cancelled && d.archives) setArchives(d.archives);
+        const d = await apiGet<any>(`${FILE_API_URL}/config/archives`);
+        if (!cancelled && d?.archives) setArchives(d.archives);
       } catch {}
     };
 
@@ -264,21 +253,10 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
     };
 
     try {
-      const r = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/upload/${uploadId}/meta`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify(payload),
-        }
-      );
-      if (r.ok) {
-        setSavedForm(submitted);
-        setSaveOk(true);
-        setTimeout(() => setSaveOk(false), 3000);
-      } else {
-        setSaveError(t('step3.metaSaveError', 'Salvestamine ebaõnnestus'));
-      }
+      await apiPatch(`${FILE_API_URL}/admin/upload/${uploadId}/meta`, payload, { token: authToken });
+      setSavedForm(submitted);
+      setSaveOk(true);
+      setTimeout(() => setSaveOk(false), 3000);
     } catch {
       setSaveError(t('step3.metaSaveError', 'Salvestamine ebaõnnestus'));
     } finally {

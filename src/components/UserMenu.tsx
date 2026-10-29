@@ -7,7 +7,7 @@ import { useUser } from '../contexts/UserContext';
 import { UserNotification } from '../types';
 import { getNotifications } from '../services/notificationService';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiPost } from '../services/apiClient';
 import { isSentNotification } from '../utils/notificationText';
 
 /** `tone="dark"`: tume päis (#587). */
@@ -56,14 +56,8 @@ const UserMenu: React.FC<{ tone?: 'light' | 'dark' }> = ({ tone = 'light' }) => 
     let cancelled = false;
     const load = async () => {
       try {
-        const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({}),
-          timeout: 5000,
-        });
-        const data = await response.json();
-        const registrations = Array.isArray(data.registrations) ? data.registrations : [];
+        const data = await apiPost<any>(`${FILE_API_URL}/admin/registrations`, {}, { token: authToken, timeout: 5000 });
+        const registrations = Array.isArray(data?.registrations) ? data.registrations : [];
         const pendingCount = registrations.filter((item: { status?: string }) => item.status === 'pending').length;
         if (!cancelled) setPendingRegistrationCount(pendingCount);
       } catch {

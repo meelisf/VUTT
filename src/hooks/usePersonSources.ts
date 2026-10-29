@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiGet, apiPost } from '../services/apiClient';
 import type { PeopleRegisterEntry } from '../components/EntityPicker';
 
 interface SuggestionItem { label: string; id: string | null }
@@ -18,19 +18,13 @@ export function usePersonSources(token: string | null, lang: string) {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-          body: JSON.stringify({ lang }),
-        });
-        const d = await r.json();
+        const d = await apiPost<any>(`${FILE_API_URL}/get-metadata-suggestions`, { lang }, { token });
         if (!cancelled && d.status === 'success') setAuthors(d.authors || []);
       } catch { /* soovitused on mugavus */ }
     })();
     (async () => {
       try {
-        const r = await fetchWithTimeout(`${FILE_API_URL}/people-register`);
-        const d = await r.json();
+        const d = await apiGet<any>(`${FILE_API_URL}/people-register`);
         if (!cancelled && d.status === 'success') setPeopleRegister(d.people || []);
       } catch { /* register on mugavus */ }
     })();

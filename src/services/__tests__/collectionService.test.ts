@@ -165,7 +165,7 @@ describe('getCollections', () => {
     const cols = { a: { name: { et: 'A', en: 'A' } } };
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'success', collections: cols }),
+      json: () => Promise.resolve({ status: 'success', collections: cols }), text: () => Promise.resolve(JSON.stringify({ status: 'success', collections: cols })),
     });
     vi.stubGlobal('fetch', fetchSpy);
 
@@ -188,7 +188,7 @@ describe('getCollections', () => {
     const cols = { a: { name: { et: 'A', en: 'A' } } };
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'success', collections: cols }),
+      json: () => Promise.resolve({ status: 'success', collections: cols }), text: () => Promise.resolve(JSON.stringify({ status: 'success', collections: cols })),
     });
     vi.stubGlobal('fetch', fetchSpy);
 
@@ -212,7 +212,7 @@ describe('getVocabularies', () => {
     const vocab = { types: { Q1: { et: 'T', en: 'T' } } };
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'success', vocabularies: vocab }),
+      json: () => Promise.resolve({ status: 'success', vocabularies: vocab }), text: () => Promise.resolve(JSON.stringify({ status: 'success', vocabularies: vocab })),
     });
     vi.stubGlobal('fetch', fetchSpy);
 

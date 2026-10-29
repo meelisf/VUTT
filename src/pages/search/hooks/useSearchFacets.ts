@@ -7,6 +7,7 @@ import { ContentSearchResponse } from '../../../types';
 import { SearchUrlParams } from './useSearchUrlParams';
 import { getLangCode } from '../../../utils/getLangCode';
 import { FILE_API_URL } from '../../../config';
+import { ApiError, apiGet } from '../../../services/apiClient';
 import { useMeiliIndex } from '../../../contexts/MeilisearchContext';
 import {
     mergeFacetsWithExisting, mergeTagsWithExisting,
@@ -54,7 +55,9 @@ export function useSearchFacets(
             try {
                 const [vocabs, aliasRes] = await Promise.all([
                     getVocabularies(),
-                    fetch(`${FILE_API_URL}/people-aliases`, { signal: controller.signal }).then(r => r.ok ? r.json() : null).catch(e => isAbortError(e) ? null : Promise.reject(e))
+                    // Serveri viga (ApiError) → aliasteta, nagu varem `!r.ok` korral
+                    apiGet<any>(`${FILE_API_URL}/people-aliases`, { signal: controller.signal })
+                        .catch(e => isAbortError(e) || e instanceof ApiError ? null : Promise.reject(e))
                 ]);
                 if (cancelled) return;
                 setVocabularies(vocabs);

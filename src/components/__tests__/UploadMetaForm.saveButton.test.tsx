@@ -15,10 +15,10 @@ vi.mock('../WorkDatingInput', () => ({ default: () => null }));
 vi.mock('../../services/collectionService', () => ({ getVocabularies: vi.fn(async () => null) }));
 
 const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-  if (url.endsWith('/meta') && !init?.method) {
-    return { ok: true, json: async () => ({ meta: { title: 'Trost-Zeilen' } }) } as any;
+  if (url.endsWith('/meta') && (init?.method ?? 'GET') === 'GET') {
+    return new Response(JSON.stringify({ meta: { title: 'Trost-Zeilen' } }));
   }
-  return { ok: true, json: async () => ({}) } as any;
+  return new Response('{}');
 });
 vi.mock('../../utils/fetchWithTimeout', () => ({
   fetchWithTimeout: (url: string, init?: RequestInit) => fetchMock(url, init),

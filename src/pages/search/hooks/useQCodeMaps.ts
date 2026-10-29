@@ -6,6 +6,7 @@ import { getLangCode } from '../../../utils/getLangCode';
 import { useSearchParams } from 'react-router-dom';
 import { isVuttId } from '../../../utils/qcodeUtils';
 import { FILE_API_URL } from '../../../config';
+import { apiGet } from '../../../services/apiClient';
 import { buildIdMap, buildLabelToIdMap } from '../../../utils/buildObjectIdMap';
 
 /** Eraldab tagsIdMap-ist VUTT isikud ({id, label}[], sorditud label järgi). */
@@ -69,8 +70,7 @@ export function useQCodeMaps(
 
     // Lae isiku-tägid alglaadimise ajal — vajalik "Isik teemana" autocompletioni jaoks
     useEffect(() => {
-        fetch(`${FILE_API_URL}/prosopography?limit=1000`)
-            .then(r => r.ok ? r.json() : null)
+        apiGet<any>(`${FILE_API_URL}/prosopography?limit=1000`)
             .then(d => {
                 if (!d?.results) return;
                 setPersonTagsFromLoad(

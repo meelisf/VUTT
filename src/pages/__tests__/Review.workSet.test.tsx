@@ -27,9 +27,9 @@ it('vahetab töökollektsiooni, säilitab filtri lehitsemisel ja eirab vana vast
   const oldResponse = new Promise(resolve => { resolveOld = resolve; });
   const commit = { full_hash: 'hash', commit_hash: 'hash', author: 'anne', date: '2026-09-24', formatted_date: '24.09.2026', message: 'Muudatus', work_id: 'wB', title: 'B teos', filepath: 'b/1.txt', lehekylje_number: 1 };
   state.fetch.mockImplementation((url: string) => {
-    if (url.includes('/admin/users')) return Promise.resolve({ json: async () => ({ status: 'success', users: [] }) });
+    if (url.includes('/admin/users')) return Promise.resolve(new Response(JSON.stringify({ status: 'success', users: [] })));
     if (url.includes('set=a')) return oldResponse;
-    return Promise.resolve({ json: async () => ({ status: 'success', commits: url.includes('offset=0') ? [commit] : [], has_more: url.includes('offset=0'), is_admin: true }) });
+    return Promise.resolve(new Response(JSON.stringify({ status: 'success', commits: url.includes('offset=0') ? [commit] : [], has_more: url.includes('offset=0'), is_admin: true })));
   });
   const view = render(<MemoryRouter><Review /></MemoryRouter>);
   await waitFor(() => expect(state.fetch).toHaveBeenCalledWith(expect.stringContaining('set=a'), expect.anything()));
@@ -39,7 +39,7 @@ it('vahetab töökollektsiooni, säilitab filtri lehitsemisel ja eirab vana vast
   expect(screen.getByText('Kogu B')).toBeTruthy();
   fireEvent.click(screen.getByText('loadMore'));
   await waitFor(() => expect(state.fetch).toHaveBeenCalledWith(expect.stringContaining('offset=1&set=b'), expect.anything()));
-  await act(async () => { resolveOld({ json: async () => ({ status: 'success', commits: [], has_more: false, is_admin: true }) }); });
+  await act(async () => { resolveOld(new Response(JSON.stringify({ status: 'success', commits: [], has_more: false, is_admin: true }))); });
   expect(screen.getByText('B teos')).toBeTruthy();
   fireEvent.click(screen.getByText('common:collections.all'));
   expect(state.setSelection).toHaveBeenCalledWith({ kind: 'all' });

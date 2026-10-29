@@ -4,7 +4,7 @@
  * Andmeleping: docs/_archive/superpowers/specs/done/2026-09-26-isiku-seoste-vaade-design.md.
  */
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { apiGet } from '../../services/apiClient';
 
 export type RelationKind = 'academic' | 'dedicated' | 'family' | 'cotext' | 'mention' | 'printer';
 
@@ -63,7 +63,5 @@ export interface PersonNetwork {
 export async function fetchPersonNetwork(personId: string, collection?: string | null): Promise<PersonNetwork> {
   const url = new URL(`${FILE_API_URL}/prosopography/${personId}/network`, window.location.origin);
   if (collection) url.searchParams.set('collection', collection);
-  const resp = await fetchWithTimeout(url.toString(), { timeout: 15000 });
-  if (!resp.ok) throw new Error(`fetchPersonNetwork: ${resp.status}`);
-  return resp.json();
+  return apiGet(url.toString(), { timeout: 15000 });
 }

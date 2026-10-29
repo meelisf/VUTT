@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiPost } from '../services/apiClient';
 import { useUser } from '../contexts/UserContext';
 
 interface SuggestionItem {
@@ -32,12 +32,7 @@ export function useMetadataSuggestions(
     const load = async () => {
       setIsLoadingSuggestions(true);
       try {
-        const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({ lang })
-        });
-        const result = await response.json();
+        const result = await apiPost<any>(`${FILE_API_URL}/get-metadata-suggestions`, { lang }, { token: authToken });
         if (!cancelled && result.status === 'success') {
           setSuggestions(result[field] || []);
         }

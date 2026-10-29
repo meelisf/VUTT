@@ -4,7 +4,7 @@
 
 import { Annotation, Page } from '../types';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { ApiError, apiPost } from './apiClient';
 import { checkMixedContent, normalizePage } from './meiliService';
 import type { Index } from 'meilisearch';
 import type { Quad4 } from '../utils/perspectiveQuad';
@@ -51,27 +51,22 @@ const saveToFileSystem = async (
       ...(proposal ? { proposal } : {}),
     };
 
-    const response = await fetchWithTimeout(`${FILE_API_URL}/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-      body: JSON.stringify(payload),
-      timeout: 30000
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const conflict = conflictFromResponse(response.status, errorData);
+    let result: any;
+    try {
+      result = (await apiPost(`${FILE_API_URL}/save`, payload, { token: authToken, timeout: 30000 })) ?? {};
+    } catch (e) {
+      if (!(e instanceof ApiError)) throw e;
+      const conflict = conflictFromResponse(e.status, e.data);
       if (conflict) throw conflict;
-      if (errorData.message?.includes('Autentimine') || response.status === 401) {
+      if (e.status === 401 || e.message.includes('Autentimine')) {
         const err = new Error('AUTH_EXPIRED');
         (err as any).status = 401;
         throw err;
       }
-      throw new Error(`File server error: ${response.status}`);
+      throw new Error(`File server error: ${e.status}`);
     }
 
     // Kontrolli git commit hoiatust vastuses
-    const result = await response.json().catch(() => ({}));
     if (result.warning) {
       console.warn("Git commit hoiatus:", result.warning);
     }
@@ -159,26 +154,15 @@ export const replyToComment = async (
   const imageFilename = pageFileFromImageUrl(page.image_url);
   const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
 
-  const response = await fetchWithTimeout(`${FILE_API_URL}/page-comments/reply`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-    body: JSON.stringify({
+  const data = await apiPost<{ comments?: Annotation[]; git_committed?: boolean; warning?: string }>(
+    `${FILE_API_URL}/page-comments/reply`, {
       original_path: page.original_path || page.originaal_kataloog,
       file_name: textFilename,
       work_id: page.work_id,
       page_number: page.page_number,
       comment_id: commentId,
       text,
-    }),
-    timeout: 30000
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || `Reply failed: ${response.status}`);
-  }
-
-  const data = await response.json();
+    }, { token: authToken, timeout: 30000 });
   // Sama käsitlus nagu lehe salvestusel: vastus on kettal, ajalugu võib puududa.
   if (data.git_committed === false) console.warn("Git commit hoiatus:", data.warning);
   return data.comments || [];
@@ -196,20 +180,10 @@ export async function transformPageImage(
   quad?: Quad4,
 ): Promise<TransformResult> {
   const body = quad ? { angle, quad } : { angle, crop };
-  const res = await fetchWithTimeout(
+  return apiPost(
     `${FILE_API_URL}/admin/work/${workId}/page-image/${encodeURIComponent(filename)}/transform`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify(body),
-      timeout: 30000,
-    },
+    body, { token, timeout: 30000 },
   );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
 }
 
 export interface RestoreResult {
@@ -223,17 +197,8 @@ export interface RestoreResult {
 export async function restoreOriginalPageImage(
   workId: string, filename: string, token: string,
 ): Promise<RestoreResult> {
-  const res = await fetchWithTimeout(
+  return apiPost(
     `${FILE_API_URL}/admin/work/${workId}/page-image/${encodeURIComponent(filename)}/restore-original`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      timeout: 30000,
-    },
+    undefined, { token, timeout: 30000 },
   );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
 }

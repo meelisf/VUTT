@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Plus, X, Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiErrorMessage, apiPost } from '../services/apiClient';
 
 interface ArchiveInfo {
   name: string;
@@ -75,24 +75,16 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
     setSaving(true);
     setAddError('');
     try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/config/archives`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders(authToken), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: trimId, name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }),
-      });
-      if (!resp.ok) {
-        const err = await resp.json();
-        setAddError(err.detail || t('common:error.unknown'));
-        return;
-      }
+      await apiPost(`${FILE_API_URL}/config/archives`,
+        { id: trimId, name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }, { token: authToken });
       const info: ArchiveInfo = { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) };
       onArchiveAdded(trimId, info);
       onChange(trimId);
       setNewId(''); setNewName(''); setNewUrl('');
       setShowAddForm(false);
       setOpen(false);
-    } catch {
-      setAddError(t('common:error.unknown'));
+    } catch (e) {
+      setAddError(apiErrorMessage(e, t('common:error.unknown')));
     } finally {
       setSaving(false);
     }
@@ -102,16 +94,11 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
     if (!notifyText.trim() || !authToken) return;
     setSaving(true);
     try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/notifications/send`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders(authToken), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient_mode: 'admins',
-          title: t('admin:archives.requestTitle'),
-          body: notifyText,
-        }),
-      });
-      if (!resp.ok) return;
+      await apiPost(`${FILE_API_URL}/notifications/send`, {
+        recipient_mode: 'admins',
+        title: t('admin:archives.requestTitle'),
+        body: notifyText,
+      }, { token: authToken });
       setNotifySent(true);
     } catch {
       // ignore send errors

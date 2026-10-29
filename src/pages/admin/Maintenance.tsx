@@ -6,7 +6,7 @@ import { RefreshCw, ChevronLeft, Wrench, Pencil, Trash2 } from 'lucide-react';
 import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { ApiError, apiDelete, apiErrorMessage, apiGet, apiPost, apiPut } from '../../services/apiClient';
 import ClientErrorsPanel from './ClientErrorsPanel';
 
 type ActionState = 'idle' | 'running' | 'done' | 'error';
@@ -52,13 +52,7 @@ const Maintenance: React.FC = () => {
     setPlaceLabelsState('running');
     setPlaceLabelsCount(null);
     try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/prosopography/admin/places/refresh-labels`, {
-        method: 'POST',
-        headers: getAuthHeaders(authToken),
-        timeout: 120000,
-      });
-      if (!resp.ok) throw new Error(String(resp.status));
-      const data = await resp.json();
+      const data = await apiPost<any>(`${FILE_API_URL}/prosopography/admin/places/refresh-labels`, undefined, { token: authToken, timeout: 120000 });
       setPlaceLabelsCount(data.updated ?? 0);
       setPlaceLabelsState('done');
     } catch {
@@ -71,13 +65,7 @@ const Maintenance: React.FC = () => {
     setEnrichPageTagsState('running');
     setEnrichPageTagsCount(null);
     try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/admin/enrich-page-tag-labels`, {
-        method: 'POST',
-        headers: getAuthHeaders(authToken),
-        timeout: 30000,
-      });
-      if (!resp.ok) throw new Error(String(resp.status));
-      const data = await resp.json();
+      const data = await apiPost<any>(`${FILE_API_URL}/admin/enrich-page-tag-labels`, undefined, { token: authToken, timeout: 30000 });
       setEnrichPageTagsCount(data.queued ?? 0);
       setEnrichPageTagsState('done');
     } catch {
@@ -91,13 +79,7 @@ const Maintenance: React.FC = () => {
     setEntityLabelsCount(null);
     setEntityLabelsPersons(null);
     try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/admin/refresh-entity-labels`, {
-        method: 'POST',
-        headers: getAuthHeaders(authToken),
-        timeout: 120000,
-      });
-      if (!resp.ok) throw new Error(String(resp.status));
-      const data = await resp.json();
+      const data = await apiPost<any>(`${FILE_API_URL}/admin/refresh-entity-labels`, undefined, { token: authToken, timeout: 120000 });
       setEntityLabelsCount(data.updated ?? 0);
       setEntityLabelsPersons(data.persons_updated ?? 0);
       setEntityLabelsState('done');
@@ -108,9 +90,8 @@ const Maintenance: React.FC = () => {
 
   React.useEffect(() => {
     if (!authToken) return;
-    fetchWithTimeout(`${FILE_API_URL}/config/archives`, { headers: getAuthHeaders(authToken) })
-      .then(r => r.json())
-      .then(d => { if (d.archives) { setArchives(d.archives); setArchivesLoaded(true); } })
+    apiGet<any>(`${FILE_API_URL}/config/archives`, { token: authToken })
+      .then(d => { if (d?.archives) { setArchives(d.archives); setArchivesLoaded(true); } })
       .catch(() => {});
   }, [authToken]);
 
@@ -122,16 +103,12 @@ const Maintenance: React.FC = () => {
     if (archives[trimId]) { setAddError(t('admin:archives.duplicateId', { id: trimId })); return; }
     setAddSaving(true); setAddError('');
     try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/config/archives`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders(authToken), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: trimId, name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }),
-      });
-      if (!resp.ok) { const e = await resp.json(); setAddError(e.detail || t('common:error.unknown')); return; }
+      await apiPost(`${FILE_API_URL}/config/archives`,
+        { id: trimId, name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }, { token: authToken });
       setArchives(prev => ({ ...prev, [trimId]: { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) } }));
       setAddId(''); setAddName(''); setAddUrl('');
       setShowAddArchive(false);
-    } catch { setAddError(t('common:error.unknown')); }
+    } catch (e) { setAddError(apiErrorMessage(e, t('common:error.unknown'))); }
     finally { setAddSaving(false); }
   };
 
@@ -141,38 +118,29 @@ const Maintenance: React.FC = () => {
     if (!trimName) { setEditError(t('admin:archives.nameRequired')); return; }
     setEditSaving(true); setEditError('');
     try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/config/archives/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: { ...getAuthHeaders(authToken), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }),
-      });
-      if (!resp.ok) { const e = await resp.json(); setEditError(e.detail || t('common:error.unknown')); return; }
+      await apiPut(`${FILE_API_URL}/config/archives/${encodeURIComponent(id)}`,
+        { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }, { token: authToken });
       setArchives(prev => ({ ...prev, [id]: { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) } }));
       setEditingId(null);
-    } catch { setEditError(t('common:error.unknown')); }
+    } catch (e) { setEditError(apiErrorMessage(e, t('common:error.unknown'))); }
     finally { setEditSaving(false); }
   };
 
   const handleDeleteArchive = async (id: string, force = false) => {
     try {
-      const resp = await fetchWithTimeout(
+      await apiDelete(
         `${FILE_API_URL}/config/archives/${encodeURIComponent(id)}${force ? '?force=true' : ''}`,
-        { method: 'DELETE', headers: getAuthHeaders(authToken) },
+        { token: authToken },
       );
-      if (resp.status === 409) {
-        const e = await resp.json();
-        setDeleteForceConfirm({ id, message: e.detail });
-        return;
-      }
-      if (!resp.ok) {
-        const e = await resp.json().catch(() => ({}));
-        setDeleteError(e.detail || t('admin:archives.deleteFailed'));
-        return;
-      }
       setDeleteError('');
       setArchives(prev => { const n = { ...prev }; delete n[id]; return n; });
       setDeleteForceConfirm(null);
-    } catch { /* ignore */ }
+    } catch (e) {
+      if (!(e instanceof ApiError)) return;
+      // 409 = arhiiv on kasutusel; server kirjeldab, kus — küsime sundkustutust.
+      if (e.status === 409) setDeleteForceConfirm({ id, message: e.message });
+      else setDeleteError(apiErrorMessage(e, t('admin:archives.deleteFailed')));
+    }
   };
 
   if (userLoading || !user) return null;

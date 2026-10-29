@@ -11,7 +11,7 @@ import { getLabel, isManuscriptType } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { ApiError, apiGet, apiPost } from '../services/apiClient';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
 import { buildMetadataPayload, type YearFieldsExisting } from '../utils/buildMetadataPayload';
@@ -291,9 +291,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
     // Lae arhiivide register
     try {
-      const archivesResp = await fetchWithTimeout(`${FILE_API_URL}/config/archives`);
-      const archivesData = await archivesResp.json();
-      if (archivesData.archives) setArchives(archivesData.archives);
+      const archivesData = await apiGet<any>(`${FILE_API_URL}/config/archives`);
+      if (archivesData?.archives) setArchives(archivesData.archives);
     } catch { /* kasuta tühja loendit kui ei õnnestu */ }
 
     // Lae soovitused ja isikute register paralleelselt
@@ -306,13 +305,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
   const fetchSuggestions = async () => {
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({ lang })
-      });
-      const data = await response.json();
-      if (data.status === 'success') {
+      const data = await apiPost<any>(`${FILE_API_URL}/get-metadata-suggestions`, { lang }, { token: authToken });
+      if (data?.status === 'success') {
         // Server tagastab nüüd [{label: "...", id: "..."}, ...]
         setSuggestions({
           authors: data.authors || [],
@@ -330,9 +324,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
   const fetchPeopleRegister = async () => {
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/people-register`);
-      const data = await response.json();
-      if (data.status === 'success') {
+      const data = await apiGet<any>(`${FILE_API_URL}/people-register`);
+      if (data?.status === 'success') {
         setPeopleRegister(data.people || []);
       }
     } catch (e) {
@@ -347,15 +340,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     }
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/get-work-metadata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify(payload)
-      });
+      const data = await apiPost<any>(`${FILE_API_URL}/get-work-metadata`, payload, { token: authToken });
 
-      const data = await response.json();
-
-      if (data.status === 'success' && data.metadata) {
+      if (data?.status === 'success' && data.metadata) {
         const m = data.metadata;
 
         // V2 formaat (v1 fallback turvavõrguna)
@@ -413,17 +400,10 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     try {
       const payload = buildMetadataPayload(metaForm, workId, page.originaal_kataloog, existingYearRef.current);
 
-      const response = await fetchWithTimeout(`${FILE_API_URL}/update-work-metadata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify(payload),
-        timeout: 30000
-      });
-
-      const data = await response.json();
+      const data = await apiPost<any>(`${FILE_API_URL}/update-work-metadata`, payload, { token: authToken, timeout: 30000 });
       const responseMs = performance.now() - saveStartedAt;
       console.info(`[Metadata] Serveri vastus: ${responseMs.toFixed(0)} ms`);
-      if (data.status === 'success') {
+      if (data?.status === 'success') {
         const { metadata: m } = payload;
         const successData = {
           title: m.title,
@@ -459,12 +439,13 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         }, 400);
       } else {
         setSaveStatus('error');
-        setSaveError(t('editor.saveErrorWithMessage', { message: data.message }));
+        setSaveError(t('editor.saveErrorWithMessage', { message: data?.message }));
       }
     } catch (e) {
       console.error("Metadata save failed", e);
       setSaveStatus('error');
-      setSaveError(t('editor.saveErrorServer'));
+      // Serveri põhjendus (nt `parts` tagasilükkamine) on kasutajale kasulikum kui üldine teade.
+      setSaveError(e instanceof ApiError ? t('editor.saveErrorWithMessage', { message: e.message }) : t('editor.saveErrorServer'));
     } finally {
       setIsSaving(false);
     }

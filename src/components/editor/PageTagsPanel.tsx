@@ -5,7 +5,7 @@ import { ExternalLink, Search, Tag, User, X } from 'lucide-react';
 import { FILE_API_URL } from '../../config';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getAllTags } from '../../services/searchService';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { apiPost } from '../../services/apiClient';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { getLabel } from '../../utils/metadataUtils';
 import type { LinkedEntity } from '../../types/LinkedEntity';
@@ -37,13 +37,8 @@ const PageTagsPanel: React.FC<PageTagsPanelProps> = ({
     const fetchTags = async () => {
       if (!authToken) return;
       try {
-        const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({ lang })
-        });
-        const data = await response.json();
-        if (data.status === 'success') {
+        const data = await apiPost<any>(`${FILE_API_URL}/get-metadata-suggestions`, { lang }, { token: authToken });
+        if (data?.status === 'success') {
           setTagSuggestions(data.tags || []);
         }
       } catch (e) {

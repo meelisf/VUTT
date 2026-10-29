@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { apiDelete, apiGet } from '../../services/apiClient';
 import { parseServerDate } from '../../utils/formatDateTime';
 
 interface ClientError {
@@ -33,9 +33,8 @@ const ClientErrorsPanel: React.FC<{ token?: string }> = ({ token }) => {
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    fetchWithTimeout(`${FILE_API_URL}/admin/client-errors`, { headers: getAuthHeaders(token) })
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then(d => { setErrors(d.errors ?? []); setMax(d.max ?? null); })
+    apiGet<any>(`${FILE_API_URL}/admin/client-errors`, { token })
+      .then(d => { setErrors(d?.errors ?? []); setMax(d?.max ?? null); })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, [token]);
@@ -44,9 +43,7 @@ const ClientErrorsPanel: React.FC<{ token?: string }> = ({ token }) => {
 
   const clearAll = () => {
     setClearing(true);
-    fetchWithTimeout(`${FILE_API_URL}/admin/client-errors`, {
-      method: 'DELETE', headers: getAuthHeaders(token),
-    })
+    apiDelete(`${FILE_API_URL}/admin/client-errors`, { token })
       .then(() => { setErrors([]); setExpanded(null); })
       .catch(() => setLoadError(true))
       .finally(() => setClearing(false));

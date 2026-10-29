@@ -3,7 +3,7 @@
  * Kõik otspunktid on ainult superadminile; kood antakse agendile kopeerimiseks.
  */
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiGet, apiPost } from './apiClient';
 import type { PageFields } from '../components/editor/pageConflict';
 
 export type ProposalPageState = 'pending' | 'accepted' | 'rejected' | 'stale' | 'superseded';
@@ -45,18 +45,12 @@ export interface ProposalJob {
 
 const enc = encodeURIComponent;
 
-async function call<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetchWithTimeout(`${FILE_API_URL}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    timeout: 15000,
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    // Serveri masinloetav kood (nt `job_running`, `unknown_proposal`) jõuab kutsujani.
-    throw new Error(typeof body?.detail === 'string' ? body.detail : `HTTP ${response.status}`);
-  }
-  return body as T;
+// Serveri masinloetav kood (nt `job_running`, `unknown_proposal`) jõuab kutsujani ApiError-i sõnumina.
+function call<T>(token: string, path: string, init: { method?: 'POST' } = {}): Promise<T> {
+  const options = { token, timeout: 15000 };
+  return init.method === 'POST'
+    ? apiPost<T>(`${FILE_API_URL}${path}`, undefined, options)
+    : apiGet<T>(`${FILE_API_URL}${path}`, options);
 }
 
 export const listPacks = (token: string, workId?: string) =>

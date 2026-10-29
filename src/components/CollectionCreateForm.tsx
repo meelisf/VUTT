@@ -17,7 +17,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiErrorMessage, apiPost } from '../services/apiClient';
 import { ColorPicker, renderTreeOptions } from './collectionFormControls';
 
 interface Props {
@@ -54,24 +54,15 @@ const CollectionCreateForm: React.FC<Props> = ({ onCreated }) => {
     setCreating(true);
     const loodudId = newId.trim();
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({
-            id: loodudId,
-            name_et: newNameEt.trim(),
-            name_en: newNameEn.trim(),
-            parent: newParent || null,
-            color: newColor || null,
-            is_virtual: newIsVirtual,
-          }),
-          timeout: 10000,
-        }
-      );
-      const data = await res.json();
-      if (data.status === 'success') {
+      const data = await apiPost<any>(`${FILE_API_URL}/admin/collections`, {
+        id: loodudId,
+        name_et: newNameEt.trim(),
+        name_en: newNameEn.trim(),
+        parent: newParent || null,
+        color: newColor || null,
+        is_virtual: newIsVirtual,
+      }, { token: authToken, timeout: 10000 });
+      if (data?.status === 'success') {
         // Kontekst enne teavitust: kutsuja navigeerib loodud kogu juurde ja
         // detailvaade loeb kogu SEALT — värskendamata kontekst annaks
         // „Kollektsiooni ei leitud".
@@ -82,10 +73,10 @@ const CollectionCreateForm: React.FC<Props> = ({ onCreated }) => {
         setTimeout(() => setCreateSuccess(false), 3000);
         onCreated?.(loodudId);
       } else {
-        setCreateError(data.message || t('collections.createError'));
+        setCreateError(data?.message || t('collections.createError'));
       }
-    } catch {
-      setCreateError(t('collections.createError'));
+    } catch (e) {
+      setCreateError(apiErrorMessage(e, t('collections.createError')));
     } finally {
       setCreating(false);
     }

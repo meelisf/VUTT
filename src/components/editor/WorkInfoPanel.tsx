@@ -7,7 +7,7 @@ import type { ArchiveRef, Work } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { apiGet } from '../../services/apiClient';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { getLabel } from '../../utils/metadataUtils';
 import { isQCode } from '../../utils/qcodeUtils';
@@ -29,9 +29,8 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
 
   // Arhiivide register (nimed kuvamiseks).
   useEffect(() => {
-    fetchWithTimeout(`${FILE_API_URL}/config/archives`)
-      .then(r => r.json())
-      .then(d => { if (d.archives) setArchives(d.archives); })
+    apiGet<any>(`${FILE_API_URL}/config/archives`)
+      .then(d => { if (d?.archives) setArchives(d.archives); })
       .catch(() => {});
   }, []);
 
