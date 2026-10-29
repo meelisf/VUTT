@@ -33,4 +33,5 @@ def test_juba_vahendatud_leht_ei_klapi():
 
 def test_bsb_id():
     assert dus.bsb_id("https://www.digitale-sammlungen.de/view/bsb10365835?page=%2C1") == "bsb10365835"
+    assert dus.bsb_id("https://www.digitale-sammlungen.de/en/view/bsb10959131") == "bsb10959131"  # --bsb
     assert dus.bsb_id("https://example.org/x") is None
