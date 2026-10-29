@@ -18,7 +18,7 @@ describe('entityLabelsService', () => {
     const data = { Q1: { et: 'A', en: 'A-en' }, Q2: { et: 'B' } };
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(data),
+      json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)),
     });
     vi.stubGlobal('fetch', fetchSpy);
 
@@ -32,7 +32,7 @@ describe('entityLabelsService', () => {
     const data = { Q1: { et: 'A' } };
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(data),
+      json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)),
     });
     vi.stubGlobal('fetch', fetchSpy);
 
@@ -45,7 +45,7 @@ describe('entityLabelsService', () => {
     const data = { Q1: { et: 'A' } };
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(data),
+      json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)),
     });
     vi.stubGlobal('fetch', fetchSpy);
 

@@ -10,7 +10,7 @@ vi.mock('../../utils/fetchWithTimeout', () => ({
 import { acceptPack, getReviewPage, listPacks, rejectPage } from '../textProposalService';
 import { savePage } from '../pageService';
 
-const ok = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
+const ok = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body, text: async () => JSON.stringify(body) });
 
 beforeEach(() => fetchMock.mockReset());
 

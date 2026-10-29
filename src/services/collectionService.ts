@@ -4,7 +4,7 @@
  */
 
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { apiGet } from './apiClient';
 
 // =========================================================
 // TÜÜBID
@@ -107,11 +107,7 @@ export async function getCollections(forceRefresh = false): Promise<Collections>
   }
 
   try {
-    const response = await fetchWithTimeout(`${FILE_API_URL}/collections`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const data = await response.json();
+    const data = await apiGet<any>(`${FILE_API_URL}/collections`);
     if (data.status === 'success') {
       collectionsCache = data.collections;
       return data.collections;
@@ -133,11 +129,7 @@ export async function getVocabularies(forceRefresh = false): Promise<Vocabularie
   }
 
   try {
-    const response = await fetchWithTimeout(`${FILE_API_URL}/vocabularies`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const data = await response.json();
+    const data = await apiGet<any>(`${FILE_API_URL}/vocabularies`);
     if (data.status === 'success') {
       vocabulariesCache = data.vocabularies;
       return data.vocabularies;

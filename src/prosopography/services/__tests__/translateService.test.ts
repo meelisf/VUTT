@@ -6,11 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TranslateFailed, fetchSourceDiff, translateText } from '../prosopographyService';
 
 const mockFetch = (body: unknown, status = 200) =>
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  } as Response);
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(body), { status }));
 
 afterEach(() => vi.restoreAllMocks());
 

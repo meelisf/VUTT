@@ -1,5 +1,5 @@
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '../../services/apiClient';
 import { appendPersonFilterParams, type PersonFilterParams } from './personFilterParams';
 import type { HistoricalRegionsResponse, ProsopoIndexEntry, ProsopoMapResponse, ProsopoRecord, PlaceEntry } from '../types';
 
@@ -52,25 +52,41 @@ export interface InstitutionRegistryEntry {
   active_from?: number; active_to?: number;
 }
 export interface PlacePeriod { place_key: string; from?: number; to?: number; }
+/** Serveri `detail` (string või objekt); puudub → `undefined`. */
+function errorDetail(e: unknown): unknown {
+  if (!(e instanceof ApiError) || !e.data || typeof e.data !== 'object') return undefined;
+  return (e.data as { detail?: unknown }).detail;
+}
+
+/**
+ * Objektikujuline `detail` sõnumiks: agendi ettepanekute paneel loeb sõnumist
+ * `stale_proposal` ja `items[i]: …` (apiClient võtaks ainult stringi).
+ */
+async function withDetailMessage<T>(request: Promise<T>): Promise<T> {
+  try {
+    return await request;
+  } catch (e) {
+    const detail = errorDetail(e);
+    if (e instanceof ApiError && detail != null && typeof detail !== 'string') {
+      throw new ApiError(JSON.stringify(detail), e.status, e.data);
+    }
+    throw e;
+  }
+}
+
 export async function fetchInstitutions(): Promise<Record<string, InstitutionRegistryEntry>> {
-  const response = await fetchWithTimeout(`${BASE}/registries/institution`, { timeout: 10000 });
-  return enrichmentResponse(response);
+  return withDetailMessage(apiGet(`${BASE}/registries/institution`, { timeout: 10000 }));
 }
 export interface OccupationRegistryEntry {
   id: string | null; labels: Record<string, string>; variants: string[]; notes?: string;
 }
 export async function fetchRegistry(kind: 'occupation' | 'institution'):
   Promise<Record<string, OccupationRegistryEntry | InstitutionRegistryEntry>> {
-  const response = await fetchWithTimeout(`${BASE}/registries/${kind}`, { timeout: 10000 });
-  return enrichmentResponse(response);
+  return withDetailMessage(apiGet(`${BASE}/registries/${kind}`, { timeout: 10000 }));
 }
 export async function saveRegistryEntry(kind: 'occupation' | 'institution', key: string,
   entry: OccupationRegistryEntry | InstitutionRegistryEntry, token: string): Promise<OccupationRegistryEntry | InstitutionRegistryEntry> {
-  const response = await fetchWithTimeout(`${BASE}/registries/${kind}/${encodeURIComponent(key)}`, {
-    method: 'PUT', headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry), timeout: 15000,
-  });
-  return enrichmentResponse(response);
+  return withDetailMessage(apiPut(`${BASE}/registries/${kind}/${encodeURIComponent(key)}`, entry, { token, timeout: 15000 }));
 }
 /** Sama Q-koodiga kirje on registris juba olemas — kutsuja pakub seda (`key`). */
 export class RegistryDuplicateError extends Error {
@@ -80,30 +96,19 @@ export class RegistryDuplicateError extends Error {
 export async function createRegistryEntry(kind: 'occupation' | 'institution',
   entry: OccupationRegistryEntry | InstitutionRegistryEntry, token: string):
   Promise<{ key: string; entry: OccupationRegistryEntry | InstitutionRegistryEntry }> {
-  const response = await fetchWithTimeout(`${BASE}/registries/${kind}`, {
-    method: 'POST', headers: { ...getAuthHeaders(token), 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry), timeout: 15000,
-  });
-  if (response.status === 409) {
-    const detail = await response.json().then(body => body?.detail, () => null);
-    if (detail?.code === 'duplicate_id' && typeof detail.key === 'string') throw new RegistryDuplicateError(detail.key);
+  try {
+    return await withDetailMessage(apiPost(`${BASE}/registries/${kind}`, entry, { token, timeout: 15000 }));
+  } catch (e) {
+    const detail = errorDetail(e) as { code?: unknown; key?: unknown } | undefined;
+    if (e instanceof ApiError && e.status === 409 && detail?.code === 'duplicate_id' && typeof detail.key === 'string') {
+      throw new RegistryDuplicateError(detail.key);
+    }
+    throw e;
   }
-  return enrichmentResponse(response);
-}
-async function enrichmentResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let detail = String(response.status);
-    try { detail = (await response.json()).detail ?? detail; } catch { /* HTTP error */ }
-    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
-  }
-  return response.json();
 }
 
 export async function listEnrichmentProposals(personId: string, token: string): Promise<EnrichmentProposal[]> {
-  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}`, {
-    headers: getAuthHeaders(token), timeout: 10000,
-  });
-  return enrichmentResponse(response);
+  return withDetailMessage(apiGet(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}`, { token, timeout: 10000 }));
 }
 
 /** Kinnitus kukkus pärast registrikirjete loomist: kirjed jäid alles, kaart muutmata. */
@@ -114,27 +119,23 @@ export class EnrichmentApplyError extends Error {
 
 export async function applyEnrichmentProposal(personId: string, proposalId: string,
   selected: number[], token: string, revision: string): Promise<ProsopoRecord> {
-  // Kinnitus võib teha mitu git-commitit (registrikirjed + kaart) — pikem ajalõpp.
-  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ proposal_id: proposalId, selected, revision }), timeout: 30000,
-  });
-  if (!response.ok) {
-    const detail = await response.clone().json().then(body => body?.detail).catch(() => null);
+  try {
+    // Kinnitus võib teha mitu git-commitit (registrikirjed + kaart) — pikem ajalõpp.
+    return await withDetailMessage(apiPost(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/apply`,
+      { proposal_id: proposalId, selected, revision }, { token, timeout: 30000 }));
+  } catch (e) {
+    const detail = errorDetail(e) as { error?: unknown; created_registry_entries?: unknown } | undefined;
     if (detail && typeof detail === 'object' && Array.isArray(detail.created_registry_entries)) {
       throw new EnrichmentApplyError(String(detail.error), detail.created_registry_entries);
     }
+    throw e;
   }
-  return enrichmentResponse(response);
 }
 
 export async function rejectEnrichmentProposal(personId: string, proposalId: string,
   selected: number[], token: string, revision: string): Promise<{ proposal_id: string; remaining: number }> {
-  const response = await fetchWithTimeout(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/reject`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ proposal_id: proposalId, selected, revision }), timeout: 15000,
-  });
-  return enrichmentResponse(response);
+  return withDetailMessage(apiPost(`${BASE}/enrichment-proposals/${encodeURIComponent(personId)}/reject`,
+    { proposal_id: proposalId, selected, revision }, { token, timeout: 15000 }));
 }
 
 export async function listPersons(params?: PersonFilterParams & {
@@ -147,14 +148,7 @@ export async function listPersons(params?: PersonFilterParams & {
   offset?: number;
 }, token?: string): Promise<{ results: ProsopoIndexEntry[]; total: number; offset: number; limit: number }> {
   if (params?.ids?.length) {
-    const resp = await fetchWithTimeout(`${BASE}/query`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify(params),
-      timeout: 10000,
-    });
-    if (!resp.ok) throw new Error(`listPersons: ${resp.status}`);
-    return resp.json();
+    return apiPost(`${BASE}/query`, params, { token, timeout: 10000 });
   }
 
   const url = new URL(BASE, window.location.origin);
@@ -166,12 +160,7 @@ export async function listPersons(params?: PersonFilterParams & {
   if (params?.limit != null) url.searchParams.set('limit', String(params.limit));
   if (params?.offset != null) url.searchParams.set('offset', String(params.offset));
 
-  const resp = await fetchWithTimeout(url.toString(), {
-    headers: getAuthHeaders(token),
-    timeout: 10000,
-  });
-  if (!resp.ok) throw new Error(`listPersons: ${resp.status}`);
-  return resp.json();
+  return apiGet(url.toString(), { token, timeout: 10000 });
 }
 
 export async function fetchPersonMapMarkers(params?: PersonFilterParams & {
@@ -187,12 +176,7 @@ export async function fetchPersonMapMarkers(params?: PersonFilterParams & {
   if (params?.collection) url.searchParams.set('collection', params.collection);
   if (params?.work_set) url.searchParams.set('work_set', params.work_set);
 
-  const resp = await fetchWithTimeout(url.toString(), {
-    headers: getAuthHeaders(token),
-    timeout: 10000,
-  });
-  if (!resp.ok) throw new Error(`fetchPersonMapMarkers: ${resp.status}`);
-  return resp.json();
+  return apiGet(url.toString(), { token, timeout: 10000 });
 }
 
 export async function fetchHistoricalRegions(params: {
@@ -206,9 +190,7 @@ export async function fetchHistoricalRegions(params: {
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, String(value));
   }
-  const resp = await fetchWithTimeout(url.toString(), { signal, timeout: 90000 });
-  if (!resp.ok) throw new Error(`fetchHistoricalRegions: ${resp.status}`);
-  return resp.json();
+  return apiGet(url.toString(), { signal, timeout: 90000 });
 }
 
 export async function getPersonFacets(params?: {
@@ -224,14 +206,7 @@ export async function getPersonFacets(params?: {
   occupations: any[];
 }> {
   if (params?.ids?.length) {
-    const resp = await fetchWithTimeout(`${BASE}/facets`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify(params),
-      timeout: 10000,
-    });
-    if (!resp.ok) throw new Error(`getPersonFacets: ${resp.status}`);
-    return resp.json();
+    return apiPost(`${BASE}/facets`, params, { token, timeout: 10000 });
   }
 
   const url = new URL(`${BASE}/facets`, window.location.origin);
@@ -240,22 +215,11 @@ export async function getPersonFacets(params?: {
   if (params?.collection) url.searchParams.set('collection', params.collection);
   if (params?.work_set) url.searchParams.set('work_set', params.work_set);
 
-  const resp = await fetchWithTimeout(url.toString(), {
-    headers: getAuthHeaders(token),
-    timeout: 10000,
-  });
-  if (!resp.ok) throw new Error(`getPersonFacets: ${resp.status}`);
-  return resp.json();
+  return apiGet(url.toString(), { token, timeout: 10000 });
 }
 
 export async function getPerson(personId: string, token?: string): Promise<ProsopoRecord> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}`, {
-    headers: getAuthHeaders(token),
-    timeout: 10000,
-  });
-  if (!resp.ok) throw new Error(`getPerson: ${resp.status}`);
-  return resp.json();
+  return apiGet(`${BASE}/${encodeURIComponent(personId)}`, { token, timeout: 10000 });
 }
 
 /**
@@ -269,15 +233,9 @@ export async function getWorkTitles(
 ): Promise<Record<string, { title: string; year: number | null; restricted: boolean }>> {
   if (workIds.length === 0) return {};
   try {
-    const resp = await fetchWithTimeout(`${BASE}/work-titles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify({ work_ids: workIds }),
-      timeout: 10000,
-    });
-    if (!resp.ok) return {};
-    const data = await resp.json();
-    return data.titles || {};
+    const data = await apiPost<{ titles?: Record<string, { title: string; year: number | null; restricted: boolean }> }>(
+      `${BASE}/work-titles`, { work_ids: workIds }, { token, timeout: 10000 });
+    return data?.titles || {};
   } catch {
     return {};
   }
@@ -300,58 +258,39 @@ export class PersonConflictError extends Error {
   }
 }
 
+/** 409 `identifier_conflict` → `PersonConflictError`; muu 409 jääb `null`-iks. */
+function personConflict(e: unknown): PersonConflictError | null {
+  if (!(e instanceof ApiError) || e.status !== 409) return null;
+  const d = (errorDetail(e) ?? {}) as { error?: unknown; conflict?: 'exists' | 'split'; existing_person_ids?: string[] };
+  return d.error === 'identifier_conflict' ? new PersonConflictError(d.conflict!, d.existing_person_ids ?? []) : null;
+}
+
 /** Isiku loomine ühe sammuga — ainus loomistee (server paneb ülevaatusmärke). */
 export async function createPersonChecked(body: CreatePersonBody, token: string): Promise<ProsopoRecord> {
-  const resp = await fetchWithTimeout(`${BASE}/persons/create`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify(body),
-    timeout: 15000,
-  });
-  if (resp.status === 409) {
-    const err = await resp.json().catch(() => ({}));
-    const d = err?.detail ?? {};
-    if (d.error === 'identifier_conflict') {
-      throw new PersonConflictError(d.conflict, d.existing_person_ids ?? []);
-    }
+  try {
+    return await apiPost(`${BASE}/persons/create`, body, { token, timeout: 15000 });
+  } catch (e) {
+    throw personConflict(e) ?? e;
   }
-  if (!resp.ok) throw new Error(`createPersonChecked: ${resp.status}`);
-  return resp.json();
 }
 
 export async function updatePerson(personId: string, data: Partial<ProsopoRecord>, token: string): Promise<ProsopoRecord> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify(data),
-    timeout: 10000,
-  });
-  if (resp.status === 409) {
-    const err = await resp.json().catch(() => ({}));
-    const d = err?.detail ?? {};
-    if (d.error === 'identifier_conflict') {
-      throw new PersonConflictError(d.conflict, d.existing_person_ids ?? []);
+  try {
+    return await apiPut(`${BASE}/${encodeURIComponent(personId)}`, data, { token, timeout: 10000 });
+  } catch (e) {
+    const conflict = personConflict(e);
+    if (conflict) throw conflict;
+    if (e instanceof ApiError && e.status === 409) {
+      const d = (errorDetail(e) ?? {}) as { current_updated_at?: string };
+      throw Object.assign(new Error('conflict'), { conflict: true, current_updated_at: d.current_updated_at });
     }
-    throw Object.assign(new Error('conflict'), { conflict: true, current_updated_at: d.current_updated_at });
+    throw e;
   }
-  if (!resp.ok) throw new Error(`updatePerson: ${resp.status}`);
-  return resp.json();
 }
 
 export async function uploadPersonImage(personId: string, file: File, token: string): Promise<{ image_url: string; updated_at?: string }> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image`, {
-    method: 'POST',
-    headers: { 'Content-Type': file.type, ...getAuthHeaders(token) },
-    body: file,
-    timeout: 30000,
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.detail ?? `uploadPersonImage: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPost(`${BASE}/${encodeURIComponent(personId)}/image`, file,
+    { token, timeout: 30000, headers: { 'Content-Type': file.type } });
 }
 
 export async function fetchEnrichmentPreview(scheme: string, id: string, token: string): Promise<{
@@ -362,12 +301,7 @@ export async function fetchEnrichmentPreview(scheme: string, id: string, token: 
   const url = new URL(`${BASE}/enrich/preview`, window.location.origin);
   url.searchParams.set('scheme', scheme);
   url.searchParams.set('id', id);
-  const resp = await fetchWithTimeout(url.toString(), {
-    headers: getAuthHeaders(token),
-    timeout: 15000,
-  });
-  if (!resp.ok) throw new Error(`fetchEnrichmentPreview: ${resp.status}`);
-  return resp.json();
+  return apiGet(url.toString(), { token, timeout: 15000 });
 }
 
 export async function fetchPersonEnrichmentPreview(
@@ -380,27 +314,14 @@ export async function fetchPersonEnrichmentPreview(
   conflicts: { field: string; local: any; remote: any }[];
   error?: string;
 }> {
-  const encoded = encodeURIComponent(personId);
-  const url = new URL(`${BASE}/${encoded}/enrich/preview`, window.location.origin);
+  const url = new URL(`${BASE}/${encodeURIComponent(personId)}/enrich/preview`, window.location.origin);
   url.searchParams.set('scheme', scheme);
   if (extId) url.searchParams.set('id', extId);
-  const resp = await fetchWithTimeout(url.toString(), {
-    headers: getAuthHeaders(token),
-    timeout: 15000,
-  });
-  if (!resp.ok) throw new Error(`fetchPersonEnrichmentPreview: ${resp.status}`);
-  return resp.json();
+  return apiGet(url.toString(), { token, timeout: 15000 });
 }
 
 export async function deletePersonImage(personId: string, token: string): Promise<{ updated_at: string }> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(token),
-    timeout: 10000,
-  });
-  if (!resp.ok) throw new Error(`deletePersonImage: ${resp.status}`);
-  return resp.json();
+  return apiDelete(`${BASE}/${encodeURIComponent(personId)}/image`, { token, timeout: 10000 });
 }
 
 export async function bulkUpdateOccupation(
@@ -409,31 +330,11 @@ export async function bulkUpdateOccupation(
   personIds: string[],
   token: string,
 ): Promise<{ updated: number; skipped: number; total: number }> {
-  const resp = await fetchWithTimeout(`${BASE}/bulk-occupation`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ occupation, mode, person_ids: personIds }),
-    timeout: 30000,
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail || `bulkUpdateOccupation: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPost(`${BASE}/bulk-occupation`, { occupation, mode, person_ids: personIds }, { token, timeout: 30000 });
 }
 
 export async function deletePerson(personId: string, token: string): Promise<{ deleted: string }> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/delete`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(token),
-    timeout: 15000,
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail || `deletePerson: ${resp.status}`);
-  }
-  return resp.json();
+  return apiDelete(`${BASE}/${encodeURIComponent(personId)}/delete`, { token, timeout: 15000 });
 }
 
 export async function mergePersons(
@@ -441,39 +342,27 @@ export async function mergePersons(
   targetId: string,
   token: string,
 ): Promise<{ id: string }> {
-  const encoded = encodeURIComponent(sourceId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/merge`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ target_id: targetId }),
-    timeout: 30000,
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail || `mergePersons: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPost(`${BASE}/${encodeURIComponent(sourceId)}/merge`, { target_id: targetId }, { token, timeout: 30000 });
 }
 
 export async function fetchPlaces(): Promise<Record<string, PlaceEntry>> {
-  const resp = await fetchWithTimeout(`${BASE}/places`, { timeout: 10000 });
-  if (!resp.ok) throw new Error(`fetchPlaces: ${resp.status}`);
-  return resp.json();
+  return apiGet(`${BASE}/places`, { timeout: 10000 });
 }
 
 export async function fetchPlacesMeta(): Promise<{
   groups: Record<string, { labels: Record<string, string>; sort_order: number }>;
   allowed_types: string[];
 }> {
-  const resp = await fetchWithTimeout(`${BASE}/places/meta`, { timeout: 10000 });
-  if (!resp.ok) throw new Error(`fetchPlacesMeta: ${resp.status}`);
-  return resp.json();
+  return apiGet(`${BASE}/places/meta`, { timeout: 10000 });
 }
 
 export async function searchPlacesWikidata(q: string, lang = 'en'): Promise<{ q: string; label: string; description: string; aliases: string[] }[]> {
-  const resp = await fetchWithTimeout(`${BASE}/places/wikidata-search?q=${encodeURIComponent(q)}&lang=${lang}`, { timeout: 10000 });
-  if (!resp.ok) return [];
-  return resp.json();
+  try {
+    return await apiGet(`${BASE}/places/wikidata-search?q=${encodeURIComponent(q)}&lang=${lang}`, { timeout: 10000 });
+  } catch (e) {
+    if (e instanceof ApiError) return [];
+    throw e;
+  }
 }
 
 export async function fetchPlaceWikidata(qid: string): Promise<{
@@ -482,23 +371,11 @@ export async function fetchPlaceWikidata(qid: string): Promise<{
   coordinates: { lat: number; lon: number; source?: string; wikidata_property?: string; geonames_id?: string } | null;
   parents: { q: string; label_en: string; label_sv: string }[];
 }> {
-  const resp = await fetchWithTimeout(`${BASE}/places/wikidata/${encodeURIComponent(qid)}`, { timeout: 15000 });
-  if (!resp.ok) throw new Error(`fetchPlaceWikidata: ${resp.status}`);
-  return resp.json();
+  return apiGet(`${BASE}/places/wikidata/${encodeURIComponent(qid)}`, { timeout: 15000 });
 }
 
 export async function addPlace(key: string, data: Partial<PlaceEntry>, token: string): Promise<{ key: string; entry: PlaceEntry }> {
-  const resp = await fetchWithTimeout(`${BASE}/admin/places/${encodeURIComponent(key)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify(data),
-    timeout: 10000,
-  });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? `addPlace: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, data, { token, timeout: 10000 });
 }
 
 export async function updatePlace(
@@ -506,31 +383,11 @@ export async function updatePlace(
   data: Partial<PlaceEntry> & { historical_names?: string[]; notes?: string },
   token: string,
 ): Promise<{ key: string; entry: PlaceEntry }> {
-  const resp = await fetchWithTimeout(
-    `${BASE}/admin/places/${encodeURIComponent(key)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify(data),
-      timeout: 10000,
-    },
-  );
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? `updatePlace: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, data, { token, timeout: 10000 });
 }
 
 export async function deletePlace(key: string, token: string): Promise<void> {
-  const resp = await fetchWithTimeout(
-    `${BASE}/admin/places/${encodeURIComponent(key)}`,
-    { method: 'DELETE', headers: getAuthHeaders(token), timeout: 10000 },
-  );
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? `deletePlace: ${resp.status}`);
-  }
+  await apiDelete(`${BASE}/admin/places/${encodeURIComponent(key)}`, { token, timeout: 10000 });
 }
 
 export async function putGroup(
@@ -538,43 +395,15 @@ export async function putGroup(
   data: { labels?: Record<string, string>; sort_order?: number; parent?: string | null },
   token: string,
 ): Promise<{ key: string; entry: Record<string, any> }> {
-  const resp = await fetchWithTimeout(
-    `${BASE}/admin/groups/${encodeURIComponent(key)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify(data),
-      timeout: 10000,
-    },
-  );
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? `putGroup: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPut(`${BASE}/admin/groups/${encodeURIComponent(key)}`, data, { token, timeout: 10000 });
 }
 
 export async function deleteGroup(key: string, token: string): Promise<void> {
-  const resp = await fetchWithTimeout(
-    `${BASE}/admin/groups/${encodeURIComponent(key)}`,
-    { method: 'DELETE', headers: getAuthHeaders(token), timeout: 10000 },
-  );
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? `deleteGroup: ${resp.status}`);
-  }
+  await apiDelete(`${BASE}/admin/groups/${encodeURIComponent(key)}`, { token, timeout: 10000 });
 }
 
 export async function autoAssignGroupParents(token: string): Promise<{ assigned: number; skipped: string[] }> {
-  const resp = await fetchWithTimeout(
-    `${BASE}/admin/groups/auto-assign`,
-    { method: 'POST', headers: getAuthHeaders(token), timeout: 10000 },
-  );
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? `autoAssignGroupParents: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPost(`${BASE}/admin/groups/auto-assign`, undefined, { token, timeout: 10000 });
 }
 
 export async function mergePlaces(
@@ -582,33 +411,15 @@ export async function mergePlaces(
   targetKey: string,
   token: string,
 ): Promise<{ redirected: number; target_key: string }> {
-  const resp = await fetchWithTimeout(
-    `${BASE}/admin/places/${encodeURIComponent(sourceKey)}/merge`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify({ target_key: targetKey }),
-      timeout: 15000,
-    },
-  );
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? `mergePlaces: ${resp.status}`);
-  }
-  return resp.json();
+  return apiPost(`${BASE}/admin/places/${encodeURIComponent(sourceKey)}/merge`, { target_key: targetKey }, { token, timeout: 15000 });
 }
 
 export async function fetchPersonHistory(
   personId: string,
   token: string | null
 ): Promise<{ hash: string; full_hash: string; author: string; date: string; formatted_date: string; message: string; is_original: boolean }[]> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/history`, {
-    headers: getAuthHeaders(token),
-  });
-  if (!resp.ok) throw new Error(`fetchPersonHistory: ${resp.status}`);
-  const data = await resp.json();
-  return data.history ?? [];
+  const data = await apiGet<{ history?: any[] }>(`${BASE}/${encodeURIComponent(personId)}/history`, { token });
+  return data?.history ?? [];
 }
 
 export async function fetchPersonDiff(
@@ -616,13 +427,9 @@ export async function fetchPersonDiff(
   commitHash: string,
   token: string | null
 ): Promise<{ field: string; old: unknown; new: unknown }[]> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/diff?commit=${commitHash}`, {
-    headers: getAuthHeaders(token),
-  });
-  if (!resp.ok) throw new Error(`fetchPersonDiff: ${resp.status}`);
-  const data = await resp.json();
-  return data.changes ?? [];
+  const data = await apiGet<{ changes?: { field: string; old: unknown; new: unknown }[] }>(
+    `${BASE}/${encodeURIComponent(personId)}/diff?commit=${commitHash}`, { token });
+  return data?.changes ?? [];
 }
 
 export async function restorePerson(
@@ -630,14 +437,7 @@ export async function restorePerson(
   commitHash: string,
   token: string | null
 ): Promise<unknown> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/restore`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ commit_hash: commitHash }),
-  });
-  if (!resp.ok) throw new Error(`restorePerson: ${resp.status}`);
-  return resp.json();
+  return apiPost(`${BASE}/${encodeURIComponent(personId)}/restore`, { commit_hash: commitHash }, { token });
 }
 
 /** Tõlke veaklass. `kind` tuleb SERVERI koodist, mitte sõnumi sisust. */
@@ -667,23 +467,16 @@ export async function translateText(
   targetLang: 'et' | 'en',
   token: string,
 ): Promise<string> {
-  const resp = await fetchWithTimeout(`${BASE}/translate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ source_lang: sourceLang, target_lang: targetLang, text }),
-    timeout: 120000,
-  });
-
-  if (resp.status === 429) {
-    throw new TranslateFailed('rate_limited', 'rate limited');
+  try {
+    const body = await apiPost<{ text: string }>(`${BASE}/translate`,
+      { source_lang: sourceLang, target_lang: targetLang, text }, { token, timeout: 120000 });
+    return body.text;
+  } catch (e) {
+    if (!(e instanceof ApiError)) throw e;
+    if (e.status === 429) throw new TranslateFailed('rate_limited', 'rate limited');
+    const detail = String(errorDetail(e) ?? '');
+    throw new TranslateFailed(detail.startsWith(CONTENT_BLOCKED_PREFIX) ? 'blocked' : 'other', detail);
   }
-  if (!resp.ok) {
-    const detail = await resp.json().then(b => String(b?.detail ?? '')).catch(() => '');
-    throw new TranslateFailed(
-      detail.startsWith(CONTENT_BLOCKED_PREFIX) ? 'blocked' : 'other', detail);
-  }
-  const body = await resp.json();
-  return body.text as string;
 }
 
 export interface SourceDiff {
@@ -699,13 +492,7 @@ export async function fetchSourceDiff(
   field: 'biography_et' | 'biography_en',
   token: string,
 ): Promise<SourceDiff> {
-  const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(
-    `${BASE}/${encoded}/source-diff?field=${field}`,
-    { headers: getAuthHeaders(token), timeout: 15000 },
-  );
-  if (!resp.ok) throw new Error(`fetchSourceDiff: ${resp.status}`);
-  return resp.json();
+  return apiGet(`${BASE}/${encodeURIComponent(personId)}/source-diff?field=${field}`, { token, timeout: 15000 });
 }
 
 export interface SimilarPerson { id: string; label: string; birth_year: number | null; death_year: number | null; work_count: number }
@@ -714,12 +501,5 @@ export interface SimilarPerson { id: string; label: string; birth_year: number |
 export async function fetchCandidates(
   name: string, refs: { scheme: string; id: string }[], token: string,
 ): Promise<{ results: import('../panel/types').CandidateResult[]; similar_persons: SimilarPerson[] }> {
-  const resp = await fetchWithTimeout(`${BASE}/candidates`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-    body: JSON.stringify({ name, refs }),
-    timeout: 15000,
-  });
-  if (!resp.ok) throw new Error(`fetchCandidates: ${resp.status}`);
-  return resp.json();
+  return apiPost(`${BASE}/candidates`, { name, refs }, { token, timeout: 15000 });
 }
