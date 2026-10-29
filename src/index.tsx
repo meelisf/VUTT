@@ -7,6 +7,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './index.css';
 import { i18nReady, preloadOtherLanguage } from './i18n';
 import { installGlobalErrorReporting } from './services/clientErrorReporter';
+import { installStaleChunkReload } from './utils/staleChunk';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -16,6 +17,8 @@ if (!rootElement) {
 // Globaalsed veakuulajad ENNE esimest renderdust: käivitusaegne viga on
 // just see, mida kasutaja kõige tõenäolisemalt ei raporteeri (#133).
 installGlobalErrorReporting();
+// Deploy järel puuduv chunk → üks uuestilaadimine, mitte veaekraan.
+installStaleChunkReload();
 
 const root = ReactDOM.createRoot(rootElement);
 

@@ -22,12 +22,13 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { useLatestQuery } from '../../hooks/useLatestQuery';
 import type { ProsopoIndexEntry, ProsopoMapResponse } from '../types';
 import { relatedMapScope, RELATED_SCOPE_PARAM, RELATED_SCOPE_COLLECTION } from '../utils/relatedMapScope';
+import { lazyRetry } from '../../utils/staleChunk';
 
 const LIMIT = 48;
 // Unit Separator — märksõna ise võib sisaldada tühikuid ja komasid
 // ("kreeka keele professor"), seega tavaline eraldaja ei sobi.
 const TAG_SEP = '\u001F';
-const PersonsMap = React.lazy(() => import('../components/PersonsMap'));
+const PersonsMap = lazyRetry(() => import('../components/PersonsMap'));
 
 const PersonsPage: React.FC = () => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);

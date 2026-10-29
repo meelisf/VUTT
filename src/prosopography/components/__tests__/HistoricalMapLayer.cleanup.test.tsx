@@ -24,6 +24,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const leafletHandlers = new Map<string, (e: unknown) => void>();
 let mapLibreRemoved = false;
 let setFeatureStateCalls: unknown[] = [];
+let webgl2 = true;
+let maplibreCalls = 0;
+let tileLayerUrl: string | null = null;
 
 const mapLibreStub = {
   // Kordab päris `remove()` semantikat: pärast mahavõtmist viskab.
@@ -48,7 +51,7 @@ const layerStub = { getMaplibreMap: () => mapLibreStub, addTo: () => layerStub }
 
 vi.mock('leaflet', () => ({
   default: {
-    maplibreGL: () => layerStub,
+    maplibreGL: () => { maplibreCalls += 1; return layerStub; },
     tooltip: () => ({
       setLatLng() { return this; },
       setContent() { return this; },
@@ -80,7 +83,11 @@ const leafletMapStub = {
   }),
 };
 
-vi.mock('react-leaflet', () => ({ useMap: () => leafletMapStub }));
+vi.mock('react-leaflet', () => ({
+  useMap: () => leafletMapStub,
+  TileLayer: ({ url }: { url: string }) => { tileLayerUrl = url; return null; },
+}));
+vi.mock('../../../utils/webgl', () => ({ supportsWebGL2: () => webgl2 }));
 
 const { default: HistoricalMapLayer } = await import('../HistoricalMapLayer');
 
@@ -89,6 +96,7 @@ describe('HistoricalMapLayer — koristus mahavõetud kaardil', () => {
     leafletHandlers.clear();
     setFeatureStateCalls = [];
     mapLibreRemoved = false;
+    webgl2 = true;
   });
 
   it('ei kutsu setFeatureState-i pärast kihi eemaldamist', () => {
@@ -104,5 +112,20 @@ describe('HistoricalMapLayer — koristus mahavõetud kaardil', () => {
     // Mahavõtmine: cleanup #1 tapab kaardi, cleanup #3 tahaks olekut lähtestada.
     expect(() => unmount()).not.toThrow();
     expect(mapLibreRemoved, 'kiht peab olema eemaldatud').toBe(true);
+  });
+});
+
+describe('HistoricalMapLayer — WebGL2-ta brauser', () => {
+  beforeEach(() => {
+    webgl2 = false;
+    maplibreCalls = 0;
+    tileLayerUrl = null;
+  });
+
+  it('MapLibre jääb loomata, asemel OSM-i rasterkaart', () => {
+    // Päris MapLibre viskaks konstruktoris „WebGL2 is required" → veapiir (vealogi 29.10).
+    expect(() => render(<HistoricalMapLayer year={1650} lang="et" />)).not.toThrow();
+    expect(maplibreCalls).toBe(0);
+    expect(tileLayerUrl).toMatch(/tile\.openstreetmap\.org/);
   });
 });

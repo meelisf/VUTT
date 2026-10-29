@@ -4,11 +4,12 @@ import type { Feature, FeatureCollection } from 'geojson';
 import { setWorkerUrl } from 'maplibre-gl';
 import type { FilterSpecification, GeoJSONSource, LayerSpecification, Map as MapLibreMap } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import { useMap } from 'react-leaflet';
+import { TileLayer, useMap } from 'react-leaflet';
 import { fetchHistoricalRegions } from '../services/prosopographyService';
 import type { HistoricalRegionProperties } from '../types';
 import { REGION_SOURCE_ID, pickRegionFeature, regionLayerSpecs } from '../utils/regionLayers';
 import '@maplibre/maplibre-gl-leaflet';
+import { supportsWebGL2 } from '../../utils/webgl';
 
 // MapLibre 6 on ESM-only: tööline ei ole enam bundle'i sees, vaid eraldi fail,
 // mille URL tuletatakse vaikimisi `import.meta.url`-ist. Vite ei näe dünaamilist
@@ -182,7 +183,7 @@ function regionTooltipContent(properties: HistoricalRegionProperties, lang: stri
 }
 
 /** Leafleti sees renderduv OpenHistoricalMapi MapLibre-vektorkiht. */
-const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) => {
+const MapLibreHistoricalLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) => {
   const map = useMap();
   const [mapLibre, setMapLibre] = useState<MapLibreMap | null>(null);
   const originalFilters = useRef(new Map<string, FilterSpecification | null>());
@@ -420,5 +421,17 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
 
   return null;
 };
+
+const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
+/**
+ * WebGL2-ta brauseris jääb ajalooline vektorkiht ära ja asemele tuleb tavaline
+ * OSM-i rasterkaart: markerid ja seosed töötavad, ajaloolisi piire ei ole.
+ * Muidu viskaks MapLibre konstruktoris ja kogu isikuleht kukuks veapiiri.
+ */
+const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = (props) =>
+  supportsWebGL2()
+    ? <MapLibreHistoricalLayer {...props} />
+    : <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution={OSM_ATTRIBUTION} />;
 
 export default HistoricalMapLayer;

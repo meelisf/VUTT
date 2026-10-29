@@ -4,7 +4,7 @@
  * kolm vaadet (Võrgustik · Ajatelg · Loend), ühised filtrid, esiletõst ja hüpikaken.
  * Kogu lüliti: vaikimisi kogu ei piira (sama mis #460 seoste kaart).
  */
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Waypoints, Map as MapIcon } from 'lucide-react';
@@ -17,9 +17,10 @@ import RelationsGraph from './RelationsGraph';
 import RelationsTimeline from './RelationsTimeline';
 import RelationsTable from './RelationsTable';
 import type { ProsopoRecord } from '../../types';
+import { lazyRetry } from '../../../utils/staleChunk';
 
 // Kaart on oma chunk'is (Leaflet on raske).
-const RelationsMap = lazy(() => import('./RelationsMap'));
+const RelationsMap = lazyRetry(() => import('./RelationsMap'));
 
 type Tab = 'graph' | 'timeline' | 'map' | 'table';
 const TABS: Tab[] = ['graph', 'timeline', 'map', 'table'];
