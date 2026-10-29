@@ -8,7 +8,7 @@ import { lineDiff } from '../../utils/lineDiff';
 import MarkdownView from '../MarkdownView';
 import { parseServerDate } from '../../utils/formatDateTime';
 
-import { useNotify } from '../../contexts/FeedbackContext';
+import { useRestoreAction } from '../../hooks/useRestoreAction';
 interface CommentHistoryPanelProps {
   page: Page;
   work?: Work;
@@ -31,7 +31,7 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
   user,
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
-  const notify = useNotify();
+  const runRestore = useRestoreAction();
   const [commentHistory, setCommentHistory] = useState<CommentHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -59,17 +59,22 @@ const CommentHistoryPanel: React.FC<CommentHistoryPanelProps> = ({
   const doRestore = async (
     mode: 'version' | 'deleted', commentId: string, commitHash: string,
   ) => {
-    try {
-      const { comments: updated, gitCommitted } = await restoreComment(
+    const outcome = await runRestore({
+      // Versioon kirjutab praeguse teksti üle; kustutatu taaste on lisav.
+      confirm: mode === 'version' ? t('info.restoreCommentConfirm') : undefined,
+      run: () => restoreComment(
         page, { mode, comment_id: commentId, commit_hash: commitHash }, authToken || undefined,
-      );
-      if (onCommentsRestored) onCommentsRestored(updated);
-      else setComments(updated);
-      if (!gitCommitted) notify(t('info.restoreCommentGitWarning'), 'warning');
-      await loadHistory(true);   // värskenda ajaloo-kaart uue seisuga
-    } catch (e) {
-      setHistoryError(e instanceof Error ? e.message : t('info.restoreError'));
-    }
+      ),
+      messages: {
+        success: t('info.restoreCommentDone'),
+        gitWarning: t('info.restoreCommentGitWarning'),
+        error: t('info.restoreError'),
+      },
+    });
+    if (!outcome) return;
+    if (onCommentsRestored) onCommentsRestored(outcome.comments);
+    else setComments(outcome.comments);
+    await loadHistory(true);   // värskenda ajaloo-kaart uue seisuga
   };
 
   return (

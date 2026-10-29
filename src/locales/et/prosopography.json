@@ -437,6 +437,7 @@
     "restoreTitle": "Taasta see versioon",
     "restoreConfirm": "Kas oled kindel, et soovid taastada selle versiooni?",
     "restoreError": "Taastamine ebaõnnestus",
+    "restoreDone": "Versioon taastatud.",
     "diffError": "Diff laadimine ebaõnnestus",
     "noChanges": "Muudatusi ei leitud",
     "empty": "Ajalugu puudub"

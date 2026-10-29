@@ -33,7 +33,7 @@ import { useWorkTitles } from '../hooks/useWorkTitles';
 import { quoteFilterValue } from '../../utils/filterUtils';
 import { formatDateTime } from '../../utils/formatDateTime';
 
-import { useConfirm, useNotify } from '../../contexts/FeedbackContext';
+import { useRestoreAction } from '../../hooks/useRestoreAction';
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
 const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
 
@@ -300,8 +300,7 @@ const PersonDetailPage: React.FC = () => {
   const location = useLocation();
   const backTo: string = (location.state as any)?.from ?? '/persons';
   const { t, i18n } = useTranslation(['prosopography', 'common']);
-  const askConfirm = useConfirm();
-  const notify = useNotify();
+  const runRestore = useRestoreAction();
   const getLabel = useEntityLabel();
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const { user, authToken } = useUser();
@@ -332,6 +331,7 @@ const PersonDetailPage: React.FC = () => {
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
   const [diffCache, setDiffCache] = useState<Record<string, { field: string; old: unknown; new: unknown }[] | 'error'>>({});
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   const loadHistory = async () => {
     if (!id || !token || historyLoading) return;
@@ -360,17 +360,18 @@ const PersonDetailPage: React.FC = () => {
 
   const handleRestore = async (commitHash: string) => {
     if (!id || !token) return;
-    if (!(await askConfirm(t('historyPanel.restoreConfirm')))) return;
     setRestoring(commitHash);
-    try {
-      await restorePerson(id, commitHash, token);
-      window.location.reload();
-    } catch (e) {
-      console.error('Taastamine ebaõnnestus:', e);
-      notify(t('historyPanel.restoreError'));
-    } finally {
-      setRestoring(null);
-    }
+    const outcome = await runRestore({
+      confirm: t('historyPanel.restoreConfirm'),
+      // Isikukaardi taastamise vastus commit'i olekut ei kanna.
+      run: async () => { await restorePerson(id, commitHash, token); return { gitCommitted: true }; },
+      messages: { success: t('historyPanel.restoreDone'), error: t('historyPanel.restoreError'), gitWarning: '' },
+    });
+    setRestoring(null);
+    if (!outcome) return;
+    // Kaart laetakse uuesti (lehe täislaadimine neelaks teate); ajalugu sai uue commit'i.
+    setReloadNonce(n => n + 1);
+    if (historyOpen) loadHistory();
   };
 
   useEffect(() => {
@@ -423,7 +424,7 @@ const PersonDetailPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isiku laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [id, token, index]);
+  }, [id, token, index, reloadNonce]);
 
   // ── Loading ──────────────────────────────────────────────
   if (loading) {

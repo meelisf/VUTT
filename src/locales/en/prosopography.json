@@ -437,6 +437,7 @@
     "restoreTitle": "Restore this version",
     "restoreConfirm": "Are you sure you want to restore this version?",
     "restoreError": "Restore failed",
+    "restoreDone": "Version restored.",
     "diffError": "Failed to load the diff",
     "noChanges": "No changes found",
     "empty": "No history yet"
