@@ -44,6 +44,11 @@
     "emptyDiff": "Muudatused puuduvad",
     "diffError": "Muudatuste laadimine ebaõnnestus",
     "onlyTimestampChanges": "Ainult tehnilised muudatused (ajatempleid uuendatud)",
+    "diffBlock": {
+      "json": "Märkmed ja metaandmed",
+      "text": "Tekstisisu",
+      "other": "Fail"
+    },
     "action": {
       "text_edit": "Muutis teksti",
       "status_change": "Muutis staatust",
@@ -554,6 +559,8 @@
     "historyTruncated": "Näidatakse viimase 100 commiti ajalugu.",
     "restoreError": "Taastamine ebaõnnestus",
     "restoreCommentGitWarning": "Kommentaar taastati, aga versiooniajaloo commit ebaõnnestus. Teata sellest administraatorile.",
+    "restoreCommentConfirm": "Kas soovid taastada kommentaari selle versiooni? Praegune tekst asendatakse.",
+    "restoreCommentDone": "Kommentaar taastatud.",
     "searchTagInCorpus": "Otsi seda märksõna kogu korpusest",
     "openEsterRecord": "Ava ESTER-i kirje",
     "editWorkMetadata": "Muuda teose metaandmeid",

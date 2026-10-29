@@ -44,6 +44,11 @@
     "emptyDiff": "No changes found",
     "diffError": "Failed to load changes",
     "onlyTimestampChanges": "Only technical changes (timestamps updated)",
+    "diffBlock": {
+      "json": "Notes and metadata",
+      "text": "Text content",
+      "other": "File"
+    },
     "action": {
       "text_edit": "Edited text",
       "status_change": "Changed status",
@@ -554,6 +559,8 @@
     "historyTruncated": "Showing history of the last 100 commits.",
     "restoreError": "Restore failed",
     "restoreCommentGitWarning": "The comment was restored, but the version history commit failed. Please tell an administrator.",
+    "restoreCommentConfirm": "Restore this version of the comment? The current text will be replaced.",
+    "restoreCommentDone": "Comment restored.",
     "searchTagInCorpus": "Search for this tag across the whole corpus",
     "openEsterRecord": "Open the ESTER record",
     "editWorkMetadata": "Edit work metadata",

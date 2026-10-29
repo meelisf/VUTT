@@ -35,6 +35,7 @@ import {
   Ban
 } from 'lucide-react';
 import Header from '../components/Header';
+import GitDiffView from '../components/editor/GitDiffView';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { isAtLeast } from '../utils/roleUtils';
@@ -397,107 +398,6 @@ const Review: React.FC = () => {
       setExpandedCommit(key);
       loadDiff(commit);
     }
-  };
-
-  // Parsi diff lihtsaks kuvamiseks
-  const renderDiff = (diffText: string) => {
-    // Jagame diffi failide plokkideks
-    const blocks = diffText.split('diff --git');
-    const result: React.ReactNode[] = [];
-
-    blocks.forEach((block, blockIdx) => {
-      if (!block.trim()) return;
-
-      const lines = block.split('\n');
-      const isJson = block.includes('.json');
-      const isTxt = block.includes('.txt');
-      
-      let label = isJson ? 'Märkmed ja metaandmed' : isTxt ? 'Tekstisisu' : 'Fail';
-      
-      const processedLines: React.ReactNode[] = [];
-      let hasMeaningfulChanges = false;
-
-      lines.forEach((line, i) => {
-        const trimmedLine = line.trim();
-
-        // 1. Filtreeri tehnilised päised ja ploki esimene rida (failitee)
-        if (i === 0 || 
-            trimmedLine.startsWith('index ') ||
-            trimmedLine.startsWith('---') ||
-            trimmedLine.startsWith('+++') ||
-            trimmedLine.startsWith('@@') ||
-            trimmedLine.startsWith('\\ No newline') ||
-            trimmedLine.startsWith('new file mode') ||
-            trimmedLine.startsWith('old file mode') ||
-            trimmedLine.startsWith('a/') ||
-            trimmedLine.startsWith('b/') ||
-            trimmedLine === '') {
-          return;
-        }
-
-        // 2. Filtreeri JSON müra (tehnilised väljad)
-        const isTechField = trimmedLine.match(/^["'](updated_at|created_at|work_id|page_number|id|slug)["']\s*:/) ||
-                           line.match(/^[+-]\s*["'](updated_at|created_at|work_id|page_number|id|slug)["']\s*:/);
-        
-        // Kas see rida on sisuline muudatus?
-        const isAddition = line.startsWith('+');
-        const isDeletion = line.startsWith('-');
-        
-        if ((isAddition || isDeletion) && !isTechField) {
-          // Kontrollime, et poleks lihtsalt sulg või tühi rida
-          const content = trimmedLine.substring(1).trim();
-          if (content !== '' && content !== '{' && content !== '}' && content !== '[' && content !== ']' && content !== '},' && content !== '],') {
-            hasMeaningfulChanges = true;
-          }
-        }
-
-        if (isTechField) return;
-
-        // Kui on JSON, peidame ka kontekstiread, mis on lihtsalt sulud või tehnilised väljad
-        if (isJson && !isAddition && !isDeletion) {
-          if (trimmedLine === '{' || trimmedLine === '}' || trimmedLine === '[' || trimmedLine === ']' || trimmedLine === '},' || trimmedLine === '],') {
-            return;
-          }
-        }
-
-        let className = 'text-gray-500 pl-4 border-l-4 border-transparent';
-        if (isAddition) {
-          className = 'bg-green-50 text-green-900 pl-4 border-l-4 border-green-400 py-0.5';
-        } else if (isDeletion) {
-          className = 'bg-red-50 text-red-900 pl-4 border-l-4 border-red-300 py-0.5';
-        }
-
-        processedLines.push(
-          <div key={`${blockIdx}-${i}`} className={`font-mono text-xs whitespace-pre-wrap break-all ${className}`}>
-            {line}
-          </div>
-        );
-      });
-
-      // Lisa faili plokk ainult siis, kui seal on reaalseid muudatusi
-      if (hasMeaningfulChanges) {
-        result.push(
-          <div key={`block-${blockIdx}`} className="mb-6 last:mb-0">
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 pb-1">
-              {label}
-            </div>
-            <div className="space-y-0.5">
-              {processedLines}
-            </div>
-          </div>
-        );
-      }
-    });
-
-    if (result.length === 0) {
-      return (
-        <div className="p-4 text-center text-gray-400 italic text-sm">
-          {t('workspace:history.onlyTimestampChanges')}
-        </div>
-      );
-    }
-
-    return result;
   };
 
   if (!user) {
@@ -1074,7 +974,7 @@ const Review: React.FC = () => {
                               {/* Diff sisu */}
                               <div className="bg-white rounded border border-gray-200 max-h-96 overflow-auto">
                                 {diffData.diff ? (
-                                  renderDiff(diffData.diff)
+                                  <GitDiffView diff={diffData.diff} />
                                 ) : (
                                   <div className="p-4 text-gray-500 text-sm text-center">
                                     {t('diff.empty')}

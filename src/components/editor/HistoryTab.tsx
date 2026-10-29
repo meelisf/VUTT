@@ -27,9 +27,11 @@ import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { parseRestoreResponse, type RestoreResult } from './pageRestore';
 import { canRestoreVersion, hasTextChange, type PageChanges } from './historyChanges';
 import { HistoryChangeBadges, HistoryChangeDetails } from './HistoryChanges';
+import GitDiffView from './GitDiffView';
+import { useRestoreAction } from '../../hooks/useRestoreAction';
 import { pageFileFromImageUrl } from '../../services/workImageService';
 import { formatDateTime, parseServerDate } from '../../utils/formatDateTime';
-import { useConfirm, useNotify } from '../../contexts/FeedbackContext';
+import { useNotify } from '../../contexts/FeedbackContext';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
@@ -89,7 +91,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   collections
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
-  const askConfirm = useConfirm();
+  const runRestore = useRestoreAction();
   const notify = useNotify();
   const navigate = useNavigate();
 
@@ -103,32 +105,34 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     if (!authToken || !page.original_path || !page.image_url) return;
     const key = `${entry.full_hash}:${annId}`;
     setRestoringAnn(key);
-    try {
-      const imagePath = pageFileFromImageUrl(page.image_url);
-      const response = await fetchWithTimeout(`${FILE_API_URL}/page-annotations/restore-as-comment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          original_path: page.original_path,
-          file_name: imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt'),
-          commit_hash: entry.full_hash,
-          annotation_id: annId,
-        }),
-        timeout: 30000,
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && Array.isArray(data.comments)) {
-        onCommentsRestored?.(data.comments);
-        setRestoredAnns(prev => new Set(prev).add(key));
-        if (data.git_committed === false) notify(t('history.changes.restoreAsCommentGitWarning'), 'warning');
-      } else {
-        notify(`${t('history.restoreError')}: ${data.detail || data.message || response.status}`);
-      }
-    } catch (e: any) {
-      notify(`${t('history.restoreError')}: ${e.message || t('common:error.network')}`);
-    } finally {
-      setRestoringAnn(null);
+    const outcome = await runRestore({
+      run: async () => {
+        const imagePath = pageFileFromImageUrl(page.image_url);
+        const response = await fetchWithTimeout(`${FILE_API_URL}/page-annotations/restore-as-comment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({
+            original_path: page.original_path,
+            file_name: imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt'),
+            commit_hash: entry.full_hash,
+            annotation_id: annId,
+          }),
+          timeout: 30000,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !Array.isArray(data.comments)) {
+          throw new Error(String(data.detail || data.message || response.status));
+        }
+        return { comments: data.comments as Annotation[], gitCommitted: data.git_committed !== false };
+      },
+      // Eduteadet ei ole: kirje märgib taastatud märkuse ise.
+      messages: { gitWarning: t('history.changes.restoreAsCommentGitWarning'), error: t('history.restoreError') },
+    });
+    if (outcome) {
+      onCommentsRestored?.(outcome.comments);
+      setRestoredAnns(prev => new Set(prev).add(key));
     }
+    setRestoringAnn(null);
   };
 
   /** Ühe ajaloo kirje vaade taastamise olekust (võtmed kujul `commit:id`). */
@@ -268,107 +272,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
   };
 
-  // Parsi diff lihtsaks kuvamiseks (nagu Review lehel)
-  const renderDiff = (diffText: string) => {
-    // Jagame diffi failide plokkideks
-    const blocks = diffText.split('diff --git');
-    const result: React.ReactNode[] = [];
-
-    blocks.forEach((block, blockIdx) => {
-      if (!block.trim()) return;
-
-      const lines = block.split('\n');
-      const isJson = block.includes('.json');
-      const isTxt = block.includes('.txt');
-      
-      let label = isJson ? 'Märkmed ja metaandmed' : isTxt ? 'Tekstisisu' : 'Fail';
-      
-      const processedLines: React.ReactNode[] = [];
-      let hasMeaningfulChanges = false;
-
-      lines.forEach((line, i) => {
-        const trimmedLine = line.trim();
-
-        // 1. Filtreeri tehnilised päised ja ploki esimene rida (failitee)
-        if (i === 0 || 
-            trimmedLine.startsWith('index ') ||
-            trimmedLine.startsWith('---') ||
-            trimmedLine.startsWith('+++') ||
-            trimmedLine.startsWith('@@') ||
-            trimmedLine.startsWith('\\ No newline') ||
-            trimmedLine.startsWith('new file mode') ||
-            trimmedLine.startsWith('old file mode') ||
-            trimmedLine.startsWith('a/') ||
-            trimmedLine.startsWith('b/') ||
-            trimmedLine === '') {
-          return;
-        }
-
-        // 2. Filtreeri JSON müra (tehnilised väljad)
-        const isTechField = trimmedLine.match(/^["'](updated_at|created_at|work_id|page_number|id|slug)["']\s*:/) ||
-                           line.match(/^[+-]\s*["'](updated_at|created_at|work_id|page_number|id|slug)["']\s*:/);
-        
-        // Kas see rida on sisuline muudatus?
-        const isAddition = line.startsWith('+');
-        const isDeletion = line.startsWith('-');
-        
-        if ((isAddition || isDeletion) && !isTechField) {
-          // Kontrollime, et poleks lihtsalt sulg või tühi rida
-          const content = trimmedLine.substring(1).trim();
-          if (content !== '' && content !== '{' && content !== '}' && content !== '[' && content !== ']' && content !== '},' && content !== '],') {
-            hasMeaningfulChanges = true;
-          }
-        }
-
-        if (isTechField) return;
-
-        // Kui on JSON, peidame ka kontekstiread, mis on lihtsalt sulud või tehnilised väljad
-        if (isJson && !isAddition && !isDeletion) {
-          if (trimmedLine === '{' || trimmedLine === '}' || trimmedLine === '[' || trimmedLine === ']' || trimmedLine === '},' || trimmedLine === '],') {
-            return;
-          }
-        }
-
-        let className = 'text-gray-500 pl-4 border-l-4 border-transparent';
-        if (isAddition) {
-          className = 'bg-green-50 text-green-900 pl-4 border-l-4 border-green-400 py-0.5';
-        } else if (isDeletion) {
-          className = 'bg-red-50 text-red-900 pl-4 border-l-4 border-red-300 py-0.5';
-        }
-
-        processedLines.push(
-          <div key={`${blockIdx}-${i}`} className={`font-mono text-xs whitespace-pre-wrap break-all ${className}`}>
-            {line}
-          </div>
-        );
-      });
-
-      // Lisa faili plokk ainult siis, kui seal on reaalseid muudatusi
-      if (hasMeaningfulChanges) {
-        result.push(
-          <div key={`block-${blockIdx}`} className="mb-6 last:mb-0">
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 pb-1">
-              {label}
-            </div>
-            <div className="space-y-0.5">
-              {processedLines}
-            </div>
-          </div>
-        );
-      }
-    });
-
-    if (result.length === 0) {
-      return (
-        <div className="p-4 text-center text-gray-400 italic text-sm">
-          {t('history.onlyTimestampChanges')}
-        </div>
-      );
-    }
-
-    return result;
-  };
-
   const handleGitRestore = async (entry: GitHistoryEntry) => {
     if (!page.original_path || !page.image_url) {
       notify(t('history.restoreError'));
@@ -380,47 +283,38 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       return;
     }
 
-    const confirmMsg = entry.is_original
-      ? `${t('history.restoreOriginalConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${formatDateTime(entry.date)}\n\n${t('history.restoreNote')}`
-      : `${t('history.restoreConfirm')}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${formatDateTime(entry.date)}\n\n${t('history.restoreNote')}`;
-
-    if (!(await askConfirm(confirmMsg))) {
-      return;
-    }
-
-    setIsRestoring(true);
-    try {
-      const imagePath = pageFileFromImageUrl(page.image_url);
-      const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
-
-      const response = await fetchWithTimeout(`${FILE_API_URL}/git-restore`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          original_path: page.original_path,
-          file_name: txtFilename,
-          commit_hash: entry.full_hash
-        }),
-        timeout: 30000
-      });
-
-      const data = await response.json();
-      const result = parseRestoreResponse(data);
-      if (result) {
-        onRestore(result);
-        const done = t('history.restoreSuccess', { date: formatDateTime(entry.date), author: entry.author });
-        // Failid on kettal, aga ajaloo commit puudub — seda ei tohi edu alla peita.
-        if (result.gitWarning) notify(`${done}\n\n${t('history.restoreGitWarning', { error: result.gitWarning })}`, 'warning');
-        else notify(done, 'success');
-        loadGitHistory();
-      } else {
-        notify(`${t('history.restoreError')}: ${data.message || t('common:error.unknown')}`);
-      }
-    } catch (e: any) {
-      console.error("Taastamine ebaõnnestus:", e);
-      notify(`${t('history.restoreError')}: ${e.message || t('common:error.network')}`);
-    } finally {
-      setIsRestoring(false);
+    const confirmHead = entry.is_original ? t('history.restoreOriginalConfirm') : t('history.restoreConfirm');
+    const result = await runRestore({
+      confirm: `${confirmHead}\n\n${t('history.author')}: ${entry.author}\n${t('history.date')}: ${formatDateTime(entry.date)}\n\n${t('history.restoreNote')}`,
+      run: async () => {
+        setIsRestoring(true);
+        const imagePath = pageFileFromImageUrl(page.image_url);
+        const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
+        const response = await fetchWithTimeout(`${FILE_API_URL}/git-restore`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({
+            original_path: page.original_path,
+            file_name: txtFilename,
+            commit_hash: entry.full_hash
+          }),
+          timeout: 30000
+        });
+        const data = await response.json();
+        const parsed = parseRestoreResponse(data);
+        if (!parsed) throw new Error(data.message || t('common:error.unknown'));
+        return { ...parsed, gitCommitted: parsed.gitWarning === null };
+      },
+      messages: {
+        success: t('history.restoreSuccess', { date: formatDateTime(entry.date), author: entry.author }),
+        gitWarning: r => t('history.restoreGitWarning', { error: r.gitWarning }),
+        error: t('history.restoreError'),
+      },
+    });
+    setIsRestoring(false);
+    if (result) {
+      onRestore(result);
+      loadGitHistory();
     }
   };
 
@@ -638,7 +532,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                             {/* Diff sisu */}
                             <div className="bg-white rounded border border-gray-200 max-h-64 overflow-auto">
                               {diffData.diff ? (
-                                renderDiff(diffData.diff)
+                                <GitDiffView diff={diffData.diff} />
                               ) : (
                                 <div className="p-3 text-gray-500 text-sm text-center">
                                   {t('history.emptyDiff')}
