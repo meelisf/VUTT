@@ -10,12 +10,12 @@ from contextlib import contextmanager
 from typing import Optional
 
 from ..config import STATE_DIR, DATA_CONFIG_DIR, PLACES_FILE
+from .. import agent_handoff
 
 DB_PATH = os.path.join(STATE_DIR, "prosopo_enrichment_proposals.sqlite3")
 # Kood on toimetaja tööpäeva pikkune ja lubab ulatuse piires mitu esitust (#492, ADR 0058
 # täiendus). Kood annab ainult ootel ettepaneku esitamise õiguse: ülevaatus ja kinnitus
 # nõuavad sama kasutaja sessiooni, seega ei ava laiem kood ühtegi andmete kirjutusteed.
-CODE_TTL = 8 * 60 * 60
 PERSON_MAX_USES = 20
 ANY_MAX_USES = 200
 PROPOSAL_TTL = 7 * 24 * 60 * 60
@@ -63,13 +63,9 @@ def _db():
     try:
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA busy_timeout=5000")
+        agent_handoff.attach(db)
         db.executescript("""
-            CREATE TABLE IF NOT EXISTS handoff (
-                code_hash TEXT PRIMARY KEY, person_id TEXT NOT NULL,
-                username TEXT NOT NULL, session_fingerprint TEXT NOT NULL,
-                base_updated_at TEXT NOT NULL,
-                expires_at INTEGER NOT NULL, used_at INTEGER
-            );
+            DROP TABLE IF EXISTS main.handoff;
             CREATE TABLE IF NOT EXISTS proposal (
                 id TEXT PRIMARY KEY, person_id TEXT NOT NULL,
                 username TEXT NOT NULL, session_fingerprint TEXT NOT NULL,
@@ -80,15 +76,6 @@ def _db():
         """)
         if not any(column[1] == "applied_at" for column in db.execute("PRAGMA table_info(proposal)")):
             db.execute("ALTER TABLE proposal ADD COLUMN applied_at INTEGER")
-        handoff_columns = {column[1] for column in db.execute("PRAGMA table_info(handoff)")}
-        # Vanad (ühekordsed) koodid: max_uses 1, kasutatud kood uses 1.
-        if "scope" not in handoff_columns:
-            db.execute("ALTER TABLE handoff ADD COLUMN scope TEXT NOT NULL DEFAULT 'person'")
-        if "max_uses" not in handoff_columns:
-            db.execute("ALTER TABLE handoff ADD COLUMN max_uses INTEGER NOT NULL DEFAULT 1")
-        if "uses" not in handoff_columns:
-            db.execute("ALTER TABLE handoff ADD COLUMN uses INTEGER NOT NULL DEFAULT 0")
-            db.execute("UPDATE handoff SET uses = 1 WHERE used_at IS NOT NULL")
         with db:
             yield db
     finally:
@@ -96,49 +83,24 @@ def _db():
 
 
 def _clean(db, now: int) -> None:
-    db.execute("DELETE FROM handoff WHERE expires_at < ?", (now,))
     db.execute("DELETE FROM proposal WHERE expires_at < ?", (now,))
-
-
-def revoke_handoffs(username: str) -> int:
-    """Kustutab kasutaja üleandmiskoodid (konto kustutus / rolli muutus, #619)."""
-    if not os.path.exists(DB_PATH):
-        return 0                 # koode pole kunagi antud — ära loo andmebaasi
-    with _db() as db:
-        return db.execute("DELETE FROM handoff WHERE username=?", (username,)).rowcount
 
 
 def issue_handoff(person_id: Optional[str], username: str, session_fingerprint: str,
                   updated_at: str = "", code: Optional[str] = None) -> dict:
-    """Esituskood ühele isikule (`person_id`) või kõigile isikutele (`None`).
+    """Ainult isikukood: üks isik (`person_id`) või kõik isikud (`None`).
 
-    Editori rolli kontrollib router. Kood on seotud kasutajaga: ettepanekud näeb ja
-    kinnitab sama kasutaja igas oma seansis (#492).
+    Tavatee on ühtne agendikood (`agent_proposals`); see on kitsa ulatusega kood
+    testidele. Kood on seotud kasutajaga: ettepanekud näeb ja kinnitab sama
+    kasutaja igas oma seansis (#492).
     """
     scope = "person" if person_id is not None else "any"
     if (scope == "person" and not valid_person_id(person_id)) or not session_fingerprint:
         raise ProposalError("invalid_person_or_version")
     max_uses = PERSON_MAX_USES if scope == "person" else ANY_MAX_USES
-    code = code or secrets.token_urlsafe(32)
-    now = int(time.time())
-    with _db() as db:
-        _clean(db, now)
-        db.execute(
-            "INSERT INTO handoff (code_hash, person_id, username, session_fingerprint, base_updated_at,"
-            " expires_at, used_at, scope, max_uses, uses) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, 0)",
-            (hashlib.sha256(code.encode()).hexdigest(), person_id or "*",
-             username, session_fingerprint, updated_at or "", now + CODE_TTL, scope, max_uses),
-        )
-    return {"code": code, "expires_at": now + CODE_TTL, "scope": scope, "max_uses": max_uses,
+    out = agent_handoff.issue(username, session_fingerprint, {"person": (person_id, max_uses)}, code=code)
+    return {**out, "scope": scope, "max_uses": max_uses,
             "person_id": person_id, "base_updated_at": updated_at}
-
-
-def revoke_code(code: str) -> None:
-    """Kustutab ühe koodi räsi järgi (ühtse koodi kompensatsioon)."""
-    if not os.path.exists(DB_PATH):
-        return
-    with _db() as db:
-        db.execute("DELETE FROM handoff WHERE code_hash=?", (hashlib.sha256(code.encode()).hexdigest(),))
 
 
 def _short_string(value, limit: int = 500) -> bool:
@@ -303,21 +265,6 @@ def _check_registry_entries(items: list) -> None:
                     f"items[{index}]: registry_entry_mismatch: {key} on ettepanekus eri sisuga")
 
 
-def _handoff_ok(row, person_id: str, now: int) -> bool:
-    return not (row is None or row["expires_at"] <= now
-                or (row["scope"] == "person" and row["person_id"] != person_id))
-
-
-def _require_live_handoff(digest: str, person_id: str) -> None:
-    now = int(time.time())
-    with _db() as db:
-        row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (digest,)).fetchone()
-    if not _handoff_ok(row, person_id, now):
-        raise ProposalError("invalid_or_expired_handoff")
-    if row["uses"] >= row["max_uses"]:
-        raise ProposalError("handoff_used_up")
-
-
 def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict:
     """Kulutab koodi ja talletab ainult ajutise ettepaneku ühe transaktsiooniga."""
     if not isinstance(code, str) or len(code) > 100 or not valid_person_id(person_id):
@@ -351,7 +298,7 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     # Kood ENNE korpuse- ja kaardikontrolle: otspunkt on autentimata ja need
     # vastaksid muidu ka koodita küsijale (teoste lehtede arv, kaardi versioon).
     # Kuju-vead ülal ei loe midagi. Ainult lugemine — kood kulub allpool INSERT-iga.
-    _require_live_handoff(hashlib.sha256(code.encode()).hexdigest(), person_id)
+    agent_handoff.check(code, "person", person_id, ProposalError, need_use=True)
     _check_vutt_pages(items)
     # Ettepanek peab põhinema elaval kaardiversioonil (enne koodi kasutust, et viga seda ei kulutaks).
     from .person_crud import get_person
@@ -362,20 +309,10 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
         raise ProposalError("stale_person")
 
     now = int(time.time())
-    digest = hashlib.sha256(code.encode()).hexdigest()
     proposal_id = secrets.token_urlsafe(16)
     with _db() as db:
         _clean(db, now)
-        row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (digest,)).fetchone()
-        if not _handoff_ok(row, person_id, now):
-            raise ProposalError("invalid_or_expired_handoff")
-        # Tingimuslik UPDATE hoiab lae ka samaaegsete esituste korral.
-        changed = db.execute(
-            "UPDATE handoff SET uses = uses + 1, used_at=? WHERE code_hash=? AND uses < max_uses",
-            (now, digest),
-        ).rowcount
-        if changed != 1:
-            raise ProposalError("handoff_used_up")
+        row = agent_handoff.consume(db, code, "person", person_id, now, ProposalError)
         db.execute(
             "INSERT INTO proposal VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
             (proposal_id, person_id, row["username"], row["session_fingerprint"], base_updated_at,

@@ -1,17 +1,15 @@
 # server/agent_proposals.py
-"""Ühtne agendikood ja ootel ettepanekute loend (ADR 0058 täiendus 2026-10-20).
+"""Ühtne agendikood ja ootel ettepanekute loend (ADR 0058 täiendused 2026-10-20, 2026-10-29).
 
-Kolm hoidlat (lehe tekst, teose osad, isikukaart) jäävad eraldi SQLite-failideks.
-Üks kood registreeritakse kõigis kolmes sama räsiga; kui mõni registreerimine
-ebaõnnestub, tühistatakse kood juba õnnestunud hoidlatest — osaliselt kehtivat
-koodi kasutajale ei näidata (ühist tehingut kolm faili ei anna).
+Kood elab ühes hoidlas (`agent_handoff`), üks rida liigi kohta; ettepanekud jäävad
+liigiti eraldi SQLite-failidesse.
 
 Loendi `target_url` koostab server: klient ei tuleta sihtlehte ise.
 """
 import logging
-import secrets
 from typing import Optional
 
+from . import agent_handoff
 from . import page_text_proposals as ptp
 from . import work_part_proposals as wpp
 from . import work_parts as wp
@@ -28,30 +26,16 @@ class AgentHandoffError(RuntimeError):
 
 
 def issue_agent_handoff(username: str, session_fingerprint: str) -> dict:
-    """Kood kõigile kolmele hoidlale, ulatus „kõik teosed + kõik isikud"."""
-    code = secrets.token_urlsafe(32)
-    steps = (
-        (ptp, lambda: ptp.issue_handoff(None, username, code=code)),
-        (wpp, lambda: wpp.issue_handoff(username, code=code)),
-        (ep, lambda: ep.issue_handoff(None, username, session_fingerprint, code=code)),
-    )
-    done, results = [], []
-    for store, issue in steps:
-        try:
-            results.append(issue())
-        except Exception as e:
-            logger.exception("Agendikoodi registreerimine ebaõnnestus (%s)", store.__name__)
-            for registered in done:
-                try:
-                    registered.revoke_code(code)
-                except Exception:
-                    logger.exception("Agendikoodi tühistus ebaõnnestus (%s)", registered.__name__)
-            raise AgentHandoffError("agent_handoff_failed") from e
-        done.append(store)
-    text, parts, persons = results
-    return {"code": code, "expires_at": min(r["expires_at"] for r in results),
-            "max_uses": {"text": text["max_uses"], "parts": parts["max_uses"],
-                         "persons": persons["max_uses"]}}
+    """Kood kõigile liikidele, ulatus „kõik teosed + kõik isikud"; üks tehing."""
+    limits = {"text": ptp.MAX_USES, "parts": wpp.MAX_USES, "person": ep.ANY_MAX_USES}
+    try:
+        out = agent_handoff.issue(username, session_fingerprint,
+                                  {kind: (None, n) for kind, n in limits.items()})
+    except Exception as e:
+        logger.exception("Agendikoodi registreerimine ebaõnnestus")
+        raise AgentHandoffError("agent_handoff_failed") from e
+    return {**out, "max_uses": {"text": limits["text"], "parts": limits["parts"],
+                                "persons": limits["person"]}}
 
 
 def _work_title(meta: Optional[dict], work_id: str) -> str:

@@ -26,10 +26,10 @@ from functools import wraps
 from typing import Optional
 
 from .config import STATE_DIR
+from . import agent_handoff
 from . import work_parts as wp
 
 DB_PATH = os.path.join(STATE_DIR, "work_part_proposals.sqlite3")
-CODE_TTL = 8 * 60 * 60
 MAX_USES = 20
 PROPOSAL_TTL = 14 * 24 * 60 * 60
 MAX_PARTS = 50
@@ -86,11 +86,9 @@ def _db():
     try:
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA busy_timeout=5000")
+        agent_handoff.attach(db)
         db.executescript("""
-            CREATE TABLE IF NOT EXISTS handoff (
-                code_hash TEXT PRIMARY KEY, work_id TEXT NOT NULL, username TEXT NOT NULL,
-                expires_at INTEGER NOT NULL, max_uses INTEGER NOT NULL, uses INTEGER NOT NULL DEFAULT 0
-            );
+            DROP TABLE IF EXISTS main.handoff;
             CREATE TABLE IF NOT EXISTS proposal (
                 id TEXT PRIMARY KEY, work_id TEXT NOT NULL, username TEXT NOT NULL,
                 pages_version TEXT NOT NULL, created_at INTEGER NOT NULL,
@@ -104,40 +102,14 @@ def _db():
 
 
 def _clean(db, now: int) -> None:
-    db.execute("DELETE FROM handoff WHERE expires_at < ?", (now,))
     db.execute("DELETE FROM proposal WHERE expires_at < ?", (now,))
 
 
-def revoke_handoffs(username: str) -> int:
-    """Kustutab kasutaja üleandmiskoodid (konto kustutus / rolli muutus, #619)."""
-    if not os.path.exists(DB_PATH):
-        return 0                 # koode pole kunagi antud — ära loo andmebaasi
-    with _db() as db:
-        return db.execute("DELETE FROM handoff WHERE username=?", (username,)).rowcount
-
-
-ALL_WORKS = "*"   # ulatus „kõik teosed" (veerg on NOT NULL)
-
-
 def issue_handoff(username: str, code: Optional[str] = None, work_id: Optional[str] = None) -> dict:
-    """Kood osade ettepanekuteks; `work_id=None` = kõik teosed. Õiguse kontrollib
-    kutsuja. `code` antakse ette ühtse agendikoodi korral (`agent_proposals`)."""
-    code = code or secrets.token_urlsafe(32)
-    now = int(time.time())
-    with _db() as db:
-        _clean(db, now)
-        db.execute("INSERT INTO handoff VALUES (?, ?, ?, ?, ?, 0)",
-                   (hashlib.sha256(code.encode()).hexdigest(), work_id or ALL_WORKS,
-                    username, now + CODE_TTL, MAX_USES))
-    return {"code": code, "expires_at": now + CODE_TTL, "max_uses": MAX_USES}
-
-
-def revoke_code(code: str) -> None:
-    """Kustutab ühe koodi räsi järgi (ühtse koodi kompensatsioon)."""
-    if not os.path.exists(DB_PATH):
-        return                   # ära loo andmebaasi
-    with _db() as db:
-        db.execute("DELETE FROM handoff WHERE code_hash=?", (hashlib.sha256(code.encode()).hexdigest(),))
+    """Ainult osade kood; `work_id=None` = kõik teosed. Tavatee on ühtne
+    agendikood (`agent_proposals`); see on kitsa ulatusega kood testidele."""
+    out = agent_handoff.issue(username, "", {"parts": (work_id, MAX_USES)}, code=code)
+    return {**out, "max_uses": MAX_USES}
 
 
 def _short(value, limit: int) -> bool:
@@ -376,13 +348,7 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
         raise ProposalError("invalid_parts")
     # Kood ENNE teose lugemist: otspunkt on autentimata ja `stale_pages` vastaks
     # muidu ka koodita küsijale. Ainult lugemine — kood kulub allpool INSERT-iga.
-    with _db() as db:
-        row = db.execute("SELECT * FROM handoff WHERE code_hash=?",
-                         (hashlib.sha256(code.encode()).hexdigest(),)).fetchone()
-    if row is None or row["expires_at"] <= int(time.time()) or row["work_id"] not in (work_id, ALL_WORKS):
-        raise ProposalError("invalid_or_expired_handoff")
-    if row["uses"] >= row["max_uses"]:
-        raise ProposalError("handoff_used_up")
+    agent_handoff.check(code, "parts", work_id, ProposalError, need_use=True)
     stems = wp.page_stems(work_dir)
     if version != pages_version(work_dir):
         raise ProposalError("stale_pages")
@@ -394,16 +360,10 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
     if len(payload.encode()) > MAX_BODY_BYTES:
         raise ProposalError("proposal_too_large")
     now = int(time.time())
-    digest = hashlib.sha256(code.encode()).hexdigest()
     proposal_id = secrets.token_urlsafe(16)
     with _db() as db:
         _clean(db, now)
-        row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (digest,)).fetchone()
-        if row is None or row["expires_at"] <= now or row["work_id"] not in (work_id, ALL_WORKS):
-            raise ProposalError("invalid_or_expired_handoff")
-        if db.execute("UPDATE handoff SET uses = uses + 1 WHERE code_hash=? AND uses < max_uses",
-                      (digest,)).rowcount != 1:
-            raise ProposalError("handoff_used_up")
+        row = agent_handoff.consume(db, code, "parts", work_id, now, ProposalError)
         db.execute("INSERT INTO proposal VALUES (?, ?, ?, ?, ?, ?, ?)",
                    (proposal_id, work_id, row["username"], version, now, now + PROPOSAL_TTL, payload))
     return {"proposal_id": proposal_id, "work_id": work_id, "status": "pending",

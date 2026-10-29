@@ -134,7 +134,8 @@ def test_markup_tags(client):
 def test_revoke_kutsutakse_rollimuutusel(monkeypatch):
     from server import auth
     kutsutud = []
-    monkeypatch.setattr(ptp, "revoke_handoffs", lambda u: kutsutud.append(u))
+    from server import agent_handoff
+    monkeypatch.setattr(agent_handoff, "revoke_user", lambda u: kutsutud.append(u))
     auth._revoke_agent_handoffs("kasutaja")
     assert kutsutud == ["kasutaja"]
 

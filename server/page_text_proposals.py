@@ -10,7 +10,6 @@ Lukkude järjekord KÕIGIS teedes (spekk): ettepanekulukud id järjekorras →
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import secrets
@@ -22,6 +21,7 @@ from contextlib import ExitStack, contextmanager
 from typing import Optional
 
 from .config import STATE_DIR
+from . import agent_handoff
 from .page_locks import page_lock
 from .page_merge import annotation_link_errors, merge_text, read_page_view
 from .page_text import normalize_page_text, text_hash
@@ -30,7 +30,6 @@ from . import git_ops
 from . import work_parts as wp
 
 DB_PATH = os.path.join(STATE_DIR, "page_text_proposals.sqlite3")
-CODE_TTL = 8 * 60 * 60
 MAX_USES = 20
 PROPOSAL_TTL = 14 * 24 * 60 * 60
 MAX_PAGES = 200
@@ -60,11 +59,9 @@ def _db():
     try:
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA busy_timeout=5000")
+        agent_handoff.attach(db)
         db.executescript("""
-            CREATE TABLE IF NOT EXISTS handoff (
-                code_hash TEXT PRIMARY KEY, work_id TEXT, username TEXT NOT NULL,
-                expires_at INTEGER NOT NULL, max_uses INTEGER NOT NULL, uses INTEGER NOT NULL DEFAULT 0
-            );
+            DROP TABLE IF EXISTS main.handoff;
             CREATE TABLE IF NOT EXISTS proposal (
                 id TEXT PRIMARY KEY, work_id TEXT NOT NULL, username TEXT NOT NULL,
                 note TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
@@ -83,14 +80,9 @@ def _db():
 
 
 def _clean(db, now: int) -> None:
-    db.execute("DELETE FROM handoff WHERE expires_at < ?", (now,))
     db.execute("DELETE FROM proposal_page WHERE proposal_id IN "
                "(SELECT id FROM proposal WHERE expires_at < ?)", (now,))
     db.execute("DELETE FROM proposal WHERE expires_at < ?", (now,))
-
-
-def _digest(code: str) -> str:
-    return hashlib.sha256(code.encode()).hexdigest()
 
 
 # ── Ettepaneku lukk ───────────────────────────────────────────────────────
@@ -122,43 +114,15 @@ def proposal_lock(proposal_id: str):
 # ── Kood ──────────────────────────────────────────────────────────────────
 
 def issue_handoff(work_id: Optional[str], username: str, code: Optional[str] = None) -> dict:
-    """Kood agendile: üks teos või (`None`) kõik teosed. Õiguse kontrollib kutsuja.
-    Kood antakse ühtse agendikoodina (`POST /agent-handoff`, `agent_proposals`)."""
-    code = code or secrets.token_urlsafe(32)
-    now = int(time.time())
-    with _db() as db:
-        _clean(db, now)
-        db.execute("INSERT INTO handoff VALUES (?, ?, ?, ?, ?, 0)",
-                   (_digest(code), work_id, username, now + CODE_TTL, MAX_USES))
-    return {"code": code, "expires_at": now + CODE_TTL, "max_uses": MAX_USES, "work_id": work_id}
+    """Ainult teksti kood; `None` = kõik teosed. Tavatee on ühtne agendikood
+    (`agent_proposals`); see on kitsa ulatusega kood testidele."""
+    out = agent_handoff.issue(username, "", {"text": (work_id, MAX_USES)}, code=code)
+    return {**out, "max_uses": MAX_USES, "work_id": work_id}
 
 
-def revoke_handoffs(username: str) -> int:
-    """Kustutab kasutaja koodid (konto kustutus / rolli muutus, #619)."""
-    if not os.path.exists(DB_PATH):
-        return 0
-    with _db() as db:
-        return db.execute("DELETE FROM handoff WHERE username=?", (username,)).rowcount
-
-
-def revoke_code(code: str) -> None:
-    """Kustutab ühe koodi räsi järgi (ühtse koodi kompensatsioon)."""
-    if not os.path.exists(DB_PATH):
-        return
-    with _db() as db:
-        db.execute("DELETE FROM handoff WHERE code_hash=?", (_digest(code),))
-
-
-def check_code(code: str, work_id: str) -> sqlite3.Row:
+def check_code(code: str, work_id: str, need_use: bool = False) -> dict:
     """Kehtiv kood, mille ulatuses on teos. Ainult lugemine — ei kuluta."""
-    if not isinstance(code, str) or not code or len(code) > 100:
-        raise ProposalError("invalid_or_expired_handoff")
-    with _db() as db:
-        row = db.execute("SELECT * FROM handoff WHERE code_hash=?", (_digest(code),)).fetchone()
-    if row is None or row["expires_at"] <= int(time.time()) \
-            or (row["work_id"] is not None and row["work_id"] != work_id):
-        raise ProposalError("invalid_or_expired_handoff")
-    return row
+    return agent_handoff.check(code, "text", work_id, ProposalError, need_use=need_use)
 
 
 # ── Leht ──────────────────────────────────────────────────────────────────
@@ -248,9 +212,7 @@ def _short_note(value, field: str) -> str:
 def submit(code: str, work_id: str, work_dir: str, pages: list, note: str) -> dict:
     """Talletab ainult ootel ettepaneku; lehti ei muudeta."""
     work_id = canonical_work_id(work_dir, work_id)
-    row = check_code(code, work_id)
-    if row["uses"] >= row["max_uses"]:
-        raise ProposalError("handoff_used_up")
+    check_code(code, work_id, need_use=True)
     if not isinstance(pages, list) or not pages:
         raise ProposalError("invalid_pages")
     if len(pages) > MAX_PAGES:
@@ -298,9 +260,7 @@ def submit(code: str, work_id: str, work_dir: str, pages: list, note: str) -> di
         changed = [r[0] for r in results]
         with _db() as db:
             _clean(db, now)
-            if db.execute("UPDATE handoff SET uses = uses + 1 WHERE code_hash=? AND uses < max_uses "
-                          "AND expires_at > ?", (_digest(code), now)).rowcount != 1:
-                raise ProposalError("handoff_used_up")
+            row = agent_handoff.consume(db, code, "text", work_id, now, ProposalError)
             superseded = [[r["proposal_id"], r["stem"]] for r in db.execute(
                 "SELECT pp.proposal_id, pp.stem FROM proposal_page pp JOIN proposal p ON p.id = pp.proposal_id "
                 f"WHERE p.work_id=? AND pp.state IN {REVIEW_STATES} AND pp.stem IN "

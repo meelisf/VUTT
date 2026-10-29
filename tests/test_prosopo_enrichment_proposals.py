@@ -3,6 +3,7 @@ import os
 import json
 import pytest
 
+from server import agent_handoff
 from server.prosopography import enrichment_proposals as proposals, registries
 
 
@@ -151,7 +152,7 @@ def test_aegunud_kood_keeldub(client, login, prosopo_env, monkeypatch):
     token = login("superadmin", "superpass")
     monkeypatch.setattr(proposals.time, "time", lambda: 1000)
     code = _kood(client, token)
-    monkeypatch.setattr(proposals.time, "time", lambda: 1000 + proposals.CODE_TTL + 1)
+    monkeypatch.setattr(proposals.time, "time", lambda: 1000 + agent_handoff.CODE_TTL + 1)
     response = client.post("/prosopography/enrichment-proposals/submit", json={
         "code": code, "person_id": "vutt:Pabc",
         "base_updated_at": "2026-01-01T00:00:00+00:00", "items": [_item()],
@@ -167,7 +168,7 @@ def test_ajutine_andmebaas_on_varundusele_loetav(tmp_path):
         proposals.issue_handoff("vutt:Pabc", "editor", "session", "t")
     finally:
         os.umask(old_umask)
-    mode = os.stat(proposals.DB_PATH).st_mode
+    mode = os.stat(agent_handoff.DB_PATH).st_mode
     assert mode & 0o044 == 0o044
     assert mode & 0o022 == 0
 
@@ -798,14 +799,9 @@ def test_ette_antud_kood_tuhistus_ja_kokkuvote(monkeypatch):
     (row,) = proposals.list_pending_summary("superadmin")
     assert row["person_id"] == "vutt:Pabc" and row["pending"] == 2 and row["proposal_id"]
     assert proposals.list_pending_summary("keegi") == []
-    proposals.revoke_code("yks-kood")
+    agent_handoff.revoke_user("superadmin")
     with pytest.raises(proposals.ProposalError, match="invalid_or_expired_handoff"):
         proposals.submit("yks-kood", "vutt:Pabc", "t", [_item()])
-
-
-def test_tuhistus_ilma_andmebaasita_ei_loo_faili():
-    proposals.revoke_code("mis-iganes")
-    assert not os.path.exists(proposals.DB_PATH)
 
 
 def test_vanad_isiku_koodiotspunktid_kadunud(client, login, prosopo_env):

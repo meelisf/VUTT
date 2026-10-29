@@ -27,6 +27,14 @@ def _koha_wikidata_ilma_vorguta(monkeypatch):
     monkeypatch.setattr(places_ops, "fetch_place_wikidata", lambda qid: None)
 
 
+@pytest.fixture(autouse=True)
+def _agendikoodi_hoidla_tmp(tmp_path, monkeypatch):
+    """Agendikoodi hoidla (ADR 0058, #675) elab `state/`-is ja iga ettepanekute
+    hoidla ühendab selle — ilma selleta kirjutaks iga ettepanekutest päris faili."""
+    from server import agent_handoff
+    monkeypatch.setattr(agent_handoff, "DB_PATH", str(tmp_path / "agent_handoff.sqlite3"))
+
+
 @pytest.fixture
 def backend_env(tmp_path, monkeypatch):
     state_dir = tmp_path / "state"
