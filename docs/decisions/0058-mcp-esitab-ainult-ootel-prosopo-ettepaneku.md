@@ -186,3 +186,25 @@ koodinupud.
   antud kitsa ulatusega koodid kehtivad oma 8 h lõpuni (ulatuse kontrollid `submit`-is
   jäävad). MCP tööriistade signatuurid ei muutunud.
 - `/review`-l ei otsustata — otsus jääb redaktorisse, „Osad" vahekaardile ja isikuvormi.
+
+## Täiendus 2026-10-29 (#675): üks koodihoidla
+
+Asendab 2026-10-20 täienduse punktid „Hoidlad jäävad eraldi SQLite-failideks" (koodi
+osas) ja „Kompensatsioon, mitte tehing".
+
+- **Kood elab ühes hoidlas** `state/agent_handoff.sqlite3` (`server/agent_handoff.py`).
+  Rida = kood × liik (`text`, `parts`, `person`), ulatus = liik + `target_id`
+  (`NULL` = kõik). Iga liik hoiab oma lage (`max_uses`/`uses`: tekst 20, osad 20,
+  isikud `ANY_MAX_USES`); TTL (8 h) ja `session_fingerprint` on koodi omad.
+  Ettepanekud jäävad liigiti eraldi failidesse.
+- **Väljaandmine on üks tehing**: kõik liigiread ühe INSERT-iga, kompensatsiooni
+  (`revoke_code`) ei ole. Ebaõnnestumine → 503 `agent_handoff_failed`, ridu ei jää.
+- **Kulutus ja ettepanek on üks tehing.** Ettepanekute hoidla ühendab koodihoidla
+  `ATTACH`-iga (`agent_handoff.attach`) ja kulutab koodi (`consume`) samas tehingus,
+  kus ta ettepaneku INSERT-ib. Mitme faili tehing on atomaarne ainult
+  rollback-journal režiimis — **WAL-i ei tohi kummalegi failile lülitada.**
+- Tühistus kasutaja järgi (`revoke_user`, #619) käib ühest kohast.
+- **Üleminek:** hoidlate vanad `handoff` tabelid kustutatakse (`DROP TABLE`). Enne
+  deploy'd antud koodid kaotavad kehtivuse — agent küsib uue koodi.
+- Uus ettepanekuliik = uus `kind` väärtus `agent_handoff.KINDS`-is + piir
+  `issue_agent_handoff`-is; uut koodihoidlat ei tehta.

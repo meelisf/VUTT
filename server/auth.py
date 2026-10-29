@@ -448,17 +448,15 @@ def get_all_users():
 
 
 def _revoke_agent_handoffs(username):
-    """MCP üleandmiskoodid (ADR 0058) kehtivad kuni 8 h ja on seotud KASUTAJAGA —
+    """MCP agendikoodid (ADR 0058) kehtivad kuni 8 h ja on seotud KASUTAJAGA —
     konto kustutamine või rolli muutus peab need tühistama nagu sessioonid (#619).
     Ootel ettepanekud jäävad: neid kinnitab sisselogitud toimetaja. Tõrge ei
     katkesta haldustoimingut — kood aegub niikuinii."""
-    from .prosopography import enrichment_proposals
-    from . import page_text_proposals, work_part_proposals
-    for module in (enrichment_proposals, work_part_proposals, page_text_proposals):
-        try:
-            module.revoke_handoffs(username)
-        except Exception as e:
-            print(f"MCP koodide tühistus ebaõnnestus ({module.__name__}, {username}): {e}")
+    from . import agent_handoff
+    try:
+        agent_handoff.revoke_user(username)
+    except Exception as e:
+        print(f"MCP koodide tühistus ebaõnnestus ({username}): {e}")
 
 
 def update_user_role(username, new_role, admin_user):

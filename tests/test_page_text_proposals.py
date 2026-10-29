@@ -8,6 +8,7 @@ import unicodedata
 
 import pytest
 
+from server import agent_handoff
 from server import page_text_proposals as ptp
 from server.page_text import normalize_page_text
 
@@ -54,9 +55,9 @@ def _rows(proposal_id=None):
 
 
 def _uses(code):
-    db = sqlite3.connect(ptp.DB_PATH)
-    return db.execute("SELECT uses FROM handoff WHERE code_hash=?",
-                      (hashlib.sha256(code.encode()).hexdigest(),)).fetchone()[0]
+    db = sqlite3.connect(agent_handoff.DB_PATH)
+    return db.execute("SELECT uses FROM handoff WHERE code_hash=? AND kind='text'",
+                      (agent_handoff.digest(code),)).fetchone()[0]
 
 
 def test_source_nouab_koodi(work):
@@ -353,14 +354,9 @@ def test_slug_kanoniseeritakse_nanoidiks(work):
 
 # ── Ühtne agendikood /review-l (2026-10-20) ──────────────────────────────────
 
-def test_revoke_code(work):
+def test_kasutaja_koodide_tuhistus(work):
     ptp.issue_handoff(None, "su", code="k")
     ptp.check_code("k", "w1")
-    ptp.revoke_code("k")
+    agent_handoff.revoke_user("su")
     with pytest.raises(ptp.ProposalError):
         ptp.check_code("k", "w1")
-
-
-def test_tuhistus_ilma_andmebaasita_ei_loo_faili(work):
-    ptp.revoke_code("mis-iganes")
-    assert not os.path.exists(ptp.DB_PATH)

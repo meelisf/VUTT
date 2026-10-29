@@ -6,10 +6,9 @@ ootel ettepanekud ja annab iga rea jaoks serveri koostatud sihtlingi."""
 import json
 import os
 import sqlite3
-from unittest.mock import Mock
-
 import pytest
 
+from server import agent_handoff
 from server import agent_proposals as ap
 from server import page_text_proposals as ptp
 from server import work_part_proposals as wpp
@@ -70,12 +69,11 @@ def client(work, monkeypatch):
     return c
 
 
-def _handoff_rows(mod) -> int:
-    if not os.path.exists(mod.DB_PATH):
-        return 0
-    db = sqlite3.connect(mod.DB_PATH)
+def _handoff_kinds(code: str) -> list[str]:
+    db = sqlite3.connect(agent_handoff.DB_PATH)
     try:
-        return db.execute("SELECT COUNT(*) FROM handoff").fetchone()[0]
+        return sorted(r[0] for r in db.execute("SELECT kind FROM handoff WHERE code_hash=?",
+                                               (agent_handoff.digest(code),)))
     finally:
         db.close()
 
@@ -106,12 +104,37 @@ def test_handoff_registreerib_kolmes(client, work):
     assert ep.submit(h["code"], "vutt:Pabc", "t", [dict(ITEM)])["status"] == "pending"
 
 
-def test_handoff_kompenseerib(client, monkeypatch):
-    monkeypatch.setattr(ep, "issue_handoff", Mock(side_effect=RuntimeError("ketas")))
+def test_handoff_on_uks_tehing(client, monkeypatch):
+    """Üks hoidla, üks tehing (#675): kui mõne liigi rida ei mahu, ei jää ka teisi."""
+    ep.issue_handoff(None, "teine", "fp", code="k")       # isikurida juba olemas → PK kokkupõrge
+    monkeypatch.setattr(agent_handoff.secrets, "token_urlsafe", lambda n: "k")
     r = client.post("/agent-handoff")
     assert r.status_code == 503 and r.json()["detail"] == "agent_handoff_failed"
     assert "code" not in r.json()
-    assert _handoff_rows(ptp) == 0 and _handoff_rows(wpp) == 0
+    assert _handoff_kinds("k") == ["person"]
+
+
+def test_liikide_laed_on_eraldi(client, work, monkeypatch):
+    """Rida liigi kohta: tekstiesitused ei kuluta osade lage."""
+    monkeypatch.setattr(ptp, "MAX_USES", 1)
+    code = client.post("/agent-handoff").json()["code"]
+    _text_pack(work, code, 2)
+    with pytest.raises(ptp.ProposalError, match="handoff_used_up"):
+        _text_pack(work, code, 3)
+    assert wpp.submit(code, "w1", work, wpp.pages_version(work), [LETTER])["status"] == "pending"
+
+
+def test_ebaonnestunud_esitus_ei_kuluta_koodi(work, monkeypatch):
+    """Koodi kulutus ja ettepaneku INSERT on üks mitme faili tehing (ATTACH)."""
+    code = wpp.issue_handoff("ed", work_id="w1")["code"]
+    monkeypatch.setattr(wpp, "PROPOSAL_TTL", None)    # viskab pärast kulutust, enne INSERT-i
+    with pytest.raises(TypeError):
+        wpp.submit(code, "w1", work, wpp.pages_version(work), [LETTER])
+    db = sqlite3.connect(agent_handoff.DB_PATH)
+    try:
+        assert db.execute("SELECT uses FROM handoff").fetchone()[0] == 0
+    finally:
+        db.close()
 
 
 def test_ainult_superadmin(client):

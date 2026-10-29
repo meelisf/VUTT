@@ -49,14 +49,12 @@ def test_kasutaja_kustutus_tuhistab_mcp_koodid(tmp_path, monkeypatch):
     wpp.issue_handoff("teine", work_id="w1")
     ep.issue_handoff(None, "kadunud", "s", "")
     auth._revoke_agent_handoffs("kadunud")
-    with wpp._db() as db:
+    from server import agent_handoff
+    with agent_handoff._db() as db:
         assert [r[0] for r in db.execute("SELECT username FROM handoff")] == ["teine"]
-    with ep._db() as db:
-        assert db.execute("SELECT COUNT(*) FROM handoff").fetchone()[0] == 0
 
 
-def test_tuhistus_ei_loo_andmebaasi(tmp_path, monkeypatch):
-    from server import work_part_proposals as wpp
-    monkeypatch.setattr(wpp, "DB_PATH", str(tmp_path / "puudub.sqlite3"))
-    assert wpp.revoke_handoffs("x") == 0
-    assert not os.path.exists(wpp.DB_PATH)
+def test_tuhistus_ei_loo_andmebaasi():
+    from server import agent_handoff
+    assert agent_handoff.revoke_user("x") == 0
+    assert not os.path.exists(agent_handoff.DB_PATH)

@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from server import agent_handoff
 from server import work_parts as wp
 from server import work_part_proposals as wpp
 
@@ -561,15 +562,9 @@ def test_yldkood_ilma_teoseta(work):
 
 def test_ette_antud_kood_ja_tuhistus(work):
     wpp.issue_handoff("ed", code="sama-kood")
-    wpp.revoke_code("sama-kood")
+    agent_handoff.revoke_user("ed")
     with pytest.raises(wpp.ProposalError, match="invalid_or_expired_handoff"):
         _submit(work, [LETTER], code="sama-kood")
-
-
-def test_tuhistus_ilma_andmebaasita_ei_loo_faili(work):
-    import os
-    wpp.revoke_code("mis-iganes")
-    assert not os.path.exists(wpp.DB_PATH)
 
 
 def test_kokkuvote_kasutaja_kaupa(work):

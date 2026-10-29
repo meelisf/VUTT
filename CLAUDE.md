@@ -98,7 +98,7 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`) | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP agendikood (`agent_handoff.sqlite3`) ja ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`, `page_text_proposals.sqlite3`) | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
 `labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`occupations.json`**, **`institutions.json`**
@@ -356,8 +356,8 @@ ettepaneku kinnitus `registries.ensure` kaudu (luku all, sama Q → seotakse).
 
 **MCP ettepanekud (ADR 0058)** — MCP kirjutab AINULT ootel ettepaneku (isik, teose osad);
 kinnitus käib olemasolevate valideeritud kirjutusteede kaudu (`create_part`,
-isikukaardi salvestus). Agendikood on ÜKS (`/review`, `POST /agent-handoff`): sama räsi
-kolmes hoidlas, osalise registreerimise korral tühistatakse; loend `GET /agent-proposals`,
+isikukaardi salvestus). Agendikood on ÜKS (`/review`, `POST /agent-handoff`): üks hoidla
+(`agent_handoff.py`, rida liigi kohta), kulutus + ettepanek üks tehing `ATTACH`-iga (WAL keelatud); loend `GET /agent-proposals`,
 `target_url` koostab server (täiendus 2026-10-20). Kood kehtib 8 h, piiratud esitused, seotud
 KASUTAJAGA, mitte sessiooniga. Kõik ettepanekuliigid on ainult superadmin.
 Lehe teksti ettepanek (#641): agent saab toorteksti AINULT koodiga, esitab asendused
