@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { UserProvider } from './contexts/UserContext';
 import { CollectionProvider } from './contexts/CollectionContext';
@@ -9,17 +9,7 @@ import { Loader2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 
-// Lazy import koos automaatse uuesti laadimisega, kui chunk on pärast uut buildi muutunud
-function lazyRetry(importFn: () => Promise<any>) {
-  return lazy(() =>
-    importFn().catch(() => {
-      // Chunk puudub (uus build) → lae leht uuesti, et saada uus index.html
-      window.location.reload();
-      // Tagasta tühi promise, et vältida React viga enne reload'i
-      return new Promise(() => {});
-    })
-  );
-}
+import { lazyRetry } from './utils/staleChunk';
 
 // Lazy-loaded lehed (laetakse ainult vajaduse korral)
 const Workspace = lazyRetry(() => import('./pages/Workspace'));

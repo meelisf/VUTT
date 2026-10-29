@@ -1,5 +1,5 @@
 import type { WorkDating } from '../../utils/workDating';
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -34,8 +34,9 @@ import { quoteFilterValue } from '../../utils/filterUtils';
 import { formatDateTime } from '../../utils/formatDateTime';
 
 import { useRestoreAction } from '../../hooks/useRestoreAction';
+import { lazyRetry } from '../../utils/staleChunk';
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
-const PersonRelations = lazy(() => import('../components/relations/PersonRelations'));
+const PersonRelations = lazyRetry(() => import('../components/relations/PersonRelations'));
 
 // =========================================================
 // Abifunktsioonid
