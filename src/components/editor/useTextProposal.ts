@@ -21,6 +21,7 @@ import type { RestoreResult } from './pageRestore';
 import { pageFileFromImageUrl } from '../../services/workImageService';
 import { pageSwapAnnotation } from './editorAnnotations';
 import { setProposalBase } from './proposalDiffExtension';
+import { useJobPoll } from '../../hooks/useJobPoll';
 import type { EditorSavedState } from './useEditorSave';
 
 interface UseTextProposalParams {
@@ -50,7 +51,6 @@ interface UseTextProposalParams {
 }
 
 const REVIEW_STATES = new Set(['pending', 'stale']);
-const MAX_POLL_ERRORS = 10;
 
 export const pageStem = (page: Page) => pageFileFromImageUrl(page.image_url || '').replace(/\.[^/.]+$/, '');
 
@@ -237,32 +237,24 @@ export function useTextProposal({
     await load();
   }, [workId, pack, stem, page.id, clearDiff, onPageRefreshedRef, load]);
 
-  const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  const pollJob = useJobPoll();
 
   const poll = useCallback(async (proposalId: string) => {
     const t = tokenRef.current;
     if (!t || !workId) return;
-    // Lagi: püsiv võrgu-/autentimisviga ei tohi pollida lõputult; lahtimonteerimisel stopp.
-    let vigu = 0;
-    while (mountedRef.current) {
-      await new Promise(r => setTimeout(r, pollMs));
-      if (!mountedRef.current) return;
-      const st = await getJobStatus(t, workId).catch(() => null);
-      if (!st) {
-        if (++vigu >= MAX_POLL_ERRORS) {
-          setJob(null);
-          setError('job_status_unavailable');
-          return;
-        }
-        continue;
-      }
-      vigu = 0;
-      setJob(st);
-      if (st.state !== 'running') break;
+    const res = await pollJob({
+      request: () => getJobStatus(t, workId),
+      isRunning: (st) => st.state === 'running',
+      onStatus: setJob,
+      intervalMs: pollMs,
+    });
+    if (res.kind === 'failed') {
+      setJob(null);
+      setError('job_status_unavailable');
+    } else if (res.kind === 'finished') {
+      await refreshAfterJob(proposalId);
     }
-    if (mountedRef.current) await refreshAfterJob(proposalId);
-  }, [workId, pollMs, refreshAfterJob]);
+  }, [workId, pollMs, refreshAfterJob, pollJob]);
 
   /** „Kinnita kogu pakk": salvestamata muudatused lahendab ühtne dialoog ENNE. */
   const acceptPack = useCallback(() => {

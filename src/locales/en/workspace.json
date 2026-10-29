@@ -313,6 +313,7 @@
       "badgeSplit": "will be split",
       "progress": "{{done}} / {{total}} pages",
       "interrupted": "The job stopped before finishing (server restart?). The page list was refreshed — check what reached the disk.",
+      "statusUnavailable": "Could not read the job status — the job may still be running on the server. The page list was refreshed; reload the page later.",
       "badgeCrop": "crop"
     },
     "tabParts": "Parts",
