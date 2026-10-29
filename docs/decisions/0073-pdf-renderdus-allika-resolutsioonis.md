@@ -1,7 +1,7 @@
 # ADR 0073 — PDF-i skannilehte ei venitata üle allika resolutsiooni
 
 **Kuupäev:** 2026-10-28
-**Staatus:** ettepanek
+**Staatus:** kehtib (2026-10-29; CER-mõõtmine jäeti ära, vt Tagajärjed)
 **Issue:** #666 · **Täpsustab:** ADR 0028 (`FULL_DPI` = 300)
 
 ## Kontekst
@@ -66,13 +66,16 @@ rasterdust, pikslid on allika omad.
 - **ADR 0028 invariant „`FULL_DPI` = OCR-serveri `PDF_DPI`" kitseneb.** ADR 0028-st
   alates materialiseerib PDF-i VUTT ja LOSS ainult OCR-ib, seega kattumine on
   oluline ainult LOSSi `expand_pdf` käsitsi-voole. `FULL_DPI = 300` jääb laeks.
-- **OCR-i kvaliteet mõõdetakse, mitte ei eeldata.** Mudelisisend sõltub LOSSi
-  eeltöötlusest (teenuses `fit_to_grid`, treeningus `image_processor`); erinev
-  sisendresolutsioon võib vahepealse skaleerimise kaudu tulemust muuta. Enne
-  „kehtib"-staatust: kontrolltranskriptsioonid (Valmis-lehed) mitmest teosest,
-  mis katavad peenkirja, kehva kontrasti ja topeltlehti; sama leht allika
-  suuruses vs 300 ppi venitusega; lubatud CER-i halvenemine lepitakse kokku
-  enne mõõtmist.
+- **OCR-i kvaliteet: hinnatud, mitte mõõdetud (täiendus 2026-10-29).** Ettepanek
+  nõudis enne „kehtib"-staatust CER-kontrolli. See jäeti ära, sest mudelisisend
+  on mõlemal juhul praktiliselt sama: LOSS viib iga pildi enne mudelit
+  `fit_to_grid`-iga (`qwen3.5/scripts/imaging.py`) eelarvesse `MAX_PIXELS =
+  5 120 000`. Venitatud `kju4xj` leht (7184 × 9475 = 68 MP) läks mudelisse
+  ~1950 × 2590 px-na, allika suuruses leht (1753 × 2298 = 4,0 MP) läheb
+  omas mõõdus. Vahe on ~11 % lineaarset interpolatsiooni, uut infot selles ei
+  ole. Kui allika pilt ise ületab eelarve, on sisend identne. Mõõdetav
+  CER-i erinevus ei ole tõenäoline; kui see kunagi ilmneb, on parandus LOSSi
+  poolel (eelarve), mitte renderduses.
 - **Lõikekoordinaadid ei sõltu resolutsioonist** (ADR 0049: `adjust` 0..1), nii et
   allika suuruses renderdus ei murra poolitust ega kärbet.
 - **Olemasolevad teosed** (#666): inventuur → ümbertegemine teose kaupa.

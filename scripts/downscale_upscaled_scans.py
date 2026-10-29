@@ -19,6 +19,7 @@ pisipildid jäävad kehtima. Pildid ei ole gitis — commit'i ei teki.
 Kasutus (serveris, Dockeris — seal on PIL ja /data):
   docker exec vutt-backend python3 scripts/downscale_upscaled_scans.py lzogr0          # kuivkäivitus
   docker exec vutt-backend python3 scripts/downscale_upscaled_scans.py lzogr0 --apply
+  ... 63y11m --bsb bsb10959131     # external_url ei ole BSB
 
 Idempotentne: juba vähendatud leht (pikk serv < MIN_LONG_EDGE) jäetakse vahele.
 """
@@ -138,11 +139,12 @@ def downscale(path: str) -> int:
     return os.path.getsize(path)
 
 
-def process(root: str, work_id: str, apply: bool, median_tol: float = MEDIAN_TOL) -> bool:
+def process(root: str, work_id: str, apply: bool, median_tol: float = MEDIAN_TOL,
+            bsb_override: str = None) -> bool:
     wd = find_work_dir(root, work_id)
     with open(os.path.join(wd, "_metadata.json"), encoding="utf-8") as f:
         meta = json.load(f)
-    bsb = bsb_id(meta.get("external_url"))
+    bsb = bsb_id(bsb_override) or bsb_id(meta.get("external_url"))
     print(f"== {work_id} {os.path.basename(wd)[:60]}")
     if not bsb:
         print(f"   VAHELE: external_url ei ole BSB ({meta.get('external_url')!r}) — tõendit ei ole")
@@ -208,9 +210,13 @@ def main():
     ap.add_argument("--median-tol", type=float, default=MEDIAN_TOL,
                     help="kõrgussuhte mediaani lubatud kõrvalekalle; BSB PDF-i kaader võib "
                          "IIIF-ist kõrguses mõne %% erineda (l6xrce: 0,969)")
+    ap.add_argument("--bsb", help="BSB-ID või -link, kui external_url viitab mujale "
+                                  "(63y11m: K10plus); lubatud ainult ühe teosega")
     args = ap.parse_args()
+    if args.bsb and (len(args.work_ids) != 1 or not bsb_id(args.bsb)):
+        ap.error("--bsb vajab täpselt üht teost ja kuju bsb12345678")
     root = args.data or _data_root()
-    ok = all([process(root, w, args.apply, args.median_tol) for w in args.work_ids])
+    ok = all([process(root, w, args.apply, args.median_tol, args.bsb) for w in args.work_ids])
     sys.exit(0 if ok else 1)
 
 
