@@ -48,6 +48,7 @@ import {
 } from '../services/workApi';
 import { restoreOriginalPageImage, RestoreResult } from '../services/pageService';
 import { useGeminiEnabled } from '../hooks/useGeminiEnabled';
+import { pollUntil, useJobPoll } from '../hooks/useJobPoll';
 import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
@@ -147,6 +148,7 @@ const WorkManage: React.FC = () => {
   const [pageOpsProgress, setPageOpsProgress] = useState<{ done: number; total: number } | null>(null);
   const pageOpsPollAlive = useRef(true);
   useEffect(() => { pageOpsPollAlive.current = true; return () => { pageOpsPollAlive.current = false; }; }, []);
+  const pollJob = useJobPoll();
 
   // Hulgivalik + liigutamine
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -271,24 +273,19 @@ const WorkManage: React.FC = () => {
   // Re-OCR koondstaatus: laeb korra (näitab .ocr-ootel märke), pollib ainult aktiivse batchi ajal.
   useEffect(() => {
     if (!workId || !authToken) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
-
-    const tick = async () => {
-      try {
-        const data = await getReocrStatus<ReocrStatusResponse>(workId, authToken);
-        if (!cancelled) setReocrStatus(data);
-        if (!cancelled && data.progress && data.progress.active) {
-          timer = setTimeout(tick, 4000);
-        }
-      } catch (e) {
-        // HTTP vead (nt 401/403 aegunud token, 404 puuduv teos) on lõplikud:
-        // ära tee taustal lõputut ebaõnnestunud pollimist. Võrgu/timeout'i viga proovi uuesti.
-        if (!cancelled && !(e instanceof ApiError)) timer = setTimeout(tick, 6000);
-      }
-    };
-    tick();
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+    // HTTP vead (nt 401/403 aegunud token, 404 puuduv teos) on lõplikud: ära
+    // tee taustal lõputut ebaõnnestunud pollimist (pollUntil-i reegel).
+    void pollUntil<ReocrStatusResponse>({
+      request: () => getReocrStatus<ReocrStatusResponse>(workId, authToken),
+      isRunning: (data) => !!data.progress?.active,
+      onStatus: setReocrStatus,
+      intervalMs: 4000,
+      firstDelayMs: 0,
+      retryMs: 6000,
+      alive: () => !cancelled,
+    });
+    return () => { cancelled = true; };
   }, [workId, authToken, reocrPollNonce]);
 
   useEffect(() => {
@@ -585,43 +582,42 @@ const WorkManage: React.FC = () => {
     let keep: Pick<PageOpsStatus, 'applied' | 'transformed'> | null = null;
     let inserted: string[] = [];
     try {
-      for (;;) {
-        await new Promise((r) => setTimeout(r, 1000));
-        if (!pageOpsPollAlive.current) return false;
-        let st: PageOpsStatus;
-        try {
-          st = await getWorkPageOpsStatus(workId, authToken);
-        } catch {
-          continue;   // ajutine võrgutõrge — töö käib serveris edasi
-        }
-        if (st.state === 'running') {
+      const res = await pollJob<PageOpsStatus>({
+        request: () => getWorkPageOpsStatus(workId, authToken),
+        isRunning: (st) => st.state === 'running',
+        onStatus: (st) => {
+          if (st.state !== 'running') return;
           const p = { done: st.done ?? 0, total: st.total ?? total };
           if (isPdf) setPdfProgress(p); else setPageOpsProgress(p);
-          continue;
-        }
-        if (isPdf) {
-          if (st.state === 'done') {
-            inserted = (st.result?.inserted ?? []).map((it) => it.filename);
-            setAddPageResult(t('manage.addPdf.done', { count: inserted.length }));
-            ok = true;
-          } else if (st.state === 'error') {
-            setAddPageError(st.code === 'anchor_missing'
-              ? t('manage.addPdf.anchorMissing')
-              : (st.error || t('manage.addPageError')));
-          } else {
-            setAddPageError(t('manage.pageOps.interrupted'));
-          }
-        } else if (st.state === 'done') {
-          const r = st.result ?? {};
-          setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, adjusted: r.adjusted ?? 0, split: r.split ?? 0 }));
+        },
+        intervalMs: 1000,
+      });
+      if (res.kind === 'cancelled') return false;
+      // Olekut ei saanud lugeda (HTTP-viga või korduv võrgutõrge): töö võib
+      // serveris veel käia — tulemust ei tea, käsitlus nagu katkestusel.
+      const st = res.kind === 'finished' ? res.status : null;
+      const lost = t(st ? 'manage.pageOps.interrupted' : 'manage.pageOps.statusUnavailable');
+      if (isPdf) {
+        if (st?.state === 'done') {
+          inserted = (st.result?.inserted ?? []).map((it) => it.filename);
+          setAddPageResult(t('manage.addPdf.done', { count: inserted.length }));
           ok = true;
-        } else if (st.state === 'error') {
-          setPageOpsError(st.error || t('manage.pageOps.error'));
-          if (st.applied) keep = { applied: st.applied, transformed: st.transformed ?? [] };
+        } else if (st?.state === 'error') {
+          setAddPageError(st.code === 'anchor_missing'
+            ? t('manage.addPdf.anchorMissing')
+            : (st.error || t('manage.addPageError')));
         } else {
-          setPageOpsError(t('manage.pageOps.interrupted'));
+          setAddPageError(lost);
         }
-        break;
+      } else if (st?.state === 'done') {
+        const r = st.result ?? {};
+        setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, adjusted: r.adjusted ?? 0, split: r.split ?? 0 }));
+        ok = true;
+      } else if (st?.state === 'error') {
+        setPageOpsError(st.error || t('manage.pageOps.error'));
+        if (st.applied) keep = { applied: st.applied, transformed: st.transformed ?? [] };
+      } else {
+        setPageOpsError(lost);
       }
     } finally {
       if (pageOpsPollAlive.current) {

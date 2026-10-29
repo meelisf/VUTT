@@ -4,6 +4,7 @@ import { ApiError, apiDelete, apiGet, apiPost } from '../../services/apiClient';
 import { FILE_API_URL } from '../../config';
 import { Page } from '../../types';
 import { reocrPageIdentity } from './reocrPageIdentity';
+import { useJobPoll } from '../../hooks/useJobPoll';
 
 export type ReocrStatus = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 
@@ -55,7 +56,10 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
   const [reocrStatus, setReocrStatus] = useState<ReocrStatus>('idle');
   const [reocrText, setReocrText] = useState<string | null>(null);
   const [reocrError, setReocrError] = useState<string | null>(null);
-  const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Iga uus poll ja lehe vahetus suurendab põlvkonda — vanem tsükkel lõpeb
+  // järgmisel sammul vaikselt (lahtimonteerimise katab useJobPoll).
+  const pollGenRef = useRef(0);
+  const pollJob = useJobPoll();
 
   const { pageFilename, pageKey, storageKey: reocrStorageKey } = reocrPageIdentity(page.work_id, page.image_url);
 
@@ -66,21 +70,47 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
   const pageKeyRef = useRef<string | null>(pageKey);
   pageKeyRef.current = pageKey;
 
-  // Poll cleanup komponendi mahavõtmisel
-  useEffect(() => {
-    return () => {
-      if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
-    };
-  }, []);
+  /** Jälgib serveri re-OCR tööd kuni lõpuni; `isCurrent` = töö leht on endiselt avatud. */
+  const followJob = useCallback(async (jobId: string, token: string, storageKey: string | null,
+                                      isCurrent: () => boolean, firstDelayMs: number) => {
+    const gen = ++pollGenRef.current;
+    setReocrStatus('processing');
+    const res = await pollJob<any>({
+      request: () => reocrJson(apiGet(`${FILE_API_URL}/admin/reocr/${jobId}/status`, { token, timeout: 10000 })),
+      isRunning: (pd) => pd.status !== 'done' && pd.status !== 'error' && pd.status !== 'not_found',
+      intervalMs: 3000,
+      firstDelayMs,
+      retryMs: 4000,
+      alive: () => isCurrent() && pollGenRef.current === gen,
+    });
+    if (res.kind === 'cancelled') return;
+    if (res.kind === 'failed') {
+      // Olekut ei saa lugeda — töö võib serveris käia, localStorage jääb alles
+      // ja lehele naastes leitakse ta uuesti üles.
+      setReocrStatus('error');
+      setReocrError((res.error as Error)?.message || 'Viga');
+      return;
+    }
+    const pd = res.status;
+    if (pd.status === 'done') {
+      setReocrStatus('done');
+      setReocrText(pd.text ?? '');
+      return;
+    }
+    if (pd.status === 'error') {
+      setReocrStatus('error');
+      setReocrError(pd.error || null);
+    } else {
+      setReocrStatus('idle');     // not_found: töö kadus (nt restart)
+    }
+    if (storageKey) localStorage.removeItem(storageKey);
+  }, [pollJob]);
 
   // Lehe vahetusel: lähtesta olek ja kontrolli UUE lehe seisu.
   // 1. .ocr fail (püsiv, elab serveri restardi üle)
   // 2. localStorage (pooleliolev töö)
   useEffect(() => {
-    if (reocrPollRef.current) {
-      clearTimeout(reocrPollRef.current);
-      reocrPollRef.current = null;
-    }
+    pollGenRef.current++;
     setReocrStatus('idle');
     setReocrText(null);
     setReocrError(null);
@@ -92,35 +122,9 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
     if (!authToken || !isAdmin || !pageKey || !page.work_id || !pageFilename) return;
 
     // Kõik hilisemad kirjutused käivad läbi selle valve — kui leht on vahepeal
-    // vahetunud, visatakse vastus lihtsalt ära.
-    const isCurrent = () => pageKeyRef.current === pageKey;
-
-    const startPollingFromSaved = (jobId: string) => {
-      setReocrStatus('processing');
-      const poll = async () => {
-        if (!isCurrent()) return;
-        try {
-          const pd = await reocrJson(apiGet(`${FILE_API_URL}/admin/reocr/${jobId}/status`, { token: authToken, timeout: 10000 }));
-          if (!isCurrent()) return;
-          if (pd.status === 'done') {
-            setReocrStatus('done');
-            setReocrText(pd.text ?? '');
-          } else if (pd.status === 'error') {
-            setReocrStatus('error');
-            setReocrError(pd.error || null);
-            localStorage.removeItem(reocrStorageKey!);
-          } else if (pd.status === 'not_found') {
-            setReocrStatus('idle');
-            localStorage.removeItem(reocrStorageKey!);
-          } else {
-            reocrPollRef.current = setTimeout(poll, 3000);
-          }
-        } catch {
-          if (isCurrent()) reocrPollRef.current = setTimeout(poll, 4000);
-        }
-      };
-      reocrPollRef.current = setTimeout(poll, 1000);
-    };
+    // vahetunud (või effect lõppes), visatakse vastus lihtsalt ära.
+    let disposed = false;
+    const isCurrent = () => !disposed && pageKeyRef.current === pageKey;
 
     const checkAll = async () => {
       // 1. Kontrolli .ocr faili (elab serveri restardi üle)
@@ -149,7 +153,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
           setReocrStatus('done');
           setReocrText(pd.text ?? '');
         } else if (pd.status === 'uploading' || pd.status === 'processing') {
-          startPollingFromSaved(savedJobId);
+          void followJob(savedJobId, authToken, reocrStorageKey, isCurrent, 1000);
         } else {
           localStorage.removeItem(reocrStorageKey!);
         }
@@ -161,12 +165,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
 
     checkAll();
 
-    return () => {
-      if (reocrPollRef.current) {
-        clearTimeout(reocrPollRef.current);
-        reocrPollRef.current = null;
-      }
-    };
+    return () => { disposed = true; };
   // pageKey katab work_id + failinime; ülejäänu on sellest tuletatud
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken, isAdmin, pageKey, discover]);
@@ -178,7 +177,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
     const jobPageKey = pageKey;
     const isCurrent = () => pageKeyRef.current === jobPageKey;
 
-    if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
+    pollGenRef.current++;
     setReocrStatus('uploading');
     setReocrText(null);
     setReocrError(null);
@@ -193,35 +192,14 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
       // on vahepeal lehte vahetanud; tagasi tulles leitakse see üles.
       if (reocrStorageKey) localStorage.setItem(reocrStorageKey, job_id);
       if (!isCurrent()) return;
-      setReocrStatus('processing');
-
-      const poll = async () => {
-        if (!isCurrent()) return;
-        try {
-          const pd = await reocrJson(apiGet(`${FILE_API_URL}/admin/reocr/${job_id}/status`, { token: authToken, timeout: 10000 }));
-          if (!isCurrent()) return;
-          if (pd.status === 'done') {
-            setReocrStatus('done');
-            setReocrText(pd.text ?? '');
-          } else if (pd.status === 'error') {
-            setReocrStatus('error');
-            setReocrError(pd.error || null);
-            if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
-          } else {
-            reocrPollRef.current = setTimeout(poll, 3000);
-          }
-        } catch {
-          if (isCurrent()) reocrPollRef.current = setTimeout(poll, 4000);
-        }
-      };
-      reocrPollRef.current = setTimeout(poll, 3000);
+      await followJob(job_id, authToken, reocrStorageKey, isCurrent, 3000);
     } catch (e: any) {
       if (!isCurrent()) return;
       setReocrStatus('error');
       setReocrError(e instanceof ApiError && e.message.startsWith('HTTP ')
         ? 'Re-OCR alustamine ebaõnnestus' : e.message || 'Viga');
     }
-  }, [pageFilename, pageKey, page.work_id, page.page_number, authToken, reocrStorageKey, provider]);
+  }, [pageFilename, pageKey, page.work_id, page.page_number, authToken, reocrStorageKey, provider, followJob]);
 
   const applyReOcr = useCallback(() => {
     if (reocrText !== null) {

@@ -313,6 +313,7 @@
       "badgeSplit": "poolitatakse",
       "progress": "{{done}} / {{total}} lehte",
       "interrupted": "Töö katkes enne lõppu (server taaskäivitus?). Lehtede nimekiri värskendati — vaata üle, mis jõudis kettale.",
+      "statusUnavailable": "Töö olekut ei õnnestunud lugeda — töö võib serveris veel käia. Lehtede nimekiri värskendati; laadi leht hiljem uuesti.",
       "badgeCrop": "kärbitakse"
     },
     "tabParts": "Osad",
