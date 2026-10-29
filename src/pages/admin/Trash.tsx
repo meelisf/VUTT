@@ -13,7 +13,7 @@ import {
 import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { apiErrorMessage, apiPost } from '../../services/apiClient';
 import { parseServerDate } from '../../utils/formatDateTime';
 
 interface DeletedWork {
@@ -54,13 +54,8 @@ const Trash: React.FC = () => {
     setTrashLoading(true);
     setTrashError(null);
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/trash`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({})
-      });
-      const data = await response.json();
-      if (data.status === 'success') {
+      const data = await apiPost<any>(`${FILE_API_URL}/admin/trash`, {}, { token: authToken });
+      if (data?.status === 'success') {
         setTrashItems(data.items);
         setTrashLoaded(true);
       } else {
@@ -78,26 +73,17 @@ const Trash: React.FC = () => {
     setRestoreMessage(null);
     setIsRestoreError(false);
     try {
-      const response = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/trash/${workId}/restore`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({}),
-          timeout: 30000
-        }
-      );
-      const data = await response.json();
-      if (data.status === 'success') {
+      const data = await apiPost<any>(`${FILE_API_URL}/admin/trash/${workId}/restore`, {}, { token: authToken, timeout: 30000 });
+      if (data?.status === 'success') {
         setRestoreMessage(t('trash.restoreSuccess', { title: data.title || title }));
         setIsRestoreError(false);
         setTrashItems(prev => prev.filter(item => item.work_id !== workId));
       } else {
-        setRestoreMessage(`${t('trash.restoreError')}: ${data.detail || data.message || t('common:error.unknown')}`);
+        setRestoreMessage(`${t('trash.restoreError')}: ${data?.message || t('common:error.unknown')}`);
         setIsRestoreError(true);
       }
-    } catch {
-      setRestoreMessage(t('trash.restoreError'));
+    } catch (e) {
+      setRestoreMessage(`${t('trash.restoreError')}: ${apiErrorMessage(e, t('common:error.unknown'))}`);
       setIsRestoreError(true);
     } finally {
       setRestoringId(null);

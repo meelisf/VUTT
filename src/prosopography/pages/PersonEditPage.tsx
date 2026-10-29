@@ -8,7 +8,7 @@ import MarkdownEditor from '../../components/MarkdownEditor';
 import BiographySection from '../components/personForm/BiographySection';
 import EntityPicker from '../../components/EntityPicker';
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { apiGet } from '../../services/apiClient';
 import { getPerson, createPersonChecked, PersonConflictError, updatePerson, uploadPersonImage, deletePersonImage, deletePerson } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
@@ -143,19 +143,18 @@ const PersonEditPage: React.FC = () => {
   }, [canEdit]);
 
   useEffect(() => {
-    fetchWithTimeout(`${FILE_API_URL}/entity-labels`)
-      .then(r => r.json())
-      .then((data: Record<string, { et?: string; en?: string }>) => {
-        const items = Object.entries(data)
+    apiGet<Record<string, { et?: string; en?: string }>>(`${FILE_API_URL}/entity-labels`)
+      .then(data => {
+        const items = Object.entries(data ?? {})
           .filter(([, v]) => v.et || v.en)
           .map(([id, v]) => ({ id, label: v.et || v.en! }));
         setEntityLabels(items);
       })
       .catch(() => {});
-    fetchWithTimeout(`${FILE_API_URL}/prosopography/relation-type-suggestions`)
-      .then(r => r.json())
-      .then((data: { label: string; id: string | null; labels?: Record<string, string> | null }[]) => {
-        const items = data.map(d => ({
+    apiGet<{ label: string; id: string | null; labels?: Record<string, string> | null }[]>(
+      `${FILE_API_URL}/prosopography/relation-type-suggestions`)
+      .then(data => {
+        const items = (data ?? []).map(d => ({
           label: (d.labels?.[lang] || d.labels?.['et'] || d.labels?.['en'] || d.label),
           id: d.id ?? null,
           labels: d.labels ?? null,

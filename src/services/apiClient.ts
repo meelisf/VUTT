@@ -75,6 +75,11 @@ function getErrorMessage(data: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Serveri veateade (`detail`/`message`/`error`), kui viga tuli vastusest; muidu `fallback`. */
+export function apiErrorMessage(e: unknown, fallback: string): string {
+  return e instanceof ApiError ? getErrorMessage(e.data, fallback) : fallback;
+}
+
 async function apiRequest<T>(
   method: string,
   path: string,

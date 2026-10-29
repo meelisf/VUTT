@@ -5,7 +5,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree, isCollectionRestricted } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiDelete, apiErrorMessage, apiGet, apiPut } from '../services/apiClient';
 import { apiPost } from '../services/apiClient';
 import CollectionAccessPanel from './CollectionAccessPanel';
 import { ColorPicker, renderTreeOptions } from './collectionFormControls';
@@ -133,30 +133,21 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
     setSaveError(null);
     setSaved(false);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${valitud}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({
-            description: { et: descEt.trim(), en: descEn.trim() },
-            description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
-            color: editColor,
-            visibility: editVisibility,
-          }),
-          timeout: 10000,
-        }
-      );
-      const data = await res.json();
-      if (data.status === 'success') {
+      const data = await apiPut<any>(`${FILE_API_URL}/admin/collections/${valitud}`, {
+        description: { et: descEt.trim(), en: descEn.trim() },
+        description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
+        color: editColor,
+        visibility: editVisibility,
+      }, { token: authToken, timeout: 10000 });
+      if (data?.status === 'success') {
         await refreshCollections();
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       } else {
-        setSaveError(data.message || t('collections.saveError'));
+        setSaveError(data?.message || t('collections.saveError'));
       }
-    } catch {
-      setSaveError(t('collections.saveError'));
+    } catch (e) {
+      setSaveError(apiErrorMessage(e, t('collections.saveError')));
     } finally {
       setSaving(false);
     }
@@ -169,12 +160,8 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
     setDeleteInput('');
     setDeleteError(null);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${valitud}/works-count`,
-        { headers: getAuthHeaders(authToken), timeout: 10000 }
-      );
-      const data = await res.json();
-      if (data.status === 'success') setDeleteWorksCount(data.count);
+      const data = await apiGet<any>(`${FILE_API_URL}/admin/collections/${valitud}/works-count`, { token: authToken, timeout: 10000 });
+      if (data?.status === 'success') setDeleteWorksCount(data.count);
     } catch {
       // count jääb null — näitame confirm ilma arvuta
     }
@@ -185,22 +172,18 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
     setDeleting(true);
     setDeleteError(null);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${valitud}`,
-        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 30000 }
-      );
-      const data = await res.json();
-      if (data.status === 'success') {
+      const data = await apiDelete<any>(`${FILE_API_URL}/admin/collections/${valitud}`, { token: authToken, timeout: 30000 });
+      if (data?.status === 'success') {
         await refreshCollections();
         vahetaValik('');
         setDeleteConfirming(false);
         setDeleteInput('');
       } else {
-        setDeleteError(data.message || t('collections.deleteError'));
+        setDeleteError(data?.message || t('collections.deleteError'));
         setDeleteConfirming(false);
       }
-    } catch {
-      setDeleteError(t('collections.deleteError'));
+    } catch (e) {
+      setDeleteError(apiErrorMessage(e, t('collections.deleteError')));
       setDeleteConfirming(false);
     } finally {
       setDeleting(false);

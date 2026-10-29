@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, MutableRefObject } from 'react';
 import { EditorView } from '@codemirror/view';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { ApiError, apiDelete, apiGet, apiPost } from '../../services/apiClient';
 import { FILE_API_URL } from '../../config';
 import { Page } from '../../types';
 import { reocrPageIdentity } from './reocrPageIdentity';
@@ -35,16 +35,21 @@ interface UseReOcrReturn {
   deleteOcrFile: () => Promise<void>;
 }
 
-const parseJsonResponse = async (response: Response): Promise<any> => {
-  const text = await response.text();
-  if (!text.trim()) return {};
+const nonJsonError = (status: number, text: string) =>
+  new Error(`Server ei tagastanud JSON vastust (${status}). ${text.replace(/\s+/g, ' ').slice(0, 180)}`);
+
+// apiClient annab mitte-JSON-vastuse stringina (nt nginx-i HTML-veakülg 502/504) —
+// siin on see viga ja sõnumisse läheb ainult lühike eelvaade.
+async function reocrJson(request: Promise<unknown>): Promise<any> {
   try {
-    return JSON.parse(text);
-  } catch {
-    const preview = text.replace(/\s+/g, ' ').slice(0, 180);
-    throw new Error(`Server ei tagastanud JSON vastust (${response.status}). ${preview}`);
+    const data = await request;
+    if (typeof data === 'string') throw nonJsonError(200, data);
+    return data ?? {};
+  } catch (e) {
+    if (e instanceof ApiError && typeof e.data === 'string') throw nonJsonError(e.status, e.data);
+    throw e;
   }
-};
+}
 
 export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provider = 'loss', discover = true }: UseReOcrProps): UseReOcrReturn {
   const [reocrStatus, setReocrStatus] = useState<ReocrStatus>('idle');
@@ -95,12 +100,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
       const poll = async () => {
         if (!isCurrent()) return;
         try {
-          const pr = await fetchWithTimeout(
-            `${FILE_API_URL}/admin/reocr/${jobId}/status`,
-            { headers: getAuthHeaders(authToken), timeout: 10000 }
-          );
-          if (!pr.ok) throw new Error('Polling ebaõnnestus');
-          const pd = await parseJsonResponse(pr);
+          const pd = await reocrJson(apiGet(`${FILE_API_URL}/admin/reocr/${jobId}/status`, { token: authToken, timeout: 10000 }));
           if (!isCurrent()) return;
           if (pd.status === 'done') {
             setReocrStatus('done');
@@ -125,21 +125,17 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
     const checkAll = async () => {
       // 1. Kontrolli .ocr faili (elab serveri restardi üle)
       try {
-        const res = await fetchWithTimeout(
+        const data = await reocrJson(apiGet(
           `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}`,
-          { headers: getAuthHeaders(authToken), timeout: 5000 }
-        );
+          { token: authToken, timeout: 5000 }
+        ));
         if (!isCurrent()) return;
-        if (res.ok) {
-          const data = await parseJsonResponse(res);
-          if (!isCurrent()) return;
-          setReocrStatus('done');
-          setReocrText(data.text ?? '');
-          localStorage.removeItem(reocrStorageKey!);
-          return;
-        }
+        setReocrStatus('done');
+        setReocrText(data.text ?? '');
+        localStorage.removeItem(reocrStorageKey!);
+        return;
       } catch {
-        // Ühenduse viga — proovime localStorage
+        // .ocr puudub (404) või ühenduse viga — proovime localStorage
       }
 
       // 2. .ocr puudub — kontrolli localStorage (pooleliolev töö)
@@ -147,11 +143,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
       if (!savedJobId || !isCurrent()) return;
 
       try {
-        const pr = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/reocr/${savedJobId}/status`,
-          { headers: getAuthHeaders(authToken), timeout: 10000 }
-        );
-        const pd = await parseJsonResponse(pr);
+        const pd = await reocrJson(apiGet(`${FILE_API_URL}/admin/reocr/${savedJobId}/status`, { token: authToken, timeout: 10000 }));
         if (!isCurrent()) return;
         if (pd.status === 'done') {
           setReocrStatus('done');
@@ -161,8 +153,9 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
         } else {
           localStorage.removeItem(reocrStorageKey!);
         }
-      } catch {
-        // Eiramine
+      } catch (e) {
+        // Server vastas veaga (nt töö kadus restardiga) → pooleliolevat tööd ei ole
+        if (e instanceof ApiError && isCurrent()) localStorage.removeItem(reocrStorageKey!);
       }
     };
 
@@ -191,21 +184,11 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
     setReocrError(null);
 
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${page.work_id}/reocr-page`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          page_filename: pageFilename,
-          page_number: page.page_number,
-          provider,
-        }),
-        timeout: 30000,
-      });
-      if (!res.ok) {
-        const d = await parseJsonResponse(res);
-        throw new Error(d.detail || 'Re-OCR alustamine ebaõnnestus');
-      }
-      const { job_id } = await parseJsonResponse(res);
+      const { job_id } = await reocrJson(apiPost(`${FILE_API_URL}/admin/work/${page.work_id}/reocr-page`, {
+        page_filename: pageFilename,
+        page_number: page.page_number,
+        provider,
+      }, { token: authToken, timeout: 30000 }));
       // job_id salvestatakse ALATI — töö jookseb serveris ka siis, kui kasutaja
       // on vahepeal lehte vahetanud; tagasi tulles leitakse see üles.
       if (reocrStorageKey) localStorage.setItem(reocrStorageKey, job_id);
@@ -215,12 +198,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
       const poll = async () => {
         if (!isCurrent()) return;
         try {
-          const pr = await fetchWithTimeout(
-            `${FILE_API_URL}/admin/reocr/${job_id}/status`,
-            { headers: getAuthHeaders(authToken), timeout: 10000 }
-          );
-          if (!pr.ok) throw new Error('Polling ebaõnnestus');
-          const pd = await parseJsonResponse(pr);
+          const pd = await reocrJson(apiGet(`${FILE_API_URL}/admin/reocr/${job_id}/status`, { token: authToken, timeout: 10000 }));
           if (!isCurrent()) return;
           if (pd.status === 'done') {
             setReocrStatus('done');
@@ -240,7 +218,8 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
     } catch (e: any) {
       if (!isCurrent()) return;
       setReocrStatus('error');
-      setReocrError(e.message || 'Viga');
+      setReocrError(e instanceof ApiError && e.message.startsWith('HTTP ')
+        ? 'Re-OCR alustamine ebaõnnestus' : e.message || 'Viga');
     }
   }, [pageFilename, pageKey, page.work_id, page.page_number, authToken, reocrStorageKey, provider]);
 
@@ -256,9 +235,9 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
     }
     // Kustuta .ocr fail — tulemus on rakendatud
     if (pageFilename && authToken && page.work_id) {
-      fetchWithTimeout(
+      apiDelete(
         `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}`,
-        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 5000 }
+        { token: authToken, timeout: 5000 }
       ).catch(() => {});
     }
     if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
@@ -268,9 +247,9 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
 
   const deleteOcrFile = useCallback(async () => {
     if (!pageFilename || !authToken || !page.work_id) return;
-    await fetchWithTimeout(
+    await apiDelete(
       `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}`,
-      { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 5000 }
+      { token: authToken, timeout: 5000 }
     ).catch(() => {});
     if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
     setReocrStatus('idle');

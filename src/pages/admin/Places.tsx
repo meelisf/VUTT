@@ -6,7 +6,7 @@ import { ChevronLeft, Loader2, Search, Plus, Settings, X } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { fetchPlaces, fetchPlacesMeta } from '../../prosopography/services/prosopographyService';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { apiGet } from '../../services/apiClient';
 import { FILE_API_URL } from '../../config';
 import type { PlaceEntry } from '../../prosopography/types';
 import { buildPlacesTree } from './placesTreeUtils';
@@ -72,14 +72,11 @@ const Places: React.FC = () => {
 
   useEffect(() => {
     if (!authToken || Object.keys(places).length === 0) return;
-    fetchWithTimeout(`${FILE_API_URL}/prosopography?limit=5000`, {
-      headers: getAuthHeaders(authToken),
-    })
-      .then(r => r.json())
-      .then((data: any) => {
+    apiGet<any>(`${FILE_API_URL}/prosopography?limit=5000`, { token: authToken })
+      .then(data => {
         const counts: Record<string, number> = {};
         const samples: Record<string, { id: string; name: string; imm_year?: number | null }[]> = {};
-        for (const entry of (data.results ?? [])) {
+        for (const entry of (data?.results ?? [])) {
           const pk = entry.origin_place;
           if (!pk) continue;
           counts[pk] = (counts[pk] ?? 0) + 1;

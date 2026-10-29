@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, RotateCcw, Loader2 } from 'lucide-react';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { apiGet, apiPost } from '../../services/apiClient';
 import { FILE_API_URL } from '../../config';
 
 interface SpecialCharacter {
@@ -26,16 +26,7 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
   const save = async (newChars: SpecialCharacter[], customFlag = true) => {
     setIsSaving(true);
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({ characters: newChars }),
-        timeout: 10000,
-      });
-      if (!res.ok) {
-        console.error('Erimärkide salvestamine ebaõnnestus:', res.status);
-        return;
-      }
+      await apiPost(`${FILE_API_URL}/user-chars`, { characters: newChars }, { token: authToken, timeout: 10000 });
       onSaved(newChars, customFlag);
     } catch (e) {
       console.error('Erimärkide salvestamine ebaõnnestus:', e);
@@ -73,16 +64,10 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
   const handleReset = async () => {
     setIsSaving(true);
     try {
-      await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({ reset: true }),
-        timeout: 10000,
-      });
+      await apiPost(`${FILE_API_URL}/user-chars`, { reset: true }, { token: authToken, timeout: 10000 });
       // Hangi globaalsed vaikimisi märgid
-      const res = await fetchWithTimeout(`${FILE_API_URL}/user-chars`, { headers: getAuthHeaders(authToken), timeout: 5000 });
-      const data = await res.json();
-      if (data.characters) {
+      const data = await apiGet<any>(`${FILE_API_URL}/user-chars`, { token: authToken, timeout: 5000 });
+      if (data?.characters) {
         setChars(data.characters);
         onSaved(data.characters, false);
       }

@@ -18,7 +18,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useImageToken, withImageToken } from '../contexts/ImageTokenContext';
 import { getViewerToken, type ViewerTokenResponse } from '../services/workApi';
-import { ApiError } from '../services/apiClient';
+import { ApiError, apiPost } from '../services/apiClient';
 import { useCollection } from '../contexts/CollectionContext';
 import { getWorkSetWorkIds } from '../services/workSetService';
 import { collectionForWorkSearch } from '../utils/workSearchSelection';
@@ -290,16 +290,12 @@ const Workspace: React.FC = () => {
         // olla vananenud. Endpoint nõuab editor-rolli, seega ülejäänutel jääb
         // kehtima Meili väärtus. Ei blokeeri lehe renderdust.
         if (!authToken) return;
-        const metaResponse = await fetch(`${FILE_API_URL}/get-work-metadata`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-          // original_path on endpointis ainult varuvariant (work_id on esmane) ja
-          // pärineb samast Meili väljast mis lehe oma (originaal_kataloog).
-          body: JSON.stringify({ work_id: workId, original_path: workData.catalog_name }),
-        });
-        const metaData = await metaResponse.json();
+        // original_path on endpointis ainult varuvariant (work_id on esmane) ja
+        // pärineb samast Meili väljast mis lehe oma (originaal_kataloog).
+        const metaData = await apiPost<any>(`${FILE_API_URL}/get-work-metadata`,
+          { work_id: workId, original_path: workData.catalog_name }, { token: authToken });
         if (cancelled) return;
-        if (metaData.status === 'success' && metaData.metadata && typeof metaData.metadata.shareable === 'boolean') {
+        if (metaData?.status === 'success' && metaData.metadata && typeof metaData.metadata.shareable === 'boolean') {
           const { shareable } = metaData.metadata;
           setWork(prev => (prev ? { ...prev, shareable } : prev));
         }

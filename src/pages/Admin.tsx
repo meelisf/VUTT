@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { UserPlus, Users, Upload, Library, History, Trash2, Wrench, MapPin } from 'lucide-react';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiGet, apiPost } from '../services/apiClient';
 import { FILE_API_URL } from '../config';
 
 
@@ -40,22 +40,14 @@ const Admin: React.FC = () => {
     // muutujast VITE_FILE_SERVER_URL — seda ei ole üheski .env failis, nii et
     // päring läks aadressile "undefined/registrations" ja catch neelas vea:
     // taotluste loendur näitas alati 0.
-    fetchWithTimeout(`${FILE_API_URL}/admin/registrations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-      body: JSON.stringify({}),
-    })
-      .then(r => r.json())
+    apiPost<any>(`${FILE_API_URL}/admin/registrations`, {}, { token: authToken })
       .then(data => {
         const registrations = Array.isArray(data?.registrations) ? data.registrations : [];
         const pending = registrations.filter((r: { status?: string }) => r.status === 'pending').length;
         setPendingCount(pending);
       })
       .catch(() => {});
-    fetchWithTimeout(`${FILE_API_URL}/admin/uploads`, {
-      headers: getAuthHeaders(authToken),
-    })
-      .then(r => r.json())
+    apiGet<any>(`${FILE_API_URL}/admin/uploads`, { token: authToken })
       .then(data => {
         const active = (data?.uploads || []).filter(
           (u: any) => u.status !== 'imported'

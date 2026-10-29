@@ -23,7 +23,7 @@ import {
 import { Annotation, Page, Work } from '../../types';
 import { isCollectionRestricted, type Collections } from '../../services/collectionService';
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { ApiError, apiPost } from '../../services/apiClient';
 import { parseRestoreResponse, type RestoreResult } from './pageRestore';
 import { canRestoreVersion, hasTextChange, type PageChanges } from './historyChanges';
 import { HistoryChangeBadges, HistoryChangeDetails } from './HistoryChanges';
@@ -108,21 +108,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     const outcome = await runRestore({
       run: async () => {
         const imagePath = pageFileFromImageUrl(page.image_url);
-        const response = await fetchWithTimeout(`${FILE_API_URL}/page-annotations/restore-as-comment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({
-            original_path: page.original_path,
-            file_name: imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt'),
-            commit_hash: entry.full_hash,
-            annotation_id: annId,
-          }),
-          timeout: 30000,
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !Array.isArray(data.comments)) {
-          throw new Error(String(data.detail || data.message || response.status));
-        }
+        const data = await apiPost<any>(`${FILE_API_URL}/page-annotations/restore-as-comment`, {
+          original_path: page.original_path,
+          file_name: imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt'),
+          commit_hash: entry.full_hash,
+          annotation_id: annId,
+        }, { token: authToken, timeout: 30000 });
+        if (!Array.isArray(data?.comments)) throw new Error(String(data?.message || ''));
         return { comments: data.comments as Annotation[], gitCommitted: data.git_committed !== false };
       },
       // Eduteadet ei ole: kirje märgib taastatud märkuse ise.
@@ -185,17 +177,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       const imagePath = pageFileFromImageUrl(page.image_url);
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
 
-      const response = await fetchWithTimeout(`${FILE_API_URL}/git-history`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          original_path: page.original_path,
-          file_name: txtFilename
-        })
-      });
-
-      const data = await response.json();
-      if (data.status === 'success') {
+      const data = await apiPost<any>(`${FILE_API_URL}/git-history`, {
+        original_path: page.original_path,
+        file_name: txtFilename
+      }, { token: authToken });
+      if (data?.status === 'success') {
         setGitHistory(data.history || []);
         setHasMoreHistory(!!data.has_more);
       } else {
@@ -206,6 +192,10 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       }
     } catch (e) {
       console.error("Git ajaloo laadimine ebaõnnestus:", e);
+      // 401 märgib apiClient sessiooni aegunuks; muu autentimisviga teatame siin.
+      if (e instanceof ApiError && e.status !== 401 && /Autentimine|parool/.test(e.message)) {
+        notify(t('history.authError'));
+      }
     } finally {
       setIsLoadingHistory(false);
     }
@@ -231,18 +221,12 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
       const filepath = `${page.original_path}/${txtFilename}`;
 
-      const response = await fetchWithTimeout(`${FILE_API_URL}/commit-diff`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          commit_hash: entry.full_hash,
-          filepath: filepath
-        })
-      });
+      const data = await apiPost<any>(`${FILE_API_URL}/commit-diff`, {
+        commit_hash: entry.full_hash,
+        filepath: filepath
+      }, { token: authToken });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
+      if (data?.status === 'success') {
         setDiffCache(prev => ({
           ...prev,
           [key]: {
@@ -290,19 +274,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
         setIsRestoring(true);
         const imagePath = pageFileFromImageUrl(page.image_url);
         const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
-        const response = await fetchWithTimeout(`${FILE_API_URL}/git-restore`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({
-            original_path: page.original_path,
-            file_name: txtFilename,
-            commit_hash: entry.full_hash
-          }),
-          timeout: 30000
-        });
-        const data = await response.json();
+        const data = await apiPost<any>(`${FILE_API_URL}/git-restore`, {
+          original_path: page.original_path,
+          file_name: txtFilename,
+          commit_hash: entry.full_hash
+        }, { token: authToken, timeout: 30000 });
         const parsed = parseRestoreResponse(data);
-        if (!parsed) throw new Error(data.message || t('common:error.unknown'));
+        if (!parsed) throw new Error(data?.message || t('common:error.unknown'));
         return { ...parsed, gitCommitted: parsed.gitWarning === null };
       },
       messages: {
@@ -356,14 +334,9 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     setShareable(newValue);
     setShareableSaving(true);
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/work/${work.work_id}/shareable`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({ shareable: newValue }),
-        timeout: 10000,
-      });
-      const data = await response.json();
-      if (!response.ok || data.status !== 'success') {
+      const data = await apiPost<any>(`${FILE_API_URL}/work/${work.work_id}/shareable`,
+        { shareable: newValue }, { token: authToken, timeout: 10000 });
+      if (data?.status !== 'success') {
         throw new Error(data.message || 'Jagamise oleku salvestamine ebaõnnestus');
       }
       setShareable(data.shareable);

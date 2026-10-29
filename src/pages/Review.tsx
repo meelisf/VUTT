@@ -42,7 +42,7 @@ import { isAtLeast } from '../utils/roleUtils';
 import AgentProposalsSection from './review/AgentProposalsSection';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { apiDelete, apiGet, apiPost } from '../services/apiClient';
 import { parseServerDate } from '../utils/formatDateTime';
 
 interface RecentCommit {
@@ -175,14 +175,9 @@ const Review: React.FC = () => {
   // Lae kõigi kasutajate nimekiri admin jaoks
   useEffect(() => {
     if (!user || !token) return;
-    fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify({})
-    })
-      .then(res => res.json())
+    apiPost<any>(`${FILE_API_URL}/admin/users`, {}, { token })
       .then(data => {
-        if (data.status === 'success' && data.users) {
+        if (data?.status === 'success' && data.users) {
           const usernames = data.users.map((u: { username: string }) => u.username).sort();
           setAllUsers(usernames);
         }
@@ -196,9 +191,8 @@ const Review: React.FC = () => {
     if (!token || !isAdmin) return;
     if (showLoader) setReocrLoading(true);
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/ocr/jobs`, { headers: getAuthHeaders(token), timeout: 10000 });
-      const data = await res.json();
-      if (data.status === 'success') setReocrJobs(data.jobs);
+      const data = await apiGet<any>(`${FILE_API_URL}/admin/ocr/jobs`, { token, timeout: 10000 });
+      if (data?.status === 'success') setReocrJobs(data.jobs);
     } catch {
       // eiramine
     } finally {
@@ -217,12 +211,8 @@ const Review: React.FC = () => {
     setCancellingId(jobId);
     setCancelError(null);
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/reocr/${jobId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(token),
-        timeout: 30000,   // koristus teeb SFTP-d, 10 s võib jääda napiks
-      });
-      if (!res.ok) throw new Error(String(res.status));
+      // koristus teeb SFTP-d, 10 s võib jääda napiks
+      await apiDelete(`${FILE_API_URL}/admin/reocr/${jobId}`, { token, timeout: 30000 });
       setCancelConfirmId(null);
       await loadReocrJobs();
     } catch {
@@ -258,12 +248,9 @@ const Review: React.FC = () => {
     if (!token || !isAdmin) return;
     setReocrLogLoading(true);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/reocr/log?offset=${fromOffset}&limit=50`,
-        { headers: getAuthHeaders(token), timeout: 10000 }
-      );
-      const data = await res.json();
-      if (data.status === 'success') {
+      const data = await apiGet<any>(
+        `${FILE_API_URL}/admin/reocr/log?offset=${fromOffset}&limit=50`, { token, timeout: 10000 });
+      if (data?.status === 'success') {
         setReocrLog(prev => reset ? data.entries : [...prev, ...data.entries]);
         setReocrLogOffset(fromOffset + data.entries.length);
         setReocrLogHasMore(data.has_more);
@@ -304,14 +291,10 @@ const Review: React.FC = () => {
 
       // Git-ajaloo koostamine võib külma failisüsteemi või hõivatud threadpool'i korral
       // võtta üle fetchWithTimeout'i vaikimisi 10 sekundi.
-      const response = await fetchWithTimeout(url, {
-        headers: getAuthHeaders(token),
-        timeout: 30000
-      });
-      const data = await response.json();
+      const data = await apiGet<any>(url, { token, timeout: 30000 });
       if (isStale()) return;
 
-      if (data.status === 'success') {
+      if (data?.status === 'success') {
         if (append) {
           setCommits(prev => [...prev, ...data.commits]);
         } else {
@@ -321,7 +304,7 @@ const Review: React.FC = () => {
         setHasMore(data.has_more);
         setOffset(fromOffset + data.commits.length);
       } else {
-        setError(data.message || t('error'));
+        setError(data?.message || t('error'));
       }
     } catch (err) {
       console.error('Muudatuste laadimine ebaõnnestus:', err);
@@ -360,18 +343,12 @@ const Review: React.FC = () => {
     setLoadingDiff(key);
     
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/commit-diff`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-        body: JSON.stringify({
-          commit_hash: commit.full_hash,
-          filepath: commit.filepath
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.status === 'success') {
+      const data = await apiPost<any>(`${FILE_API_URL}/commit-diff`, {
+        commit_hash: commit.full_hash,
+        filepath: commit.filepath
+      }, { token });
+
+      if (data?.status === 'success') {
         setDiffCache(prev => ({
           ...prev,
           [key]: {
