@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from . import state
 from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, rebuild_indices
-from .person_crud import _AsyncTasks, _id_to_path, get_person
+from .person_crud import _AsyncTasks, _id_to_path, copy_person_image, get_person
 from .locks import ext_id_claim_lock, merge_operation_lock, person_lock
 from ._compat import sync_from_facade
 from ..prosopo_biography_fields import (
@@ -154,6 +154,13 @@ def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
             target_changed = True
 
     if _merge_biography_fields(source, target):
+        target_changed = True
+
+    # Pildifail ei ole kaardi JSON-is — ilma kopeerimiseta jäi ainuke pilt
+    # tombstone'i taha (#240, Glück 2026-10-30).
+    image_url = copy_person_image(source_id, target_id)
+    if image_url:
+        target["image_url"] = image_url
         target_changed = True
 
     src_notes = (source.get("notes") or "").strip()
