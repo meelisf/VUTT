@@ -140,10 +140,13 @@ def _apply(module: Any, name: str, facade_value: Any, default: Any) -> None:
             setattr(module, name, kirjutatud[1])
         return
 
-    if key not in _APPLIED:
-        _APPLIED[key] = (facade_value, getattr(module, name))
-    else:
-        _APPLIED[key] = (facade_value, _APPLIED[key][1])
+    # Vana kirje „eelmine" kehtib ainult siis, kui moodulis on veel MEIE
+    # kirjutis. Kui keegi taastas mooduli sünkist mööda (otsene patch lõppes),
+    # on kirje vananenud ja selle tagasivõtt tooks surnud moki tagasi.
+    vana = _APPLIED.get(key)
+    current = getattr(module, name)
+    previous = vana[1] if vana is not None and current is vana[0] else current
+    _APPLIED[key] = (facade_value, previous)
     setattr(module, name, facade_value)
 
 

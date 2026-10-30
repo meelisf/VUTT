@@ -62,3 +62,34 @@ def test_sync_ei_kirjuta_ule_voorast_otsest_patchi():
         assert person_crud.get_person is minu_mokk, "sync võttis võõra patchi maha"
     finally:
         person_crud.get_person = paris
+
+
+def test_vahepeal_taastatud_otsene_patch_ei_tule_tagasi():
+    """Vananenud „eelmine väärtus" ei tohi järgmise fassaadipatchi lõpus tagasi tulla.
+
+    Reproduktsioon (test_merge_teosed → test_person_image_variants →
+    test_delete_person…): test patchib nii domeenimoodulit otse kui fassaadi;
+    sync talletab otsese moki „eelmiseks". Otsene patch taastatakse sünkist
+    mööda. Järgmine fassaadipatch säilitas vana kirje ja selle tagasivõtt
+    kirjutas ammu surnud moki sõltumatusse testi tagasi.
+    """
+    paris = person_crud.get_person
+    otse = lambda pid: None  # noqa: E731
+    fassaad1 = lambda pid: {"id": "F1"}  # noqa: E731
+    fassaad2 = lambda pid: {"id": "F2"}  # noqa: E731
+    try:
+        person_crud.get_person = otse
+        ops.get_person = fassaad1
+        _compat.sync_from_facade()           # talletab „eelmiseks" `otse`
+        person_crud.get_person = paris       # otsene patch taastub sünkist mööda
+        ops.get_person = paris
+        ops.get_person = fassaad2
+        _compat.sync_from_facade()
+        assert person_crud.get_person is fassaad2
+    finally:
+        ops.get_person = paris
+    _compat.sync_from_facade()
+
+    assert person_crud.get_person is paris, (
+        f"LEKE: sync taastas {person_crud.get_person!r}, mitte päris funktsiooni"
+    )
