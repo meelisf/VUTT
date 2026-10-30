@@ -300,22 +300,29 @@ def make_upload(backend_env):
 def prosopo_env(tmp_path, monkeypatch):
     """Isoleeritud prosopograafia: kaardid tmp-kaustas, git = failikirjutus, indeksid tmp-is.
 
-    Patch käib `server.prosopography.ops` fassaadil — `sync_from_facade` kannab
-    selle domeenimoodulitesse (vt `_compat._SYNC_NAMES`).
+    Patch käib otse `state`-il: kõik teed ja `save_with_git` elavad seal ja
+    domeenikood loeb neid `state.X` kaudu — fassaadi sild (`_compat`) ei
+    osale (#690). Laadureid ei patchita: kood loeb tmp-faile.
     """
     import json as _json
     from types import SimpleNamespace
-    from server.prosopography import ops, ext_id_index
+    from server.prosopography import ext_id_index, state
+    from server.prosopography._compat import sync_from_facade
 
+    # Sild taastab `state`-i laisalt (järgmisel sync'il): ilma selleta salvestaks
+    # monkeypatch taastuspunktiks eelmise testi tmp-tee ja paneks selle lõpus
+    # tagasi. Kaob koos sillaga (#690).
+    sync_from_facade()
     d = tmp_path / "prosopography"
     d.mkdir()
     cfg = tmp_path / "config"
     cfg.mkdir()
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_DIR", str(d))
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_INDEX_FILE", str(cfg / "prosopography_index.json"))
-    monkeypatch.setattr(ops, "PERSON_TO_WORKS_FILE", str(cfg / "person_to_works.json"))
-    monkeypatch.setattr(ops, "PERSON_ALIASES_FILE", str(cfg / "person_aliases.json"))
-    monkeypatch.setattr(ops, "WORK_COLLECTIONS_INDEX_FILE", str(cfg / "work_collections_index.json"))
+    monkeypatch.setattr(state, "PROSOPOGRAPHY_DIR", str(d))
+    monkeypatch.setattr(state, "PROSOPOGRAPHY_IMAGES_DIR", str(d / "images"))
+    monkeypatch.setattr(state, "PROSOPOGRAPHY_INDEX_FILE", str(cfg / "prosopography_index.json"))
+    monkeypatch.setattr(state, "PERSON_TO_WORKS_FILE", str(cfg / "person_to_works.json"))
+    monkeypatch.setattr(state, "PERSON_ALIASES_FILE", str(cfg / "person_aliases.json"))
+    monkeypatch.setattr(state, "WORK_COLLECTIONS_INDEX_FILE", str(cfg / "work_collections_index.json"))
 
     def fake_save(path, content, username, message=None, additional_files=None):
         with open(path, "w", encoding="utf-8") as f:
@@ -325,7 +332,7 @@ def prosopo_env(tmp_path, monkeypatch):
                 f.write(c)
         return {"success": True}
 
-    monkeypatch.setattr(ops, "save_with_git", fake_save)
+    monkeypatch.setattr(state, "save_with_git", fake_save)
     ext_id_index.invalidate()
 
     def write(nanoid, **fields):
