@@ -192,7 +192,7 @@ def patch_person(monkeypatch):
     def fake_get(pid):
         return person if pid == "vutt:P1" else None
 
-    monkeypatch.setattr("server.prosopography.ops.get_person_with_works", fake_get)
+    monkeypatch.setattr("server.prosopography.relations.get_person_with_works", fake_get)
     return person
 
 

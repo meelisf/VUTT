@@ -96,19 +96,15 @@ def test_compute_person_diff_new_field():
     assert any(c["field"] == "notes" and c["old"] is None and c["new"] == "Uus märge" for c in changes)
 
 
-def test_create_person_calls_save_with_git(tmp_path):
+def test_create_person_calls_save_with_git(prosopo_env, monkeypatch):
     """create_person() peab kutsuma save_with_git()."""
-    import json
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock
+    from server.prosopography import ops, state
 
     mock_save = MagicMock(return_value={"success": True, "commit_hash": "abc12345"})
+    monkeypatch.setattr(state, "save_with_git", mock_save)
 
-    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
-         patch("server.prosopography.ops.save_with_git", mock_save), \
-         patch("server.prosopography.ops._update_index_entry"), \
-         patch("server.prosopography.ops._update_aliases_entry"):
-        from server.prosopography import ops
-        person = ops.create_person({"name": "Test Isik"}, "testuser")
+    person = ops.create_person({"name": "Test Isik"}, "testuser")
 
     assert mock_save.called
     call_args = mock_save.call_args
@@ -120,29 +116,16 @@ def test_create_person_calls_save_with_git(tmp_path):
     assert person["created_by"] == "testuser"
 
 
-def test_update_person_calls_save_with_git(tmp_path):
+def test_update_person_calls_save_with_git(prosopo_env, monkeypatch):
     """update_person() peab kutsuma save_with_git()."""
-    import json
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock
+    from server.prosopography import ops, state
 
-    person_data = {
-        "id": "vutt:Pabc123",
-        "name": {"label": "Test"},
-        "updated_at": "2024-01-01T00:00:00+00:00",
-        "record_status": "draft",
-    }
-    person_file = tmp_path / "abc123.json"
-    person_file.write_text(json.dumps(person_data), encoding="utf-8")
-
+    prosopo_env.write("abc123", name={"label": "Test"}, updated_at="2024-01-01T00:00:00+00:00")
     mock_save = MagicMock(return_value={"success": True, "commit_hash": "abc12345"})
+    monkeypatch.setattr(state, "save_with_git", mock_save)
 
-    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
-         patch("server.prosopography.ops.save_with_git", mock_save), \
-         patch("server.prosopography.ops._update_index_entry"), \
-         patch("server.prosopography.ops._update_aliases_entry"), \
-         patch("server.prosopography.ops._propagate_name_to_works"):
-        from server.prosopography import ops
-        result = ops.update_person("vutt:Pabc123", {"updated_at": "2024-01-01T00:00:00+00:00", "name": {"label": "Test muudetud"}}, "testuser")
+    result = ops.update_person("vutt:Pabc123", {"updated_at": "2024-01-01T00:00:00+00:00", "name": {"label": "Test muudetud"}}, "testuser")
 
     assert mock_save.called
     msg = mock_save.call_args.kwargs.get("message", "")
@@ -150,31 +133,16 @@ def test_update_person_calls_save_with_git(tmp_path):
     assert result["updated_by"] == "testuser"
 
 
-def test_delete_person_calls_delete_file_from_git(tmp_path):
+def test_delete_person_calls_delete_file_from_git(prosopo_env, monkeypatch):
     """delete_person() peab kutsuma delete_file_from_git()."""
-    import json
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock
+    from server.prosopography import ops, state
 
-    person_data = {
-        "id": "vutt:Pabc123",
-        "name": {"label": "Kustutav Isik"},
-        "record_status": "draft",
-        "updated_at": "2024-01-01T00:00:00+00:00",
-    }
-    person_file = tmp_path / "abc123.json"
-    person_file.write_text(json.dumps(person_data), encoding="utf-8")
-
+    prosopo_env.write("abc123", name={"label": "Kustutav Isik"})
     mock_delete = MagicMock(return_value=True)
+    monkeypatch.setattr(state, "delete_file_from_git", mock_delete)
 
-    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
-         patch("server.prosopography.ops.delete_file_from_git", mock_delete), \
-         patch("server.prosopography.ops._load_person_to_works", return_value={}), \
-         patch("server.prosopography.ops._load_index", return_value={"entries": []}), \
-         patch("server.prosopography.ops.atomic_write_json"), \
-         patch("server.prosopography.ops._remove_aliases_entry"), \
-         patch("server.prosopography.ops._glob.glob", return_value=[]):
-        from server.prosopography import ops
-        result = ops.delete_person("vutt:Pabc123", "testuser")
+    result = ops.delete_person("vutt:Pabc123", "testuser")
 
     assert mock_delete.called
     call_args = mock_delete.call_args
@@ -182,10 +150,11 @@ def test_delete_person_calls_delete_file_from_git(tmp_path):
     assert result["deleted"] == "vutt:Pabc123"
 
 
-def test_merge_person_commits_source_and_target(tmp_path):
+def test_merge_person_commits_source_and_target(prosopo_env, monkeypatch):
     """merge_person() peab commitama source (tombstone) + target ühes commit-is."""
     import json
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock
+    from server.prosopography import ops, state
 
     source = {"id": "vutt:Psrc", "name": {"label": "Allikas"}, "record_status": "draft",
                "updated_at": "2024-01-01T00:00:00+00:00", "relations": [], "identifiers": [],
@@ -201,28 +170,13 @@ def test_merge_person_commits_source_and_target(tmp_path):
                "sources": [], "confessions": [], "birth": None, "death": None,
                "origin": {}, "gender": None, "biography": None, "notes": None, "image_url": None}
 
-    (tmp_path / "src.json").write_text(json.dumps(source), encoding="utf-8")
-    (tmp_path / "tgt.json").write_text(json.dumps(target), encoding="utf-8")
+    (prosopo_env.dir / "src.json").write_text(json.dumps(source), encoding="utf-8")
+    (prosopo_env.dir / "tgt.json").write_text(json.dumps(target), encoding="utf-8")
 
     mock_save = MagicMock(return_value={"success": True, "commit_hash": "abc"})
+    monkeypatch.setattr(state, "save_with_git", mock_save)
 
-    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
-         patch("server.prosopography.ops.save_with_git", mock_save), \
-         patch("server.prosopography.ops._update_index_entry"), \
-         patch("server.prosopography.ops._update_aliases_entry"), \
-         patch("server.prosopography.ops._remove_aliases_entry"), \
-         patch("server.prosopography.ops.atomic_write_json"), \
-         patch("server.prosopography.ops._glob.glob", return_value=[]), \
-         patch("server.prosopography.ops._load_index", return_value={"entries": []}):
-        from server.prosopography import ops
-
-        def _get_person(pid):
-            nanoid = pid.removeprefix("vutt:P")
-            path = tmp_path / f"{nanoid}.json"
-            return json.loads(path.read_text()) if path.exists() else None
-
-        with patch("server.prosopography.ops.get_person", side_effect=_get_person):
-            ops.merge_person("vutt:Psrc", "vutt:Ptgt", "testuser")
+    ops.merge_person("vutt:Psrc", "vutt:Ptgt", "testuser")
 
     # Prosopo liitmine commit must have been called
     prosopo_calls = [c for c in mock_save.call_args_list

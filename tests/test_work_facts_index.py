@@ -89,11 +89,11 @@ def _work_dir(tmp_path, meta):
 def _env(monkeypatch, tmp_path):
     """Metaandmete salvestus ilma giti ja Meilita; indeksid tmp-is."""
     from server import metadata_ops
-    from server.prosopography import ops
+    from server.prosopography import state
     monkeypatch.setattr(wro, "BASE_DIR", str(tmp_path / "data"))
     monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
-    monkeypatch.setattr(ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json"))
-    monkeypatch.setattr(ops, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json"))
+    monkeypatch.setattr(state, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json"))
+    monkeypatch.setattr(state, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json"))
     monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch", lambda *_a, **_k: None)
     # Git-kirjutus nagu tests/test_metadata_git_tulemus.py-s
     monkeypatch.setattr(metadata_ops, "save_with_git", lambda *_a, **_k: {"success": True})

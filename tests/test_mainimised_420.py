@@ -84,10 +84,11 @@ def test_kiire_salvestuste_jada_ei_skanni_iga_kord(client, login, leht):
 @pytest.fixture
 def ptw(tmp_path, monkeypatch):
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
 
     fail = tmp_path / "person_to_works.json"
     fail.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(fail))
+    monkeypatch.setattr(prosopo_state, "PERSON_TO_WORKS_FILE", str(fail))
     return lambda: json.loads(fail.read_text(encoding="utf-8"))
 
 

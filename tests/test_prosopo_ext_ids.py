@@ -75,42 +75,19 @@ def test_tyhi_vaartus_annab_tyhja_stringi(scheme, raw):
 from unittest.mock import MagicMock, patch  # noqa: E402
 
 
-def _fake_save_with_git(file_path, content, username, message=None):
-    """Kirjutab faili päriselt (aga ilma gitita) — muidu ei leia get_person kaarti."""
-    import os
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return {"success": True, "commit_hash": "abc12345"}
-
-
-def _patched_ops(tmp_path):
-    """create_person/add_identifier isoleeritud kaustas, ilma gitita."""
-    return (
-        patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)),
-        patch("server.prosopography.ops.save_with_git", _fake_save_with_git),
-        patch("server.prosopography.ops._update_index_entry"),
-        patch("server.prosopography.ops._update_aliases_entry"),
+def test_create_person_salvestab_id_kanoonilisel_kujul(prosopo_env):
+    from server.prosopography import ops
+    person = ops.create_person(
+        {"name": "Laurentius Ludenius",
+         "identifiers": [{"scheme": "gnd", "id": "GND:1029967695"}]},
+        "testuser",
     )
-
-
-def test_create_person_salvestab_id_kanoonilisel_kujul(tmp_path):
-    p1, p2, p3, p4 = _patched_ops(tmp_path)
-    with p1, p2, p3, p4:
-        from server.prosopography import ops
-        person = ops.create_person(
-            {"name": "Laurentius Ludenius",
-             "identifiers": [{"scheme": "gnd", "id": "GND:1029967695"}]},
-            "testuser",
-        )
     assert person["identifiers"] == [{"scheme": "gnd", "id": "1029967695"}]
 
 
-def test_add_identifier_ei_lisa_sama_id_teist_kuju(tmp_path):
+def test_add_identifier_ei_lisa_sama_id_teist_kuju(prosopo_env):
     """`GND:123` lisamine kaardile, kus on juba `123`, ei tohi teha teist kirjet."""
-    p1, p2, p3, p4 = _patched_ops(tmp_path)
-    with p1, p2, p3, p4, \
-         patch("server.prosopography.enrichment.fetch_and_diff",
+    with patch("server.prosopography.enrichment.fetch_and_diff",
                MagicMock(return_value={"auto_filled": {}, "conflicts": []})):
         from server.prosopography import ops
         person = ops.create_person(
@@ -124,22 +101,17 @@ def test_add_identifier_ei_lisa_sama_id_teist_kuju(tmp_path):
     assert gnd[0]["id"] == "1029967695"
 
 
-def test_ensure_prosopo_ei_tee_dublikaati_prefiksi_pärast(tmp_path):
+def test_ensure_prosopo_ei_tee_dublikaati_prefiksi_pärast(prosopo_env):
     """Metaandmete salvestus tõi `GND:123`, kaardil on `123` — sama isik."""
-    from server.prosopography import ext_id_index
-    p1, p2, p3, p4 = _patched_ops(tmp_path)
-    with p1, p2, p3, p4:
-        from server.prosopography import ops
-        ext_id_index.invalidate()
-        olemas = ops.create_person(
-            {"name": "Test", "identifiers": [{"scheme": "gnd", "id": "1029967695"}]},
-            "testuser",
-        )
-        ext_id_index.invalidate()
-        tulemus = ops.ensure_prosopo_for_entity(
-            {"id": "GND:1029967695", "label": "Test", "source": "gnd"}, "testuser"
-        )
+    from server.prosopography import ext_id_index, ops
+    olemas = ops.create_person(
+        {"name": "Test", "identifiers": [{"scheme": "gnd", "id": "1029967695"}]},
+        "testuser",
+    )
     ext_id_index.invalidate()
+    tulemus = ops.ensure_prosopo_for_entity(
+        {"id": "GND:1029967695", "label": "Test", "source": "gnd"}, "testuser"
+    )
     assert tulemus["id"] == olemas["id"]
 
 

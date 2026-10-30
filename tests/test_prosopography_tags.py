@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from server.prosopography import state
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -107,13 +109,10 @@ FAKE_INDEX = {
 
 
 @pytest.fixture
-def indexed(ops, monkeypatch):
-    monkeypatch.setattr(ops, "_load_index", lambda: FAKE_INDEX)
-    monkeypatch.setattr(ops, "_load_person_to_works", lambda: {})
-    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
-    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
+def indexed(prosopo_env, ops, monkeypatch):
+    prosopo_env.index(FAKE_INDEX)
     # get_person_facets kutsub selle alati välja — ilma patchita loeks päris konfiguratsiooni.
-    monkeypatch.setattr(ops, "_load_origin_groups", lambda: {})
+    monkeypatch.setattr(state, "_load_origin_groups", lambda: {})
     return ops
 
 
@@ -217,38 +216,35 @@ def test_facets_legacy_string_tag_uses_label_as_value(indexed):
     assert by_value["kantsler"]["count"] == 1
 
 
-def _facets_for(ops, monkeypatch, tags_value):
+def _facets_for(prosopo_env, ops, monkeypatch, tags_value):
     index = {
         "entries": [{
             "id": "p1", "label": "Dup", "sort_name": "Dup", "record_status": "draft",
             "tags": tags_value,
         }]
     }
-    monkeypatch.setattr(ops, "_load_index", lambda: index)
-    monkeypatch.setattr(ops, "_load_person_to_works", lambda: {})
-    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
-    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
-    monkeypatch.setattr(ops, "_load_origin_groups", lambda: {})
+    prosopo_env.index(index)
+    monkeypatch.setattr(state, "_load_origin_groups", lambda: {})
     return [(t["value"], t["count"]) for t in ops.get_person_facets()["tags"]]
 
 
-def test_facets_duplicate_tag_on_one_person_counts_once(ops, monkeypatch):
+def test_facets_duplicate_tag_on_one_person_counts_once(prosopo_env, ops, monkeypatch):
     """Sama märksõna kaks korda ühel isikul ei tohi loendurit topeltada."""
-    result = _facets_for(ops, monkeypatch, [
+    result = _facets_for(prosopo_env, ops, monkeypatch, [
         {"label": "pietism", "id": "Q193664"},
         {"label": "Pietism", "id": "Q193664"},
     ])
     assert result == [("Q193664", 1)]
 
 
-def test_facets_qcode_and_bare_label_are_separate_rows(ops, monkeypatch):
+def test_facets_qcode_and_bare_label_are_separate_rows(prosopo_env, ops, monkeypatch):
     """Grupeerimisvõti on Q-kood kui olemas, muidu label.
 
     Q-koodiga ja Q-koodita märksõna on seega eraldi read, isegi kui label
     kattub. Label-põhine liitmine oleks mitmemõtteline: kui sama labeliga on
     kaks eri Q-koodi, ei ole ühest vastust, kumma alla paljas label kuulub.
     """
-    result = _facets_for(ops, monkeypatch, [
+    result = _facets_for(prosopo_env, ops, monkeypatch, [
         {"label": "pietism", "id": "Q193664"},
         "pietism",
     ])
@@ -264,12 +260,9 @@ def test_facets_tag_selection_does_not_narrow_facets(indexed):
 # ---- HTTP-tasand ----
 
 @pytest.fixture
-def http(client, ops, monkeypatch):
-    monkeypatch.setattr(ops, "_load_index", lambda: FAKE_INDEX)
-    monkeypatch.setattr(ops, "_load_person_to_works", lambda: {})
-    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
-    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
-    monkeypatch.setattr(ops, "_load_origin_groups", lambda: {})
+def http(prosopo_env, client, ops, monkeypatch):
+    prosopo_env.index(FAKE_INDEX)
+    monkeypatch.setattr(state, "_load_origin_groups", lambda: {})
     return client
 
 

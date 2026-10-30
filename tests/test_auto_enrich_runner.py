@@ -90,19 +90,19 @@ def test_seotud_id_teisel_kaardil_ei_lisata(prosopo_env, monkeypatch):
 
 
 def test_teine_kaivitus_ei_kirjuta_uuesti(prosopo_env, monkeypatch):
-    from server.prosopography import ops
+    from server.prosopography import state
     prosopo_env.write("aaa", identifiers=[{"scheme": "wikidata", "id": "Q1"}],
                       gender=None, review=PENDING)
     remote(monkeypatch, {("wikidata", "Q1"): {"gender": "M"}})
 
     calls = []
-    algne = ops.save_with_git
+    algne = state.save_with_git
 
     def loendav(*a, **k):
         calls.append(1)
         return algne(*a, **k)
 
-    monkeypatch.setattr(ops, "save_with_git", loendav)
+    monkeypatch.setattr(state, "save_with_git", loendav)
 
     runner.run_auto_enrichment("vutt:Paaa")
     esimene = prosopo_env.read("aaa")

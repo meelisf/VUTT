@@ -128,15 +128,14 @@ def test_kaks_kirjutajat_ei_puhi_teineteist(prosopo_env, workdir):
 
 
 def test_rebuild_annab_sama_mis_uuendus(prosopo_env, workdir, tmp_path, monkeypatch):
-    from server.prosopography import ops
+    from server.prosopography import state
     from server.prosopography.indices import rebuild_indices, update_person_to_works
     from server.prosopography.relations import update_page_person_mentions
-    monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(state, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(wro, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
     rebuild_indices()
     rebuilt = _ptw(prosopo_env)
-    from server.prosopography import state
     with open(state.PERSON_TO_WORKS_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
     update_person_to_works("w1", [], [], None, "T", 1690, parts=[LETTER_A, POEM_C])
@@ -196,7 +195,6 @@ def test_umberjarjestus_uuendab_faktid_ka_osade_muutuseta(work):
 # ── Isikuleht ────────────────────────────────────────────────────────────────
 
 def test_isiku_teosed_kannavad_osa_andmeid(prosopo_env, tmp_path, monkeypatch):
-    from server.prosopography import ops
     from server.prosopography.relations import get_person_with_works
     prosopo_env.write("aaaaa")
     from server.prosopography import state

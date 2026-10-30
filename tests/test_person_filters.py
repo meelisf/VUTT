@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from server.prosopography import state
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -37,12 +39,9 @@ def ops():
 
 
 @pytest.fixture
-def http(client, ops, monkeypatch):
-    monkeypatch.setattr(ops, "_load_index", lambda: FAKE_INDEX)
-    monkeypatch.setattr(ops, "_load_person_to_works", lambda: {})
-    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
-    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
-    monkeypatch.setattr(ops, "_load_origin_groups", lambda: {})
+def http(prosopo_env, client, ops, monkeypatch):
+    prosopo_env.index(FAKE_INDEX)
+    monkeypatch.setattr(state, "_load_origin_groups", lambda: {})
     return client
 
 

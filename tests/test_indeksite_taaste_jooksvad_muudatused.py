@@ -19,6 +19,7 @@ from server.prosopography import work_relations_ops as wro
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
 
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -28,9 +29,9 @@ def env(tmp_path, monkeypatch):
                         ("PROSOPOGRAPHY_INDEX_FILE", "index.json"),
                         ("WORK_COLLECTIONS_INDEX_FILE", "wc.json"),
                         ("PERSON_ALIASES_FILE", "aliases.json")]:
-        monkeypatch.setattr(prosopo_ops, name, str(tmp_path / fname))
-    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
-    monkeypatch.setattr(prosopo_ops, "BASE_DIR", str(data_dir))
+        monkeypatch.setattr(prosopo_state, name, str(tmp_path / fname))
+    monkeypatch.setattr(prosopo_state, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
+    monkeypatch.setattr(prosopo_state, "BASE_DIR", str(data_dir))
     monkeypatch.setattr(wro, "BASE_DIR", str(data_dir))
     monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
     return tmp_path, data_dir, prosopo_dir
