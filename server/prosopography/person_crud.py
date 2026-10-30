@@ -587,6 +587,26 @@ def get_person_image_path(person_id: str) -> Optional[str]:
     return None
 
 
+def copy_person_image(source_id: str, target_id: str) -> Optional[str]:
+    """Kopeerib source'i pildi target'ile, kui target'il pilti ei ole.
+
+    Tagastab target'i uue `image_url`-i või None (midagi ei kopeeritud).
+    Kutsuja hoiab mõlema isiku lukku ja salvestab `image_url`-i ise.
+    KOPEERIB, mitte ei liiguta: tombstone jääb taastatavaks.
+    """
+    import shutil
+
+    source_path = get_person_image_path(source_id)
+    if source_path is None or get_person_image_path(target_id) is not None:
+        return None
+    ext = os.path.splitext(source_path)[1]
+    os.makedirs(state.PROSOPOGRAPHY_IMAGES_DIR, exist_ok=True)
+    shutil.copyfile(source_path, _person_image_path(target_id, ext))
+    image_variants.remove_variants(state.PROSOPOGRAPHY_IMAGES_DIR, _safe_nanoid(target_id))
+    encoded_id = target_id.replace(":", "%3A")
+    return f"/api/files/prosopography/{encoded_id}/image?v={format(time.time_ns(), 'x')}"
+
+
 def get_person_image_variant(person_id: str, width: int) -> Optional[str]:
     """Tagastab isiku pildi `width` laiuse variandi tee; None kui pilti ei ole.
 
@@ -996,4 +1016,4 @@ def bulk_update_occupation(
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 
 
-__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_new_person_skeleton', '_make_date_obj', '_propagate_name_to_works', '_apply_card_update', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'get_person_image_variant', 'delete_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation', 'SERVER_FIELDS', 'strip_server_fields', 'create_person_checked', 'set_enrichment_scheduler', '_has_similar_name']
+__all__ = ['_safe_nanoid', '_id_to_path', '_save_person_locked', '_strip_markup', '_make_snippets', 'get_person', 'create_person', '_new_person_skeleton', '_make_date_obj', '_propagate_name_to_works', '_apply_card_update', 'update_person', 'add_identifier', '_person_image_path', 'upload_person_image', 'get_person_image_path', 'get_person_image_variant', 'delete_person_image', 'copy_person_image', 'apply_enrichment', 'restore_person', 'IdentifierConflict', '_check_identifiers_free', '_find_by_external_id', 'ensure_prosopo_for_entity', 'ensure_prosopo_stubs', 'bulk_update_occupation', 'SERVER_FIELDS', 'strip_server_fields', 'create_person_checked', 'set_enrichment_scheduler', '_has_similar_name']
