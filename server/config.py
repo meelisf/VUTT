@@ -139,8 +139,9 @@ BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 # JSON failide asukohad
 # NB: _PROJECT_ROOT on defineeritud ülal logimise sektsioonis
 
-# Runtime/tundlikud failid — projekti state/ kaustas (ei ole gitis)
-_STATE_DIR = os.path.join(_PROJECT_ROOT, "state")
+# Runtime/tundlikud failid — projekti state/ kaustas (ei ole gitis).
+# VUTT_STATE_DIR on testide isolatsiooniks (juur-conftest.py); tootmine seda ei sea.
+_STATE_DIR = os.getenv("VUTT_STATE_DIR") or os.path.join(_PROJECT_ROOT, "state")
 STATE_DIR = _STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
 USERS_FILE = os.path.join(_STATE_DIR, "users.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
