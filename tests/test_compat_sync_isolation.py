@@ -14,6 +14,11 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from server.prosopography import _compat, ops, person_crud  # noqa: E402
 
+import pytest  # noqa: E402
+
+# Silla enda testid patchivad fassaadi tahtlikult (valvur: tests/conftest.py).
+pytestmark = pytest.mark.usefixtures("fassaadi_patch_lubatud")
+
 
 def test_otsene_patch_ei_talletu_originaalina():
     """#342 reproduktsioon: mokk ei tohi ellu jääda teda seadnud testi üle."""
