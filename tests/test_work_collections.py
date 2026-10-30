@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from server.prosopography import state
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -21,7 +23,7 @@ def _ops(tmp_path):
 def test_update_work_collections_writes_entry(tmp_path):
     ops = _ops(tmp_path)
     wc_file = tmp_path / "work_collections_index.json"
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)):
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)):
         ops.update_work_collections("w1", ["academia-gustaviana"])
         data = json.loads(wc_file.read_text(encoding="utf-8"))
     assert data == {"w1": ["academia-gustaviana"]}
@@ -31,7 +33,7 @@ def test_update_work_collections_empty_removes_entry(tmp_path):
     ops = _ops(tmp_path)
     wc_file = tmp_path / "work_collections_index.json"
     wc_file.write_text(json.dumps({"w1": ["c1"], "w2": ["c2"]}), encoding="utf-8")
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)):
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)):
         ops.update_work_collections("w1", [])
         data = json.loads(wc_file.read_text(encoding="utf-8"))
     assert data == {"w2": ["c2"]}
@@ -51,13 +53,13 @@ def test_rebuild_indices_builds_work_collections(tmp_path):
     )
     wc_file = tmp_path / "work_collections_index.json"
 
-    with mock.patch.object(ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir)), \
-         mock.patch.object(ops, "BASE_DIR", str(base_dir)), \
-         mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json")), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "idx.json")), \
-         mock.patch.object(ops, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json")), \
-         mock.patch.object(ops, "build_works_creators_index", lambda: None):
+    with mock.patch.object(state, "PROSOPOGRAPHY_DIR", str(prosopo_dir)), \
+         mock.patch.object(state, "BASE_DIR", str(base_dir)), \
+         mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json")), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "idx.json")), \
+         mock.patch.object(state, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json")), \
+         mock.patch.object(state, "build_works_creators_index", lambda: None):
         ops.rebuild_indices()
         data = json.loads(wc_file.read_text(encoding="utf-8"))
     assert data == {"w1": ["c-child", "c-other"]}
@@ -80,13 +82,13 @@ def test_rebuild_indices_excludes_merged_persons(tmp_path):
     (prosopo_dir / "merged.json").write_text(json.dumps(merged), encoding="utf-8")
     index_file = tmp_path / "idx.json"
 
-    with mock.patch.object(ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir)), \
-         mock.patch.object(ops, "BASE_DIR", str(base_dir)), \
-         mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json")), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json")), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(index_file)), \
-         mock.patch.object(ops, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json")), \
-         mock.patch.object(ops, "build_works_creators_index", lambda: None):
+    with mock.patch.object(state, "PROSOPOGRAPHY_DIR", str(prosopo_dir)), \
+         mock.patch.object(state, "BASE_DIR", str(base_dir)), \
+         mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json")), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json")), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(index_file)), \
+         mock.patch.object(state, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json")), \
+         mock.patch.object(state, "build_works_creators_index", lambda: None):
         ops.rebuild_indices()
 
     entries = json.loads(index_file.read_text(encoding="utf-8"))["entries"]
@@ -116,9 +118,9 @@ def test_persons_in_collection_roles_and_inheritance(tmp_path):
     }), encoding="utf-8")
     idx_file.write_text(json.dumps({"entries": []}), encoding="utf-8")
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
          mock.patch("server.cache.get_cached_collections", return_value=COLLECTIONS):
         # Valitud vanemkollektsioon → hõlmab alamkollektsiooni w1 isikuid
         result = ops._persons_in_collection("parent")
@@ -158,9 +160,9 @@ def test_persons_in_collection_includes_education_institution_members_without_wo
         "academia-gustaviana": {"name": {"et": "Gustavianum", "en": "Gustavian University"}},
     }
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
          mock.patch("server.cache.get_cached_collections", return_value=collections):
         result = ops._persons_in_collection("academia-gustaviana")
 
@@ -189,9 +191,9 @@ def test_persons_in_collection_does_not_match_institution_by_display_name(tmp_pa
         "theme-gustaviana": {"name": {"et": "Academia Gustaviana", "en": "Academia Gustaviana"}},
     }
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
          mock.patch("server.cache.get_cached_collections", return_value=collections):
         result = ops._persons_in_collection("theme-gustaviana")
 
@@ -213,9 +215,9 @@ def test_list_persons_collection_filters(tmp_path):
         {"id": "vutt:Pout", "label": "Väljas", "sort_name": "valjas", "record_status": "published"},
     ]}), encoding="utf-8")
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
          mock.patch("server.cache.get_cached_collections", return_value=COLLECTIONS):
         res = ops.list_persons(collection="parent")
 
@@ -235,8 +237,8 @@ def test_person_collections_returns_works_own_collections(tmp_path):
         "vutt:Pnowork": [],
     }), encoding="utf-8")
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)):
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(ptw_file)):
         assert ops._person_collections("vutt:Pmulti") == ["c-child", "c-other"]
         assert ops._person_collections("vutt:Pnowork") == []
         assert ops._person_collections("vutt:Punknown") == []
@@ -265,9 +267,9 @@ def test_map_markers_collection_includes_education_member_without_works(tmp_path
         "academia-gustaviana": {"name": {"et": "Gustavianum", "en": "Gustavian University"}},
     }
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
          mock.patch("server.cache.get_cached_collections", return_value=collections):
         res = ops.get_person_map_markers(collection="academia-gustaviana")
 
@@ -287,10 +289,9 @@ def test_map_markers_includes_focus_for_related_to(tmp_path):
         {"id": "vutt:Pfocus", "label": "Focus Inimene", "sort_name": "focus", "record_status": "published"},
     ]}), encoding="utf-8")
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
-         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
-         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
-         mock.patch.object(ops, "get_person_relation_network_ids", return_value=["vutt:Pfocus"]), \
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(state, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
          mock.patch("server.cache.get_cached_collections", return_value=COLLECTIONS):
         res = ops.get_person_map_markers(related_to="vutt:Pfocus", collection="parent")
 
@@ -305,7 +306,7 @@ def test_map_markers_no_focus_without_related_to(tmp_path):
     ops = _ops(tmp_path)
     idx_file = tmp_path / "idx.json"
     idx_file.write_text(json.dumps({"entries": []}), encoding="utf-8")
-    with mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)):
+    with mock.patch.object(state, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)):
         res = ops.get_person_map_markers()
     assert "focus" not in res
 
@@ -319,7 +320,7 @@ def test_save_work_metadata_updates_collections_even_when_call_ptw_false(tmp_pat
     meta_path.write_text(json.dumps({"id": "w1", "title": "T", "collections": ["c-old"]}), encoding="utf-8")
     wc_file = tmp_path / "work_collections_index.json"
 
-    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+    with mock.patch.object(state, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
          mock.patch.object(metadata_ops, "save_with_git", lambda *a, **k: None), \
          mock.patch.object(metadata_ops, "sync_work_to_meilisearch", lambda *a, **k: None):
         metadata_ops.save_work_metadata(

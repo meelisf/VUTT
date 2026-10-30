@@ -550,7 +550,7 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
 
     work_links sisaldab ainult eelnevalt ligipääsukontrollitud avalikke teoseid.
     """
-    from .prosopography.ops import get_person_with_works
+    from .prosopography.relations import get_person_with_works
 
     person = get_person_with_works(person_id)
     if not person or person.get("record_status") == "tombstone" or person.get("merged_into"):

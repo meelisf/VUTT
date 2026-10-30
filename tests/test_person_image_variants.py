@@ -20,33 +20,10 @@ def _jpeg(width, height, exif_orientation=None):
 
 
 @pytest.fixture
-def crud(monkeypatch, tmp_path):
-    from server.prosopography import ops, person_crud
+def crud(prosopo_env):
+    from server.prosopography import person_crud
 
-    prosopo_dir = tmp_path / "prosopography"
-    images_dir = prosopo_dir / "images"
-    prosopo_dir.mkdir()
-    path = prosopo_dir / "abc123.json"
-    path.write_text(json.dumps({
-        "id": "vutt:Pabc123", "name": {"label": "Test Isik"}, "image_url": None,
-        "updated_at": "2026-01-01T00:00:00+00:00",
-    }), encoding="utf-8")
-
-    def save(filepath, content, *_a, **_kw):
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(content)
-        return {"success": True, "commit_hash": "test"}
-
-    # Patch fassaadil (nagu conftest `prosopo_env`): otse `state`-i patchimine
-    # jätab `sync_from_facade` taastuse vahele ja lekib järgmistesse testidesse.
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_IMAGES_DIR", str(images_dir))
-    monkeypatch.setattr(ops, "save_with_git", save)
-    monkeypatch.setattr(ops, "get_person", lambda _pid: json.loads(path.read_text()))
-    monkeypatch.setattr(person_crud, "_indices", lambda: type("I", (), {
-        "_update_index_entry": staticmethod(lambda _p: None),
-        "_update_aliases_entry": staticmethod(lambda _p: None),
-    })())
+    prosopo_env.write("abc123", name={"label": "Test Isik"}, image_url=None)
     return person_crud
 
 

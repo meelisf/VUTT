@@ -242,6 +242,7 @@ def test_update_page_person_mentions(tmp_path, monkeypatch):
     Olemasolevad 'subject'/'creator' rollid jäävad puutumata.
     """
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
 
     work_id = "work123"
     work_dir = tmp_path / "teos1"
@@ -274,7 +275,7 @@ def test_update_page_person_mentions(tmp_path, monkeypatch):
         "vutt:Pccc": [{"work_id": "other_work", "role": "mentioned"}],
     }), encoding="utf-8")
 
-    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(prosopo_state, "PERSON_TO_WORKS_FILE", str(ptw_file))
 
     prosopo_ops.update_page_person_mentions(work_id, str(work_dir))
 
@@ -302,6 +303,7 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
     rolliga 'mentioned'.
     """
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
 
     # Teoste kataloog
     data_dir = tmp_path / "data"
@@ -336,13 +338,12 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
     index_file = tmp_path / "prosopography_index.json"
     aliases_file = tmp_path / "person_aliases.json"
 
-    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
-    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_INDEX_FILE", str(index_file))
-    monkeypatch.setattr(prosopo_ops, "PERSON_ALIASES_FILE", str(aliases_file))
-    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
+    monkeypatch.setattr(prosopo_state, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(prosopo_state, "PROSOPOGRAPHY_INDEX_FILE", str(index_file))
+    monkeypatch.setattr(prosopo_state, "PERSON_ALIASES_FILE", str(aliases_file))
+    monkeypatch.setattr(prosopo_state, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
 
-    # rebuild_indices kasutab mooduli-tasandi BASE_DIR importi (ops.py)
-    monkeypatch.setattr(prosopo_ops, "BASE_DIR", str(data_dir))
+    monkeypatch.setattr(prosopo_state, "BASE_DIR", str(data_dir))
 
     prosopo_ops.rebuild_indices()
 
@@ -364,6 +365,7 @@ def test_page_mentions_record_page_numbers(tmp_path, monkeypatch):
     Numeratsioon = enumerate_page_images järjekord (sequence, siis failinimi).
     """
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
 
     work_id = "workAAA"
     work_dir = tmp_path / "teos1"
@@ -383,7 +385,7 @@ def test_page_mentions_record_page_numbers(tmp_path, monkeypatch):
 
     ptw_file = tmp_path / "person_to_works.json"
     ptw_file.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(prosopo_state, "PERSON_TO_WORKS_FILE", str(ptw_file))
 
     prosopo_ops.update_page_person_mentions(work_id, str(work_dir))
 
@@ -398,6 +400,7 @@ def test_page_mentions_record_page_numbers(tmp_path, monkeypatch):
 def test_rebuild_indices_records_mention_page_numbers(tmp_path, monkeypatch):
     """rebuild_indices() peab 'mentioned' kirjetele samamoodi lehenumbrid andma."""
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
 
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -419,11 +422,11 @@ def test_rebuild_indices_records_mention_page_numbers(tmp_path, monkeypatch):
     prosopo_dir.mkdir()
     ptw_file = tmp_path / "person_to_works.json"
 
-    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
-    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "index.json"))
-    monkeypatch.setattr(prosopo_ops, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json"))
-    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
-    monkeypatch.setattr(prosopo_ops, "BASE_DIR", str(data_dir))
+    monkeypatch.setattr(prosopo_state, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(prosopo_state, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "index.json"))
+    monkeypatch.setattr(prosopo_state, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json"))
+    monkeypatch.setattr(prosopo_state, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
+    monkeypatch.setattr(prosopo_state, "BASE_DIR", str(data_dir))
 
     prosopo_ops.rebuild_indices()
 
@@ -440,6 +443,7 @@ def test_update_person_to_works_preserves_mentioned(tmp_path, monkeypatch):
     (leheküljefailid) ja neid see funktsioon uuesti ei arvuta.
     """
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
     import server.prosopography.work_relations_ops as work_relations_ops
 
     work_id = "workAAA"
@@ -451,7 +455,7 @@ def test_update_person_to_works_preserves_mentioned(tmp_path, monkeypatch):
         "vutt:Pold": [{"work_id": work_id, "role": "auctor"}],
     }), encoding="utf-8")
 
-    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(prosopo_state, "PERSON_TO_WORKS_FILE", str(ptw_file))
     monkeypatch.setattr(
         work_relations_ops, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "works_creators_index.json")
     )

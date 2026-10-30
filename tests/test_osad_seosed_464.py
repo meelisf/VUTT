@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 
-from server.prosopography import ops
+from server.prosopography import state
 from server.prosopography import work_relations_ops as wro
 
 F, A, B, E, M, Q = ("vutt:Pfocus", "vutt:Paaaaa", "vutt:Pbbbbb", "vutt:Peditor", "vutt:Pmenti", "vutt:Pqqqqq")
@@ -39,9 +39,9 @@ def net(tmp_path, monkeypatch, prosopo_env):
     idx = {"entries": [{"id": x, "label": x[6:]} for x in (F, A, B, E, M, Q)]}
     for name, data in (("ptw.json", ptw), ("wci.json", facts), ("wc.json", {"w1": ["agc"]}), ("idx.json", idx)):
         (tmp_path / name).write_text(json.dumps(data), encoding="utf-8")
-    monkeypatch.setattr(ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json"))
-    monkeypatch.setattr(ops, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json"))
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "idx.json"))
+    monkeypatch.setattr(state, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json"))
+    monkeypatch.setattr(state, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json"))
+    monkeypatch.setattr(state, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "idx.json"))
     monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
     for n in ("focus", "aaaaa", "bbbbb", "editor", "menti", "qqqqq"):
         prosopo_env.write(n)

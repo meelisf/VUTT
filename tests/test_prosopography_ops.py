@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from server.prosopography import state
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -67,11 +69,11 @@ def test_migrate_missing_status_key(tmp_path):
 
 def _build_entry(person: dict) -> dict:
     ops = importlib.import_module("server.prosopography.ops")
-    with mock.patch.object(ops, "_resolve_origin_group", return_value=None), \
-         mock.patch.object(ops, "_get_parent_place", return_value=None), \
-         mock.patch.object(ops, "_get_place_labels", return_value=None), \
-         mock.patch.object(ops, "_get_place_coordinates", return_value=None), \
-         mock.patch.object(ops, "_load_origin_groups", return_value={}):
+    with mock.patch.object(state, "_resolve_origin_group", return_value=None), \
+         mock.patch.object(state, "_get_parent_place", return_value=None), \
+         mock.patch.object(state, "_get_place_labels", return_value=None), \
+         mock.patch.object(state, "_get_place_coordinates", return_value=None), \
+         mock.patch.object(state, "_load_origin_groups", return_value={}):
         return ops._index_entry_from_person(person)
 
 
@@ -117,11 +119,11 @@ def test_index_entry_includes_origin_coordinates():
         "origin": {"place": "Riga", "place_id": "Q1773"},
     }
     coords = {"lat": 56.9475, "lon": 24.1069, "source": "wikidata", "wikidata_property": "P625"}
-    with mock.patch.object(ops, "_resolve_origin_group", return_value="Liivimaa"), \
-         mock.patch.object(ops, "_get_parent_place", return_value=None), \
-         mock.patch.object(ops, "_get_place_labels", return_value={"et": "Riia"}), \
-         mock.patch.object(ops, "_get_place_coordinates", return_value=coords), \
-         mock.patch.object(ops, "_load_origin_groups", return_value={"Liivimaa": {"labels": {"et": "Liivimaa"}}}):
+    with mock.patch.object(state, "_resolve_origin_group", return_value="Liivimaa"), \
+         mock.patch.object(state, "_get_parent_place", return_value=None), \
+         mock.patch.object(state, "_get_place_labels", return_value={"et": "Riia"}), \
+         mock.patch.object(state, "_get_place_coordinates", return_value=coords), \
+         mock.patch.object(state, "_load_origin_groups", return_value={"Liivimaa": {"labels": {"et": "Liivimaa"}}}):
         entry = ops._index_entry_from_person(person)
     assert entry["origin_coordinates"] == coords
 
@@ -139,7 +141,7 @@ def test_index_entry_includes_floruit_years():
 
 # ---- list_persons filter test ----
 
-def test_list_persons_status_id_filter(tmp_path, monkeypatch):
+def test_list_persons_status_id_filter(prosopo_env):
     """status_id filter kontrollib status_ids massiivi (contains, mitte equals)."""
     ops = importlib.import_module("server.prosopography.ops")
 
@@ -150,9 +152,7 @@ def test_list_persons_status_id_filter(tmp_path, monkeypatch):
             {"id": "p3", "status_ids": [], "record_status": "draft", "label": "C", "sort_name": "C"},
         ]
     }
-    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
-    monkeypatch.setattr(ops, "_load_person_to_works", lambda: {})
-    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
+    prosopo_env.index(fake_index)
 
     result = ops.list_persons(status_id="Q134737")
     ids = [r["id"] for r in result["results"]]
@@ -161,7 +161,7 @@ def test_list_persons_status_id_filter(tmp_path, monkeypatch):
     assert "p3" not in ids
 
 
-def test_list_persons_year_range_uses_known_single_dates_conservatively(monkeypatch):
+def test_list_persons_year_range_uses_known_single_dates_conservatively(prosopo_env):
     ops = importlib.import_module("server.prosopography.ops")
 
     fake_index = {
@@ -195,7 +195,7 @@ def test_list_persons_year_range_uses_known_single_dates_conservatively(monkeypa
             },
         ]
     }
-    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
+    prosopo_env.index(fake_index)
 
     result = ops.list_persons(year_from=1640, year_to=1650)
     ids = [r["id"] for r in result["results"]]
@@ -203,7 +203,7 @@ def test_list_persons_year_range_uses_known_single_dates_conservatively(monkeypa
     assert ids == ["imm"]
 
 
-def test_list_persons_year_range_matches_floruit_overlap(monkeypatch):
+def test_list_persons_year_range_matches_floruit_overlap(prosopo_env):
     ops = importlib.import_module("server.prosopography.ops")
 
     fake_index = {
@@ -234,7 +234,7 @@ def test_list_persons_year_range_matches_floruit_overlap(monkeypatch):
             },
         ]
     }
-    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
+    prosopo_env.index(fake_index)
 
     result = ops.list_persons(year_from=1650, year_to=1660)
     ids = [r["id"] for r in result["results"]]
@@ -242,7 +242,7 @@ def test_list_persons_year_range_matches_floruit_overlap(monkeypatch):
     assert ids == ["overlap", "single"]
 
 
-def test_get_person_map_markers_groups_by_origin_place(monkeypatch):
+def test_get_person_map_markers_groups_by_origin_place(prosopo_env):
     ops = importlib.import_module("server.prosopography.ops")
 
     fake_index = {
@@ -283,9 +283,7 @@ def test_get_person_map_markers_groups_by_origin_place(monkeypatch):
             },
         ]
     }
-    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
-    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
-    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
+    prosopo_env.index(fake_index)
 
     result = ops.get_person_map_markers()
 
@@ -299,7 +297,7 @@ def test_get_person_map_markers_groups_by_origin_place(monkeypatch):
     assert [p["id"] for p in marker["persons"]] == ["p1", "p2"]
 
 
-def test_get_person_map_markers_applies_filters(monkeypatch):
+def test_get_person_map_markers_applies_filters(prosopo_env):
     ops = importlib.import_module("server.prosopography.ops")
 
     fake_index = {
@@ -324,9 +322,7 @@ def test_get_person_map_markers_applies_filters(monkeypatch):
             },
         ]
     }
-    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
-    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
-    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
+    prosopo_env.index(fake_index)
 
     result = ops.get_person_map_markers(origin_group="Liivimaa")
 

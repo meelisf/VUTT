@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 
-from server.prosopography import ops
+from server.prosopography import ops, state
 from server.prosopography import work_relations_ops as wro
 
 F, P, R, G, S, T = ("vutt:Pfocus", "vutt:Ppraes", "vutt:Presp", "vutt:Pgrat", "vutt:Psubj", "vutt:Pprint")
@@ -38,9 +38,9 @@ def net(tmp_path, monkeypatch, prosopo_env):
     ]}
     for name, data in (("ptw.json", ptw), ("wci.json", facts), ("wc.json", wc), ("idx.json", idx)):
         (tmp_path / name).write_text(json.dumps(data), encoding="utf-8")
-    monkeypatch.setattr(ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json"))
-    monkeypatch.setattr(ops, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json"))
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "idx.json"))
+    monkeypatch.setattr(state, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json"))
+    monkeypatch.setattr(state, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json"))
+    monkeypatch.setattr(state, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "idx.json"))
     monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
     prosopo_env.write("focus")
     prosopo_env.write("praes")
@@ -212,7 +212,7 @@ def test_markerid_on_koordinaadiga_osa(net, collection):
         from server.prosopography.indices import _persons_in_collection
         if F not in _persons_in_collection(collection):
             expected = expected - {F}
-    with_coords = {e["id"] for e in json.loads(open(ops.PROSOPOGRAPHY_INDEX_FILE).read())["entries"]
+    with_coords = {e["id"] for e in json.loads(open(state.PROSOPOGRAPHY_INDEX_FILE).read())["entries"]
                    if e.get("origin_coordinates")}
     assert mapped == expected & with_coords
     assert res["without_coordinates"] == len(expected - with_coords)
@@ -224,10 +224,10 @@ def test_pereliige_jaab_kogu_kaardile_ilma_teoseta_kogus(net, tmp_path):
     _persons_in_collection oleks ta eemaldanud)."""
     net.write("focus", relations=[{"target_id": "vutt:Pfam", "type": "isa"}])
     net.write("fam")
-    idx = json.loads(open(ops.PROSOPOGRAPHY_INDEX_FILE).read())
+    idx = json.loads(open(state.PROSOPOGRAPHY_INDEX_FILE).read())
     idx["entries"].append({"id": "vutt:Pfam", "label": "Isa", "origin_place": "Riga",
                            "origin_coordinates": {"lat": 56.95, "lon": 24.1}})
-    open(ops.PROSOPOGRAPHY_INDEX_FILE, "w").write(json.dumps(idx))
+    open(state.PROSOPOGRAPHY_INDEX_FILE, "w").write(json.dumps(idx))
     res = ops.get_person_map_markers(related_to=F, collection="agc")
     mapped = {p["id"] for m in res["markers"] for p in m["persons"]}
     assert "vutt:Pfam" in mapped

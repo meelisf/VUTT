@@ -39,21 +39,12 @@ def test_person_lock_provides_mutual_exclusion():
     assert counter["v"] == 8 * 2000
 
 
-def test_bulk_update_occupation_no_lost_update(tmp_path, monkeypatch):
+def test_bulk_update_occupation_no_lost_update(prosopo_env):
     """Paralleelsed bulk_update_occupation samale isikule ei kaota ühtegi ametit (lukk hoiab RMW)."""
     from server.prosopography import ops
 
     nanoid = "abc123"
-    person = {"id": f"vutt:P{nanoid}", "name": {"label": "Test"}, "occupations": []}
-    (tmp_path / f"{nanoid}.json").write_text(json.dumps(person), encoding="utf-8")
-
-    # Suuna failitee tmp-kausta ja muuda index-uuendus no-op'iks
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_DIR", str(tmp_path))
-    monkeypatch.setattr(ops, "_update_index_entry", lambda p: None)
-    monkeypatch.setattr(
-        ops, "save_with_git",
-        lambda path, content, *_args, **_kwargs: Path(path).write_text(content, encoding="utf-8"),
-    )
+    prosopo_env.write(nanoid, name={"label": "Test"}, occupations=[])
 
     pid = f"vutt:P{nanoid}"
     N = 20
@@ -71,18 +62,18 @@ def test_bulk_update_occupation_no_lost_update(tmp_path, monkeypatch):
     for t in threads:
         t.join()
 
-    data = json.loads((tmp_path / f"{nanoid}.json").read_text(encoding="utf-8"))
+    data = prosopo_env.read(nanoid)
     ids = {o["id"] for o in data["occupations"]}
     assert len(ids) == N, f"Oodati {N} ametit, sai {len(ids)} — lost update!"
 
 
-def test_bulk_occupation_updates_version_and_makes_open_form_stale(tmp_path, monkeypatch):
+def test_bulk_occupation_updates_version_and_makes_open_form_stale(prosopo_env, monkeypatch):
     """Bulk-muudatus peab vana vormi timestampi aegunuks tegema ja git commiti looma."""
-    from server.prosopography import ops
+    from server.prosopography import ops, state
 
     pid = "vutt:Pabc123"
     old_timestamp = "2026-01-01T00:00:00+00:00"
-    person_path = tmp_path / "abc123.json"
+    person_path = prosopo_env.dir / "abc123.json"
     person_path.write_text(json.dumps({
         "id": pid,
         "name": {"label": "Test"},
@@ -97,10 +88,7 @@ def test_bulk_occupation_updates_version_and_makes_open_form_stale(tmp_path, mon
         Path(path).write_text(content, encoding="utf-8")
         return {"success": True, "commit_hash": "abc123"}
 
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_DIR", str(tmp_path))
-    monkeypatch.setattr(ops, "_update_index_entry", lambda _person: None)
-    monkeypatch.setattr(ops, "_update_aliases_entry", lambda _person: None)
-    monkeypatch.setattr(ops, "save_with_git", fake_save)
+    monkeypatch.setattr(state, "save_with_git", fake_save)
 
     result = ops.bulk_update_occupation(
         {"id": "Q123", "label": "professor"}, "add", [pid], username="bulk-user"
@@ -145,17 +133,16 @@ def test_update_person_endpoint_reports_missing_updated_at_as_400(client, login,
 
 
 @pytest.mark.parametrize("missing_value", [None, ""])
-def test_update_person_requires_nonempty_updated_at(tmp_path, monkeypatch, missing_value):
+def test_update_person_requires_nonempty_updated_at(prosopo_env, missing_value):
     from server.prosopography import ops
 
     pid = "vutt:Pabc123"
-    person_path = tmp_path / "abc123.json"
+    person_path = prosopo_env.dir / "abc123.json"
     person_path.write_text(json.dumps({
         "id": pid,
         "name": {"label": "Test"},
         "updated_at": "2026-01-01T00:00:00+00:00",
     }), encoding="utf-8")
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_DIR", str(tmp_path))
 
     payload = {"name": {"label": "Ülekirjutus"}}
     if missing_value is not None:

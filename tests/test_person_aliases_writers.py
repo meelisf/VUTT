@@ -17,6 +17,7 @@ import pytest
 def _prosopo_env(tmp_path, monkeypatch):
     """Suunab prosopograafia teed tmp_path'i ja tagastab aliaste faili tee."""
     import server.prosopography.ops as prosopo_ops
+    import server.prosopography.state as prosopo_state
 
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -24,12 +25,12 @@ def _prosopo_env(tmp_path, monkeypatch):
     prosopo_dir.mkdir()
 
     aliases_file = tmp_path / "person_aliases.json"
-    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "person_to_works.json"))
-    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "prosopography_index.json"))
-    monkeypatch.setattr(prosopo_ops, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "work_collections_index.json"))
-    monkeypatch.setattr(prosopo_ops, "PERSON_ALIASES_FILE", str(aliases_file))
-    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
-    monkeypatch.setattr(prosopo_ops, "BASE_DIR", str(data_dir))
+    monkeypatch.setattr(prosopo_state, "PERSON_TO_WORKS_FILE", str(tmp_path / "person_to_works.json"))
+    monkeypatch.setattr(prosopo_state, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "prosopography_index.json"))
+    monkeypatch.setattr(prosopo_state, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "work_collections_index.json"))
+    monkeypatch.setattr(prosopo_state, "PERSON_ALIASES_FILE", str(aliases_file))
+    monkeypatch.setattr(prosopo_state, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
+    monkeypatch.setattr(prosopo_state, "BASE_DIR", str(data_dir))
     return prosopo_ops, prosopo_dir, aliases_file
 
 

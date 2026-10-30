@@ -28,6 +28,15 @@ def _koha_wikidata_ilma_vorguta(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _fassaadi_sild_puhtaks():
+    """Sild taastab `state`-i laisalt (järgmisel `sync_from_facade()`-il): ilma
+    selleta salvestaks testi otsene `monkeypatch.setattr(state, …)` taastuspunktiks
+    eelmise testi fassaadipatchi ja paneks selle lõpus tagasi. Kaob koos sillaga (#690)."""
+    from server.prosopography._compat import sync_from_facade
+    sync_from_facade()
+
+
+@pytest.fixture(autouse=True)
 def _agendikoodi_hoidla_tmp(tmp_path, monkeypatch):
     """Agendikoodi hoidla (ADR 0058, #675) elab `state/`-is ja iga ettepanekute
     hoidla ühendab selle — ilma selleta kirjutaks iga ettepanekutest päris faili."""
@@ -307,12 +316,7 @@ def prosopo_env(tmp_path, monkeypatch):
     import json as _json
     from types import SimpleNamespace
     from server.prosopography import ext_id_index, state
-    from server.prosopography._compat import sync_from_facade
 
-    # Sild taastab `state`-i laisalt (järgmisel sync'il): ilma selleta salvestaks
-    # monkeypatch taastuspunktiks eelmise testi tmp-tee ja paneks selle lõpus
-    # tagasi. Kaob koos sillaga (#690).
-    sync_from_facade()
     d = tmp_path / "prosopography"
     d.mkdir()
     cfg = tmp_path / "config"
@@ -348,10 +352,9 @@ def prosopo_env(tmp_path, monkeypatch):
     def read(nanoid):
         return _json.loads((d / f"{nanoid}.json").read_text(encoding="utf-8"))
 
-    yield SimpleNamespace(dir=d, write=write, read=read)
+    def index(data):
+        """Kirjuta otsinguindeks (`prosopography_index.json`) — laadureid ei patchita."""
+        (cfg / "prosopography_index.json").write_text(_json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    yield SimpleNamespace(dir=d, write=write, read=read, index=index)
     ext_id_index.invalidate()
-    # Fassaadi patch kandub vajadusel domeenimoodulitesse. Taasta see kohe
-    # pärast testi, et järgmine test ei näeks tmp-kaardi asukohta (#342).
-    monkeypatch.undo()
-    from server.prosopography._compat import sync_from_facade
-    sync_from_facade()

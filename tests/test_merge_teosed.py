@@ -1,14 +1,7 @@
 """Isikute liitmine teostes (#615): juurväljad bulk_update_works kaudu, osad work_parts kaudu."""
 import json
-from unittest.mock import MagicMock, patch
 
 from server.prosopography import merge_ops
-
-
-def _kaart(pid, label, **extra):
-    return {"id": pid, "name": {"label": label}, "record_status": "draft",
-            "updated_at": "2024-01-01T00:00:00+00:00", "relations": [], "identifiers": [],
-            **extra}
 
 
 def _teos(tmp_path):
@@ -27,11 +20,15 @@ def _teos(tmp_path):
     return d
 
 
-def test_liitmine_seob_teose_ja_osade_loojad_sihtkaardiga(tmp_path, monkeypatch):
-    from server import metadata_ops
-    from server.prosopography import relations
+def test_liitmine_seob_teose_ja_osade_loojad_sihtkaardiga(prosopo_env, tmp_path, monkeypatch):
+    from server import config, metadata_ops
+    from server.prosopography import relations, state
     work = _teos(tmp_path)
-    kaardid = {"vutt:Psrc": _kaart("vutt:Psrc", "Allikas"), "vutt:Ptgt": _kaart("vutt:Ptgt", "Sihtmärk")}
+    prosopo_env.write("src", name={"label": "Allikas"}, relations=[])
+    prosopo_env.write("tgt", name={"label": "Sihtmärk"}, relations=[])
+    # Teoste juur: liitmine loeb seda `config`-ist, indeksite taaste `state`-ist.
+    monkeypatch.setattr(config, "BASE_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(state, "BASE_DIR", str(tmp_path / "data"))
 
     def fake_save(path, content, *a, additional_files=None, **k):
         from server.utils import atomic_write_text
@@ -49,19 +46,7 @@ def test_liitmine_seob_teose_ja_osade_loojad_sihtkaardiga(tmp_path, monkeypatch)
     monkeypatch.setattr(metadata_ops, "sync_work_to_meilisearch_async", lambda *a, **k: meili.append(a))
     monkeypatch.setattr(relations, "update_page_person_mentions", lambda *a, **k: None)
 
-    with patch("server.config.BASE_DIR", str(tmp_path / "data")), \
-         patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
-         patch("server.prosopography.ops.save_with_git", MagicMock(return_value={"success": True})), \
-         patch("server.prosopography.ops._update_index_entry"), \
-         patch("server.prosopography.ops._update_aliases_entry"), \
-         patch("server.prosopography.ops._remove_aliases_entry"), \
-         patch("server.prosopography.ops.atomic_write_json"), \
-         patch("server.prosopography.ops._glob.glob", return_value=[]), \
-         patch("server.prosopography.ops._load_index", return_value={"entries": []}), \
-         patch.object(merge_ops, "rebuild_indices"), \
-         patch("server.prosopography.ops.get_person", side_effect=lambda pid: kaardid.get(pid)), \
-         patch.object(merge_ops, "get_person", side_effect=lambda pid: kaardid.get(pid)):
-        merge_ops.merge_person("vutt:Psrc", "vutt:Ptgt", "admin")
+    merge_ops.merge_person("vutt:Psrc", "vutt:Ptgt", "admin")
 
     meta = json.loads((work / "_metadata.json").read_text())
     assert meta["creators"][0] == {"id": "vutt:Ptgt", "label": "Sihtmärk", "name": "Sihtmärk", "role": "auctor"}

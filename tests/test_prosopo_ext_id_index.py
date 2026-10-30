@@ -35,7 +35,7 @@ def prosopo_dir(tmp_path, monkeypatch):
     d = tmp_path / "prosopography"
     d.mkdir()
     from server.prosopography import ext_id_index
-    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(d)):
+    with patch("server.prosopography.state.PROSOPOGRAPHY_DIR", str(d)):
         ext_id_index.invalidate()
         yield d
     ext_id_index.invalidate()
@@ -176,9 +176,9 @@ def test_kausta_vahetus_ehitab_indeksi_umber(tmp_path):
     _write_person(b, "bbb", [{"scheme": "wikidata", "id": "Q1"}])
 
     ext_id_index.invalidate()
-    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(a)):
+    with patch("server.prosopography.state.PROSOPOGRAPHY_DIR", str(a)):
         assert ext_id_index.find_person_id("wikidata", "Q1") == "vutt:Paaa"
-    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(b)):
+    with patch("server.prosopography.state.PROSOPOGRAPHY_DIR", str(b)):
         assert ext_id_index.find_person_id("wikidata", "Q1") == "vutt:Pbbb"
     ext_id_index.invalidate()
 
