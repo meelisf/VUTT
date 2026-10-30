@@ -80,8 +80,8 @@ def test_rebuild_ja_uuendus_annavad_sama_kirje(workdir, tmp_path, monkeypatch):
 # ── person_to_works ──────────────────────────────────────────────────────────
 
 def _ptw(prosopo_env):
-    from server.prosopography import ops
-    with open(ops.PERSON_TO_WORKS_FILE, encoding="utf-8") as f:
+    from server.prosopography import state
+    with open(state.PERSON_TO_WORKS_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -136,7 +136,8 @@ def test_rebuild_annab_sama_mis_uuendus(prosopo_env, workdir, tmp_path, monkeypa
     monkeypatch.setattr(wro, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "wci.json"))
     rebuild_indices()
     rebuilt = _ptw(prosopo_env)
-    with open(ops.PERSON_TO_WORKS_FILE, "w", encoding="utf-8") as f:
+    from server.prosopography import state
+    with open(state.PERSON_TO_WORKS_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
     update_person_to_works("w1", [], [], None, "T", 1690, parts=[LETTER_A, POEM_C])
     update_page_person_mentions("w1", str(workdir))
@@ -198,7 +199,8 @@ def test_isiku_teosed_kannavad_osa_andmeid(prosopo_env, tmp_path, monkeypatch):
     from server.prosopography import ops
     from server.prosopography.relations import get_person_with_works
     prosopo_env.write("aaaaa")
-    with open(ops.PERSON_TO_WORKS_FILE, "w", encoding="utf-8") as f:
+    from server.prosopography import state
+    with open(state.PERSON_TO_WORKS_FILE, "w", encoding="utf-8") as f:
         json.dump({A: [{"work_id": "w1", "role": "auctor", "part_id": "pa"},
                        {"work_id": "w1", "role": "auctor", "part_id": "kadunud"},
                        {"work_id": "w2", "role": "praeses"}]}, f)

@@ -5,15 +5,13 @@ liidetava kaardi ainuke pilt tombstone'i taha (Glück, 2026-10-30).
 """
 import pytest
 
-from server.prosopography import merge_ops, ops
+from server.prosopography import merge_ops
 
 
 @pytest.fixture
 def env(prosopo_env, monkeypatch):
-    images = prosopo_env.dir / "images"
-    monkeypatch.setattr(ops, "PROSOPOGRAPHY_IMAGES_DIR", str(images))
     monkeypatch.setattr(merge_ops, "_rebind_work_parts", lambda *a, **k: None)
-    prosopo_env.images = images
+    prosopo_env.images = prosopo_env.dir / "images"
     return prosopo_env
 
 
