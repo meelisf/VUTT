@@ -51,6 +51,37 @@ def _merge_biography_fields(source: dict, target: dict) -> bool:
     return changed
 
 
+# Täpsus → kuupäevastringi tähendusega osa pikkus (`1640-02-05`[:4] = aasta).
+_DATE_PRECISION_LEN = {"year": 4, "month": 7, "day": 10}
+
+
+def _merged_date(src_val, tgt_val):
+    """Sünni-/surmaaja väärtus sihtkaardile või None (siht jääb).
+
+    Tühi siht saab allika. Täidetud siht asendub ainult TÄPSUSTUSEGA: allika
+    täpsus on peenem ja kuupäev algab sihi täpsusega lõigatud osaga
+    (`1640` täpsusega „aasta" → `1640-02-05`). `-01-01` täpsusega „aasta" on
+    kohatäide, mitte 1. jaanuar (#240). Vastuolu või puuduv täpsus → siht jääb.
+    """
+    src_date = src_val.get("date") if isinstance(src_val, dict) else None
+    tgt_date = tgt_val.get("date") if isinstance(tgt_val, dict) else None
+    if not src_date:
+        return None
+    if not tgt_date:
+        return src_val
+    src_len = _DATE_PRECISION_LEN.get(src_val.get("precision"))
+    tgt_len = _DATE_PRECISION_LEN.get(tgt_val.get("precision"))
+    if src_len is None or tgt_len is None or src_len <= tgt_len:
+        return None
+    if str(src_date)[:tgt_len] != str(tgt_date)[:tgt_len]:
+        return None
+    merged = dict(src_val)
+    # Koht on kuupäevast sõltumatu teadmine — sihi oma ei tohi kaduda.
+    if not merged.get("place") and tgt_val.get("place"):
+        merged["place"] = tgt_val["place"]
+    return merged
+
+
 def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
     """Liidab kirjed; kutsuja hoiab liitmis- ning source/target isikulukke."""
     sync_from_facade()
@@ -99,12 +130,9 @@ def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
             target_changed = True
 
     for field in ("birth", "death"):
-        src_val = source.get(field)
-        tgt_val = target.get(field)
-        src_date = (src_val or {}).get("date") if isinstance(src_val, dict) else None
-        tgt_date = (tgt_val or {}).get("date") if isinstance(tgt_val, dict) else None
-        if src_date and not tgt_date:
-            target[field] = src_val
+        merged = _merged_date(source.get(field), target.get(field))
+        if merged is not None:
+            target[field] = merged
             target_changed = True
 
     src_origin = source.get("origin") or {}
