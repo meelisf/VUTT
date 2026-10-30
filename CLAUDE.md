@@ -38,7 +38,7 @@ Väravad (samad jooksevad CI-s, `.github/workflows/ci.yml`):
 | `npm run typecheck` | Vite EI typecheck'i — `build` üksi ei püüa tüübivigu |
 | `npm test` | vitest. Loogikatestid jooksevad `node`-keskkonnas; **komponenditest** (`*.test.tsx`) valib jsdom-i failipäises `/** @vitest-environment jsdom */` — vaikimisi jsdom-it EI ole, sest ta maksaks aega igas failis |
 | `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 41` — parandades LANGETA arvu |
-| `.venv/bin/pytest tests/` | Kasuta ALATI projekti venv-i (`.venv/bin/python`), süsteemi `python3`-l puuduvad sõltuvused |
+| `.venv/bin/pytest tests/` | Kasuta ALATI projekti venv-i (`.venv/bin/python`), süsteemi `python3`-l puuduvad sõltuvused. Juur-`conftest.py` suunab `VUTT_DATA_DIR`/`VUTT_STATE_DIR` sessiooni tmp-kausta ja kukutab jooksu, kui päris `data/` või `state/` muutus |
 
 CI käivitub ainult main'i-PR-idel: virnastatud PR checke ei saa (baasi ümbersuunamine EI käivita, close+reopen käivitab). Merge-stiil = merge-commit.
 
