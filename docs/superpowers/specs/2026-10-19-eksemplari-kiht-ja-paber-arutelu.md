@@ -39,9 +39,9 @@ otse siduda. Segadus on andmetes juba näha:
 3. Ühe lehe kaupa erinev eksemplar → leht eksemplari kirje juurde pildina, soovi korral
    transkriptsiooniga.
 4. Sisuliselt erinev eksemplar → eraldi teos seosega „sama väljaanne, variant" (toimetaja otsus).
-   `nri7ga` on selline: poolitada kaheks teoseks (lk 1 Rīga LAB, lk 2 Uppsala UB), mõlemad
-   transkribeeritud, `isVersionOf` vastastikku, variandi põhjus mõlema märkustes. Ei oota
-   eksemplari kihti.
+   `nri7ga` on selline: **tehtud 2026-11-01** — poolitatud kaheks teoseks (`nri7ga` = Rīga LAB,
+   [`27ffq0`](https://vutt.utlib.ut.ee/work/27ffq0) = Uppsala UB), `isVersionOf` vastastikku.
+   Poolitus käsitsi (uus upload + lehe kustutus); tekstiga poolituse toiming on #705.
 5. Teise eksemplari leht täiendab tekstitunnistajat (nt puuduv leht) → teose lehed märgitakse
    eksemplari järgi („lk 7 = eksemplar B").
 
@@ -96,8 +96,12 @@ migreerimata teosel võib see puududa); vaatlus kuulub alati ühele eksemplarile
   **vaatlused eraldi failis** (nt `_watermarks.json`), et poolik arhiivisalvestus ei käivitaks
   teose täisteksti Meili-sünki (ül. §6). Korpuseülene vaade (töövoo p. 5) vajab siis tuletatud
   read-modelit (ADR 0007).
-- Variandiseos (reegel 4) on olemas: `Relation.rel_type = 'isVersionOf'`, aga ainult andmeväljana —
-  kuvamine ja vastastikune kirjutus: #701.
+- Variandiseos (reegel 4) on **töös** (#701, [ADR 0075](../../decisions/0075-teoste-seos-uks-kirjutustee-vastastikune.md),
+  2026-11-01): ainus kirjutustee `PUT /works/{id}/relations`, vastastikune ühe commitiga,
+  kuvamine infopaneelil ja teosekaardil. Konvoluut tuleb samasse kuvamisse (#702).
+- **Agent täidab** eksemplarid, konvoluudid ja seosed ESTERist ootel ettepanekutena (#703; osa 1 —
+  MCP `get_work` annab `ester_id` + `archive_refs` — tehtud). Seetõttu peavad eksemplari väljad
+  olema struktureeritud ja kandma allikaviidet.
 - **Konvoluut** (mitu trükist ühes köites) on **eksemplari väli**, mitte oma kirje: `convolute =
   {reference, position (0 = põhiteos, N = N. kaasköide), total, contents}`; samas köites olevad
   trükised tuletatakse (sama hoidja + normaliseeritud konvoluudi kohaviit, „(I)" jääb võtmesse).
