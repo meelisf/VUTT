@@ -39,7 +39,7 @@ const RelatedWorksList: React.FC<RelatedWorksListProps> = ({ items, lang, onRemo
                   <span className="min-w-0 flex-1">
                     {r.readable ? (
                       <Link to={`/work/${r.id}/1`} onClick={e => e.stopPropagation()}
-                            className={`${dark ? 'text-white hover:text-violet-200' : 'text-primary-700 hover:text-primary-900'} hover:underline line-clamp-2`}>
+                            className={`${dark ? 'text-white hover:text-emerald-200' : 'text-primary-700 hover:text-primary-900'} hover:underline line-clamp-2`}>
                         {title}
                       </Link>
                     ) : (

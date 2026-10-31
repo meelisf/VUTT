@@ -86,8 +86,8 @@ const RelationsButton: React.FC<RelationsButtonProps> = ({
         aria-label={label}
         title={label}
         className={isCard
-          ? `absolute top-10 right-2 z-30 h-6 min-w-6 px-1 rounded-full flex items-center justify-center gap-0.5 backdrop-blur-sm transition-all duration-150 hover:scale-110 bg-violet-600/70 hover:bg-violet-600/90 text-white text-[10px] ${hidden ? 'hidden' : ''}`
-          : 'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 hover:bg-violet-100 text-xs align-middle'}
+          ? `absolute top-10 right-2 z-30 h-6 min-w-6 px-1 rounded-full flex items-center justify-center gap-0.5 backdrop-blur-sm transition-all duration-150 hover:scale-110 bg-emerald-600/70 hover:bg-emerald-600/90 text-white text-[10px] ${hidden ? 'hidden' : ''}`
+          : 'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs align-middle'}
         onMouseEnter={enter}
         onMouseLeave={leave}
         onClick={(e) => {
@@ -115,7 +115,7 @@ const RelationsButton: React.FC<RelationsButtonProps> = ({
             ? 'absolute inset-0 z-20 bg-black/75 backdrop-blur-sm rounded-lg p-4 pr-10 overflow-y-auto'
             : 'absolute left-0 top-full mt-1 z-30 w-80 max-w-[80vw] bg-white border border-gray-200 rounded-lg shadow-lg p-3'}
         >
-          <p className={`text-[10px] uppercase tracking-widest font-semibold mb-2 ${isCard ? 'text-violet-200' : 'text-gray-500'}`}>
+          <p className={`text-[10px] uppercase tracking-widest font-semibold mb-2 ${isCard ? 'text-emerald-200' : 'text-gray-500'}`}>
             {label}
           </p>
           {list}
