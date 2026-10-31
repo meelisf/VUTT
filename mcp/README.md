@@ -81,7 +81,7 @@ Kolm asja, mis üllatavad:
 |---|---|
 | `search_pages` | Täistekstiotsing, lehekülje-katked |
 | `search_works` | Sama teosetasandil + esindav lehekülg |
-| `get_work` | Teose metaandmed + lehekülgede loend |
+| `get_work` | Teose metaandmed + lehekülgede loend; ESTERi kirje number (`ester_id`) ja arhiiviviited (hoidja · kohaviit · digikoopia) — agendi eksemplariettepanekute lähtepunkt (#703) |
 | `get_pages` | Lehekülgede vahemiku täistekst (kuni 20 lk) |
 | `get_page_image` | Ühe skaneeringu täisresolutsiooniga pilt OCR-i kontrolliks |
 | `search_persons` | Isikuotsing (nimevariandid kaetud) |

@@ -176,6 +176,41 @@ async def test_get_work_kysib_metaandmevaljad_paringus(server_with):
     assert "lehekylje_tekst" not in retrieve
 
 
+async def test_get_work_naitab_esteri_kirje_ja_arhiiviviited(server_with):
+    """Agendi tee (#703): ESTERi kirje number ja kohaviidad on eksemplari-,
+    konvoluudi- ja seoseettepanekute lähtepunkt."""
+    hit = _hit(page=1, ester_id="b2648642", archive_refs=[
+        {"archive_id": "TÜR", "reference": "R Est.B-954 (konvoluut)",
+         "url": "http://hdl.handle.net/10062/33497"},
+        {"archive_id": "LAB", "reference": "R Acad. doyp. 1702:17"},
+    ])
+    server, client = server_with([{"hits": [hit], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    retrieve = client.bodies[0]["attributesToRetrieve"]
+    assert "ester_id" in retrieve and "archive_refs" in retrieve
+    assert "ester_id: b2648642 · https://www.ester.ee/record=b2648642*est" in out
+    assert "  TÜR · R Est.B-954 (konvoluut) · http://hdl.handle.net/10062/33497" in out
+    assert "  LAB · R Acad. doyp. 1702:17" in out
+
+
+async def test_get_work_ilma_esteri_ja_viideteta_ei_lisa_ridu(server_with):
+    server, _ = server_with([{"hits": [_hit(page=1)], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "ester_id" not in out
+    assert "Arhiiviviited" not in out
+
+
+async def test_get_work_praak_arhiiviviide_ei_kukuta(server_with):
+    """Meili dokument kannab `archive_refs`-i nii, nagu `_metadata.json`-is
+    on — vana kirje võib sisaldada mitte-objekti või tühja viidet."""
+    hit = _hit(page=1, archive_refs=["vana string", {"archive_id": "", "reference": ""},
+                                     {"archive_id": "RA", "reference": "EAA.402"}])
+    server, _ = server_with([{"hits": [hit], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    assert "  RA · EAA.402" in out
+    assert "vana string" not in out
+
+
 async def test_get_work_naitab_praeses_ja_gratulandid(server_with):
     creators = [
         {"name": "Andreas Virginius", "role": "praeses", "id": "vutt:Pky0a04"},

@@ -364,10 +364,14 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
         ("keeled", first.get("languages")),
         ("kollektsioonid", first.get("collections")),
         ("work_id", work_id),
+        ("ester_id", fmt.ester_ref(first["ester_id"]) if first.get("ester_id") else None),
         ("lehekülgi", first.get("teose_lehekylgede_arv") or len(hits)),
         ("vaata", fmt.work_url(work_id, base_url=base_url)),
     ])
     lines = [header]
+    archive_refs = fmt.format_archive_refs(first.get("archive_refs"))
+    if archive_refs:
+        lines += ["", archive_refs]
 
     # Loojad rollidega: praeses, gratulandid ja eessõna autor (aui) elavad
     # AINULT `creators`-massiivis — tuletatud `autor`/`respondens` neid ei kata.

@@ -86,7 +86,9 @@ def test_tagastatavad_valjad_eksisteerivad_dokumendis():
         | set(queries.WORK_OVERVIEW_RETRIEVE_FIELDS)
     )
     for field in requested:
-        assert f'"{field}"' in source, f"{field} ei esine meili_doc.py-s"
+        # meili_doc kirjutab osa välju kujul doc['ester_id'] — mõlemad jutumärgid
+        assert f'"{field}"' in source or f"'{field}'" in source, \
+            f"{field} ei esine meili_doc.py-s"
 
 
 def test_eszett_normaliseerimine_kattub_indekseerijaga():
