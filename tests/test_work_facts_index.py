@@ -148,7 +148,8 @@ def test_teose_kustutus_eemaldab_faktid(monkeypatch, tmp_path):
     monkeypatch.setattr(admin, "delete_work_from_git", lambda *a, **k: None)
     monkeypatch.setattr(admin, "delete_work_from_meilisearch", lambda *a, **k: None)
     monkeypatch.setattr(admin, "build_work_id_cache", lambda: None)
-    admin.admin_work_delete("w1", user={"username": "admin", "role": "admin"})
+    from fastapi import BackgroundTasks
+    admin.admin_work_delete("w1", BackgroundTasks(), user={"username": "admin", "role": "admin"})
     assert "w1" not in _read(tmp_path)
 
 
