@@ -3,15 +3,17 @@
 **Seis:** arutelu alus, mitte otsus (2026-10-19, tihendatud 2026-10-31). Issue [#696](https://github.com/meelisf/VUTT/issues/696).
 ADR kirjutamata — tuleb enne etappi 2. Koodibaasi vastu kontrollitud:
 [ülevaatus 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-koodi-ulevaade.md) (viited allpool „ül. §N")
-ja [järelkontroll 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-jarelkontroll.md) („jk. §N").
+ja [järelkontroll 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-jarelkontroll.md) („jk. §N");
+sõnastus täpsustatud [kavandi täpsustuste](../../reviews/2026-10-31-eksemplari-kiht-kavandi-tapsustused.md) järgi.
 
 ## Lähtekoht
 
 - **paber.ut.ee** ([Eesti varajased trükised][paber]) valmis ETF grandi 8205 raames: 522 eksemplari
   kirjeldust, vesimärgid IPH tüpoloogia järgi ([IPH Norm 2.1.1][iph]), fotod. Tarkvara ei ole üle
   10 aasta uuendatud, hooldus sõltub välisfirmast (5Dvision).
-- **Andmed ei ole ohus:** kirjeldused ja täissuuruses pildid (`/pics/`) on HTML-ist kättesaadavad,
-  ülekanne ei vaja vana tarkvara.
+- **Ülevõtmine on võimalik:** kirjeldused ja täissuuruses pildid (`/pics/`) on HTML-ist kättesaadavad,
+  ülekanne ei vaja vana tarkvara. Andmestiku täielikkus on kontrollimata — selgub etapi 1
+  inventuurist.
 - **Uurimine jätkub**, ka käsikirjadest (senatiprotokollid, kirjad). Vaja on kohta, kus andmeid
   jooksvalt täiendada.
 - **VUTT on tekstikeskne.** Paber on eksemplari omadus, VUTT-is eksemplari mõistet ei ole.
@@ -24,9 +26,12 @@ otse siduda. Segadus on andmetes juba näha:
 
 - [`7zot7j`][7zot7j] — pealkirja sabas leidumus ja kohaviit („Tartu ÜR; Rīga LAB; Uppsala UB
   R Bergm. 357(8)").
-- [`nri7ga`][nri7ga] — lk 1 ja lk 2 on eri eksemplarid, andmed seda ei ütle.
+- [`nri7ga`][nri7ga] — lk 1 (Rīga LAB, R Acad. doyp. 1702:17) ja lk 2 (Uppsala UB) on sama
+  plakattrüki kaks terviklikku eksemplari ja kaks varianti: filosoofiateaduskonnas on Sjöberg
+  ühes esimene, teises viimane (professorite tüli), ka teaduskondade järjekord erineb. Andmed
+  seda ei ütle.
 
-## Reegel: teosel üks tekstitunnistaja
+## Reegel: teosel kuni üks tekstitunnistaja
 
 1. Transkribeeritakse üht eksemplari teose kohta; selle skaneering on teose lehed (nagu praegu).
 2. Teised eksemplarid (digiteeritud või mitte) on **kirjed**: teksti ei transkribeerita; kirjel
@@ -34,7 +39,11 @@ otse siduda. Segadus on andmetes juba näha:
 3. Ühe lehe kaupa erinev eksemplar → leht eksemplari kirje juurde pildina, soovi korral
    transkriptsiooniga.
 4. Sisuliselt erinev eksemplar → eraldi teos seosega „sama väljaanne, variant" (toimetaja otsus).
-5. `nri7ga`-juhtum → teose lehed märgitakse eksemplari järgi („lk 2 = eksemplar B").
+   `nri7ga` on selline: poolitada kaheks teoseks (lk 1 Rīga LAB, lk 2 Uppsala UB), mõlemad
+   transkribeeritud, `isVersionOf` vastastikku, variandi põhjus mõlema märkustes. Ei oota
+   eksemplari kihti.
+5. Teise eksemplari leht täiendab tekstitunnistajat (nt puuduv leht) → teose lehed märgitakse
+   eksemplari järgi („lk 7 = eksemplar B").
 
 Kirjeid tuleb juurde, transkribeeritavaid tekste mitte.
 
@@ -42,12 +51,13 @@ Kirjeid tuleb juurde, transkribeeritavaid tekste mitte.
 
 Teos (olemas) → **eksemplar** → **vaatlus**; **vorm** on register, mis koondab vaatlusi eri
 eksemplaridest ja teostest, ka käsikirjadest. Teose tekst ja paber ei puutu otse kokku.
-Teosel on 0…n eksemplari, üks neist tekstitunnistaja; vaatlus kuulub alati ühele eksemplarile.
+Teosel on 0…n eksemplari, neist kuni üks kinnitatud tekstitunnistaja (lehtedeta või
+migreerimata teosel võib see puududa); vaatlus kuulub alati ühele eksemplarile.
 
 | Kiht | Kirjeldab | Põhiväljad |
 |---|---|---|
-| Eksemplar | üks füüsiline eksemplar | hoidja, kohaviit, tekstitunnistaja j/e, lehed (kui digiteeritud), väline digikoopia, seisund, tüpograafia, provenients, märkus, pildid |
-| Vaatlus | üks vesimärk (või vesimärgita paber) eksemplari kindlas kohas | asukoht (`locus` + valikulised lehetüved, vt allpool), IPH klassid, kirjeldus, tekst vesimärgil, paigutus, poogna mõõt, ahel- ja ribijooned, paberi tüüp ja kvaliteet, sõel, äär, fotod, kommentaar |
+| Eksemplar | üks füüsiline eksemplar | hoidja, kohaviit, tekstitunnistaja j/e, lehed (kui digiteeritud), väline digikoopia, seisund, tüpograafia, köide (kaaned, köitmisviis), provenients, konvoluut + järjekoht, märkus, pildid |
+| Vaatlus | üks vesimärgitüüp (või vesimärgita paber) ühes eksemplaris, üks või mitu asukohta | asukoht (`locus` + valikulised lehetüved, vt allpool), IPH klassid, kirjeldus, tekst vesimärgil, paigutus, poogna mõõt, ahel- ja ribijooned, paberi tüüp ja kvaliteet, sõel, äär, fotod, kommentaar |
 | Vorm | paberivorm, mille jälg vesimärk on | nimi, kirjeldus, kaksikvorm, veski/paberitegija, viited ([Bernstein][bernstein], [WZIS][wzis], [Briquet][briquet]), seotud vaatlused kindlusastmega |
 
 - IPH põhiklassid (A…Z) on valikloend, mitte vaba tekst. Väljade loend tuleb paber.ut.ee-st ja on
@@ -69,7 +79,7 @@ Teosel on 0…n eksemplari, üks neist tekstitunnistaja; vaatlus kuulub alati ü
     võib jääda määramata; kinnitatud vaikimisi tekstitunnistajaid on teose kohta kuni üks.
   - Käsikirjal on `archive_refs` praegu tavaliselt tema ainus eksemplar.
 - **Lehtede seos eksemplariga käib lehetüvede kaudu** (ül. §5), nagu teose osadel: vaikimisi kõik
-  lehed tekstitunnistajale, ainult `nri7ga`-tüüpi erand salvestab tüved ja saab `sync_work_parts`-i
+  lehed tekstitunnistajale, ainult reegli 5 erand salvestab tüved ja saab `sync_work_parts`-i
   eeskujul ümberarvutuse `refresh_work_mentions` ahelas (ADR 0055). **Vaatlustel on teised reeglid
   kui osadel** (jk. §3–4):
   - Tüvi on digitaalne lehekoht, mitte füüsilise allika tõend. `replace-image` kirjutab uue pildi
@@ -86,7 +96,20 @@ Teosel on 0…n eksemplari, üks neist tekstitunnistaja; vaatlus kuulub alati ü
   **vaatlused eraldi failis** (nt `_watermarks.json`), et poolik arhiivisalvestus ei käivitaks
   teose täisteksti Meili-sünki (ül. §6). Korpuseülene vaade (töövoo p. 5) vajab siis tuletatud
   read-modelit (ADR 0007).
-- Variandiseos (reegel 4) on olemas: `Relation.rel_type = 'isVersionOf'`.
+- Variandiseos (reegel 4) on olemas: `Relation.rel_type = 'isVersionOf'`, aga ainult andmeväljana —
+  kuvamine ja vastastikune kirjutus: #701.
+- **Konvoluut** (mitu trükist ühes köites) on **eksemplari väli**, mitte oma kirje: `convolute =
+  {reference, position (0 = põhiteos, N = N. kaasköide), total, contents}`; samas köites olevad
+  trükised tuletatakse (sama hoidja + normaliseeritud konvoluudi kohaviit, „(I)" jääb võtmesse).
+  Fakt „13 trükist" on number, sisukord vabatekst — VUTT-is puuduv trükis ei saa tühja kirjet.
+  ESTER näitab konvoluuti ainult eksemplari märkuses (TÜR R Est.B-954: Fischer b2648642 põhiteos,
+  *Personalia* b4346241 1. kaasköide; R Est.B-954 (I) on teine köide samade trükistega) — sama
+  raamatukogu võib hoida sama trükist kahes konvoluudis, seega kuulub konvoluut eksemplarile.
+  VUTT-is `xzy2ee` = need kaks kirjet ühe teosena. Enne eksemplari kihti saab ploki tuletada
+  `archive_refs`-ist. Issue #702.
+- „Köide" = köitmine (kaaned, köitmisviis), eksemplari väli; „konvoluut" = samas köites trükised.
+- Hoidjatel (`archives.json`) võiks olla ISIL-kood (`EE-…`, `LV-…`, `SE-…`) — sobitus ESTERi,
+  paber.ut.ee ja Bernsteiniga; ESTERi kirje number on teosel juba olemas (`ester_id`).
 - Vormiregister võtab ADR 0059-st tehnilise mustri (VUTT-i võti, lukk, `save_config_with_git`),
   aga mitte skeemi — vormil ei ole Q-koodi ega tõlgitavat silti (ül. §7).
 - Ehitada saab olemasoleva peale: teose osad ([ADR 0057](../../decisions/0057-teose-osad.md)), ameti- ja
@@ -167,7 +190,7 @@ paber.ut.ee välju.
 
 1. **Arhiiv** — ülevõtmine, staatiline koopia, andmestik püsiarhiivi. Sõltumatu, ~paar päeva.
 2. **Eksemplari kiht** — eksemplari kirje teose juures, tekstitunnistaja märge, lehtede seos
-   eksemplariga (`nri7ga`). Kasulik ka ilma paberiuurimiseta.
+   eksemplariga (reegel 5). Kasulik ka ilma paberiuurimiseta.
 3. **Vaatlused** — vaatluse vorm, fotod, IPH sõnastik, paneel „Paber" teose lehel; paber.ut.ee
    import. Siit alates uued vaatlused VUTT-i.
 4. **Vormiregister** — vormid, seosed kindlusastmega, korpuseülene vaade. Kuju tuleb uurija praktikast.
