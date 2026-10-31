@@ -26,7 +26,10 @@ otse siduda. Segadus on andmetes juba näha:
 
 - [`7zot7j`][7zot7j] — pealkirja sabas leidumus ja kohaviit („Tartu ÜR; Rīga LAB; Uppsala UB
   R Bergm. 357(8)").
-- [`nri7ga`][nri7ga] — lk 1 ja lk 2 on eri eksemplarid, andmed seda ei ütle.
+- [`nri7ga`][nri7ga] — lk 1 (Rīga LAB, R Acad. doyp. 1702:17) ja lk 2 (Uppsala UB) on sama
+  plakattrüki kaks terviklikku eksemplari ja kaks varianti: filosoofiateaduskonnas on Sjöberg
+  ühes esimene, teises viimane (professorite tüli), ka teaduskondade järjekord erineb. Andmed
+  seda ei ütle.
 
 ## Reegel: teosel kuni üks tekstitunnistaja
 
@@ -36,7 +39,11 @@ otse siduda. Segadus on andmetes juba näha:
 3. Ühe lehe kaupa erinev eksemplar → leht eksemplari kirje juurde pildina, soovi korral
    transkriptsiooniga.
 4. Sisuliselt erinev eksemplar → eraldi teos seosega „sama väljaanne, variant" (toimetaja otsus).
-5. `nri7ga`-juhtum → teose lehed märgitakse eksemplari järgi („lk 2 = eksemplar B").
+   `nri7ga` on selline: poolitada kaheks teoseks (lk 1 Rīga LAB, lk 2 Uppsala UB), mõlemad
+   transkribeeritud, `isVersionOf` vastastikku, variandi põhjus mõlema märkustes. Ei oota
+   eksemplari kihti.
+5. Teise eksemplari leht täiendab tekstitunnistajat (nt puuduv leht) → teose lehed märgitakse
+   eksemplari järgi („lk 7 = eksemplar B").
 
 Kirjeid tuleb juurde, transkribeeritavaid tekste mitte.
 
@@ -72,7 +79,7 @@ migreerimata teosel võib see puududa); vaatlus kuulub alati ühele eksemplarile
     võib jääda määramata; kinnitatud vaikimisi tekstitunnistajaid on teose kohta kuni üks.
   - Käsikirjal on `archive_refs` praegu tavaliselt tema ainus eksemplar.
 - **Lehtede seos eksemplariga käib lehetüvede kaudu** (ül. §5), nagu teose osadel: vaikimisi kõik
-  lehed tekstitunnistajale, ainult `nri7ga`-tüüpi erand salvestab tüved ja saab `sync_work_parts`-i
+  lehed tekstitunnistajale, ainult reegli 5 erand salvestab tüved ja saab `sync_work_parts`-i
   eeskujul ümberarvutuse `refresh_work_mentions` ahelas (ADR 0055). **Vaatlustel on teised reeglid
   kui osadel** (jk. §3–4):
   - Tüvi on digitaalne lehekoht, mitte füüsilise allika tõend. `replace-image` kirjutab uue pildi
@@ -170,7 +177,7 @@ paber.ut.ee välju.
 
 1. **Arhiiv** — ülevõtmine, staatiline koopia, andmestik püsiarhiivi. Sõltumatu, ~paar päeva.
 2. **Eksemplari kiht** — eksemplari kirje teose juures, tekstitunnistaja märge, lehtede seos
-   eksemplariga (`nri7ga`). Kasulik ka ilma paberiuurimiseta.
+   eksemplariga (reegel 5). Kasulik ka ilma paberiuurimiseta.
 3. **Vaatlused** — vaatluse vorm, fotod, IPH sõnastik, paneel „Paber" teose lehel; paber.ut.ee
    import. Siit alates uued vaatlused VUTT-i.
 4. **Vormiregister** — vormid, seosed kindlusastmega, korpuseülene vaade. Kuju tuleb uurija praktikast.
