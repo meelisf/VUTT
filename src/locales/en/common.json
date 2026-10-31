@@ -357,5 +357,18 @@
     "hide": "Hide filters",
     "clearAll": "Clear all",
     "removeFilter": "Remove filter"
+  },
+  "workRelations": {
+    "title": "Related works",
+    "types": {
+      "isVersionOf": "Variant"
+    },
+    "restricted": "restricted access",
+    "add": "+ Add variant",
+    "remove": "Remove link",
+    "removeConfirm": "Remove the link from both works?",
+    "saveError": "The link was not saved",
+    "searchPlaceholder": "Title, year or work_id",
+    "button": "Related works"
   }
 }

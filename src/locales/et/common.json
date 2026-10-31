@@ -357,5 +357,18 @@
     "hide": "Peida filtrid",
     "clearAll": "Tühjenda",
     "removeFilter": "Eemalda filter"
+  },
+  "workRelations": {
+    "title": "Seotud teosed",
+    "types": {
+      "isVersionOf": "Variant"
+    },
+    "restricted": "piiratud ligipääs",
+    "add": "+ Lisa variant",
+    "remove": "Eemalda seos",
+    "removeConfirm": "Eemalda seos mõlemalt teoselt?",
+    "saveError": "Seost ei salvestatud",
+    "searchPlaceholder": "Pealkiri, aasta või work_id",
+    "button": "Seotud teosed"
   }
 }

@@ -72,6 +72,23 @@ export interface Relation {
   label?: string;
 }
 
+// Seos kuvamiseks (GET /works/{id}/relations, ADR 0075): sihtteose väljad
+// loetakse serveris kettalt; `readable: false` = pealkiri nähtav, link mitte.
+export interface ResolvedRelation {
+  id: string;
+  rel_type: Relation['rel_type'];
+  title?: string;
+  title_en?: string;
+  title_original?: string;
+  title_devised?: boolean;
+  year?: number | null;
+  year_display?: string | null;
+  dating?: WorkDating | null;
+  archive_ref?: string | null;
+  readable?: boolean;
+  missing?: boolean;
+}
+
 // =========================================================
 // WORK - Teose andmed (Dashboard, WorkCard)
 // =========================================================
