@@ -38,12 +38,14 @@ const RelatedWorksBlock: React.FC<RelatedWorksBlockProps> = ({ work, lang }) => 
     setItems([]);
     setPicking(false);
     // Päring ainult siis, kui teosel on variandiseos (work.relations tuleb Meilist).
-    if (!variantKey) return;
+    // Admin küsib alati: äsja teiselt poolt lisatud seos ei pruugi Meili koopias
+    // veel olla, ja ilma selleta näiks seos ühepoolsena kuni sünkini.
+    if (!variantKey && !canEdit) return;
     const workId = work.work_id;
     fetchRelations(workId, authToken || undefined)
       .then(res => { if (currentWork.current === workId) setItems(res); })
       .catch(() => {});
-  }, [work.work_id, variantKey, authToken]);
+  }, [work.work_id, variantKey, authToken, canEdit]);
 
   const save = async (change: { add: Relation[]; remove: Relation[] }) => {
     if (!authToken) return;

@@ -28,6 +28,8 @@ const meiliIndex = {};
 vi.mock('../../../contexts/MeilisearchContext', () => ({ useMeiliIndex: () => meiliIndex }));
 const searchWorks = vi.fn();
 vi.mock('../../../services/searchService', () => ({ searchWorks: (...a: unknown[]) => searchWorks(...a) }));
+const getWorkMetadata = vi.fn();
+vi.mock('../../../services/workService', () => ({ getWorkMetadata: (...a: unknown[]) => getWorkMetadata(...a) }));
 
 import RelatedWorksBlock from '../RelatedWorksBlock';
 
@@ -43,7 +45,7 @@ const renderBlock = (w: Work) =>
 describe('RelatedWorksBlock', () => {
   beforeEach(() => {
     mockRole = 'admin';
-    fetchRelations.mockReset(); changeRelations.mockReset(); notify.mockReset(); searchWorks.mockReset();
+    fetchRelations.mockReset(); changeRelations.mockReset(); notify.mockReset(); searchWorks.mockReset(); getWorkMetadata.mockReset();
   });
 
   it('piiratud siht on lingita koos märkega, loetav on link', async () => {
@@ -55,10 +57,10 @@ describe('RelatedWorksBlock', () => {
     expect(screen.getByText('piiratud ligipääs')).toBeTruthy();
   });
 
-  it('ilma isVersionOf seoseta teos ei tee fetchRelations päringut', () => {
+  it('ilma isVersionOf seoseta teos ei tee fetchRelations päringut (mitte-admin)', () => {
+    mockRole = 'editor';
     renderBlock(work('w1', [{ id: 'x', rel_type: 'isPartOf' }]));
     expect(fetchRelations).not.toHaveBeenCalled();
-    expect(screen.getByText('+ Lisa variant')).toBeTruthy();
   });
 
   it('mitte-admin ilma seosteta ei näe plokki', () => {
@@ -113,5 +115,33 @@ describe('RelatedWorksBlock', () => {
     fireEvent.click(await screen.findByText('T w5'));
     await screen.findByText(/Teos w5/);
     expect(changeRelations).toHaveBeenCalledWith('w1', { add: [V('w5')], remove: [] }, 'tok');
+  });
+
+  it('admin küsib seoseid ka siis, kui Meili koopias neid veel pole (värske seos teiselt poolt)', async () => {
+    fetchRelations.mockResolvedValue([rel('w1')]);
+    renderBlock(work('w2', []));
+    await screen.findByText(/Teos w1/);
+    expect(fetchRelations).toHaveBeenCalledWith('w2', 'tok');
+  });
+
+  it('valija leiab teose work_id järgi otse', async () => {
+    fetchRelations.mockResolvedValue([]);
+    searchWorks.mockResolvedValue({ works: [], facets: {}, totalHits: 0 });
+    getWorkMetadata.mockResolvedValue(work('wq3k9p'));
+    renderBlock(work('w1', []));
+    fireEvent.click(screen.getByText('+ Lisa variant'));
+    fireEvent.change(screen.getByPlaceholderText('Pealkiri, aasta või work_id'), { target: { value: 'wq3k9p' } });
+    expect(await screen.findByText('T wq3k9p')).toBeTruthy();
+    expect(getWorkMetadata).toHaveBeenCalledWith(meiliIndex, 'wq3k9p');
+  });
+
+  it('valija otsib aastaarvu järgi aastafiltriga', async () => {
+    fetchRelations.mockResolvedValue([]);
+    searchWorks.mockResolvedValue({ works: [work('w5')], facets: {}, totalHits: 1 });
+    renderBlock(work('w1', []));
+    fireEvent.click(screen.getByText('+ Lisa variant'));
+    fireEvent.change(screen.getByPlaceholderText('Pealkiri, aasta või work_id'), { target: { value: '1702' } });
+    await screen.findByText('T w5');
+    expect(searchWorks).toHaveBeenLastCalledWith(meiliIndex, '', expect.objectContaining({ yearStart: '1702', yearEnd: '1702' }));
   });
 });

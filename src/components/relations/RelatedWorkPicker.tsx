@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Work } from '../../types';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { searchWorks } from '../../services/searchService';
+import { getWorkMetadata } from '../../services/workService';
 import { workDisplayTitle } from '../../utils/workTitle';
 
 interface RelatedWorkPickerProps {
@@ -26,8 +27,23 @@ const RelatedWorkPicker: React.FC<RelatedWorkPickerProps> = ({ excludeIds, lang,
     const q = query.trim();
     if (!index || q.length < 1) { setResults([]); return; }
     let cancelled = false;
-    searchWorks(index, q, { limit: 10 })
-      .then(res => { if (!cancelled) setResults(res.works); })
+    // Aastaarv → aastafilter; work_id-laadne sõne → otsene leid + tekstiotsing.
+    // Avalehe otsinguväljad ei sisalda aastat ega work_id-d, aga samanimeliste
+    // variantide eristamiseks on just need vajalikud.
+    const isYear = /^\d{4}$/.test(q);
+    const looksLikeId = /^[A-Za-z0-9_-]{6,12}$/.test(q) && !isYear;
+    const textSearch = isYear
+      ? searchWorks(index, '', { limit: 10, yearStart: q, yearEnd: q })
+      : searchWorks(index, q, { limit: 10 });
+    const byId = looksLikeId
+      ? Promise.resolve().then(() => getWorkMetadata(index, q)).catch(() => undefined)
+      : Promise.resolve(undefined);
+    Promise.all([textSearch, byId])
+      .then(([res, exact]) => {
+        if (cancelled) return;
+        const works = res.works.filter(w => w.work_id !== (exact as Work | undefined)?.work_id);
+        setResults(exact ? [exact as Work, ...works] : works);
+      })
       .catch(() => { if (!cancelled) setResults([]); });
     return () => { cancelled = true; };
   }, [index, query]);
