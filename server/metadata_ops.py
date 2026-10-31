@@ -59,6 +59,17 @@ def clean_archive_refs(value):
         result.append(clean)
     return result if result else None
 
+def drop_empty_relations(meta: dict) -> None:
+    """Tühi `relations` eemaldatakse võtmena (ADR 0075).
+
+    „Seoseid pole" = võtme puudumine. Muidu tekitaks viimase seose eemaldus
+    või no-op eemaldus teosel, millel võtit polnud, tühja `[]` kirjutuse ja
+    commiti, sest `metadata_unchanged` võrdleb dict-e otse (ADR 0012).
+    """
+    if not meta.get("relations"):
+        meta.pop("relations", None)
+
+
 def normalize_title_fields(meta: dict) -> None:
     """Tühi pealkirja lisaväli ja `title_devised: false` eemaldatakse võtmena.
 
@@ -158,6 +169,7 @@ def bulk_update_works(
                 clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
                 meta.update(clean)
                 normalize_title_fields(meta)
+                drop_empty_relations(meta)
                 for field in _V1_FIELDS:
                     meta.pop(field, None)
             except Exception as e:
