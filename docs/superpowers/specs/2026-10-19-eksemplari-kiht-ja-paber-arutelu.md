@@ -2,7 +2,8 @@
 
 **Seis:** arutelu alus, mitte otsus (2026-10-19, tihendatud 2026-10-31). Issue [#696](https://github.com/meelisf/VUTT/issues/696).
 ADR kirjutamata — tuleb enne etappi 2. Koodibaasi vastu kontrollitud:
-[ülevaatus 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-koodi-ulevaade.md) (viited allpool „ül. §N").
+[ülevaatus 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-koodi-ulevaade.md) (viited allpool „ül. §N")
+ja [järelkontroll 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-jarelkontroll.md) („jk. §N").
 
 ## Lähtekoht
 
@@ -55,12 +56,29 @@ Teosel on 0…n eksemplari, üks neist tekstitunnistaja; vaatlus kuulub alati ü
   eksemplari tasemel, vaatlusel ainult erinevuse korral.
 - **Eksemplar kasvab välja `archive_refs`-ist** (ül. §1). Teose väli `archive_refs`
   (`{archive_id, reference, url}`, hoidjad `archives.json`-is, otsitav `archive_refs_text`) on
-  juba hoidja + kohaviit + digikoopia. Paralleelset kohta EI looda — iga praegune kirje on
-  üks eksemplar ja otsinguväli katab edasi kõigi eksemplaride hoidjaid/kohaviitu. Käsikirjal on
-  `archive_refs` juba praegu tema ainus eksemplar.
+  juba hoidja + kohaviit + digikoopia. Paralleelset tõeallikat EI looda.
+  - **`exemplars` on autoriteetne, `archive_refs` tuletatud** (jk. §1): `clean_archive_refs` ja
+    kliendi `cleanArchiveRefs` ehitavad kirje uuesti kolmest väljast, nii et lisaväljad
+    (`id`, `is_text_witness`, tüved) kaoksid iga tavalise metaandmete salvestusega. `exemplars`
+    muutub AINULT oma otspunktidega; `archive_refs` jääb ühilduvuskujuks ilma sõltumatu
+    kirjutajata. Migratsioon katab ka lugejad (hoidja kasutuse kontroll, `meili_doc`).
+  - **Kirje ≠ eksemplar automaatselt** (jk. §2): üks eksemplar võib kanda mitut viidet (ADA teeb
+    igast `dc.identifier.other`-ist eraldi kirje). Eksemplaril on **püsiv ID**, mida kohaviida
+    parandus ei muuda; migratsioon säilitab algse viite ja päritolu, ebaselge vastavus läheb
+    ülevaatusele. Esimest viidet EI valita automaatselt tekstitunnistajaks — kontrollimata seos
+    võib jääda määramata; kinnitatud vaikimisi tekstitunnistajaid on teose kohta kuni üks.
+  - Käsikirjal on `archive_refs` praegu tavaliselt tema ainus eksemplar.
 - **Lehtede seos eksemplariga käib lehetüvede kaudu** (ül. §5), nagu teose osadel: vaikimisi kõik
   lehed tekstitunnistajale, ainult `nri7ga`-tüüpi erand salvestab tüved ja saab `sync_work_parts`-i
-  eeskujul ümberarvutuse `refresh_work_mentions` ahelas (ADR 0055).
+  eeskujul ümberarvutuse `refresh_work_mentions` ahelas (ADR 0055). **Vaatlustel on teised reeglid
+  kui osadel** (jk. §3–4):
+  - Tüvi on digitaalne lehekoht, mitte füüsilise allika tõend. `replace-image` kirjutab uue pildi
+    sama failinime peale (`7zot7j` Uppsala → Tartu oli just see) — asendusel eristada sama
+    eksemplari uut skaneeringut ja teise eksemplari lehte; seotud vaatlused ülevaatusele.
+  - Poolitus: eksemplari päritolu pärandub mõlemale poolele; vaatluse leheviide remapitakse
+    kandidaatidena mõlemale, täpne pool märgitakse kontrollimist vajavaks (vesimärk on ühel poolel).
+  - Lehe kustutus/asendus EI kustuta vaatlust, eksemplariseost ega `locus`-t — kehtetuks läheb
+    ainult digitaalne leheviide. Vaikimisi tekstitunnistaja vahetus vajab oma reeglit.
 - **Pildid `_`-prefiksiga alamkausta** (`_exemplars/…`, `_watermarks/…`, ül. §4): juurkausta pilt
   loetakse teose leheks; pildiserver (`server/image_server.py`) lubab praegu alamkaustadest ainult
   `_thumbs/` ja vajab laiendust sama ligipääsukontrolli all.
@@ -177,15 +195,24 @@ Etappide 2–4 maht hindamata.
 - Vesimärgid avalikud kohe või pärast avaldamist (doktoritöö prioriteet)?
 - Kes lisavad vaatlusi — projekti uurijad või ka teised paberiajaloolased (uus õigus)?
 - Arhiveerimine VUTT-i serveris või ÜR-i veebimajutuses?
-- **Lehtedeta teos** (töövoo p. 1, ül. §3): `build_work_documents` tagastab 0 pildiga teosele
-  `[]` → teost ei ole Meilis (ka mitte `kirjad`-is) ega töölaual. Variant A: sünteetiline
-  0-leheline dokument + vaade; variant B: kohustuslik pilt (häkk). Etapi 3 eeltingimus.
+- **Lehtedeta teos** (töövoo p. 1, ül. §3, jk. §5): `build_work_documents` tagastab 0 pildiga
+  teosele `[]` ja sünk kustutab ka vanad lehe- ja kirjadokumendid → teost ei ole Meilis ega
+  töölaual. Sünteetiline „leht 0" üksi EI aita: avalehe otsing ja teosepõhised loendurid
+  filtreerivad `lehekylje_number = 1` (`src/services/searchService.ts`). Terviklik töö: loomine,
+  indekseerimine (kuidas teose kirje lehedokumendist eristub), leidmine, avamine
+  eksemplaride vaates, kaanepildi puudumine, loendurid/statistika. Vajadus selgub sobitusraportist.
 - **Vaatluste korpuseülene indeks:** kas tuletatud JSON read-model või Meili? Mis jõuab MCP-sse?
 - **Nähtavus ja õigused:** kuidas vaatlus enne doktoritöö ilmumist peidetakse ja kes lisab —
   seosta olemasoleva mudeliga (`can_write_work`, ADR 0031; kogu nähtavus, ADR 0069), mitte uus
-  paralleelne kontroll.
+  paralleelne kontroll. **Teose õigus ei piisa** (jk. §6): `can_read_work` ja pildiserver
+  lubavad avaliku teose kõigile, seega avaldamiseelne vaatlus vajab oma nähtavust API-s, indeksis
+  ja MCP-s. **Vastuolu:** „kõik fotod avalikuks" (Otsustatud) ja peidetud vaatlus ei käi kokku —
+  kui fotod peidetakse koos vaatlusega, peab seda kontrollima ka pildiserver, mitte ainult UI.
 - **Katalooginumbrid** (Jaanson, VD17, ESTER, DSpace): struktureeritud väli või mitte? Vastus tuleb
-  kuivkäivitusega sobitusskriptist kohe etapi 1 järel (ül. §7), enne etapi 2 ADR-i.
+  kuivkäivitusega sobitusskriptist kohe etapi 1 järel (ül. §7), enne etapi 2 ADR-i. Raport
+  näitab kindlad, mitmetähenduslikud ja vasteta sobitused (jk.).
+- **Impordi korduskäivitus** ei tohi tekitada duplikaate: allika nimeruumiga ID (nt
+  `paber:7/5`) ja allikast imporditud väärtused eristatavad uurija hilisematest parandustest (jk.).
 
 ## Viited
 
