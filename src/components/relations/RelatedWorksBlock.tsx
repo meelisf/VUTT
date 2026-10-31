@@ -23,7 +23,7 @@ const RelatedWorksBlock: React.FC<RelatedWorksBlockProps> = ({ work, lang }) => 
   const { t } = useTranslation(['common']);
   const { user, authToken } = useUser();
   const notify = useNotify();
-  const confirm = useConfirm();
+  const askConfirm = useConfirm();
   const canEdit = isAtLeast(user?.role, 'admin') && !!authToken;
   const [items, setItems] = useState<ResolvedRelation[]>([]);
   const [picking, setPicking] = useState(false);
@@ -60,7 +60,7 @@ const RelatedWorksBlock: React.FC<RelatedWorksBlockProps> = ({ work, lang }) => 
   };
 
   const handleRemove = async (rel: ResolvedRelation) => {
-    const ok = await confirm({
+    const ok = await askConfirm({
       message: t('common:workRelations.removeConfirm', 'Eemalda seos mõlemalt teoselt?'),
       variant: 'warning',
     });
