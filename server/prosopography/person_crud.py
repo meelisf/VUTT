@@ -11,7 +11,6 @@ from typing import Optional
 from . import state
 from . import ext_id_index
 from . import image_variants
-from ._compat import sync_from_facade
 from .ext_ids import normalize_ext_id
 from .locks import ext_id_claim_lock, person_lock
 from ..entity_labels_ops import fill_person_labels_from_registry
@@ -88,7 +87,6 @@ def _safe_nanoid(person_id: str) -> str:
 
 def _id_to_path(person_id: str) -> str:
     """vutt:Pabc123 → data/config/prosopography/abc123.json"""
-    sync_from_facade()
     nanoid = _safe_nanoid(person_id)
     path = os.path.join(state.PROSOPOGRAPHY_DIR, f"{nanoid}.json")
     # Kaitse sügavuti: lahendatud tee peab jääma PROSOPOGRAPHY_DIR sisse.
@@ -179,7 +177,6 @@ def get_person(person_id: str) -> Optional[dict]:
     `GET /prosopography/{id}` tagastab selle tulemuse otse. Failis olevat
     väärtust ei muudeta; salvestatud kirjed puhastab `scripts/strip_person_auth_tokens.py`.
     """
-    sync_from_facade()
     try:
         path = _id_to_path(person_id)
     except ValueError:
@@ -252,7 +249,6 @@ def _new_person_skeleton(data: dict, username: str) -> dict:
 def create_person(data: dict, username: str) -> dict:
     """Madala taseme loomine (ilma ID-kontrolli ja ülevaatusmärketa). Kutsujad:
     ainult testid — tootmiskood kutsub `create_person_checked`-i."""
-    sync_from_facade()
     person = _new_person_skeleton(data, username)
     os.makedirs(state.PROSOPOGRAPHY_DIR, exist_ok=True)
     fill_person_labels_from_registry(person)
@@ -300,7 +296,6 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
     from ..config import BASE_DIR as data_dir
     from ..metadata_ops import bulk_update_works
 
-    sync_from_facade()
     if not os.path.exists(data_dir):
         return
 
@@ -426,7 +421,6 @@ def _apply_card_update(person: dict, data: dict, now: str) -> None:
 
 def update_person(person_id: str, data: dict, username: str) -> dict:
     """Uuendab isiku kirjet optimistliku konkurentsikontrolliga."""
-    sync_from_facade()
     from contextlib import nullcontext
     claim = ext_id_claim_lock if "identifiers" in data else nullcontext()
     with claim, person_lock(person_id):
@@ -477,7 +471,6 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
     """Lisab identifikaatori; rikastuse eelvaade (võrk) PÄRAST lukke (spekk §4.6)."""
     from .enrichment import fetch_and_diff
 
-    sync_from_facade()
     ext_id = normalize_ext_id(scheme, ext_id)
     with ext_id_claim_lock, person_lock(person_id):
         person = get_person(person_id)
@@ -500,7 +493,6 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
 
 def _person_image_path(person_id: str, ext: str) -> str:
     """Tagastab isiku pildi failitee (PROSOPOGRAPHY_IMAGES_DIR — ei ole gitis)."""
-    sync_from_facade()
     nanoid = _safe_nanoid(person_id)
     path = os.path.join(state.PROSOPOGRAPHY_IMAGES_DIR, f"{nanoid}{ext}")
     if os.path.commonpath([os.path.realpath(path), os.path.realpath(state.PROSOPOGRAPHY_IMAGES_DIR)]) != os.path.realpath(state.PROSOPOGRAPHY_IMAGES_DIR):
@@ -513,7 +505,6 @@ _PERSON_IMAGE_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp":
 
 def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, username: str) -> dict:
     """Salvestab isiku pildi ja uuendab image_url kirjes."""
-    sync_from_facade()
 
     pil_format = _PERSON_IMAGE_FORMATS.get(content_type)
     if pil_format is None:
@@ -620,7 +611,6 @@ def get_person_image_variant(person_id: str, width: int) -> Optional[str]:
 
 def delete_person_image(person_id: str, username: str) -> dict:
     """Kustutab isiku pildi ja tühjendab image_url. Tagastab uuendatud kirje."""
-    sync_from_facade()
     with person_lock(person_id):
         person = get_person(person_id)
         if person is None:
@@ -658,7 +648,6 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
                 obj[parts[0]] = {}
             _deep_set(obj[parts[0]], parts[1], value)
 
-    sync_from_facade()
     with person_lock(person_id):
         person = get_person(person_id)
         if person is None:
@@ -719,7 +708,6 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
 def restore_person(person_id: str, restored: dict, username: str) -> dict:
     """Taastab kaardi varasemale seisule (git). ID-lisav tee: võib tuua tagasi ID,
     mis on vahepeal teisele kaardile läinud — seega ID-lukk + kontroll."""
-    sync_from_facade()
     with ext_id_claim_lock, person_lock(person_id):
         current = get_person(person_id) or {}
         # Hauakivi (tombstone) või liidetud kaart kannab endiselt lähtekaardi ID-sid,
@@ -772,7 +760,6 @@ def create_person_checked(*, username: str, created_via: str, name: Optional[str
     rikastus järjekorda alles pärast salvestust."""
     from .auto_enrich import ENRICH_SCHEMES, new_review
 
-    sync_from_facade()
     if card is not None and any(v is not None for v in (name, identifiers, aliases, note)):
         raise ValueError("card_and_fields")
 
@@ -976,7 +963,6 @@ def bulk_update_occupation(
     mode='add'     — lisab ameti kui seda veel pole
     mode='replace' — asendab kõik olemasolevad ametid uuega
     """
-    sync_from_facade()
     updated = 0
     skipped = 0
     occ_id = occupation.get("id")

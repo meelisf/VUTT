@@ -10,7 +10,6 @@ from . import state
 from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, rebuild_indices
 from .person_crud import _AsyncTasks, _id_to_path, copy_person_image, get_person
 from .locks import ext_id_claim_lock, merge_operation_lock, person_lock
-from ._compat import sync_from_facade
 from ..prosopo_biography_fields import (
     ANCHOR_FIELDS, BIOGRAPHY_EN, BIOGRAPHY_ET, TEXT_FIELDS,
 )
@@ -84,7 +83,6 @@ def _merged_date(src_val, tgt_val):
 
 def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
     """Liidab kirjed; kutsuja hoiab liitmis- ning source/target isikulukke."""
-    sync_from_facade()
     if source_id == target_id:
         raise ValueError("Source ja target ei tohi olla samad.")
 
@@ -343,7 +341,6 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
 
 def delete_person(person_id: str, username: str) -> dict:
     """Kustutab isikukaardi jäädavalt, kui viiteid pole."""
-    sync_from_facade()
     person = get_person(person_id)
     if person is None:
         raise KeyError(person_id)

@@ -21,7 +21,6 @@ import threading
 from typing import Dict, Optional, Tuple
 
 from . import state
-from ._compat import sync_from_facade
 from .ext_ids import normalize_ext_id
 from ..config import get_logger
 
@@ -93,7 +92,6 @@ def _scan_dir(directory: str) -> Dict[str, str]:
 
 
 def _current_dir() -> str:
-    sync_from_facade()
     return state.PROSOPOGRAPHY_DIR
 
 

@@ -27,16 +27,13 @@ def _koha_wikidata_ilma_vorguta(monkeypatch):
     monkeypatch.setattr(places_ops, "fetch_place_wikidata", lambda qid: None)
 
 
-_FASSAADI_PATCH_LUBATUD = [False]
-
-
 @pytest.fixture(scope="session", autouse=True)
 def _ops_fassaadi_valvur():
     """Testid ei patchi `server.prosopography.ops`-i (#690 samm 3).
 
-    Fassaad on ainult re-eksport: tema atribuudi asendus jõuab koodini ainult
-    silla (`_compat`) kaudu ja nimekirjast puuduv nimi ei jõua kuhugi (#693
-    leidis sellise surnud patchi). Patchi `state`-il (teed, git) või kasuta
+    Fassaad on ainult re-eksport: tema atribuudi asendus ei jõua domeenikoodini
+    (sild `_compat` eemaldati sammus 4), nii et patch oleks vaikselt surnud.
+    Patchi `state`-il (teed, git) või kasuta
     `prosopo_env`-i (kaardid, indeksid). Kirjutus viskab kohe, nii et
     jälg osutab patchi reale. Algväärtuse tagasipanek on lubatud.
     """
@@ -47,7 +44,7 @@ def _ops_fassaadi_valvur():
 
     class _Valvur(vana_klass):
         def __setattr__(self, name, value):
-            if name != "__class__" and not _FASSAADI_PATCH_LUBATUD[0] and algne.get(name, _Valvur) is not value:
+            if name != "__class__" and algne.get(name, _Valvur) is not value:
                 raise AssertionError(
                     f"Test patchib server.prosopography.ops.{name} — patchi `state`-il "
                     "või kasuta `prosopo_env`-i (#690)."
@@ -55,30 +52,11 @@ def _ops_fassaadi_valvur():
             super().__setattr__(name, value)
 
         def __delattr__(self, name):
-            if not _FASSAADI_PATCH_LUBATUD[0]:
-                raise AssertionError(f"Test kustutab server.prosopography.ops.{name} (#690).")
-            super().__delattr__(name)
+            raise AssertionError(f"Test kustutab server.prosopography.ops.{name} (#690).")
 
     ops.__class__ = _Valvur
     yield
     ops.__class__ = vana_klass
-
-
-@pytest.fixture
-def fassaadi_patch_lubatud():
-    """Ainult silla enda testidele (`test_compat_sync_isolation.py`); kaob koos sillaga."""
-    _FASSAADI_PATCH_LUBATUD[0] = True
-    yield
-    _FASSAADI_PATCH_LUBATUD[0] = False
-
-
-@pytest.fixture(autouse=True)
-def _fassaadi_sild_puhtaks():
-    """Sild taastab `state`-i laisalt (järgmisel `sync_from_facade()`-il): ilma
-    selleta salvestaks testi otsene `monkeypatch.setattr(state, …)` taastuspunktiks
-    eelmise testi fassaadipatchi ja paneks selle lõpus tagasi. Kaob koos sillaga (#690)."""
-    from server.prosopography._compat import sync_from_facade
-    sync_from_facade()
 
 
 @pytest.fixture(autouse=True)
@@ -355,8 +333,7 @@ def prosopo_env(tmp_path, monkeypatch):
     """Isoleeritud prosopograafia: kaardid tmp-kaustas, git = failikirjutus, indeksid tmp-is.
 
     Patch käib otse `state`-il: kõik teed ja `save_with_git` elavad seal ja
-    domeenikood loeb neid `state.X` kaudu — fassaadi sild (`_compat`) ei
-    osale (#690). Laadureid ei patchita: kood loeb tmp-faile.
+    domeenikood loeb neid `state.X` kaudu (#690). Laadureid ei patchita: kood loeb tmp-faile.
     """
     import json as _json
     from types import SimpleNamespace

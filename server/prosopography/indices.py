@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from . import fresh_merge, state
-from ._compat import sync_from_facade
 from ..meili_doc import enumerate_page_images
 
 
@@ -105,17 +104,14 @@ def _load_json_or_default(path: str, default: Any) -> Any:
 
 
 def _load_index() -> dict:
-    sync_from_facade()
     return _load_json_or_default(state.PROSOPOGRAPHY_INDEX_FILE, {"rebuilt_at": None, "entries": []})
 
 
 def _load_person_to_works() -> dict:
-    sync_from_facade()
     return _load_json_or_default(state.PERSON_TO_WORKS_FILE, {})
 
 
 def _load_work_collections() -> dict:
-    sync_from_facade()
     return _load_json_or_default(state.WORK_COLLECTIONS_INDEX_FILE, {})
 
 
@@ -123,7 +119,6 @@ def update_work_collections(work_id: str, collections: list) -> None:
     """Uuendab work_collections_index.json üht kirjet teose salvestamisel."""
     if not work_id:
         return
-    sync_from_facade()
     with state._work_collections_lock:
         data = _load_work_collections()
         if collections:
@@ -188,7 +183,6 @@ def _persons_in_collection(collection_id: str) -> set:
     """Isikute id-d, kes kuuluvad kollektsiooni või alamkollektsioonidesse."""
     from ..cache import get_cached_collections
 
-    sync_from_facade()
     collections = get_cached_collections() or {}
     target = _collection_descendants(collection_id, collections)
     wc = _load_work_collections()
@@ -214,7 +208,6 @@ def _persons_in_work_set(work_ids) -> set:
     töökollektsioonil hierarhiat ega liikmesus-institutsioone: liikmesus on
     sõnaselge loend, mitte tuletatud reegel.
     """
-    sync_from_facade()
     target = set(work_ids or ())
     if not target:
         return set()
@@ -227,7 +220,6 @@ def _persons_in_work_set(work_ids) -> set:
 
 def _person_collections(person_id: str) -> list:
     """Kollektsioonid, kuhu isiku teosed kuuluvad; dedup esmaesinemise järjekorras."""
-    sync_from_facade()
     wc = _load_work_collections()
     ptw = _load_person_to_works()
     result: list = []
@@ -246,7 +238,6 @@ def _update_index_entry(person: dict):
     sektsioonis (ADR 0048). See funktsioon jookseb pärast luku vabastamist ja
     võib saada aegunud koopia — otsinguindeksile on see talutav, duplikaadikontrollile mitte.
     """
-    sync_from_facade()
     from .person_search import _index_entry_from_person
 
     person_id = person["id"]
@@ -274,7 +265,6 @@ def _on_kaardi_voti(key: str) -> bool:
 
 def _update_aliases_entry(person: dict):
     """Uuendab person_aliases.json — vutt:P ID → nimevariandid."""
-    sync_from_facade()
     person_id = person["id"]
     name_obj = person.get("name") or {}
     label = name_obj.get("label") or ""
@@ -339,7 +329,6 @@ def update_person_to_works(
     parts: Optional[list] = None,
 ):
     """Uuendab person_to_works.json pöördindeksit ühe teose salvestamisel."""
-    sync_from_facade()
     new_by_pid = metadata_entries(work_id, {
         "creators": creators, "tags": tags, "publisher": publisher, "parts": parts,
     })
@@ -374,7 +363,6 @@ def rebuild_indices():
     lähteandmeid ja avaldamine jätab vahepeal kirjutatud võtmed kettalt
     (`fresh_merge`). Uus indeksi kirjutaja peab kirjutama oma indeksi luku all.
     """
-    sync_from_facade()
     if not os.path.exists(state.PROSOPOGRAPHY_DIR):
         return
 
@@ -504,7 +492,6 @@ def _remove_aliases_entry(person_id: str):
     Luku all: taaste avaldamine (#417) võrdleb kettaseisu baasseisuga ja
     lukuta kirjutus võiks jääda avaldamise vahele.
     """
-    sync_from_facade()
     from .person_search import _load_person_aliases
     with state._aliases_lock:
         data = _load_person_aliases()

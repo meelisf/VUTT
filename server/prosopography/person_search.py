@@ -14,11 +14,9 @@ from .indices import (ACADEMIA_INSTITUTION_NAMES, _load_index, _persons_in_colle
                       _persons_in_work_set, _person_collections)
 from .person_crud import _make_snippets, get_person
 from .relations import get_person_relation_network_ids
-from ._compat import sync_from_facade
 
 
 def _load_person_aliases() -> dict:
-    sync_from_facade()
     if os.path.exists(state.PERSON_ALIASES_FILE):
         try:
             with open(state.PERSON_ALIASES_FILE, "r", encoding="utf-8") as f:
@@ -213,7 +211,6 @@ def _entry_occupations(entry: dict) -> list[dict]:
     person_id = entry.get("id")
     if not person_id:
         return []
-    sync_from_facade()
     person = get_person(person_id)
     if not person:
         return []
@@ -343,7 +340,6 @@ def _filter_index_entries(
     aliases_data: Optional[dict] = None,
     **filter_fields,
 ) -> list[dict]:
-    sync_from_facade()
     f = _resolve_filters(filters, filter_fields)
     q, gender, occupation = f.q, f.gender, f.occupation
     origin_group, origin_place, institution = f.origin_group, f.origin_place, f.institution
@@ -454,7 +450,6 @@ def list_persons(
     on tehtud routeris, siin ainult lõikamine. `None` = piirangut ei ole,
     tühi loend = null tulemust (tühi kogu EI OLE sama mis puuduv filter).
     """
-    sync_from_facade()
     filters = _resolve_filters(filters, filter_fields)
     q = filters.q
     if collection:
@@ -511,7 +506,6 @@ def get_person_map_markers(
     **filter_fields,
 ) -> dict:
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
-    sync_from_facade()
     filters = _resolve_filters(filters, filter_fields)
     if related_to:
         # Üks tõde (#461): kogu filtreerib ühiseid teoseid ehitajas, mitte isikuid
@@ -610,7 +604,6 @@ def get_person_facets(
     work_set_ids: Optional[list] = None,
 ) -> dict:
     """Tagastab persons-listingu jaoks facetid."""
-    sync_from_facade()
     filtered = list_persons(
         q=q,
         gender=gender,
@@ -691,7 +684,6 @@ def get_person_facets(
 
 def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     """Ehitab prosopography_index.json kirje isiku täisandmetest."""
-    sync_from_facade()
     birth = person.get("birth") or {}
     death = person.get("death") or {}
     identifiers = person.get("identifiers") or []

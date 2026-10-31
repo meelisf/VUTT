@@ -1,7 +1,7 @@
 """Prosopograafia jagatud seis ja patch'itavad sõltuvused.
 
-See moodul hoiab domeenimoodulite ühiseid konstante/lukke/sõltuvusi. `_compat`
-sünkroniseerib siia ka vana `ops.py` façade peal tehtud monkeypatch'id.
+See moodul hoiab domeenimoodulite ühiseid konstante/lukke/sõltuvusi. Testid
+patchivad neid siin (`ops.py` fassaadi patch ei jõuaks koodini, #690).
 """
 from __future__ import annotations
 
