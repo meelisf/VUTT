@@ -56,7 +56,7 @@ migreerimata teosel võib see puududa); vaatlus kuulub alati ühele eksemplarile
 
 | Kiht | Kirjeldab | Põhiväljad |
 |---|---|---|
-| Eksemplar | üks füüsiline eksemplar | hoidja, kohaviit, tekstitunnistaja j/e, lehed (kui digiteeritud), väline digikoopia, seisund, tüpograafia, provenients, märkus, pildid |
+| Eksemplar | üks füüsiline eksemplar | hoidja, kohaviit, tekstitunnistaja j/e, lehed (kui digiteeritud), väline digikoopia, seisund, tüpograafia, köide (kaaned, köitmisviis), provenients, konvoluut + järjekoht, märkus, pildid |
 | Vaatlus | üks vesimärgitüüp (või vesimärgita paber) ühes eksemplaris, üks või mitu asukohta | asukoht (`locus` + valikulised lehetüved, vt allpool), IPH klassid, kirjeldus, tekst vesimärgil, paigutus, poogna mõõt, ahel- ja ribijooned, paberi tüüp ja kvaliteet, sõel, äär, fotod, kommentaar |
 | Vorm | paberivorm, mille jälg vesimärk on | nimi, kirjeldus, kaksikvorm, veski/paberitegija, viited ([Bernstein][bernstein], [WZIS][wzis], [Briquet][briquet]), seotud vaatlused kindlusastmega |
 
@@ -96,7 +96,16 @@ migreerimata teosel võib see puududa); vaatlus kuulub alati ühele eksemplarile
   **vaatlused eraldi failis** (nt `_watermarks.json`), et poolik arhiivisalvestus ei käivitaks
   teose täisteksti Meili-sünki (ül. §6). Korpuseülene vaade (töövoo p. 5) vajab siis tuletatud
   read-modelit (ADR 0007).
-- Variandiseos (reegel 4) on olemas: `Relation.rel_type = 'isVersionOf'`.
+- Variandiseos (reegel 4) on olemas: `Relation.rel_type = 'isVersionOf'`, aga ainult andmeväljana —
+  kuvamine ja vastastikune kirjutus: #701.
+- **Konvoluut** (mitu trükist ühes köites; ESTERi näide b1337568: TÜR Est.C-44, 22 trükist) on oma
+  kirje (hoidja, kohaviit, märkus, liikmed järjekorras), mitte paarisseos — 22 liikme puhul oleks
+  paare 231 ja järjekord kaoks. Konvoluut seob **eksemplare**, mitte teoseid (Uppsala eksemplar võib
+  olla köidetud teistega); enne eksemplari kihti on liige `{work_id, exemplar_id?}`, sest teos on
+  sisuliselt tema digiteeritud eksemplar. Kuvamine koos #701 seostega. Issue #702.
+- „Köide" = köitmine (kaaned, köitmisviis), eksemplari väli; „konvoluut" = samas köites trükised.
+- Hoidjatel (`archives.json`) võiks olla ISIL-kood (`EE-…`, `LV-…`, `SE-…`) — sobitus ESTERi,
+  paber.ut.ee ja Bernsteiniga; ESTERi kirje number on teosel juba olemas (`ester_id`).
 - Vormiregister võtab ADR 0059-st tehnilise mustri (VUTT-i võti, lukk, `save_config_with_git`),
   aga mitte skeemi — vormil ei ole Q-koodi ega tõlgitavat silti (ül. §7).
 - Ehitada saab olemasoleva peale: teose osad ([ADR 0057](../../decisions/0057-teose-osad.md)), ameti- ja
