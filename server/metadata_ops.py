@@ -59,6 +59,17 @@ def clean_archive_refs(value):
         result.append(clean)
     return result if result else None
 
+def drop_empty_relations(meta: dict) -> None:
+    """Tühi `relations` eemaldatakse võtmena (ADR 0075).
+
+    „Seoseid pole" = võtme puudumine. Muidu tekitaks viimase seose eemaldus
+    või no-op eemaldus teosel, millel võtit polnud, tühja `[]` kirjutuse ja
+    commiti, sest `metadata_unchanged` võrdleb dict-e otse (ADR 0012).
+    """
+    if not meta.get("relations"):
+        meta.pop("relations", None)
+
+
 def normalize_title_fields(meta: dict) -> None:
     """Tühi pealkirja lisaväli ja `title_devised: false` eemaldatakse võtmena.
 
@@ -103,6 +114,14 @@ def _git_ok(git_result) -> bool:
     return not (isinstance(git_result, dict) and git_result.get("success") is False)
 
 
+class BulkUpdateError(Exception):
+    """Range bulk-uuendus (`all_or_nothing=True`) katkestati; midagi ei kirjutatud."""
+
+    def __init__(self, message: str, failed_paths=None):
+        super().__init__(message)
+        self.failed_paths = list(failed_paths or [])
+
+
 def bulk_update_works(
     items: Iterable[Tuple[str, Callable[[dict], dict]]],
     username: str,
@@ -110,6 +129,8 @@ def bulk_update_works(
     *,
     background_tasks=None,
     call_ptw: bool = False,
+    all_or_nothing: bool = False,
+    skip_sync_paths: Iterable[str] = (),
 ) -> dict:
     """
     Atomaarne bulk-uuendus mitmele teosele: üks lukutsükkel, üks Git commit.
@@ -127,8 +148,17 @@ def bulk_update_works(
     tõttu ajaloost puudu, läheb sama commiti sisse (#418) — järeltegevusi
     tal ei korrata ja ta loetakse `skipped`-iks.
 
+    `all_or_nothing=True` (ADR 0075): ükskõik milline loetamatu fail või viskav
+    transform katkestab partii ENNE kirjutamist; kirjutus- või commiti viga
+    pööratakse tagasi (`save_with_git(rollback_on_error=True)`). Mõlemal juhul
+    `BulkUpdateError` ja järeltegevusi ei tehta.
+
+    `skip_sync_paths` — teed, mis kirjutatakse ja commititakse, aga mis ei saa
+    järeltegevusi ega Meili sünki (nt kohe kustutatav teos).
+
     Tagastab `{"updated": n, "skipped": n, "failed": n, "git_committed": bool}`.
     """
+    skip_sync = set(skip_sync_paths)
     originals = {}   # meta_path -> kettalt loetud seis
     pending = {}     # meta_path -> jooksev seis (kordused ahelduvad)
     order = []       # unikaalsed teed sisendjärjekorras
@@ -158,6 +188,7 @@ def bulk_update_works(
                 clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
                 meta.update(clean)
                 normalize_title_fields(meta)
+                drop_empty_relations(meta)
                 for field in _V1_FIELDS:
                     meta.pop(field, None)
             except Exception as e:
@@ -165,6 +196,9 @@ def bulk_update_works(
                 # jääb tervikuna kirjutamata, ülejäänud partii läheb edasi.
                 failed_paths.add(meta_path)
                 logger.warning("BULK: teose uuendamine ebaõnnestus (%s): %s", meta_path, e)
+
+        if all_or_nothing and failed_paths:
+            raise BulkUpdateError("Bulk-uuendus katkestati", sorted(failed_paths))
 
         usable = [p for p in order if p not in failed_paths]
         changed = [p for p in usable if not metadata_unchanged(originals[p], pending[p])]
@@ -187,13 +221,18 @@ def bulk_update_works(
                 username,
                 message=git_message,
                 additional_files=extra or None,
+                **({"rollback_on_error": True} if all_or_nothing else {}),
             )
             git_committed = _git_ok(git_result)
+            if not git_committed and all_or_nothing:
+                raise BulkUpdateError(f"Salvestus ebaõnnestus: {git_result.get('error')}", to_commit)
             if not git_committed:
                 logger.error("BULK: %s — failid kirjutati, aga Git commit ebaõnnestus", git_message)
 
     # Tuletatud indeksid ja sünk ainult päriselt muutunud teostele, üks kord teose kohta.
     for meta_path in changed:
+        if meta_path in skip_sync:
+            continue
         meta = pending[meta_path]
         slug = os.path.basename(os.path.dirname(meta_path))
 

@@ -325,6 +325,10 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
     # saadab terve objekti ja kirjutaks samaaegse toimetaja osad üle.
     if 'parts' in (data.get('metadata') or {}):
         raise HTTPException(status_code=400, detail="Osi muudetakse /works/{id}/parts kaudu")
+    # Seosed muutuvad AINULT /works/{id}/relations kaudu (ADR 0075): see kirjutab
+    # mõlemad pooled korraga, üldine salvestus jätaks seose ühepoolseks.
+    if 'relations' in (data.get('metadata') or {}):
+        raise HTTPException(status_code=400, detail="Seoseid muudetakse /works/{id}/relations kaudu")
     try:
         data['metadata'] = dating_updates(data.get('metadata', {}))
         # Käsikirja lehenummerduse skeem (#630 spekk 2): ainult foliation | pagination | null.

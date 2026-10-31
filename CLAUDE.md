@@ -337,6 +337,12 @@ Osa avalik kokkuvõte on `abstract_et`/`abstract_en`, `notes` on toimetaja märk
 (API-s avalik, vaates ainult toimetajale); `abstract_en_src` ankru kirjutab AINULT server
 kinnituse peale (ADR 0063).
 
+**Teoste seos (ADR 0075)** — `relations` muutub AINULT `PUT /works/{id}/relations` kaudu
+(`server/work_relations.py`); `/update-work-metadata` lükkab ta tagasi. Kirjutus on alati
+vastastikune ühe range `bulk_update_works(all_or_nothing=True)` partiiga — üks commit või
+mitte midagi. Praegu ainult `isVersionOf`. Tühi = võtme puudumine; `label` ei ole tõeallikas.
+Teose kustutus koristab seosed `metadata_lock`-i all enne kausta eemaldamist.
+
 **Kirjaindeks (ADR 0065)** — `kirjad`: üks dokument kirja-osa kohta, tuletatakse
 `meili_doc.build_letter_documents`-iga sama teose LEHEDOKUMENTIDEST (ligipääsuväljad ja
 tekst ühest allikast). Iga tee, mis kirjutab/kustutab `teosed`-i, võtab `kirjad`-i kaasa

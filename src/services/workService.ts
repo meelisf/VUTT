@@ -67,7 +67,7 @@ export const getWorkMetadata = async (index: Index, workId: string): Promise<Wor
         'work_id', 'id', 'title', 'title_en', 'title_original', 'title_devised', 'year', 'year_display', 'dating', 'location', 'location_object', 'publisher', 'publisher_object', 'publisher_id',
         'type', 'type_object', 'genre', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'notes', 'languages',
-        'series', 'series_title', 'ester_id', 'external_url', 'archive_refs',
+        'series', 'series_title', 'ester_id', 'external_url', 'archive_refs', 'relations',
         // Filtrite/sortimise väljad
         'originaal_kataloog', 'year',
         'lehekylje_pilt', 'teose_lehekylgede_arv'

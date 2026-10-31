@@ -1,7 +1,8 @@
 import { hasImpreciseDating, parseDatingText } from '../utils/workDating';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PartPersonsHint from './PartPersonsHint';
+import RelationsButton from './relations/RelationsButton';
 import { Work } from '../types';
 import { workStatusDotClass } from '../utils/workStatusDot';
 import { BookOpen, Calendar, User, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, Check } from 'lucide-react';
@@ -49,6 +50,9 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
 
   // Info-overlay nähtavus (desktop: hover + 150ms delay, mobiil: touch-hold)
   const [infoVisible, setInfoVisible] = useState(false);
+  // Seoste ülekate (#701): korraga on lahti ainult üks ülekate — mõlemad nupud on z-30.
+  const [relationsOpen, setRelationsOpen] = useState(false);
+  useEffect(() => { if (infoVisible) setRelationsOpen(false); }, [infoVisible]);
   const infoDelayRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -372,7 +376,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
 
           {/* Info-nupp — desktop hover + mobiil touch-hold */}
           <button
-            className={`absolute top-2 right-2 z-30 w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110 ${copied ? 'bg-green-500/80 hover:bg-green-500/90' : 'bg-black/25 hover:bg-black/50'}`}
+            className={`absolute top-2 right-2 z-30 w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110 ${copied ? 'bg-green-500/80 hover:bg-green-500/90' : 'bg-black/25 hover:bg-black/50'} ${relationsOpen ? 'hidden' : ''}`}
             onClick={handleCopyInfo}
             onMouseEnter={() => { infoDelayRef.current = setTimeout(() => setInfoVisible(true), 200); }}
             onMouseLeave={() => { if (infoDelayRef.current) clearTimeout(infoDelayRef.current); setInfoVisible(false); }}
@@ -382,6 +386,17 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           >
             {copied ? <Check size={11} className="text-white" /> : <Info size={11} className="text-white/90" />}
           </button>
+
+          {/* Seoste nupp info-nupu all (#701, ADR 0075) */}
+          <RelationsButton
+            workId={work.work_id}
+            relations={work.relations}
+            variant="card"
+            lang={getLangCode(i18n.language)}
+            open={relationsOpen}
+            onOpenChange={(open) => { setRelationsOpen(open); if (open) setInfoVisible(false); }}
+            hidden={infoVisible}
+          />
 
           {/* Overlay — katab kogu kaardi; mobiilil toks suleb */}
           <div

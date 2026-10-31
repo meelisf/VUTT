@@ -4,6 +4,7 @@ Prügikasti operatsioonid (kustutatud teosed).
 Prügikast asub BASE_DIR/._trash/{work_id}/ — punkt-prefiks tagab, et
 metadata_watcher_loop seda ignoreerib.
 """
+import json
 import os
 import re
 import shutil
@@ -12,7 +13,7 @@ from git import Actor
 
 from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, git_write_lock
-from .utils import WORK_ID_CACHE
+from .utils import WORK_ID_CACHE, atomic_write_text
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import refresh_work_mentions
 from .trash_reason import liigita, on_taastatav
@@ -161,6 +162,22 @@ def restore_deleted_work(work_id, username="VUTT Server"):
                     )
         except Exception as e:
             return {'ok': False, 'error': f'JPG-de liigutamine ebaõnnestus: {e}'}
+
+        # 5b. Seosed (ADR 0075): vastaspooled koristati kustutamisel, nii et taastatud
+        # teose `relations` oleks ühepoolne. Eemaldame ja stage'ime uuesti —
+        # checkout täitis indeksi vana sisuga ja repo.index.commit kasutab indeksit.
+        meta_rel = os.path.join(folder_name, "_metadata.json")
+        meta_abs = os.path.join(BASE_DIR, meta_rel)
+        try:
+            if os.path.exists(meta_abs):
+                with open(meta_abs, "r", encoding="utf-8") as f:
+                    restored_meta = json.load(f)
+                if "relations" in restored_meta:
+                    restored_meta.pop("relations")
+                    atomic_write_text(meta_abs, json.dumps(restored_meta, indent=2, ensure_ascii=False))
+                    repo.index.add([meta_rel])
+        except Exception as e:
+            return {'ok': False, 'error': f'Seoste eemaldamine taastatud teoselt ebaõnnestus: {e}'}
 
         # 6. Git commit — taastamise commit
         title = work_id

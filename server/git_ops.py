@@ -413,13 +413,66 @@ def run_git_fsck():
         return {"ok": False, "output": "", "errors": str(e)}
 
 
-def save_with_git(filepath, content, username, message=None, additional_files=None):
+def _read_snapshot(paths):
+    """Failide algne toorsisu (baidid); puuduv fail = None."""
+    snapshot = {}
+    for path in paths:
+        try:
+            with open(path, "rb") as f:
+                snapshot[path] = f.read()
+        except FileNotFoundError:
+            snapshot[path] = None
+    return snapshot
+
+
+def _restore_snapshot(snapshot, relative_paths, git_env):
+    """Taastab failid baithaaval ja eemaldab need indeksist. Tagastab, kas õnnestus.
+
+    Kutsuja hoiab `_git_write_lock`-i: indeks ei tohi staged olekus jääda ühelegi
+    teisele kirjutajale, kes commitib kogu indeksi (`repo.index.commit`).
+    """
+    try:
+        for path, data in snapshot.items():
+            if data is None:
+                if os.path.exists(path):
+                    os.remove(path)
+                continue
+            tmp_path = f"{path}.rollback.tmp"
+            with open(tmp_path, "wb") as f:
+                f.write(data)
+            os.replace(tmp_path, path)
+        tracked = [rel for rel, path in zip(relative_paths, snapshot) if snapshot[path] is not None]
+        if tracked:
+            subprocess.run(["git", "reset", "-q", "--", *tracked], cwd=BASE_DIR, env=git_env,
+                           check=True, capture_output=True, text=True)
+        untracked = [rel for rel, path in zip(relative_paths, snapshot) if snapshot[path] is None]
+        if untracked:
+            # Uus fail: `git reset` ei tunne teed HEAD-is — eemaldame ainult indeksist.
+            subprocess.run(["git", "rm", "-q", "--cached", "--ignore-unmatch", "--", *untracked],
+                           cwd=BASE_DIR, env=git_env, check=True, capture_output=True, text=True)
+        return True
+    except Exception as e:
+        logger.error(f"Git tagasipööramine EBAÕNNESTUS: {relative_paths}: {e}")
+        try:
+            from .client_errors import record_server_error
+            record_server_error("server:thread", e)
+        except Exception:
+            pass
+        return False
+
+
+def save_with_git(filepath, content, username, message=None, additional_files=None, *,
+                  rollback_on_error=False):
     """Salvestab failid ja teeb path-skoobitud native Git CLI commiti.
 
     GitPythoni ``repo.index.commit`` kirjutas suure repo indeksi puhtas Pythonis
     läbi ja võttis /data repos ~1,8 s. Native git teeb sama töö ~0,15 s-ga.
     Kogu write+stage+commit tsükkel on lukus, et samaaegsed salvestused ei saaks
     teineteise faili vale autori commiti sisse stage'ida.
+
+    `rollback_on_error=True` (ADR 0075): kirjutus-, add- või commiti vea korral
+    kirjutatakse failid baithaaval algseisu ja eemaldatakse indeksist samas
+    lukus; tulemus kannab `rolled_back`-i. Vaikimisi jääb fail kettale (#418).
     """
     get_or_init_repo()  # Initsialiseerib/valideerib repo nagu varem.
     relative_path = os.path.relpath(filepath, BASE_DIR)
@@ -450,11 +503,23 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
                 if is_first_commit else f"Muuda: {relative_path}"
             )
 
+        snapshot = _read_snapshot([filepath] + [path for path, _ in extra]) if rollback_on_error else None
+
+        def _rolled_back(error_text):
+            ok = _restore_snapshot(snapshot, files_to_add, git_env)
+            return {"success": False, "error": error_text, "rolled_back": ok}
+
         # Kirjutamine peab olema sama luku sees kui stage'imine: muidu võiks
         # teine lõim faili kahe sammu vahel üle kirjutada.
-        atomic_write_text(filepath, content)
-        for add_filepath, add_content in extra:
-            atomic_write_text(add_filepath, add_content)
+        try:
+            atomic_write_text(filepath, content)
+            for add_filepath, add_content in extra:
+                atomic_write_text(add_filepath, add_content)
+        except Exception as e:
+            if not rollback_on_error:
+                raise
+            logger.error(f"Faili kirjutus EBAÕNNESTUS, pööran tagasi: {relative_path}: {e}")
+            return _rolled_back(str(e))
 
         max_retries = 3
         for attempt in range(max_retries):
@@ -530,6 +595,8 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
                     f"Git commit EBAÕNNESTUS: {relative_path} (kasutaja: {username}): {error_text}"
                 )
                 _record_git_failure(relative_path, username, e)
+                if rollback_on_error:
+                    return _rolled_back(error_text)
                 return {"success": False, "error": error_text}
 
 

@@ -4,7 +4,7 @@ import shutil
 import threading
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -392,27 +392,41 @@ async def admin_people_refresh_status(user=Depends(require_role("admin"))):
 
 
 @router.delete("/admin/work/{work_id}")
-def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
-    path = find_directory_by_id(work_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Teost ei leitud")
-    folder_name = os.path.basename(path)
-    title = work_id
-    try:
+def admin_work_delete(work_id: str, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    from ..metadata_ops import BulkUpdateError
+    from ..utils import metadata_lock
+    from ..work_relations import cleanup_for_deletion
+
+    # Seoste lugemine, koristus ja kausta eemaldamine ÜHE metadata_lock-i all
+    # (ADR 0075): muidu jõuaks samaaegne PUT lisada seose, mida keegi ei koristaks.
+    # Meili sünk käib background_tasks-iga, väljaspool lukku.
+    with metadata_lock:
+        path = find_directory_by_id(work_id)
+        if not path:
+            raise HTTPException(status_code=404, detail="Teost ei leitud")
+        folder_name = os.path.basename(path)
         meta_path = os.path.join(path, "_metadata.json")
-        if os.path.exists(meta_path):
-            with open(meta_path, "r", encoding="utf-8") as f:
-                title = json.load(f).get("title", work_id)
-    except Exception:
-        pass
+        title = work_id
+        try:
+            if os.path.exists(meta_path):
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    title = json.load(f).get("title", work_id)
+        except Exception:
+            pass
 
-    trash_dir = os.path.join(BASE_DIR, "._trash", work_id)
-    os.makedirs(trash_dir, exist_ok=True)
-    for fname in os.listdir(path):
-        if fname.lower().endswith((".jpg", ".jpeg", ".png")):
-            shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
+        try:
+            cleanup_for_deletion(work_id, meta_path, user["username"], background_tasks)
+        except BulkUpdateError as e:
+            logger.error("Teose %s seoste koristus ebaõnnestus, kustutus katkestatud: %s", work_id, e)
+            raise HTTPException(status_code=500, detail="Seoste koristus ebaõnnestus, teost ei kustutatud")
 
-    shutil.rmtree(path)
+        trash_dir = os.path.join(BASE_DIR, "._trash", work_id)
+        os.makedirs(trash_dir, exist_ok=True)
+        for fname in os.listdir(path):
+            if fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
+
+        shutil.rmtree(path)
     delete_work_from_git(folder_name, title, work_id, username=user["username"])
     delete_work_from_meilisearch(work_id)
     from ..prosopography.indices import update_work_collections
