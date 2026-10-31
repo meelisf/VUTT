@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PartPersonsHint from './PartPersonsHint';
+import RelationsButton from './relations/RelationsButton';
 import { Check } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Work } from '../types';
@@ -35,6 +36,8 @@ const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isS
   const genres = Array.isArray(work.genre) ? work.genre : work.genre ? [work.genre] : [];
   const creators = (work.creators || []).filter(c => c.name);
   const typeLabel = work.type ? getLabel(work.type, lang) : '';
+
+  const [relationsOpen, setRelationsOpen] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -81,6 +84,19 @@ const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isS
         >
           {displayTitle.main}
         </a>
+        {/* Seoste nupp (#701): popover nupu juurest, klõpsud ei jõua rea onClick-ini */}
+        {!selectMode && (
+          <span className="ml-2">
+            <RelationsButton
+              workId={work.work_id}
+              relations={work.relations}
+              variant="row"
+              lang={lang}
+              open={relationsOpen}
+              onOpenChange={setRelationsOpen}
+            />
+          </span>
+        )}
         {displayTitle.secondary && (
           <div className="text-sm italic text-gray-500 line-clamp-1" title={displayTitle.secondary}>
             {displayTitle.secondary}
