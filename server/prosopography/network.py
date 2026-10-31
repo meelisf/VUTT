@@ -15,7 +15,6 @@ import threading
 from typing import Optional
 
 from . import state
-from ._compat import sync_from_facade
 from .indices import _collection_descendants, _load_index, _load_person_to_works, _load_work_collections
 from .network_rules import classify_pair
 from .person_crud import get_person
@@ -212,7 +211,6 @@ def _family_records(person_id: str, focus_card: dict) -> dict:
 
 
 def build_person_network(person_id: str, collection: Optional[str] = None) -> Optional[dict]:
-    sync_from_facade()
     card = get_person(person_id)
     if card is None:
         return None

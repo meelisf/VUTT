@@ -10,7 +10,6 @@ from . import state
 from .indices import _load_index, _load_person_to_works, mention_entries
 from ..config import get_logger
 from .person_crud import get_person
-from ._compat import sync_from_facade
 
 logger = get_logger(__name__)
 
@@ -20,7 +19,6 @@ _WORK_TO_PERSONS_TTL = 300  # sekundit
 
 def get_person_with_works(person_id: str) -> Optional[dict]:
     """Laeb isiku + tema teosed pöördindeksist (O(1))."""
-    sync_from_facade()
     person = get_person(person_id)
     if person is None:
         return None
@@ -50,7 +48,6 @@ def _with_part_facts(entries: list) -> list:
 
 def _build_work_to_persons() -> dict:
     """Pöörab person_to_works → {work_id: [{id, label}]}, label isikuindeksist."""
-    sync_from_facade()
     ptw = _load_person_to_works()
     index = _load_index()
     labels = {e.get("id"): (e.get("label") or e.get("name") or e.get("id"))
@@ -106,7 +103,6 @@ def get_person_relation_network_ids(person_id: str, collection: Optional[str] = 
 
 def get_relation_type_suggestions() -> list:
     """Kogub kõigist isikukaartidest unikaalsed seose tüübid."""
-    sync_from_facade()
     seen: dict[str, dict] = {}
     pattern = os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")
     for path in state._glob.glob(pattern):
@@ -131,7 +127,6 @@ def update_page_person_mentions(work_id: str, work_dir: str):
     """Uuendab person_to_works 'mentioned' rolle antud teose lehekülje page_tags põhjal."""
     if not work_id:
         return
-    sync_from_facade()
 
     try:
         parts = []

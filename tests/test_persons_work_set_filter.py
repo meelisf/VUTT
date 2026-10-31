@@ -47,7 +47,6 @@ def keskkond(tmp_path, monkeypatch, backend_env):
 
     monkeypatch.setattr(indices, "_load_person_to_works", lambda: PERSON_TO_WORKS)
     monkeypatch.setattr(indices, "_load_index", lambda: INDEX)
-    monkeypatch.setattr(indices, "sync_from_facade", lambda: None)
     monkeypatch.setattr(person_search, "_load_index", lambda: INDEX)
     return kaust
 

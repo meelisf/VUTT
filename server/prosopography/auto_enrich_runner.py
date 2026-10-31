@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from . import state
-from ._compat import sync_from_facade
 from .auto_enrich import (ENRICH_SCHEMES, PLACE_FIELDS, add_place_review, aggregate,
                           apply_place_plans, apply_to_card, card_place_qid, finish_review)
 from .enrichment import fetch_remote
@@ -93,7 +92,6 @@ def _apply_places(card: dict, plans: dict) -> tuple:
 
 def run_auto_enrichment(person_id: str) -> Optional[dict]:
     crud = _crud()
-    sync_from_facade()
     card = crud.get_person(person_id)
     if _is_dead(card) or not _is_pending(card):
         return None
@@ -207,7 +205,6 @@ def run_place_fill(person_id: str, username: str = "Automaatne") -> Optional[dic
     uuesti. Muutuseta → ei salvestata (tagastab None).
     """
     crud = _crud()
-    sync_from_facade()
     card = crud.get_person(person_id)
     if _is_dead(card):
         return None
@@ -250,7 +247,6 @@ def schedule_auto_enrichment(person_id: str) -> None:
 
 def recover_pending() -> int:
     """Ajastab kaardid, kuhu `enrich_pending` jäi alles (katse ei jõudnud lõpule)."""
-    sync_from_facade()
     n = 0
     for path in glob.glob(os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")):
         try:

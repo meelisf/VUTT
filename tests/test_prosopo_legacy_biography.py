@@ -48,7 +48,7 @@ def kaart(tmp_path, monkeypatch):
     return _build_kaart(monkeypatch, tmp_path, person)
 
 
-# NB: `update_person` kutsub lisaks `sync_from_facade()`, `person_lock()` ja
+# NB: `update_person` kutsub lisaks `person_lock()` ja
 # `fill_person_labels_from_registry()`. Kui mõni neist puudutab failisüsteemi ja
 # test kukub selle taha, patchi ka need — vaata `tests/test_prosopography_ops.py`
 # olemasolevaid fikstuure ja korda sealset mustrit, ära leiuta uut.
