@@ -11,6 +11,7 @@ import os
 from typing import Optional
 
 from .access_ops import can_read_work
+from .config import get_logger
 from .metadata_ops import BulkUpdateError, bulk_update_works
 from .utils import find_directory_by_id
 from .work_sets_access import load_work_metadata_by_id
@@ -19,6 +20,8 @@ from .work_sets_access import load_work_metadata_by_id
 INVERSE = {"isVersionOf": "isVersionOf"}
 
 _VERB_LABEL = {"isVersionOf": "variant"}
+
+logger = get_logger(__name__)
 
 
 class RelationError(Exception):
@@ -147,7 +150,12 @@ def cleanup_for_deletion(work_id: str, meta_path: str, username: str,
     Rippuvad sihtmärgid jäetakse välja; kustutatav teos ei saa Meili sünki.
     Viga → `BulkUpdateError` (midagi ei muutunud) — kutsuja katkestab kustutuse.
     """
-    meta = load_work_metadata_by_id(work_id) or {}
+    try:
+        meta = load_work_metadata_by_id(work_id) or {}
+    except (OSError, ValueError) as e:
+        # Katkine fail ei saa anda vastaspooli; katkine teos peab jääma kustutatavaks.
+        logger.warning("Teose %s metaandmeid ei saa lugeda, seoseid ei koristata: %s", work_id, e)
+        return []
     rels = [r for r in (meta.get("relations") or []) if isinstance(r, dict)]
     if not rels:
         return []

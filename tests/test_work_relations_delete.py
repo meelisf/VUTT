@@ -178,3 +178,10 @@ def test_taastamine_eemaldab_seosed_ka_kui_eelmine_commit_neid_kannab(trash_repo
     assert "relations" not in json.loads((base / folder / "_metadata.json").read_text())
     assert "relations" not in json.loads(repo.git.show(f"HEAD:{folder}/_metadata.json"))
     assert synced and "relations" not in synced[-1]
+
+
+def test_rikutud_metaandmetega_teose_saab_kustutada(env):
+    """Enne seoseid oli pealkirja lugemine try/except-is; katkine teos peab olema kustutatav."""
+    Path(env["dirs"]["w3"], "_metadata.json").write_text("{katki", encoding="utf-8")
+    assert _delete("w3") == {"status": "success"}
+    assert not Path(env["dirs"]["w3"]).exists()
