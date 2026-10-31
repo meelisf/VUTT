@@ -26,6 +26,7 @@ Veel lahtiseks jäänud read tõsta enne `tegemata_tood.md`-sse, et need ei kaok
 | [reviews/2026-10-02-htr-mudelite-vordlus.md](reviews/2026-10-02-htr-mudelite-vordlus.md) | Käsikirja-OCR: 20 üldmudelit + meie Qwen 3.5 9B ühel Kurrendi lehel (CER/WER/hind); uued treeningandmestikud | OCR-mudeli vahetuse või järgmise Kurrendi treeningu eel |
 | [reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md](reviews/2026-09-27-turva-ja-andmelekke-ulevaade.md) | Andmelekkeriskid: kood, tootmise saladuste ja failide õigused, teenuste eraldatus | Turvaparanduste planeerimisel ja tootmise järelkontrollil |
 | [reviews/2026-09-15-koodibaasi-ulevaade.md](reviews/2026-09-15-koodibaasi-ulevaade.md) | Koodibaasi ülevaatus: saladuste kontroll, turva, hallatavus, pikaealisus (P0–P2) | Enne suuremat refaktorit või uue töö planeerimist |
+| [superpowers/specs/2026-10-19-eksemplari-kiht-ja-paber-arutelu.md](superpowers/specs/2026-10-19-eksemplari-kiht-ja-paber-arutelu.md) | Arutelu (mitte otsus): eksemplari kiht, üks tekstitunnistaja, paber.ut.ee vesimärkide arhiiv + import (#696) | Enne eksemplari-, leidumuse- või paberiandmete tööd |
 | [superpowers/specs/](superpowers/specs/) | **Lahtised** disainid: teose osad (PR 4 CMIF, #464/#526), isiku lisamise voog (ülevaatusjärjekord), contributor-ulatuse B osa, Gemini re-OCR superadmin | Enne selle töö jätkamist |
 | [superpowers/plans/](superpowers/plans/) | **Teostamata** plaanid — praegu tühi (2026-10-01) | Enne selle töö alustamist |
 
