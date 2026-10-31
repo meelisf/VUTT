@@ -62,3 +62,80 @@ def test_viimase_seose_eemaldus_eemaldab_votme(tmp_path, spies):
                                       "relations": [{"id": "w2", "rel_type": "isVersionOf"}]})
     bulk_update_works([(path, lambda m: {"relations": []})], "u", "msg")
     assert "relations" not in json.loads(spies["git"][0]["content"])
+
+
+# --- Task 3: range režiim ---------------------------------------------------------
+
+from server.metadata_ops import BulkUpdateError  # noqa: E402
+
+
+def _add(other):
+    def transform(meta):
+        rels = list(meta.get("relations") or [])
+        rels.append({"id": other, "rel_type": "isVersionOf"})
+        return {"relations": rels}
+    return transform
+
+
+def _boom(meta):
+    raise ValueError("katki")
+
+
+def test_range_puuduv_fail_ei_kirjuta_midagi(tmp_path, spies):
+    a = _work(tmp_path, "a", {"id": "w1", "title": "A"})
+    puudub = str(tmp_path / "b" / "_metadata.json")
+    with pytest.raises(BulkUpdateError) as e:
+        bulk_update_works([(a, _add("w2")), (puudub, _add("w1"))], "u", "m", all_or_nothing=True)
+    assert e.value.failed_paths == [puudub]
+    assert spies["git"] == [] and spies["meili"] == [] and spies["collections"] == []
+    assert "relations" not in json.loads(Path(a).read_text())
+
+
+def test_range_teise_transformi_viga_ei_kirjuta_esimest(tmp_path, spies):
+    a = _work(tmp_path, "a", {"id": "w1", "title": "A"})
+    b = _work(tmp_path, "b", {"id": "w2", "title": "B"})
+    with pytest.raises(BulkUpdateError):
+        bulk_update_works([(a, _add("w2")), (b, _boom)], "u", "m", all_or_nothing=True)
+    assert spies["git"] == [] and spies["meili"] == []
+
+
+def test_range_kasutab_tagasipooramist_ja_commiti_viga_viskab(tmp_path, spies, monkeypatch):
+    a = _work(tmp_path, "a", {"id": "w1", "title": "A"})
+    b = _work(tmp_path, "b", {"id": "w2", "title": "B"})
+    kutsed = []
+
+    def kukkuv(*args, **kwargs):
+        kutsed.append(kwargs)
+        return {"success": False, "error": "x", "rolled_back": True}
+
+    monkeypatch.setattr(metadata_ops, "save_with_git", kukkuv)
+    with pytest.raises(BulkUpdateError):
+        bulk_update_works([(a, _add("w2")), (b, _add("w1"))], "u", "m", all_or_nothing=True)
+    assert kutsed[0]["rollback_on_error"] is True
+    assert spies["meili"] == [] and spies["collections"] == [] and spies["facts"] == []
+
+
+def test_range_edukas_kirjutab_molemad_uhe_commitiga(tmp_path, spies):
+    a = _work(tmp_path, "a", {"id": "w1", "title": "A"})
+    b = _work(tmp_path, "b", {"id": "w2", "title": "B"})
+    res = bulk_update_works([(a, _add("w2")), (b, _add("w1"))], "u", "m", all_or_nothing=True)
+    assert res["updated"] == 2 and len(spies["git"]) == 1
+    assert sorted(spies["meili"]) == ["a", "b"]
+
+
+def test_skip_sync_paths_kirjutab_aga_ei_sunki(tmp_path, spies):
+    a = _work(tmp_path, "a", {"id": "w1", "title": "A"})
+    b = _work(tmp_path, "b", {"id": "w2", "title": "B"})
+    bulk_update_works([(a, _add("w2")), (b, _add("w1"))], "u", "m", skip_sync_paths=[a])
+    git = spies["git"][0]
+    assert {git["path"], *[p for p, _ in git["additional_files"]]} == {a, b}
+    assert spies["meili"] == ["b"]
+    assert spies["collections"] == [("w2", [])] and spies["facts"] == ["w2"]
+
+
+def test_vaikimisi_osaline_rike_kaitub_nagu_enne(tmp_path, spies):
+    a = _work(tmp_path, "a", {"id": "w1", "title": "A"})
+    b = _work(tmp_path, "b", {"id": "w2", "title": "B"})
+    res = bulk_update_works([(a, _add("w2")), (b, _boom)], "u", "m")
+    assert res["updated"] == 1 and res["failed"] == 1
+    assert "rollback_on_error" not in spies["git"][0]["kwargs"]
