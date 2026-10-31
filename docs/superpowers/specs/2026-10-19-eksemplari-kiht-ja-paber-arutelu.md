@@ -1,7 +1,8 @@
 # Eksemplari kiht ja paber.ut.ee vesimärgid — arutelu
 
 **Seis:** arutelu alus, mitte otsus (2026-10-19, tihendatud 2026-10-31). Issue [#696](https://github.com/meelisf/VUTT/issues/696).
-ADR kirjutamata — tuleb enne etappi 2.
+ADR kirjutamata — tuleb enne etappi 2. Koodibaasi vastu kontrollitud:
+[ülevaatus 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-koodi-ulevaade.md) (viited allpool „ül. §N").
 
 ## Lähtekoht
 
@@ -45,13 +46,31 @@ Teosel on 0…n eksemplari, üks neist tekstitunnistaja; vaatlus kuulub alati ü
 | Kiht | Kirjeldab | Põhiväljad |
 |---|---|---|
 | Eksemplar | üks füüsiline eksemplar | hoidja, kohaviit, tekstitunnistaja j/e, lehed (kui digiteeritud), väline digikoopia, seisund, tüpograafia, provenients, märkus, pildid |
-| Vaatlus | üks vesimärk (või vesimärgita paber) eksemplari kindlas kohas | asukoht, IPH klassid, kirjeldus, tekst vesimärgil, paigutus, poogna mõõt, ahel- ja ribijooned, paberi tüüp ja kvaliteet, sõel, äär, fotod, kommentaar |
+| Vaatlus | üks vesimärk (või vesimärgita paber) eksemplari kindlas kohas | asukoht (`locus` + valikulised lehetüved, vt allpool), IPH klassid, kirjeldus, tekst vesimärgil, paigutus, poogna mõõt, ahel- ja ribijooned, paberi tüüp ja kvaliteet, sõel, äär, fotod, kommentaar |
 | Vorm | paberivorm, mille jälg vesimärk on | nimi, kirjeldus, kaksikvorm, veski/paberitegija, viited ([Bernstein][bernstein], [WZIS][wzis], [Briquet][briquet]), seotud vaatlused kindlusastmega |
 
 - IPH põhiklassid (A…Z) on valikloend, mitte vaba tekst. Väljade loend tuleb paber.ut.ee-st ja on
   lahti.
 - Paberi üldandmed (veržee, sõel, äär, mõõt) korduvad paber.ut.ee-s igal vaatlusel; uues mudelis
   eksemplari tasemel, vaatlusel ainult erinevuse korral.
+- **Eksemplar kasvab välja `archive_refs`-ist** (ül. §1). Teose väli `archive_refs`
+  (`{archive_id, reference, url}`, hoidjad `archives.json`-is, otsitav `archive_refs_text`) on
+  juba hoidja + kohaviit + digikoopia. Paralleelset kohta EI looda — iga praegune kirje on
+  üks eksemplar ja otsinguväli katab edasi kõigi eksemplaride hoidjaid/kohaviitu. Käsikirjal on
+  `archive_refs` juba praegu tema ainus eksemplar.
+- **Lehtede seos eksemplariga käib lehetüvede kaudu** (ül. §5), nagu teose osadel: vaikimisi kõik
+  lehed tekstitunnistajale, ainult `nri7ga`-tüüpi erand salvestab tüved ja saab `sync_work_parts`-i
+  eeskujul ümberarvutuse `refresh_work_mentions` ahelas (ADR 0055).
+- **Pildid `_`-prefiksiga alamkausta** (`_exemplars/…`, `_watermarks/…`, ül. §4): juurkausta pilt
+  loetakse teose leheks; pildiserver (`server/image_server.py`) lubab praegu alamkaustadest ainult
+  `_thumbs/` ja vajab laiendust sama ligipääsukontrolli all.
+- **Eksemplarid `_metadata.json`-is oma otspunktiga** (`/works/{id}/exemplars`, nagu `parts`);
+  **vaatlused eraldi failis** (nt `_watermarks.json`), et poolik arhiivisalvestus ei käivitaks
+  teose täisteksti Meili-sünki (ül. §6). Korpuseülene vaade (töövoo p. 5) vajab siis tuletatud
+  read-modelit (ADR 0007).
+- Variandiseos (reegel 4) on olemas: `Relation.rel_type = 'isVersionOf'`.
+- Vormiregister võtab ADR 0059-st tehnilise mustri (VUTT-i võti, lukk, `save_config_with_git`),
+  aga mitte skeemi — vormil ei ole Q-koodi ega tõlgitavat silti (ül. §7).
 - Ehitada saab olemasoleva peale: teose osad ([ADR 0057](../../decisions/0057-teose-osad.md)), ameti- ja
   asutuseregister ([ADR 0059](../../decisions/0059-ameti-ja-asutusregistri-voti.md)).
 
@@ -141,10 +160,13 @@ Etappide 2–4 maht hindamata.
 
 - Kõik fotod avalikuks.
 - 5Dvisioniga tuleb suhelda (leping, ekspordimoodul).
-- **Ettepanek:** vaatluse asukoht = VUTT-i üldine viitamisviis. Poognasignatuurid, foliatsioon ja
-  paginatsioon on transkriptsioonis juba tägidega märgitud → teos + signatuur / folio / lehekülg
-  (eriti kirjade puhul), eraldi välja pole vaja. Vt [lehe aadress sisukorras](2026-10-19-lehe-aadress-sisukorras-design.md),
-  kus signatuurid jäeti eksemplari kihi juurde.
+- **Ettepanek: vaatlusel on oma asukohaväli** (`locus`, vabatekst: `a2, a3`, `a4`, `c4, d2`, `fol. 10`,
+  `eesleht`) + valikulised VUTT-i lehetüved, kui vaatlus on tekstitunnistajal. *Muudetud
+  2026-10-31* (ül. §2): varasem ettepanek „asukoht = VUTT-i üldine viitamisviis tägidest, eraldi
+  välja pole vaja" ei pea — lehe aadress ([ADR 0070](../../decisions/0070-lehe-tahistus-ja-lehe-aadress.md),
+  `server/page_address.py`) töötab ainult käsikirjadel; trükisel ei ole signatuuri igal poogna
+  lehel (`a4`), toores leht on `<sig>`-tägita, eksemplare B/C ei transkribeerita, eeslehel
+  tähist pole.
 
 ## Lahtised küsimused
 
@@ -155,6 +177,15 @@ Etappide 2–4 maht hindamata.
 - Vesimärgid avalikud kohe või pärast avaldamist (doktoritöö prioriteet)?
 - Kes lisavad vaatlusi — projekti uurijad või ka teised paberiajaloolased (uus õigus)?
 - Arhiveerimine VUTT-i serveris või ÜR-i veebimajutuses?
+- **Lehtedeta teos** (töövoo p. 1, ül. §3): `build_work_documents` tagastab 0 pildiga teosele
+  `[]` → teost ei ole Meilis (ka mitte `kirjad`-is) ega töölaual. Variant A: sünteetiline
+  0-leheline dokument + vaade; variant B: kohustuslik pilt (häkk). Etapi 3 eeltingimus.
+- **Vaatluste korpuseülene indeks:** kas tuletatud JSON read-model või Meili? Mis jõuab MCP-sse?
+- **Nähtavus ja õigused:** kuidas vaatlus enne doktoritöö ilmumist peidetakse ja kes lisab —
+  seosta olemasoleva mudeliga (`can_write_work`, ADR 0031; kogu nähtavus, ADR 0069), mitte uus
+  paralleelne kontroll.
+- **Katalooginumbrid** (Jaanson, VD17, ESTER, DSpace): struktureeritud väli või mitte? Vastus tuleb
+  kuivkäivitusega sobitusskriptist kohe etapi 1 järel (ül. §7), enne etapi 2 ADR-i.
 
 ## Viited
 
