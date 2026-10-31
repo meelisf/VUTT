@@ -70,6 +70,30 @@ def person_url(person_id: str, *, base_url: str) -> str:
     return f"{base_url}/persons/{person_id}"
 
 
+def ester_ref(ester_id: str) -> str:
+    """ESTERi kirje number + link (sama kuju mis töölaua infopaneelil)."""
+    return f"{ester_id} · https://www.ester.ee/record={ester_id}*est"
+
+
+def format_archive_refs(refs) -> str:
+    """Arhiiviviited ridadena `hoidja · kohaviit · url`.
+
+    Meili dokument kannab välja nii, nagu `_metadata.json`-is on: vanas
+    kirjes võib olla mitte-objekt või tühi viide — need jäetakse vahele.
+    """
+    lines = []
+    for ref in refs or []:
+        if not isinstance(ref, dict):
+            continue
+        parts = [str(ref.get(key) or "").strip() for key in ("archive_id", "reference", "url")]
+        parts = [p for p in parts if p]
+        if parts:
+            lines.append("  " + " · ".join(parts))
+    if not lines:
+        return ""
+    return "\n".join(["Arhiiviviited (hoidja · kohaviit · digikoopia):", *lines])
+
+
 def _first(value) -> str:
     """Massiivist esimene väärtus, skalaarist tema ise, tühjast tühi string."""
     if isinstance(value, list):

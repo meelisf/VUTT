@@ -78,6 +78,10 @@ WORK_OVERVIEW_RETRIEVE_FIELDS = [
     # praeses, gratulandid ja eessõna autor elavad AINULT siin — tuletatud
     # väljad `autor`/`respondens` neid ei kata.
     "creators",
+    # ESTERi kirje ja kohaviidad: agendi eksemplari-, konvoluudi- ja
+    # seoseettepanekute lähtepunkt (#703).
+    "ester_id",
+    "archive_refs",
     "lehekylje_number",
     "status",
     "teose_lehekylgede_arv",
