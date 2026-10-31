@@ -3,15 +3,17 @@
 **Seis:** arutelu alus, mitte otsus (2026-10-19, tihendatud 2026-10-31). Issue [#696](https://github.com/meelisf/VUTT/issues/696).
 ADR kirjutamata — tuleb enne etappi 2. Koodibaasi vastu kontrollitud:
 [ülevaatus 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-koodi-ulevaade.md) (viited allpool „ül. §N")
-ja [järelkontroll 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-jarelkontroll.md) („jk. §N").
+ja [järelkontroll 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-jarelkontroll.md) („jk. §N");
+sõnastus täpsustatud [kavandi täpsustuste](../../reviews/2026-10-31-eksemplari-kiht-kavandi-tapsustused.md) järgi.
 
 ## Lähtekoht
 
 - **paber.ut.ee** ([Eesti varajased trükised][paber]) valmis ETF grandi 8205 raames: 522 eksemplari
   kirjeldust, vesimärgid IPH tüpoloogia järgi ([IPH Norm 2.1.1][iph]), fotod. Tarkvara ei ole üle
   10 aasta uuendatud, hooldus sõltub välisfirmast (5Dvision).
-- **Andmed ei ole ohus:** kirjeldused ja täissuuruses pildid (`/pics/`) on HTML-ist kättesaadavad,
-  ülekanne ei vaja vana tarkvara.
+- **Ülevõtmine on võimalik:** kirjeldused ja täissuuruses pildid (`/pics/`) on HTML-ist kättesaadavad,
+  ülekanne ei vaja vana tarkvara. Andmestiku täielikkus on kontrollimata — selgub etapi 1
+  inventuurist.
 - **Uurimine jätkub**, ka käsikirjadest (senatiprotokollid, kirjad). Vaja on kohta, kus andmeid
   jooksvalt täiendada.
 - **VUTT on tekstikeskne.** Paber on eksemplari omadus, VUTT-is eksemplari mõistet ei ole.
@@ -26,7 +28,7 @@ otse siduda. Segadus on andmetes juba näha:
   R Bergm. 357(8)").
 - [`nri7ga`][nri7ga] — lk 1 ja lk 2 on eri eksemplarid, andmed seda ei ütle.
 
-## Reegel: teosel üks tekstitunnistaja
+## Reegel: teosel kuni üks tekstitunnistaja
 
 1. Transkribeeritakse üht eksemplari teose kohta; selle skaneering on teose lehed (nagu praegu).
 2. Teised eksemplarid (digiteeritud või mitte) on **kirjed**: teksti ei transkribeerita; kirjel
@@ -42,12 +44,13 @@ Kirjeid tuleb juurde, transkribeeritavaid tekste mitte.
 
 Teos (olemas) → **eksemplar** → **vaatlus**; **vorm** on register, mis koondab vaatlusi eri
 eksemplaridest ja teostest, ka käsikirjadest. Teose tekst ja paber ei puutu otse kokku.
-Teosel on 0…n eksemplari, üks neist tekstitunnistaja; vaatlus kuulub alati ühele eksemplarile.
+Teosel on 0…n eksemplari, neist kuni üks kinnitatud tekstitunnistaja (lehtedeta või
+migreerimata teosel võib see puududa); vaatlus kuulub alati ühele eksemplarile.
 
 | Kiht | Kirjeldab | Põhiväljad |
 |---|---|---|
 | Eksemplar | üks füüsiline eksemplar | hoidja, kohaviit, tekstitunnistaja j/e, lehed (kui digiteeritud), väline digikoopia, seisund, tüpograafia, provenients, märkus, pildid |
-| Vaatlus | üks vesimärk (või vesimärgita paber) eksemplari kindlas kohas | asukoht (`locus` + valikulised lehetüved, vt allpool), IPH klassid, kirjeldus, tekst vesimärgil, paigutus, poogna mõõt, ahel- ja ribijooned, paberi tüüp ja kvaliteet, sõel, äär, fotod, kommentaar |
+| Vaatlus | üks vesimärgitüüp (või vesimärgita paber) ühes eksemplaris, üks või mitu asukohta | asukoht (`locus` + valikulised lehetüved, vt allpool), IPH klassid, kirjeldus, tekst vesimärgil, paigutus, poogna mõõt, ahel- ja ribijooned, paberi tüüp ja kvaliteet, sõel, äär, fotod, kommentaar |
 | Vorm | paberivorm, mille jälg vesimärk on | nimi, kirjeldus, kaksikvorm, veski/paberitegija, viited ([Bernstein][bernstein], [WZIS][wzis], [Briquet][briquet]), seotud vaatlused kindlusastmega |
 
 - IPH põhiklassid (A…Z) on valikloend, mitte vaba tekst. Väljade loend tuleb paber.ut.ee-st ja on
