@@ -98,11 +98,15 @@ migreerimata teosel võib see puududa); vaatlus kuulub alati ühele eksemplarile
   read-modelit (ADR 0007).
 - Variandiseos (reegel 4) on olemas: `Relation.rel_type = 'isVersionOf'`, aga ainult andmeväljana —
   kuvamine ja vastastikune kirjutus: #701.
-- **Konvoluut** (mitu trükist ühes köites; ESTERi näide b1337568: TÜR Est.C-44, 22 trükist) on oma
-  kirje (hoidja, kohaviit, märkus, liikmed järjekorras), mitte paarisseos — 22 liikme puhul oleks
-  paare 231 ja järjekord kaoks. Konvoluut seob **eksemplare**, mitte teoseid (Uppsala eksemplar võib
-  olla köidetud teistega); enne eksemplari kihti on liige `{work_id, exemplar_id?}`, sest teos on
-  sisuliselt tema digiteeritud eksemplar. Kuvamine koos #701 seostega. Issue #702.
+- **Konvoluut** (mitu trükist ühes köites) on **eksemplari väli**, mitte oma kirje: `convolute =
+  {reference, position (0 = põhiteos, N = N. kaasköide), total, contents}`; samas köites olevad
+  trükised tuletatakse (sama hoidja + normaliseeritud konvoluudi kohaviit, „(I)" jääb võtmesse).
+  Fakt „13 trükist" on number, sisukord vabatekst — VUTT-is puuduv trükis ei saa tühja kirjet.
+  ESTER näitab konvoluuti ainult eksemplari märkuses (TÜR R Est.B-954: Fischer b2648642 põhiteos,
+  *Personalia* b4346241 1. kaasköide; R Est.B-954 (I) on teine köide samade trükistega) — sama
+  raamatukogu võib hoida sama trükist kahes konvoluudis, seega kuulub konvoluut eksemplarile.
+  VUTT-is `xzy2ee` = need kaks kirjet ühe teosena. Enne eksemplari kihti saab ploki tuletada
+  `archive_refs`-ist. Issue #702.
 - „Köide" = köitmine (kaaned, köitmisviis), eksemplari väli; „konvoluut" = samas köites trükised.
 - Hoidjatel (`archives.json`) võiks olla ISIL-kood (`EE-…`, `LV-…`, `SE-…`) — sobitus ESTERi,
   paber.ut.ee ja Bernsteiniga; ESTERi kirje number on teosel juba olemas (`ester_id`).
