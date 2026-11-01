@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, ExternalLink, Search, User } from 'lucide-react';
+import { ExternalLink, Search, Tags, User } from 'lucide-react';
 import type { Work } from '../../types';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { getLabel } from '../../utils/metadataUtils';
@@ -20,7 +20,7 @@ const WorkTagsPanel: React.FC<WorkTagsPanelProps> = ({ work, lang }) => {
   return (
     <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
       <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-        <BookOpen size={18} className="text-green-600" />
+        <Tags size={18} className="text-green-600" />
         <h4 className="font-bold">{t('metadata.tags')}</h4>
       </div>
       <div className="flex flex-wrap gap-2">
