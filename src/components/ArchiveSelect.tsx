@@ -3,6 +3,7 @@ import { Plus, X, Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FILE_API_URL } from '../config';
 import { apiErrorMessage, apiPost } from '../services/apiClient';
+import { isAtLeast } from '../utils/roleUtils';
 
 interface ArchiveInfo {
   name: string;
@@ -119,11 +120,12 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
           <ChevronDown size={12} className="shrink-0 text-gray-400" />
         </button>
 
-        {userRole !== 'contributor' && (
+        {isAtLeast(userRole, 'editor') && (
           <button
             type="button"
             onClick={() => {
-              if (userRole === 'admin') {
+              // Otse lisab admin+ (server: require_role("admin")), toimetaja saadab palve.
+              if (isAtLeast(userRole, 'admin')) {
                 setShowAddForm(f => !f);
                 setOpen(false);
                 setShowNotifyModal(false);
