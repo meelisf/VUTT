@@ -14,6 +14,7 @@ from mcp.server.mcpserver import MCPServer
 from . import format as fmt
 from . import page_text
 from . import parts as work_parts_mod
+from . import exemplars as exemplars_mod
 from . import persons
 from . import queries
 from .client import VuttClient
@@ -548,6 +549,58 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         Võrguvea järel ära saada sama ettepanekut pimesi uuesti.
         """
         return work_parts_mod.submit_parts(client, handoff_code, work_id, pages_version, parts, persons)
+
+    @mcp.tool(structured_output=False)
+    async def get_work_exemplars(work_id: str) -> str:
+        """Teose eksemplarid (füüsilised koopiad) ja hoidjate register.
+
+        Tagastab iga eksemplari püsiva `id`-ga: holder (hoidja võti), shelfmark
+        (kohaviit), url, condition, binding, provenance, notes, convolute
+        ({reference, position, total, contents}) ja text_witness (kas skaneering
+        on sellest eksemplarist). `holders` = hoidjate register (võti → nimi);
+        uue eksemplari hoidja peab olema selle võti.
+        Kasuta enne submit_exemplar_proposal'it: olemasolevat eksemplari ei
+        pakuta uuena, ja muudatuse `base` tuleb siit. Piiratud teose eksemplare
+        ei anta (ettepanekut ei saa teha).
+        """
+        return exemplars_mod.work_exemplars(client, work_id)
+
+    @mcp.tool(structured_output=False)
+    async def submit_exemplar_proposal(handoff_code: str, work_id: str, rows: list[dict],
+                                       note: str | None = None) -> str:
+        """Esitab teose eksemplaride ettepaneku (ESTERi põhjal) superadmini ülevaatuseks.
+
+        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review → „Loo
+        agendikood"); kehtib 8 h, kõigis teostes. Loe ENNE get_work_exemplars.
+        ESTERi kirje (www.ester.ee/record=b…) loe OMA veebivahendiga — MCP ESTERit
+        ei puuduta.
+
+        Iga rida lähtub ÜHEST allikaolukorrast ja kannab allikat:
+        source = {kind: "ester", ref: "b2648642" (ESTERi kirje number),
+        quote: SÕNASÕNALINE lõik ESTERi kirjest, ≤ 500 märki}.
+        Rida on kas
+        - uus eksemplar: {op: "create", fields: {holder, shelfmark?, url?,
+          condition?, binding?, provenance?, notes?, convolute?}, source};
+        - olemasoleva muudatus: {op: "update", exemplar_id, fields: {ainult
+          muudetavad väljad}, base: {samad võtmed, praegune väärtus
+          get_work_exemplars'ist; puuduv = null}, source}.
+        Kui eksemplar on get_work_exemplars'is juba olemas (sama hoidja +
+        kohaviit — migratsioon lõi need vanadest viidetest), esita UPDATE, mitte
+        CREATE: topelt-rida blokeeritakse. Hoidja AINULT `holders` võtmete seast;
+        kui õiget pole, kirjuta lähim võti ja maini seda `note`-is (toimetaja
+        lisab hoidja registrisse).
+
+        Konvoluut (mitu trükist ühes köites): convolute = {reference (konvoluudi
+        kohaviit nagu allikas, nt "R Est.B-954"), position (0 = põhiteos,
+        N = N. kaasköide; ESTERi märkusest), total (trükiste arv köites),
+        contents (sisukord vabatekstina)}. Rühmavõtme normaliseerib server.
+
+        ÄRA paku text_witness'i, lehti (pages), needs_review'd, seoseid teiste
+        teostega, poolitust ega teose ester_id-d. Kuni 30 rida; see talletab
+        AINULT ettepaneku — teost ei muudeta, toimetaja kinnitab või lükkab read
+        tagasi. Võrguvea järel ära saada sama ettepanekut pimesi uuesti.
+        """
+        return exemplars_mod.submit_exemplars(client, handoff_code, work_id, rows, note)
 
     @mcp.tool(structured_output=False)
     async def get_page_source(handoff_code: str, work_id: str, page: int) -> str:
