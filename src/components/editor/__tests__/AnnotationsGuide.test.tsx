@@ -18,7 +18,7 @@ describe('AnnotationsGuide', () => {
     render(<AnnotationsGuide counts={{ pageNotes: 2, toc: 12, workTags: 0, pageTags: 1 }}
       canAddNote onJump={() => {}} />);
     expect(labels()).toEqual(['toc', 'pageTags', 'pageNotes']);
-    expect(screen.getByText('12')).toBeTruthy();
+    expect(screen.getByText('12').className).toContain('text-primary-600');   // paneeli värv
     expect(screen.queryByText('info.guide.addNote')).toBeNull();   // märkmed on juba olemas
   });
 
