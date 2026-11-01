@@ -133,13 +133,15 @@ export function partFromDraft(d: PartDraft, pages: string[]): PartInput {
   return out;
 }
 
-export type ManageTab = 'parts' | 'pages' | 'trash' | 'replace';
+export type ManageTab = 'parts' | 'pages' | 'trash' | 'replace' | 'exemplars';
 
 /** Vaikimisi „Leheküljed": osi läheb harvem vaja, ja töölaua sügavlink `?focus=N`
  *  (utils/manageDeeplink) vajab niikuinii lehtede vahekaarti. `?tab=parts` tuleb
- *  `/review` agendi ettepanekute loendist (ADR 0058, 2026-10-20). */
+ *  `/review` agendi ettepanekute loendist (ADR 0058, 2026-10-20), `?tab=exemplars`
+ *  sealt eksemplari-ettepanekute juurde (#703). */
 export function initialManageTab(focus: number | null, tab: string | null): ManageTab {
-  return tab === 'parts' && focus === null ? 'parts' : 'pages';
+  if (focus !== null) return 'pages';
+  return tab === 'parts' || tab === 'exemplars' ? tab : 'pages';
 }
 
 /** Vahekaardi vahetust kaitstakse ainult osade mustandi korral: järjekorra ja lehetoimingute

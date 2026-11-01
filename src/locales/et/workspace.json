@@ -439,6 +439,35 @@
       "unknown": "Teadmata",
       "witness": "tekstitunnistaja",
       "required": "Teosel on eksemplarid: vali enne pildi päritolu."
+    },
+    "exemplarProposals": {
+      "tab": "Eksemplarid",
+      "title": "Agendi eksemplari-ettepanekud",
+      "help": "Iga rida lähtub ühest ESTERi kirjest. Kinnita või lükka tagasi; parandused tee pärast kinnitust eksemplari vormis (metaandmete aken).",
+      "none": "Selle teose kohta ettepanekuid ei ole.",
+      "loadError": "Ettepanekute laadimine ebaõnnestus.",
+      "decideError": "Otsust ei salvestatud.",
+      "accepted": "Ettepanek kinnitatud.",
+      "rejected": "Ettepanek tagasi lükatud.",
+      "acceptSelected": "Kinnita valitud",
+      "accept": "Kinnita",
+      "reject": "Lükka tagasi",
+      "select": "Vali rida",
+      "colKind": "Liik",
+      "colCurrent": "Praegu",
+      "colProposed": "Ettepanek",
+      "colSource": "Allikas",
+      "opCreate": "uus eksemplar",
+      "opUpdate": "muudatus",
+      "state": {
+        "stale": "eksemplar on vahepeal muutunud",
+        "blocked_holder": "hoidja puudub registris",
+        "duplicate": "eksemplar on juba olemas",
+        "expired": "ettepanek on aegunud",
+        "accepted": "kinnitatud",
+        "rejected": "tagasi lükatud",
+        "pending": "ootel"
+      }
     }
   },
   "metadata": {
