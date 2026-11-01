@@ -316,8 +316,9 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                 <div className="space-y-1.5">
                   {work.archive_refs.map((ref: ArchiveRef, idx: number) => {
                     const archiveName = archives[ref.archive_id]?.name;
-                    const archiveUrl = archives[ref.archive_id]?.url;
                     const isValidUrl = (url: string) => /^https?:\/\//.test(url);
+                    // Link ainult eksemplari enda URL-ile: arhiivi esilehe link eksitas
+                    // (lubas viia eksemplarini, aga viis ainult arhiivi avalehele).
                     return (
                       <div key={idx} className="text-sm text-gray-700">
                         <span className="font-medium text-gray-800">
@@ -325,11 +326,9 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                           {archiveName && <span className="font-normal text-gray-500"> — {archiveName}</span>}
                         </span>
                         {ref.reference && <span className="ml-1">{ref.reference}</span>}
-                        {ref.url && isValidUrl(ref.url) ? (
+                        {ref.url && isValidUrl(ref.url) && (
                           <a href={ref.url} target="_blank" rel="noopener noreferrer" className="ml-1 text-primary-600 hover:text-primary-800" title={ref.url}>↗</a>
-                        ) : archiveUrl && isValidUrl(archiveUrl) ? (
-                          <a href={archiveUrl} target="_blank" rel="noopener noreferrer" className="ml-1 text-gray-400 hover:text-gray-600" title={archiveUrl}>↗</a>
-                        ) : null}
+                        )}
                       </div>
                     );
                   })}
