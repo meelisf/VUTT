@@ -516,8 +516,7 @@
     "pageNumberingHint": "Meaning of the page's <fw> in the part's address reference (fol. / p.).",
     "viewPersonPage": "View person page",
     "noGenres": "No genres",
-    "genrePlaceholder": "Add a genre...",
-    "archiveRefsReadOnly": "Archive references come from the copies (exemplars) and are read-only here. Editing copies will get its own view."
+    "genrePlaceholder": "Add a genre..."
   },
   "download": {
     "title": "Download",
@@ -767,5 +766,49 @@
     "error": "Action failed: {{error}}",
     "handoffAll": "Code for agent (all works)",
     "packPagesGone": "The pack's pages are no longer in the work — the pack can be rejected."
+  },
+  "exemplars": {
+    "title": "Copies",
+    "savesImmediately": "Changes to copies are saved immediately, not with the metadata save button.",
+    "none": "No copies have been added.",
+    "loadError": "Failed to load copies.",
+    "saveError": "The change to the copy was not saved.",
+    "holder": "Holding institution",
+    "holderRequired": "Choose a holding institution for the copy.",
+    "shelfmark": "Shelfmark",
+    "shelfmarkPlaceholder": "e.g. R Est.B-954",
+    "url": "URL (optional)",
+    "more": "More",
+    "fields": {
+      "condition": "Condition",
+      "binding": "Binding",
+      "provenance": "Provenance",
+      "notes": "Notes"
+    },
+    "witness": "Text witness",
+    "markWitness": "Mark as text witness",
+    "unmarkWitness": "Remove text witness mark",
+    "witnessConfirmTitle": "Change text witness",
+    "witnessConfirm": "The scanned pages will be attributed to this copy. The previous witness mark and this copy's exception pages will be removed. Continue?",
+    "needsReview": "Unverified",
+    "needsReviewHint": "Correspondence of this record to the physical copy has not been verified (automatically created record).",
+    "markReviewed": "Mark as verified",
+    "source": "Source",
+    "sourceKind": {
+      "ester": "ESTER",
+      "ada": "ADA",
+      "upload": "upload",
+      "migration": "migration",
+      "manual": "manual"
+    },
+    "add": "Add copy",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteTitle": "Delete copy",
+    "deleteConfirm": "Delete copy “{{label}}”? This cannot be undone here.",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "saveExemplar": "Save copy",
+    "manuscriptOne": "A manuscript has one copy: the document itself. A transcript or another redaction is a separate work — link it as a variant (block “Related works” in the work info panel)."
   }
 }

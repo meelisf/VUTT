@@ -1,6 +1,6 @@
 import { LinkedEntity } from '../types/LinkedEntity';
 import type { Exemplar } from '../types';
-import { ApiRequestOptions, apiDelete, apiGet, apiPost } from './apiClient';
+import { ApiRequestOptions, apiDelete, apiGet, apiPost, apiPut } from './apiClient';
 import { FILE_API_URL } from '../config';
 import type { PageOpRequest } from '../pages/manage/pageOpsPlan';
 import type { PageAdjust } from '../pages/upload/types';
@@ -328,6 +328,41 @@ export interface WorkExemplarsResponse {
 
 export function getWorkExemplars(workId: string, token?: string | null): Promise<WorkExemplarsResponse> {
   return apiGet<WorkExemplarsResponse>(`/works/${workId}/exemplars`, auth(token ?? null));
+}
+
+/** Eksemplari muudetavad väljad (ADR 0076 p 2). Tühi string = välja eemaldamine. */
+export interface ExemplarInput {
+  holder?: string;
+  shelfmark?: string;
+  url?: string;
+  condition?: string;
+  binding?: string;
+  provenance?: string;
+  notes?: string;
+  /** true = see on tunnistaja (server võtab märke eelmiselt), false = märge maha. */
+  text_witness?: boolean;
+  /** Ainult `false` on toimetaja toiming: lipu mahavõtmine. */
+  needs_review?: boolean;
+}
+
+const exemplarsPath = (workId: string) => `/works/${encodeURIComponent(workId)}/exemplars`;
+
+export function createWorkExemplar(workId: string, data: ExemplarInput, token: string | null): Promise<Exemplar> {
+  return apiPost<Exemplar>(exemplarsPath(workId), data, auth(token));
+}
+
+export function updateWorkExemplar(
+  workId: string, exemplarId: string, data: ExemplarInput, token: string | null,
+): Promise<Exemplar> {
+  return apiPut<Exemplar>(`${exemplarsPath(workId)}/${encodeURIComponent(exemplarId)}`, data, auth(token));
+}
+
+export function deleteWorkExemplar(workId: string, exemplarId: string, token: string | null): Promise<void> {
+  return apiDelete<void>(`${exemplarsPath(workId)}/${encodeURIComponent(exemplarId)}`, auth(token));
+}
+
+export function reorderWorkExemplars(workId: string, ids: string[], token: string | null): Promise<{ exemplars: Exemplar[] }> {
+  return apiPost<{ exemplars: Exemplar[] }>(`${exemplarsPath(workId)}/order`, { ids }, auth(token));
 }
 
 export function replaceWorkPageImage(
