@@ -13,19 +13,21 @@ vi.mock('../../../services/relationsService', async (orig) => ({
   ...(await orig<typeof import('../../../services/relationsService')>()),
   fetchRelations: (...a: unknown[]) => fetchRelations(...a),
 }));
+const getWorkExemplars = vi.fn();
+vi.mock('../../../services/workApi', () => ({ getWorkExemplars: (...a: unknown[]) => getWorkExemplars(...a) }));
 vi.mock('../../../contexts/UserContext', () => ({ useUser: () => ({ user: null, authToken: null }) }));
 
 import RelationsButton from '../RelationsButton';
 
 const V = (id: string): Relation => ({ id, rel_type: 'isVersionOf' });
 
-function Harness({ relations, variant = 'card', onRowClick }:
-  { relations?: Relation[]; variant?: 'card' | 'row'; onRowClick?: () => void }) {
+function Harness({ relations, variant = 'card', onRowClick, convoluteCount }:
+  { relations?: Relation[]; variant?: 'card' | 'row'; onRowClick?: () => void; convoluteCount?: number }) {
   const [open, setOpen] = useState(false);
   return (
     <MemoryRouter>
       <div onClick={onRowClick} style={{ position: 'relative' }}>
-        <RelationsButton workId="w1" relations={relations} variant={variant} lang="et" open={open} onOpenChange={setOpen} />
+        <RelationsButton workId="w1" relations={relations} convoluteCount={convoluteCount} variant={variant} lang="et" open={open} onOpenChange={setOpen} />
       </div>
     </MemoryRouter>
   );
@@ -39,6 +41,14 @@ describe('RelationsButton', () => {
     vi.useFakeTimers();
     fetchRelations.mockReset();
     fetchRelations.mockResolvedValue([{ id: 'w2', rel_type: 'isVersionOf', title: 'Teos w2', readable: true }]);
+    getWorkExemplars.mockReset();
+    getWorkExemplars.mockResolvedValue({ exemplars: [], convolutes: [{
+      exemplar_id: 'a', key: 'tür:r 1', holder: 'TÜR', reference: 'R 1', total: 2,
+      members: [
+        { work_id: 'w1', exemplar_id: 'a', position: 0, title: 'See teos', readable: true, current: true },
+        { work_id: 'w9', exemplar_id: 'z', position: 1, title: 'Kaaslane w9', readable: true, current: false },
+      ],
+    }] });
   });
   afterEach(() => { vi.useRealTimers(); });
 
@@ -94,5 +104,31 @@ describe('RelationsButton', () => {
     fireEvent.click(screen.getByTestId('relations-overlay'));
     fireEvent.click(screen.getByText('Teos w2'));
     expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('ainult konvoluudiga teosel on nupp; avamine laeb plokid, seoseid ei küsi (#702)', async () => {
+    render(<Harness relations={[]} convoluteCount={1} />);
+    const btn = screen.getByRole('button', { name: 'common:convolute.title' });
+    expect(screen.getByTestId('convolute-indicator')).toBeTruthy();
+    fireEvent.click(btn);
+    await flush(0);
+    expect(fetchRelations).not.toHaveBeenCalled();
+    expect(getWorkExemplars).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Kaaslane w9')).toBeTruthy();
+  });
+
+  it('variant + konvoluut: mõlemad lõigud ülekattes', async () => {
+    render(<Harness relations={[V('w2')]} convoluteCount={1} />);
+    fireEvent.click(button());
+    await flush(0);
+    expect(screen.getByText('Teos w2')).toBeTruthy();
+    expect(screen.getByText('Kaaslane w9')).toBeTruthy();
+  });
+
+  it('konvoluudita teosel exemplars-päringut ei tehta', async () => {
+    render(<Harness relations={[V('w2')]} />);
+    fireEvent.click(button());
+    await flush(0);
+    expect(getWorkExemplars).not.toHaveBeenCalled();
   });
 });

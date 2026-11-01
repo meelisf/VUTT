@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BookDown, BookOpen, Bookmark, Download, ExternalLink, FileSliders, FolderOpen, IdCard, StickyNote, User } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import RelatedWorksBlock from '../relations/RelatedWorksBlock';
+import SameVolumeBlock from '../convolutes/SameVolumeBlock';
 import type { ArchiveRef, Work } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -338,6 +339,9 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
 
             {/* Seotud teosed (#701, ADR 0075) */}
             <RelatedWorksBlock work={work} lang={lang} />
+
+            {/* Samas köites — konvoluudi kaaslased (#702, ADR 0076 p 6) */}
+            <SameVolumeBlock work={work} lang={lang} />
 
             {/* Teose märkused */}
             {work.notes && (

@@ -809,6 +809,16 @@
     "moveUp": "Liiguta üles",
     "moveDown": "Liiguta alla",
     "saveExemplar": "Salvesta eksemplar",
-    "manuscriptOne": "Käsikirjal on üks eksemplar: dokument ise. Ärakiri või teine redaktsioon on eraldi teos — seo see variandina (teose infopaneelis plokk „Seotud teosed“)."
+    "manuscriptOne": "Käsikirjal on üks eksemplar: dokument ise. Ärakiri või teine redaktsioon on eraldi teos — seo see variandina (teose infopaneelis plokk „Seotud teosed“).",
+    "convolute": {
+      "toggle": "Konvoluut",
+      "label": "Konvoluut",
+      "hint": "Täida, kui eksemplar on köidetud koos teiste trükistega. Samas köites on eksemplarid, millel on sama hoidja ja sama konvoluudi kohaviit.",
+      "reference": "Konvoluudi kohaviit",
+      "position": "Koht (0 = põhiteos)",
+      "total": "Trükiste arv köites",
+      "contents": "Sisukord (vabatekst)",
+      "countInvalid": "Konvoluudi koht ja trükiste arv peavad olema täisarvud."
+    }
   }
 }

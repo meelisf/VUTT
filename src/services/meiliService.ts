@@ -96,6 +96,7 @@ export const normalizeWork = (hit: any): Work => {
     series: hit.series,
     series_title: hit.series_title,
     relations: hit.relations,
+    convolute_count: hit.convolute_count || 0,
     ester_id: hit.ester_id,
     external_url: hit.external_url,
     archive_refs: hit.archive_refs || null,

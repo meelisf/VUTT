@@ -489,7 +489,7 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
         'publisher_object', 'location_object',
         'type_object', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'part_persons_text', 'tags_object', 'languages',
-        'series', 'series_title', 'ester_id', 'external_url', 'archive_refs', 'relations',
+        'series', 'series_title', 'ester_id', 'external_url', 'archive_refs', 'relations', 'convolute_count',
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus',
         'lehekylje_pilt' // loendivaate täispisipilt (#587)
       ],

@@ -1,7 +1,10 @@
 /** @vitest-environment jsdom */
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mitme järjestikuse päringuga voog: vaikimisi 1 s jääb täiskomplekti koormuse all väheks.
+configure({ asyncUtilTimeout: 3000 });
 import type { Exemplar } from '../../../types';
 
 vi.mock('react-i18next', () => ({
@@ -55,6 +58,7 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
         for (const f of ['holder', 'shelfmark', 'url'] as const) {
           if (f in body) { if (body[f]) (nx as any)[f] = body[f]; else delete (nx as any)[f]; }
         }
+        if ('convolute' in body) { if (body.convolute) nx.convolute = body.convolute; else delete nx.convolute; }
         if (body.needs_review === false) delete nx.needs_review;
         if (body.text_witness === true) nx.text_witness = true;
         if (body.text_witness === false) delete nx.text_witness;
@@ -220,5 +224,46 @@ describe('ExemplarsSection — mitteadmin', () => {
     expect(screen.queryByText('exemplars.add')).toBeNull();
     expect(screen.queryByText('exemplars.markWitness')).toBeNull();
     expect(screen.queryByText(/exemplars\.source:/)).toBeNull();
+  });
+});
+
+describe('ExemplarsSection — konvoluut (#702)', () => {
+  it('märgib konvoluudi: PUT kannab kohaviita, kohta, arvu ja sisukorda; kokkuvõte loendis', async () => {
+    renderSection();
+    await screen.findByText('· R Est.B-954');
+    fireEvent.click(screen.getAllByLabelText('exemplars.edit')[0]);
+    fireEvent.click(screen.getByText('exemplars.convolute.toggle'));
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.reference'), { target: { value: 'R Est.B-954' } });
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.position'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.total'), { target: { value: '13' } });
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.contents'), { target: { value: 'Fischer; Personalia' } });
+    fireEvent.click(screen.getByText('exemplars.saveExemplar'));
+    await screen.findByTestId('convolute-summary');
+    expect(writes()[0].body.convolute).toEqual({ reference: 'R Est.B-954', position: 0, total: 13, contents: 'Fischer; Personalia' });
+    expect(screen.getByTestId('convolute-summary').textContent).toContain('common:convolute.main');
+  });
+
+  it('kohaviida tühjendamine eemaldab märke (convolute: null)', async () => {
+    server.exemplars[0].convolute = { reference: 'R Est.B-954', position: 1 };
+    renderSection();
+    await screen.findByTestId('convolute-summary');
+    fireEvent.click(screen.getAllByLabelText('exemplars.edit')[0]);
+    // Olemasoleva konvoluudiga on väljad kohe lahti
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.reference'), { target: { value: '' } });
+    fireEvent.click(screen.getByText('exemplars.saveExemplar'));
+    await waitFor(() => expect(screen.queryByTestId('convolute-summary')).toBeNull());
+    expect(writes()[0].body.convolute).toBeNull();
+  });
+
+  it('mittetäisarvuline koht: hoiatus, päringut ei tehta', async () => {
+    renderSection();
+    await screen.findByText('· R Est.B-954');
+    fireEvent.click(screen.getAllByLabelText('exemplars.edit')[0]);
+    fireEvent.click(screen.getByText('exemplars.convolute.toggle'));
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.reference'), { target: { value: 'R 1' } });
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.position'), { target: { value: '1a' } });
+    fireEvent.click(screen.getByText('exemplars.saveExemplar'));
+    await screen.findByText('exemplars.convolute.countInvalid');
+    expect(writes()).toHaveLength(0);
   });
 });

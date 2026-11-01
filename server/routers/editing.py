@@ -37,7 +37,7 @@ from ..page_merge import PAGE_FIELDS, merge_page, read_page_view, text_conflict_
 from ..page_address import clean_page_numbering
 from ..page_paths import check_page_filename, require_existing_page
 from ..page_text import normalize_page_text
-from ..work_exemplars import derive_archive_refs
+from ..work_exemplars import convolute_keys, derive_archive_refs
 from .. import page_text_proposals
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.indices import page_person_ids
@@ -381,7 +381,8 @@ async def get_work_meta_direct(request: Request, user=Depends(require_role("cont
         catalog = os.path.basename(path)
     metadata = await run_in_threadpool(_require_catalog_access, catalog, user)
     # Lugemiskuju (ADR 0076 p 1): vorm kuvab arhiiviviiteid eksemplaridest.
-    metadata = {**metadata, "archive_refs": derive_archive_refs(metadata)}
+    metadata = {**metadata, "archive_refs": derive_archive_refs(metadata),
+                "convolute_count": len(convolute_keys(metadata))}
     return {"status": "success", "metadata": metadata}
 
 @router.post("/get-metadata-suggestions")

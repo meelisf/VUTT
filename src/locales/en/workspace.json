@@ -809,6 +809,16 @@
     "moveUp": "Move up",
     "moveDown": "Move down",
     "saveExemplar": "Save copy",
-    "manuscriptOne": "A manuscript has one copy: the document itself. A transcript or another redaction is a separate work — link it as a variant (block “Related works” in the work info panel)."
+    "manuscriptOne": "A manuscript has one copy: the document itself. A transcript or another redaction is a separate work — link it as a variant (block “Related works” in the work info panel).",
+    "convolute": {
+      "toggle": "Bound volume (convolute)",
+      "label": "Convolute",
+      "hint": "Fill in if the copy is bound together with other printed items. Copies with the same holding institution and convolute shelfmark are grouped together.",
+      "reference": "Convolute shelfmark",
+      "position": "Position (0 = main work)",
+      "total": "Number of items in the volume",
+      "contents": "Contents (free text)",
+      "countInvalid": "Convolute position and number of items must be whole numbers."
+    }
   }
 }

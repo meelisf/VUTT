@@ -325,6 +325,8 @@ def test_archive_refs_text_denormaliseeritud(synced):
     d = synced["docs"][0]
     assert d["archive_refs"] == [{"archive_id": "RA", "reference": "f. 1"}]
     assert d["archive_refs_text"] == "RA Rahvusarhiiv f. 1"
+    # Konvoluudita eksemplar: kuvamisvälja ei ole (#702, väärtuseta = puudub)
+    assert "convolute_count" not in d
 
 
 # =========================================================

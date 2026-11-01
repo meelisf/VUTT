@@ -391,6 +391,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           <RelationsButton
             workId={work.work_id}
             relations={work.relations}
+            convoluteCount={work.convolute_count}
             variant="card"
             lang={getLangCode(i18n.language)}
             open={relationsOpen}

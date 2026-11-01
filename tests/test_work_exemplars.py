@@ -499,3 +499,23 @@ def test_pildi_kirjutaja_nouab_paritolu(tmp_path):
     assert pages._checked_origin(str(tmp_path), "a") == "a"
     (tmp_path / "_metadata.json").write_text(json.dumps({"id": "w1"}))
     assert pages._checked_origin(str(tmp_path), None) is None
+
+
+def test_convolute_count_meili_dokumendis(tmp_path):
+    """Kaart näitab „Samas köites" nuppu `convolute_count`-i järgi (#702) — üks väärtus
+    konvoluudivõtme kohta, väli puudub dokumendist, kui konvoluuti ei ole."""
+    from server import meili_doc
+    work_dir = tmp_path / "t"
+    work_dir.mkdir()
+    meta = {"id": "w1", "exemplars": [
+        _x(id="a", convolute={"reference": "R Est.B-954 (konvoluut)", "position": 0}),
+        _x(id="b", convolute={"reference": "R Est.B-954 (I)"}),
+        _x(id="c")]}
+    (work_dir / "_metadata.json").write_text(json.dumps(meta), encoding="utf-8")
+    _, result = meili_doc.get_work_metadata(str(work_dir), "t", {})
+    assert result["convolute_count"] == 2
+
+    meta["exemplars"] = [_x(id="c")]
+    (work_dir / "_metadata.json").write_text(json.dumps(meta), encoding="utf-8")
+    _, result = meili_doc.get_work_metadata(str(work_dir), "t", {})
+    assert result["convolute_count"] == 0
