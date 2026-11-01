@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Work, Page, Annotation } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -12,6 +12,7 @@ import WorkSetsPanel from './WorkSetsPanel';
 import WorkPartsPanel from './WorkPartsPanel';
 import { canEditWork, isAtLeast } from '../../utils/roleUtils';
 import TextAnnotationsPanel from './TextAnnotationsPanel';
+import AnnotationsGuide, { type GuideKey } from './AnnotationsGuide';
 
 interface AnnotationsTabProps {
   work?: Work;
@@ -75,6 +76,36 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [highlightedCommentId, comments]);
 
+  // Tähelepanujuht (pillid „Teose info" päises): osade ja kogude arvu teatavad
+  // paneelid ise, lehe andmed on siin käes. Klõps kerib paneeli juurde.
+  const [partsCount, setPartsCount] = useState(0);
+  const [setsCount, setSetsCount] = useState(0);
+  const [tocOpenSignal, setTocOpenSignal] = useState(0);
+  const anchors = {
+    toc: useRef<HTMLDivElement>(null), workSets: useRef<HTMLDivElement>(null),
+    workTags: useRef<HTMLDivElement>(null), textAnnotations: useRef<HTMLDivElement>(null),
+    pageTags: useRef<HTMLDivElement>(null), pageNotes: useRef<HTMLDivElement>(null),
+  };
+  const jump = (key: GuideKey) => {
+    if (key === 'toc') setTocOpenSignal(n => n + 1);
+    const target = anchors[key === 'addNote' ? 'pageNotes' : key].current;
+    // Järgmisel kaadril: kokkuklapitud sisukord peab enne kerimist lahti olema
+    requestAnimationFrame(() => {
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (key === 'addNote') target?.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true });
+    });
+  };
+  const guide = (
+    <AnnotationsGuide
+      counts={{
+        toc: partsCount, workSets: setsCount, workTags: work?.tags?.length ?? 0,
+        textAnnotations: textAnnotations.length, pageTags: page_tags.length, pageNotes: comments.length,
+      }}
+      canAddNote={!readOnly && !!user}
+      onJump={jump}
+    />
+  );
+
   return (
     <div className="h-full flex flex-col bg-gray-50 p-6 overflow-y-auto">
 
@@ -82,50 +113,64 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
         work={work}
         lang={lang}
         onOpenMetaModal={onOpenMetaModal}
+        guide={guide}
       />
 
       {/* Teose osade sisukord (#464) — teose info all, kokkuklapitav */}
-      <WorkPartsPanel workId={work?.work_id} token={authToken} currentPage={_page.page_number}
-        canEdit={isAtLeast(user?.role, 'editor') && canEditWork(user, work)} />
+      <div ref={anchors.toc} className="scroll-mt-4">
+        <WorkPartsPanel workId={work?.work_id} token={authToken} currentPage={_page.page_number}
+          canEdit={isAtLeast(user?.role, 'editor') && canEditWork(user, work)}
+          onCount={setPartsCount} openSignal={tocOpenSignal} />
+      </div>
 
       {/* Töökollektsioonid on „kõrgema taseme märksõna" — kuraatori, mitte
           sisu tasandi väide teose kohta. Seepärast teose märksõnade EES. */}
-      <WorkSetsPanel workId={work?.work_id} lang={lang} readOnly={readOnly} />
+      <div ref={anchors.workSets} className="scroll-mt-4">
+        <WorkSetsPanel workId={work?.work_id} lang={lang} readOnly={readOnly} onCount={setSetsCount} />
+      </div>
 
-      <WorkTagsPanel work={work} lang={lang} />
+      <div ref={anchors.workTags} className="scroll-mt-4">
+        <WorkTagsPanel work={work} lang={lang} />
+      </div>
 
-      <TextAnnotationsPanel
-        textAnnotations={textAnnotations}
-        textContent={textContent}
-        readOnly={readOnly}
-        onSaveTextAnnotations={onSaveTextAnnotations}
-        onDeleteTextAnnotation={onDeleteTextAnnotation}
-      />
+      <div ref={anchors.textAnnotations} className="scroll-mt-4">
+        <TextAnnotationsPanel
+          textAnnotations={textAnnotations}
+          textContent={textContent}
+          readOnly={readOnly}
+          onSaveTextAnnotations={onSaveTextAnnotations}
+          onDeleteTextAnnotation={onDeleteTextAnnotation}
+        />
+      </div>
 
       {/* Tags */}
-      <PageTagsPanel
-        pageTags={page_tags}
-        setPageTags={setPageTags}
-        readOnly={readOnly}
-        authToken={authToken}
-        lang={lang}
-      />
+      <div ref={anchors.pageTags} className="scroll-mt-4">
+        <PageTagsPanel
+          pageTags={page_tags}
+          setPageTags={setPageTags}
+          readOnly={readOnly}
+          authToken={authToken}
+          lang={lang}
+        />
+      </div>
 
       {/* Comments — key lähtestab mustandiväljad lehe vahetusel.
           Editor ei monteeru enam lehe pöördel maha (ADR 0010), seega jääks
           pooleli kirjutatud kommentaar muidu järgmisele lehele rippuma. */}
-      <PageCommentsPanel
-        key={_page.id}
-        comments={comments}
-        setComments={setComments}
-        onDraftChange={onDraftChange}
-        flushRef={flushRef}
-        onSaveAnnotations={onSaveAnnotations}
-        onReplyToComment={onReplyToComment}
-        readOnly={readOnly}
-        user={user}
-        highlightedCommentId={highlightedCommentId}
-      />
+      <div ref={anchors.pageNotes} className="scroll-mt-4">
+        <PageCommentsPanel
+          key={_page.id}
+          comments={comments}
+          setComments={setComments}
+          onDraftChange={onDraftChange}
+          flushRef={flushRef}
+          onSaveAnnotations={onSaveAnnotations}
+          onReplyToComment={onReplyToComment}
+          readOnly={readOnly}
+          user={user}
+          highlightedCommentId={highlightedCommentId}
+        />
+      </div>
 
       <CommentHistoryPanel
         page={_page}

@@ -255,5 +255,14 @@ describe('WorkPartsPanel', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Näita osa andmeid' })[0]);
     expect(screen.queryByRole('button', { name: 'Muuda osa' })).toBeNull();
   });
-});
 
+  it('teatab osade arvu ja openSignal avab kokkuklapitud sisukorra (tähelepanujuht)', async () => {
+    const onCount = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter><WorkPartsPanel workId="w1" token={null} currentPage={1} onCount={onCount} openSignal={0} /></MemoryRouter>);
+    await waitFor(() => expect(onCount).toHaveBeenLastCalledWith(2));
+    expect(document.querySelector('[data-part-id="a"]')).toBeNull();     // vaikimisi kinni
+    rerender(<MemoryRouter><WorkPartsPanel workId="w1" token={null} currentPage={1} onCount={onCount} openSignal={1} /></MemoryRouter>);
+    await waitFor(() => expect(document.querySelector('[data-part-id="a"]')).toBeTruthy());
+  });
+});
