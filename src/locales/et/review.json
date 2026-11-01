@@ -95,17 +95,19 @@
     "title": "Agendi ettepanekud",
     "error": "Toiming ebaõnnestus: {{error}}",
     "createCode": "Loo agendikood",
-    "codeHelp": "Kood kehtib kõigile teostele ja isikutele: lehe tekst (kuni {{text}} esitust), teose osad (kuni {{parts}}) ja isikukaardid (kuni {{persons}}). Anna see agendile.",
+    "codeHelp": "Kood kehtib kõigile teostele ja isikutele: lehe tekst (kuni {{text}} esitust), teose osad (kuni {{parts}}), eksemplarid (kuni {{exemplars}}) ja isikukaardid (kuni {{persons}}). Anna see agendile.",
     "copy": "Kopeeri",
     "copied": "Kopeeritud",
     "expires": "Aegub",
     "kind": {
       "text": "Tekst",
       "parts": "Osad",
-      "person": "Isik"
+      "person": "Isik",
+      "exemplars": "Eksemplarid"
     },
     "pending": "ootel {{count}}",
     "stale": "aegunud {{count}}",
-    "pagesChanged": "lehed muutunud"
+    "pagesChanged": "lehed muutunud",
+    "blocked": "ei saa kinnitada {{count}}"
   }
 }

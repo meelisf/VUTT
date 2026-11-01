@@ -72,6 +72,8 @@ import TrashModifiedImages from './manage/TrashModifiedImages';
 import TrashSplitRemnants from './manage/TrashSplitRemnants';
 import ExemplarOriginSelect from './manage/ExemplarOriginSelect';
 import type { Exemplar } from '../types';
+import ExemplarProposalsTab from './manage/exemplars/ExemplarProposalsTab';
+import { listExemplarProposals } from '../services/exemplarProposalsApi';
 
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
@@ -272,6 +274,27 @@ const WorkManage: React.FC = () => {
   useEffect(() => {
     if (isAdmin) loadPages();
   }, [workId, authToken, isAdmin]);
+
+  // Agendi eksemplari-ettepanekud (#703, ainult superadmin): vahekaart on nähtav, kui
+  // teosel on ettepanekuid; nupul kinnitatavate ridade arv (olek tuleb serverist).
+  const [exemplarProposalRows, setExemplarProposalRows] = useState<{ total: number; pending: number }>(
+    { total: 0, pending: 0 });
+  const loadExemplarProposalCount = useCallback(() => {
+    if (!workId || !authToken || !isSuperadmin) return;
+    listExemplarProposals(workId, authToken)
+      .then(ps => {
+        const rows = ps.flatMap(p => p.rows);
+        setExemplarProposalRows({ total: rows.length,
+          pending: rows.filter(r => r.review_state === 'pending').length });
+      })
+      .catch(() => {});
+  }, [workId, authToken, isSuperadmin]);
+  useEffect(() => { loadExemplarProposalCount(); }, [loadExemplarProposalCount]);
+  const onExemplarProposalsChanged = () => {
+    loadExemplarProposalCount();
+    // Kinnitus võis lisada eksemplari — lehtede päritolu valikud kasutavad seda loendit.
+    if (workId && authToken) getWorkExemplars(workId, authToken).then(d => setExemplars(d.exemplars || [])).catch(() => {});
+  };
 
   // Pildi allkiri piiratud teoste pisipiltidele. Server-allkirja TTL on 1h
   // (public.py), seega `refresh` — muidu aeguks see pikalt lahti oleval
@@ -979,6 +1002,23 @@ const WorkManage: React.FC = () => {
           >
             {t('manage.tabParts')}
           </button>
+          {isSuperadmin && (exemplarProposalRows.total > 0 || activeTab === 'exemplars') && (
+            <button
+              onClick={() => switchTab('exemplars')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'exemplars'
+                  ? 'border-primary-600 text-primary-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t('manage.exemplarProposals.tab')}
+              {exemplarProposalRows.pending > 0 && (
+                <span className="ml-1.5 text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
+                  {exemplarProposalRows.pending}
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={() => switchTab('replace')}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -1022,6 +1062,10 @@ const WorkManage: React.FC = () => {
             runGuarded={runGuarded}
             saveRef={partsSaveRef}
           />
+        )}
+
+        {activeTab === 'exemplars' && workId && isSuperadmin && (
+          <ExemplarProposalsTab workId={workId} token={authToken} onChanged={onExemplarProposalsChanged} />
         )}
 
         {activeTab === 'pages' && (

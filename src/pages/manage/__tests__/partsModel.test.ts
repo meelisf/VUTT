@@ -51,6 +51,8 @@ describe('initialManageTab / tabSwitch (arvustuse I2, I3)', () => {
   });
   it('?tab=parts (/review link) avab osad, aga fookus vajab lehti', () => {
     expect(initialManageTab(null, 'parts')).toBe('parts');
+    expect(initialManageTab(null, 'exemplars')).toBe('exemplars');   // #703: /review eksemplari-ettepanek
+    expect(initialManageTab(3, 'exemplars')).toBe('pages');
     expect(initialManageTab(3, 'parts')).toBe('pages');
     expect(initialManageTab(null, 'muu')).toBe('pages');
   });

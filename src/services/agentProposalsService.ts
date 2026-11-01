@@ -5,7 +5,7 @@
 import { FILE_API_URL } from '../config';
 import { apiGet, apiPost } from './apiClient';
 
-export type AgentProposalKind = 'text' | 'parts' | 'person';
+export type AgentProposalKind = 'text' | 'parts' | 'person' | 'exemplars';
 
 export interface AgentProposal {
   kind: AgentProposalKind;
@@ -14,7 +14,8 @@ export interface AgentProposal {
   target_label: string;
   target_url: string;
   pending: number;
-  /** `null` = vananemist ei arvutata (isik); osadel = `pending`, kui lehed muutusid. */
+  /** `null` = vananemist ei arvutata (isik); osadel = `pending`, kui lehed muutusid;
+   *  eksemplaridel = ootel read, mida praegu kinnitada ei saa (alus muutus, topelt, hoidja). */
   stale: number | null;
   created_at: number;
 }
@@ -22,7 +23,7 @@ export interface AgentProposal {
 export interface AgentHandoff {
   code: string;
   expires_at: number;
-  max_uses: { text: number; parts: number; persons: number };
+  max_uses: { text: number; parts: number; persons: number; exemplars: number };
 }
 
 function call<T>(token: string, path: string, init: { method?: 'POST' } = {}): Promise<T> {

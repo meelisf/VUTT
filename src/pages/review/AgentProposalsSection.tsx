@@ -38,6 +38,7 @@ export default function AgentProposalsSection({ token }: { token: string }) {
     text: t('proposals.kind.text'),
     parts: t('proposals.kind.parts'),
     person: t('proposals.kind.person'),
+    exemplars: t('proposals.kind.exemplars'),
   };
 
   return (
@@ -75,7 +76,10 @@ export default function AgentProposalsSection({ token }: { token: string }) {
                 {row.stale !== null && row.kind === 'parts' && row.stale > 0 && (
                   <span className="text-xs text-amber-800">{t('proposals.pagesChanged')}</span>
                 )}
-                {row.stale !== null && row.kind !== 'parts' && row.stale > 0 && (
+                {row.stale !== null && row.kind === 'exemplars' && row.stale > 0 && (
+                  <span className="text-xs text-amber-800">{t('proposals.blocked', { count: row.stale })}</span>
+                )}
+                {row.stale !== null && row.kind !== 'parts' && row.kind !== 'exemplars' && row.stale > 0 && (
                   <span className="text-xs text-amber-800">{t('proposals.stale', { count: row.stale })}</span>
                 )}
                 <span className="text-xs text-violet-700">{new Date(row.created_at * 1000).toLocaleDateString()}</span>

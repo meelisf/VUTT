@@ -12,6 +12,7 @@ from server import agent_handoff
 from server import agent_proposals as ap
 from server import page_text_proposals as ptp
 from server import work_part_proposals as wpp
+from server import exemplar_proposals as epp
 from server.prosopography import enrichment_proposals as ep
 
 
@@ -24,7 +25,7 @@ ITEM = {"kind": "occupation", "match_status": "matched", "raw_occupation": "Prof
 
 @pytest.fixture
 def work(tmp_path, monkeypatch):
-    for mod, name in ((ptp, "ptp"), (wpp, "wpp"), (ep, "ep")):
+    for mod, name in ((ptp, "ptp"), (wpp, "wpp"), (ep, "ep"), (epp, "epp")):
         monkeypatch.setattr(mod, "DB_PATH", str(tmp_path / f"{name}.sqlite3"))
     d = tmp_path / "slug-w1"
     d.mkdir()
@@ -97,7 +98,8 @@ def test_handoff_registreerib_kolmes(client, work):
     r = client.post("/agent-handoff")
     assert r.status_code == 200
     h = r.json()
-    assert h["max_uses"] == {"text": ptp.MAX_USES, "parts": wpp.MAX_USES, "persons": ep.ANY_MAX_USES}
+    assert h["max_uses"] == {"text": ptp.MAX_USES, "parts": wpp.MAX_USES, "persons": ep.ANY_MAX_USES,
+                             "exemplars": epp.MAX_USES}
     assert set(h) == {"code", "expires_at", "max_uses"}
     ptp.check_code(h["code"], "w1")                                      # ei viska
     assert wpp.submit(h["code"], "w1", work, wpp.pages_version(work), [LETTER])["status"] == "pending"
@@ -242,3 +244,23 @@ def test_nahtavus_kasutaja_kaupa(client, work):
     client.state["user"] = {"username": "ed", "role": "superadmin"}
     rows = client.get("/agent-proposals").json()
     assert [(r["kind"], r["proposal_id"]) for r in rows] == [("text", pid)]
+
+
+EX_NEW = {"op": "create", "fields": {"holder": "TÜR", "shelfmark": "R 1"},
+          "source": {"kind": "ester", "ref": "b2648642", "quote": "R 1"}}
+
+
+def test_loend_naitab_eksemplari_ettepanekut(client, work, monkeypatch):
+    import importlib
+    config = importlib.import_module("server.config")   # sama moodul, mida kood loeb (vt test_exemplar_proposals)
+    archives = os.path.join(os.path.dirname(work), "archives.json")
+    json.dump({"TÜR": {"name": "TÜR"}}, open(archives, "w"))
+    monkeypatch.setattr(config, "ARCHIVES_FILE", archives)
+    code = client.post("/agent-handoff").json()["code"]
+    res = epp.submit(code, "w1", work, [EX_NEW, {**EX_NEW, "fields": {"holder": "XX"}}])
+    (row,) = _by_kind(client.get("/agent-proposals").json(), "exemplars")
+    assert row == {"kind": "exemplars", "proposal_id": res["proposal_id"], "target_id": "w1",
+                   "target_label": "Epistolae", "target_url": "/work/w1/manage?tab=exemplars",
+                   "pending": 2, "stale": 1, "created_at": row["created_at"]}
+    client.state["user"] = {"username": "teine", "role": "superadmin"}
+    assert _by_kind(client.get("/agent-proposals").json(), "exemplars") == []

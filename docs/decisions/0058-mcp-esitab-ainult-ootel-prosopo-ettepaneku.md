@@ -208,3 +208,25 @@ osas) ja „Kompensatsioon, mitte tehing".
   deploy'd antud koodid kaotavad kehtivuse — agent küsib uue koodi.
 - Uus ettepanekuliik = uus `kind` väärtus `agent_handoff.KINDS`-is + piir
   `issue_agent_handoff`-is; uut koodihoidlat ei tehta.
+
+## Täiendus 2026-11-01 (#703): eksemplari ettepanek
+
+Kavand: `docs/superpowers/specs/2026-11-01-eksemplari-ettepanekud-design.md`; mudel ADR 0076 §7.
+
+- **Tõendi liik `ester` on lubatud AINULT eksemplari-ettepanekul** — erand täiendusest
+  2026-09-28 („tõend ainult VUTT-ist"). ESTERi kirje on püsiv, numbriga kontrollitav
+  kataloog, mitte suvaline veebileht. Server kontrollib numbri kuju (`^b\d{7,8}$`) ja
+  tsitaadi pikkust (≤ 500 märki); lingi (`https://www.ester.ee/record=<ref>*est`)
+  koostab klient, agent URL-i ei anna. Üks rida = üks allikas. Muu veebiallika peale
+  agent endiselt ettepanekut ei tee.
+- **Uus liik `exemplars`** `agent_handoff.KINDS`-is (lagi 20 esitust), hoidla
+  `state/exemplar_proposals.sqlite3` (`server/exemplar_proposals.py`), kulutus + INSERT
+  üks `ATTACH`-tehing nagu teistel liikidel. Otspunktid `POST /works/exemplar-proposals/submit`
+  (autentimata, kood), `GET /works/{id}/exemplar-proposals`, `POST /works/{id}/exemplar-proposals/decide`
+  (superadmin). `/review` loendis `target_url = /work/{id}/manage?tab=exemplars`,
+  `stale` = ootel read, mida praegu kinnitada ei saa. Nähtavus: koodi loonud kasutaja.
+- Ülevaatus = Kinnita / Lükka tagasi (täiendus 2026-09-29). Valitud read = üks
+  `work_exemplars.apply_proposal_ops` kirjutus = üks commit, atomaarne.
+- Otsustatud ridadega ettepanekut aegumine ei kustuta: hilisem süstemaatiline läbikäik
+  toetub „töödeldud" märkele. Ootel read aegunud ettepanekus on `expired`.
+

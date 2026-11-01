@@ -217,6 +217,21 @@ Tekstitunnistajal oleks `"text_witness": true` ja `pages`-i võtit ei oleks (p 3
 - Ülevaatus käib teose kaupa. Toimetaja võib kinnitada valitud read **ühe partiina** (üks
   commit) või ükshaaval. Kinnitus käib samade `work_exemplars` funktsioonide kaudu nagu
   käsitsi muutmine. `needs_review` selle käigus ei muutu (p 2).
+- **Täpsustus 2026-11-01 (#703, teostus):**
+  - `base` on muudatusreal kohustuslik ja katab täpselt `fields` võtmed (puuduv väli =
+    `null`). Esitusel peab `base` klappima elava seisuga (`stale_base`), kinnitusel uuesti
+    (`stale`).
+  - Ülevaatuse olek arvutatakse igal lugemisel, mitte ei salvestata: `stale` (alus
+    muutus või eksemplar puudub), `blocked_holder` (uue eksemplari hoidja puudub
+    registrist — superadmin lisab hoidja, rida vabaneb ilma uue esituseta), `duplicate`
+    (uue või muudetud eksemplari hoidja + kohaviit kattuvad teise olemasolevaga,
+    `work_exemplars.duplicate_of`; kohaviidata kirje ei ole kunagi topelt), `expired`.
+    Kinnitada saab ainult `pending` rida; tagasi lükata iga otsustamata rea.
+  - Uue kirje `source` = `{kind: "ester", ref, at}`. Muudatusrida olemasolevat allikat
+    (`manual`, `migration`) EI asenda: see on kasutaja sisestus ja kasutajal oli põhjus;
+    ainult allikata kirje saab ESTERi viite. Tsitaat jääb ettepanekute hoidlasse, ESTERi
+    number läheb commit-sõnumisse.
+  - Otsustatud ridadega ettepanek säilib aegumisel (ADR 0058 täiendus 2026-11-01).
 
 ### 8. Migratsioon
 

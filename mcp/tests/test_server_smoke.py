@@ -7,6 +7,7 @@ EXPECTED_TOOLS = {
     "submit_person_enrichment_proposal", "list_filter_values",
     "get_work_parts", "submit_work_parts_proposal",
     "get_page_source", "submit_page_text_proposal",
+    "get_work_exemplars", "submit_exemplar_proposal",
 }
 
 

@@ -439,6 +439,35 @@
       "unknown": "Unknown",
       "witness": "text witness",
       "required": "This work has copies: choose the image source first."
+    },
+    "exemplarProposals": {
+      "tab": "Copies",
+      "title": "Agent proposals for copies",
+      "help": "Each row is based on one ESTER record. Accept or reject; make corrections after accepting in the copy form (metadata window).",
+      "none": "There are no proposals for this work.",
+      "loadError": "Failed to load proposals.",
+      "decideError": "The decision was not saved.",
+      "accepted": "Proposal accepted.",
+      "rejected": "Proposal rejected.",
+      "acceptSelected": "Accept selected",
+      "accept": "Accept",
+      "reject": "Reject",
+      "select": "Select row",
+      "colKind": "Kind",
+      "colCurrent": "Current",
+      "colProposed": "Proposed",
+      "colSource": "Source",
+      "opCreate": "new copy",
+      "opUpdate": "change",
+      "state": {
+        "stale": "the copy has changed since",
+        "blocked_holder": "holder not in the registry",
+        "duplicate": "the copy already exists",
+        "expired": "the proposal has expired",
+        "accepted": "accepted",
+        "rejected": "rejected",
+        "pending": "pending"
+      }
     }
   },
   "metadata": {

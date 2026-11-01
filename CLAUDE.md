@@ -98,7 +98,7 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP agendikood (`agent_handoff.sqlite3`) ja ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`, `page_text_proposals.sqlite3`) | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP agendikood (`agent_handoff.sqlite3`) ja ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`, `page_text_proposals.sqlite3`, `exemplar_proposals.sqlite3`) | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
 `labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`occupations.json`**, **`institutions.json`**
@@ -361,7 +361,7 @@ registrikirje `place_periods`-is, mitte isikufaktis. Registrikirje on admini era
 toiming (`save_config_with_git`); isikufakti kinnitamine EI loo kirjet, v.a agendi
 ettepaneku kinnitus `registries.ensure` kaudu (luku all, sama Q → seotakse).
 
-**MCP ettepanekud (ADR 0058)** — MCP kirjutab AINULT ootel ettepaneku (isik, teose osad);
+**MCP ettepanekud (ADR 0058)** — MCP kirjutab AINULT ootel ettepaneku (isik, teose osad, lehe tekst, eksemplarid);
 kinnitus käib olemasolevate valideeritud kirjutusteede kaudu (`create_part`,
 isikukaardi salvestus). Agendikood on ÜKS (`/review`, `POST /agent-handoff`): üks hoidla
 (`agent_handoff.py`, rida liigi kohta), kulutus + ettepanek üks tehing `ATTACH`-iga (WAL keelatud); loend `GET /agent-proposals`,
@@ -370,6 +370,10 @@ KASUTAJAGA, mitte sessiooniga. Kõik ettepanekuliigid on ainult superadmin.
 Lehe teksti ettepanek (#641): agent saab toorteksti AINULT koodiga, esitab asendused
 räsi vastu; ülevaatus liidab ketta vastu ühe `page_lock`-i all (`review_page`), pakk on
 ÜKS commit, lukud ettepanek → leht → git. Kinnitus ei muuda lehe seisundit.
+Eksemplari ettepanek (#703): ainus ettepanekuliik, mille tõend tohib olla väline — ESTERi
+kirje number (`ester`, server kontrollib kuju, klient koostab lingi). Rea olek (`stale`,
+`blocked_holder`, `duplicate`) arvutatakse lugemisel; kinnitus AINULT
+`work_exemplars.apply_proposal_ops` kaudu (üks commit); otsustatud read säilivad aegumisel.
 
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
