@@ -20,9 +20,11 @@ interface WorkInfoPanelProps {
   work?: Work;
   lang: string;
   onOpenMetaModal?: () => void;
+  /** Tähelepanujuht päise all (`AnnotationsGuide`). */
+  guide?: React.ReactNode;
 }
 
-const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaModal }) => {
+const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaModal, guide }) => {
   const { t } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
   const { collections } = useCollection();
@@ -55,6 +57,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
               {t('download.button')}
             </button>
           </div>
+          {guide}
           <div className="space-y-3 text-sm">
             <div>
               <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.workTitle')}</span>

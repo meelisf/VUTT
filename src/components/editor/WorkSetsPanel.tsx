@@ -23,9 +23,11 @@ interface WorkSetsPanelProps {
   workId?: string;
   lang: string;
   readOnly?: boolean;
+  /** Kogude arv, kuhu teos kuulub (nähtavad), tähelepanujuhile. */
+  onCount?: (n: number) => void;
 }
 
-const WorkSetsPanel: React.FC<WorkSetsPanelProps> = ({ workId, lang, readOnly }) => {
+const WorkSetsPanel: React.FC<WorkSetsPanelProps> = ({ workId, lang, readOnly, onCount }) => {
   const { t } = useTranslation(['common']);
   const { workSets, workSetsError, refreshWorkSets, setSelection } = useCollection();
   const navigate = useNavigate();
@@ -52,6 +54,7 @@ const WorkSetsPanel: React.FC<WorkSetsPanelProps> = ({ workId, lang, readOnly })
   }, [workId, t]);
 
   useEffect(() => { lae(); }, [lae]);
+  useEffect(() => { onCount?.(kuuluvus?.length ?? 0); }, [kuuluvus, onCount]);
 
   // Paneel on nähtav ainult siis, kui on midagi näidata või midagi teha.
   // Anonüümsele lugejale, kes ühtki kogu ei näe, oleks tühi kast müra.

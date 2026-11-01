@@ -569,6 +569,16 @@
     "filterByPrinter": "Filter by printer",
     "pageTags": "Page tags",
     "pageAnnotations": "Page notes",
+    "guide": {
+      "label": "In this work and page",
+      "toc": "Contents",
+      "workSets": "Work sets",
+      "workTags": "Work keywords",
+      "pageTags": "Page tags",
+      "textAnnotations": "Text annotations",
+      "pageNotes": "Page notes",
+      "addNote": "Add a note"
+    },
     "noAnnotations": "No notes added",
     "noAnnotationsHint": "Add first comment or note.",
     "noTags": "No tags added",

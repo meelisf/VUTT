@@ -41,9 +41,13 @@ interface Props {
   currentPage: number;
   /** Toimetaja, kes tohib teost muuta: osa andmete juures pliiats → sama vorm mis teose halduses. */
   canEdit?: boolean;
+  /** Osade arv tähelepanujuhile (`AnnotationsGuide`). */
+  onCount?: (n: number) => void;
+  /** Kasvav loendur: iga muutus avab sisukorra (pilli klõps). */
+  openSignal?: number;
 }
 
-const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit = false }) => {
+const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit = false, onCount, openSignal = 0 }) => {
   const { t } = useTranslation(['workspace']);
   const [parts, setParts] = useState<WorkPart[]>([]);
   const [nums, setNums] = useState<Map<string, number>>(new Map());
@@ -55,6 +59,9 @@ const WorkPartsPanel: React.FC<Props> = ({ workId, token, currentPage, canEdit =
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+
+  useEffect(() => { onCount?.(parts.length); }, [parts.length, onCount]);
+  useEffect(() => { if (openSignal > 0) setOpen(true); }, [openSignal]);
 
   const load = useCallback(async (isCancelled: () => boolean = () => false) => {
     if (!workId) return;

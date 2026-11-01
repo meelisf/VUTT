@@ -569,6 +569,16 @@
     "filterByPrinter": "Filtreeri trükkali järgi",
     "pageTags": "Lehekülje märksõnad",
     "pageAnnotations": "Lehekülje märkmed",
+    "guide": {
+      "label": "Selles teoses ja lehel",
+      "toc": "Sisukord",
+      "workSets": "Töökollektsioonid",
+      "workTags": "Teose märksõnad",
+      "pageTags": "Lehe märksõnad",
+      "textAnnotations": "Tekstiannotatsioonid",
+      "pageNotes": "Lehekülje märkmed",
+      "addNote": "Lisa märge"
+    },
     "noAnnotations": "Märkmeid pole lisatud",
     "noAnnotationsHint": "Lisa esimene kommentaar või märkus.",
     "noTags": "Märksõnad puuduvad",
