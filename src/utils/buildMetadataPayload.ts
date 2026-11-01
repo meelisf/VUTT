@@ -56,7 +56,6 @@ export interface MetadataPayload {
     ester_id: string | null;
     external_url: string | null;
     collections: string[];
-    archive_refs: ArchiveRef[] | null;
   };
   original_path?: string;
 }
@@ -84,7 +83,8 @@ export function cleanCreators(creators: Creator[]): CleanedCreator[] {
     .map(c => ({ name: c.name.trim(), role: c.role, id: c.id, source: c.source }));
 }
 
-// Puhastab archive_refs massiivi: eemaldab tühjad kirjed, trimmib stringid
+// Puhastab archive_refs massiivi: eemaldab tühjad kirjed, trimmib stringid.
+// Ainult upload'i staging-vormile — uue teose loomisel teisendab server need eksemplarideks.
 export function cleanArchiveRefs(refs: ArchiveRef[]): ArchiveRef[] | null {
   const clean = refs
     .filter(r => r.archive_id.trim() || r.reference.trim())
@@ -135,7 +135,8 @@ export function buildMetadataPayload(
       ester_id: cleanEsterId(form.ester_id),
       external_url: form.external_url.trim() || null,
       collections: form.collections,
-      archive_refs: cleanArchiveRefs(form.archive_refs),
+      // archive_refs EI lähe kaasa: see on eksemplaridest tuletatud lugemiskuju ja
+      // server lükkab ta tagasi (ADR 0076). Eksemplarid: /works/{id}/exemplars.
     },
   };
 

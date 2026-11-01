@@ -37,6 +37,7 @@ from ..page_merge import PAGE_FIELDS, merge_page, read_page_view, text_conflict_
 from ..page_address import clean_page_numbering
 from ..page_paths import check_page_filename, require_existing_page
 from ..page_text import normalize_page_text
+from ..work_exemplars import derive_archive_refs
 from .. import page_text_proposals
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.indices import page_person_ids
@@ -329,6 +330,10 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
     # mõlemad pooled korraga, üldine salvestus jätaks seose ühepoolseks.
     if 'relations' in (data.get('metadata') or {}):
         raise HTTPException(status_code=400, detail="Seoseid muudetakse /works/{id}/relations kaudu")
+    # Eksemplarid muutuvad AINULT /works/{id}/exemplars kaudu (ADR 0076); `archive_refs`
+    # on neist tuletatud lugemiskuju ja vana klient ei tohi seda tagasi kirjutada.
+    if {'exemplars', 'exemplar_unknown_pages', 'archive_refs'} & set(data.get('metadata') or {}):
+        raise HTTPException(status_code=400, detail="Eksemplare muudetakse /works/{id}/exemplars kaudu")
     try:
         data['metadata'] = dating_updates(data.get('metadata', {}))
         # Käsikirja lehenummerduse skeem (#630 spekk 2): ainult foliation | pagination | null.
@@ -375,6 +380,8 @@ async def get_work_meta_direct(request: Request, user=Depends(require_role("cont
     else:
         catalog = os.path.basename(path)
     metadata = await run_in_threadpool(_require_catalog_access, catalog, user)
+    # Lugemiskuju (ADR 0076 p 1): vorm kuvab arhiiviviiteid eksemplaridest.
+    metadata = {**metadata, "archive_refs": derive_archive_refs(metadata)}
     return {"status": "success", "metadata": metadata}
 
 @router.post("/get-metadata-suggestions")

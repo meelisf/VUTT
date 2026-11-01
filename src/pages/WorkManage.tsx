@@ -38,6 +38,7 @@ import {
   getReocrStatus,
   getWorkMetadata,
   getWorkPages,
+  getWorkExemplars,
   ModifiedImage,
   reorderWorkPages,
   replaceWorkPageImage,
@@ -69,6 +70,8 @@ import { ruhmita } from './manage/trashGrouping';
 import TrashDeletedPages from './manage/TrashDeletedPages';
 import TrashModifiedImages from './manage/TrashModifiedImages';
 import TrashSplitRemnants from './manage/TrashSplitRemnants';
+import ExemplarOriginSelect from './manage/ExemplarOriginSelect';
+import type { Exemplar } from '../types';
 
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
@@ -107,6 +110,9 @@ const WorkManage: React.FC = () => {
   // Lehekülje lisamine
   const [showAddForm, setShowAddForm] = useState(false);
   const [addAfterPage, setAddAfterPage] = useState<number>(-1);
+  // Eksemplarid (ADR 0076): uue pildi päritolu on eksemplaridega teosel kohustuslik.
+  const [exemplars, setExemplars] = useState<Exemplar[]>([]);
+  const [addOrigin, setAddOrigin] = useState('');
   const [addFiles, setAddFiles] = useState<File[]>([]);
   const [showAllNames, setShowAllNames] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
@@ -206,6 +212,9 @@ const WorkManage: React.FC = () => {
     if (!workId || !authToken) return [];
     setLoading(true);
     setLoadError(null);
+    // Eksemplarid koos lehtedega: lehetoiming võib erandlehed muuta. Viga ei takista
+    // lehtede laadimist — server lükkab päritoluta pildi siis ise tagasi.
+    getWorkExemplars(workId, authToken).then((d) => setExemplars(d.exemplars || [])).catch(() => {});
     try {
       const data = await getWorkPages(workId, authToken);
       if (data.status === 'success') {
@@ -726,11 +735,11 @@ const WorkManage: React.FC = () => {
 
   // Asendab ühe lehe pildi. Viskab vea edasi, et kutsuja (redaktori-modaal)
   // saaks oma UI-s vea näidata ja eelvaadet mitte värskendada.
-  const handleReplaceImage = async (file: File, pageNum: number) => {
+  const handleReplaceImage = async (file: File, pageNum: number, origin?: string) => {
     if (!workId || !authToken) throw new Error('Not authorized');
     setReplaceError(null);
 
-    const data = await replaceWorkPageImage(workId, authToken, pageNum, file);
+    const data = await replaceWorkPageImage(workId, authToken, pageNum, file, origin);
     if (data.status !== 'success') throw new Error(t('manage.replaceError'));
 
     // Õnnestus: cache-bust + sessionStorage (Workspace tühistab cache'i) + lehtede uuesti laadimine
@@ -751,6 +760,7 @@ const WorkManage: React.FC = () => {
     setShowAddForm(false);
     setAddFiles([]);
     setAddAfterPage(-1);
+    setAddOrigin('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -762,7 +772,7 @@ const WorkManage: React.FC = () => {
     setAddPageResult(null);
     setHighlightedFiles(new Set());
     try {
-      const r = await addWorkPdf(workId, authToken, file, afterToAnchor(addAfterPage, pages));
+      const r = await addWorkPdf(workId, authToken, file, afterToAnchor(addAfterPage, pages), addOrigin || null);
       await followJob('add_pdf', r.total);
     } catch (e: any) {
       setAddingPage(false);
@@ -782,6 +792,10 @@ const WorkManage: React.FC = () => {
 
   const handleAddPage = async () => {
     if (!workId || !authToken || addFiles.length === 0) return;
+    if (exemplars.length > 0 && !addOrigin) {
+      setAddPageError(t('manage.exemplarOrigin.required'));
+      return;
+    }
     const picked = classifyAddFiles(addFiles);
     if (picked.kind === 'invalid') {
       setAddPageError(t(picked.reason === 'mixed' ? 'manage.addPdf.mixed' : 'manage.addPdf.multiplePdf'));
@@ -807,7 +821,7 @@ const WorkManage: React.FC = () => {
         // Tühistus on tüki-granulaarne: parajasti pooleliolev tükk jõuab veel
         // serverisse committida; katkestus rakendub alles järgmise tüki ees.
         if (cancelRef.current) break;
-        const data = await addWorkPages(workId, authToken, chunk.files, chunk.afterPageNum);
+        const data = await addWorkPages(workId, authToken, chunk.files, chunk.afterPageNum, addOrigin || null);
         if (data.meili_warning) meiliWarned = true;
         done += chunk.files.length;
         setUploadProgress({ done, total });
@@ -1330,6 +1344,8 @@ const WorkManage: React.FC = () => {
                     </select>
                   </div>
 
+                  <ExemplarOriginSelect exemplars={exemplars} value={addOrigin} onChange={setAddOrigin} disabled={addingPage} />
+
                   {addFiles.length > 1 && (
                     <div className="text-xs text-gray-600">
                       <p className="font-medium mb-1">{t('manage.addPagesPreview')}</p>
@@ -1361,7 +1377,7 @@ const WorkManage: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleAddPage}
-                      disabled={addFiles.length === 0 || addingPage}
+                      disabled={addFiles.length === 0 || addingPage || (exemplars.length > 0 && !addOrigin)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white rounded transition-colors"
                     >
                       {addingPage ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -1557,6 +1573,7 @@ const WorkManage: React.FC = () => {
             return fresh;
           }}
           onReplaceImage={handleReplaceImage}
+          exemplars={exemplars}
           cacheBust={thumbCacheBust}
           pendingOps={pendingOps}
           globalSplitX={splitX}

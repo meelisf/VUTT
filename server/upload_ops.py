@@ -770,7 +770,7 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
             "creators", "genre", "type", "tags",
             "location", "publisher",
             "ester_id", "external_url", "year_display", "dating",
-            "archive_refs",
+            # `archive_refs` EI ole siin (ADR 0076 p 5): sisu asendus ei kirjuta eksemplare.
         ]
         updates = {}
         if upload_meta.get('title'):
@@ -831,6 +831,13 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     # 9b. Lehehulk vahetus tervikuna (#626, ADR 0055): vanade lehtede `mentioned`-kirjed
     # ja osade lehetüved tuleb uute lehtede järgi ühtlustada. Enne Meili sünki, et
     # sünk kannaks ühtlustatud osi. Viga logitakse funktsiooni sees, ei visata.
+    # Uus skaneering võib olla teisest eksemplarist ja failinimed korduvad: vana
+    # päritolu ei tohi pärida (ADR 0076 p 3). Enne sünki, mis tüvede järgi remapiks.
+    try:
+        from .work_exemplars import reset_page_origins
+        reset_page_origins(work_dir, username)
+    except Exception:
+        logger.exception(f"replace {upload_id}: eksemplaride päritolu nullimine ebaõnnestus")
     from .prosopography import relations as _relations
     _relations.refresh_work_mentions(work_dir, work_id)
 

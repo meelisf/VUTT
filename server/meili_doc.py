@@ -30,6 +30,7 @@ from .utils import (
     get_labels_by_lang, sanitize_id, parse_year_range, normalize_genre,
 )
 from .marginalia_normalize import normalize_marginalia_tags
+from .work_exemplars import derive_archive_refs
 from .vutt_tags import page_mark_entries, remove_page_marks
 
 # Pealkirja lisaväljad (ADR 0064) — tõlge(d) ja transkribeeritud originaal.
@@ -713,7 +714,7 @@ def get_work_metadata(doc_path, dir_name, collections):
     result['languages'] = meta.get('languages', [])
     result['ester_id'] = meta.get('ester_id')
     result['external_url'] = meta.get('external_url')
-    result['archive_refs'] = meta.get('archive_refs') or []
+    result['archive_refs'] = derive_archive_refs(meta)
     result['shareable'] = meta.get('shareable', False)
     result['parts'] = meta.get('parts') or []
 
@@ -799,7 +800,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         'series': series,
         'series_title': doc_metadata.get('series_title', '') if series else '',
         'relations': doc_metadata.get('relations'),
-        'archive_refs': doc_metadata.get('archive_refs') or [],
+        'archive_refs': doc_metadata.get('archive_refs') or [],  # juba tuletatud (get_work_metadata)
         '_archives': archives,
     }
 

@@ -431,6 +431,14 @@
     },
     "jobs": {
       "otherRunning": "Another background job is running on this work. Try again shortly."
+    },
+    "exemplarOrigin": {
+      "label": "Image source (copy)",
+      "choose": "— choose source —",
+      "same": "Same copy as the existing scan",
+      "unknown": "Unknown",
+      "witness": "text witness",
+      "required": "This work has copies: choose the image source first."
     }
   },
   "metadata": {
@@ -508,7 +516,8 @@
     "pageNumberingHint": "Meaning of the page's <fw> in the part's address reference (fol. / p.).",
     "viewPersonPage": "View person page",
     "noGenres": "No genres",
-    "genrePlaceholder": "Add a genre..."
+    "genrePlaceholder": "Add a genre...",
+    "archiveRefsReadOnly": "Archive references come from the copies (exemplars) and are read-only here. Editing copies will get its own view."
   },
   "download": {
     "title": "Download",

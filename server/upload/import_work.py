@@ -436,6 +436,15 @@ def _teosta_import(
     for field in optional_meta_fields:
         if field in meta and meta[field] not in (None, [], ""):
             metadata[field] = meta[field]
+    # Arhiiviviited → eksemplarid (ADR 0076 p 5): uue teose loomisel ainus koht, kus
+    # vana kuju veel sisse tuleb. Automaatne kirje saab `needs_review`.
+    refs = metadata.pop("archive_refs", None)
+    if refs:
+        from ..work_exemplars import exemplars_from_archive_refs, is_manuscript
+        exemplars = exemplars_from_archive_refs(refs, "ada" if state.get('ada') else "upload",
+                                                manuscript=is_manuscript(metadata))
+        if exemplars:
+            metadata["exemplars"] = exemplars
     # Puudumine = false (ADR 0064) — `false`-i ei kirjutata.
     if meta.get("title_devised") is True:
         metadata["title_devised"] = True

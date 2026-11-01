@@ -6,6 +6,7 @@ from typing import Optional
 from urllib.parse import urlencode
 from .config import BASE_DIR
 from .utils import find_directory_by_id
+from .work_exemplars import derive_archive_refs
 from .text_reading import read_work_page_texts, _clean_search_text, work_latest_mtime
 from .prosopo_biography_fields import BIOGRAPHY_EN, BIOGRAPHY_ET
 
@@ -285,7 +286,7 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
     if place or publisher_name:
         body_lines.append(f"<p>{_escape(place)}{': ' + _escape(publisher_name) if publisher_name else ''}</p>")
 
-    archive_refs = meta.get("archive_refs") or []
+    archive_refs = derive_archive_refs(meta)
     for ref in archive_refs:
         archive_id = ref.get("archive_id", "")
         reference = ref.get("reference", "")

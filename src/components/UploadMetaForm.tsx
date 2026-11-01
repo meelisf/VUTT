@@ -553,7 +553,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           </div>
         </div>
 
-        {/* Arhiiviviited */}
+        {/* Arhiiviviited — ainult uue teose loomisel: server teisendab need eksemplarideks.
+            Sisu asendus eksemplare ei puuduta (ADR 0076 p 5), seepärast seal välja ei ole. */}
+        {!replaceWorkId && (
         <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
           <h4 className="text-xs font-bold text-gray-600 uppercase">
             {t('workspace:metadata.archiveRefs', 'Arhiiviviited')}
@@ -596,6 +598,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
           >+ {t('workspace:metadata.addArchiveRef', 'Lisa arhiiviviide')}</button>
         </div>
+        )}
 
         {/* Salvestusnupp */}
         {saveError && (

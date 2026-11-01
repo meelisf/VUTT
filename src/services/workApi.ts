@@ -1,4 +1,5 @@
 import { LinkedEntity } from '../types/LinkedEntity';
+import type { Exemplar } from '../types';
 import { ApiRequestOptions, apiDelete, apiGet, apiPost } from './apiClient';
 import { FILE_API_URL } from '../config';
 import type { PageOpRequest } from '../pages/manage/pageOpsPlan';
@@ -312,14 +313,33 @@ export function deleteWorkPages(workId: string, token: string, baseNames: string
   return apiPost<ApiStatusResponse>(`/admin/work/${workId}/delete-pages`, { base_names: baseNames }, authJson(token, { timeout: 30000 }));
 }
 
+/** Uue pildi päritolu eksemplaridega teosel (ADR 0076 p 4): 'same' | 'unknown' | eksemplari id. */
+function appendOrigin(formData: FormData, origin?: string | null) {
+  if (origin) formData.append('exemplar_origin', origin);
+}
+
+export interface WorkExemplarsResponse {
+  exemplars: Exemplar[];
+  unknown_pages: string[];
+  page_numbers: Record<string, number>;
+  page_count: number;
+  convolutes: unknown[];
+}
+
+export function getWorkExemplars(workId: string, token?: string | null): Promise<WorkExemplarsResponse> {
+  return apiGet<WorkExemplarsResponse>(`/works/${workId}/exemplars`, auth(token ?? null));
+}
+
 export function replaceWorkPageImage(
   workId: string,
   token: string,
   pageNum: number,
   file: File,
+  origin?: string | null,
 ): Promise<ApiStatusResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  appendOrigin(formData, origin);
   return apiPost<ApiStatusResponse>(
     `/admin/work/${workId}/page/${pageNum}/replace-image`,
     formData,
@@ -332,10 +352,12 @@ export function addWorkPages(
   token: string,
   files: File[],
   afterPageNum: number,
+  origin?: string | null,
 ): Promise<AddPagesResponse> {
   const formData = new FormData();
   files.forEach((file) => formData.append('file', file));
   formData.append('after_page_num', String(afterPageNum));
+  appendOrigin(formData, origin);
   return apiPost<AddPagesResponse>(`/admin/work/${workId}/add-pages`, formData, auth(token, { timeout: 120000 }));
 }
 
@@ -348,10 +370,12 @@ export function addWorkPdf(
   token: string,
   file: File,
   after: string,
+  origin?: string | null,
 ): Promise<{ status: string; total: number }> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('after', after);
+  appendOrigin(formData, origin);
   return apiPost(`/admin/work/${workId}/add-pdf`, formData, auth(token, { timeout: 600000 }));
 }
 

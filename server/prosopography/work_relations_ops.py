@@ -5,10 +5,15 @@ Indeks: data/config/works_creators_index.json — kirje IGALE teosele (#461)
   { work_id: { "title": str, "year": int|None, "creators": [{ "person_id": str, "roles": [str] }],
                "location": {"id": str|None, "label": str}|None, "genres": [str],
                "parts": { part_id: { "kind", "title", "year", "place", "first_page", "pages": [int] } } } }
-  `manuscript: true` ainult käsikirjal. `parts` ainult osadega teosel (#464). Leheküljenumbrid arvutatakse KIRJUTAMISEL teose
+  `manuscript: true` ainult käsikirjal. `parts` ainult osadega teosel (#464).
+  Leheküljenumbrid arvutatakse KIRJUTAMISEL teose
   kausta järgi, et /network ei peaks kausta skannima; lehetoiming kutsub seepärast
   update_work_facts'i ka siis, kui osad ise ei muutu (sync_work_parts).
   Kogud ja avalikkus EI OLE siin: need elavad work_collections_index.json-is (ADR 0056).
+
+Kõrvalindeks: data/config/convolute_index.json — { konvoluudi võti: [work_id, …] } (ADR 0076 p 6).
+  Eraldi fail, et kaaslaste leidmine ei peaks parsima kogu faktide indeksi (~1 MB).
+  Kirjutavad samad kolm funktsiooni samas kohas, nii et ükski teose kirjutustee ei jää maha.
 
 Kutsumiskohad:
   build_works_creators_index()  — rebuild_indices() ja serveri start
@@ -22,11 +27,12 @@ import os
 import threading
 from typing import Optional
 
-from ..config import WORKS_CREATORS_INDEX_FILE, PERSON_TO_WORKS_FILE, PROSOPOGRAPHY_INDEX_FILE, BASE_DIR, get_logger
+from ..config import WORKS_CREATORS_INDEX_FILE, CONVOLUTE_INDEX_FILE, PERSON_TO_WORKS_FILE, PROSOPOGRAPHY_INDEX_FILE, BASE_DIR, get_logger
 from ..utils import atomic_write_json
 
 logger = get_logger(__name__)
 _creators_lock = threading.Lock()
+_convolute_lock = threading.Lock()
 
 
 def _creators_to_entries(creators: list) -> list:
@@ -130,6 +136,47 @@ def _work_facts_entry(meta: dict, work_dir: Optional[str] = None) -> dict:
     return entry
 
 
+def load_convolute_index() -> dict:
+    if os.path.exists(CONVOLUTE_INDEX_FILE):
+        try:
+            with open(CONVOLUTE_INDEX_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _keys_by_work(index: dict) -> dict:
+    """{võti: [teosed]} → {teos: [võtmed]} — kirjutajad töötavad teose kaupa."""
+    out: dict = {}
+    for key, work_ids in (index or {}).items():
+        for work_id in work_ids or []:
+            out.setdefault(work_id, []).append(key)
+    return {w: sorted(keys) for w, keys in out.items()}
+
+
+def _convolute_from_works(by_work: dict) -> dict:
+    out: dict = {}
+    for work_id, keys in by_work.items():
+        for key in keys:
+            out.setdefault(key, []).append(work_id)
+    return {k: sorted(ids) for k, ids in sorted(out.items())}
+
+
+def _write_convolute(work_id: str, keys: list) -> None:
+    with _convolute_lock:
+        current = load_convolute_index()
+        by_work = _keys_by_work(current)
+        if keys:
+            by_work[work_id] = sorted(keys)
+        else:
+            by_work.pop(work_id, None)
+        index = _convolute_from_works(by_work)
+        # Enamik teoseid ei ole konvoluudis — muutuseta salvestus faili ei puuduta.
+        if index != current:
+            atomic_write_json(CONVOLUTE_INDEX_FILE, index)
+
+
 def _write_entry(work_id: str, entry: Optional[dict]) -> None:
     with _creators_lock:
         index = _load_creators_index()
@@ -142,14 +189,17 @@ def _write_entry(work_id: str, entry: Optional[dict]) -> None:
 
 def update_work_facts(meta: dict, work_dir: Optional[str] = None) -> None:
     """Kirjutab teose faktid. Kutsutakse tingimusteta update_work_collections kõrval."""
+    from ..work_exemplars import convolute_keys
     work_id = meta.get("id") or meta.get("work_id")
     if work_id:
         _write_entry(work_id, _work_facts_entry(meta, work_dir))
+        _write_convolute(work_id, convolute_keys(meta))
 
 
 def remove_work_facts(work_id: str) -> None:
     if work_id:
         _write_entry(work_id, None)
+        _write_convolute(work_id, [])
 
 
 def build_works_creators_index() -> None:
@@ -159,8 +209,11 @@ def build_works_creators_index() -> None:
     kirjed jäävad avaldamisel kettalt (#417, `fresh_merge`).
     """
     from .fresh_merge import merge_fresh
+    from ..work_exemplars import convolute_keys
     baseline = _load_creators_index()
+    conv_baseline = _keys_by_work(load_convolute_index())
     index: dict = {}
+    conv: dict = {}
     if os.path.exists(BASE_DIR):
         for entry in os.scandir(BASE_DIR):
             meta_path = os.path.join(entry.path, "_metadata.json")
@@ -174,9 +227,16 @@ def build_works_creators_index() -> None:
             work_id = meta.get("id") or meta.get("work_id")
             if work_id:
                 index[work_id] = _work_facts_entry(meta, entry.path)
+                keys = convolute_keys(meta)
+                if keys:
+                    conv[work_id] = sorted(keys)
     with _creators_lock:
         index = merge_fresh(index, baseline, _load_creators_index())
         atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
+    # Sama protokoll teose kaupa: vahepeal update_work_facts-iga kirjutatud teos jääb kettalt.
+    with _convolute_lock:
+        conv = merge_fresh(conv, conv_baseline, _keys_by_work(load_convolute_index()))
+        atomic_write_json(CONVOLUTE_INDEX_FILE, _convolute_from_works(conv))
 
 
 def _load_person_to_works() -> dict:

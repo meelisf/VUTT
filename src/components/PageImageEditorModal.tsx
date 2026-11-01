@@ -15,6 +15,8 @@ import RotateButtons from './pagePrep/RotateButtons';
 import { useCropBox } from './pagePrep/useCropBox';
 import CropOverlay from './pagePrep/CropOverlay';
 import type { PendingPageOp } from '../pages/manage/pageOpsPlan';
+import ExemplarOriginSelect from '../pages/manage/ExemplarOriginSelect';
+import type { Exemplar } from '../types';
 
 interface PageInfo {
   filename: string;
@@ -29,7 +31,9 @@ interface Props {
   imageToken: { exp: number; sig: string } | null;
   onClose: () => void;
   onPagesChanged: () => Promise<string[]>;  // laeb pages uuesti, tagastab uue failinimede massiivi
-  onReplaceImage: (file: File, pageNum: number) => Promise<void>;  // asendab lehe pildi; viskab vea ebaõnnestumisel
+  onReplaceImage: (file: File, pageNum: number, origin?: string) => Promise<void>;  // asendab lehe pildi; viskab vea ebaõnnestumisel
+  /** Teose eksemplarid (ADR 0076): olemasolul on asenduspildi päritolu kohustuslik. */
+  exemplars?: Exemplar[];
   cacheBust: number;  // muutub iga pildi-mutatsiooni järel (kärbe/pööre/poolitus/asendus) → eelvaade värske
   /**
    * Poolitus on OOTEL plaan (#431, ADR 0050), nagu upload'i detailvaates: joon
@@ -58,7 +62,7 @@ const DEFAULT_STAGE_H = 540;
 
 const PageImageEditorModal: React.FC<Props> = ({
   workId, pages, initialIndex, initialTab, imageToken, onClose, onPagesChanged, onReplaceImage, cacheBust,
-  pendingOps, globalSplitX, onSplitChange, onEditChange, onAdjustClear,
+  pendingOps, globalSplitX, onSplitChange, onEditChange, onAdjustClear, exemplars = [],
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
@@ -75,6 +79,8 @@ const PageImageEditorModal: React.FC<Props> = ({
   const [restoring, setRestoring] = useState(false);
   const [replacing, setReplacing] = useState(false);          // pildi asendamine käib
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [replaceOrigin, setReplaceOrigin] = useState('');
+  const originMissing = exemplars.length > 0 && !replaceOrigin;
   const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
 
   const splitContainerRef = useRef<HTMLDivElement>(null);
@@ -297,7 +303,7 @@ const PageImageEditorModal: React.FC<Props> = ({
     setReplacing(true);
     setError(null);
     try {
-      await onReplaceImage(file, current.page_num);
+      await onReplaceImage(file, current.page_num, replaceOrigin || undefined);
       onAdjustClear(current.filename);  // ootel kärbe oli vana pildi raamis
       // cacheBust uueneb parent'is (thumbCacheBust) → reset-effekt mõõdab pildi uuesti ja lähtestab teisendused
     } catch (e: unknown) {
@@ -353,10 +359,12 @@ const PageImageEditorModal: React.FC<Props> = ({
                 if (replaceInputRef.current) replaceInputRef.current.value = '';
               }}
             />
+            <ExemplarOriginSelect exemplars={exemplars} value={replaceOrigin} onChange={setReplaceOrigin}
+                                  disabled={replacing} compact />
             <button
               onClick={() => replaceInputRef.current?.click()}
-              disabled={replacing}
-              title={t('manage.replaceImage')}
+              disabled={replacing || originMissing}
+              title={originMissing ? t('manage.exemplarOrigin.required') : t('manage.replaceImage')}
               className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
             >
               {replacing ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}

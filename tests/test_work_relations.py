@@ -160,7 +160,7 @@ def works(tmp_path, monkeypatch):
     for wid, title in (("w1", "Series lectionum"), ("w2", "Series lectionum"), ("w3", "Piiratud")):
         path = _work(tmp_path, f"teos-{wid}", {
             "id": wid, "title": title, "title_en": f"{title} EN", "year": 1702,
-            "archive_refs": [{"archive_id": "LAB", "reference": f"R {wid}"}],
+            "exemplars": [{"id": "x1", "holder": "LAB", "shelfmark": f"R {wid}"}],
         })
         dirs[wid] = str(Path(path).parent)
 

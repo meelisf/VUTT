@@ -16,7 +16,6 @@ import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
 import { buildMetadataPayload, type YearFieldsExisting } from '../utils/buildMetadataPayload';
 import { parseYearDisplayRange, deriveYearFields } from '../utils/yearDisplayUtils';
-import ArchiveSelect from './ArchiveSelect';
 import { useDraggablePosition } from '../hooks/useDraggablePosition';
 import CreatorsEditor from './creators/CreatorsEditor';
 import { vocabularyRoleOptions } from './creators/roleOptions';
@@ -30,7 +29,7 @@ interface MetadataModalProps {
   work?: Work;
   workId: string;
   authToken: string;
-  userRole?: string;
+  userRole?: string;  // ei kasutata (arhiiviviited ainult lugemiseks, ADR 0076); kutsujad annavad edasi
   collections: Collections;
   onSaveSuccess: (updatedPage: Partial<Page>, updatedWork: Partial<Work>) => void;
 }
@@ -190,7 +189,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   work,
   workId,
   authToken,
-  userRole,
   collections,
   onSaveSuccess
 }) => {
@@ -742,50 +740,22 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             </div>
           </div>
 
-          {/* Grupp 4: Arhiiviviited */}
-          <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
-            <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.archiveRefs', 'Arhiiviviited')}</h4>
-            <div className="space-y-2">
-              {metaForm.archive_refs.map((ref, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
-                  <ArchiveSelect
-                    archives={archives}
-                    value={ref.archive_id}
-                    onChange={archiveId => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, archive_id: archiveId } : r) })}
-                    onArchiveAdded={(id, info) => setArchives(prev => ({ ...prev, [id]: info }))}
-                    userRole={userRole || ''}
-                    authToken={authToken}
-                  />
-                  <div className="flex-1 space-y-1">
-                    <textarea
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
-                      rows={2}
-                      placeholder={t('metadata.archiveRefPlaceholder', 'Viide (nt fond, nimistu, säilik, lehed)')}
-                      value={ref.reference}
-                      onChange={e => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, reference: e.target.value } : r) })}
-                    />
-                    <input
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      placeholder={t('metadata.archiveRefUrl', 'URL (valikuline)')}
-                      value={ref.url || ''}
-                      onChange={e => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, url: e.target.value } : r) })}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.filter((_, i) => i !== idx) })}
-                    className="text-gray-400 hover:text-red-500 mt-1 shrink-0 text-lg leading-none"
-                    title={t('common:buttons.remove', 'Eemalda')}
-                  >×</button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setMetaForm({ ...metaForm, archive_refs: [...metaForm.archive_refs, { archive_id: '', reference: '', url: '' }] })}
-                className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
-              >+ {t('metadata.addArchiveRef', 'Lisa arhiiviviide')}</button>
+          {/* Grupp 4: Arhiiviviited — eksemplaridest tuletatud, siin ainult lugemiseks (ADR 0076) */}
+          {metaForm.archive_refs.length > 0 && (
+            <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
+              <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.archiveRefs', 'Arhiiviviited')}</h4>
+              <ul className="space-y-1 text-sm text-gray-700">
+                {metaForm.archive_refs.map((ref, idx) => (
+                  <li key={idx}>
+                    <span className="font-medium">{ref.archive_id}</span>
+                    {archives[ref.archive_id]?.name && <span className="text-gray-500"> — {archives[ref.archive_id].name}</span>}
+                    {ref.reference && <span> · {ref.reference}</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-500">{t('metadata.archiveRefsReadOnly')}</p>
             </div>
-          </div>
+          )}
 
           {/* Grupp 5: Välised lingid */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">

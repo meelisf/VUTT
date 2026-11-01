@@ -52,7 +52,6 @@ FULL_META = {
     "languages": ["la", "de"],
     "external_url": "https://digar.nlib.ee/show/nlib-digar:123",
     "collections": [],
-    "archive_refs": None,
 }
 
 MANUSCRIPT_META = {
@@ -66,8 +65,8 @@ MANUSCRIPT_META = {
     "languages": ["de"],
     "external_url": None,
     "collections": [],
-    "archive_refs": [
-        {"archive_id": "EAA", "reference": "1.2.3, l. 45"},
+    "exemplars": [  # archive_refs tuletatakse (ADR 0076)
+        {"id": "x1", "holder": "EAA", "shelfmark": "1.2.3, l. 45"},
     ],
 }
 

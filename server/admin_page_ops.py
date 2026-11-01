@@ -1003,7 +1003,7 @@ class AnchorMissing(ValueError):
     code = "anchor_missing"
 
 
-def add_pages(work_id, files, after_page_num, username):
+def add_pages(work_id, files, after_page_num, username, origin=None):
     """Lisab mitu pildifaili teosele valitud positsioonile (nimejärgi sorteeritud).
 
     files: list of (filename, bytes). Tagastab dict (vt Interfaces). Viskab
@@ -1054,12 +1054,12 @@ def add_pages(work_id, files, after_page_num, username):
                 f.write(jpeg)
             prepared.append(p)
         del converted
-        return insert_prepared_pages(work_id, prepared, after_page_num, username)
+        return insert_prepared_pages(work_id, prepared, after_page_num, username, origin=origin)
     finally:
         shutil.rmtree(prepared_dir, ignore_errors=True)
 
 
-def insert_prepared_pages(work_id, jpeg_paths, after, username):
+def insert_prepared_pages(work_id, jpeg_paths, after, username, origin=None):
     """Sisestab kettal olevad valmis pildid teosele ühe git-commit'iga.
 
     jpeg_paths: failiteed sisestusjärjekorras (EI sorteerita). Failid LIIGUTATAKSE
@@ -1071,6 +1071,9 @@ def insert_prepared_pages(work_id, jpeg_paths, after, username):
     Puuduv ankur → AnchorMissing, midagi ei kirjutata.
 
     Osalise vea korral teeb `_cleanup_bulk` täieliku tagasipööramise.
+
+    origin: uute lehtede eksemplari päritolu (ADR 0076 p 4) — kutsuja on selle
+    `work_exemplars.check_origin`-iga juba kontrollinud.
     """
     path = find_directory_by_id(work_id)
     if not path:
@@ -1196,6 +1199,14 @@ def insert_prepared_pages(work_id, jpeg_paths, after, username):
             logger.error(f"add_pages meili sync ebaõnnestus ({folder_name}): {e}")
         # Lisatud lehed nihutavad järgmiste lehtede numbreid (#420).
         refresh_work_mentions(path, work_id)
+        if origin and origin != "same":
+            # Pildid on juba kettal ja commititud: viga logitakse, leht jääb vaikimisi
+            # päritoluga (toimetaja parandab eksemplaride vaates).
+            try:
+                from .work_exemplars import set_page_origin
+                set_page_origin(path, [p["base"] for p in written_pages], origin, username, locked=True)
+            except Exception:
+                logger.exception(f"Lisatud lehtede päritolu märkimine ebaõnnestus ({folder_name})")
 
         inserted = [{"filename": p["filename"], "sequence": s}
                     for p, s in zip(written_pages, new_seqs)]
