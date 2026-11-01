@@ -16,7 +16,8 @@ run_in_backend() {
     docker exec -i "${TTY_FLAG[@]}" vutt-backend "$@"
 }
 
-echo "⚠️  HOIATUS: See skript kustutab ja taasloob 'teosed' ja 'kirjad' indeksi."
+echo "⚠️  HOIATUS: See skript ehitab 'teosed' ja 'kirjad' indeksi uuesti (kõrvale, vahetus valmis kujul)."
+echo "   Ehituse ajal tehtud salvestused kaovad vahetusel indeksist (failid jäävad) — käivita vaiksel ajal."
 read -p "Kas oled kindel? (y/n) " -n 1 -r || true
 echo
 if [[ ! ${REPLY:-} =~ ^[Yy]$ ]]
