@@ -1,0 +1,262 @@
+# tests/test_exemplar_proposals.py
+"""Agendi eksemplari-ettepanekud (#703, ADR 0076 §7, ADR 0058): kood → ootel
+ettepanek → superadmin kinnitab või lükkab read tagasi. Esitus teost ei muuda;
+kinnitus käib `work_exemplars.apply_proposal_ops` kaudu (üks commit)."""
+import json
+import sqlite3
+import time
+
+import pytest
+
+from server import agent_handoff
+from server import exemplar_proposals as epp
+from server import work_exemplars as we
+from server import work_part_proposals as wpp
+
+COMMITS: list = []
+
+A = {"id": "a", "holder": "TÜR", "shelfmark": "R Est.B-954",
+     "source": {"kind": "migration", "ref": "TÜR: R Est.B-954"}, "needs_review": True}
+UPD = {"op": "update", "exemplar_id": "a",
+       "fields": {"convolute": {"reference": "R Est.B-954", "position": 0, "total": 2}},
+       "base": {"convolute": None},
+       "source": {"kind": "ester", "ref": "b2648642", "quote": "konvoluut, koos 1 trükisega"}}
+NEW = {"op": "create", "fields": {"holder": "TÜR", "shelfmark": "R Est.B-954 (I)", "condition": "defektne"},
+       "source": {"kind": "ester", "ref": "b2648642", "quote": "R Est.B-954 (I): defektne"}}
+
+
+@pytest.fixture
+def work(tmp_path, monkeypatch):
+    from server import metadata_ops, config
+    monkeypatch.setattr(epp, "DB_PATH", str(tmp_path / "epp.sqlite3"))
+    monkeypatch.setattr(wpp, "DB_PATH", str(tmp_path / "wpp.sqlite3"))
+    monkeypatch.setattr(agent_handoff, "DB_PATH", str(tmp_path / "handoff.sqlite3"))
+    d = tmp_path / "slug-w1"
+    d.mkdir()
+    for s in ("t-001", "t-002"):
+        (d / f"{s}.jpg").write_bytes(b"x")
+    (d / "_metadata.json").write_text(json.dumps({"id": "w1", "title": "Das Bild", "exemplars": [A]}),
+                                      encoding="utf-8")
+    archives = tmp_path / "archives.json"
+    archives.write_text(json.dumps({"TÜR": {"name": "Tartu Ülikooli Raamatukogu"}}), encoding="utf-8")
+    monkeypatch.setattr(config, "ARCHIVES_FILE", str(archives))
+    COMMITS.clear()
+
+    def fake_save(path, content, *a, additional_files=None, message="", **k):
+        from server.utils import atomic_write_text
+        atomic_write_text(path, content)
+        COMMITS.append(message)
+        return {"success": True}
+    monkeypatch.setattr(metadata_ops, "save_with_git", fake_save)
+    monkeypatch.setattr(metadata_ops, "uncommitted_paths", lambda paths: [])
+    for name in ("sync_work_to_meilisearch", "sync_work_to_meilisearch_async", "update_person_to_works",
+                 "update_work_collections", "update_work_facts"):
+        monkeypatch.setattr(metadata_ops, name, lambda *a, **k: None)
+    import os
+    monkeypatch.setattr(we, "page_stems", lambda wd: sorted(
+        os.path.splitext(n)[0] for n in os.listdir(wd) if n.endswith(".jpg")))
+    return str(d)
+
+
+def _meta(work):
+    with open(f"{work}/_metadata.json", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _write_meta(work, meta):
+    with open(f"{work}/_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+
+
+def _submit(work, rows, code=None, username="ed", note=None):
+    code = code or epp.issue_handoff(username, work_id="w1")["code"]
+    return epp.submit(code, "w1", work, rows, note)
+
+
+def _rows(work, username="ed"):
+    return [r for p in epp.list_for_work("w1", work, username) for r in p["rows"]]
+
+
+def test_esitus_ei_muuda_teost(work):
+    raw = open(f"{work}/_metadata.json", "rb").read()
+    res = _submit(work, [UPD, NEW], note="ESTER b2648642")
+    assert res["status"] == "pending" and res["rows"] == 2
+    assert open(f"{work}/_metadata.json", "rb").read() == raw and COMMITS == []
+    (p,) = epp.list_for_work("w1", work, "ed")
+    assert p["note"] == "ESTER b2648642"
+    assert [r["review_state"] for r in p["rows"]] == ["pending", "pending"]
+    upd, new = p["rows"]
+    assert upd["current"]["id"] == "a" and upd["exemplar_id"] == "a"
+    assert new["current"] is None and new["source"]["ref"] == "b2648642"
+
+
+@pytest.mark.parametrize("bad, code", [
+    ({**NEW, "fields": {**NEW["fields"], "text_witness": True}}, "invalid_field"),
+    ({**NEW, "fields": {**NEW["fields"], "pages": ["t-001"]}}, "invalid_field"),
+    ({**NEW, "fields": {**NEW["fields"], "needs_review": False}}, "invalid_field"),
+    ({**NEW, "source": {**NEW["source"], "kind": "web"}}, "invalid_source"),
+    ({**NEW, "source": {**NEW["source"], "ref": "12345"}}, "invalid_source"),
+    ({**NEW, "source": {**NEW["source"], "quote": "x" * 501}}, "invalid_source"),
+    ({**NEW, "source": {**NEW["source"], "quote": "  "}}, "invalid_source"),
+    ({**NEW, "fields": {"shelfmark": "X"}}, "invalid_field"),                 # create ilma hoidjata
+    ({**UPD, "base": {}}, "invalid_base"),                                      # base peab katma fields võtmed
+    ({**UPD, "exemplar_id": "puudub"}, "unknown_exemplar"),
+    ({**UPD, "base": {"convolute": {"reference": "muu"}}}, "stale_base"),      # agent nägi vana seisu
+    ({**NEW, "fields": {**NEW["fields"], "convolute": {"reference": "R", "position": 5, "total": 2}}},
+     "fields.convolute"),
+    ({**NEW, "extra": 1}, "invalid_row"),
+])
+def test_vigane_rida_lukatakse_tagasi_ja_kood_ei_kulu(work, bad, code):
+    h = epp.issue_handoff("ed", work_id="w1")
+    with pytest.raises(epp.ProposalError, match=code) as e:
+        _submit(work, [UPD, bad] if bad is not UPD else [bad], code=h["code"])
+    assert "rows[1]" in str(e.value) or "rows[0]" in str(e.value)
+    assert agent_handoff.check(h["code"], "exemplars", "w1")["uses"] == 0
+
+
+def test_ridade_lagi(work):
+    with pytest.raises(epp.ProposalError, match="invalid_rows"):
+        _submit(work, [])
+    many = [{**NEW, "fields": {"holder": "TÜR", "shelfmark": f"X {i}"}} for i in range(31)]
+    with pytest.raises(epp.ProposalError, match="invalid_rows"):
+        _submit(work, many)
+
+
+def test_markus_on_piiratud(work):
+    with pytest.raises(epp.ProposalError, match="invalid_note"):
+        _submit(work, [NEW], note="x" * 1001)
+
+
+def test_kood_ilma_exemplars_liigita_ei_kehti(work):
+    code = wpp.issue_handoff("ed", work_id="w1")["code"]
+    with pytest.raises(epp.ProposalError, match="invalid_or_expired_handoff"):
+        _submit(work, [NEW], code=code)
+
+
+def test_partii_kinnitus_uks_commit(work):
+    res = _submit(work, [UPD, NEW])
+    pid = res["proposal_id"]
+    out = epp.decide("w1", work, "ed", [(pid, 0), (pid, 1)], "accept")
+    assert len(COMMITS) == 1 and "agendi ettepanek" in COMMITS[0] and "b2648642" in COMMITS[0]
+    ex = _meta(work)["exemplars"]
+    assert out["accepted"] == ["a", ex[1]["id"]]
+    assert ex[0]["source"]["kind"] == "ester" and ex[0]["convolute"]["total"] == 2
+    assert ex[1]["needs_review"] is True and ex[1]["shelfmark"] == "R Est.B-954 (I)"
+    rows = _rows(work)
+    assert [r["review_state"] for r in rows] == ["accepted", "accepted"]
+    assert rows[1]["created_exemplar_id"] == ex[1]["id"]
+
+
+def test_tagasilukkamine_ei_muuda_teost(work):
+    pid = _submit(work, [UPD, NEW])["proposal_id"]
+    before = _meta(work)
+    assert epp.decide("w1", work, "ed", [(pid, 1)], "reject") == {"accepted": [], "rejected": 1}
+    assert _meta(work) == before and COMMITS == []
+    assert [r["review_state"] for r in _rows(work)] == ["pending", "rejected"]
+
+
+def test_topelt_create_on_duplicate(work):
+    """Migratsioonist juba olemas — agent oleks pidanud esitama update'i."""
+    dup = {**NEW, "fields": {"holder": "TÜR", "shelfmark": "R Est. B-954"}}
+    pid = _submit(work, [dup])["proposal_id"]
+    assert _rows(work)[0]["review_state"] == "duplicate"
+    before = _meta(work)
+    with pytest.raises(epp.ProposalError, match="not_decidable"):
+        epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+    assert _meta(work) == before
+
+
+def test_korduv_esitus_blokeerub_parast_esimest_kinnitust(work):
+    """Võrguvea järel kordus: kaks ettepanekut, teine on pärast esimese kinnitust duplicate."""
+    p1 = _submit(work, [NEW])["proposal_id"]
+    _submit(work, [NEW])
+    assert len(epp.list_for_work("w1", work, "ed")) == 2
+    epp.decide("w1", work, "ed", [(p1, 0)], "accept")
+    states = {p["proposal_id"]: p["rows"][0]["review_state"] for p in epp.list_for_work("w1", work, "ed")}
+    assert states[p1] == "accepted"
+    assert [s for k, s in states.items() if k != p1] == ["duplicate"]
+
+
+def test_hoidja_lisamine_vabastab_rea(work):
+    from server import config
+    pid = _submit(work, [{**NEW, "fields": {"holder": "RR", "shelfmark": "EAA.1"}}])["proposal_id"]
+    assert _rows(work)[0]["review_state"] == "blocked_holder"
+    with pytest.raises(epp.ProposalError, match="not_decidable"):
+        epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+    reg = json.load(open(config.ARCHIVES_FILE))
+    reg["RR"] = {"name": "Rahvusarhiiv"}
+    json.dump(reg, open(config.ARCHIVES_FILE, "w"))
+    assert _rows(work)[0]["review_state"] == "pending"
+    epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+    assert _meta(work)["exemplars"][1]["holder"] == "RR"
+
+
+def test_teine_partii_vana_alusega_on_stale(work):
+    p1 = _submit(work, [UPD])["proposal_id"]
+    p2 = _submit(work, [UPD])["proposal_id"]
+    epp.decide("w1", work, "ed", [(p1, 0)], "accept")
+    states = {p["proposal_id"]: p["rows"][0]["review_state"] for p in epp.list_for_work("w1", work, "ed")}
+    assert states == {p1: "accepted", p2: "stale"}
+    before = _meta(work)
+    with pytest.raises(epp.ProposalError, match="not_decidable"):
+        epp.decide("w1", work, "ed", [(p2, 0)], "accept")
+    assert _meta(work) == before
+
+
+def test_toimetaja_parandus_parast_esitust_teeb_rea_stale(work):
+    _submit(work, [{**UPD, "fields": {"condition": "terve"}, "base": {"condition": None}}])
+    meta = _meta(work)
+    meta["exemplars"][0]["condition"] = "defektne"
+    _write_meta(work, meta)
+    (row,) = _rows(work)
+    assert row["review_state"] == "stale" and row["current"]["condition"] == "defektne"
+
+
+def test_aegunud_ettepanek_jatab_otsustatud_read(work, monkeypatch):
+    pid = _submit(work, [UPD, NEW])["proposal_id"]
+    _submit(work, [{**NEW, "fields": {"holder": "TÜR", "shelfmark": "X 9"}}])   # täiesti otsustamata
+    epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+    later = time.time() + epp.PROPOSAL_TTL + 60
+    monkeypatch.setattr(epp.time, "time", lambda: later)
+    (p,) = epp.list_for_work("w1", work, "ed")
+    assert p["proposal_id"] == pid
+    assert [r["review_state"] for r in p["rows"]] == ["accepted", "expired"]
+    with pytest.raises(epp.ProposalError, match="not_decidable"):
+        epp.decide("w1", work, "ed", [(pid, 1)], "accept")
+    assert epp.list_pending_summary("ed") == []
+
+
+def test_kokkuvote_ja_mittekinnitatavad(work, monkeypatch):
+    from server import utils
+    monkeypatch.setattr(utils, "find_directory_by_id", lambda wid: work if wid == "w1" else None)
+    _submit(work, [UPD, {**NEW, "fields": {"holder": "TÜR", "shelfmark": "r est.b-954"}}])
+    (s,) = epp.list_pending_summary("ed")
+    # UPD on kinnitatav, teine rida on topelt (migratsioonist juba olemas)
+    assert s["work_id"] == "w1" and s["pending"] == 2 and s["stale"] == 1
+    meta = _meta(work)
+    meta["exemplars"][0]["convolute"] = {"reference": "R Est.B-954"}
+    _write_meta(work, meta)
+    assert epp.list_pending_summary("ed")[0]["stale"] == 2      # toimetaja muutis → ka UPD aegunud
+
+
+def test_teine_kasutaja_ei_nae_ega_otsusta(work):
+    pid = _submit(work, [NEW])["proposal_id"]
+    assert epp.list_for_work("w1", work, "muu") == []
+    assert epp.list_pending_summary("muu") == []
+    with pytest.raises(epp.ProposalError, match="proposal_not_found"):
+        epp.decide("w1", work, "muu", [(pid, 0)], "accept")
+
+
+@pytest.mark.parametrize("picks, action", [
+    ([], "accept"), ([("p", 0), ("p", 0)], "accept"), ([("p", True)], "accept"), ([("p", 0)], "muuda"),
+])
+def test_vigane_otsus(work, picks, action):
+    with pytest.raises(epp.ProposalError):
+        epp.decide("w1", work, "ed", picks, action)
+
+
+def test_hoidla_ei_kasuta_wal(work):
+    _submit(work, [NEW])
+    for path in (epp.DB_PATH, agent_handoff.DB_PATH):
+        mode = sqlite3.connect(path).execute("PRAGMA journal_mode").fetchone()[0]
+        assert mode.lower() != "wal"

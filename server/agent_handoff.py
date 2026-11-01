@@ -23,7 +23,7 @@ from .config import STATE_DIR
 
 DB_PATH = os.path.join(STATE_DIR, "agent_handoff.sqlite3")
 CODE_TTL = 8 * 60 * 60
-KINDS = ("text", "parts", "person")
+KINDS = ("text", "parts", "person", "exemplars")
 MAX_CODE_LEN = 100
 
 _SCHEMA = """
