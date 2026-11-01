@@ -144,7 +144,9 @@ def test_partii_kinnitus_uks_commit(work):
     assert len(COMMITS) == 1 and "agendi ettepanek" in COMMITS[0] and "b2648642" in COMMITS[0]
     ex = _meta(work)["exemplars"]
     assert out["accepted"] == ["a", ex[1]["id"]]
-    assert ex[0]["source"]["kind"] == "ester" and ex[0]["convolute"]["total"] == 2
+    # Muudatus ei kirjuta kasutaja sisestatud allikat üle; ESTER on commit-sõnumis
+    assert ex[0]["source"]["kind"] == "migration" and ex[0]["convolute"]["total"] == 2
+    assert ex[1]["source"]["kind"] == "ester"
     assert ex[1]["needs_review"] is True and ex[1]["shelfmark"] == "R Est.B-954 (I)"
     rows = _rows(work)
     assert [r["review_state"] for r in rows] == ["accepted", "accepted"]
@@ -306,7 +308,7 @@ def test_otspunktide_voog(client, work):
     r = client.post("/works/w1/exemplar-proposals/decide",
                     json={"items": [{"proposal_id": pid, "index": 0}], "action": "accept"})
     assert r.status_code == 200 and r.json() == {"accepted": ["a"], "rejected": 0}
-    assert _meta(work)["exemplars"][0]["source"]["kind"] == "ester"
+    assert _meta(work)["exemplars"][0]["source"]["kind"] == "migration"
     # Sama rida uuesti: enam ei ole ootel → 400 not_decidable (409 ainult aegunud/topelt korral)
     r = client.post("/works/w1/exemplar-proposals/decide",
                     json={"items": [{"proposal_id": pid, "index": 0}], "action": "accept"})
@@ -346,3 +348,88 @@ def test_submit_rate_limit(client, monkeypatch):
     res = client.post("/works/exemplar-proposals/submit", json={})
     assert res.status_code == 429 and res.headers["Retry-After"] == "7"
     assert seen == ["/works/exemplar-proposals-submit"]
+
+
+@pytest.mark.parametrize("make_blocked", ["duplicate", "stale", "blocked_holder"])
+def test_kinnitamatu_rea_saab_tagasi_lukata(work, make_blocked):
+    """Topelt, aegunud alus või puuduv hoidja: kinnitada ei saa, aga tagasi lükata saab —
+    muidu jääks rida /review loendisse ja töödeldud märge kaoks."""
+    if make_blocked == "duplicate":
+        row = {**NEW, "fields": {"holder": "TÜR", "shelfmark": "R Est. B-954"}}
+    elif make_blocked == "blocked_holder":
+        row = {**NEW, "fields": {"holder": "XYZ", "shelfmark": "1"}}
+    else:
+        row = UPD
+    pid = _submit(work, [row])["proposal_id"]
+    if make_blocked == "stale":
+        meta = _meta(work)
+        meta["exemplars"][0]["convolute"] = {"reference": "muu"}
+        _write_meta(work, meta)
+    assert _rows(work)[0]["review_state"] == make_blocked
+    before = _meta(work)
+    assert epp.decide("w1", work, "ed", [(pid, 0)], "reject") == {"accepted": [], "rejected": 1}
+    assert _meta(work) == before and COMMITS == []
+    assert _rows(work)[0]["review_state"] == "rejected"
+    assert epp.list_pending_summary("ed") == []
+
+
+def test_otsustatud_rida_ei_saa_uuesti_tagasi_lukata(work):
+    pid = _submit(work, [NEW])["proposal_id"]
+    epp.decide("w1", work, "ed", [(pid, 0)], "reject")
+    with pytest.raises(epp.ProposalError, match="not_decidable"):
+        epp.decide("w1", work, "ed", [(pid, 0)], "reject")
+
+
+def test_muudatus_mis_teeb_topelt_on_duplicate(work):
+    """Kohaviida muutmine teise olemasoleva eksemplari omaks: ülevaatus näitab, kinnitus ei kirjuta."""
+    meta = _meta(work)
+    meta["exemplars"].append({"id": "b", "holder": "TÜR", "shelfmark": "R Est.B-955"})
+    _write_meta(work, meta)
+    row = {"op": "update", "exemplar_id": "b", "fields": {"shelfmark": "R Est.B-954"},
+           "base": {"shelfmark": "R Est.B-955"}, "source": NEW["source"]}
+    pid = _submit(work, [row])["proposal_id"]
+    assert _rows(work)[0]["review_state"] == "duplicate"
+    before = _meta(work)
+    with pytest.raises(we.ExemplarError, match="duplicate:0"):
+        we.apply_proposal_ops(work, [{"op": "update", "exemplar_id": "b", "fields": row["fields"],
+                                      "base": row["base"], "source_ref": "b2648642"}], "ed", "m")
+    assert _meta(work) == before
+    with pytest.raises(epp.ProposalError, match="not_decidable"):
+        epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+
+
+def test_muudatus_oma_kohaviida_ümber_ei_ole_duplicate(work):
+    """Sama eksemplari kohaviida kirjapildi parandus ei põrka iseendaga."""
+    row = {"op": "update", "exemplar_id": "a", "fields": {"shelfmark": "R Est. B-954"},
+           "base": {"shelfmark": "R Est.B-954"}, "source": NEW["source"]}
+    pid = _submit(work, [row])["proposal_id"]
+    assert _rows(work)[0]["review_state"] == "pending"
+    epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+    assert _meta(work)["exemplars"][0]["shelfmark"] == "R Est. B-954"
+
+
+def test_muudatus_registrist_puuduva_hoidjaga_on_blocked(work):
+    row = {"op": "update", "exemplar_id": "a", "fields": {"holder": "XYZ"},
+           "base": {"holder": "TÜR"}, "source": NEW["source"]}
+    _submit(work, [row])
+    assert _rows(work)[0]["review_state"] == "blocked_holder"
+
+
+def test_muudatus_jatab_kasitsi_allika_alles(work):
+    """Käsitsi sisestatud kirje: kasutajal oli põhjus, agendi kinnitus allikat ei asenda."""
+    meta = _meta(work)
+    meta["exemplars"][0]["source"] = {"kind": "manual", "at": "2026-10-01"}
+    _write_meta(work, meta)
+    pid = _submit(work, [UPD])["proposal_id"]
+    epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+    assert _meta(work)["exemplars"][0]["source"] == {"kind": "manual", "at": "2026-10-01"}
+    assert "b2648642" in COMMITS[-1]
+
+
+def test_muudatus_allikata_kirjel_saab_ester_allika(work):
+    meta = _meta(work)
+    meta["exemplars"][0].pop("source")
+    _write_meta(work, meta)
+    pid = _submit(work, [UPD])["proposal_id"]
+    epp.decide("w1", work, "ed", [(pid, 0)], "accept")
+    assert _meta(work)["exemplars"][0]["source"]["ref"] == "b2648642"

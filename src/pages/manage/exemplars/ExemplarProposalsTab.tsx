@@ -194,10 +194,19 @@ const ExemplarProposalsTab: React.FC<Props> = ({ workId, token, onChanged }) => 
                             </button>
                           </div>
                         ) : (
-                          <span className={`text-xs ${row.review_state === 'accepted' ? 'text-green-700'
-                            : row.review_state === 'rejected' ? 'text-gray-500' : 'text-amber-700'}`}>
-                            {t(`manage.exemplarProposals.state.${row.review_state}`)}
-                          </span>
+                          <div className="flex gap-2 justify-end items-baseline">
+                            <span className={`text-xs ${row.review_state === 'accepted' ? 'text-green-700'
+                              : row.review_state === 'rejected' ? 'text-gray-500' : 'text-amber-700'}`}>
+                              {t(`manage.exemplarProposals.state.${row.review_state}`)}
+                            </span>
+                            {/* Kinnitada ei saa, aga otsustamata rea saab ära koristada */}
+                            {row.status === 'pending' && (
+                              <button type="button" disabled={busy} onClick={() => void decide([pick], 'reject')}
+                                className="text-xs font-medium text-red-700 hover:text-red-900 disabled:opacity-50">
+                                {t('manage.exemplarProposals.reject')}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>

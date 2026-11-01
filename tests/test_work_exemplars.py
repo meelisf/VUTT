@@ -548,7 +548,8 @@ def test_ettepaneku_partii_uks_commit_ja_allikas(work):
     a, new = meta["exemplars"][0], meta["exemplars"][1]
     assert ids == ["a", new["id"]]
     assert a["convolute"] == {"reference": "R Est.B-954", "position": 0, "total": 2}
-    assert a["source"] == {"kind": "ester", "ref": "b2648642", "at": date.today().isoformat()}
+    assert a["source"] == {"kind": "migration", "ref": "TÜR: R Est.B-954"}  # kasutaja sisestus jääb
+    assert new["source"] == {"kind": "ester", "ref": "b2648642", "at": date.today().isoformat()}
     assert a["needs_review"] is True                     # muudatus ei puutu lippu
     assert new["needs_review"] is True and new["source"]["kind"] == "ester"
     assert new["condition"] == "defektne" and "text_witness" not in new

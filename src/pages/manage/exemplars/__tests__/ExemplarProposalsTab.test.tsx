@@ -71,6 +71,25 @@ describe('ExemplarProposalsTab', () => {
     expect(screen.getByText('manage.exemplarProposals.state.duplicate')).toBeTruthy();
   });
 
+  it('kinnitamatu rea saab tagasi lükata', async () => {
+    api.listExemplarProposals.mockResolvedValue([proposal(['stale', 'duplicate'])]);
+    render(<ExemplarProposalsTab workId="w1" token="tok" />);
+    await screen.findByText('R Est.B-954 (I): defektne');
+    expect(screen.getAllByText('manage.exemplarProposals.reject')).toHaveLength(2);
+    fireEvent.click(within(rowOf('R Est.B-954 (I): defektne')).getByText('manage.exemplarProposals.reject'));
+    await waitFor(() => expect(api.decideExemplarProposals).toHaveBeenCalledWith(
+      'w1', [{ proposal_id: 'p1', index: 1 }], 'reject', 'tok'));
+  });
+
+  it('otsustatud real nuppe ei ole', async () => {
+    const p = proposal(['accepted', 'rejected']);
+    p.rows.forEach((r, i) => { r.status = i === 0 ? 'accepted' : 'rejected'; });
+    api.listExemplarProposals.mockResolvedValue([p]);
+    render(<ExemplarProposalsTab workId="w1" token="tok" />);
+    await screen.findByText('R Est.B-954 (I): defektne');
+    expect(screen.queryByText('manage.exemplarProposals.reject')).toBeNull();
+  });
+
   it('kinnita valitud saadab valitud read ühe päringuga ja laeb uuesti', async () => {
     const onChanged = vi.fn();
     api.listExemplarProposals.mockResolvedValue([proposal()]);

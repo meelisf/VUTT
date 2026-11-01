@@ -74,7 +74,7 @@ TTL 8 h nagu teistel. Kulutus ja ettepaneku INSERT ühes tehingus `ATTACH`-iga, 
 `state/exemplar_proposals.sqlite3` (ADR 0076 §7), moodul `server/exemplar_proposals.py`
 `work_part_proposals.py` eeskujul. Ettepanek = üks esitus ühe teose kohta; tal on read.
 Rea olek: `pending` | `accepted` | `rejected` | `stale` (stale arvutab server loetelul, ei salvesta).
-Ettepanek aegub nagu teised (7 päeva) — aga **töödeldud märge** (teosel on olnud kinnitatud või
+Ettepanek aegub nagu osade ettepanekud (14 päeva) — aga **töödeldud märge** (teosel on olnud kinnitatud või
 tagasi lükatud ridu) peab säilima kauem, sest hiljem tulev läbikäik toetub sellele. Selles
 etapis piisab, kui otsustatud ridu ei kustutata aegumisel (vt Ehitaja otsustada).
 
@@ -160,7 +160,7 @@ Konventsioon nagu teose osadel:
   vt Ehitaja otsustada, kas ka muidu). Tabel, rida ettepaneku rea kohta: linnuke · liik (uus /
   muudatus + millise eksemplari kohta) · **praegu** · **ettepanek** (muutunud väljad esile tõstetud)
   · **allikas** (ESTERi kirje link + tsitaat) · Kinnita / Lükka tagasi. Kohal nupp „Kinnita valitud
-  (N)". Aegunud ja blokeeritud read on märgitud ega ole valitavad. Makett:
+  (N)". Aegunud ja blokeeritud read on märgitud ega ole valitavad, aga neid saab tagasi lükata. Makett:
   `.superpowers/brainstorm/…/eksemplari-ettepanek-asukoht.html` (variant B).
 - Pärast kinnitust värskeneb eksemplaride loend ja infopaneel (`convolute_count` → „Samas köites").
 

@@ -229,14 +229,19 @@ def _review_state(row: dict, expired: bool, live: dict, holders: set) -> str:
         x = live.get(row["exemplar_id"])
         if x is None or any(row["base"][f] != x.get(f) for f in row["base"]):
             return "stale"
+        fields = row["fields"]
+        if "holder" in fields and fields["holder"] != x.get("holder") and fields["holder"] not in holders:
+            return "blocked_holder"
+        # Topelt ainult siis, kui muudatus puudutab hoidjat või kohaviita (vana topelt ei blokeeri muud).
+        if ("holder" in fields or "shelfmark" in fields) and \
+                we.duplicate_of({**x, **fields}, live.values(), skip_id=x["id"]):
+            return "duplicate"
         return "pending"
     fields = row["fields"]
     if fields["holder"] not in holders:
         return "blocked_holder"
-    if fields.get("shelfmark"):
-        key = we.shelfmark_key(fields["holder"], fields["shelfmark"])
-        if any(we.shelfmark_key(x.get("holder"), x.get("shelfmark")) == key for x in live.values()):
-            return "duplicate"
+    if we.duplicate_of(fields, live.values()):
+        return "duplicate"
     return "pending"
 
 
@@ -312,9 +317,10 @@ def decide(work_id: str, work_dir: str, username: str, picks: list, action: str,
            background_tasks=None) -> dict:
     """Valitud read (`[(proposal_id, index)]`) vastu ÜHE kirjutusega või tagasi.
 
-    Klient saadab read, mida kasutaja nägi. Iga rida peab olema praegu `pending`
-    (mitte aegunud alus, topelt, registrist puuduv hoidja ega aegunud ettepanek).
-    Atomaarne: üks mittekinnitatav rida → midagi ei kirjutata.
+    Klient saadab read, mida kasutaja nägi. Vastuvõtul peab iga rida olema praegu
+    `pending` (mitte aegunud alus, topelt, registrist puuduv hoidja ega aegunud
+    ettepanek); tagasilükkamisel piisab, et rida pole veel otsustatud.
+    Atomaarne: üks mitteotsustatav rida → midagi ei kirjutata.
     """
     if action not in ("accept", "reject"):
         raise ProposalError("invalid_decision")
@@ -332,7 +338,13 @@ def decide(work_id: str, work_dir: str, username: str, picks: list, action: str,
         live, holders = _live(work_dir), _holders()
         for pid, index in keys:
             items, expired = loaded[pid]
-            if not 0 <= index < len(items) or _review_state(items[index], expired, live, holders) != "pending":
+            if not 0 <= index < len(items):
+                raise ProposalError(f"not_decidable: {pid}/{index}")
+            # Kinnitada saab ainult kinnitatava rea; tagasi lükata iga otsustamata rea
+            # (ka aegunud, topelt, puuduva hoidjaga) — muidu jääks ta loendisse ripakile.
+            ok = (_review_state(items[index], expired, live, holders) == "pending" if action == "accept"
+                  else items[index]["status"] == "pending")
+            if not ok:
                 raise ProposalError(f"not_decidable: {pid}/{index}")
         accepted: list = []
         if action == "accept":

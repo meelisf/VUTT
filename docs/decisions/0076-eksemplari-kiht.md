@@ -224,11 +224,13 @@ Tekstitunnistajal oleks `"text_witness": true` ja `pages`-i võtit ei oleks (p 3
   - Ülevaatuse olek arvutatakse igal lugemisel, mitte ei salvestata: `stale` (alus
     muutus või eksemplar puudub), `blocked_holder` (uue eksemplari hoidja puudub
     registrist — superadmin lisab hoidja, rida vabaneb ilma uue esituseta), `duplicate`
-    (uue eksemplari hoidja + kohaviit kattuvad olemasolevaga, `work_exemplars.shelfmark_key`;
-    agent oleks pidanud esitama muudatuse), `expired`.
-  - Kinnitatud kirje `source` = `{kind: "ester", ref, at}` nii uuel kui muudetud
-    eksemplaril: muudatusrida asendab varasema allika (nt `migration`). Tsitaat jääb
-    ettepanekute hoidlasse, ESTERi number läheb ka commit-sõnumisse.
+    (uue või muudetud eksemplari hoidja + kohaviit kattuvad teise olemasolevaga,
+    `work_exemplars.duplicate_of`; kohaviidata kirje ei ole kunagi topelt), `expired`.
+    Kinnitada saab ainult `pending` rida; tagasi lükata iga otsustamata rea.
+  - Uue kirje `source` = `{kind: "ester", ref, at}`. Muudatusrida olemasolevat allikat
+    (`manual`, `migration`) EI asenda: see on kasutaja sisestus ja kasutajal oli põhjus;
+    ainult allikata kirje saab ESTERi viite. Tsitaat jääb ettepanekute hoidlasse, ESTERi
+    number läheb commit-sõnumisse.
   - Otsustatud ridadega ettepanek säilib aegumisel (ADR 0058 täiendus 2026-11-01).
 
 ### 8. Migratsioon

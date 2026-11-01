@@ -530,6 +530,16 @@ def shelfmark_key(holder: str, shelfmark: str) -> str:
     return f"{(holder or '').strip().casefold()}:{s}"
 
 
+def duplicate_of(candidate: dict, exemplars, skip_id: Optional[str] = None) -> bool:
+    """Kas kandidaadi hoidja + kohaviit on juba mõnel teisel eksemplaril. Kohaviidata
+    kandidaat ei ole kunagi topelt (muidu blokeeruks iga sama hoidja kohaviidata kirje)."""
+    if not (candidate.get("shelfmark") or "").strip():
+        return False
+    key = shelfmark_key(candidate.get("holder"), candidate.get("shelfmark"))
+    return any(x.get("id") != skip_id and shelfmark_key(x.get("holder"), x.get("shelfmark")) == key
+               for x in exemplars)
+
+
 def _norm_field(field: str, value):
     """Ettepaneku välja väärtus salvestatavale kujule (puudub = None)."""
     if field == "convolute":
@@ -551,7 +561,8 @@ def apply_proposal_ops(work_dir: str, ops: list, username: str, message: str,
     `{"op": "update", "exemplar_id", "fields", "base", "source_ref"}`.
     Atomaarne: `stale:i` (alus ei klapi või eksemplar puudub), `duplicate:i`
     (sama hoidja + kohaviit on juba olemas) või muu `ExemplarError` → midagi ei
-    kirjutata. Kirje `source` saab ESTERi viite nii uuel kui muudetud eksemplaril;
+    kirjutata. Uus kirje saab `source`-iks ESTERi viite; muudetud kirje olemasolevat
+    allikat ei asendata (kasutaja sisestus), allikata kirje saab ESTERi viite;
     uus saab `needs_review` (kinnitus ≠ füüsiline vastavus), muudatus lippu ei puutu.
     Tekstitunnistajat, lehti ega lippu ettepanek ei määra (`invalid_field`).
     """
@@ -578,15 +589,18 @@ def apply_proposal_ops(work_dir: str, ops: list, username: str, message: str,
                         _norm_field(f, base[f]) != exemplars[idx].get(f) for f in fields):
                     raise ExemplarError(f"stale:{i}", 409)
                 x = _apply_fields(exemplars[idx], fields)
-                x["source"] = source
+                if ("holder" in fields or "shelfmark" in fields) and duplicate_of(x, exemplars, skip_id=x["id"]):
+                    raise ExemplarError(f"duplicate:{i}", 409)
+                # Olemasolev allikas (`manual`, `migration`) on kasutaja sisestus — jääb alles;
+                # ESTERi viide on commit-sõnumis ja ettepanekute hoidlas.
+                if not x.get("source"):
+                    x["source"] = source
                 exemplars[idx] = x
                 ids.append(x["id"])
             else:
-                shelfmark = _text(fields.get("shelfmark"), "shelfmark")
-                if shelfmark:
-                    key = shelfmark_key(fields["holder"], shelfmark)
-                    if any(shelfmark_key(x.get("holder"), x.get("shelfmark")) == key for x in exemplars):
-                        raise ExemplarError(f"duplicate:{i}", 409)
+                if duplicate_of({"holder": fields["holder"],
+                                 "shelfmark": _text(fields.get("shelfmark"), "shelfmark")}, exemplars):
+                    raise ExemplarError(f"duplicate:{i}", 409)
                 x = _apply_fields({"id": _new_id({e["id"] for e in exemplars})}, fields)
                 x["source"] = source
                 x["needs_review"] = True
