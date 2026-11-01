@@ -294,9 +294,6 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
-          {form.title.includes(' / ') && (
-            <p className="text-xs text-amber-700 mt-1">{t('workspace:metadata.titleSlashWarning')}</p>
-          )}
         </div>
 
         {/* Pealkirja tõlge, originaal ja tekkeviis (ADR 0064) */}
