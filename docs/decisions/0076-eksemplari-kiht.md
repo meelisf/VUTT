@@ -22,8 +22,9 @@ Arutelu, kaks ülevaatust ja kavandi täpsustused:
 - Eksemplari andmed täidab suures osas agent ESTERi põhjal (#703). Väljad peavad olema
   struktureeritud ja kandma allikaviidet.
 
-Tootmises (2026-11-01) on `archive_refs` 131 teosel, igaühel täpselt üks kirje. Konvoluuti
-mainib neist 5. Ühelgi konvoluudil pole VUTT-is teist liiget.
+Tootmises (2026-11-01) on `archive_refs` 131 teosel, igaühel täpselt üks kirje: 116
+käsikirja ja 15 trükist. Konvoluuti mainib neist 5. Ühelgi konvoluudil pole VUTT-is teist
+liiget. 244 teosel on võti tühja loendiga.
 
 ## Otsus
 
@@ -92,6 +93,15 @@ Tekstitunnistajal oleks `"text_witness": true` ja `pages`-i võtit ei oleks (p 3
   väljad, mitte eksemplari omad. `ester_id` on juba teosel.
 - Eksemplari pildid, tüpograafia ja paberiandmed ei kuulu siia. Need tulevad etapi 3 ADR-iga
   (pildid `_exemplars/{id}/`, pildiserveri laiendus).
+- **Käsikirjal on üks eksemplar** (`type.id == Q87167`): dokument ise. Ka täpne ümberkiri on
+  teine dokument, sest aeg ja kirjutaja on teised. Seega on see eraldi teos ja seotakse
+  variandiseosega (`isVersionOf`, ADR 0075), mitte teise eksemplarina. Kirjutustee
+  lükkab käsikirja eksemplaride arvu kasvu üle ühe tagasi (400, sõnum suunab
+  variandiseose juurde). Keelatud on **ainult kasv**: kui teos on hiljem käsikirjaks
+  muudetud ja tal on juba mitu eksemplari, saab neid muuta ja kustutada.
+  Käsikirja ainus `archive_refs`-i viide **on** see eksemplar, seepärast ei saa
+  teisendus (migratsioon, upload) talle `needs_review`-lippu. Mitu viidet käsikirjal on
+  vastuolu, mille lahendab inimene: kõik saavad lipu, midagi ei visata ära.
 
 ### 3. Tekstitunnistaja
 
@@ -205,13 +215,17 @@ Tekstitunnistajal oleks `"text_witness": true` ja `pages`-i võtit ei oleks (p 3
 
 Üks skript, kuivkäivitus vaikimisi. Iga `archive_refs` kirje → üks eksemplar
 (`source.kind: "migration"`, `source.ref` = algne kirje stringina `"{archive_id}: {reference}"`,
-`url` üle, `needs_review: true`, `text_witness` puudub). Seejärel eemaldatakse `archive_refs`.
-Kõik teosed lähevad ühe commitiga.
+`url` üle, `needs_review: true` (käsikirja ainsal viitel mitte, p 2), `text_witness` puudub).
+Seejärel eemaldatakse `archive_refs`, ka tühi loend. Hoidjata viide peatab skripti, sest
+hoidja on kohustuslik ja viide kaoks: hoidja lisatakse enne käsitsi. Kõik teosed lähevad
+ühe commitiga.
 
 **Kasutuselevõtt.** Vana ja uus server ei tohi kumbki näha teise kuju. Vana server kirjutaks
 `archive_refs`-i tagasi, uus server peidaks migreerimata viited. VUTT-il hooldusrežiimi ei ole,
 seega peatatakse kirjutused backendi seiskamisega:
 
+0. Serveri `data/.gitignore`-i lisatakse `config/convolute_index.json` (tuletatud
+   read-model, p 6).
 1. `docker stop vutt-backend`. Kõik kirjutused (ja lugemine API kaudu) on peatatud. Meili
    ja pildiserver jäävad tööle, nii et otsing ja pildid toimivad.
 2. Migratsioon uue image'iga, enne päriselt kuivkäivitus. Raport: teoste arv, eksemplaride
