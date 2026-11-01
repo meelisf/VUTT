@@ -25,6 +25,11 @@ const PERSON = {
   target_url: '/persons/vutt:Pabc/edit?agent=1', pending: 3, stale: null, created_at: 1_700_000_000,
 };
 
+const EXEMPLARS = {
+  kind: 'exemplars', proposal_id: 'p4', target_id: 'w1', target_label: 'Das Bild',
+  target_url: '/work/w1/manage?tab=exemplars', pending: 2, stale: 1, created_at: 1_700_000_000,
+};
+
 function Leht() {
   const loc = useLocation();
   return <div>LEHT {loc.search}</div>;
@@ -78,6 +83,25 @@ describe('AgentProposalsSection', () => {
     expect(container.textContent).toContain('proposals.stale:{"count":2}');
   });
 
+  it('eksemplaride rida: oma silt, mittekinnitatavate arv ja link haldusvaatesse (#703)', async () => {
+    svc.listAgentProposals.mockResolvedValue([EXEMPLARS]);
+    const { container } = render(
+      <MemoryRouter initialEntries={['/review']}>
+        <Routes>
+          <Route path="/review" element={<AgentProposalsSection token="t" />} />
+          <Route path="/work/:id/manage" element={<Leht />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText('Das Bild');
+    expect(container.textContent).toContain('proposals.kind.exemplars');
+    // Topelt / registrist puuduv hoidja ei ole „aegunud" — eraldi märk
+    expect(container.textContent).toContain('proposals.blocked:{"count":1}');
+    expect(container.textContent).not.toContain('proposals.stale');
+    fireEvent.click(screen.getByText('Das Bild'));
+    expect(await screen.findByText('LEHT ?tab=exemplars')).toBeTruthy();
+  });
+
   it('tühja loendi korral on koodinupp näha, loendit ei ole', async () => {
     svc.listAgentProposals.mockResolvedValue([]);
     const { container } = renderIt();
@@ -90,12 +114,13 @@ describe('AgentProposalsSection', () => {
   it('koodi loomine näitab koodi ja lage', async () => {
     svc.listAgentProposals.mockResolvedValue([]);
     svc.createAgentHandoff.mockResolvedValue({
-      code: 'KOOD-123', expires_at: 1_700_000_000, max_uses: { text: 20, parts: 20, persons: 200 },
+      code: 'KOOD-123', expires_at: 1_700_000_000, max_uses: { text: 20, parts: 20, persons: 200, exemplars: 20 },
     });
     const { container } = renderIt();
     fireEvent.click(screen.getByText('proposals.createCode'));
     expect(await screen.findByText('KOOD-123')).toBeTruthy();
     expect(container.textContent).toContain('"text":20');
     expect(container.textContent).toContain('"persons":200');
+    expect(container.textContent).toContain('"exemplars":20');
   });
 });

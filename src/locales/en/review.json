@@ -95,17 +95,19 @@
     "title": "Agent proposals",
     "error": "Action failed: {{error}}",
     "createCode": "Create agent code",
-    "codeHelp": "The code is valid for all works and persons: page text (up to {{text}} submissions), work parts (up to {{parts}}) and person records (up to {{persons}}). Give it to the agent.",
+    "codeHelp": "The code is valid for all works and persons: page text (up to {{text}} submissions), work parts (up to {{parts}}), copies (up to {{exemplars}}) and person records (up to {{persons}}). Give it to the agent.",
     "copy": "Copy",
     "copied": "Copied",
     "expires": "Expires",
     "kind": {
       "text": "Text",
       "parts": "Parts",
-      "person": "Person"
+      "person": "Person",
+      "exemplars": "Copies"
     },
     "pending": "pending {{count}}",
     "stale": "stale {{count}}",
-    "pagesChanged": "pages changed"
+    "pagesChanged": "pages changed",
+    "blocked": "cannot be accepted {{count}}"
   }
 }
