@@ -21,14 +21,15 @@ interface Props {
   onJump: (key: GuideKey) => void;
 }
 
-// Järjekord = paneelide järjekord veerus
-const ITEMS: { key: Exclude<GuideKey, 'addNote'>; icon: LucideIcon }[] = [
-  { key: 'toc', icon: ListOrdered },
-  { key: 'workSets', icon: Bookmark },
-  { key: 'workTags', icon: Tags },
-  { key: 'textAnnotations', icon: SquarePen },
-  { key: 'pageTags', icon: Tag },
-  { key: 'pageNotes', icon: MessageSquare },
+// Järjekord = paneelide järjekord veerus. Numbri värv = paneeli päise ikooni värv,
+// et pill ja paneel seostuksid (kollane üks aste tumedam loetavuse pärast).
+const ITEMS: { key: Exclude<GuideKey, 'addNote'>; icon: LucideIcon; tone: string }[] = [
+  { key: 'toc', icon: ListOrdered, tone: 'text-primary-600' },
+  { key: 'workSets', icon: Bookmark, tone: 'text-violet-600' },
+  { key: 'workTags', icon: Tags, tone: 'text-green-600' },
+  { key: 'textAnnotations', icon: SquarePen, tone: 'text-yellow-600' },
+  { key: 'pageTags', icon: Tag, tone: 'text-primary-600' },
+  { key: 'pageNotes', icon: MessageSquare, tone: 'text-amber-700' },
 ];
 
 const base = 'inline-flex items-center gap-1.5 text-xs rounded-full border px-2.5 py-0.5 transition-colors';
@@ -51,12 +52,12 @@ const AnnotationsGuide: React.FC<Props> = ({ counts, canAddNote, onJump }) => {
 
   return (
     <nav aria-label={t('info.guide.label')} className="flex flex-wrap gap-1.5 -mt-1 mb-4">
-      {present.map(({ key, icon: Icon }) => (
+      {present.map(({ key, icon: Icon, tone }) => (
         <button key={key} type="button" data-guide={key} onClick={() => onJump(key)}
           className={key === 'pageNotes' ? warm : calm}>
           <Icon size={12} aria-hidden />
           {label[key]}
-          <span className={key === 'pageNotes' ? 'text-amber-700' : 'text-gray-400'}>{counts[key]}</span>
+          <span className={`font-medium ${tone}`}>{counts[key]}</span>
         </button>
       ))}
       {addNote && (
