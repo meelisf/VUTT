@@ -519,3 +519,110 @@ def test_convolute_count_meili_dokumendis(tmp_path):
     (work_dir / "_metadata.json").write_text(json.dumps(meta), encoding="utf-8")
     _, result = meili_doc.get_work_metadata(str(work_dir), "t", {})
     assert result["convolute_count"] == 0
+
+
+# ── Agendi ettepaneku kinnitus (#703, ADR 0076 §7) ──────────────────────────
+
+def _with_a(work, **extra):
+    """Teosel eksemplar „a" nagu migratsiooni järel: TÜR R Est.B-954, lipuga."""
+    meta = _meta(work)
+    meta["exemplars"] = [{"id": "a", "holder": "TÜR", "shelfmark": "R Est.B-954",
+                          "source": {"kind": "migration", "ref": "TÜR: R Est.B-954"},
+                          "needs_review": True, **extra}]
+    with open(f"{work}/_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+    COMMITS.clear()
+
+
+def test_ettepaneku_partii_uks_commit_ja_allikas(work):
+    from datetime import date
+    _with_a(work)
+    ids = we.apply_proposal_ops(work, [
+        {"op": "update", "exemplar_id": "a",
+         "fields": {"convolute": {"reference": "R Est.B-954", "position": 0, "total": 2}},
+         "base": {"convolute": None}, "source_ref": "b2648642"},
+        {"op": "create", "fields": {"holder": "TÜR", "shelfmark": "R Est.B-954 (I)", "condition": "defektne"},
+         "source_ref": "b2648642"},
+    ], "ed", "Eksemplar: agendi ettepanek (ESTER b2648642)")
+    meta = _meta(work)
+    a, new = meta["exemplars"][0], meta["exemplars"][1]
+    assert ids == ["a", new["id"]]
+    assert a["convolute"] == {"reference": "R Est.B-954", "position": 0, "total": 2}
+    assert a["source"] == {"kind": "ester", "ref": "b2648642", "at": date.today().isoformat()}
+    assert a["needs_review"] is True                     # muudatus ei puutu lippu
+    assert new["needs_review"] is True and new["source"]["kind"] == "ester"
+    assert new["condition"] == "defektne" and "text_witness" not in new
+    assert COMMITS == ["Eksemplar: agendi ettepanek (ESTER b2648642)"]
+
+
+def test_ettepaneku_alus_aegunud(work):
+    """Toimetaja muutis välja pärast esitust → rida on stale, midagi ei kirjutata."""
+    _with_a(work, condition="defektne")
+    before = _meta(work)
+    with pytest.raises(we.ExemplarError) as e:
+        we.apply_proposal_ops(work, [
+            {"op": "create", "fields": {"holder": "UUB", "shelfmark": "X 1"}, "source_ref": "b2648642"},
+            {"op": "update", "exemplar_id": "a", "fields": {"condition": "terve"},
+             "base": {"condition": None}, "source_ref": "b2648642"},
+        ], "ed", "m")
+    assert str(e.value) == "stale:1" and e.value.status == 409
+    assert _meta(work) == before and COMMITS == []
+
+
+def test_ettepaneku_puuduv_eksemplar_on_stale(work):
+    _with_a(work)
+    with pytest.raises(we.ExemplarError) as e:
+        we.apply_proposal_ops(work, [{"op": "update", "exemplar_id": "zz", "fields": {"notes": "n"},
+                                      "base": {"notes": None}, "source_ref": "b2648642"}], "ed", "m")
+    assert str(e.value) == "stale:0"
+
+
+def test_ettepaneku_alus_vordleb_puhastatud_kuju(work):
+    """Agendi `base` võib kanda tühikuid; võrdlus käib salvestatava kuju järgi."""
+    _with_a(work)
+    we.apply_proposal_ops(work, [{"op": "update", "exemplar_id": "a", "fields": {"notes": "n"},
+                                  "base": {"notes": ""}, "source_ref": "b2648642"}], "ed", "m")
+    assert _meta(work)["exemplars"][0]["notes"] == "n"
+
+
+def test_ettepaneku_topelt_loomine(work):
+    """Migratsioonist juba olemas: tähesuurus ja tühikud ei tee uut eksemplari."""
+    _with_a(work)
+    before = _meta(work)
+    with pytest.raises(we.ExemplarError) as e:
+        we.apply_proposal_ops(work, [{"op": "create", "fields": {"holder": "TÜR", "shelfmark": "r est. b-954"},
+                                      "source_ref": "b2648642"}], "ed", "m")
+    assert str(e.value) == "duplicate:0" and e.value.status == 409
+    assert _meta(work) == before
+
+
+def test_ettepaneku_topelt_samas_partiis(work):
+    row = {"op": "create", "fields": {"holder": "UUB", "shelfmark": "X 1"}, "source_ref": "b2648642"}
+    with pytest.raises(we.ExemplarError) as e:
+        we.apply_proposal_ops(work, [row, row], "ed", "m")
+    assert str(e.value) == "duplicate:1"
+    assert "exemplars" not in _meta(work)
+
+
+def test_ettepaneku_tundmatu_hoidja(work):
+    before = _meta(work)
+    with pytest.raises(we.ExemplarError):
+        we.apply_proposal_ops(work, [{"op": "create", "fields": {"holder": "XYZ"}, "source_ref": "b2648642"}],
+                              "ed", "m")
+    assert _meta(work) == before
+
+
+@pytest.mark.parametrize("field", ["text_witness", "pages", "needs_review", "id", "source"])
+def test_ettepaneku_ops_ei_maara_serverivalju(work, field):
+    value = {"text_witness": True, "pages": ["t-001"], "needs_review": False, "id": "x",
+             "source": {"kind": "manual"}}[field]
+    with pytest.raises(we.ExemplarError) as e:
+        we.apply_proposal_ops(work, [{"op": "create", "fields": {"holder": "TÜR", field: value},
+                                      "source_ref": "b2648642"}], "ed", "m")
+    assert str(e.value) == "invalid_field"
+
+
+def test_shelfmark_key():
+    assert we.shelfmark_key("TÜR", "R Est. B-954") == we.shelfmark_key("tür", "r est.b - 954")
+    assert we.shelfmark_key("TÜR", "R Est.B-954") != we.shelfmark_key("TÜR", "R Est.B-954 (I)")
+    assert we.shelfmark_key("TÜR", "R 1") != we.shelfmark_key("UUB", "R 1")

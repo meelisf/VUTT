@@ -519,6 +519,84 @@ def update_exemplar(work_dir: str, ex_id: str, data: dict, username: str, backgr
     return _read_exemplar(work_dir, ex_id)
 
 
+# ── Agendi ettepaneku kinnitus (#703, ADR 0076 §7) ──────────────────────────
+
+def shelfmark_key(holder: str, shelfmark: str) -> str:
+    """Topelt-eksemplari võti: sama hoidja + sama kohaviit (tähesuurus, tühikud ja
+    tühikud punkti/sidekriipsu ümber ühtlustatud). Erinevalt `convolute_key`-st ei
+    eemalda ta midagi — „(I)" ja „(konvoluut)" jäävad kohaviida osaks."""
+    s = _PUNKT_RE.sub(r"\1", (shelfmark or "").casefold())
+    s = re.sub(r"\s+", " ", s).strip()
+    return f"{(holder or '').strip().casefold()}:{s}"
+
+
+def _norm_field(field: str, value):
+    """Ettepaneku välja väärtus salvestatavale kujule (puudub = None)."""
+    if field == "convolute":
+        return clean_convolute(value)
+    return _text(value, field)
+
+
+def _check_fields(fields) -> dict:
+    if not isinstance(fields, dict) or not fields or set(fields) - set(EDITABLE_FIELDS):
+        raise ExemplarError("invalid_field")
+    return fields
+
+
+def apply_proposal_ops(work_dir: str, ops: list, username: str, message: str,
+                       background_tasks=None) -> list[str]:
+    """Kinnitatud ettepaneku read ÜHE kirjutusega (üks commit, üks Meili sünk).
+
+    Op: `{"op": "create", "fields", "source_ref"}` või
+    `{"op": "update", "exemplar_id", "fields", "base", "source_ref"}`.
+    Atomaarne: `stale:i` (alus ei klapi või eksemplar puudub), `duplicate:i`
+    (sama hoidja + kohaviit on juba olemas) või muu `ExemplarError` → midagi ei
+    kirjutata. Kirje `source` saab ESTERi viite nii uuel kui muudetud eksemplaril;
+    uus saab `needs_review` (kinnitus ≠ füüsiline vastavus), muudatus lippu ei puutu.
+    Tekstitunnistajat, lehti ega lippu ettepanek ei määra (`invalid_field`).
+    """
+    if not isinstance(ops, list) or not ops:
+        raise ExemplarError("invalid_ops")
+    for op in ops:
+        if not isinstance(op, dict) or op.get("op") not in ("create", "update"):
+            raise ExemplarError("invalid_ops")
+        _check_fields(op.get("fields"))
+        if op["op"] == "create":
+            _check_holder(op["fields"].get("holder"))
+    today = date.today().isoformat()
+
+    def mutate(exemplars, unknown, _stems):
+        exemplars = [dict(x) for x in exemplars]
+        ids = []
+        for i, op in enumerate(ops):
+            fields = op["fields"]
+            source = {"kind": "ester", "ref": op["source_ref"], "at": today}
+            if op["op"] == "update":
+                base = op.get("base")
+                idx = next((j for j, x in enumerate(exemplars) if x.get("id") == op.get("exemplar_id")), None)
+                if idx is None or not isinstance(base, dict) or set(base) != set(fields) or any(
+                        _norm_field(f, base[f]) != exemplars[idx].get(f) for f in fields):
+                    raise ExemplarError(f"stale:{i}", 409)
+                x = _apply_fields(exemplars[idx], fields)
+                x["source"] = source
+                exemplars[idx] = x
+                ids.append(x["id"])
+            else:
+                shelfmark = _text(fields.get("shelfmark"), "shelfmark")
+                if shelfmark:
+                    key = shelfmark_key(fields["holder"], shelfmark)
+                    if any(shelfmark_key(x.get("holder"), x.get("shelfmark")) == key for x in exemplars):
+                        raise ExemplarError(f"duplicate:{i}", 409)
+                x = _apply_fields({"id": _new_id({e["id"] for e in exemplars})}, fields)
+                x["source"] = source
+                x["needs_review"] = True
+                exemplars.append(x)
+                ids.append(x["id"])
+        return exemplars, unknown, ids
+
+    return _write(work_dir, username, message, mutate, background_tasks)
+
+
 def delete_exemplar(work_dir: str, ex_id: str, username: str, background_tasks=None) -> None:
     def mutate(exemplars, unknown, _stems):
         _find(exemplars, ex_id)
