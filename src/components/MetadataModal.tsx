@@ -1,6 +1,6 @@
 import WorkDatingInput from './WorkDatingInput';
 import { datingError, WorkDating } from '../utils/workDating';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Edit3, X, Save, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
@@ -22,6 +22,8 @@ import { vocabularyRoleOptions } from './creators/roleOptions';
 import TitleVariantsFields from './TitleVariantsFields';
 
 import { useNotify } from '../contexts/FeedbackContext';
+import ExemplarsSection, { type ExemplarsSectionHandle } from './exemplars/ExemplarsSection';
+import UnsavedChangesDialog from './UnsavedChangesDialog';
 interface MetadataModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,7 +31,7 @@ interface MetadataModalProps {
   work?: Work;
   workId: string;
   authToken: string;
-  userRole?: string;  // ei kasutata (arhiiviviited ainult lugemiseks, ADR 0076); kutsujad annavad edasi
+  userRole?: string;  // eksemplaride toimetamine ainult admin+ (ADR 0076)
   collections: Collections;
   onSaveSuccess: (updatedPage: Partial<Page>, updatedWork: Partial<Work>) => void;
 }
@@ -189,6 +191,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   work,
   workId,
   authToken,
+  userRole,
   collections,
   onSaveSuccess
 }) => {
@@ -230,6 +233,42 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Eksemplari mustand salvestub oma nupuga (ADR 0076 p 5), mitte üldise
+  // „Salvesta" kaudu. Salvestamata mustandiga sulgemine küsib ühtse dialoogiga.
+  const exemplarsRef = useRef<ExemplarsSectionHandle>(null);
+  // Ref, sest sulgemine võib tulla vanast sulundist (üldise salvestuse setTimeout).
+  const exemplarsDirtyRef = useRef(false);
+  const setExemplarsDirty = useCallback((dirty: boolean) => { exemplarsDirtyRef.current = dirty; }, []);
+  const [closeGuard, setCloseGuard] = useState<{ open: boolean; saving: boolean; saveFailed: boolean }>(
+    { open: false, saving: false, saveFailed: false });
+
+  const requestClose = () => {
+    if (exemplarsDirtyRef.current) setCloseGuard({ open: true, saving: false, saveFailed: false });
+    else onClose();
+  };
+
+  const closeGuardSave = async () => {
+    setCloseGuard(g => ({ ...g, saving: true, saveFailed: false }));
+    let ok = false;
+    try { ok = (await exemplarsRef.current?.saveDraft()) ?? true; } catch { ok = false; }
+    if (ok) {
+      setCloseGuard({ open: false, saving: false, saveFailed: false });
+      onClose();
+    } else {
+      setCloseGuard({ open: true, saving: false, saveFailed: true });
+    }
+  };
+
+  // Eksemplari muudatus muudab tuletatud arhiiviviiteid (infopaneel, kaart). Loeme
+  // need serverist — klient ei tuleta `archive_refs`-i ise (ADR 0076 p 1).
+  const handleExemplarsChanged = useCallback(async () => {
+    try {
+      const data = await apiPost<any>(`${FILE_API_URL}/get-work-metadata`, { work_id: workId }, { token: authToken });
+      const refs = data?.metadata?.archive_refs;
+      if (Array.isArray(refs)) onSaveSuccess({}, { archive_refs: refs });
+    } catch { /* kuva värskendub järgmisel laadimisel */ }
+  }, [workId, authToken, onSaveSuccess]);
+
   // Päisest lohistatav (ühine hook osade paneeliga)
   const drag = useDraggablePosition();
 
@@ -241,6 +280,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   // Lae andmed kui modal avatakse
   useEffect(() => {
     if (isOpen) {
+      setExemplarsDirty(false);
+      setCloseGuard({ open: false, saving: false, saveFailed: false });
       loadData();
       drag.reset();
     }
@@ -432,7 +473,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         // kestab edasi ka pärast serveri edukat vastust.
         setTimeout(() => {
           console.info(`[Metadata] Salvestus kuni modaali sulgemiseni: ${(performance.now() - saveStartedAt).toFixed(0)} ms`);
-          onClose();
+          requestClose();
           setSaveStatus('idle');
         }, 400);
       } else {
@@ -452,7 +493,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose}>
+    <>
+    <div className="fixed inset-0 bg-black/50 z-50" onClick={requestClose}>
       <div
         ref={drag.ref}
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
@@ -467,7 +509,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             <Edit3 size={18} className="text-amber-600" />
             {t('metadata.title')}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={requestClose} className="text-gray-400 hover:text-gray-600" aria-label={t('common:buttons.close')}>
             <X size={20} />
           </button>
         </div>
@@ -740,22 +782,18 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             </div>
           </div>
 
-          {/* Grupp 4: Arhiiviviited — eksemplaridest tuletatud, siin ainult lugemiseks (ADR 0076) */}
-          {metaForm.archive_refs.length > 0 && (
-            <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
-              <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.archiveRefs', 'Arhiiviviited')}</h4>
-              <ul className="space-y-1 text-sm text-gray-700">
-                {metaForm.archive_refs.map((ref, idx) => (
-                  <li key={idx}>
-                    <span className="font-medium">{ref.archive_id}</span>
-                    {archives[ref.archive_id]?.name && <span className="text-gray-500"> — {archives[ref.archive_id].name}</span>}
-                    {ref.reference && <span> · {ref.reference}</span>}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-gray-500">{t('metadata.archiveRefsReadOnly')}</p>
-            </div>
-          )}
+          {/* Grupp 4: Eksemplarid (ADR 0076) — salvestuvad kohe oma otspunktidesse, mitte üldise „Salvesta" kaudu */}
+          <ExemplarsSection
+            ref={exemplarsRef}
+            workId={workId}
+            authToken={authToken}
+            userRole={userRole}
+            isManuscript={isManuscriptType(metaForm.type)}
+            archives={archives}
+            onArchiveAdded={(id, info) => setArchives(prev => ({ ...prev, [id]: info }))}
+            onDirtyChange={setExemplarsDirty}
+            onChanged={handleExemplarsChanged}
+          />
 
           {/* Grupp 5: Välised lingid */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
@@ -806,7 +844,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         )}
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2 shrink-0">
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
           >
             {t('common:buttons.cancel')}
@@ -837,6 +875,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         </div>
       </div>
     </div>
+      {/* Väljaspool tausta-div'i: muidu jõuaks dialoogi klõps Reacti puus taustani (requestClose). */}
+      <UnsavedChangesDialog
+        open={closeGuard.open}
+        saving={closeGuard.saving}
+        saveFailed={closeGuard.saveFailed}
+        onStay={() => setCloseGuard({ open: false, saving: false, saveFailed: false })}
+        onDiscard={() => { setCloseGuard({ open: false, saving: false, saveFailed: false }); onClose(); }}
+        onSaveAndContinue={() => void closeGuardSave()}
+      />
+    </>
   );
 };
 

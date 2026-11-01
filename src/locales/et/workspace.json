@@ -516,8 +516,7 @@
     "pageNumberingHint": "Lehe <fw> tähendus osa aadressiviites (fol. / p.).",
     "viewPersonPage": "Vaata isiku lehte",
     "noGenres": "Žanrid puuduvad",
-    "genrePlaceholder": "Lisa žanr...",
-    "archiveRefsReadOnly": "Arhiiviviited tulevad eksemplaridest ja on siin ainult lugemiseks. Eksemplaride toimetamine tuleb eraldi vaatesse."
+    "genrePlaceholder": "Lisa žanr..."
   },
   "download": {
     "title": "Lae alla",
@@ -767,5 +766,49 @@
     "error": "Toiming ebaõnnestus: {{error}}",
     "handoffAll": "Kood agendile (kõik teosed)",
     "packPagesGone": "Paki lehed on teosest kadunud — pakki saab tagasi lükata."
+  },
+  "exemplars": {
+    "title": "Eksemplarid",
+    "savesImmediately": "Eksemplari muudatused salvestuvad kohe, mitte metaandmete salvestusnupuga.",
+    "none": "Eksemplare ei ole lisatud.",
+    "loadError": "Eksemplaride laadimine ebaõnnestus.",
+    "saveError": "Eksemplari muudatust ei salvestatud.",
+    "holder": "Hoidja",
+    "holderRequired": "Vali eksemplarile hoidja.",
+    "shelfmark": "Kohaviit",
+    "shelfmarkPlaceholder": "nt R Est.B-954",
+    "url": "URL (valikuline)",
+    "more": "Rohkem",
+    "fields": {
+      "condition": "Seisund",
+      "binding": "Köide",
+      "provenance": "Provenients",
+      "notes": "Märkused"
+    },
+    "witness": "Tekstitunnistaja",
+    "markWitness": "Märgi tekstitunnistajaks",
+    "unmarkWitness": "Eemalda tekstitunnistaja märge",
+    "witnessConfirmTitle": "Tekstitunnistaja vahetus",
+    "witnessConfirm": "Skaneeringu lehed loetakse edaspidi selle eksemplari omaks. Eelmise tunnistaja märge ja selle eksemplari erandlehed eemaldatakse. Jätkan?",
+    "needsReview": "Kontrollimata",
+    "needsReviewHint": "Kirje vastavus füüsilisele eksemplarile on kontrollimata (automaatselt loodud kirje).",
+    "markReviewed": "Märgi kontrollituks",
+    "source": "Allikas",
+    "sourceKind": {
+      "ester": "ESTER",
+      "ada": "ADA",
+      "upload": "üleslaadimine",
+      "migration": "migratsioon",
+      "manual": "käsitsi"
+    },
+    "add": "Lisa eksemplar",
+    "edit": "Muuda",
+    "delete": "Kustuta",
+    "deleteTitle": "Kustuta eksemplar",
+    "deleteConfirm": "Kustutan eksemplari „{{label}}“? Seda ei saa siit tagasi võtta.",
+    "moveUp": "Liiguta üles",
+    "moveDown": "Liiguta alla",
+    "saveExemplar": "Salvesta eksemplar",
+    "manuscriptOne": "Käsikirjal on üks eksemplar: dokument ise. Ärakiri või teine redaktsioon on eraldi teos — seo see variandina (teose infopaneelis plokk „Seotud teosed“)."
   }
 }
