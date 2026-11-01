@@ -65,6 +65,31 @@ export interface ArchiveRef {
   url?: string;
 }
 
+// Eksemplar (ADR 0076): `_metadata.json` `exemplars[]`; `archive_refs` tuletatakse sellest.
+// Väärtuseta väli puudub võtmena.
+export interface ExemplarConvolute {
+  reference: string;
+  position?: number;   // 0 = põhiteos, N = N. kaasköide
+  total?: number;
+  contents?: string;
+}
+
+export interface Exemplar {
+  id: string;
+  holder: string;
+  shelfmark?: string;
+  url?: string;
+  text_witness?: true;
+  pages?: string[];
+  condition?: string;
+  binding?: string;
+  provenance?: string;
+  convolute?: ExemplarConvolute;
+  notes?: string;
+  source?: { kind: 'ester' | 'ada' | 'upload' | 'migration' | 'manual'; ref?: string; at?: string };
+  needs_review?: true;
+}
+
 // Seos teiste teostega
 export interface Relation {
   id: string;

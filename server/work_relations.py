@@ -14,6 +14,7 @@ from .access_ops import can_read_work
 from .config import get_logger
 from .metadata_ops import BulkUpdateError, bulk_update_works
 from .utils import find_directory_by_id
+from .work_exemplars import derive_archive_refs
 from .work_sets_access import load_work_metadata_by_id
 
 # Pöördliik: A → B liigiga X tähendab B → A liigiga INVERSE[X].
@@ -104,7 +105,7 @@ def apply_relation_changes(source_id: str, add: list, remove: list, username: st
 
 
 def _first_archive_ref(meta: dict) -> Optional[str]:
-    for ref in meta.get("archive_refs") or []:
+    for ref in derive_archive_refs(meta):
         if isinstance(ref, dict):
             text = " ".join(p for p in (ref.get("archive_id"), ref.get("reference")) if p)
             if text:

@@ -88,7 +88,8 @@ def anchor_exists(work_dir: str, after: str) -> bool:
     return after in ("start", "end") or after in get_sorted_images(work_dir)
 
 
-def run_add_pdf(work_id: str, tmp_dir: str, page_count: int, after: str, username: str, progress) -> dict:
+def run_add_pdf(work_id: str, tmp_dir: str, page_count: int, after: str, username: str, progress,
+                origin=None) -> dict:
     """Renderdab PDF-i lehed ja sisestab need. Ajutine kaust koristatakse alati."""
     try:
         src = PdfPageSource(os.path.join(tmp_dir, SOURCE_NAME))
@@ -99,7 +100,7 @@ def run_add_pdf(work_id: str, tmp_dir: str, page_count: int, after: str, usernam
                 src.render_full(n, dst)
             paths.append(dst)
             progress(n, page_count)
-        result = insert_prepared_pages(work_id, paths, after, username)
+        result = insert_prepared_pages(work_id, paths, after, username, origin=origin)
         logger.info(f"ADD-PDF: {work_id} +{page_count} lehte [after={after}] ({username})")
         return result
     finally:

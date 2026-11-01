@@ -431,6 +431,14 @@
     },
     "jobs": {
       "otherRunning": "Sellel teosel käib praegu teine taustatöö. Proovi mõne aja pärast uuesti."
+    },
+    "exemplarOrigin": {
+      "label": "Pildi päritolu (eksemplar)",
+      "choose": "— vali päritolu —",
+      "same": "Sama eksemplar kui senine skaneering",
+      "unknown": "Teadmata",
+      "witness": "tekstitunnistaja",
+      "required": "Teosel on eksemplarid: vali enne pildi päritolu."
     }
   },
   "metadata": {
@@ -508,7 +516,8 @@
     "pageNumberingHint": "Lehe <fw> tähendus osa aadressiviites (fol. / p.).",
     "viewPersonPage": "Vaata isiku lehte",
     "noGenres": "Žanrid puuduvad",
-    "genrePlaceholder": "Lisa žanr..."
+    "genrePlaceholder": "Lisa žanr...",
+    "archiveRefsReadOnly": "Arhiiviviited tulevad eksemplaridest ja on siin ainult lugemiseks. Eksemplaride toimetamine tuleb eraldi vaatesse."
   },
   "download": {
     "title": "Lae alla",

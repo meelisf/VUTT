@@ -89,7 +89,7 @@ def _write_metadata(work_dir: Path):
         "publisher": {"label": "Academische Buchdruckerei", "id": "Q777", "labels": {"et": "Akadeemiline trükikoda"}},
         "languages": ["la"],
         "collections": ["col-public", "child-col"],
-        "archive_refs": [{"archive_id": "RA", "reference": "f. 1"}],
+        "exemplars": [{"id": "x1", "holder": "RA", "shelfmark": "f. 1"}],  # → archive_refs (ADR 0076)
     }, ensure_ascii=False), encoding="utf-8")
 
 

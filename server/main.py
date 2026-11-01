@@ -37,6 +37,7 @@ from .routers.editing import router as editing_router
 from .routers.work_sets import router as work_sets_router
 from .routers.work_parts import router as work_parts_router
 from .routers.work_relations import router as work_relations_router
+from .routers.work_exemplars import router as work_exemplars_router
 from .routers.page_text_proposals import router as page_text_proposals_router
 from .routers.agent_proposals import router as agent_proposals_router
 from .routers.collections import router as collections_router
@@ -102,6 +103,8 @@ async def lifespan(app: FastAPI):
     await run_in_threadpool(start_auth_background)
     warn_if_no_superadmin()
     threading.Thread(target=rebuild_indices, daemon=True).start()
+    from .work_exemplars import check_unmigrated
+    threading.Thread(target=check_unmigrated, daemon=True, name="exemplars-check").start()
     # Isikukaartide automaatrikastus (ADR 0048): planeerija + pooleliolevate taaste.
     from .prosopography import auto_enrich_runner
     auto_enrich_runner.start()
@@ -144,6 +147,7 @@ app.include_router(collections_router)
 app.include_router(work_sets_router)
 app.include_router(work_parts_router)
 app.include_router(work_relations_router)
+app.include_router(work_exemplars_router)
 app.include_router(page_text_proposals_router)
 app.include_router(agent_proposals_router)
 

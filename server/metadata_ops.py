@@ -20,6 +20,7 @@ from .prosopography.work_relations_ops import update_work_facts
 from .prosopography.person_crud import ensure_prosopo_stubs
 from .save_diff import metadata_unchanged
 from .meili_doc import TITLE_TEXT_FIELDS
+from .work_exemplars import drop_empty_exemplar_fields
 
 logger = get_logger(__name__)
 
@@ -27,37 +28,18 @@ logger = get_logger(__name__)
 ALLOWED_METADATA_FIELDS = {
     "title", "year", "year_display", "dating", "location", "publisher", "creators", "tags", "notes",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
-    "series", "relations", "archive_refs", "shareable",
+    "series", "relations", "shareable",
     # Pealkirja tõlge, originaal ja tekkeviis (ADR 0064).
     *TITLE_TEXT_FIELDS, "title_devised",
     # Käsikirja lehenummerduse skeem (#630 spekk 2); valideerib /update-work-metadata.
     "page_numbering",
     # Osad (#464): muudetakse AINULT work_parts otspunktidega; üldine route lükkab tagasi.
     "parts",
+    # Eksemplarid (ADR 0076): AINULT work_exemplars; `archive_refs` on lugemiskuju ega
+    # ole siin, nii et ükski kirjutustee ei saa vana kuju tagasi kirjutada.
+    "exemplars", "exemplar_unknown_pages",
 }
 
-
-def clean_archive_refs(value):
-    """
-    Sanitiseerib archive_refs välja.
-    Tagastab puhastatud massiivi või None kui tühi/vigane.
-    """
-    if not isinstance(value, list):
-        return None
-    result = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        archive_id = str(item.get('archive_id', '') or '').strip()
-        reference = str(item.get('reference', '') or '').strip()
-        if not archive_id and not reference:
-            continue
-        clean = {'archive_id': archive_id, 'reference': reference}
-        url = str(item.get('url', '') or '').strip()
-        if url:
-            clean['url'] = url
-        result.append(clean)
-    return result if result else None
 
 def drop_empty_relations(meta: dict) -> None:
     """Tühi `relations` eemaldatakse võtmena (ADR 0075).
@@ -189,6 +171,7 @@ def bulk_update_works(
                 meta.update(clean)
                 normalize_title_fields(meta)
                 drop_empty_relations(meta)
+                drop_empty_exemplar_fields(meta)
                 for field in _V1_FIELDS:
                     meta.pop(field, None)
             except Exception as e:
@@ -312,10 +295,6 @@ def save_work_metadata(
     updates = dating_updates(updates)
     started = time.monotonic()
     slug = os.path.basename(os.path.dirname(meta_path))
-
-    # Sanitiseeri archive_refs enne salvestamist (None = tühi, eemaldatakse meta-st)
-    if 'archive_refs' in updates:
-        updates['archive_refs'] = clean_archive_refs(updates['archive_refs'])
 
     # Loo prosopo stub kaardid Wikidata Q-koodiga creators/tags/publisher jaoks
     if any(k in updates for k in ("creators", "tags", "publisher")):

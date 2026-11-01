@@ -105,7 +105,8 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 (ameti- ja asutuseregister, ADR 0059), **`work_sets/{id}.json`**, **`prosopography/{nanoid}.json`**
 (~2350 isikukaarti; **kaardid JA pildid (`prosopography/images/`) on siin** — pildid ei ole gitis,
 `data/.gitignore` ignoreerib `*.jpg`; `images/variants/` = laisad suurusvariandid, #424) ning tuletatud indeksid
-`prosopography_index.json`, `person_to_works.json`, `works_creators_index.json`, `work_collections_index.json`.
+`prosopography_index.json`, `person_to_works.json`, `works_creators_index.json`, `work_collections_index.json`,
+`convolute_index.json` (konvoluudi võti → teosed, ADR 0076).
 
 Tuletatud indeksid on read-modelid — nullist taastatavad (`rebuild_indices()` jookseb serveri
 stardil taustalõimes), vt ADR 0007. **Nad EI OLE `data/` gitis** (`data/.gitignore`): iga start

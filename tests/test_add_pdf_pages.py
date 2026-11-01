@@ -248,3 +248,19 @@ def test_add_pdf_teost_pole_404(ep):
 def test_add_pdf_nouab_admini(ep):
     h = {"Authorization": f"Bearer {ep['login']('editor', 'editorpass')}"}
     assert ep["post"](_pdf_bytes(), headers=h).status_code == 401
+
+
+def test_paritolu_margitakse_lisatud_lehtedele(work, monkeypatch):
+    """Eksemplaridega teosel: uued lehed saavad valitud päritolu (ADR 0076 p 4)."""
+    from server import work_exemplars
+    calls = []
+    monkeypatch.setattr(work_exemplars, "set_page_origin",
+                        lambda path, stems, origin, user, locked=False: calls.append((stems, origin, locked)))
+    tmp_dir, n = _prep(work)
+    res = app.run_add_pdf(work["work_id"], tmp_dir, n, "end", "admin", lambda d, t: None, origin="ex1")
+    uued = [os.path.splitext(it["filename"])[0] for it in res["inserted"]]
+    assert calls == [(uued, "ex1", True)]
+    calls.clear()
+    tmp_dir, n = _prep(work)
+    app.run_add_pdf(work["work_id"], tmp_dir, n, "end", "admin", lambda d, t: None, origin="same")
+    assert calls == []

@@ -29,7 +29,7 @@ from ..admin_page_ops import (
 from ..config import BASE_DIR, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import delete_page_from_git, save_with_git
-from .. import add_pdf_pages, page_ops_jobs
+from .. import add_pdf_pages, page_ops_jobs, work_exemplars
 from ..image_server import generate_thumbnail, invalidate_cover
 from ..meilisearch_ops import sync_work_to_meilisearch
 from ..prosopography.relations import refresh_work_mentions
@@ -138,17 +138,43 @@ async def admin_delete_pages(work_id: str, request: Request, user=Depends(requir
     return result
 
 
+def _checked_origin(path: str, origin: Optional[str]) -> Optional[str]:
+    """Uue pildi päritolu (ADR 0076 p 4): eksemplaridega teosel kohustuslik, muidu None."""
+    try:
+        with open(os.path.join(path, "_metadata.json"), "r", encoding="utf-8") as f:
+            meta = json.load(f) or {}
+    except (OSError, ValueError):
+        meta = {}
+    try:
+        return work_exemplars.check_origin(meta, origin)
+    except work_exemplars.ExemplarError as e:
+        raise HTTPException(status_code=e.status, detail=str(e))
+
+
+def _apply_origin(path: str, stems: list, origin: Optional[str], username: str) -> None:
+    """Kutsuja hoiab work_lock'i. Pilt on juba kettal: viga logitakse, ei visata —
+    leht jääb vaikimisi päritoluga ja toimetaja saab selle eksemplaride vaates parandada."""
+    if not origin or origin == work_exemplars.ORIGIN_SAME:
+        return
+    try:
+        work_exemplars.set_page_origin(path, stems, origin, username, locked=True)
+    except Exception:
+        logger.exception(f"Lehe päritolu märkimine ebaõnnestus ({path}: {stems} → {origin})")
+
+
 @router.post("/admin/work/{work_id}/page/{page_num}/replace-image")
 def admin_replace_page_image(
     work_id: str,
     page_num: int,
     file: UploadFile = File(...),
+    exemplar_origin: Optional[str] = Form(None),
     user=Depends(require_role("admin")),
 ):
     """
     Asendab lehekülje pildi uuega. Vana pilt säilitatakse prügikastis (tähtajatult:
     see on ainus koopia, sest asendus kustutab ._originals kirje).
-    Body: multipart — file (JPG/PNG)
+    Body: multipart — file (JPG/PNG), exemplar_origin (eksemplaridega teosel kohustuslik:
+    "same" | "unknown" | eksemplari id, ADR 0076 p 4)
     """
     path = find_directory_by_id(work_id)
     if not path:
@@ -166,6 +192,8 @@ def admin_replace_page_image(
         images = get_sorted_images(path)
         if page_num < 1 or page_num > len(images):
             raise HTTPException(status_code=404, detail=f"Lehekülge {page_num} ei leitud")
+        # Päritolu kontroll ENNE pildi kirjutamist (lukus — loeb värsket olekut).
+        origin = _checked_origin(path, exemplar_origin)
 
         img_name = images[page_num - 1]
         img_path = os.path.join(path, img_name)
@@ -204,6 +232,7 @@ def admin_replace_page_image(
         clear_original_backup(work_id, img_name)
 
         logger.info(f"REPLACE-IMG: {folder_name}/{img_name} asendatud ({user['username']})")
+        _apply_origin(path, [base], origin, user["username"])
         sync_work_to_meilisearch(folder_name)
         return {"status": "success", "filename": img_name}
 
@@ -213,6 +242,7 @@ def admin_add_page(
     work_id: str,
     file: UploadFile = File(...),
     after_page_num: int = Form(-1),
+    exemplar_origin: Optional[str] = Form(None),
     user=Depends(require_role("admin")),
 ):
     """
@@ -233,6 +263,7 @@ def admin_add_page(
         raise HTTPException(status_code=400, detail=str(e))
 
     with work_lock(folder_name, path):
+        origin = _checked_origin(path, exemplar_origin)
         # Arvuta uus sequence (lukus — loeb värsket olekut)
         images = get_sorted_images(path)
         page_count = len(images)
@@ -304,6 +335,7 @@ def admin_add_page(
         sync_work_to_meilisearch(folder_name)
         # Uus leht nihutab järgmiste lehtede numbreid (#420).
         refresh_work_mentions(path, work_id)
+        _apply_origin(path, [base], origin, user["username"])
 
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "new_page_count": new_page_count, "sequence": new_seq, "filename": new_filename}
@@ -314,15 +346,21 @@ def admin_add_pages(
     work_id: str,
     files: list[UploadFile] = File(..., alias="file"),
     after_page_num: int = Form(-1),
+    exemplar_origin: Optional[str] = Form(None),
     user=Depends(require_role("admin")),
 ):
     """Lisab teosele mitu lehekülge korraga (JPG/PNG), nimejärgi sorteeritud.
-    Body: multipart — mitu `file`-välja + after_page_num (int, 0=algusesse, -1=lõppu).
+    Body: multipart — mitu `file`-välja + after_page_num (int, 0=algusesse, -1=lõppu)
+    + exemplar_origin (eksemplaridega teosel kohustuslik, ADR 0076 p 4).
     """
+    path = find_directory_by_id(work_id)
+    if path:
+        _checked_origin(path, exemplar_origin)
     upload_data = [(up.filename or "", up.file.read()) for up in files]
 
     try:
-        result = add_pages(work_id, upload_data, after_page_num, user["username"])
+        result = add_pages(work_id, upload_data, after_page_num, user["username"],
+                           origin=exemplar_origin)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):
@@ -335,6 +373,7 @@ def admin_add_pdf(
     work_id: str,
     file: UploadFile = File(...),
     after: str = Form("end"),
+    exemplar_origin: Optional[str] = Form(None),
     user=Depends(require_role("admin")),
 ):
     """Lisab teosele PDF-i lehed TAUSTATÖÖNA (ADR 0074).
@@ -346,6 +385,7 @@ def admin_add_pdf(
     path = find_directory_by_id(work_id)
     if not path:
         raise HTTPException(status_code=404, detail="Teost ei leitud")
+    _checked_origin(path, exemplar_origin)
     if not add_pdf_pages.anchor_exists(path, after):
         raise HTTPException(status_code=409, detail="Lehte, mille järele sisestada, ei ole enam teoses")
     try:
@@ -356,7 +396,8 @@ def admin_add_pdf(
     username = user["username"]
     started = page_ops_jobs.start_job(
         work_id, "add_pdf", page_count, username,
-        lambda progress: add_pdf_pages.run_add_pdf(work_id, tmp_dir, page_count, after, username, progress),
+        lambda progress: add_pdf_pages.run_add_pdf(work_id, tmp_dir, page_count, after, username, progress,
+                                                  origin=exemplar_origin),
         on_error=add_pdf_pages.error_fields,
     )
     if not started:

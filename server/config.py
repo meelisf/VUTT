@@ -167,6 +167,8 @@ PROSOPOGRAPHY_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "prosopography_index.j
 PERSON_TO_WORKS_FILE = os.path.join(_DATA_CONFIG_DIR, "person_to_works.json")
 WORKS_CREATORS_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "works_creators_index.json")
 WORK_COLLECTIONS_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "work_collections_index.json")
+# Konvoluudi võti → liikmeteosed (ADR 0076 p 6) — tuletatud read-model, ei ole gitis
+CONVOLUTE_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "convolute_index.json")
 ARCHIVES_FILE = os.path.join(_DATA_CONFIG_DIR, "archives.json")
 
 # Kasutaja runtime seaded — state/user_settings/ kaustas (ei ole gitis)

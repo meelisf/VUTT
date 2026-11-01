@@ -159,8 +159,8 @@ def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None,
     muutust (#420). Salvestus skannib ainult isikutägide muutusel, seega PEAB
     iga lehenumbreid nihutav tee selle ise kutsuma — muidu jäävad numbrid vanaks.
 
-    Enne mainimisi ühtlustatakse teose osad (#464, ADR 0057): osade lehed ja
-    mainimiste osa-viited sõltuvad samast lehehulgast. Poolitus annab `renamed`
+    Enne mainimisi ühtlustatakse teose osad (#464, ADR 0057) ja eksemplaride lehed
+    (ADR 0076): osade lehed ja mainimiste osa-viited sõltuvad samast lehehulgast. Poolitus annab `renamed`
     = {algne_tüvi: [vasak, parem]}.
 
     Viga logitakse, ei visata: lehetoiming on juba kettal ja commititud.
@@ -171,6 +171,12 @@ def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None,
         work_parts.sync_work_parts(work_dir, work_id, renamed=renamed)
     except Exception:
         logger.exception(f"Osade ühtlustus ebaõnnestus ({work_id or work_dir})")
+    try:
+        # Eksemplaride lehed samast lehehulgast (ADR 0076 p 4).
+        from .. import work_exemplars
+        work_exemplars.sync_work_exemplars(work_dir, work_id, renamed=renamed)
+    except Exception:
+        logger.exception(f"Eksemplaride ühtlustus ebaõnnestus ({work_id or work_dir})")
     try:
         if not work_id:
             with open(os.path.join(work_dir, '_metadata.json'), 'r', encoding='utf-8') as f:

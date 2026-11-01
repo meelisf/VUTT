@@ -332,29 +332,11 @@ describe('cleanArchiveRefs', () => {
 // buildMetadataPayload — archive_refs
 // ---------------------------------------------------------------------------
 describe('buildMetadataPayload — archive_refs', () => {
-  it('tühi archive_refs massiiv → null payload-is', () => {
-    expect(buildMetadataPayload(baseForm(), 'x').metadata.archive_refs).toBeNull();
-  });
-
-  it('archive_refs kirjetega → säilitatakse', () => {
-    const refs: ArchiveRef[] = [{ archive_id: 'EAA', reference: '1.2.3, l. 4', url: 'https://example.com' }];
+  // Eksemplaridest tuletatud lugemiskuju: server lükkab ta tagasi (ADR 0076).
+  it('payload ei kanna archive_refs-i ka siis, kui vormis on viiteid', () => {
+    const refs: ArchiveRef[] = [{ archive_id: 'EAA', reference: '1.2.3, l. 4' }];
     const form = { ...baseForm(), archive_refs: refs };
-    expect(buildMetadataPayload(form, 'x').metadata.archive_refs).toEqual(refs);
-  });
-
-  it('kirje ilma url-ita → säilitatakse (url puudub)', () => {
-    const refs: ArchiveRef[] = [{ archive_id: 'TÜR', reference: 'Ms. 123' }];
-    const form = { ...baseForm(), archive_refs: refs };
-    expect(buildMetadataPayload(form, 'x').metadata.archive_refs).toEqual([{ archive_id: 'TÜR', reference: 'Ms. 123' }]);
-  });
-
-  it('filtreerib tühjad kirjed ja trimmib', () => {
-    const refs: ArchiveRef[] = [
-      { archive_id: '', reference: '' },
-      { archive_id: '  EAA  ', reference: '  1.2.3  ' },
-    ];
-    const form = { ...baseForm(), archive_refs: refs };
-    expect(buildMetadataPayload(form, 'x').metadata.archive_refs).toEqual([{ archive_id: 'EAA', reference: '1.2.3' }]);
+    expect('archive_refs' in buildMetadataPayload(form, 'x').metadata).toBe(false);
   });
 });
 

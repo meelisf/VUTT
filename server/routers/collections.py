@@ -305,8 +305,9 @@ def _find_works_with_archive(archive_id: str):
         try:
             with open(meta_path, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
-            refs = meta.get('archive_refs') or []
-            if any(isinstance(ref, dict) and ref.get('archive_id') == archive_id for ref in refs):
+            # Hoidja on eksemplari väli (ADR 0076).
+            if any(isinstance(x, dict) and x.get('holder') == archive_id
+                   for x in meta.get('exemplars') or []):
                 results.append((meta_path, meta))
         except Exception:
             continue
