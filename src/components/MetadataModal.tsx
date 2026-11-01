@@ -267,7 +267,11 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       const m = data?.metadata;
       // `convolute_count` tuleb samuti serverist: infopaneeli „Samas köites" plokk sõltub sellest (#702).
       if (Array.isArray(m?.archive_refs)) {
-        onSaveSuccess({}, { archive_refs: m.archive_refs, convolute_count: m.convolute_count || 0 });
+        onSaveSuccess({}, {
+          archive_refs: m.archive_refs,
+          convolute_count: m.convolute_count || 0,
+          exemplars_rev: Date.now(),  // ainult muutumine loeb; sulundi `work` võib olla vana
+        });
       }
     } catch { /* kuva värskendub järgmisel laadimisel */ }
   }, [workId, authToken, onSaveSuccess]);

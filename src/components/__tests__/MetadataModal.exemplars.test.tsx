@@ -84,6 +84,7 @@ describe('MetadataModal — eksemplarid samas aknas', () => {
     // Tuletatud arhiiviviited loetakse serverist ja antakse Workspace'ile edasi
     await waitFor(() => expect(onSaveSuccess).toHaveBeenCalledWith({}, {
       archive_refs: [{ archive_id: 'TÜR', reference: 'R Est.B-954' }], convolute_count: 0,
+      exemplars_rev: expect.any(Number),  // „Samas köites" laeb selle muutumisel uuesti
     }));
   });
 

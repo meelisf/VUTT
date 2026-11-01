@@ -383,6 +383,7 @@
     "thisWork": "see teos",
     "contents": "Sisukord",
     "showContents": "näita kogu teksti",
-    "hideContents": "näita vähem"
+    "hideContents": "näita vähem",
+    "unavailable": "Köite andmeid ei õnnestunud laadida."
   }
 }

@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -123,6 +123,23 @@ describe('RelationsButton', () => {
     await flush(0);
     expect(screen.getByText('Teos w2')).toBeTruthy();
     expect(screen.getByText('Kaaslane w9')).toBeTruthy();
+  });
+
+  it('tühi konvoluudivastus: üksinda teade, seoste kõrval lõik ära', async () => {
+    getWorkExemplars.mockResolvedValue({ exemplars: [], convolutes: [] });
+    render(<Harness relations={[]} convoluteCount={1} />);
+    fireEvent.click(screen.getByRole('button', { name: 'common:convolute.title' }));
+    await flush(0);
+    expect(screen.getByTestId('convolute-unavailable')).toBeTruthy();
+    cleanup();
+
+    render(<Harness relations={[V('w2')]} convoluteCount={1} />);
+    fireEvent.click(button());
+    await flush(0);
+    expect(screen.getByText('Teos w2')).toBeTruthy();
+    // Nupu sr-only silt jääb; ülekattes konvoluudi pealkirja ei ole
+    expect(screen.queryAllByText('common:convolute.title').filter(e => !e.classList.contains('sr-only'))).toHaveLength(0);
+    expect(screen.queryByTestId('convolute-unavailable')).toBeNull();
   });
 
   it('konvoluudita teosel exemplars-päringut ei tehta', async () => {

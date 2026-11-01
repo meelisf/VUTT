@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { ConvoluteBlock } from '../../types';
@@ -29,6 +29,13 @@ const ConvoluteBlocks: React.FC<ConvoluteBlocksProps> = ({ blocks, lang, dark = 
 const OneBlock: React.FC<{ block: ConvoluteBlock; lang: string; dark: boolean }> = ({ block, lang, dark }) => {
   const { t } = useTranslation(['common']);
   const [showContents, setShowContents] = useState(false);
+  // Laiendusnupp ainult siis, kui `line-clamp-2` midagi tegelikult peidab (mõõdetakse kärbitult).
+  const contentsRef = useRef<HTMLSpanElement | null>(null);
+  const [clamped, setClamped] = useState(false);
+  useLayoutEffect(() => {
+    const el = contentsRef.current;
+    if (el && !showContents) setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [block.contents, showContents]);
   const muted = dark ? 'text-gray-400' : 'text-gray-500';
   const total = block.total ?? null;
   // VUTT-is puuduvad trükised: ainult siis, kui arv on teada (ADR 0076: kirjet neist ei looda).
@@ -80,11 +87,11 @@ const OneBlock: React.FC<{ block: ConvoluteBlock; lang: string; dark: boolean }>
       {block.contents && (
         <div className={`text-xs ${muted} mt-1`}>
           <span className="font-medium">{t('common:convolute.contents')}:</span>{' '}
-          <span className={`whitespace-pre-wrap ${showContents ? '' : 'line-clamp-2'}`}>{block.contents}</span>
-          <button type="button" onClick={e => { e.stopPropagation(); setShowContents(v => !v); }}
+          <span ref={contentsRef} className={`whitespace-pre-wrap ${showContents ? '' : 'line-clamp-2'}`}>{block.contents}</span>
+          {(clamped || showContents) && <button type="button" onClick={e => { e.stopPropagation(); setShowContents(v => !v); }}
                   className={`block mt-0.5 ${dark ? 'text-emerald-200' : 'text-primary-700'} hover:underline`}>
             {showContents ? t('common:convolute.hideContents') : t('common:convolute.showContents')}
-          </button>
+          </button>}
         </div>
       )}
     </div>

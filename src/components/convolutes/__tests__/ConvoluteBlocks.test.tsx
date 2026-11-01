@@ -71,20 +71,31 @@ describe('ConvoluteBlocks', () => {
     expect(restricted.textContent).toContain('common:workRelations.restricted');
   });
 
-  it('teadmata arvuga plokis puuduvate rida ei ole; sisukord laieneb', () => {
-    const noTotal = { ...blocks[0], total: null };
-    render(<MemoryRouter><ConvoluteBlocks blocks={[noTotal]} lang="et" /></MemoryRouter>);
-    expect(screen.queryByText(/common:convolute.missing/)).toBeNull();
-    fireEvent.click(screen.getByText('common:convolute.showContents'));
-    expect(screen.getByText('common:convolute.hideContents')).toBeTruthy();
+  it('teadmata arvuga plokis puuduvate rida ei ole; kärbitud sisukord laieneb', () => {
+    // jsdom ei paiguta: kärbitust simuleeritakse mõõtude kaudu
+    const sh = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(80);
+    const ch = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(32);
+    try {
+      const noTotal = { ...blocks[0], total: null };
+      render(<MemoryRouter><ConvoluteBlocks blocks={[noTotal]} lang="et" /></MemoryRouter>);
+      expect(screen.queryByText(/common:convolute.missing/)).toBeNull();
+      fireEvent.click(screen.getByText('common:convolute.showContents'));
+      expect(screen.getByText('common:convolute.hideContents')).toBeTruthy();
+    } finally { sh.mockRestore(); ch.mockRestore(); }
+  });
+
+  it('lühike sisukord: laiendusnuppu ei ole', () => {
+    render(<MemoryRouter><ConvoluteBlocks blocks={[blocks[0]]} lang="et" /></MemoryRouter>);
+    expect(screen.getByText('Fischer; Personalia; …')).toBeTruthy();
+    expect(screen.queryByText('common:convolute.showContents')).toBeNull();
   });
 });
 
 describe('SameVolumeBlock', () => {
   beforeEach(() => getWorkExemplars.mockReset());
 
-  const work = (convolute_count: number) =>
-    ({ work_id: 'w1', convolute_count, archive_refs: [] } as unknown as Work);
+  const work = (convolute_count: number, extra: Partial<Work> = {}) =>
+    ({ work_id: 'w1', convolute_count, archive_refs: [], ...extra } as unknown as Work);
 
   it('konvoluudita teos ei tee päringut ega näita plokki', () => {
     render(<MemoryRouter><SameVolumeBlock work={work(0)} lang="et" /></MemoryRouter>);
@@ -98,5 +109,36 @@ describe('SameVolumeBlock', () => {
     await waitFor(() => expect(screen.getAllByTestId('convolute-block')).toHaveLength(2));
     expect(getWorkExemplars).toHaveBeenCalledWith('w1', 'tok');
     expect(screen.getByText('common:convolute.title')).toBeTruthy();
+  });
+
+  it('eksemplaride salvestus (exemplars_rev) laeb uuesti ilma plokki peitmata; uus archive_refs ei lae', async () => {
+    getWorkExemplars.mockResolvedValue({ exemplars: [], convolutes: blocks });
+    const { rerender } = render(<MemoryRouter><SameVolumeBlock work={work(2)} lang="et" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByTestId('convolute-block')).toHaveLength(2));
+
+    // Workspace laadis teose objekti uuesti (tokeni vahetus): sama sisu, uus massiiv
+    rerender(<MemoryRouter><SameVolumeBlock work={work(2, { archive_refs: [] })} lang="et" /></MemoryRouter>);
+    expect(getWorkExemplars).toHaveBeenCalledTimes(1);
+
+    let resolve!: (v: unknown) => void;
+    getWorkExemplars.mockReturnValue(new Promise(r => { resolve = r; }));
+    rerender(<MemoryRouter><SameVolumeBlock work={work(2, { exemplars_rev: 1 })} lang="et" /></MemoryRouter>);
+    expect(getWorkExemplars).toHaveBeenCalledTimes(2);
+    // Päringu ajal jääb vana plokk nähtavale
+    expect(screen.getAllByTestId('convolute-block')).toHaveLength(2);
+    resolve({ exemplars: [], convolutes: [blocks[0]] });
+    await waitFor(() => expect(screen.getAllByTestId('convolute-block')).toHaveLength(1));
+  });
+
+  it('hiljaks jäänud vastus ei kirjuta uuemat üle', async () => {
+    let first!: (v: unknown) => void;
+    getWorkExemplars.mockReturnValueOnce(new Promise(r => { first = r; }));
+    getWorkExemplars.mockResolvedValueOnce({ exemplars: [], convolutes: [blocks[1]] });
+    const { rerender } = render(<MemoryRouter><SameVolumeBlock work={work(2)} lang="et" /></MemoryRouter>);
+    rerender(<MemoryRouter><SameVolumeBlock work={work(2, { exemplars_rev: 1 })} lang="et" /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByTestId('convolute-block')).toHaveLength(1));
+    first({ exemplars: [], convolutes: blocks });
+    await new Promise(r => setTimeout(r, 0));
+    expect(screen.getAllByTestId('convolute-block')).toHaveLength(1);
   });
 });

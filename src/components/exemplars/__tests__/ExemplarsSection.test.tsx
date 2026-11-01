@@ -243,16 +243,28 @@ describe('ExemplarsSection — konvoluut (#702)', () => {
     expect(screen.getByTestId('convolute-summary').textContent).toContain('common:convolute.main');
   });
 
-  it('kohaviida tühjendamine eemaldab märke (convolute: null)', async () => {
+  it('kõigi konvoluudiväljade tühjendamine eemaldab märke (convolute: null)', async () => {
     server.exemplars[0].convolute = { reference: 'R Est.B-954', position: 1 };
     renderSection();
     await screen.findByTestId('convolute-summary');
     fireEvent.click(screen.getAllByLabelText('exemplars.edit')[0]);
     // Olemasoleva konvoluudiga on väljad kohe lahti
     fireEvent.change(screen.getByLabelText('exemplars.convolute.reference'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.position'), { target: { value: '' } });
     fireEvent.click(screen.getByText('exemplars.saveExemplar'));
     await waitFor(() => expect(screen.queryByTestId('convolute-summary')).toBeNull());
     expect(writes()[0].body.convolute).toBeNull();
+  });
+
+  it('kohaviiteta, aga täidetud sisukord: hoiatus, märget ei eemaldata', async () => {
+    server.exemplars[0].convolute = { reference: 'R Est.B-954', contents: 'Fischer' };
+    renderSection();
+    await screen.findByTestId('convolute-summary');
+    fireEvent.click(screen.getAllByLabelText('exemplars.edit')[0]);
+    fireEvent.change(screen.getByLabelText('exemplars.convolute.reference'), { target: { value: '' } });
+    fireEvent.click(screen.getByText('exemplars.saveExemplar'));
+    await screen.findByText('exemplars.convolute.referenceRequired');
+    expect(writes()).toHaveLength(0);
   });
 
   it('mittetäisarvuline koht: hoiatus, päringut ei tehta', async () => {

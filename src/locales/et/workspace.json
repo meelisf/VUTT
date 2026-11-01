@@ -818,7 +818,8 @@
       "position": "Koht (0 = põhiteos)",
       "total": "Trükiste arv köites",
       "contents": "Sisukord (vabatekst)",
-      "countInvalid": "Konvoluudi koht ja trükiste arv peavad olema täisarvud."
+      "countInvalid": "Konvoluudi koht ja trükiste arv peavad olema täisarvud.",
+      "referenceRequired": "Konvoluudi kohaviit puudub. Märke eemaldamiseks tühjenda kõik konvoluudi väljad."
     }
   }
 }

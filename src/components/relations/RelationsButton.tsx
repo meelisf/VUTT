@@ -136,10 +136,16 @@ const RelationsButton: React.FC<RelationsButtonProps> = ({
               {items === null ? loading : <RelatedWorksList items={items} lang={lang} dark={isCard} />}
             </>
           )}
-          {convoluteCount > 0 && (
+          {/* Tühi vastus arvu > 0 korral = päring ebaõnnestus: seoste kõrval jäetakse osa ära,
+              üksinda öeldakse see välja — muidu jääks ülekattesse ainult pealkiri. */}
+          {convoluteCount > 0 && !(convolutes?.length === 0 && variants.length > 0) && (
             <div className={variants.length > 0 ? 'mt-3' : ''}>
               <p className={heading}>{t('common:convolute.title')}</p>
-              {convolutes === null ? loading : <ConvoluteBlocks blocks={convolutes} lang={lang} dark={isCard} />}
+              {convolutes === null
+                ? loading
+                : convolutes.length === 0
+                  ? <p className="text-xs opacity-70" data-testid="convolute-unavailable">{t('common:convolute.unavailable')}</p>
+                  : <ConvoluteBlocks blocks={convolutes} lang={lang} dark={isCard} />}
             </div>
           )}
         </div>

@@ -383,6 +383,7 @@
     "thisWork": "this work",
     "contents": "Contents",
     "showContents": "show full text",
-    "hideContents": "show less"
+    "hideContents": "show less",
+    "unavailable": "Could not load the volume details."
   }
 }

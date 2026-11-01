@@ -79,12 +79,18 @@ const parseCount = (raw: string): number | undefined => {
 };
 
 /**
- * Mustandi konvoluut PUT-i kujule. Kohaviida puudumine = märge maha (`null`).
+ * Mustandi konvoluut PUT-i kujule. Kõik väljad tühjad = märge maha (`null`);
+ * kohaviiteta, aga muu väljaga mustand on vormi viga (`noReference`).
  * Koha ja arvu kooskõla (koht < arv) kontrollib server — klient ainult parsib.
  */
-function convoluteFromDraft(d: Draft): ExemplarConvolute | null | 'invalid' {
+function convoluteFromDraft(d: Draft): ExemplarConvolute | null | 'invalid' | 'noReference' {
   const reference = d.convReference.trim();
-  if (!reference) return null;
+  if (!reference) {
+    // Märke eemaldamine on tahtlik ainult siis, kui kõik konvoluudiväljad on tühjad —
+    // muidu kaoks unustatud kohaviida tõttu sisestatud sisukord vaikselt.
+    const rest = [d.convPosition, d.convTotal, d.convContents].some(v => v.trim());
+    return rest ? 'noReference' : null;
+  }
   const position = parseCount(d.convPosition);
   const total = parseCount(d.convTotal);
   if (Number.isNaN(position) || Number.isNaN(total)) return 'invalid';
@@ -161,6 +167,11 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
     const convolute = convoluteFromDraft(d);
     if (convolute === 'invalid') {
       notify(t('exemplars.convolute.countInvalid'), 'warning');
+      return false;
+    }
+    if (convolute === 'noReference') {
+      setConvOpen(true);
+      notify(t('exemplars.convolute.referenceRequired'), 'warning');
       return false;
     }
     // Kõik väljad kaasa: tühi string eemaldab serveris välja (väärtuseta = võtme puudumine).

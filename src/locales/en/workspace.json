@@ -818,7 +818,8 @@
       "position": "Position (0 = main work)",
       "total": "Number of items in the volume",
       "contents": "Contents (free text)",
-      "countInvalid": "Convolute position and number of items must be whole numbers."
+      "countInvalid": "Convolute position and number of items must be whole numbers.",
+      "referenceRequired": "The convolute shelfmark is missing. To remove the convolute entry, clear all convolute fields."
     }
   }
 }

@@ -212,6 +212,9 @@ export interface Work {
   relations?: Relation[];
   /** Mitmes konvoluudis teose eksemplarid on (Meili kuvamisväli, #702). Puudub = 0. */
   convolute_count?: number;
+  /** AINULT klient: muutub eksemplaride salvestusel (MetadataModal), et „Samas köites"
+   *  laadiks uuesti ka siis, kui arv ei muutu (nt sisukord). Serverist ei tule. */
+  exemplars_rev?: number;
 
   // Välised lingid ja arhiiviviited
   ester_id?: string;
