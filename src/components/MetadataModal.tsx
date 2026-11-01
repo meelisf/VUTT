@@ -530,9 +530,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               value={metaForm.title}
               onChange={e => setMetaForm({ ...metaForm, title: e.target.value })}
             />
-            {metaForm.title.includes(' / ') && (
-              <p className="text-xs text-amber-700 mt-1">{t('metadata.titleSlashWarning')}</p>
-            )}
           </div>
 
           {/* Pealkirja tõlge, originaal ja tekkeviis (ADR 0064) */}
