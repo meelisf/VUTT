@@ -573,7 +573,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review → „Loo
         agendikood"); kehtib 8 h, kõigis teostes. Loe ENNE get_work_exemplars.
         ESTERi kirje (www.ester.ee/record=b…) loe OMA veebivahendiga — MCP ESTERit
-        ei puuduta.
+        ei puuduta. Eksemplaride tabeli märkus on lehel kärbitud („… >>"); täistekst
+        on ainult lehe HTML-is — loe toor-HTML (nt curl), mitte kokkuvõtvat lugejat.
+        Kärbitud teksti tsitaadiks ega väljaks ei esitata.
 
         Iga rida lähtub ÜHEST allikaolukorrast ja kannab allikat:
         source = {kind: "ester", ref: "b2648642" (ESTERi kirje number),
