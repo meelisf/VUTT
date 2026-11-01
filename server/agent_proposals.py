@@ -12,6 +12,7 @@ from typing import Optional
 from . import agent_handoff
 from . import page_text_proposals as ptp
 from . import work_part_proposals as wpp
+from . import exemplar_proposals as epp
 from . import work_parts as wp
 from .prosopography import enrichment_proposals as ep
 from .prosopography.person_crud import get_person
@@ -27,7 +28,8 @@ class AgentHandoffError(RuntimeError):
 
 def issue_agent_handoff(username: str, session_fingerprint: str) -> dict:
     """Kood kõigile liikidele, ulatus „kõik teosed + kõik isikud"; üks tehing."""
-    limits = {"text": ptp.MAX_USES, "parts": wpp.MAX_USES, "person": ep.ANY_MAX_USES}
+    limits = {"text": ptp.MAX_USES, "parts": wpp.MAX_USES, "person": ep.ANY_MAX_USES,
+              "exemplars": epp.MAX_USES}
     try:
         out = agent_handoff.issue(username, session_fingerprint,
                                   {kind: (None, n) for kind, n in limits.items()})
@@ -35,7 +37,7 @@ def issue_agent_handoff(username: str, session_fingerprint: str) -> dict:
         logger.exception("Agendikoodi registreerimine ebaõnnestus")
         raise AgentHandoffError("agent_handoff_failed") from e
     return {**out, "max_uses": {"text": limits["text"], "parts": limits["parts"],
-                                "persons": limits["person"]}}
+                                "persons": limits["person"], "exemplars": limits["exemplars"]}}
 
 
 def _work_title(meta: Optional[dict], work_id: str) -> str:
@@ -79,7 +81,7 @@ def _text_page(pack: dict, number: dict) -> int:
 
 def list_agent_proposals(username: str) -> list[dict]:
     """Kõik ootel ettepanekud ühes loendis. Nähtavus järgib sihtvaadet: tekstipakke
-    näevad kõik superadminid, osi ja isikuid ainult koodi loonud kasutaja."""
+    näevad kõik superadminid, osi, eksemplare ja isikuid ainult koodi loonud kasutaja."""
     works = _Works()
     rows = []
     for pack in ptp.list_pending():
@@ -100,6 +102,13 @@ def list_agent_proposals(username: str) -> list[dict]:
             "target_label": w["label"], "target_url": f"/work/{p['work_id']}/manage?tab=parts",
             "pending": p["pending"], "stale": p["pending"] if changed else 0,
             "created_at": p["created_at"],
+        })
+    for p in epp.list_pending_summary(username):
+        w = works.get(p["work_id"])
+        rows.append({
+            "kind": "exemplars", "proposal_id": p["proposal_id"], "target_id": p["work_id"],
+            "target_label": w["label"], "target_url": f"/work/{p['work_id']}/manage?tab=exemplars",
+            "pending": p["pending"], "stale": p["stale"], "created_at": p["created_at"],
         })
     people: dict = {}
     for p in ep.list_pending_summary(username):

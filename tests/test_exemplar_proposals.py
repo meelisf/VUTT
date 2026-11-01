@@ -27,7 +27,11 @@ NEW = {"op": "create", "fields": {"holder": "TÜR", "shelfmark": "R Est.B-954 (I
 
 @pytest.fixture
 def work(tmp_path, monkeypatch):
-    from server import metadata_ops, config
+    import importlib
+    from server import metadata_ops
+    # Kood loeb registrit `from .config import ARCHIVES_FILE` kaudu (sys.modules); mõni test
+    # impordib server.config'i uuesti, nii et paketi atribuut võib olla teine moodul.
+    config = importlib.import_module("server.config")
     monkeypatch.setattr(epp, "DB_PATH", str(tmp_path / "epp.sqlite3"))
     monkeypatch.setattr(wpp, "DB_PATH", str(tmp_path / "wpp.sqlite3"))
     monkeypatch.setattr(agent_handoff, "DB_PATH", str(tmp_path / "handoff.sqlite3"))
@@ -178,7 +182,8 @@ def test_korduv_esitus_blokeerub_parast_esimest_kinnitust(work):
 
 
 def test_hoidja_lisamine_vabastab_rea(work):
-    from server import config
+    import importlib
+    config = importlib.import_module("server.config")
     pid = _submit(work, [{**NEW, "fields": {"holder": "RR", "shelfmark": "EAA.1"}}])["proposal_id"]
     assert _rows(work)[0]["review_state"] == "blocked_holder"
     with pytest.raises(epp.ProposalError, match="not_decidable"):
@@ -260,3 +265,84 @@ def test_hoidla_ei_kasuta_wal(work):
     for path in (epp.DB_PATH, agent_handoff.DB_PATH):
         mode = sqlite3.connect(path).execute("PRAGMA journal_mode").fetchone()[0]
         assert mode.lower() != "wal"
+
+
+# ── HTTP (Task 3) ────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def client(work, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from server import deps
+    from server.routers import work_exemplars as r
+    app = FastAPI()
+    app.include_router(r.router)
+    state = {"user": {"username": "ed", "role": "superadmin"}, "write": True}
+
+    async def fake_get_user(request, min_role="contributor"):
+        from fastapi import HTTPException
+        from server.auth import is_at_least
+        if not is_at_least(state["user"]["role"], min_role):
+            raise HTTPException(status_code=403, detail="Puudub õigus")
+        return state["user"]
+    monkeypatch.setattr(deps, "get_user", fake_get_user)
+    monkeypatch.setattr(r, "find_directory_by_id", lambda wid: work if wid == "w1" else None)
+    monkeypatch.setattr(r, "load_work_metadata_by_id", lambda wid: _meta(work) if wid == "w1" else None)
+    monkeypatch.setattr(r, "can_write_work", lambda meta, user: state["write"])
+    monkeypatch.setattr(r, "check_rate_limit", lambda key, endpoint: (True, 0))
+    c = TestClient(app)
+    c.state = state
+    return c
+
+
+def test_otspunktide_voog(client, work):
+    code = epp.issue_handoff("ed", work_id="w1")["code"]
+    r = client.post("/works/exemplar-proposals/submit",
+                    json={"code": code, "work_id": "w1", "rows": [UPD, NEW], "note": "ESTER"})
+    assert r.status_code == 200 and r.json()["rows"] == 2
+    pid = r.json()["proposal_id"]
+    (p,) = client.get("/works/w1/exemplar-proposals").json()
+    assert [row["review_state"] for row in p["rows"]] == ["pending", "pending"]
+    r = client.post("/works/w1/exemplar-proposals/decide",
+                    json={"items": [{"proposal_id": pid, "index": 0}], "action": "accept"})
+    assert r.status_code == 200 and r.json() == {"accepted": ["a"], "rejected": 0}
+    assert _meta(work)["exemplars"][0]["source"]["kind"] == "ester"
+    # Sama rida uuesti: enam ei ole ootel → 400 not_decidable (409 ainult aegunud/topelt korral)
+    r = client.post("/works/w1/exemplar-proposals/decide",
+                    json={"items": [{"proposal_id": pid, "index": 0}], "action": "accept"})
+    assert r.status_code == 400 and r.json()["detail"].startswith("not_decidable")
+
+    client.state["user"] = {"username": "ed", "role": "admin"}
+    assert client.get("/works/w1/exemplar-proposals").status_code == 403
+    client.state["user"] = {"username": "ed", "role": "superadmin"}
+    client.state["write"] = False
+    assert client.get("/works/w1/exemplar-proposals").status_code == 403
+
+
+def test_submit_vigane_kuju(client, work):
+    code = epp.issue_handoff("ed", work_id="w1")["code"]
+    base = {"code": code, "work_id": "w1", "rows": [NEW]}
+    assert client.post("/works/exemplar-proposals/submit", json={**base, "x": 1}).status_code == 400
+    r = client.post("/works/exemplar-proposals/submit", json={**base, "work_id": "puudub"})
+    assert r.status_code == 400 and r.json()["detail"] == "invalid_or_expired_handoff"
+    assert client.post("/works/exemplar-proposals/submit", content=b"{").status_code == 400
+    r = client.post("/works/exemplar-proposals/submit", json={**base, "rows": [{**NEW, "op": "x"}]})
+    assert r.status_code == 400 and r.json()["detail"].startswith("invalid_row")
+    r = client.post("/works/exemplar-proposals/submit",
+                    json={**base, "rows": [{**UPD, "base": {"convolute": {"reference": "muu"}}}]})
+    assert r.status_code == 409 and r.json()["detail"].startswith("stale_base")
+
+
+def test_submit_suur_keha_413(client, monkeypatch):
+    monkeypatch.setattr(epp, "MAX_BODY_BYTES", 100)
+    r = client.post("/works/exemplar-proposals/submit", json={"code": "x" * 200, "work_id": "w1", "rows": []})
+    assert r.status_code == 413
+
+
+def test_submit_rate_limit(client, monkeypatch):
+    from server.routers import work_exemplars as r
+    seen = []
+    monkeypatch.setattr(r, "check_rate_limit", lambda key, endpoint: (seen.append(endpoint), (False, 7))[1])
+    res = client.post("/works/exemplar-proposals/submit", json={})
+    assert res.status_code == 429 and res.headers["Retry-After"] == "7"
+    assert seen == ["/works/exemplar-proposals-submit"]

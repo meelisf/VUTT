@@ -305,6 +305,8 @@ RATE_LIMITS = {
     # Ühtne agendikood /review-l (ADR 0058, 2026-10-20): võti on kasutajanimi.
     '/agent-handoff': (30, 3600),
     '/works/parts-proposals-submit': (30, 300),
+    # Agendi eksemplari-ettepanekud (#703): submit on autentimata (kood on õigus).
+    '/works/exemplar-proposals-submit': (30, 300),
     # Agendi lehe teksti ettepanekud (#641): source/submit on autentimata (kood on õigus).
     '/works/text-proposals-submit': (30, 300),
     '/works/text-proposals-source': (120, 300),

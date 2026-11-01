@@ -210,9 +210,10 @@ def submit(code: str, work_id: str, work_dir: str, rows: list, note: Optional[st
 # ── Ülevaatus ────────────────────────────────────────────────────────────────
 
 def _holders() -> set:
-    from . import config
+    # Sama lugemisviis mis `work_exemplars._check_holder`: register ja kinnitus ei tohi lahku minna.
+    from .config import ARCHIVES_FILE
     try:
-        with open(config.ARCHIVES_FILE, encoding="utf-8") as f:
+        with open(ARCHIVES_FILE, encoding="utf-8") as f:
             return set(json.load(f) or {})
     except (OSError, ValueError):
         return set()
