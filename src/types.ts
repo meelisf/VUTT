@@ -90,6 +90,35 @@ export interface Exemplar {
   needs_review?: true;
 }
 
+// Konvoluudi plokk „Samas köites" (GET /works/{id}/exemplars → convolutes, ADR 0076 p 6).
+// Server tuletab rühma ja järjestab liikmed (koht, siis aasta); klient ainult kuvab.
+export interface ConvoluteMember {
+  work_id: string;
+  exemplar_id: string;
+  position?: number | null;
+  title?: string;
+  title_en?: string;
+  title_original?: string;
+  title_devised?: boolean;
+  year?: number | null;
+  year_display?: string | null;
+  dating?: WorkDating | null;
+  /** false = piiratud teos: pealkiri nähtav, link mitte (nagu seosed, ADR 0075). */
+  readable: boolean;
+  /** Sama teose sama eksemplar, mille plokk see on. */
+  current: boolean;
+}
+
+export interface ConvoluteBlock {
+  exemplar_id: string;
+  key: string;
+  holder: string;
+  reference: string;
+  total?: number | null;
+  contents?: string | null;
+  members: ConvoluteMember[];
+}
+
 // Seos teiste teostega
 export interface Relation {
   id: string;
@@ -181,6 +210,11 @@ export interface Work {
   series?: Series;
   series_title?: string;
   relations?: Relation[];
+  /** Mitmes konvoluudis teose eksemplarid on (Meili kuvamisväli, #702). Puudub = 0. */
+  convolute_count?: number;
+  /** AINULT klient: muutub eksemplaride salvestusel (MetadataModal), et „Samas köites"
+   *  laadiks uuesti ka siis, kui arv ei muutu (nt sisukord). Serverist ei tule. */
+  exemplars_rev?: number;
 
   // Välised lingid ja arhiiviviited
   ester_id?: string;

@@ -1,6 +1,9 @@
 /** @vitest-environment jsdom */
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mitme järjestikuse päringuga voog: vaikimisi 1 s jääb täiskomplekti koormuse all väheks.
+configure({ asyncUtilTimeout: 3000 });
 import type { Page } from '../../types';
 
 vi.mock('react-i18next', () => ({
@@ -80,7 +83,8 @@ describe('MetadataModal — eksemplarid samas aknas', () => {
     expect(put?.body.shelfmark).toBe('R Est.B-954 (I)');
     // Tuletatud arhiiviviited loetakse serverist ja antakse Workspace'ile edasi
     await waitFor(() => expect(onSaveSuccess).toHaveBeenCalledWith({}, {
-      archive_refs: [{ archive_id: 'TÜR', reference: 'R Est.B-954' }],
+      archive_refs: [{ archive_id: 'TÜR', reference: 'R Est.B-954' }], convolute_count: 0,
+      exemplars_rev: expect.any(Number),  // „Samas köites" laeb selle muutumisel uuesti
     }));
   });
 

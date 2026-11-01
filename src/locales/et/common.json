@@ -370,5 +370,20 @@
     "saveError": "Seost ei salvestatud",
     "searchPlaceholder": "Pealkiri, aasta või work_id",
     "button": "Seotud teosed"
+  },
+  "convolute": {
+    "title": "Samas köites",
+    "main": "põhiteos",
+    "position": "{{n}}. kaasköide",
+    "total_one": "{{count}} trükis",
+    "total_other": "{{count}} trükist",
+    "missing_one": "veel {{count}} trükis VUTT-is puudub",
+    "missing_other": "veel {{count}} trükist VUTT-is puudub",
+    "orderUnknown": "järjekord köites teadmata",
+    "thisWork": "see teos",
+    "contents": "Sisukord",
+    "showContents": "näita kogu teksti",
+    "hideContents": "näita vähem",
+    "unavailable": "Köite andmeid ei õnnestunud laadida."
   }
 }

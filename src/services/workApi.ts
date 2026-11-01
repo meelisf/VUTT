@@ -1,5 +1,5 @@
 import { LinkedEntity } from '../types/LinkedEntity';
-import type { Exemplar } from '../types';
+import type { ConvoluteBlock, Exemplar, ExemplarConvolute } from '../types';
 import { ApiRequestOptions, apiDelete, apiGet, apiPost, apiPut } from './apiClient';
 import { FILE_API_URL } from '../config';
 import type { PageOpRequest } from '../pages/manage/pageOpsPlan';
@@ -323,7 +323,7 @@ export interface WorkExemplarsResponse {
   unknown_pages: string[];
   page_numbers: Record<string, number>;
   page_count: number;
-  convolutes: unknown[];
+  convolutes: ConvoluteBlock[];
 }
 
 export function getWorkExemplars(workId: string, token?: string | null): Promise<WorkExemplarsResponse> {
@@ -339,6 +339,8 @@ export interface ExemplarInput {
   binding?: string;
   provenance?: string;
   notes?: string;
+  /** null = konvoluudi märge eemaldatakse. */
+  convolute?: ExemplarConvolute | null;
   /** true = see on tunnistaja (server võtab märke eelmiselt), false = märge maha. */
   text_witness?: boolean;
   /** Ainult `false` on toimetaja toiming: lipu mahavõtmine. */

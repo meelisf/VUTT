@@ -17,7 +17,7 @@
 import React, { useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
-import type { Exemplar } from '../../types';
+import type { Exemplar, ExemplarConvolute } from '../../types';
 import {
   createWorkExemplar, deleteWorkExemplar, getWorkExemplars, reorderWorkExemplars, updateWorkExemplar,
   type ExemplarInput,
@@ -50,7 +50,10 @@ interface ExemplarsSectionProps {
 
 const TEXT_FIELDS = ['holder', 'shelfmark', 'url', 'condition', 'binding', 'provenance', 'notes'] as const;
 const MORE_FIELDS = ['condition', 'binding', 'provenance', 'notes'] as const;
-type Draft = Record<(typeof TEXT_FIELDS)[number], string>;
+// Konvoluudi väljad (#702, ADR 0076 p 6): koht ja arv on mustandis stringid, et lahtri saaks tühjendada.
+const CONV_FIELDS = ['convReference', 'convPosition', 'convTotal', 'convContents'] as const;
+type Draft = Record<(typeof TEXT_FIELDS)[number] | (typeof CONV_FIELDS)[number], string>;
+const DRAFT_KEYS = [...TEXT_FIELDS, ...CONV_FIELDS] as const;
 
 const toDraft = (x?: Exemplar): Draft => ({
   holder: x?.holder ?? '',
@@ -60,9 +63,44 @@ const toDraft = (x?: Exemplar): Draft => ({
   binding: x?.binding ?? '',
   provenance: x?.provenance ?? '',
   notes: x?.notes ?? '',
+  convReference: x?.convolute?.reference ?? '',
+  convPosition: x?.convolute?.position != null ? String(x.convolute.position) : '',
+  convTotal: x?.convolute?.total != null ? String(x.convolute.total) : '',
+  convContents: x?.convolute?.contents ?? '',
 });
 
-const sameDraft = (a: Draft, b: Draft) => TEXT_FIELDS.every(f => a[f].trim() === b[f].trim());
+const sameDraft = (a: Draft, b: Draft) => DRAFT_KEYS.every(f => a[f].trim() === b[f].trim());
+
+/** Tühi → undefined, täisarv → number, muu → NaN (vormi viga). */
+const parseCount = (raw: string): number | undefined => {
+  const v = raw.trim();
+  if (!v) return undefined;
+  return /^\d+$/.test(v) ? Number(v) : NaN;
+};
+
+/**
+ * Mustandi konvoluut PUT-i kujule. Kõik väljad tühjad = märge maha (`null`);
+ * kohaviiteta, aga muu väljaga mustand on vormi viga (`noReference`).
+ * Koha ja arvu kooskõla (koht < arv) kontrollib server — klient ainult parsib.
+ */
+function convoluteFromDraft(d: Draft): ExemplarConvolute | null | 'invalid' | 'noReference' {
+  const reference = d.convReference.trim();
+  if (!reference) {
+    // Märke eemaldamine on tahtlik ainult siis, kui kõik konvoluudiväljad on tühjad —
+    // muidu kaoks unustatud kohaviida tõttu sisestatud sisukord vaikselt.
+    const rest = [d.convPosition, d.convTotal, d.convContents].some(v => v.trim());
+    return rest ? 'noReference' : null;
+  }
+  const position = parseCount(d.convPosition);
+  const total = parseCount(d.convTotal);
+  if (Number.isNaN(position) || Number.isNaN(total)) return 'invalid';
+  const out: ExemplarConvolute = { reference };
+  if (position !== undefined) out.position = position;
+  if (total !== undefined) out.total = total;
+  const contents = d.convContents.trim();
+  if (contents) out.contents = contents;
+  return out;
+}
 
 interface Editing { id: string | null; draft: Draft; original: Draft }  // id null = uus kirje
 
@@ -81,6 +119,7 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
   const [loadFailed, setLoadFailed] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [convOpen, setConvOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const dirty = editing !== null && !sameDraft(editing.draft, editing.original);
@@ -125,8 +164,18 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
       notify(t('exemplars.holderRequired'), 'warning');
       return false;
     }
+    const convolute = convoluteFromDraft(d);
+    if (convolute === 'invalid') {
+      notify(t('exemplars.convolute.countInvalid'), 'warning');
+      return false;
+    }
+    if (convolute === 'noReference') {
+      setConvOpen(true);
+      notify(t('exemplars.convolute.referenceRequired'), 'warning');
+      return false;
+    }
     // Kõik väljad kaasa: tühi string eemaldab serveris välja (väärtuseta = võtme puudumine).
-    const body: ExemplarInput = Object.fromEntries(TEXT_FIELDS.map(f => [f, d[f].trim()]));
+    const body: ExemplarInput = { ...Object.fromEntries(TEXT_FIELDS.map(f => [f, d[f].trim()])), convolute };
     const ok = await write(() => editing.id === null
       ? createWorkExemplar(workId, body, authToken)
       : updateWorkExemplar(workId, editing.id, body, authToken));
@@ -140,6 +189,7 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
     const d = toDraft(x);
     setEditing({ id: x?.id ?? null, draft: d, original: d });
     setMoreOpen(MORE_FIELDS.some(f => d[f]));
+    setConvOpen(!!d.convReference);
   };
 
   const setField = (f: keyof Draft, v: string) =>
@@ -219,6 +269,38 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
               onChange={e => setField('url', e.target.value)} placeholder="https://..." />
           </div>
         </div>
+        <button type="button" onClick={() => setConvOpen(v => !v)}
+          className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-1">
+          <ChevronDown size={12} className={convOpen ? 'rotate-180' : ''} />
+          {t('exemplars.convolute.toggle')}
+        </button>
+        {convOpen && (
+          <div className="space-y-2 border-l-2 border-gray-200 pl-2" data-testid="convolute-fields">
+            <p className="text-[11px] text-gray-500">{t('exemplars.convolute.hint')}</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-3 sm:col-span-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="convolute-reference">{t('exemplars.convolute.reference')}</label>
+                <input id="convolute-reference" className={inputClass} value={d.convReference}
+                  onChange={e => setField('convReference', e.target.value)} placeholder="R Est.B-954" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="convolute-position">{t('exemplars.convolute.position')}</label>
+                <input id="convolute-position" type="text" inputMode="numeric" className={inputClass} value={d.convPosition}
+                  onChange={e => setField('convPosition', e.target.value)} placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="convolute-total">{t('exemplars.convolute.total')}</label>
+                <input id="convolute-total" type="text" inputMode="numeric" className={inputClass} value={d.convTotal}
+                  onChange={e => setField('convTotal', e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="convolute-contents">{t('exemplars.convolute.contents')}</label>
+              <textarea id="convolute-contents" rows={2} className={`${inputClass} resize-y`} value={d.convContents}
+                onChange={e => setField('convContents', e.target.value)} />
+            </div>
+          </div>
+        )}
         <button type="button" onClick={() => setMoreOpen(v => !v)}
           className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-1">
           <ChevronDown size={12} className={moreOpen ? 'rotate-180' : ''} />
@@ -282,6 +364,18 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
                       className="text-xs text-primary-700 hover:underline inline-flex items-center gap-1 break-all">
                       <ExternalLink size={11} />{x.url}
                     </a>
+                  )}
+                  {x.convolute && (
+                    <p className="text-xs text-gray-600" data-testid="convolute-summary">
+                      <span className="text-gray-400">{t('exemplars.convolute.label')}:</span>{' '}
+                      {[
+                        x.convolute.reference,
+                        x.convolute.position != null && (x.convolute.position === 0
+                          ? t('common:convolute.main')
+                          : t('common:convolute.position', { n: x.convolute.position })),
+                        x.convolute.total != null && t('common:convolute.total', { count: x.convolute.total }),
+                      ].filter(Boolean).join(' · ')}
+                    </p>
                   )}
                   {MORE_FIELDS.filter(f => x[f]).map(f => (
                     <p key={f} className="text-xs text-gray-600">

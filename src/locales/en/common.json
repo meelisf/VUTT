@@ -370,5 +370,20 @@
     "saveError": "The link was not saved",
     "searchPlaceholder": "Title, year or work_id",
     "button": "Related works"
+  },
+  "convolute": {
+    "title": "Bound together",
+    "main": "main work",
+    "position": "bound-with no. {{n}}",
+    "total_one": "{{count}} printed item",
+    "total_other": "{{count}} printed items",
+    "missing_one": "{{count}} more item not in VUTT",
+    "missing_other": "{{count}} more items not in VUTT",
+    "orderUnknown": "order within the volume unknown",
+    "thisWork": "this work",
+    "contents": "Contents",
+    "showContents": "show full text",
+    "hideContents": "show less",
+    "unavailable": "Could not load the volume details."
   }
 }

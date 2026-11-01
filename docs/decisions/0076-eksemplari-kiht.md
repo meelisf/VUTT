@@ -192,6 +192,13 @@ Tekstitunnistajal oleks `"text_witness": true` ja `pages`-i võtit ei oleks (p 3
   kettalt, piiratud kaaslane `readable: false`, vastus ei lähe `server/cache.py`-sse.
   Meilisse uut filtreeritavat välja ei tule. Ligipääsufilter peidaks piiratud kaaslase
   täielikult, #701 kuvab ta aga pealkirjaga.
+- **Täiendus 2026-11-01 (#702):** Meili teosedokument kannab **kuvamisvälja**
+  `convolute_count` (`len(convolute_keys(meta))`, väärtuseta = puudub). Väli ei ole
+  filtreeritav ega otsitav. Teosekaart ja infopaneel otsustavad selle järgi, kas
+  küsida `GET /works/{id}/exemplars`. Ilma selleta peaks iga kaart tegema päringu.
+  Liikmeid ega võtmeid Meilisse ei kirjutata: kaaslased tulevad endiselt indeksist.
+  `/get-work-metadata` annab sama arvu, et `MetadataModal` saaks Workspace'i teose
+  pärast eksemplari salvestust värskendada.
 
 ### 7. Agendi ettepanek
 

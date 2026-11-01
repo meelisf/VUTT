@@ -90,6 +90,7 @@ const WorkListRow: React.FC<WorkListRowProps> = ({ work, selectMode = false, isS
             <RelationsButton
               workId={work.work_id}
               relations={work.relations}
+              convoluteCount={work.convolute_count}
               variant="row"
               lang={lang}
               open={relationsOpen}

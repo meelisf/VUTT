@@ -30,7 +30,7 @@ from .utils import (
     get_labels_by_lang, sanitize_id, parse_year_range, normalize_genre,
 )
 from .marginalia_normalize import normalize_marginalia_tags
-from .work_exemplars import derive_archive_refs
+from .work_exemplars import convolute_keys, derive_archive_refs
 from .vutt_tags import page_mark_entries, remove_page_marks
 
 # Pealkirja lisaväljad (ADR 0064) — tõlge(d) ja transkribeeritud originaal.
@@ -577,6 +577,8 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         doc['series_title'] = normalize_eszett(work_ctx.get('series_title', ''))
     if work_ctx.get('relations'):
         doc['relations'] = work_ctx['relations']
+    if work_ctx.get('convolute_count'):
+        doc['convolute_count'] = work_ctx['convolute_count']
 
     if work_ctx['archive_refs']:
         doc['archive_refs'] = work_ctx['archive_refs']
@@ -662,6 +664,7 @@ def get_work_metadata(doc_path, dir_name, collections):
         'ester_id': None,
         'external_url': None,
         'archive_refs': [],
+        'convolute_count': 0,
         'shareable': False,
         'parts': [],
     }
@@ -715,6 +718,9 @@ def get_work_metadata(doc_path, dir_name, collections):
     result['ester_id'] = meta.get('ester_id')
     result['external_url'] = meta.get('external_url')
     result['archive_refs'] = derive_archive_refs(meta)
+    # Mitmes konvoluudis teose eksemplarid on (ADR 0076 p 6) — ainult kuvamiseks:
+    # kaart näitab selle järgi „Samas köites" nuppu. Filtreeritav EI ole.
+    result['convolute_count'] = len(convolute_keys(meta))
     result['shareable'] = meta.get('shareable', False)
     result['parts'] = meta.get('parts') or []
 
@@ -801,6 +807,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         'series_title': doc_metadata.get('series_title', '') if series else '',
         'relations': doc_metadata.get('relations'),
         'archive_refs': doc_metadata.get('archive_refs') or [],  # juba tuletatud (get_work_metadata)
+        'convolute_count': doc_metadata.get('convolute_count') or 0,
         '_archives': archives,
     }
 
