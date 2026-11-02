@@ -13,6 +13,10 @@ salvestus saab 409.
 
 ## 0. Eelkontroll (lokaalselt)
 
+- [ ] **Ülevaatus tehtud:** [`decisions/0077-ulevaatus.md`](decisions/0077-ulevaatus.md). Otsustamata
+      teosed (jaotis 1), signaalita fraktuurteosed (2) ja segateoste lehed (3) on kantud faili
+      `0077-otsused.json`. Värava lipud (4) ei blokeeri migratsiooni, aga Valmis-lehed jäävad
+      treeningust välja, kuni need on VUTT-is parandatud.
 - [ ] PR #724 CI roheline.
 - [ ] Keegi ei toimeta. Viimased commitid: `ssh vutt 'cd ~/VUTT/data && git log -5 --format="%ci %an %s"'`.
 
@@ -46,11 +50,12 @@ Oodatav (kuivkäivitus koopial 2026-11-02; päevased parandused võivad numbreid
 
 | Rida | Väärtus |
 |---|---|
-| Antiikvateosed | 194 teost, 491 lehte |
-| Fraktuurteosed | 89 teost, 3544 lehte |
-| Segateosed | 2 teost, 8 lehte; signaalita `<cs>`-lehti **0** |
 | Otsustamata | **0** teost |
+| Segateosed | signaalita lehti **0** (või teadlikult puutumata jäetud) |
 | Käsikirjad `<cs>`-iga | 3 teost |
+
+Teiste ridade numbrid sõltuvad ülevaatuse otsustest. Võrdle sama käsuga lokaalselt tehtud
+kuivkäivitusega.
 
 **Peatu, kui „Otsustamata“ > 0 või „signaalita `<cs>`-lehti“ > 0.** Mõni teos sai
 päeval uue `<cs>`-i. Aruanne on `/tmp/cs_to_f_aruanne.json`
@@ -114,5 +119,9 @@ hilisemad muudatused).
 ## Pärast
 
 - [ ] ADR 0077 staatusest eemalda „migratsioon käivitamata“, docs/decisions/README rida samuti.
-- [ ] LOSS: eksport `<f>`-ga + kanoniseerimine + poolitusvärav, treening. Seejärel
-      mõlemad juhised `<f>`-ile ja `config.OCR_OUTPUT_RELATIVE_CS = False` (ADR 0077 p 7).
+- [ ] LOSS (meelisf/qwen-mudeli-treenimine#1): merge → LOSSis `git pull` → värske varukoopia
+      (`~/bin/vutt_backup.py`) PÄRAST migratsiooni → `build_vutt_dataset.py` → vaata
+      `data/vutt/f_poolitus_lipud.csv` → treening (~5 h) → `eval_print.py` (`f_f1`, `cer_plain`).
+      OCR-teenus kasutab kuni vahetuseni vana `INSTRUCTION_CS`-i, nii et taaskäivitus on ohutu.
+- [ ] Mudeli vahetus alles pärast hindamist ja koos: LOSSi teenus `"print": INSTRUCTION`,
+      VUTT `config.OCR_OUTPUT_RELATIVE_CS = False` + Gemini trükijuhis `<f>`-ile (ADR 0077 p 7).
