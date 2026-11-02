@@ -1,7 +1,7 @@
 # ADR 0077 — Fraktuur on absoluutne märgend `<f>`, mitte suhteline `<cs>`
 
 **Kuupäev:** 2026-11-02
-**Staatus:** kehtib (vastu võetud 2026-11-02; kood teostatud, korpuse migratsioon käivitamata — vt „Teostus“)
+**Staatus:** kehtib (vastu võetud 2026-11-02; kood teostatud, korpus migreeritud 2026-11-02: 540 teost + 3 käsikirja, 5747 lehte, valvur `<cs>`-iga lehti 0; enne-seis data-repos tag `pre-0077-f`)
 **Seotud:** ADR 0071 (märgendus = TEI alamhulk; asendab selle `cs`-erandi), ADR 0003/0009
 (`<m>` välimine), ADR 0062 (migratsioon ühe teisendusfunktsiooniga), #649 (heebrea)
 
