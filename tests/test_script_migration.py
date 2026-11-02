@@ -139,3 +139,8 @@ def test_terve_leht_cs_is_pohikiri_sisu_vastand():
     new, info = to_absolute("<cs>vnd die Welt ist nicht mit dem Herrn</cs>", "Toores")
     assert info["base"] == "A" and info["reason"] == "<cs>-i sisu keel"
     assert new == "<f>vnd die Welt ist nicht mit dem Herrn</f>"
+
+
+def test_toimetaja_marge_nurksulgudes_ei_lahe_f_i():
+    assert cs_to_f("[tühi lehekülg]", "F") == "[tühi lehekülg]"
+    assert cs_to_f("vnd Ge⸗ [loetamatu] witter", "F") == "<f>vnd Ge⸗</f> [loetamatu] <f>witter</f>"

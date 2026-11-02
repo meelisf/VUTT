@@ -34,7 +34,22 @@ def _is_latin(ch: str) -> bool:
     return ch.isalpha() and unicodedata.name(ch, "").startswith("LATIN")
 
 
+_EDITORIAL_RE = re.compile(r"\[[^\]\n]*\]")
+
+
 def _wrap_runs(segment: str) -> str:
+    """Toimetaja märge nurksulgudes (`[tühi lehekülg]`, `[vasakpoolne lk]`) ei ole trükitekst
+    ega lähe `<f>`-i — tühja lehe märgend peab jääma baidi-täpseks."""
+    out, pos = [], 0
+    for m in _EDITORIAL_RE.finditer(segment):
+        out.append(_wrap_runs_plain(segment[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(_wrap_runs_plain(segment[pos:]))
+    return "".join(out)
+
+
+def _wrap_runs_plain(segment: str) -> str:
     """Mähib segmendi fraktuurijooksud `<f>`-i: jooks on maksimaalne jupp ilma
     mitteladina täheta (kreeka/heebrea katkestab), servatühik väljas, vähemalt üks
     ladina täht. Numbrid ja kirjavahemärgid jooksu sees JA servas jäävad sisse
