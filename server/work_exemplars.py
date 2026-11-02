@@ -23,7 +23,8 @@ from .utils import generate_nanoid
 
 logger = get_logger(__name__)
 
-SOURCE_KINDS = frozenset({"ester", "ada", "upload", "migration", "manual"})
+# `jaanson`: Jaansoni bibliograafia (2000) leidumus, `ref` = kirje number ("Jaanson 946").
+SOURCE_KINDS = frozenset({"ester", "ada", "upload", "migration", "manual", "jaanson"})
 # Vabatekstiväljad, mida vorm ja ettepanek muudavad (holder eraldi: kohustuslik).
 TEXT_FIELDS = ("shelfmark", "url", "condition", "binding", "provenance", "notes")
 EDITABLE_FIELDS = ("holder", *TEXT_FIELDS, "convolute")
