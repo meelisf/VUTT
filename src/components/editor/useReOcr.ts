@@ -4,6 +4,7 @@ import { ApiError, apiDelete, apiGet, apiPost } from '../../services/apiClient';
 import { FILE_API_URL } from '../../config';
 import { Page } from '../../types';
 import { reocrPageIdentity } from './reocrPageIdentity';
+import { recomputeScriptMode } from './scriptMode';
 import { useJobPoll } from '../../hooks/useJobPoll';
 
 export type ReocrStatus = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
@@ -207,6 +208,7 @@ export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty, provid
       if (view) {
         view.dispatch({
           changes: { from: 0, to: view.state.doc.length, insert: reocrText },
+          effects: recomputeScriptMode.of(null), // tervikasendus (ADR 0077, 2a)
         });
         setIsDirty(true);
       }

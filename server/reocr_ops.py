@@ -14,6 +14,7 @@ from .config import (
     REOCR_LOG_FILE, UPLOAD_ENABLED, gemini_enabled, get_logger,
 )
 from .macron import convert_ocr_text, work_languages
+from .script_transition import ocr_to_absolute
 from .ocr_prompts import instruction_for
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
@@ -83,9 +84,11 @@ def _backup_dir(job_id: str) -> str:
 
 
 def _ocr_postprocess(slug: str, text: str) -> str:
-    """Lühendi tilde → makron teose keelte järgi (ADR 0062). Idempotentne —
-    üksiktöö kutsub seda enne kliendile andmist JA `_write_ocr_file` uuesti."""
-    return convert_ocr_text(text, work_languages(os.path.join(BASE_DIR, slug)), slug)
+    """Lühendi tilde → makron teose keelte järgi (ADR 0062) ja üleminekuajal
+    suhteline <cs> → <f> (ADR 0077). Idempotentne — üksiktöö kutsub seda enne
+    kliendile andmist JA `_write_ocr_file` uuesti."""
+    text = convert_ocr_text(text, work_languages(os.path.join(BASE_DIR, slug)), slug)
+    return ocr_to_absolute(slug, text)
 
 
 def _write_ocr_file(slug: str, page_filename: str, text: str, job_id: str) -> str:

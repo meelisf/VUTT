@@ -117,3 +117,17 @@ describe('pageMarkEdit — lõppülevaatuse leiud', () => {
     expect(pageMarkEdit(doc, 5, 5, 'sig', hidden)).toEqual({ ok: false, reason: 'marginalia' });
   });
 });
+
+describe('tähistus on stiilitägi ümber, mitte sees (ADR 0077, punkt 3)', () => {
+  it('kursoriga: <catch><f>…</f></catch>', () => {
+    expect(run('<f>Vor⸗‸</f>', 'catch').doc).toBe('<catch><f>Vor⸗</f></catch>');
+  });
+
+  it('valikuga kogu <f>-sisu: sama tulemus kui kursoriga', () => {
+    expect(run('<f>⟦Vor⸗⟧</f>', 'catch').doc).toBe('<catch><f>Vor⸗</f></catch>');
+  });
+
+  it('valik osa <f>-sisust: <f> poolitatakse, tähistus jääb välimiseks', () => {
+    expect(run('<f>und ⟦A iij⟧</f>', 'sig').doc).toBe('<f>und </f><sig><f>A iij</f></sig>');
+  });
+});

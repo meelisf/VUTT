@@ -12,6 +12,7 @@ import time
 
 from ..config import BASE_DIR, OCR_SERVER_PATH, get_logger
 from ..macron import convert_ocr_text
+from ..script_transition import ocr_to_absolute
 from ..marginalia_normalize import normalize_marginalia_tags
 from ..metadata_ops import normalize_title_fields
 from ..utils import generate_nanoid, derive_year_fields
@@ -22,15 +23,18 @@ from . import page_status
 logger = get_logger(__name__)
 
 
-def normalize_txt_file(path: str, languages=None):
+def normalize_txt_file(path: str, languages=None, manuscript=None):
     """Normaliseerib alla laetud OCR .txt marginaalia-tägid kanoonilisele kujule.
     OCR-mudel toodab ristuvaid <i><m>...</i></m> — vt server/marginalia_normalize.py.
-    Lühendi tilde → makron teose keelte järgi (ADR 0062); `None` = keel teadmata."""
+    Lühendi tilde → makron teose keelte järgi (ADR 0062); `None` = keel teadmata.
+    Üleminekuajal suhteline <cs> → <f> (ADR 0077); käsikirja tekst jääb puutumata."""
     try:
         with open(path, 'r', encoding='utf-8') as f:
             raw = f.read()
         fixed = convert_ocr_text(normalize_marginalia_tags(raw), languages,
                                  os.path.basename(path))
+        fixed = ocr_to_absolute(os.path.basename(os.path.dirname(path)), fixed,
+                                manuscript=manuscript)
         if fixed != raw:
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(fixed)
@@ -288,6 +292,7 @@ def _teosta_import(
     slug = meta['slug']
     work_collections = meta.get('collections') or []
     languages = meta.get('languages') or []
+    manuscript = (meta.get('type') or {}).get('id') == 'Q87167'  # ADR 0077: käekiri ilma kirjamärgenduseta
     # Samm 1 aastalahter on vabatekst ("1634-1653", "ca. 1650", "17. saj") —
     # `int()` kukuks ja aasta läheks vaikselt kaotsi (teos sai aastaks 0).
     year, derived_year_display = derive_year_fields(
@@ -366,7 +371,7 @@ def _teosta_import(
             else:
                 try:
                     sftp.get(f"{remote_work}/{txt_name}", local_txt)
-                    normalize_txt_file_func(local_txt, languages)
+                    normalize_txt_file_func(local_txt, languages, manuscript)
                 except FileNotFoundError:
                     raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); import katkestati")
             os.chmod(local_txt, 0o644)

@@ -13,7 +13,7 @@ export type PageMarkEditResult =
   | { ok: true; changes: { from: number; to: number; insert: string }[]; cursor?: number }
   | { ok: false; reason: PageMarkRefusal };
 
-// Vormindustägid, mida tohib poolitada: inline, nummerdamata, mitte tähistus (i b cs hi add).
+// Vormindustägid, mida tohib poolitada: inline, nummerdamata, mitte tähistus (i b f hi add).
 const FORMAT_TAGS = new Set(
   VUTT_TAG_REGISTRY.filter(t => t.marginaliaInline && !t.numbered && !t.pageMark).map(t => t.name),
 );
@@ -114,6 +114,21 @@ export function pageMarkEdit(
   }
   if (from >= to) return { ok: false, reason: 'tagBoundary' };
 
+  // 4b. `<f>`, mis vahemikku ümbritseb, jääb tähistuse SISSE (ADR 0077 p 3:
+  // `<catch><f>Vor⸗</f></catch>`, mitte `<f><catch>…</catch></f>`). Ainult `f`:
+  // `<i>`/`<b>` sees jääb tähistus ADR 0070 järgi stiili sisse.
+  // Pool, kus stiilipaari sisust midagi üle ei jää, laieneb paari tokenini;
+  // kui jääb mõlemale poole, poolitab samm 5 paari mõlemas servas.
+  const blank = (s: string) => s.replace(/<[^>]*>/g, '').trim() === '';
+  for (let grown = true; grown;) {
+    grown = false;
+    for (const p of pairsOf(toks)) {
+      if (p.name !== 'f' || !(p.openTo <= from && to <= p.closeFrom)) continue;
+      if (from !== p.openFrom && blank(doc.slice(p.openTo, from))) { from = p.openFrom; grown = true; }
+      if (to !== p.closeTo && blank(doc.slice(to, p.closeFrom))) { to = p.closeTo; grown = true; }
+    }
+  }
+
   // Keeldumised lõpliku vahemiku kohta.
   if (toks.some(t => (t.from < from && from < t.to) || (t.from < to && to < t.to))) return { ok: false, reason: 'tagBoundary' };
   const inside = toks.filter(t => t.from >= from && t.to <= to);
@@ -127,6 +142,11 @@ export function pageMarkEdit(
   for (const p of pairsOf(toks)) {
     const atFrom = p.openTo <= from && from < p.closeFrom && p.closeTo <= to;
     const atTo = from <= p.openFrom && p.openTo <= to && to < p.closeFrom;
+    if (p.name === 'f' && p.openTo <= from && to <= p.closeFrom) {
+      crossFrom.push(p); // ümbritsev <f> (4b): poolitub mõlemas servas
+      crossTo.push(p);
+      continue;
+    }
     if (!atFrom && !atTo) continue;
     if (!FORMAT_TAGS.has(p.name)) return { ok: false, reason: 'tagBoundary' };
     (atFrom ? crossFrom : crossTo).push(p);

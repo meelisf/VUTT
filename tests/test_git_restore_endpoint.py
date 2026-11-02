@@ -116,3 +116,22 @@ def test_git_history_naitab_ka_json_muutust(client, login, repo):
     assert v1["full_hash"] == repo["v1"] and v1["is_original"] is True
     assert v2["changes"]["text"] is True
     assert v2["changes"]["text_annotations"]["added"] == [{"id": 1, "text": "toimetaja märkus"}]
+
+
+def test_migratsioonieelne_cs_versioon_taastub_f_ina(client, login, repo, monkeypatch):
+    """ADR 0077 p 7: vana <cs> ei tule ajaloo kaudu korpusesse tagasi."""
+    import server.script_transition as st
+    monkeypatch.setattr(st, "BASE_DIR", os.path.dirname(str(repo["txt"].parent)))
+    r_ = repo["repo"]
+    repo["txt"].write_text("Thesis <cs>Gott</cs> prima ex-\nemplum", encoding="utf-8")
+    r_.index.add([os.path.relpath(str(repo["txt"]), r_.working_tree_dir)])
+    r_.index.commit("v3 (vana märgendus)")
+    vana = r_.head.commit.hexsha
+    repo["txt"].write_text("Thesis <f>Gott</f> prima ex-\nemplum", encoding="utf-8")
+    r_.index.add([os.path.relpath(str(repo["txt"]), r_.working_tree_dir)])
+    r_.index.commit("v4 (migratsioon)")
+
+    r = _restore(client, login("editor", "editorpass"), vana)
+    assert r.status_code == 200, r.text
+    assert r.json()["restored_content"] == "Thesis <f>Gott</f> prima ex-\nemplum"
+    assert "<cs>" not in repo["txt"].read_text(encoding="utf-8")

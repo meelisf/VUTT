@@ -18,6 +18,10 @@ Automaatset valvurit LOSSi vastu ei ole — LOSS ei ole VUTT-i jaoks runtime'is 
 """
 import re
 
+# ADR 0077: juhis kannab üleminekuajal VEEL suhtelist <cs>-i (sama mis LOSSi vana mudel);
+# väljund teisendatakse importimisel <f>-iks (script_transition.ocr_to_absolute).
+# Mudeli vahetusel → absoluutne <f> („mark every Fraktur passage with <f>…</f>,
+# unmarked = Antiqua") JA config.OCR_OUTPUT_RELATIVE_CS = False.
 GEMINI_PRINT_INSTRUCTION = """You are an expert OCR assistant for historical documents. Transcribe the page using VUTT XML markup.
 
 Instructions:

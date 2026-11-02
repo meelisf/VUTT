@@ -46,6 +46,7 @@ from ..save_diff import page_content_unchanged
 from ..utils import find_directory_by_id
 from ..work_sets_ops import load_work_set
 from ..work_sets_access import can_view_set, search_visible_work_ids
+from ..script_transition import incoming_to_absolute, restored_to_absolute, stale_premigration_base
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -253,6 +254,16 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename: raise HTTPException(status_code=400, detail="Vigased teed")
     check_page_filename(filename)
+    # ADR 0077: vahelehe avas enne <cs> → <f> migratsiooni — kolmesuunaline
+    # liitmine tooks muudetud read vanas märgenduses tagasi. Laadi uuesti.
+    base = data.get('base')
+    if isinstance(base, dict) and await run_in_threadpool(
+            stale_premigration_base, catalog, filename, base.get('text_content') or ''):
+        raise HTTPException(status_code=409, detail=(
+            "Leht on vahepeal teisendatud (fraktuur <f>, ADR 0077) — laadi leht uuesti. "
+            "The page was converted in the meantime — please reload."))
+    # Vana JS-kimp (Ctrl+K enne uuendust) saadab veel <cs>-i.
+    text = await run_in_threadpool(incoming_to_absolute, catalog, text)
 
     # Puuduv/vigane meta ei tohi muuta piiratud teose kontrolli fail-open'iks.
     await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
@@ -727,6 +738,8 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
         get_file_at_commit, os.path.join(catalog, filename), data.get('commit_hash')
     )
     if content is None: raise HTTPException(status_code=400, detail="Ei leitud")
+    # ADR 0077: migratsioonieelne versioon (<cs> või märgendamata fraktuur) → <f>.
+    content = await run_in_threadpool(restored_to_absolute, catalog, content, data.get('commit_hash'))
 
     json_filename = os.path.splitext(filename)[0] + ".json"
     json_path = os.path.join(BASE_DIR, catalog, json_filename)

@@ -12,6 +12,7 @@ import { vuttTheme } from './VuttTheme';
 import { createVuttSearchPanel } from './VuttSearchPanel';
 import { isPageSwapUpdate } from './editorAnnotations';
 import { applyMacron } from './combiningMarkCommand';
+import { scriptModeExtension, scriptModeField, toggleScriptMode, type PageScript } from './scriptMode';
 
 interface UseCodeMirrorLifecycleParams {
   page: Page;
@@ -48,6 +49,10 @@ export function useCodeMirrorLifecycle({
   // Eraldi (kõrgem) lävend kui narrowPane (640) — sildid kaovad enne badge-režiimi.
   const [compactToolbar, setCompactToolbar] = useState(false);
   const [marginaliaCount, setMarginaliaCount] = useState(0);
+  // Lehe kirjastiili kuvarežiim (ADR 0077, 2a) — tööriistariba nupp ja alumise riba silt.
+  const [scriptMode, setScriptMode] = useState<PageScript & { manual: boolean }>(
+    { mode: 'antiqua', hasF: false, manual: false },
+  );
   const marginaliaMode: MarginaliaMode = narrowPane ? 'badge' : marginaliaUserMode;
 
   // Globaalne Ctrl+F käsitleja — avab CM6 otsingu capture-faasis enne brauserit.
@@ -83,7 +88,7 @@ export function useCodeMirrorLifecycle({
             { key: 'Mod-s', run: () => { handleSaveRef.current(); return true; } },
             { key: 'Mod-b', run: () => { wrapWithTagRef.current('b'); return true; } },
             { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
-            { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
+            { key: 'Mod-k', run: () => { wrapWithTagRef.current('f'); return true; } },
             { key: 'Alt-m', run: applyMacron },
             // Lisandus (ADR 0067). Alt-täht ei sobi: Macis annab iga Alt-täht märgi (Alt-a = å).
             { key: 'Mod-Shift-l', run: () => { wrapWithTagRef.current('add'); return true; } },
@@ -95,6 +100,7 @@ export function useCodeMirrorLifecycle({
           ),
           search({ top: false, createPanel: createVuttSearchPanel }),
           vuttMarkupExtension,
+          scriptModeExtension(),
           proposalDiffExtension(),
           marginaliaCompartmentRef.current.of(
             marginaliaExtension(localStorage.getItem('vutt_marginalia_view') === 'badge' ? 'badge' : 'column')
@@ -107,6 +113,8 @@ export function useCodeMirrorLifecycle({
             if (update.docChanged && !isPageSwapUpdate(update.transactions)) setIsDirty(true);
             const count = update.state.field(marginaliaField).blocks.length;
             setMarginaliaCount(prev => (prev === count ? prev : count));
+            const sm = update.state.field(scriptModeField);
+            setScriptMode(prev => (prev.mode === sm.mode && prev.hasF === sm.hasF && prev.manual === sm.manual ? prev : sm));
           }),
           copyPastePlainMarkup,
         ],
@@ -116,6 +124,7 @@ export function useCodeMirrorLifecycle({
 
     viewRef.current = view;
     setMarginaliaCount(view.state.field(marginaliaField).blocks.length);
+    setScriptMode(view.state.field(scriptModeField));
 
     return () => {
       view.destroy();
@@ -170,7 +179,13 @@ export function useCodeMirrorLifecycle({
     });
   }, []);
 
+  const flipScriptMode = useCallback(() => {
+    viewRef.current?.dispatch({ effects: toggleScriptMode.of(null) });
+  }, [viewRef]);
+
   return {
+    scriptMode,
+    flipScriptMode,
     marginaliaUserMode,
     narrowPane,
     compactToolbar,

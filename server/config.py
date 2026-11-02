@@ -447,3 +447,10 @@ def check_render_concurrency():
                 "(ADR 0028), muidu renderdab masin korraga {} 300 DPI PDF-i."
             ).format(nimi, workereid, workereid)
     return None
+
+
+# ADR 0077 üleminek: OCR-väljund (LOSSi trükimudel, Gemini trükijuhis) kannab veel
+# suhtelist <cs>-i ja teisendatakse importimisel <f>-iks (script_transition).
+# Pane False SAMAL ajal, kui uus <f>-ga treenitud mudel ja mõlemad juhised
+# (LOSS prompt.py, ocr_prompts.GEMINI_PRINT_INSTRUCTION) tootmisse lähevad.
+OCR_OUTPUT_RELATIVE_CS = True

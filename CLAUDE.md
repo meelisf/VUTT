@@ -248,7 +248,7 @@ kaardiks ainult renderduses (`groupMarginaliaBlocks`). Normaliseerimine toimub *
 salvestamisel** (`normalize_marginalia_tags` — `<m>` väliseks + `strip_empty_tags`), MITTE elavalt
 iga klahvivajutuse peal. Kopeeritud marginaalia-sisu on alati **plain**; vormingu määrab sihtkoht.
 
-**CodeMirror `VuttMarkupExtension`** — paaristägid (`<i> <b> <cs> <m> <hi> <ann>`) on
+**CodeMirror `VuttMarkupExtension`** — paaristägid (`<i> <b> <f> <m> <hi> <ann>`) on
 **mark-dekoratsioon + `atomicRanges`**, MITTE `Decoration.replace` (replace murdis plain-kursori
 nooleliikumise, kuigi Shift+Nool töötas). Replace/widget on ainult `<pb/>` ja `<fn>…</fn>` jaoks.
 `RangeSetBuilder.add()` nõuab `from ASC`, sama `from` korral `to ASC` (**mitte DESC**).
@@ -374,6 +374,15 @@ Eksemplari ettepanek (#703): ainus ettepanekuliik, mille tõend tohib olla väli
 kirje number (`ester`, server kontrollib kuju, klient koostab lingi). Rea olek (`stale`,
 `blocked_holder`, `duplicate`) arvutatakse lugemisel; kinnitus AINULT
 `work_exemplars.apply_proposal_ops` kaudu (üks commit); otsustatud read säilivad aegumisel.
+
+**Fraktuur `<f>` (ADR 0077)** — absoluutne: fraktuur on ALATI `<f>`-is, märgendamata ladina tähestik
+on antiikva (`<cs>` on kadunud). `<f>` ja `<i>` välistavad teineteist; `<f>` on struktuuritägide SEES
+ega ületa reapiiri (salvestamisel poolitatakse rea kaupa). Kuvamine on lehe kaupa SUHTELINE
+(`scriptMode.ts`): hall = lehe vähemuskiri, enamus arvutatakse tervikasendusel/salvestamisel, mitte
+iga klahvivajutusega. Vana `<cs>` ei tohi tagasi tulla: KÕIK teed läbivad `cs_to_f`-i
+(`script_transition.py` — re-OCR/import kuni `OCR_OUTPUT_RELATIVE_CS = False`, `/git-restore`,
+`/save` sisend) ja teisendatuse tunnus on manifest `data/config/migrations/0077-f.json`, MITTE `<f>`-i
+olemasolu. `/save` vastab 409, kui kliendi `base` on migratsioonieelne.
 
 **Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
 `MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on

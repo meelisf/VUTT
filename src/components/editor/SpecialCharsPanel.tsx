@@ -5,6 +5,7 @@ import SafeHtml from '../SafeHtml';
 import CharSetEditor from './CharSetEditor';
 import type { SpecialCharacter } from './useSpecialChars';
 import type { CombiningMark } from '../../utils/combiningMarks';
+import type { PageScript } from './scriptMode';
 
 // Kombineerivate märkide rühm paneeli ees, kasutaja märgikomplektist sõltumatu.
 // Märk läheb kursori ees olevale tähele (makron ADR 0062; makronil ka Alt-M).
@@ -19,6 +20,9 @@ const MARK_GLYPHS: Record<CombiningMark, string> = {
 };
 
 interface SpecialCharsPanelProps {
+  /** Lehe kirjastiil (ADR 0077, 2a): silt + käsitsi pööramine. Vaate olek, ei salvestata. */
+  scriptMode: PageScript & { manual: boolean };
+  flipScriptMode: () => void;
   authToken: string | null;
   user: unknown;
   readOnly: boolean;
@@ -39,6 +43,8 @@ interface SpecialCharsPanelProps {
 
 // Erimärkide paneel koos kasutaja märgikomplekti redaktori ja transkriptsioonijuhendi modaali avamisega.
 export default function SpecialCharsPanel({
+  scriptMode,
+  flipScriptMode,
   authToken,
   user,
   readOnly,
@@ -92,11 +98,25 @@ export default function SpecialCharsPanel({
               >
                 {t('editor.openGuide')}
               </button>
+              <span className="ml-auto" />
+              {scriptMode.hasF && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); flipScriptMode(); }}
+                  className={`text-[11px] font-normal flex items-center gap-1 px-1.5 rounded border transition-colors ${scriptMode.mode === 'fraktur'
+                    ? 'text-amber-800 bg-amber-50 border-amber-200 hover:bg-amber-100'
+                    : 'text-gray-400 border-transparent hover:text-gray-600 hover:border-gray-200'}`}
+                  title={t('editor.scriptMode.hint', { minority: scriptMode.mode === 'fraktur' ? t('editor.scriptMode.antiquaWord') : t('editor.scriptMode.frakturWord') })}
+                >
+                  {scriptMode.mode === 'fraktur' ? t('editor.scriptMode.fraktur') : t('editor.scriptMode.antiqua')}
+                  <span aria-hidden="true">⇄</span>
+                </button>
+              )}
               {Boolean(user) && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setShowCharEditor(true); }}
-                  className="ml-auto text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
                   title={t('editor.editChars', 'Kohanda märgikomplekti')}
                 >
                   <Settings2 size={12} />

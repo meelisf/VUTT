@@ -13,7 +13,7 @@ from .marginalia_audit import audit_marginalia
 
 
 _M_TAG_RE = re.compile(r"<(/?)m>")
-_INLINE_TAG_RE = re.compile(r"<(/?)(i|b|cs|hi|fn|ann\d*)>")
+_INLINE_TAG_RE = re.compile(r"<(/?)(i|b|f|hi|fn|ann\d*)>")
 _ALL_VUTT_TAG_RE = re.compile(r"</?[a-z]+\d*[^>]*>")
 
 

@@ -90,6 +90,62 @@ def strip_empty_tags(text: str) -> str:
     return cur
 
 
+# Stiilipaarid, mis ei tohi ületada reapiiri (ADR 0077 p 3a): eemaldatav inline,
+# mitte lehe tähistus ega annotatsioon (i b f hi add).
+_SPLIT_TAGS = tuple(t.name for t in VUTT_TAG_REGISTRY
+                    if t.marginalia_inline and t.clean_markup == "remove"
+                    and not t.page_mark and not t.numbered)
+_SPLIT_TOKEN_RE = re.compile(r'<(/?)(' + '|'.join(_SPLIT_TAGS) + r')>')
+
+
+def split_multiline_style_pairs(text: str) -> str:
+    """Üle reavahetuse ulatuv stiilipaar poolitatakse rea kaupa:
+    `<f>rida 1\nrida 2</f>` → `<f>rida 1</f>\n<f>rida 2</f>`.
+
+    Taust: fraktuurlehel on iga rida `<f>`-is ja tägid on redaktoris peidetud —
+    Enter keset rida tekitas märkamatult mitmerealise paari. Tühjaks jääv pool
+    (tühi rida) koristab `strip_empty_tags`. Orb-täg ei ava ega sulge midagi.
+    """
+    if not text or '\n' not in text or '<' not in text:
+        return text
+    lines = text.split('\n')
+    # Ainult paaritud tägid: orvud jäävad puutumata (neid koristab sanitiseerija).
+    stack = []
+    paired = set()
+    positions = []  # (rea nr, algus, lõpp, nimi, sulgev)
+    for li, line in enumerate(lines):
+        for m in _SPLIT_TOKEN_RE.finditer(line):
+            positions.append((li, m.start(), m.end(), m.group(2), bool(m.group(1))))
+    for idx, (_, _, _, name, closing) in enumerate(positions):
+        if not closing:
+            stack.append(idx)
+            continue
+        for k in range(len(stack) - 1, -1, -1):
+            if positions[stack[k]][3] == name:
+                paired.add(stack[k])
+                paired.add(idx)
+                del stack[k]
+                break
+    out = []
+    active = []
+    by_line = {}
+    for idx in sorted(paired):
+        by_line.setdefault(positions[idx][0], []).append(idx)
+    for li, line in enumerate(lines):
+        prefix = ''.join(f'<{n}>' for n in active)
+        for idx in by_line.get(li, []):
+            _, _, _, name, closing = positions[idx]
+            if not closing:
+                active.append(name)
+            elif name in active:
+                active.reverse()
+                active.remove(name)
+                active.reverse()
+        suffix = ''.join(f'</{n}>' for n in reversed(active))
+        out.append(prefix + line + suffix)
+    return '\n'.join(out)
+
+
 def normalize_marginalia_tags(text: str) -> str:
     """Teeb `<m>` välimiseks tägiks igal real, mis on tervikuna marginaalia,
     eemaldab sellise rea servatühiku (`<m> <i>x</i></m>` → `<m><i>x</i></m>`)
@@ -106,6 +162,9 @@ def normalize_marginalia_tags(text: str) -> str:
     prev = None
     while prev != text:
         prev = text
+        # Mitmerealine stiilipaar rea kaupa (ADR 0077 p 3a) — ENNE <m> välimiseks
+        # tõstmist, et `<f><m>…` saaks järgmisel sammul `<m><f>…`-ks.
+        text = split_multiline_style_pairs(text)
         if '<m>' in text:
             # Rea-kaupa, et säilitada täpsed reavahetused (sh lõpu-reavahetus).
             parts = text.split('\n')

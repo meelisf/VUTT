@@ -6,6 +6,7 @@ import type { Annotation, Page, PageStatus, TextAnnotation } from '../../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 import { replyToComment } from '../../services/pageService';
 import { pageSwapAnnotation } from './editorAnnotations';
+import { recomputeScriptMode } from './scriptMode';
 import { savedStateAfterRestore, type RestoreResult } from './pageRestore';
 import {
   PageConflictError, annotationsForText, assembleChunks, baseFromSavedState, minimalTextChange, retryBase,
@@ -107,6 +108,8 @@ export function useEditorSave({
     try {
       const { merged } = await onSave(updatedPage, base);
       afterSave?.();
+      // Lehe kirjastiil arvutatakse salvestamisel uuesti (ADR 0077, 2a).
+      viewRef.current?.dispatch({ effects: recomputeScriptMode.of(null) });
       if (merged) {
         // Server liitis vahepealse ketta seisu (#455): see ON nüüd salvestatud
         // seis. Tekst pannakse redaktorisse SIIN — Workspace `page` kaudu see

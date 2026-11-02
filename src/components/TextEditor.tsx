@@ -183,6 +183,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   });
 
   const {
+    scriptMode,
+    flipScriptMode,
     marginaliaUserMode,
     narrowPane,
     compactToolbar,
@@ -366,6 +368,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           pageStatus={page.status}
           onStatusChange={onStatusChange}
           compactToolbar={compactToolbar}
+          scriptMode={scriptMode}
+          flipScriptMode={flipScriptMode}
           narrowPane={narrowPane}
           marginaliaCount={marginaliaCount}
           marginaliaUserMode={marginaliaUserMode}

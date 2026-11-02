@@ -34,7 +34,7 @@ def _t(name, tei, *, paired=True, search="keep", page_mark=False, numbered=False
 VUTT_TAG_REGISTRY = (
     _t("i", 'hi rend="italic"'),
     _t("b", 'hi rend="bold"'),
-    _t("cs", "hi (kiri vastupidine teose põhikirjale; ADR 0071 erand)"),
+    _t("f", 'hi rend="fraktur"'),  # absoluutne: fraktuur alati märgitud (ADR 0077)
     _t("hi", "hi", wrap_block=True),
     _t("m", 'note place="margin"', search="marginalia", marginalia_inline=False, wrap_block=True),
     _t("add", "add", wrap_block=True),

@@ -59,7 +59,7 @@ def test_mitu_inline_tagi():
 
 
 def test_cs_ja_hi_tagid():
-    assert norm('<cs><m>verbum</cs></m>') == '<m><cs>verbum</cs></m>'
+    assert norm('<f><m>verbum</f></m>') == '<m><f>verbum</f></m>'
     assert norm('<m><hi>NB</m></hi>') == '<m><hi>NB</hi></m>'
 
 
@@ -93,7 +93,7 @@ def test_split_marginalia_normaliseeritud_sisuga():
 def test_strip_tuhi_inline():
     assert strip('<i></i>') == ''
     assert strip('<b></b>') == ''
-    assert strip('<cs></cs>') == ''
+    assert strip('<f></f>') == ''
     assert strip('<hi></hi>') == ''
 
 
@@ -252,3 +252,23 @@ def test_tahistus_m_sees_m_jaab_valimiseks():
 def test_normaliseerimine_idempotentne_tahistusega():
     t = "x <sig>A <sig>ij</sig></sig>\n<fw>1<pb/>2</fw>"
     assert norm(norm(t)) == norm(t)
+
+
+# --- ADR 0077 p 3a: stiilipaar ei ületa reapiiri ---
+
+def test_mitmerealine_f_poolitatakse_rea_kaupa():
+    assert norm('<f>rida üks\nrida kaks</f>') == '<f>rida üks</f>\n<f>rida kaks</f>'
+
+
+def test_mitmerealine_pesastus_ja_tuhi_rida():
+    assert norm('<i>a <b>b\nc</b> d</i>') == '<i>a <b>b</b></i>\n<i><b>c</b> d</i>'
+    assert norm('<f>a\n\nb</f>') == '<f>a</f>\n\n<f>b</f>'
+
+
+def test_mitmerealine_marginaalias_m_jaab_valimiseks():
+    assert norm('<f>tekst\n<m>Ge⸗</m></f>') == '<f>tekst</f>\n<m><f>Ge⸗</f></m>'
+
+
+def test_reasisesed_paarid_ja_orvud_muutumata():
+    assert norm('<f>a</f>\n<f>b</f>') == '<f>a</f>\n<f>b</f>'
+    assert norm('<f>orb\nrida') == '<f>orb\nrida'

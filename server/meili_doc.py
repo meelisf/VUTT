@@ -117,7 +117,7 @@ def clean_text_for_search(text, keep_ann=False):
     """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
 
     Toetab mõlemat märgendusformaati:
-    - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <add>, <fn>n</fn>, <pb/>; lehe tähistus
+    - Uus XML: <i>, <b>, <f>, <m>, <hi>, <add>, <fn>n</fn>, <pb/>; lehe tähistus
       <fw>/<sig>/<catch>/<rh> eemaldatakse koos sisuga (ADR 0070)
     - Vana pseudo-markdown: *italic*, **bold*, ~cs~, [[m:text]], --lk--, [^n]
 
@@ -147,7 +147,7 @@ def clean_text_for_search(text, keep_ann=False):
         # tühikuklassi liikmed ega satu ühegi allpoolse mustri alla.
         text = re.sub(r'<ann(\d+)>', _ANN_OPEN + r'\1' + _ANN_END, text)
         text = re.sub(r'</ann(\d+)>', _ANN_CLOSE + r'\1' + _ANN_END, text)
-    text = re.sub(r'</?[a-z]+\d*>', '', text)    # avamis/sulgemistägid (<i>, </i>, <cs>, <ann1>, </ann1> jne)
+    text = re.sub(r'</?[a-z]+\d*>', '', text)    # avamis/sulgemistägid (<i>, </i>, <f>, <ann1>, </ann1> jne)
 
     # 2. Vana pseudo-markdown (legacy, kui faile pole veel migreeritud)
     text = text.replace('*', ' ')               # bold/italic tärnid

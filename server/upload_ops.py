@@ -26,9 +26,10 @@ from . import ocr_reaper
 from .upload import page_status
 
 
-def _normalize_txt_file(path: str, languages=None):
-    """Normaliseerib alla laetud OCR .txt marginaalia-tägid ja lühendi (ADR 0062)."""
-    return _import_work.normalize_txt_file(path, languages)
+def _normalize_txt_file(path: str, languages=None, manuscript=None):
+    """Normaliseerib alla laetud OCR .txt marginaalia-tägid, lühendi (ADR 0062) ja
+    üleminekuajal suhtelise <cs> → <f> (ADR 0077)."""
+    return _import_work.normalize_txt_file(path, languages, manuscript)
 
 logger = get_logger(__name__)
 

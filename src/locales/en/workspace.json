@@ -665,14 +665,15 @@
     "tooltips": {
       "bold": "Bold",
       "italic": "Italic",
-      "fractur": "Font switch (fractur)",
       "addition": "Insertion above or below the line — at its insertion point",
       "marginalia": "Marginalia",
       "footnote": "Footnote",
       "pageBreak": "Page break",
       "cleanMarkup": "Remove markup from selection",
       "cleanMarkupButton": "Clean",
-      "annotate": "Highlight and comment (select text first)"
+      "annotate": "Highlight and comment (select text first)",
+      "markFraktur": "Mark as Fraktur",
+      "markAntiqua": "Mark as Antiqua"
     },
     "pageMarks": {
       "title": "Page marks",
@@ -721,6 +722,13 @@
     "reocrGemini": {
       "button": "Re-OCR (Gemini)",
       "hint": "Transcribes with the Google Gemini model. Superadmin only; the result goes through the same review step."
+    },
+    "scriptMode": {
+      "antiqua": "Page typeface: Antiqua",
+      "fraktur": "Page typeface: Fraktur",
+      "antiquaWord": "Antiqua",
+      "frakturWord": "Fraktur",
+      "hint": "Display only, not saved. Grey background = {{minority}}. Computed from the page text on load and save; click to flip."
     }
   },
   "annotations": {

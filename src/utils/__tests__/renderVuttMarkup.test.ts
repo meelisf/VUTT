@@ -21,9 +21,28 @@ describe('renderVuttMarkup — VUTT-tägide renderdamine', () => {
     expect(html).toBe('daß <span class="vutt-add">mir</span> bedeutende');
   });
 
-  it('cs ja m', () => {
-    expect(renderVuttMarkup('<cs>x</cs>')).toContain('italic tracking-wide');
+  it('m', () => {
     expect(renderVuttMarkup('<m>x</m>')).toContain('border-l-2');
+  });
+
+  it('antiikvalehel on <f> vähemuskiri (ADR 0077, 2a)', () => {
+    expect(renderVuttMarkup('Thesis prima <f>Gott</f> secunda'))
+      .toBe('Thesis prima <span class="vutt-script-minority">Gott</span> secunda');
+  });
+
+  it('fraktuurlehel on antiikva vähemuskiri, <f> kaob', () => {
+    expect(renderVuttMarkup('<f>sich bey den </f>exercitiis<f> finden laſſen</f>'))
+      .toBe('sich bey den <span class="vutt-script-minority">exercitiis</span> finden laſſen');
+  });
+
+  it('vahemik ei ristu kursiiviga', () => {
+    expect(renderVuttMarkup('<f>als </f><i>exercitiis</i> Academicis<f> und so weiter mit vielen Worten hier</f>'))
+      .toBe('als <em><span class="vutt-script-minority">exercitiis</span></em><span class="vutt-script-minority"> Academicis</span> und so weiter mit vielen Worten hier');
+  });
+
+  it('marginaaliakaart saab lehe režiimi', () => {
+    expect(renderVuttMarkup('<f>Gott</f>', 'antiqua')).toBe('<span class="vutt-script-minority">Gott</span>');
+    expect(renderVuttMarkup('<f>Gott</f>', 'fraktur')).toBe('Gott');
   });
 
   it('renderdab <m> ploki kaardina (block, väiksem kiri, ilma sundkursiivita)', () => {

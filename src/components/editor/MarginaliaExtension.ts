@@ -18,6 +18,7 @@ import type { Extension } from '@codemirror/state';
 import { findMarginaliaBlocks, stackMarginalia, groupMarginaliaBlocks } from '../../utils/marginaliaUtils';
 import type { MarginaliaBlock, MarginaliaGroup } from '../../utils/marginaliaUtils';
 import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
+import { scriptModeField } from './scriptMode';
 
 export type MarginaliaMode = 'column' | 'badge';
 
@@ -226,7 +227,7 @@ interface OverlayMeasure {
  *
  * `coordsAtPos` on MÄRGI-koordinaadi päring ja tagastab CM6-s `null`, kui pos
  * langeb peidetud `Decoration.replace` tägi servale — nt kui ankrurida algab
- * `<cs>`/`<i>`/`<b>`/`<pb/>`-ga (VuttMarkupExtension peidab avatägi rea alguses).
+ * `<f>`/`<i>`/`<b>`/`<pb/>`-ga (VuttMarkupExtension peidab avatägi rea alguses).
  * Siis kaoks ülekatte-kaart vaikselt. Fallback kasutab rea BLOKK-geomeetriat
  * (`lineBlockAt` + `documentTop`), mis ei sõltu inline-dekoratsioonidest.
  */
@@ -354,7 +355,7 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
           if (isEmpty) {
             el.textContent = '(–)';
           } else {
-            el.innerHTML = renderVuttMarkup(item.content);
+            el.innerHTML = renderVuttMarkup(item.content, view.state.field(scriptModeField, false)?.mode);
           }
           newEls.set(item.blockFrom, el);
         }

@@ -26,6 +26,7 @@ import os
 import re
 
 from .meili_doc import normalize_eszett
+from .vutt_tags import VUTT_TAG_REGISTRY, tag_pattern
 
 PAGE_FIELDS = ("text_content", "status", "page_tags", "comments", "text_annotations")
 
@@ -170,7 +171,11 @@ def merge_text(base: str, mine: str, theirs: str):
     return "".join(tk["text"] for tk in tükid), tükid
 
 
-_PAARISTÄG_RE = re.compile(r"<(/?)(m|i|b|cs|hi|fn|ann\d+)>")
+# Paaristägid registrist (ADR 0071/0077) — käsitsi loendist puudusid `add` ja lehe tähistus.
+_PAARISTÄG_RE = re.compile(
+    r"<(/?)(" + "|".join(tag_pattern(t) if not t.numbered else rf"{t.name}\d+"
+                         for t in VUTT_TAG_REGISTRY if t.paired) + r")>"
+)
 _ANN_ID_RE = re.compile(r"^ann(\d+)$")
 
 
