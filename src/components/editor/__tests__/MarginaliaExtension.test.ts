@@ -10,8 +10,9 @@ import {
   closeAllMarginalia,
   hiddenBlockRanges,
 } from '../MarginaliaExtension';
-import { cleanMarkupSpecs, marginaliaFromSelection, openGroupAt, toggleGroupStyle } from '../../../utils/marginaliaUtils';
+import { marginaliaFromSelection, openGroupAt, toggleGroupStyle } from '../../../utils/marginaliaUtils';
 import { selectionWrapChanges } from '../wrapTagUtils';
+import { cleanSelectionChanges } from '../cleanSelection';
 
 const DOC = 'rida üks\n<m>Apoc. 12.</m>\nrida kaks\n<m>Vide Picrium</m>\nrida kolm';
 
@@ -247,10 +248,7 @@ describe('cleanMarkup per-segment dispatch (uus käitumine)', () => {
     const doc = 'AA <i>x</i>\n<m>note</m>\nBB';
     let state = mkState(doc);
     const hidden = hiddenBlockRanges(state);
-    const specs = cleanMarkupSpecs(
-      doc, 0, doc.length, hidden,
-      s => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, ''),
-    );
+    const specs = cleanSelectionChanges(doc, 0, doc.length, hidden);
     state = state.update({
       changes: state.changes(specs),
       annotations: Transaction.userEvent.of('input.format'),
@@ -265,10 +263,7 @@ describe('cleanMarkup per-segment dispatch (uus käitumine)', () => {
     const doc = 'A <b>q</b>\n<m>one</m>\nB\n<m>two</m>\nC <i>z</i>';
     let state = mkState(doc);
     const hidden = hiddenBlockRanges(state);
-    const specs = cleanMarkupSpecs(
-      doc, 0, doc.length, hidden,
-      s => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, ''),
-    );
+    const specs = cleanSelectionChanges(doc, 0, doc.length, hidden);
     state = state.update({
       changes: state.changes(specs),
       annotations: Transaction.userEvent.of('input.format'),

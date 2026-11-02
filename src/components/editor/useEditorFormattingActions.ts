@@ -5,11 +5,11 @@ import { vuttMarkupField } from './VuttMarkupExtension';
 import { hiddenBlockRanges, marginaliaField, openMarginalia } from './MarginaliaExtension';
 import { findContainer, selectionWrapChanges } from './wrapTagUtils';
 import { applyCombiningMark } from './combiningMarkCommand';
-import { CLEAN_MARKUP_TAG_RE } from '../../markup/consumers';
+import { cleanSelectionChanges } from './cleanSelection';
 import { pageMarkEdit, type PageMarkRefusal } from './pageMarkEdit';
 import type { PageMarkKind } from '../../markup/vuttTags';
 import type { CombiningMark } from '../../utils/combiningMarks';
-import { cleanMarkupSpecs, marginaliaFromSelection, openGroupAt, rangeTouchesOpenMarginalia, toggleGroupStyle } from '../../utils/marginaliaUtils';
+import { marginaliaFromSelection, openGroupAt, rangeTouchesOpenMarginalia, toggleGroupStyle } from '../../utils/marginaliaUtils';
 
 interface UseEditorFormattingActionsParams {
   viewRef: MutableRefObject<EditorView | null>;
@@ -178,28 +178,15 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
   const cleanMarkup = useCallback(() => {
     const view = viewRef.current;
     if (!view || readOnly) return;
-    let { from, to } = view.state.selection.main;
+    const { from, to } = view.state.selection.main;
     if (from === to) return;
 
-    // Laienda valikut, et hõlmata kõik osaliselt kattuvad tägid
-    // (mouse-valik võib lõppeda tägi sees → ilma laienduseta jääb poolik täg alles)
-    const { tagRanges } = view.state.field(vuttMarkupField);
-    for (const r of tagRanges) {
-      if (r.from < to && r.to > from) {
-        from = Math.min(from, r.from);
-        to = Math.max(to, r.to);
-      }
-    }
-
-    // Puhasta iga nähtav segment ERALDI muudatusena — peidetud marginaalia
-    // plokke ei puudutata üldse, nii jäävad nad oma ridadele ja ankrutele
-    // (üks valikut kattev muudatus laseks kaitsefiltril ploki valiku lõppu
-    // nihutada, kus ta degradeeruks inline-margiks)
+    // Valitud tekst jääb märgenduseta, valikust väljapoole jääv hoiab oma
+    // märgenduse: valikust välja ulatuv stiilipaar poolitatakse. Peidetud
+    // marginaaliaplokke ei puudutata (kaitsefilter nihutaks muidu ploki
+    // valiku lõppu, kus ta degradeeruks inline-margiks).
     const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
-    const specs = cleanMarkupSpecs(
-      view.state.doc.toString(), from, to, hidden,
-      s => s.replace(CLEAN_MARKUP_TAG_RE, ''),
-    );
+    const specs = cleanSelectionChanges(view.state.doc.toString(), from, to, hidden);
     if (specs.length === 0) return;
     const changes = view.state.changes(specs);
 
