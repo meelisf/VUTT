@@ -17,6 +17,52 @@ def test_antiikvateos_cs_kursiiviga_kursiiv_voidab():
     assert cs_to_f("<cs>Gott <i>Deus</i></cs>", "A") == "<f>Gott</f> <i>Deus</i>"
 
 
+# Sisemine täg otsustab: <cs> kursiivi SEES on antiikvateoses fraktuurisõna kursiivlõigus
+# (nimed, kohanimed). Esimene migratsioon viskas selle ära (91 Valmis-lehte, 2026-11-02).
+
+def test_antiikvateos_cs_kursiivi_sees_on_f_kursiiv_tykeldub():
+    assert cs_to_f("<i>ne in <cs>Frödzwijck</cs> &c. Regij</i>", "A") == \
+        "<i>ne in </i><f>Frödzwijck</f><i> &c. Regij</i>"
+
+
+def test_antiikvateos_cs_kursiivi_alguses_tyhja_kursiivi_ei_jaa():
+    assert cs_to_f("<i><cs>Saalſtad</cs>/ Domine</i>", "A") == "<f>Saalſtad</f><i>/ Domine</i>"
+
+
+def test_antiikvateos_cs_kursiivis_vale_pesastusega():
+    # tootmisest: <cs> suletakse pärast </i>-d
+    assert cs_to_f("<i><cs>Saalſtad</cs>/ Domine in <cs>Frödz⸗</i></cs>", "A") == \
+        "<f>Saalſtad</f><i>/ Domine in </i><f>Frödz⸗</f>"
+
+
+def test_antiikvateos_cs_kursiivis_ainult_kirjavahemark_ei_tykelda():
+    assert cs_to_f("<i>a <cs>.</cs> b</i>", "A") == "<i>a . b</i>"
+
+
+def test_antiikvateos_cs_kursiivis_mitu_rida():
+    assert cs_to_f("<i>in <cs>Frödz⸗</cs></i>\n<i><cs>wijck</cs> &c.</i>", "A") == \
+        "<i>in </i><f>Frödz⸗</f>\n<f>wijck</f><i> &c.</i>"
+
+
+def test_fraktuurteos_cs_kursiivis_jaab_antiikvaks():
+    assert cs_to_f("<i>Deus <cs>Christus</cs></i>", "F") == "<i>Deus Christus</i>"
+    # tootmisest (1632-1 Relatio): kahekordne <cs> ümber kursiivi
+    assert cs_to_f("<cs><i><cs>Fridericus Menius</i></cs>", "F") == "<i>Fridericus Menius</i>"
+
+
+def test_cs_inside_italic():
+    from server.script_migration import cs_inside_italic
+    assert cs_inside_italic("<i>in <cs>Frödz⸗</cs></i>")
+    assert cs_inside_italic("<i>a\nb <cs>X</cs></i>")
+    assert not cs_inside_italic("<cs>Gott <i>Deus</i></cs>")
+    assert not cs_inside_italic("<i>a</i> <cs>X</cs>")
+
+
+def test_pesastatud_cs_ei_poora_tagasi():
+    # tootmisest (1647-17): sisemine <cs> on topeltmärgendus, mitte tagasipööre
+    assert cs_to_f("<cs>Konungs <cs>Balker</cs></cs>", "A") == "<f>Konungs</f> <f>Balker</f>"
+
+
 # --- fraktuurteos: ümberpööramine ---
 
 def test_fraktuurteos_rida_mahitakse():

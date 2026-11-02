@@ -114,8 +114,12 @@ def needs_review(info: dict) -> str:
 
 
 def apply_work(work_dir: str, work_id: str, originals: dict, plans: dict, infos: dict,
-               manifest: dict) -> dict:
-    """Kirjutab teose lehed + manifesti ÜHE commitiga. Tagastab {'written', 'raced', 'commit'}."""
+               manifest: dict, in_hashes: dict = None, message: str = None) -> dict:
+    """Kirjutab teose lehed + manifesti ÜHE commitiga. Tagastab {'written', 'raced', 'commit'}.
+
+    in_hashes: {failinimi: räsi} — manifesti `in` (migratsioonieelne tekst); vaikimisi
+    `originals`. Parandusel PEAB jääma esialgne `in`, muidu ei tunne `/git-restore` ja
+    vananenud `/save` migratsioonieelset versiooni enam ära."""
     from datetime import datetime, timezone
 
     from server.git_ops import save_with_git
@@ -137,7 +141,8 @@ def apply_work(work_dir: str, work_id: str, originals: dict, plans: dict, infos:
                 continue
             text, json_write = _reconcile_annotations(work_dir, fn, new)
             info = infos.get(fn, {})
-            page_records[fn] = {"in": text_hash(originals[fn]), "out": text_hash(text),
+            page_records[fn] = {"in": (in_hashes or {}).get(fn) or text_hash(originals[fn]),
+                                "out": text_hash(text),
                                 "base": info.get("base"), "kind": info.get("kind")}
             if text != originals[fn]:
                 writes.append((txt, text))
@@ -155,7 +160,7 @@ def apply_work(work_dir: str, work_id: str, originals: dict, plans: dict, infos:
     else:
         first, first_text = writes[0]
         res = save_with_git(first, first_text, "Automaatne",
-                            message=f"Fraktuur: <cs> → <f>, {n_pages} lehte (ADR 0077)",
+                            message=(message or "Fraktuur: <cs> → <f>, {n} lehte (ADR 0077)").format(n=n_pages),
                             additional_files=writes[1:] + [manifest_write])
     return {"written": n_pages, "raced": raced, "commit": (res.get("commit_hash") or "")[:8]}
 
@@ -199,6 +204,78 @@ def load_decisions(path):
     return decisions, page_decisions, bad
 
 
+FIX_ITALIC_MESSAGE = "Fraktuur: <cs> kursiivis → <f>, {n} lehte, parandus (ADR 0077)"
+
+
+def git_show(base_dir: str, ref: str, relpath: str):
+    import subprocess
+    r = subprocess.run(["git", "-C", base_dir, "show", f"{ref}:{relpath}"],
+                       capture_output=True)
+    return r.stdout.decode("utf-8") if r.returncode == 0 else None
+
+
+def fix_italic(base_dir: str, ref: str, apply: bool, only_works=()) -> int:
+    """Parandus: esimene migratsioon viskas antiikvateoses kursiivisisese `<cs>`-i ära.
+
+    Teisendab manifesti `base == "A"` lehe uuesti migratsioonieelsest tekstist (`ref`,
+    räsi peab klappima manifesti `in`-iga) parandatud `cs_to_f`-iga. Kirjutab AINULT
+    lehe, mille praegune tekst on täpselt migratsiooni väljund (manifesti `out`);
+    pärast migratsiooni muudetud mõjutatud leht läheb nimekirja käsitsi ülevaatuseks.
+    Commit sõnumiga „… (ADR 0077)" — runbooki tagasipööramine katab ka selle.
+    """
+    from server.script_migration import cs_inside_italic, cs_to_f
+
+    manifest = load_manifest()
+    fixed = edited = 0
+    review = []
+    for work_id, entry in sorted(manifest["works"].items()):
+        if only_works and work_id not in only_works:
+            continue
+        slug = entry["slug"]
+        work_dir = os.path.join(base_dir, slug)
+        originals, plans, infos, in_hashes = {}, {}, {}, {}
+        for fn, rec in entry.get("pages", {}).items():
+            if rec.get("base") != "A":
+                continue
+            src = git_show(base_dir, ref, f"{slug}/{fn}")
+            if src is None or text_hash(src) != rec.get("in") or not cs_inside_italic(src):
+                continue
+            txt = os.path.join(work_dir, fn)
+            if not os.path.exists(txt):
+                continue
+            cur = read(txt)
+            if text_hash(cur) != rec.get("out"):
+                review.append(f"{work_id}  {slug}/{fn}  (muudetud pärast migratsiooni)")
+                edited += 1
+                continue
+            new = cs_to_f(src, "A")
+            if new == cur:
+                continue
+            originals[fn], plans[fn], in_hashes[fn] = cur, new, rec["in"]
+            infos[fn] = {"base": "A", "kind": rec.get("kind")}
+        if not plans:
+            continue
+        if not apply:
+            print(f"{work_id}: {len(plans)} lehte parandada")
+            fixed += len(plans)
+            continue
+        res = apply_work(work_dir, work_id, originals, plans, infos, manifest,
+                         in_hashes=in_hashes, message=FIX_ITALIC_MESSAGE)
+        fixed += res["written"]
+        for fn in res["raced"]:
+            review.append(f"{work_id}  {slug}/{fn}  (muutus paranduse ajal)")
+        if res["written"]:
+            from server.meilisearch_ops import sync_work_to_meilisearch
+            sync_work_to_meilisearch(slug)
+        print(f"{work_id}: {res['written']} lehte, commit {res['commit']}"
+              + (f", VAHELE: {res['raced']}" if res["raced"] else ""))
+    print(f"Parandatud lehti: {fixed}" + ("" if apply else " (kuivkäivitus, --apply kirjutab)"))
+    print(f"Käsitsi ülevaatuseks: {len(review)}")
+    for r in review:
+        print(f"  {r}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true", help="kirjuta (vaikimisi kuivkäivitus)")
@@ -208,12 +285,17 @@ def main() -> int:
     ap.add_argument("--manuscript-cs", choices=("skip", "strip", "hi"), default="skip",
                     help="käsikirja <cs>: jäta puutumata (vaikimisi), eemalda tägid või asenda <hi>-ga")
     ap.add_argument("--report", default="/tmp/cs_to_f_aruanne.json", help="aruande JSON")
+    ap.add_argument("--fix-italic", metavar="REF",
+                    help="parandus: kursiivisisene <cs> antiikvateoses uuesti migratsioonieelsest "
+                         "tekstist (REF = git tag, nt pre-0077-f)")
     args = ap.parse_args()
 
     from server.config import BASE_DIR
 
     if args.check:
         return check(BASE_DIR)
+    if args.fix_italic:
+        return fix_italic(BASE_DIR, args.fix_italic, args.apply, args.work)
 
     decisions, page_decisions = {}, {}
     if args.decisions:

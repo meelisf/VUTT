@@ -104,3 +104,51 @@ def test_kasikirjaline_leht_trukises():
                                  page_decisions={"m.txt": "H"})
     assert plans["m.txt"] == "R Acad. Born. 1697: 32\n<hi>koopia: Lund UB</hi>"
     assert infos["m.txt"]["kind"] == "manuscript" and not mig.needs_review(infos["m.txt"])
+
+
+# --- parandus: kursiivisisene <cs> (esimene migratsioon viskas ära, 2026-11-02) ---
+
+SRC_I = "<i>Baro in <cs>Saalſtad</cs>/ Domine</i>"
+OUT_OLD = "<i>Baro in Saalſtad/ Domine</i>"          # esimese migratsiooni väljund
+OUT_NEW = "<i>Baro in </i><f>Saalſtad</f><i>/ Domine</i>"
+
+
+def _fix_setup(tmp_path, monkeypatch, current_texts):
+    commits = _fake_git(monkeypatch, tmp_path)
+    work = tmp_path / "teos-w1"
+    work.mkdir()
+    for fn, t in current_texts.items():
+        (work / fn).write_text(t, encoding="utf-8")
+    src = {"a.txt": SRC_I, "b.txt": SRC_I, "c.txt": "<cs>Gott</cs> Deus"}
+    manifest = {"version": 1, "works": {"w1": {"slug": "teos-w1", "pages": {
+        fn: {"in": text_hash(s), "out": text_hash(OUT_OLD if fn != "c.txt" else "<f>Gott</f> Deus"),
+             "base": "A", "kind": "cs"} for fn, s in src.items()}}}}
+    monkeypatch.setattr(mig, "load_manifest", lambda: manifest)
+    monkeypatch.setattr(mig, "git_show", lambda base, ref, rel: src.get(rel.split("/", 1)[1]))
+    import server.meilisearch_ops as mo
+    synced = []
+    monkeypatch.setattr(mo, "sync_work_to_meilisearch", lambda slug: synced.append(slug))
+    return commits, manifest, synced
+
+
+def test_fix_italic_parandab_muutmata_lehe_ja_jatab_in_rasi(tmp_path, monkeypatch, capsys):
+    commits, manifest, synced = _fix_setup(tmp_path, monkeypatch, {
+        "a.txt": OUT_OLD, "b.txt": "toimetaja parandas", "c.txt": "<f>Gott</f> Deus"})
+    assert mig.fix_italic(str(tmp_path), "pre-0077-f", apply=True) == 0
+    assert len(commits) == 1
+    (first, text, author), kw = commits[0]
+    assert first.endswith("a.txt") and text == OUT_NEW and author == "Automaatne"
+    assert kw["message"].endswith("(ADR 0077)")
+    rec = manifest["works"]["w1"]["pages"]["a.txt"]
+    assert rec["in"] == text_hash(SRC_I) and rec["out"] == text_hash(OUT_NEW)
+    assert synced == ["teos-w1"]
+    out = capsys.readouterr().out
+    assert "b.txt" in out and "muudetud pärast migratsiooni" in out   # käsitsi nimekirja
+    assert "c.txt" not in out                                         # kursiivita, puutumata
+
+
+def test_fix_italic_kuivkaivitus_ei_kirjuta(tmp_path, monkeypatch):
+    commits, _, _ = _fix_setup(tmp_path, monkeypatch, {
+        "a.txt": OUT_OLD, "b.txt": OUT_OLD, "c.txt": "<f>Gott</f> Deus"})
+    mig.fix_italic(str(tmp_path), "pre-0077-f", apply=False)
+    assert commits == [] and (tmp_path / "teos-w1" / "a.txt").read_text(encoding="utf-8") == OUT_OLD

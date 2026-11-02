@@ -35,6 +35,7 @@ def _is_latin(ch: str) -> bool:
 
 
 _EDITORIAL_RE = re.compile(r"\[[^\]\n]*\]")
+_EMPTY_I_RE = re.compile(r"<i>([ \t]*)</i>")
 
 
 def _wrap_runs(segment: str) -> str:
@@ -86,8 +87,11 @@ def cs_to_f(text: str, base: str) -> str:
 
     base: teose põhikiri, 'A' (antiikva) või 'F' (fraktuur).
     - kiri = fraktuur, kui (base == 'F') XOR (`<cs>` avatud);
-    - `<i>` sisu on alati antiikva (gooti kirjal kursiivi ei ole, `<f>`/`<i>`
-      välistavad teineteist); `<fn>` sisu ei märgita;
+    - `<cs>`/`<i>` pesastuses otsustab SISEMINE täg: `<i>` sees on antiikva (gooti
+      kirjal kursiivi ei ole, `<f>`/`<i>` välistavad teineteist), aga `<cs>`
+      kursiivi sees on antiikvateoses fraktuurisõna kursiivlõigus — kursiiv
+      tükeldatakse ümber `<f>`-i (`<i>ne in </i><f>Frödzwijck</f><i> &c.</i>`).
+      Fraktuurteoses tähendab kursiivisisene `<cs>` antiikvat. `<fn>` sisu ei märgita;
     - `<f>` mähib ainult tekstisegmente tägide vahel: ta jääb struktuuri- ja
       stiilitägide SISSE (`<catch><f>Vor⸗</f></catch>`) ega ületa reapiiri;
     - `<cs>` tokenid kaovad, kõik muud tokenid jäävad.
@@ -97,33 +101,66 @@ def cs_to_f(text: str, base: str) -> str:
         raise ValueError(f"tundmatu põhikiri: {base!r}")
     if "<f>" in text and "<cs>" not in text:
         return text
-    open_counts = {"cs": 0, "i": 0, "fn": 0}
+    # `<cs>`/`<i>` virn avamise järjekorras: sisemine (viimane) otsustab.
+    stack = []
+    fn_open = 0
     out = []
     pos = 0
 
     def emit_text(seg: str):
         if not seg:
             return
-        if open_counts["fn"]:
+        if fn_open or (stack and stack[-1] == "i"):
             out.append(seg)
             return
-        fraktur = (base == "F") != bool(open_counts["cs"])
-        if open_counts["i"] or not fraktur:
+        # mõni `<cs>` avatud = lülitus (pesastatud/sulgemata `<cs>` ei pööra tagasi)
+        fraktur = (base == "F") != ("cs" in stack)
+        if not fraktur:
             out.append(seg)
             return
-        out.append("\n".join(_wrap_runs(line) for line in seg.split("\n")))
+        wrapped = "\n".join(_wrap_runs(line) for line in seg.split("\n"))
+        if "i" not in stack:
+            out.append(wrapped)
+        elif "<f>" not in wrapped:
+            out.append(seg)  # ainult kirjavahemärgid — kursiivi ei tükeldata
+        else:
+            core = wrapped.strip()
+            lead = wrapped[: len(wrapped) - len(wrapped.lstrip())]
+            trail = wrapped[len(wrapped.rstrip()):]
+            out.append(f"{lead}</i>{core}<i>{trail}")
 
     for m in _TOKEN_RE.finditer(text):
         emit_text(text[pos:m.start()])
         pos = m.end()
         closing, name, self_closing = m.group(1) == "/", m.group(2), m.group(4) == "/"
-        if name in open_counts and not self_closing:
-            open_counts[name] = max(0, open_counts[name] + (-1 if closing else 1))
+        if not self_closing:
+            if name == "fn":
+                fn_open = max(0, fn_open + (-1 if closing else 1))
+            elif name in ("cs", "i"):
+                if not closing:
+                    stack.append(name)
+                elif name in stack:
+                    # vale pesastus (`<cs>X</i></cs>`): eemalda viimane sama nimega
+                    del stack[len(stack) - 1 - stack[::-1].index(name)]
         if name == "cs":
             continue
         out.append(m.group(0))
     emit_text(text[pos:])
-    return "".join(out)
+    # kursiivi tükeldusest jäänud tühjad paarid
+    return _EMPTY_I_RE.sub(r"\1", "".join(out))
+
+
+def cs_inside_italic(text: str) -> bool:
+    """Kas `<cs>` avatakse avatud `<i>` sees — juhtum, mille esimene migratsioon
+    (2026-11-02) antiikvateoses ära viskas; parandus: `migrate_cs_to_f.py --fix-italic`."""
+    i_open = 0
+    for m in _TOKEN_RE.finditer(text or ""):
+        closing, name = m.group(1) == "/", m.group(2)
+        if name == "i" and m.group(4) != "/":
+            i_open = max(0, i_open + (-1 if closing else 1))
+        elif name == "cs" and not closing and i_open:
+            return True
+    return False
 
 
 def hyphen_signal(texts) -> tuple:
