@@ -599,6 +599,12 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         N = N. kaasköide; ESTERi märkusest), total (trükiste arv köites),
         contents (sisukord vabatekstina)}. Rühmavõtme normaliseerib server.
 
+        Koopia (TÜR-i paberkoopia, mikrofilm …): reproduction = {kind: koopia |
+        paberkoopia | mikrofilm | fotokoopia | digikoopia, of?: originaali
+        eksemplari id SAMAS teoses (get_work_exemplars'ist)}. `of` ainult siis,
+        kui allikas ütleb, mille koopia see on (ESTERi märkus „Koopia …
+        eksemplarist").
+
         ÄRA paku text_witness'i, lehti (pages), needs_review'd, seoseid teiste
         teostega, poolitust ega teose ester_id-d. Kuni 30 rida; see talletab
         AINULT ettepaneku — teost ei muudeta, toimetaja kinnitab või lükkab read

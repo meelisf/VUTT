@@ -323,6 +323,29 @@ plaani, `scripts/jaanson_apply.py` rakendab selle serveris ühe commitiga.
   ≥ 0.85, vahe järgmisega ≥ 0.05 ja samad sarja tunnused (järgarv, rooma number ≤ XXXIX).
   Ülejäänu läheb ülevaatusnimekirja, mitte plaani.
 
+### 11. Reproduktsioon (täiendus 2026-11-02)
+
+TÜR-i `R Acad. Dorp.` paberkoopia on teise raamatukogu eksemplari koopia (nt `occgcn`: TÜR
+`R Acad. Dorp. 1632:1` on tehtud Uppsala UB `Rar 10:252` säilikust). Koopia on endiselt
+eksemplar (hoidja riiulil olemas asi), aga tema tekst pärineb originaalist.
+
+- Valikuline väli `reproduction: {kind, of?}`:
+  - `kind` ∈ `koopia` (liik teadmata), `paberkoopia`, `mikrofilm`, `fotokoopia`,
+    `digikoopia`; väli puudub = originaal või teadmata;
+  - `of` = originaali eksemplari `id` SAMAS teoses; puudub = allikas teadmata.
+    Seos käib püsiva ID kaudu (p 2), kohaviida parandus seda ei katkesta.
+- Kogu loendi reegel (`validate_exemplars`): `of` on sama teose teine eksemplar, ahel on
+  lubatud (mikrofilm → paberkoopia), ring mitte.
+- Originaali kustutus eemaldab koopialt `of`-i ja paneb `needs_review` (koopia jääb).
+- Tekstitunnistaja on originaal, ka siis, kui skaneering tehti koopiast.
+- Kust koopia tehti, on enamasti pliiatsiga skaneeringul, mõnikord on see välja kärbitud;
+  ESTERis on see TÜR-i eksemplari märkuses. `of` täidab inimene või agendi ettepanek
+  (väli on ettepaneku `fields`-is; `of` peab esitusel viitama olemasolevale eksemplarile).
+- Koopia liik oli varem märkuses (Jaansoni import, ESTERi ettepanekud):
+  `scripts/migrate_reproduction.py` teisendab märkuse, mis koosneb ainult liigist
+  („Paberkoopia", „Koopia (Skarast)" → liik + märkus „Skarast"). Muu märkus jääb ja läheb
+  raportisse.
+
 ## Mida teadlikult EI tehtud
 
 - `archive_refs`-i ei laiendatud eksemplariks. See oleks jätnud kaks puhastajat ja üldise

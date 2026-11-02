@@ -11,7 +11,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink } from 'lucide-react';
-import type { Exemplar, ExemplarConvolute } from '../../../types';
+import type { Exemplar, ExemplarConvolute, ExemplarReproduction } from '../../../types';
 import { useNotify } from '../../../contexts/FeedbackContext';
 import { apiErrorMessage } from '../../../services/apiClient';
 import {
@@ -76,7 +76,7 @@ const ExemplarProposalsTab: React.FC<Props> = ({ workId, token, onChanged }) => 
     holder: t('exemplars.holder'), shelfmark: t('exemplars.shelfmark'), url: t('exemplars.url'),
     condition: t('exemplars.fields.condition'), binding: t('exemplars.fields.binding'),
     provenance: t('exemplars.fields.provenance'), notes: t('exemplars.fields.notes'),
-    convolute: t('exemplars.convolute.label'),
+    convolute: t('exemplars.convolute.label'), reproduction: t('exemplars.reproduction.label'),
   };
 
   const formatValue = (field: string, value: unknown): string => {
@@ -90,6 +90,10 @@ const ExemplarProposalsTab: React.FC<Props> = ({ workId, token, onChanged }) => 
         c.total != null && t('common:convolute.total', { count: c.total }),
         c.contents,
       ].filter(Boolean).join(' · ');
+    }
+    if (field === 'reproduction') {
+      const r = value as ExemplarReproduction;
+      return [t(`exemplars.reproduction.kinds.${r.kind}`), r.of ? `→ ${r.of}` : t('exemplars.reproduction.unknown')].join(' · ');
     }
     return String(value);
   };

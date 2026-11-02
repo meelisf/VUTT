@@ -186,8 +186,11 @@ def qualifier_policy(q):
     if re.search(r"\bdef\.", ql):
         fields["condition"] = "defektne" + ("?" if "def.?" in ql else "")
     if "kopie" in ql:
+        # Koopia liik on struktureeritud väli (ADR 0076 §11); päritolu jääb märkuseks.
+        fields["reproduction"] = {"kind": "fotokoopia" if "foto" in ql else "koopia"}
         src = re.search(r"aus (\w+)", q)
-        fields["notes"] = "Fotokoopia" if "foto" in ql else "Koopia" + (f" ({src.group(1)}st)" if src else "")
+        if src:
+            fields["notes"] = f"{src.group(1)}st"
     rest = re.sub(r"(?<!\w)(def\.\??|Fotokopie|Kopie(?: aus \w+)?)(?!\w)", "", q)
     rest = re.sub(r"\s*,\s*", ", ", rest).strip(" ,")
     if rest:
@@ -222,7 +225,7 @@ def entry_exemplars(e: dict, resolve) -> tuple[list[dict], list[str]]:
     if shelf and shelf.startswith(COPY_PREFIX):
         if any(x["holder"] == TUR for x in planned):
             review.append("Tartu ÜR vasakul JA paberkoopia paremal — originaali kohaviit teadmata")
-        planned.append({"holder": TUR, "shelfmark": shelf, "notes": "Paberkoopia"})
+        planned.append({"holder": TUR, "shelfmark": shelf, "reproduction": {"kind": "paberkoopia"}})
     elif tur_original and not any(x["holder"] == TUR for x in planned):
         planned.append({"holder": TUR, "shelfmark": shelf})
     return planned, review

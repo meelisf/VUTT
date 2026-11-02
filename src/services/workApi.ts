@@ -1,5 +1,5 @@
 import { LinkedEntity } from '../types/LinkedEntity';
-import type { ConvoluteBlock, Exemplar, ExemplarConvolute } from '../types';
+import type { ConvoluteBlock, Exemplar, ExemplarConvolute, ExemplarReproduction } from '../types';
 import { ApiRequestOptions, apiDelete, apiGet, apiPost, apiPut } from './apiClient';
 import { FILE_API_URL } from '../config';
 import type { PageOpRequest } from '../pages/manage/pageOpsPlan';
@@ -341,6 +341,8 @@ export interface ExemplarInput {
   notes?: string;
   /** null = konvoluudi märge eemaldatakse. */
   convolute?: ExemplarConvolute | null;
+  /** null = reproduktsiooni märge eemaldatakse (eksemplar on originaal). */
+  reproduction?: ExemplarReproduction | null;
   /** true = see on tunnistaja (server võtab märke eelmiselt), false = märge maha. */
   text_witness?: boolean;
   /** Ainult `false` on toimetaja toiming: lipu mahavõtmine. */
