@@ -87,8 +87,9 @@ def test_arhiiviviide_on_kohaviit():
 @pytest.mark.parametrize("q, ok, fields", [
     (None, True, {}),
     ("def.", True, {"condition": "defektne"}),
-    ("Kopie, def.", True, {"condition": "defektne", "notes": "Koopia"}),
-    ("Kopie aus Skara", True, {"notes": "Koopia (Skarast)"}),
+    ("Kopie, def.", True, {"condition": "defektne", "reproduction": {"kind": "koopia"}}),
+    ("Kopie aus Skara", True, {"reproduction": {"kind": "koopia"}, "notes": "Skarast"}),
+    ("Fotokopie", True, {"reproduction": {"kind": "fotokoopia"}}),
     ("nur def. Titelbl.", True, {"notes": "nur def. Titelbl."}),
     ("verschollen", False, None),
     ("früher in BGGA", False, None),
@@ -105,7 +106,7 @@ def test_kirje_eksemplarid(entries):
     resolve = jp.HolderResolver(REG)
     planned, review = jp.entry_exemplars(entries[0], resolve)
     assert planned == [{"holder": "Helsinki KK"}, {"holder": "Stockholm KB"},
-                       {"holder": "Tartu TÜR", "shelfmark": "R Acad. Dorp. 1633:9", "notes": "Paberkoopia"}]
+                       {"holder": "Tartu TÜR", "shelfmark": "R Acad. Dorp. 1633:9", "reproduction": {"kind": "paberkoopia"}}]
     # Vasak „Tartu ÜR" + parem originaali kohaviit = ÜKS TÜR-i eksemplar
     planned, review = jp.entry_exemplars(entries[2], resolve)
     assert [x for x in planned if x["holder"] == "Tartu TÜR"] == [{"holder": "Tartu TÜR", "shelfmark": "R Est. A-5065(9)"}]
@@ -126,7 +127,7 @@ def test_sobitus_uks_uhele_ja_sari():
 
 ITEM = {"work_id": "w1", "nr": 39, "exemplars": [
     {"holder": "Helsinki KK"}, {"holder": "Stockholm KB", "condition": "defektne"},
-    {"holder": "Tartu TÜR", "shelfmark": "R Acad. Dorp. 1633:9", "notes": "Paberkoopia"}]}
+    {"holder": "Tartu TÜR", "shelfmark": "R Acad. Dorp. 1633:9", "reproduction": {"kind": "paberkoopia"}}]}
 
 
 def test_rakendus_lisab_ja_margib():

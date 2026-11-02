@@ -17,7 +17,8 @@
 import React, { useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
-import type { Exemplar, ExemplarConvolute } from '../../types';
+import { REPRODUCTION_KINDS } from '../../types';
+import type { Exemplar, ExemplarConvolute, ExemplarReproduction, ReproductionKind } from '../../types';
 import {
   createWorkExemplar, deleteWorkExemplar, getWorkExemplars, reorderWorkExemplars, updateWorkExemplar,
   type ExemplarInput,
@@ -52,8 +53,10 @@ const TEXT_FIELDS = ['holder', 'shelfmark', 'url', 'condition', 'binding', 'prov
 const MORE_FIELDS = ['condition', 'binding', 'provenance', 'notes'] as const;
 // Konvoluudi väljad (#702, ADR 0076 p 6): koht ja arv on mustandis stringid, et lahtri saaks tühjendada.
 const CONV_FIELDS = ['convReference', 'convPosition', 'convTotal', 'convContents'] as const;
-type Draft = Record<(typeof TEXT_FIELDS)[number] | (typeof CONV_FIELDS)[number], string>;
-const DRAFT_KEYS = [...TEXT_FIELDS, ...CONV_FIELDS] as const;
+// Reproduktsioon (ADR 0076 §11): liik ('' = originaal) ja originaali eksemplari id ('' = teadmata).
+const REP_FIELDS = ['repKind', 'repOf'] as const;
+type Draft = Record<(typeof TEXT_FIELDS)[number] | (typeof CONV_FIELDS)[number] | (typeof REP_FIELDS)[number], string>;
+const DRAFT_KEYS = [...TEXT_FIELDS, ...CONV_FIELDS, ...REP_FIELDS] as const;
 
 const toDraft = (x?: Exemplar): Draft => ({
   holder: x?.holder ?? '',
@@ -67,7 +70,15 @@ const toDraft = (x?: Exemplar): Draft => ({
   convPosition: x?.convolute?.position != null ? String(x.convolute.position) : '',
   convTotal: x?.convolute?.total != null ? String(x.convolute.total) : '',
   convContents: x?.convolute?.contents ?? '',
+  repKind: x?.reproduction?.kind ?? '',
+  repOf: x?.reproduction?.of ?? '',
 });
+
+/** Mustandi reproduktsioon PUT-i kujule: liigita = originaal (`null`). */
+const reproductionFromDraft = (d: Draft): ExemplarReproduction | null => {
+  if (!d.repKind) return null;
+  return { kind: d.repKind as ReproductionKind, ...(d.repOf ? { of: d.repOf } : {}) };
+};
 
 const sameDraft = (a: Draft, b: Draft) => DRAFT_KEYS.every(f => a[f].trim() === b[f].trim());
 
@@ -175,7 +186,9 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
       return false;
     }
     // Kõik väljad kaasa: tühi string eemaldab serveris välja (väärtuseta = võtme puudumine).
-    const body: ExemplarInput = { ...Object.fromEntries(TEXT_FIELDS.map(f => [f, d[f].trim()])), convolute };
+    const body: ExemplarInput = {
+      ...Object.fromEntries(TEXT_FIELDS.map(f => [f, d[f].trim()])), convolute, reproduction: reproductionFromDraft(d),
+    };
     const ok = await write(() => editing.id === null
       ? createWorkExemplar(workId, body, authToken)
       : updateWorkExemplar(workId, editing.id, body, authToken));
@@ -240,6 +253,11 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
   const editorOpen = editing !== null;
 
   const holderLabel = (id: string) => archives[id]?.name ? `${id} — ${archives[id].name}` : id;
+  // Originaali silt: hoidja + kohaviit (id on püsiv, aga kasutajale tähenduseta).
+  const exemplarLabel = (id: string) => {
+    const o = list.find(e => e.id === id);
+    return o ? [o.holder, o.shelfmark].filter(Boolean).join(', ') : t('exemplars.reproduction.missing');
+  };
 
   const renderEditor = () => {
     if (!editing) return null;
@@ -267,6 +285,26 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
             <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="exemplar-url">{t('exemplars.url')}</label>
             <input id="exemplar-url" className={inputClass} value={d.url}
               onChange={e => setField('url', e.target.value)} placeholder="https://..." />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2" data-testid="reproduction-fields">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="exemplar-rep-kind">{t('exemplars.reproduction.kind')}</label>
+            <select id="exemplar-rep-kind" className={inputClass} value={d.repKind}
+              onChange={e => { setField('repKind', e.target.value); if (!e.target.value) setField('repOf', ''); }}>
+              <option value="">{t('exemplars.reproduction.original')}</option>
+              {REPRODUCTION_KINDS.map(k => <option key={k} value={k}>{t(`exemplars.reproduction.kinds.${k}`)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="exemplar-rep-of">{t('exemplars.reproduction.of')}</label>
+            <select id="exemplar-rep-of" className={inputClass} value={d.repOf} disabled={!d.repKind}
+              onChange={e => setField('repOf', e.target.value)}>
+              <option value="">{t('exemplars.reproduction.unknown')}</option>
+              {list.filter(e => e.id !== editing.id).map(e => (
+                <option key={e.id} value={e.id}>{exemplarLabel(e.id)}</option>
+              ))}
+            </select>
           </div>
         </div>
         <button type="button" onClick={() => setConvOpen(v => !v)}
@@ -364,6 +402,14 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
                       className="text-xs text-primary-700 hover:underline inline-flex items-center gap-1 break-all">
                       <ExternalLink size={11} />{x.url}
                     </a>
+                  )}
+                  {x.reproduction && (
+                    <p className="text-xs text-gray-600" data-testid="reproduction-summary">
+                      <span className="text-gray-400">{t('exemplars.reproduction.label')}:</span>{' '}
+                      {t(`exemplars.reproduction.kinds.${x.reproduction.kind}`)}
+                      {' · '}
+                      {x.reproduction.of ? exemplarLabel(x.reproduction.of) : t('exemplars.reproduction.unknown')}
+                    </p>
                   )}
                   {x.convolute && (
                     <p className="text-xs text-gray-600" data-testid="convolute-summary">

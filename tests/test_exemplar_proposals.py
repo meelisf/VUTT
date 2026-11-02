@@ -209,6 +209,17 @@ def test_alias_lahendatakse_votmeks(work):
     assert row["fields"]["holder"] == "TÜR" and row["review_state"] == "pending"
 
 
+def test_koopia_originaal_peab_olema_teose_eksemplar(work):
+    """ADR 0076 §11: `reproduction.of` viitab olemasolevale eksemplarile."""
+    row = {**NEW, "fields": {"holder": "TÜR", "shelfmark": "R Acad. Dorp. 1632:1",
+                             "reproduction": {"kind": "paberkoopia", "of": "a"}}}
+    _submit(work, [row])
+    assert _rows(work)[0]["fields"]["reproduction"] == {"kind": "paberkoopia", "of": "a"}
+    bad = {**row, "fields": {**row["fields"], "reproduction": {"kind": "paberkoopia", "of": "puudub"}}}
+    with pytest.raises(epp.ProposalError, match="reproduction.of"):
+        _submit(work, [bad])
+
+
 def test_teine_partii_vana_alusega_on_stale(work):
     p1 = _submit(work, [UPD])["proposal_id"]
     p2 = _submit(work, [UPD])["proposal_id"]

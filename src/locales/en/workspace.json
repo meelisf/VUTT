@@ -849,6 +849,21 @@
     "moveDown": "Move down",
     "saveExemplar": "Save copy",
     "manuscriptOne": "A manuscript has one copy: the document itself. A transcript or another redaction is a separate work — link it as a variant (block “Related works” in the work info panel).",
+    "reproduction": {
+      "label": "Copy",
+      "kind": "Original or copy",
+      "original": "Original",
+      "of": "Copy of",
+      "unknown": "source unknown",
+      "missing": "(exemplar missing)",
+      "kinds": {
+        "koopia": "Copy",
+        "paberkoopia": "Paper copy",
+        "mikrofilm": "Microfilm",
+        "fotokoopia": "Photocopy",
+        "digikoopia": "Digital copy"
+      }
+    },
     "convolute": {
       "toggle": "Bound volume (convolute)",
       "label": "Convolute",

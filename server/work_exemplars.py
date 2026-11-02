@@ -27,10 +27,12 @@ logger = get_logger(__name__)
 SOURCE_KINDS = frozenset({"ester", "ada", "upload", "migration", "manual", "jaanson"})
 # Vabatekstiväljad, mida vorm ja ettepanek muudavad (holder eraldi: kohustuslik).
 TEXT_FIELDS = ("shelfmark", "url", "condition", "binding", "provenance", "notes")
-EDITABLE_FIELDS = ("holder", *TEXT_FIELDS, "convolute")
+EDITABLE_FIELDS = ("holder", *TEXT_FIELDS, "convolute", "reproduction")
+# Reproduktsiooni liik (ADR 0076 §11). `koopia` = liik teadmata.
+REPRODUCTION_KINDS = ("koopia", "paberkoopia", "mikrofilm", "fotokoopia", "digikoopia")
 # Salvestatud võtmete järjekord — sama sisu annab sama JSON-i (ADR 0012).
 _KEY_ORDER = ("id", "holder", "shelfmark", "url", "text_witness", "pages", "condition",
-              "binding", "provenance", "convolute", "notes", "source", "needs_review")
+              "binding", "provenance", "convolute", "reproduction", "notes", "source", "needs_review")
 UNKNOWN_FIELD = "exemplar_unknown_pages"
 ORIGIN_SAME = "same"
 ORIGIN_UNKNOWN = "unknown"
@@ -94,6 +96,25 @@ def clean_convolute(value) -> Optional[dict]:
     return out
 
 
+def clean_reproduction(value) -> Optional[dict]:
+    """Reproduktsiooni väli (ADR 0076 §11): `{kind, of?}`; tühi → None.
+
+    `of` = originaali eksemplari id samas teoses; et see on olemas ja tsüklit pole,
+    kontrollib `validate_exemplars` (kogu loendi reegel)."""
+    if value in (None, "", {}):
+        return None
+    if not isinstance(value, dict) or set(value) - {"kind", "of"}:
+        raise ExemplarError("Reproduktsioon peab olema objekt {kind, of}")
+    kind = value.get("kind")
+    if kind not in REPRODUCTION_KINDS:
+        raise ExemplarError(f"Reproduktsiooni liik peab olema üks: {', '.join(REPRODUCTION_KINDS)}")
+    out = {"kind": kind}
+    of = _text(value.get("of"), "reproduction.of")
+    if of:
+        out["of"] = of
+    return out
+
+
 def clean_source(value) -> Optional[dict]:
     if value in (None, {}):
         return None
@@ -132,6 +153,9 @@ def normalize_exemplar(x) -> dict:
     convolute = clean_convolute(x.get("convolute"))
     if convolute:
         out["convolute"] = convolute
+    reproduction = clean_reproduction(x.get("reproduction"))
+    if reproduction:
+        out["reproduction"] = reproduction
     source = clean_source(x.get("source"))
     if source:
         out["source"] = source
@@ -147,6 +171,19 @@ def validate_exemplars(exemplars, unknown_pages, stems: Optional[list] = None) -
     ids = [x["id"] for x in out]
     if len(ids) != len(set(ids)):
         raise ExemplarError("Eksemplari id kordub")
+    by_id = {x["id"]: x for x in out}
+    for x in out:
+        of = (x.get("reproduction") or {}).get("of")
+        if of is None:
+            continue
+        if of == x["id"] or of not in by_id:
+            raise ExemplarError("Reproduktsiooni originaal peab olema sama teose teine eksemplar")
+        seen_chain, cur = {x["id"]}, of
+        while cur is not None:                       # mikrofilm → paberkoopia on lubatud, tsükkel mitte
+            if cur in seen_chain:
+                raise ExemplarError("Reproduktsioonide ahel ei tohi olla ring")
+            seen_chain.add(cur)
+            cur = (by_id[cur].get("reproduction") or {}).get("of")
     witnesses = [x for x in out if x.get("text_witness")]
     if len(witnesses) > 1:
         raise ExemplarError("Teosel saab olla ainult üks tekstitunnistaja")
@@ -550,6 +587,8 @@ def _norm_field(field: str, value):
     """Ettepaneku välja väärtus salvestatavale kujule (puudub = None)."""
     if field == "convolute":
         return clean_convolute(value)
+    if field == "reproduction":
+        return clean_reproduction(value)
     return _text(value, field)
 
 
@@ -617,10 +656,22 @@ def apply_proposal_ops(work_dir: str, ops: list, username: str, message: str,
     return _write(work_dir, username, message, mutate, background_tasks)
 
 
+def drop_reproduction_links(exemplars: list, ex_id: str) -> list:
+    """Kustutatud originaali koopiad kaotavad `of`-i ja saavad `needs_review` (ADR 0076 §11).
+    Koopiat ennast ei kustutata: see on endiselt koopia, ainult allikas on teadmata."""
+    out = []
+    for x in exemplars:
+        r = x.get("reproduction") or {}
+        if r.get("of") == ex_id:
+            x = {**x, "reproduction": {"kind": r["kind"]}, "needs_review": True}
+        out.append(x)
+    return out
+
+
 def delete_exemplar(work_dir: str, ex_id: str, username: str, background_tasks=None) -> None:
     def mutate(exemplars, unknown, _stems):
         _find(exemplars, ex_id)
-        return [x for x in exemplars if x["id"] != ex_id], unknown, None
+        return drop_reproduction_links([x for x in exemplars if x["id"] != ex_id], ex_id), unknown, None
 
     _write(work_dir, username, f"Eksemplar: kustuta [{ex_id}]", mutate, background_tasks)
 

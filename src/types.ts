@@ -74,6 +74,14 @@ export interface ExemplarConvolute {
   contents?: string;
 }
 
+// Reproduktsioon (ADR 0076 §11): koopia liik ja originaali eksemplar samas teoses.
+export type ReproductionKind = 'koopia' | 'paberkoopia' | 'mikrofilm' | 'fotokoopia' | 'digikoopia';
+export const REPRODUCTION_KINDS: ReproductionKind[] = ['koopia', 'paberkoopia', 'mikrofilm', 'fotokoopia', 'digikoopia'];
+export interface ExemplarReproduction {
+  kind: ReproductionKind;
+  of?: string;          // originaali eksemplari id; puudub = allikas teadmata
+}
+
 export interface Exemplar {
   id: string;
   holder: string;
@@ -85,6 +93,7 @@ export interface Exemplar {
   binding?: string;
   provenance?: string;
   convolute?: ExemplarConvolute;
+  reproduction?: ExemplarReproduction;
   notes?: string;
   source?: { kind: 'ester' | 'ada' | 'upload' | 'migration' | 'manual' | 'jaanson'; ref?: string; at?: string };
   needs_review?: true;

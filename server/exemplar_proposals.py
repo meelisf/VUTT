@@ -165,6 +165,10 @@ def _clean_row(raw, i: int, live: dict) -> dict:
     create = raw["op"] == "create"
     row = {"op": raw["op"], "fields": _clean_fields(raw.get("fields"), label, create),
            "source": _clean_source(raw.get("source"), label), "status": "pending"}
+    of = (row["fields"].get("reproduction") or {}).get("of")
+    if of is not None and (of not in live or of == raw.get("exemplar_id")):
+        # Originaal peab olema teose olemasolev teine eksemplar (ADR 0076 §11).
+        raise ProposalError(f"invalid_field: {label}.fields.reproduction.of")
     if create:
         if "exemplar_id" in raw or "base" in raw:
             raise ProposalError(f"invalid_row: {label}")

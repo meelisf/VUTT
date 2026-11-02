@@ -849,6 +849,21 @@
     "moveDown": "Liiguta alla",
     "saveExemplar": "Salvesta eksemplar",
     "manuscriptOne": "Käsikirjal on üks eksemplar: dokument ise. Ärakiri või teine redaktsioon on eraldi teos — seo see variandina (teose infopaneelis plokk „Seotud teosed“).",
+    "reproduction": {
+      "label": "Koopia",
+      "kind": "Originaal või koopia",
+      "original": "Originaal",
+      "of": "Mille koopia",
+      "unknown": "allikas teadmata",
+      "missing": "(eksemplar puudub)",
+      "kinds": {
+        "koopia": "Koopia",
+        "paberkoopia": "Paberkoopia",
+        "mikrofilm": "Mikrofilm",
+        "fotokoopia": "Fotokoopia",
+        "digikoopia": "Digikoopia"
+      }
+    },
     "convolute": {
       "toggle": "Konvoluut",
       "label": "Konvoluut",

@@ -18,7 +18,7 @@ MAX_ROWS = 30
 # Väljad, mida agent näeb ja pakkuda tohib (+ id ja tunnistaja märk kontekstiks).
 # Lehed, lipp ja allikas on serveri väljad — neid väljundis ei ole, et agent neid ei pakuks.
 _SHOWN = ("id", "holder", "shelfmark", "url", "condition", "binding", "provenance", "notes",
-          "convolute", "text_witness")
+          "convolute", "reproduction", "text_witness")
 
 
 def _check_work_id(work_id: str) -> None:
