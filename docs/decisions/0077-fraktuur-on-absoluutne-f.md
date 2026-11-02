@@ -307,7 +307,7 @@ Täpsustused teostuse käigus:
   Backendi seiskamine ei ole seega rangelt vajalik; vananenud vahelehed kaitseb
   `/save` 409. Vaikne aeg on siiski soovitatav.
 
-Käivitamata (inimese otsus):
+Käivitamata — samm-sammult juhis: [`docs/runbook-adr-0077-migratsioon.md`](../runbook-adr-0077-migratsioon.md):
 
 1. Kuivkäivitus serveris → aruanne, otsustamata teosed → `otsused.json`.
 2. Hetktõmmis (`git tag pre-0077-f` + `tar`) → `--apply --decisions` → `--check`.
