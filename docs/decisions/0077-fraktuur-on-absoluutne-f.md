@@ -59,10 +59,24 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
      Näide: märgendamata fraktuurlehel (`<f>` 0 % → režiim „antiikva“) märgib
      toimetaja Ctrl+A → Ctrl+K kogu teksti `<f>`-iks. Leht on hall kuni
      salvestamiseni või kuni ta režiimi käsitsi vahetab.
-   - **Käsitsi vahetus:** sildil klõpsamine pöörab kuvarežiimi. See on vaate olek, mida
-     ei salvestata, ja järgmine automaatne arvutus kirjutab selle üle.
-   - **Režiim on nähtav:** tööriistariba juures klõpsatav silt, nt „Põhikiri: fraktuur ·
-     esile tõstetud antiikva“. Ilma sildita ei tea toimetaja, kumba halli ta näeb.
+   - **Režiim on nähtav kahes kohas, ja kumbki ei pikenda tööriistariba** (see on juba
+     täis: kitsal ribal on nupud ainult ikoonidega ja lehe tähistus avaneb eraldi
+     paneelis):
+     - **𝔉 nupp näitab, mida toiming praegu teeb.** Lüliti pöörab alati valiku kirja
+       ümber. Nupu silt on täht, mille tähendus on hall, ja see seisab halli näidise
+       peal: antiikvalehel `𝔉`, fraktuurlehel `A`. Hõljukvihje näiteks „Märgi antiikvaks ·
+       lehe kirjastiil: fraktuur (Ctrl+K)“. Toiming ja kiirklahv ei muutu.
+     - **„Lehekülje kirjastiil“ on redaktori alumisel ribal** („Erimärgid ja juhend“
+       kõrval, paremas servas). Riba on lehe info ja abi jaoks, nii et legend kuulub
+       sinna. Antiikvalehel on silt vaikne (hall), fraktuurlehel värviline, sest seal on
+       halli tähendus vastupidine harjumuspärasele. Kui lehel ei ole ühtki `<f>`-i, silt
+       peidetakse; märgendamata fraktuurlehel ilmub ta pärast esimest `<f>`-i.
+     - **Miks mitte staatuse kõrval:** lehe staatus on salvestatud andmeväli, mida
+       toimetaja määrab. Samasugune rippmenüü selle kõrval laseks arvata, et kirjastiil
+       on samuti lehe omadus, mis salvestub.
+   - **Käsitsi vahetus:** alumise riba sildil klõpsamine pöörab kuvarežiimi. See on
+     vaate olek, mida ei salvestata, ja järgmine automaatne arvutus kirjutab selle üle.
+     Hõljukvihje: „Kuvamine, ei salvestata“.
    - **Miks mitte absoluutne taust:** taustakanalit kasutavad `<m>` ja `<hi>` (kollane)
      ning lehe tähistused. `<f>` on nende sees (`<m><f>…</f></m>`) ja sisemise
      elemendi taust katab välimise. Täielikult halli fraktuurlehel kaotaks
