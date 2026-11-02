@@ -70,7 +70,16 @@
 <ul>
   <li><strong>Italic</strong> – <strong><em>I</em></strong> button (Ctrl+I). If the <strong>whole page</strong> is in italics, still mark all of the text as italic – do not skip it because italic is the “normal” type on that page.</li>
   <li><strong>Bold</strong> – <strong>B</strong> button (Ctrl+B). Early modern print practically never uses it – emphasis there is italic and change of typeface. Use it in later texts (e.g. 19th century) where bold type actually occurs.</li>
-  <li><strong>Code-switching</strong> = a change of <strong>typeface</strong> – <strong class="char">𝔉</strong> button (Ctrl+K); the marked text gets a grey background. Mark both a word set in Antiqua within Fraktur text (typically a Latin word in German text) and a word set in Fraktur within Antiqua text. Mark the typeface, not the language: a change of language within the same typeface is not marked. Antiqua italic within Antiqua text is italic, not code-switching.</li>
+  <li><strong>Fraktur</strong> – <strong class="char">𝔉</strong> button (Ctrl+K). <strong>Fraktur is always marked</strong>, even when the whole page is in Fraktur (as with italics): unmarked text is Antiqua. The same button flips the typeface of the selection – on a Fraktur page it unmarks the selected Antiqua word (the button then shows <strong>A</strong>).
+    <ul>
+      <li><strong>The grey background shows the page’s minority typeface:</strong> Fraktur on an Antiqua page, Antiqua on a Fraktur page. The bottom bar shows <em>Page typeface</em>; clicking it flips the display (not saved). The typeface is computed from the page text on load and on save.</li>
+      <li>Mark the typeface, not the language. Schwabacher and other blackletter types count as Fraktur.</li>
+      <li><strong>Italic and Fraktur exclude each other:</strong> blackletter has no italic, italic is always Antiqua. The italic button on a Fraktur word turns it into Antiqua italic.</li>
+      <li>Greek and Hebrew are neither Fraktur nor Antiqua – they are not marked even inside a Fraktur passage.</li>
+      <li>Numbers and punctuation inside and at the edges of a Fraktur sentence (line-end ⸗, full stop, brackets) belong to the sentence. A line consisting only of a number (e.g. a page number) is not marked.</li>
+      <li>The hyphen follows the typeface: <span class="char">⸗</span> in Fraktur, <span class="char">-</span> in Antiqua – transcribe as printed.</li>
+    </ul>
+  </li>
   <li><strong>Type size is not marked.</strong> Large type on a title page or in a heading stays unformatted – do not make it bold. Italic and change of typeface are still marked there as elsewhere.</li>
 </ul>
 

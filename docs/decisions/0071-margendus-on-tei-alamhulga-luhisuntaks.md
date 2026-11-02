@@ -26,7 +26,7 @@ teisendada.
 | Täg | TEI | Otsingusse |
 |---|---|---|
 | `i` `b` | `hi rend="italic\|bold"` | jah |
-| `cs` | `hi`, kiri vastupidine teose põhikirjale — **erand**, vt allpool | jah |
+| `f` | `hi rend="fraktur"` — absoluutne (ADR 0077; asendas suhtelise `cs`-i) | jah |
 | `hi` | `hi` | jah |
 | `m` | `note place="margin"` | `marginaalia_tekst` |
 | `add` | `add` (ADR 0067) | jah |
@@ -35,7 +35,7 @@ teisendada.
 | `pb` | `pb` | ei |
 | `fw` `sig` `catch` `rh` | `fw type="pageNum\|sig\|catch\|header"` (ADR 0070) | ei → `page_marks` |
 
-**`cs` on suhteline** (koodivahetus teose põhikirja suhtes). TEI teeb sama: põhikiri
+**Ajalugu: `cs` oli suhteline** (koodivahetus teose põhikirja suhtes; asendatud ADR 0077 absoluutse `<f>`-iga). TEI teeb sama: põhikiri
 deklareeritakse kord (`<text rendition="…">`), kõrvalekalle märgitakse. Puudu on
 põhikirja väli; seni ei ole `cs`-i TEI teisendus mehaaniline.
 

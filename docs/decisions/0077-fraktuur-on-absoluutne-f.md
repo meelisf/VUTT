@@ -1,7 +1,7 @@
 # ADR 0077 — Fraktuur on absoluutne märgend `<f>`, mitte suhteline `<cs>`
 
 **Kuupäev:** 2026-11-02
-**Staatus:** ettepanek
+**Staatus:** kehtib (vastu võetud 2026-11-02; kood teostatud, korpuse migratsioon käivitamata — vt „Teostus“)
 **Seotud:** ADR 0071 (märgendus = TEI alamhulk; asendab selle `cs`-erandi), ADR 0003/0009
 (`<m>` välimine), ADR 0062 (migratsioon ühe teisendusfunktsiooniga), #649 (heebrea)
 
@@ -274,3 +274,45 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
   (v.a `cs`)“ kaotab erandi.
 - **EI TOHI:** taastada suhtelist märgendit ega lisada teose põhikirja välja, et mudel
   või import saaks „teisendada tagasi“. Kogu mõte on, et siht tuleneb lehest üksi.
+
+## Teostus (2026-11-02)
+
+| ADR punkt | Kood |
+|---|---|
+| 1, registri kirje | `server/vutt_tags.py`, `src/markup/vuttTags.ts` (`f`, `hi rend="fraktur"`; `cs` kustus); `STYLE_TAGS`, `CLEAN_SPLIT_TAGS` (`consumers.ts`); `page_merge` paaristägid registrist |
+| 2, 2a kuva | `src/components/editor/scriptMode.ts` (+ CodeMirrori väli), 𝔉/A nupp (`EditorToolbar`), „Lehekülje kirjastiil“ (`SpecialCharsPanel`), lugemisvaade ja marginaaliakaart (`renderVuttMarkup(text, mode)`), `.vutt-script-minority` |
+| 3 `<f>`/`<i>` | `selectionWrapChanges` (`wrapTagUtils.ts`): vastandtägi eemaldus enne mähkimist; `cs_to_f` |
+| 3 pesastus | `pageMarkEdit.ts` samm 4b (ainult `f`: `<i>`/`<b>` sees jääb tähistus ADR 0070 järgi stiili sisse) |
+| 3a reapiir | `split_multiline_style_pairs` (`marginalia_normalize.py`, salvestamisel); lüliti `findContainerGlobal` + lahtipakkimine `cleanSelectionChanges(…, only)` kaudu |
+| 6 migratsioon | `scripts/migrate_cs_to_f.py`, `server/script_migration.py` (`cs_to_f`, `infer_base`, manifest) |
+| 7 üleminek | `server/script_transition.py`: `ocr_to_absolute` (re-OCR `_ocr_postprocess`, upload'i import), `restored_to_absolute` (`/git-restore`), `stale_premigration_base` (`/save` 409), `incoming_to_absolute` (vana JS-kimbu `<cs>`) |
+
+Täpsustused teostuse käigus:
+
+- **Manifest commititakse teose lehtedega samas commitis** (`save_with_git`
+  `additional_files`, autor „Automaatne“), mitte eraldi `save_config_with_git`-iga. Nii ei
+  jää katkenud jooksu järel teisendatud lehte manifestita. Vorming on sama.
+- **Manifest kannab teose `migrated_at` ajatemplit, mitte commiti räsi.** Commit ei
+  saa kanda iseenda räsi. Ajaloo taastamine võrdleb versiooni commiti aega sellega.
+- **Gemini trükijuhis jääb üleminekuks suhteliseks `<cs>`-iks**, nagu punkt 7 ütleb,
+  ja läbib sama teisenduse. Sellega ei ole vaja eristada, kumb pakkuja `.ocr` faili
+  tootis. Vahetus käib koos LOSSi mudeliga ja lipuga `config.OCR_OUTPUT_RELATIVE_CS = False`.
+- **Vana mudeli `<cs>`-ita lehte** teisendatakse ainult lehe enda fraktuurisignaali
+  järgi, mitte manifesti põhikirja järgi. `_ocr_postprocess` kutsutakse mitu korda, ja
+  teisendusest märgenduseta jäänud antiikvaleht mähitaks muidu teisel kutsel `<f>`-i.
+  Käsikirja (`Q87167`) teksti ei teisendata.
+- **Meili sünk käib migratsioonis teose kaupa** (nagu `migrate_macron_corpus.py`), mitte
+  täisreindeksina. `lehekylje_tekst` eemaldab tägid niikuinii.
+- **Migratsioon jookseb CAS + `page_lock`-iga** (leht loetakse enne kirjutust uuesti).
+  Backendi seiskamine ei ole seega rangelt vajalik; vananenud vahelehed kaitseb
+  `/save` 409. Vaikne aeg on siiski soovitatav.
+
+Käivitamata (inimese otsus):
+
+1. Kuivkäivitus serveris → aruanne, otsustamata teosed → `otsused.json`.
+2. Hetktõmmis (`git tag pre-0077-f` + `tar`) → `--apply --decisions` → `--check`.
+3. Frontendi ja backendi deploy **samal ajal** migratsiooniga: uus redaktor eeldab
+   absoluutset `<f>`-i ja vana `<cs>` korpuses kuvataks märgendamata tekstina.
+4. LOSS: eksport + kanoniseerimine + poolitusvärav (punkt 5 ja „Tagajärjed“), treening,
+   seejärel mõlemad juhised + `OCR_OUTPUT_RELATIVE_CS = False`.
+
