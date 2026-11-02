@@ -298,6 +298,31 @@ tuvastamist nimekuju järgi. Kasutus oli väike (153 eksemplari, 14 võtit), see
   muutmata. Migratsiooni `source.ref`
   (`"TÜR: R Est.B-954"`) jääb muutmata: see on algse kirje tsitaat.
 
+### 10. Jaansoni leidumus (täiendus 2026-11-02)
+
+Jaansoni bibliograafia (2000, VUTT-i kirjanduses `U9GJPKM8`) kirje lõpus on vasakul
+leidumus (hoidjate lühendid), paremal TÜR-i kohaviit (lk 166). Import on kahes osas:
+`scripts/jaanson_plan.py` (lokaalne: tekst on ainult kohalikus kirjandusindeksis) kirjutab
+plaani, `scripts/jaanson_apply.py` rakendab selle serveris ühe commitiga.
+
+- Iga lahendatud leidumuse hoidja → kohaviidata eksemplar, `source.kind = "jaanson"`,
+  `ref = "Jaanson N"`, `needs_review` (p 2). Tekstitunnistajat ei märgita: skaneeringu
+  päritolu jääb lahtiseks.
+- `R Acad. Dorp. …` on TÜR-i paberkoopiate kollektsioon → TÜR-i eksemplar selle
+  kohaviidaga, märkus „Paberkoopia" (mitte „mikrofilmist": Jaanson ei ütle seda kirje
+  kaupa). Muu parem kohaviit on TÜR-i original; vasak „Tartu ÜR" + parem kohaviit = üks
+  eksemplar.
+- Leidumuse märge: `def.` → `condition: "defektne"`; `Kopie` → märkus „Koopia";
+  `verschollen`, `früher in …`, `Abschr.`/`Handschr.` → eksemplari EI looda (kadunud,
+  asukoht teadmata, käsikirjaline ärakiri on teine dokument); muu märge sõnasõnalt
+  `notes`-i.
+- Teose märkustesse rida „Jaanson N" (väljaande katalooginumber, p 2).
+- Olemas = vahele: kohaviidata kirjel sama hoidja, kohaviidaga kirjel `duplicate_of`,
+  TÜR-i originaalil mis tahes mitte-koopia TÜR-i eksemplar. Käsikirjale ei lisata.
+- Sobitus: pealkirja sarnasus sama aasta (±1) piires, ahne üks-ühele jaotus. Kindel =
+  ≥ 0.85, vahe järgmisega ≥ 0.05 ja samad sarja tunnused (järgarv, rooma number ≤ XXXIX).
+  Ülejäänu läheb ülevaatusnimekirja, mitte plaani.
+
 ## Mida teadlikult EI tehtud
 
 - `archive_refs`-i ei laiendatud eksemplariks. See oleks jätnud kaks puhastajat ja üldise

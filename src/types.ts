@@ -86,7 +86,7 @@ export interface Exemplar {
   provenance?: string;
   convolute?: ExemplarConvolute;
   notes?: string;
-  source?: { kind: 'ester' | 'ada' | 'upload' | 'migration' | 'manual'; ref?: string; at?: string };
+  source?: { kind: 'ester' | 'ada' | 'upload' | 'migration' | 'manual' | 'jaanson'; ref?: string; at?: string };
   needs_review?: true;
 }
 
