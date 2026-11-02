@@ -109,3 +109,15 @@ def test_kasikirja_cs_esiletostuks_voi_valja():
     t = "mit Leib u. Seel. <cs>Kangro Jaan</cs>."
     assert mig.manuscript_cs(t, "hi") == "mit Leib u. Seel. <hi>Kangro Jaan</hi>."
     assert mig.manuscript_cs(t, "strip") == "mit Leib u. Seel. Kangro Jaan."
+
+
+def test_vastuoluline_signaal_cs_ita_on_otsustamata():
+    texts = {"a.txt": "Ge⸗\nx", "b.txt": "ex-\ny"}
+    assert mig.plan_work("w", texts, None, None)[0] == "undecided"
+
+
+def test_segateos_cs_ita_leht_lehe_signaalist():
+    texts = {"de.txt": "Klag vnd Ge⸗\nwitter", "la.txt": "ex-\nemplum", "mix.txt": "Ge⸗\nex-\nx"}
+    status, _, _, plans, extra = mig.plan_work("w", texts, "P", None)
+    assert plans == {"de.txt": "<f>Klag vnd Ge⸗</f>\n<f>witter</f>"}
+    assert extra == {"unresolved": ["mix.txt"]}

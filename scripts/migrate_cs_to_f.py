@@ -105,7 +105,9 @@ def plan_work(work_id: str, texts: dict, decision, entry, page_decisions=None):
     elif inferred:
         base, source = inferred, "signaal"
     else:
-        if has_cs:
+        # Vastuoluline signaal on otsustamata ka <cs>-ita: fraktuurteos, kus <cs>-i
+        # pole, jääks muidu märgendamata (kuvataks antiikvana, värav lipustaks).
+        if has_cs or (f and a):
             return "undecided", None, None, {}, (f, a)
         return "no_signal", None, None, {}, (f, a)
     if base == "A" and not has_cs:
@@ -113,9 +115,15 @@ def plan_work(work_id: str, texts: dict, decision, entry, page_decisions=None):
     if base == "P":
         plans, unresolved = {}, []
         for fn, t in texts.items():
-            if "<cs>" not in t and fn not in page_decisions:
-                continue  # segateose <cs>-ita leht: kiri teadmata, jääb puutumata
             pb = page_base(base, fn, t, page_decisions)
+            if "<cs>" not in t and fn not in page_decisions:
+                # <cs>-ita leht: kirja pole kunagi märgitud. Fraktuurisignaaliga leht
+                # mähitakse, antiikva jääb puutumata, vastuoluline ⸗-ga leht → aruandesse.
+                if pb == "F":
+                    plans[fn] = cs_to_f(t, "F")
+                elif pb is None and "⸗" in t:
+                    unresolved.append(fn)
+                continue
             if pb:
                 plans[fn] = cs_to_f(t, pb)
             else:
@@ -225,7 +233,7 @@ def main() -> int:
 
     manifest = load_manifest()
     totals = Counter()
-    report = {"fraktur": {}, "antiqua": {}, "undecided": {}, "no_signal": 0, "italic_in_fraktur": {}, "raced": {}}
+    report = {"fraktur": {}, "antiqua": {}, "undecided": {}, "no_signal": [], "italic_in_fraktur": {}, "raced": {}}
     for meta_path in sorted(glob.glob(os.path.join(BASE_DIR, "*", "_metadata.json"))):
         work_dir = os.path.dirname(meta_path)
         try:
@@ -253,12 +261,19 @@ def main() -> int:
             work_id, texts, decisions.get(work_id), manifest["works"].get(work_id),
             page_decisions.get(work_id))
         slug = os.path.basename(work_dir)
+        try:
+            langs = json.load(open(meta_path, encoding="utf-8")).get("languages") or []
+        except (OSError, ValueError):
+            langs = []
         if status == "undecided":
             report["undecided"][work_id] = {"slug": slug, "signal_F": signal[0], "signal_A": signal[1],
-                                            "cs_pages": sum("<cs>" in t for t in texts.values())}
+                                            "cs_pages": sum("<cs>" in t for t in texts.values()),
+                                            "pages": len(texts), "languages": langs}
             continue
         if status == "no_signal":
-            report["no_signal"] += 1
+            # Ei muutu — aga loetle, et inimene näeks (nt lühike fraktuurtrükis poolitusteta).
+            report["no_signal"].append({"work_id": work_id, "slug": slug, "pages": len(texts),
+                                        "languages": langs})
             continue
         if status == "noop":
             continue
@@ -295,7 +310,7 @@ def main() -> int:
     print(f"Otsustamata (<cs> + signaalita/vastuoluga): {len(report['undecided'])} teost — vaja --decisions")
     print(f"<i> fraktuurteostes (vaata üle): {len(report['italic_in_fraktur'])} teost")
     print(f"Käsikirjad <cs>-iga (välja jäetud, --manuscript-cs): {len(report.get('manuscript', {}))} teost")
-    print(f"Signaalita ja <cs>-ita (ei muutu): {report['no_signal']} teost")
+    print(f"Signaalita ja <cs>-ita (ei muutu, aruandes nimekiri): {len(report['no_signal'])} teost")
     print("(kuivkäivitus, --apply kirjutab)" if not args.apply else f"Vahele (muutus vahepeal): {len(report['raced'])} teost")
     print(f"Aruanne: {args.report}")
     return 0
