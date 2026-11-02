@@ -13,6 +13,7 @@ Ainult stdlib: moodulit impordib ka standalone migratsiooniskript.
 """
 import hashlib
 import json
+from typing import Optional
 import os
 import re
 import unicodedata
@@ -167,13 +168,13 @@ def load_manifest(path: str = MANIFEST_PATH) -> dict:
     return data
 
 
-def work_entry(work_id: str, manifest: dict | None = None) -> dict | None:
+def work_entry(work_id: str, manifest: Optional[dict] = None) -> Optional[dict]:
     m = manifest if manifest is not None else load_manifest()
     return m["works"].get(work_id)
 
 
 def is_premigration_base(work_id: str, filename: str, base_text: str,
-                         manifest: dict | None = None) -> bool:
+                         manifest: Optional[dict] = None) -> bool:
     """Kas kliendi `base` on migratsioonieelne tekst (vananenud redaktoriseanss)."""
     entry = work_entry(work_id, manifest)
     if not entry:
