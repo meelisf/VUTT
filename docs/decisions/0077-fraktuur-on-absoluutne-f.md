@@ -181,7 +181,13 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
       mitte `(<f>Gott sey Lob</f>).`). Muidu läheks migratsioon kohe vastuollu
       punkti 4 väravaga. Servatühik jääb välja. Lõik
       katkeb `<cs>`-, `<i>`-, kreeka- ja heebrealõigu, `<fn>`-i ja `<pb/>`-ga. `<i>`
-      jääb `<f>`-ist välja ja `<cs><i>x</i></cs>` muutub `<i>x</i>`-ks. Struktuuritägi
+      jääb `<f>`-ist välja ja `<cs><i>x</i></cs>` muutub `<i>x</i>`-ks. Pesastuses
+      otsustab **sisemine** täg: antiikvateoses on `<i>…<cs>x</cs>…</i>` fraktuurisõna
+      kursiivlõigus (nimed, kohanimed) ja kursiiv tükeldatakse —
+      `<i>ne in </i><f>Frödzwijck</f><i> &c.</i>`. *Täiendus 2026-11-02:* esimene
+      rakendus viskas selle `<cs>`-i ära (91 lehte, peaaegu kõik Valmis); parandus
+      `migrate_cs_to_f.py --fix-italic pre-0077-f` teisendab need lehed
+      migratsioonieelsest tekstist uuesti, kui leht pole vahepeal muutunud. Struktuuritägi
       sees mähitakse sisu (`<catch><f>…</f></catch>`), mitte tägi ennast. Kehtivad
       punkti 3 reeglid.
    5. Kõik lehed, ka **Toores**: nende `<cs>` on vana mudeli suhteline väljund.
