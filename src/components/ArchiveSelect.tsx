@@ -8,6 +8,7 @@ import { isAtLeast } from '../utils/roleUtils';
 interface ArchiveInfo {
   name: string;
   url?: string;
+  aliases?: string[];
 }
 
 interface ArchiveSelectProps {
@@ -42,7 +43,9 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
   const filtered = filter
     ? entries.filter(([id, info]) =>
         id.toLowerCase().includes(filter.toLowerCase()) ||
-        info.name.toLowerCase().includes(filter.toLowerCase())
+        info.name.toLowerCase().includes(filter.toLowerCase()) ||
+        // Ajalooline kuju („Tallinn ERR") leiab praeguse hoidja
+        (info.aliases || []).some(a => a.toLowerCase().includes(filter.toLowerCase()))
       )
     : entries;
 

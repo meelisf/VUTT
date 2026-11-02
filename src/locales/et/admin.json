@@ -444,6 +444,8 @@
     "addArchive": "Lisa arhiiv",
     "id": "Lühend",
     "idPlaceholder": "Lühend (nt \"EKM\")",
+    "aliases": "Teised nimekujud",
+    "aliasesPlaceholder": "Teised nimekujud (eralda semikooloniga)",
     "name": "Nimi",
     "url": "URL (valikuline)",
     "selectPlaceholder": "Arhiiv",
