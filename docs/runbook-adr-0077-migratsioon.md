@@ -13,7 +13,7 @@ salvestus saab 409.
 
 ## 0. Eelkontroll (lokaalselt)
 
-- [ ] **Ülevaatus tehtud:** [`decisions/0077-ulevaatus.md`](decisions/0077-ulevaatus.md). Otsustamata
+- [ ] **Ülevaatus tehtud** ülevaatuslehel https://claude.ai/artifact/Cnwfbg833Aa8ivPVErx1Mq (põhikiri keelest; valikud salvestuvad, Claude kannab need `0077-otsused.json`-i). Vanem poolitusmärgipõhine nimekiri [`decisions/0077-ulevaatus.md`](decisions/0077-ulevaatus.md) on aegunud. Otsustamata
       teosed (jaotis 1), signaalita fraktuurteosed (2) ja segateoste lehed (3) on kantud faili
       `0077-otsused.json`. Värava lipud (4) ei blokeeri migratsiooni, aga Valmis-lehed jäävad
       treeningust välja, kuni need on VUTT-is parandatud.
