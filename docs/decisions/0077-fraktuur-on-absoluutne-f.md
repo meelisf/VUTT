@@ -11,8 +11,12 @@
 ole kuskil kirjas: seda ei näe ei mudel, kes loeb ühte lehte, ega TEI teisendus.
 Sama pilt saab treeningandmetes vastupidise märgenduse: fraktuuris lõik on
 antiikvateoses `<cs>`, fraktuurteoses märgendamata. Trükimudel ei ole koodivahetust
-usaldusväärselt õppinud. Selle põhjus on vastuoluline siht, mitte mudeli
-võimekus: mudelilt küsitakse infot, mida lehel ei ole.
+usaldusväärselt õppinud. **Hüpotees** on, et põhjus on vastuoluline siht, mitte mudeli
+võimekus: mudelilt küsitakse infot, mida lehel ei ole. Allolev loendus näitab, et
+siht on teose kaupa vastupidine. Seda, et just see on õppimisraskuse põhjus, ta ei
+tõesta. Kinnituse annab alles `<f>`-ga treenitud mudeli mõõtmine samal
+hindamiskomplektil (`<f>`-vahemike F1 enne ja pärast). Otsus on põhjendatud ka ilma
+selleta: absoluutne märgend teeb TEI teisenduse mehaaniliseks (ADR 0071 erand kaob).
 
 Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 lehte,
 137 teost). Põhikiri tuletati rea lõpu poolitusmärgist: juhis seob `⸗` fraktuuri ja
@@ -25,7 +29,10 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
 - 1256 `<cs>`-vahemikust on mitmerealisi 6: reapiiri üle ei märgendata ka praegu.
 - Kümnes teoses on üksikuid vastuolusid. Näiteks oratsioonides on üks `⸗` antiikvas
   väljaspool `<cs>`-i ja Hexen-Predigt 1626-s 13 `-` fraktuuris väljaspool `<cs>`-i.
-  Need on märgendusvead (unustatud `<cs>` või vale poolitusmärk), mitte signaali müra.
+  **Neid ei ole pildilt kontrollitud.** Vastuolu võib olla märgendusviga (unustatud
+  `<cs>`, vale poolitusmärk) või autentne: varauusaegne trükk ei ole poolitusmärgi
+  kasutuses alati järjekindel. Kumb, selgub alles pildilt; seepärast on punktis 4
+  erandite nimekiri ja migratsiooni aruandes (6.2) eraldi rühm „vastuoluga“.
 
 ## Otsus
 
@@ -164,7 +171,7 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
       seisundi) poolitusmärgist. Aruanne loetleb teosed kolmes rühmas: antiikva,
       fraktuur ja otsustamata (signaalita või vastuoluga). Otsustamata teosed määrab
       inimene ühe pildi järgi; käsitsi loend (`work_id → F|A`) antakse skriptile
-      sisendiks. Aruanne loetleb eraldi `<i>` fraktuurteostes, sest nende tähendus
+      sisendiks ja läheb manifesti (6.7). Aruanne loetleb eraldi `<i>` fraktuurteostes, sest nende tähendus
       tuleb enne vaadata.
    3. **Antiikvateos:** `<cs>` → `<f>`.
    4. **Fraktuurteos:** iga rea fraktuurlõik mähitakse `<f>`-i ja `<cs>` eemaldatakse
@@ -181,19 +188,48 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
    6. **Rakendus seisatud backendiga** (nagu ADR 0076): ükski toimetaja salvestus ei
       jookse vahele. Teose kohta üks commit (autor `"Automaatne"`), siis Meili
       täisreindeks (`server_seed_data.sh`).
-   7. **Idempotentne:** `<f>`-iga lehte ei puudutata uuesti. `<cs>`-iga lehe
-      teisendab korduskäivitus samamoodi, mis katab üleminekuaja (punkt 7).
+   7. **Manifest, mitte `<f>`-i olemasolu, on teisendatuse tunnus.** `<f>`-i
+      olemasolu ei kõlba: fraktuurteose täielikult antiikvas leht teisendub
+      `<cs>ABC</cs>` → `ABC`, ja korduskäivitus loeks selle teisendamata fraktuuriks ning
+      annaks `<f>ABC</f>`. Skript kirjutab manifesti
+      `data/config/migrations/0077-f.json` (`save_config_with_git`, ADR 0040):
+      - teose kohta põhikiri (`F|A`), päritolu (`signaal` | `käsitsi`) ja migratsiooni
+        commit;
+      - lehe kohta sisendi ja väljundi räsi.
+
+      Korduskäivitus puudutab ainult lehte, mille praegune räsi ei ole manifestis
+      väljundina. Selline leht on muutunud pärast migratsiooni, ja teisendatakse ta
+      ainult siis, kui tal on `<cs>`. Manifest ei ole põhikirja väli andmemudelis: seda
+      loeb ainult üleminekukiht (punkt 7), mitte mudel, import pärast üleminekut ega
+      TEI eksport.
 
    Mahuliselt on risk väike, sest enamik toimetatud lehti on antiikvas ja sealne
    teisendus on ümbernimetamine. Sisuliselt muutuvad ainult fraktuurteosed.
 
 7. **Üleminek ühe korraga.** Järjekord: migratsioon → uus eksport → treening →
    mudel ja **mõlemad juhised** (LOSSi `scripts/prompt.py`, VUTT-i
-   `server/ocr_prompts.py` Gemini tee) lähevad tootmisse koos. Vahepeal annab vana
-   mudel `<cs>`-i. Need lehed teisendab migratsiooniskripti korduskäivitus
-   (lehe kaupa poolitusmärgist või teose varem määratud põhikirjast). Pärast
-   vahetust ei tohi korpuses ühtki `<cs>`-i olla. Viimane korduskäivitus kontrollib
-   seda.
+   `server/ocr_prompts.py` Gemini tee) lähevad tootmisse koos.
+
+   **Vana märgendus võib tagasi tulla kolme teed pidi.** Iga tee kasutab sama
+   teisendusfunktsiooni (`cs_to_f(text, põhikiri)`) ja manifesti:
+   - **Vana mudeli väljund üleminekuajal** (upload'i import, re-OCR-i vastuvõtt,
+     Gemini tee vana juhisega): teisendatakse impordi hetkel. Põhikiri tuleb
+     manifestist; uue teose puhul lehe poolitusmärgist ja kui signaal puudub, siis
+     `A` aruandesse. Pärast mudeli vahetust see kiht eemaldatakse.
+   - **Ajaloo taastamine** (`/git-restore`, `server/routers/editing.py`): versioon, mis
+     on vanem kui teose migratsiooni commit (manifestis), teisendatakse enne
+     kirjutamist. Muidu tuleks tagasi `<cs>` või märgendamata vana fraktuurtekst.
+     `/commit-diff` näitab ajalugu muutmata kujul, sest see on ajaloo kirje, mitte
+     kirjutustee.
+   - **Vananenud redaktoriseanss:** pärast migratsiooni salvestab enne migratsiooni
+     avatud vaheleht, mille `base` on vana tekst (`/save` kolmesuunaline liitmine,
+     ADR 0054). Muudetud read tuleksid vanas märgenduses tagasi. Kui `base` räsi on
+     manifestis sisendina, vastab `/save` 409-ga („Leht on vahepeal teisendatud,
+     laadi uuesti“) ega liida.
+   - Agendi lehe teksti ettepanekud (ADR 0058) on räsiseotud ja vananevad ise.
+
+   Valvur: korpuses ei ole pärast mudeli vahetust ühtki `<cs>`-i (skripti
+   kontrollrežiim). Test: `/git-restore` migratsioonieelsele versioonile annab `<f>`-i.
 
 ## Tagajärjed
 
