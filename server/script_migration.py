@@ -183,3 +183,164 @@ def is_premigration_base(work_id: str, filename: str, base_text: str,
     if not page or page.get("in") == page.get("out"):
         return False
     return text_hash(base_text) == page.get("in")
+
+
+# --- Keelepõhine põhikiri (kasutaja reegel 2026-11-02) ---
+#
+# Poolitusmärk on signaal AINULT inimese üle vaadatud lehel; Toores-lehe poolitusmärgi
+# kirjutas OCR-mudel. Keel on kindlam: ladina/prantsuse → antiikva, saksa/rootsi/eesti →
+# fraktuur (harvad erandid → ülevaatus).
+
+REVIEWED_STATUSES = frozenset({"Valmis", "Annoteeritud", "Parandatud"})
+SCRIPT_OF_LANG = {"lat": "A", "fra": "A", "deu": "F", "swe": "F", "est": "F"}
+
+# Ainult ühele keelele omased sõnad: ladina „die" (kuupäev), „se", „ei", „ne", „en", „qui",
+# „que", „des", „the" on välja jäetud, sest nad tõmbaksid ladina lehe teise keele poole.
+_STOP = {
+    "lat": "et in est non ad cum quod qui quae quam ut sed de ex per sunt enim autem vel ac atque "
+           "nec hoc esse eius sic tam etiam ab pro sub inter ita si nos vos tibi mihi quoque deus dei "
+           "deo nobis ipse illa ille quia quibus sive seu omnia omnes erat esset sit ad",
+    "deu": "und vnd der das ist nicht ein eine zu den mit sich auch auff auf von dem des wie er "
+           "sie ich wir daß dass dieser welche wird hat nach bey bei aus auß seyn sein gott herr "
+           "ihr ihm ihn uns vns kan kann noch doch wann wenn als mein dein sol soll",
+    "swe": "och att det som ett är på med för af til then thet hwar icke eller han hon sigh sin "
+           "uthi uti wara war gudh gud oss migh tigh mitt ditt hwad ock skal skall hafwer",
+    "est": "ja ning on kes mis ka nüüd wäega kui temma sedda ollema jummal jummala meie sinna "
+           "minna kõik kõige sees peale wasto agga ollid sinno minno tahhan",
+    "fra": "le la les du un une pour dans avec pas au aux ce cette il elle sont nous "
+           "vous mais leur",
+}
+_STOP_SETS = {lang: frozenset(w.split()) for lang, w in _STOP.items()}
+_WORD_RE = re.compile(r"[^\W\d_]+")
+_CS_BLOCK_RE = re.compile(r"<cs>.*?</cs>", re.S)
+
+
+def _words(text: str) -> list:
+    plain = _TOKEN_RE.sub(" ", text or "").replace("ſ", "s").lower()
+    return _WORD_RE.findall(plain)
+
+
+def language_scores(text: str) -> dict:
+    words = _words(text)
+    return {lang: sum(1 for w in words if w in s) for lang, s in _STOP_SETS.items()}
+
+
+def detect_language(text: str, min_hits: int = 2):
+    """Keelekood või None (liiga vähe tõendit / viik). Ülekaal: vähemalt 2× teisest."""
+    scores = language_scores(text)
+    ranked = sorted(scores.items(), key=lambda kv: -kv[1])
+    (top, n1), (_, n2) = ranked[0], ranked[1]
+    if n1 >= min_hits and n1 >= 2 * n2:
+        return top
+    return None
+
+
+def _is_mixed(text: str) -> bool:
+    """Kas lehel on kahe eri kirja keeled märkimisväärselt (nt ladina + saksa luuletus)."""
+    by_script = {"A": 0, "F": 0}
+    for lang, n in language_scores(text).items():
+        by_script[SCRIPT_OF_LANG[lang]] += n
+    lo, hi = sorted(by_script.values())
+    return lo >= 3 and lo >= 0.2 * hi
+
+
+def _line_scripts(text: str) -> list:
+    """Iga rea kiri ('A'|'F'|None) rea keelest; tõenditeta rida pärib eelmise
+    (luuletus ja proosaplokk on mitmerealised), alguse tühimik järgmise."""
+    out = []
+    for line in text.split("\n"):
+        lang = detect_language(line, min_hits=1)
+        out.append(SCRIPT_OF_LANG[lang] if lang else None)
+    last = None
+    for i, s in enumerate(out):
+        if s is None:
+            out[i] = last
+        else:
+            last = s
+    nxt = None
+    for i in range(len(out) - 1, -1, -1):
+        if out[i] is None:
+            out[i] = nxt
+        else:
+            nxt = out[i]
+    return out
+
+
+def _wrap_lines(text: str, scripts: list) -> str:
+    """Mähib fraktuuriread: antiikvaread märgitakse ajutiselt <cs>-iga ja teisendatakse
+    põhikirjaga F — sama `cs_to_f` reeglid (struktuuritägide sees, kreeka välja jne)."""
+    lines = text.split("\n")
+    marked = [f"<cs>{ln}</cs>" if s != "F" else ln for ln, s in zip(lines, scripts)]
+    return cs_to_f("\n".join(marked), "F")
+
+
+def to_absolute(text: str, status=None, fallback=None, override=None):
+    """Lehe teisendus absoluutseks `<f>`-iks. Tagastab (uus_tekst, info).
+
+    info: {"kind": 'cs'|'whole'|'mixed'|'antiqua'|'none'|'unknown', "base": 'A'|'F'|None,
+           "lang": keel|None, "conflict": bool, "reason": str}
+    - `<cs>`-iga leht: põhikiri = `<cs>`-ist VÄLJAPOOLE jääva teksti keel (`<cs>` tähistas
+      kõrvalekallet just sellest); tundmatu → `<cs>`-i sisu keele vastand → üle vaadatud
+      lehe poolitusmärk →
+      `fallback` (teose otsus) → 'unknown' (tekst muutumata).
+    - `<cs>`-ita leht: fraktuurikeelne leht → `<f>`; segaleht → rea kaupa; antiikva → muutumata.
+    - `override` ('A'|'F', lehe käsitsi otsus) võidab keele.
+    - `conflict`: üle vaadatud lehe poolitusmärk on keelega vastuolus → ülevaatusse.
+    """
+    info = {"kind": "none", "base": None, "lang": None, "conflict": False, "reason": ""}
+    if not text or not text.strip():
+        return text, info
+    if "<f>" in text and "<cs>" not in text:
+        info.update(kind="none", reason="juba <f>")
+        return text, info
+    reviewed = status in REVIEWED_STATUSES
+    hyphen = infer_base([text])[0] if reviewed else None
+    has_cs = "<cs>" in text
+    probe = _CS_BLOCK_RE.sub(" ", text) if has_cs else text
+    lang = detect_language(probe)
+    info["lang"] = lang
+    lang_base = SCRIPT_OF_LANG.get(lang) if lang else None
+
+    # Väljaspool <cs>-i keel tundmatu (nt terve leht <cs>-is): põhikiri on <cs>-i sisu
+    # kirja VASTAND (<cs> tähistas kõrvalekallet).
+    inner_base = None
+    if has_cs and not lang_base:
+        inner = detect_language(" ".join(_CS_BLOCK_RE.findall(text)))
+        if inner:
+            inner_base = "F" if SCRIPT_OF_LANG[inner] == "A" else "A"
+    if override:
+        base, reason = override, "lehe otsus"
+    elif lang_base:
+        base, reason = lang_base, f"keel {lang}"
+    elif inner_base:
+        base, reason = inner_base, "<cs>-i sisu keel"
+    elif hyphen:
+        base, reason = hyphen, "poolitus (üle vaadatud)"
+    elif fallback in ("A", "F"):
+        base, reason = fallback, "teose otsus"
+    else:
+        base, reason = None, "keel tundmatu"
+    info.update(base=base, reason=reason,
+                conflict=bool(not override and lang_base and hyphen and hyphen != lang_base))
+
+    if has_cs:
+        if base is None:
+            info["kind"] = "unknown"
+            return text, info
+        info["kind"] = "cs"
+        return cs_to_f(text, base), info
+
+    # <cs>-ita leht
+    if not override and _is_mixed(text):
+        info["kind"] = "mixed"
+        return _wrap_lines(text, _line_scripts(text)), info
+    if base == "F":
+        info["kind"] = "whole"
+        return cs_to_f(text, "F"), info
+    if base == "A":
+        info["kind"] = "antiqua"
+        return text, info
+    # Keel tundmatu: kui lehel on fraktuuri poolitus ja piisavalt teksti, vajab ülevaatust.
+    letters = sum(1 for c in probe if _is_latin(c))
+    info["kind"] = "unknown" if ("⸗" in text and letters >= 40) else "none"
+    return text, info

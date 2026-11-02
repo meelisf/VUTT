@@ -17,7 +17,7 @@ from datetime import datetime
 
 from . import config
 from .config import BASE_DIR, get_logger
-from .script_migration import cs_to_f, infer_base, is_premigration_base, load_manifest
+from .script_migration import infer_base, is_premigration_base, load_manifest, to_absolute
 
 logger = get_logger(__name__)
 
@@ -37,45 +37,34 @@ def _work_id(slug: str) -> Optional[str]:
     return _work_meta(slug).get("id")
 
 
-def _base_for(slug: str, text: str) -> str:
-    """Põhikiri: manifestist; uue teose või segateose puhul lehe poolitusmärgist; muidu 'A'."""
-    entry = load_manifest()["works"].get(_work_id(slug) or "")
-    if entry and entry["base"] in ("A", "F"):
-        return entry["base"]
-    # Uus teos või segateos (P, ADR 0077): lehe poolitusmärgist.
-    return infer_base([text])[0] or "A"
+def _abs(text: str):
+    """`to_absolute` kirjutusteel: tundmatu keele korral EI tohi `<cs>` alles jääda —
+    varuvariant on lehe poolitusmärk, siis antiikva (migratsioonis läheb selline leht
+    hoopis ülevaatusse)."""
+    return to_absolute(text, fallback=infer_base([text])[0] or "A")
 
 
 def incoming_to_absolute(slug: str, text: str) -> str:
-    """`<cs>`-iga sisend (vana JS-kimp, vana mudel) → `<f>`. Ilma `<cs>`-ita muutumata."""
+    """`<cs>`-iga sisend (vana JS-kimp) → `<f>` keelepõhise põhikirjaga. Ilma `<cs>`-ita muutumata."""
     if "<cs>" not in (text or ""):
         return text
-    base = _base_for(slug, text)
-    logger.warning("ADR 0077: <cs>-iga sisend teisendati (%s, põhikiri %s)", slug, base)
-    return cs_to_f(text, base)
+    new, info = _abs(text)
+    logger.warning("ADR 0077: <cs>-iga sisend teisendati (%s, %s)", slug, info.get("reason"))
+    return new
 
 
 def ocr_to_absolute(slug: str, text: str, *, manuscript: Optional[bool] = None) -> str:
-    """Vana trükimudeli väljund üleminekuajal. Idempotentne (kutsutakse mitu korda).
-
-    - `<cs>`-iga leht → teisendus teose põhikirjaga;
-    - `<cs>`-ita leht teisendatakse ainult siis, kui LEHE ENDA signaal on fraktuur
-      (vana mudel ei märgi terves fraktuurlehes midagi). Manifesti põhikirja siin ei
-      kasutata: teisendusest märgenduseta jäänud antiikvaleht mähitaks muidu teisel
-      kutsel tervikuna `<f>`-i.
-    Käekiri ei kanna kirjamärgendust → muutumata.
-    """
+    """Vana trükimudeli väljund üleminekuajal — sama `to_absolute` mis migratsioonil
+    (põhikiri keelest; OCR-väljundi poolitusmärk on mudeli oma, mitte tõend).
+    Idempotentne: `<f>`-iga tekst ja antiikvaleht jäävad teisel kutsel samaks.
+    Käekiri ei kanna kirjamärgendust → muutumata."""
     if not config.OCR_OUTPUT_RELATIVE_CS or not text:
         return text
     if manuscript is None:
         manuscript = (_work_meta(slug).get("type") or {}).get("id") == MANUSCRIPT_TYPE
     if manuscript:
         return text
-    if "<cs>" in text:
-        return cs_to_f(text, _base_for(slug, text))
-    if "<f>" not in text and infer_base([text])[0] == "F":
-        return cs_to_f(text, "F")
-    return text
+    return _abs(text)[0]
 
 
 def _commit_time(commit_hash: str) -> Optional[datetime]:
@@ -89,21 +78,19 @@ def _commit_time(commit_hash: str) -> Optional[datetime]:
 def restored_to_absolute(slug: str, content: str, commit_hash: str) -> str:
     """Ajaloo versioon enne kirjutamist (`/git-restore`).
 
-    `<cs>`-iga versioon on migratsioonieelne definitsiooni järgi. Fraktuurteose
-    märgendamata vana tekst (`<cs>`-i ega `<f>`-i ei ole) on migratsioonieelne, kui
-    tema commit on vanem kui teose `migrated_at` manifestis.
+    `<cs>`-iga versioon on migratsioonieelne definitsiooni järgi. `<cs>`-ita versioon on
+    migratsioonieelne, kui tema commit on vanem kui teose `migrated_at` manifestis —
+    siis läbib ta sama keelepõhise teisenduse (märgendamata vana fraktuurtekst).
     """
     if "<cs>" in (content or ""):
-        return cs_to_f(content, _base_for(slug, content))
+        return _abs(content)[0]
+    if "<f>" in (content or ""):
+        return content
     entry = load_manifest()["works"].get(_work_id(slug) or "")
-    if not entry or entry.get("base") != "F" or "<f>" in (content or ""):
-        return content
-    migrated_at = entry.get("migrated_at")
-    when = _commit_time(commit_hash)
-    if not migrated_at or when is None:
-        return content
-    if when < datetime.fromisoformat(migrated_at):
-        return cs_to_f(content, "F")
+    migrated_at = (entry or {}).get("migrated_at")
+    when = _commit_time(commit_hash) if migrated_at else None
+    if when is not None and when < datetime.fromisoformat(migrated_at):
+        return _abs(content)[0]
     return content
 
 

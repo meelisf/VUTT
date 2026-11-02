@@ -38,28 +38,34 @@ def work(monkeypatch):
             os.remove(p)
 
 
-def test_ocr_cs_teisendatakse_manifesti_pohikirjaga(work):
-    slug = work("w1", entry={"base": "F", "pages": {}})
-    assert st.ocr_to_absolute(slug, "Text <cs>Deus</cs>") == "<f>Text</f> Deus"
+DE = "vnd die Welt ist nicht mit dem Herrn"
+LA = "Quod est in corpore et non sine Deo"
 
 
-def test_ocr_uus_teos_lehe_signaalist_ja_idempotentne(work):
+def test_ocr_cs_pohikiri_keelest(work):
+    slug = work("w1")
+    assert st.ocr_to_absolute(slug, f"{DE} <cs>Deus</cs>") == f"<f>{DE}</f> Deus"
+    assert st.ocr_to_absolute(slug, f"{LA} <cs>Gott</cs>") == f"{LA} <f>Gott</f>"
+
+
+def test_ocr_saksa_leht_mahitakse_ja_idempotentne(work):
     slug = work("w2")
-    once = st.ocr_to_absolute(slug, "vnd Ge⸗\nwitter")
-    assert once == "<f>vnd Ge⸗</f>\n<f>witter</f>"
+    once = st.ocr_to_absolute(slug, f"{DE} Ge⸗\nwitter")
+    assert once.startswith("<f>")
     assert st.ocr_to_absolute(slug, once) == once
 
 
-def test_ocr_fraktuurteose_antiikvaleht_ei_maha_teisel_kutsel(work):
-    slug = work("w3", entry={"base": "F", "pages": {}})
-    once = st.ocr_to_absolute(slug, "<cs>Thesis prima ex-</cs>\n<cs>emplum</cs>")
-    assert "<f>" not in once
+def test_ocr_antiikvaleht_ei_maha_teisel_kutsel(work):
+    slug = work("w3")
+    # Terve leht <cs>-is, sisu ladina → põhikiri oli fraktuur, sisu antiikva → <f>-ita
+    once = st.ocr_to_absolute(slug, f"<cs>{LA}</cs>")
+    assert once == LA
     assert st.ocr_to_absolute(slug, once) == once
 
 
 def test_ocr_kasikiri_muutumata(work):
     slug = work("w4", manuscript=True)
-    assert st.ocr_to_absolute(slug, "Ge⸗\nwitter") == "Ge⸗\nwitter"
+    assert st.ocr_to_absolute(slug, DE) == DE
 
 
 def test_ocr_lipp_valjas_muutumata(work, monkeypatch):
@@ -69,26 +75,26 @@ def test_ocr_lipp_valjas_muutumata(work, monkeypatch):
 
 
 def test_sisend_cs_teisendatakse(work):
-    slug = work("w6", entry={"base": "A", "pages": {}})
-    assert st.incoming_to_absolute(slug, "Thesis <cs>Gott</cs>") == "Thesis <f>Gott</f>"
-    assert st.incoming_to_absolute(slug, "Thesis <f>Gott</f>") == "Thesis <f>Gott</f>"
+    slug = work("w6")
+    assert st.incoming_to_absolute(slug, f"{LA} <cs>Gott</cs>") == f"{LA} <f>Gott</f>"
+    assert st.incoming_to_absolute(slug, f"{LA} <f>Gott</f>") == f"{LA} <f>Gott</f>"
 
 
 def test_taastamine_cs_versioon_teisendatakse(work):
-    slug = work("w7", entry={"base": "A", "pages": {}})
-    assert st.restored_to_absolute(slug, "x <cs>Gott</cs>", "deadbeef") == "x <f>Gott</f>"
+    slug = work("w7")
+    assert st.restored_to_absolute(slug, f"{LA} <cs>Gott</cs>", "deadbeef") == f"{LA} <f>Gott</f>"
 
 
 def test_taastamine_margendamata_vana_fraktuur(work, monkeypatch):
     migrated = datetime(2026, 11, 3, tzinfo=timezone.utc)
-    slug = work("w8", entry={"base": "F", "pages": {}, "migrated_at": migrated.isoformat()})
+    slug = work("w8", entry={"pages": {}, "migrated_at": migrated.isoformat()})
     monkeypatch.setattr(st, "_commit_time", lambda h: migrated - timedelta(days=1) if h == "vana" else migrated + timedelta(days=1))
-    assert st.restored_to_absolute(slug, "Text", "vana") == "<f>Text</f>"
-    assert st.restored_to_absolute(slug, "Antiqua", "uus") == "Antiqua"  # migratsioonijärgne
+    assert st.restored_to_absolute(slug, DE, "vana") == f"<f>{DE}</f>"
+    assert st.restored_to_absolute(slug, DE, "uus") == DE  # migratsioonijärgne: inimese otsus
 
 
 def test_vananenud_base(work):
-    slug = work("w9", entry={"base": "F", "pages": {
+    slug = work("w9", entry={"pages": {
         "p1.txt": {"in": text_hash("vana"), "out": text_hash("<f>vana</f>")}}})
     assert st.stale_premigration_base(slug, "p1.txt", "vana")
     assert not st.stale_premigration_base(slug, "p1.txt", "<f>vana</f>")
