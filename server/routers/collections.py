@@ -7,6 +7,7 @@ from git import Actor
 from starlette.concurrency import run_in_threadpool
 
 from ..auth import delete_user_sessions, save_users, users_transaction
+from ..archives_registry import build_entry, clean_aliases, find_conflict, read_archives
 from ..cache import get_cached_archives, get_cached_collections
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
 from ..collection_tree import is_collection_public
@@ -35,19 +36,17 @@ async def get_archives(): return {"status": "success", "archives": get_cached_ar
 @router.post("/config/archives")
 async def create_archive(request: Request, user=Depends(require_role("admin"))):
     body = await get_json_data(request)
-    archive_id = str(body.get("id") or "").strip()
+    archive_id = " ".join(str(body.get("id") or "").split())
     name = str(body.get("name") or "").strip()
     url = str(body.get("url") or "").strip()
     if not archive_id or not name:
         raise HTTPException(status_code=400, detail="Lühend ja nimi on kohustuslikud")
-    archives = {}
-    if os.path.exists(ARCHIVES_FILE):
-        archives = await run_in_threadpool(_read_json, ARCHIVES_FILE)
+    aliases = _aliases_from_body(body)
+    archives = await run_in_threadpool(read_archives, ARCHIVES_FILE)
     if archive_id in archives:
         raise HTTPException(status_code=409, detail=f"Arhiiv tähisega '{archive_id}' on juba olemas")
-    entry: dict = {"name": name}
-    if url:
-        entry["url"] = url
+    _raise_on_conflict(archives, archive_id, aliases)
+    entry = build_entry(name, url, aliases)
     archives[archive_id] = entry
     await run_in_threadpool(save_config_with_git, ARCHIVES_FILE, archives, user["username"],
                             f"Arhiiv: lisa {archive_id}")
@@ -61,19 +60,38 @@ async def update_archive(archive_id: str, request: Request, user=Depends(require
     url = str(body.get("url") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Nimi on kohustuslik")
-    archives = {}
-    if os.path.exists(ARCHIVES_FILE):
-        archives = await run_in_threadpool(_read_json, ARCHIVES_FILE)
+    archives = await run_in_threadpool(read_archives, ARCHIVES_FILE)
     if archive_id not in archives:
         raise HTTPException(status_code=404, detail=f"Arhiivi '{archive_id}' ei leitud")
-    entry: dict = {"name": name}
-    if url:
-        entry["url"] = url
+    # Puuduv `aliases` = ära puutu: vana (vahemälus) klient saadab ainult nime ja URL-i
+    # ega tohi aliaseid kustutada. Tühi loend eemaldab.
+    if "aliases" in body:
+        aliases = _aliases_from_body(body)
+    else:
+        aliases = list((archives[archive_id] or {}).get("aliases") or [])
+    _raise_on_conflict(archives, archive_id, aliases)
+    entry = build_entry(name, url, aliases)
     archives[archive_id] = entry
     await run_in_threadpool(save_config_with_git, ARCHIVES_FILE, archives, user["username"],
                             f"Arhiiv: uuenda {archive_id}")
     _invalidate_all_caches()
     return {"status": "success", "id": archive_id, "archive": entry}
+
+
+def _aliases_from_body(body: dict) -> list[str]:
+    try:
+        return clean_aliases(body.get("aliases"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def _raise_on_conflict(archives: dict, archive_id: str, aliases: list[str]) -> None:
+    """Sama nimekuju kahel kirjel tähendaks topelthoidjat (ADR 0076 täiendus 2026-11-02)."""
+    hit = find_conflict(archives, archive_id, aliases)
+    if hit:
+        form, owner = hit
+        raise HTTPException(status_code=409,
+                            detail=f"Nimekuju '{form}' kuulub juba hoidjale '{owner}'")
 
 # sync def → threadpool: arhiivi kustutus skannib kõiki teoseid (_find_works_with_archive)
 @router.delete("/config/archives/{archive_id}")

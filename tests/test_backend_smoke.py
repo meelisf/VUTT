@@ -775,6 +775,31 @@ def test_update_archive_writes_file(client, login, backend_env):
     assert archives["RA"]["url"] == "https://uus.ee"
 
 
+def test_archive_aliases_kept_and_unique(client, login, backend_env):
+    """ADR 0076 täiendus 2026-11-02: aliased säilivad, kui klient neid ei saada,
+    ja ükski nimekuju ei kuulu kahele hoidjale."""
+    headers = {"Authorization": f"Bearer {login('admin', 'adminpass')}"}
+    r = client.put("/config/archives/RA", headers=headers,
+                   json={"name": "Rahvusarhiiv", "aliases": [" Tartu  EAA ", "Tartu EAA", ""]})
+    assert r.status_code == 200
+    assert r.json()["archive"]["aliases"] == ["Tartu EAA"]
+    # Vana klient saadab ainult nime → aliased jäävad alles
+    assert client.put("/config/archives/RA", headers=headers, json={"name": "RA"}).status_code == 200
+    archives = json.loads(backend_env["archives_file"].read_text(encoding="utf-8"))
+    assert archives["RA"]["aliases"] == ["Tartu EAA"]
+    # Teise kirje alias või võti on konflikt (tähesuurus ei loe)
+    r = client.post("/config/archives", headers=headers, json={"id": "tartu eaa", "name": "X"})
+    assert r.status_code == 409 and "RA" in r.json()["detail"]
+    r = client.post("/config/archives", headers=headers, json={"id": "X", "name": "X", "aliases": ["ra"]})
+    assert r.status_code == 409
+    # Tühi loend eemaldab
+    client.put("/config/archives/RA", headers=headers, json={"name": "RA", "aliases": []})
+    archives = json.loads(backend_env["archives_file"].read_text(encoding="utf-8"))
+    assert "aliases" not in archives["RA"]
+    assert client.put("/config/archives/RA", headers=headers,
+                      json={"name": "RA", "aliases": "Tartu EAA"}).status_code == 400
+
+
 def test_update_archive_not_found_returns_404(client, login, backend_env):
     token = login("admin", "adminpass")
     headers = {"Authorization": f"Bearer {token}"}

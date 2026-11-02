@@ -455,6 +455,11 @@ def _check_holder(holder) -> None:
     except (OSError, ValueError):
         raise ExemplarError("Hoidjate registrit ei saa lugeda", 503)
     if holder not in archives:
+        # Eksemplar kannab ainult võtit; alias saab vihje (ADR 0076 täiendus 2026-11-02).
+        from .archives_registry import resolve_holder
+        key = resolve_holder(archives, holder)
+        if key:
+            raise ExemplarError(f"Hoidja '{holder}' on registris võtmega '{key}'")
         raise ExemplarError(f"Tundmatu hoidja: {holder}")
 
 

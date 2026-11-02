@@ -11,6 +11,11 @@ import ClientErrorsPanel from './ClientErrorsPanel';
 
 type ActionState = 'idle' | 'running' | 'done' | 'error';
 
+// Teised nimekujud (ADR 0076 täiendus 2026-11-02) — semikooloniga eraldatud,
+// sest koma võib esineda asutuse nimes.
+const parseAliases = (value: string): string[] =>
+  value.split(';').map(a => a.trim()).filter(Boolean);
+
 const Maintenance: React.FC = () => {
   const { t } = useTranslation(['admin', 'common']);
   const { user, authToken, isLoading: userLoading } = useUser();
@@ -24,17 +29,19 @@ const Maintenance: React.FC = () => {
   const [entityLabelsPersons, setEntityLabelsPersons] = useState<number | null>(null);
   const [enrichPageTagsState, setEnrichPageTagsState] = useState<ActionState>('idle');
   const [enrichPageTagsCount, setEnrichPageTagsCount] = useState<number | null>(null);
-  const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
+  const [archives, setArchives] = useState<Record<string, { name: string; url?: string; aliases?: string[] }>>({});
   const [archivesLoaded, setArchivesLoaded] = useState(false);
   const [showAddArchive, setShowAddArchive] = useState(false);
   const [addId, setAddId] = useState('');
   const [addName, setAddName] = useState('');
   const [addUrl, setAddUrl] = useState('');
+  const [addAliases, setAddAliases] = useState('');
   const [addError, setAddError] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editUrl, setEditUrl] = useState('');
+  const [editAliases, setEditAliases] = useState('');
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [deleteForceConfirm, setDeleteForceConfirm] = useState<{ id: string; message: string } | null>(null);
@@ -99,14 +106,16 @@ const Maintenance: React.FC = () => {
     const trimId = addId.trim();
     const trimName = addName.trim();
     const trimUrl = addUrl.trim();
+    const aliases = parseAliases(addAliases);
     if (!trimId || !trimName) { setAddError(t('admin:archives.idNameRequired')); return; }
     if (archives[trimId]) { setAddError(t('admin:archives.duplicateId', { id: trimId })); return; }
     setAddSaving(true); setAddError('');
     try {
-      await apiPost(`${FILE_API_URL}/config/archives`,
-        { id: trimId, name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }, { token: authToken });
-      setArchives(prev => ({ ...prev, [trimId]: { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) } }));
-      setAddId(''); setAddName(''); setAddUrl('');
+      // Server kontrollib, et ükski nimekuju ei kuulu teisele hoidjale (409).
+      const res = await apiPost<any>(`${FILE_API_URL}/config/archives`,
+        { id: trimId, name: trimName, ...(trimUrl ? { url: trimUrl } : {}), aliases }, { token: authToken });
+      setArchives(prev => ({ ...prev, [res?.id ?? trimId]: res?.archive ?? { name: trimName } }));
+      setAddId(''); setAddName(''); setAddUrl(''); setAddAliases('');
       setShowAddArchive(false);
     } catch (e) { setAddError(apiErrorMessage(e, t('common:error.unknown'))); }
     finally { setAddSaving(false); }
@@ -118,9 +127,10 @@ const Maintenance: React.FC = () => {
     if (!trimName) { setEditError(t('admin:archives.nameRequired')); return; }
     setEditSaving(true); setEditError('');
     try {
-      await apiPut(`${FILE_API_URL}/config/archives/${encodeURIComponent(id)}`,
-        { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }, { token: authToken });
-      setArchives(prev => ({ ...prev, [id]: { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) } }));
+      const res = await apiPut<any>(`${FILE_API_URL}/config/archives/${encodeURIComponent(id)}`,
+        { name: trimName, ...(trimUrl ? { url: trimUrl } : {}), aliases: parseAliases(editAliases) },
+        { token: authToken });
+      setArchives(prev => ({ ...prev, [id]: res?.archive ?? { name: trimName } }));
       setEditingId(null);
     } catch (e) { setEditError(apiErrorMessage(e, t('common:error.unknown'))); }
     finally { setEditSaving(false); }
@@ -204,7 +214,7 @@ const Maintenance: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700">{t('admin:archives.title')}</h3>
             <button
-              onClick={() => { setShowAddArchive(a => !a); setAddId(''); setAddName(''); setAddUrl(''); setAddError(''); }}
+              onClick={() => { setShowAddArchive(a => !a); setAddId(''); setAddName(''); setAddUrl(''); setAddAliases(''); setAddError(''); }}
               className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 border border-primary-200 rounded px-2 py-1 hover:bg-primary-50"
             >
               + {t('admin:archives.addArchive')}
@@ -213,7 +223,7 @@ const Maintenance: React.FC = () => {
 
           {showAddArchive && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 space-y-2">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <input
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
                   placeholder={t('admin:archives.idPlaceholder')}
@@ -231,6 +241,12 @@ const Maintenance: React.FC = () => {
                   placeholder={t('admin:archives.url')}
                   value={addUrl}
                   onChange={e => setAddUrl(e.target.value)}
+                />
+                <input
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
+                  placeholder={t('admin:archives.aliasesPlaceholder')}
+                  value={addAliases}
+                  onChange={e => { setAddAliases(e.target.value); setAddError(''); }}
                 />
               </div>
               {addError && <p className="text-xs text-red-600">{addError}</p>}
@@ -263,6 +279,7 @@ const Maintenance: React.FC = () => {
                   <tr className="bg-gray-50 text-xs text-gray-500 font-medium">
                     <th className="text-left px-3 py-2 w-24">{t('admin:archives.id')}</th>
                     <th className="text-left px-3 py-2">{t('admin:archives.name')}</th>
+                    <th className="text-left px-3 py-2">{t('admin:archives.aliases')}</th>
                     <th className="text-left px-3 py-2 w-40">{t('admin:archives.url')}</th>
                     <th className="w-20" />
                   </tr>
@@ -280,6 +297,14 @@ const Maintenance: React.FC = () => {
                               onChange={e => { setEditName(e.target.value); setEditError(''); }}
                             />
                             {editError && <p className="text-xs text-red-600 mt-0.5">{editError}</p>}
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
+                              value={editAliases}
+                              onChange={e => { setEditAliases(e.target.value); setEditError(''); }}
+                              placeholder={t('admin:archives.aliasesPlaceholder')}
+                            />
                           </td>
                           <td className="px-3 py-2">
                             <input
@@ -310,6 +335,9 @@ const Maintenance: React.FC = () => {
                       ) : (
                         <>
                           <td className="px-3 py-2 text-gray-800">{info.name}</td>
+                          <td className="px-3 py-2 text-xs text-gray-500">
+                            {info.aliases?.length ? info.aliases.join('; ') : <span className="text-gray-300">—</span>}
+                          </td>
                           <td className="px-3 py-2">
                             {info.url && /^https?:\/\//i.test(info.url) ? (
                               <a href={info.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-600 hover:underline truncate block max-w-[140px]">
@@ -339,7 +367,7 @@ const Maintenance: React.FC = () => {
                               ) : (
                                 <>
                                   <button
-                                    onClick={() => { setEditingId(id); setEditName(info.name); setEditUrl(info.url || ''); setEditError(''); }}
+                                    onClick={() => { setEditingId(id); setEditName(info.name); setEditUrl(info.url || ''); setEditAliases((info.aliases || []).join('; ')); setEditError(''); }}
                                     className="text-gray-300 hover:text-gray-600 transition-colors"
                                     title={t('common:buttons.edit')}
                                   >

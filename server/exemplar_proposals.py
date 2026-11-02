@@ -32,6 +32,7 @@ from typing import Optional
 
 from .config import STATE_DIR
 from . import agent_handoff
+from .archives_registry import read_archives, resolve_holder
 from . import work_exemplars as we
 
 DB_PATH = os.path.join(STATE_DIR, "exemplar_proposals.sqlite3")
@@ -145,6 +146,10 @@ def _clean_fields(raw, label: str, create: bool) -> dict:
         out = {k: v for k, v in out.items() if v is not None}
     elif "holder" in out and not out["holder"]:
         raise ProposalError(f"invalid_field: {label}.fields.holder")
+    if out.get("holder"):
+        # Alias → võti (ADR 0076 täiendus 2026-11-02): eksemplar kannab ainult võtit.
+        # Tundmatu kuju jääb alles ja rida on `blocked_holder`, kuni register teda tunneb.
+        out["holder"] = resolve_holder(_archives(), out["holder"]) or out["holder"]
     try:
         we.normalize_exemplar({"id": "x", "holder": out.get("holder") or "x",
                                **{k: v for k, v in out.items() if k != "holder"}})
@@ -209,14 +214,15 @@ def submit(code: str, work_id: str, work_dir: str, rows: list, note: Optional[st
 
 # ── Ülevaatus ────────────────────────────────────────────────────────────────
 
+def _archives() -> dict:
+    from .config import ARCHIVES_FILE
+    return read_archives(ARCHIVES_FILE)
+
+
 def _holders() -> set:
     # Sama lugemisviis mis `work_exemplars._check_holder`: register ja kinnitus ei tohi lahku minna.
-    from .config import ARCHIVES_FILE
-    try:
-        with open(ARCHIVES_FILE, encoding="utf-8") as f:
-            return set(json.load(f) or {})
-    except (OSError, ValueError):
-        return set()
+    # Ainult võtmed: alias ei ole eksemplari hoidja.
+    return set(_archives())
 
 
 def _review_state(row: dict, expired: bool, live: dict, holders: set) -> str:

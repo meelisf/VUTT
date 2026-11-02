@@ -262,6 +262,42 @@ stardikontroll annab `record_server_error`-i, kui mõni `_metadata.json` kannab 
 `archive_refs`-i, nii et migreerimata teos ei jää märkamatuks. `derive_archive_refs` vana
 välja varuvariandina ei loe: muidu oleks jälle kaks tõeallikat.
 
+### 9. Hoidjate register (täiendus 2026-11-02)
+
+`archives.json` võtmed tekkisid juhuslikult (`TÜR`, `UAH`, `LUAB Latvia`, `NL Russia`,
+`KB`). Jaansoni bibliograafia leidumuse import (ja ESTER) vajab hoidja kindlat
+tuvastamist nimekuju järgi. Kasutus oli väike (153 eksemplari, 14 võtit), seega tehti
+ümbernimetamine kohe.
+
+- **Võti = linn + asutuse praegune lühend**: `Tartu TÜR`, `Tartu RA`, `Tallinn RR`,
+  `Riga LUAB`, `Stockholm KB`, `København KB`. Muster on Jaansoni oma (lk 501–505), aga
+  lühend peegeldab **praegust** asutust, mitte 2000. aasta seisu ega saksa mudelit
+  (`Tartu TÜR`, mitte `Tartu ÜR` ega `Tartu UB`).
+- **`aliases`** — teised nimekujud kirje juures: Jaansoni lühend (`Tallinn ERR`), vana
+  VUTT-i võti (`TÜR`), lakanud asutus, mille kogud on selle hoidja juures
+  (`Riga StB` → `Riga LUAB`). Mitmetähenduslik kuju (`KB`, `RA`) ei ole kellegi alias.
+  Kui praegune asukoht on teadmata (Jaansoni „Riga (früher in BGGA)"), aliast ei panda:
+  import paneb rea ülevaatusnimekirja.
+- **Iga nimekuju (võti või alias) kuulub registris ühele kirjele.** Võrdlus on
+  tühikute ja tähesuuruse suhtes ühtlustatud (`archives_registry.form_key`). `POST` ja
+  `PUT /config/archives` vastavad konfliktile 409. Nii ei teki samast asutusest teist
+  kirjet ainult seepärast, et kasutati teist nimekuju.
+- **Eksemplari `holder` kannab ainult võtit.** Nimekuju → võti lahendab ÜKS funktsioon
+  `archives_registry.resolve_holder` (import, ümbernimetamise skript, agendi ettepanek).
+  Agendi ettepaneku alias lahendatakse esitusel võtmeks. Käsitsi kirjutustee
+  (`_check_holder`) aliast vastu ei võta, aga ütleb veateates õige võtme.
+- `PUT /config/archives/{id}` ilma `aliases` võtmeta jätab aliased alles: vana klient
+  saadab ainult nime ja URL-i. Tühi loend eemaldab.
+- Ümbernimetamine: `scripts/rename_archive_keys.py` (kuivkäivitus vaikimisi). Teosed
+  ühe commitiga, register `save_config_with_git`-iga, ootel ettepanekute
+  `fields.holder`/`base.holder` samas käigus. Kasutuselevõtt nagu p 8 (backend seisma,
+  täisreindeks: `archive_refs_text` kannab hoidja võtit). Vana võti `TLÜAR baltika`
+  kandis kogu nime, mis on uurijale leidmiseks vajalik (käibenimetus). Hoidjaks jääb
+  asutus `Tallinn TLÜAR` ja kogu nimi läheb kohaviida ette (`Baltika kogu, III-140`).
+  Ootel uue eksemplari read saavad sama eesliite, otsustatud read jäävad ajaloona
+  muutmata. Migratsiooni `source.ref`
+  (`"TÜR: R Est.B-954"`) jääb muutmata: see on algse kirje tsitaat.
+
 ## Mida teadlikult EI tehtud
 
 - `archive_refs`-i ei laiendatud eksemplariks. See oleks jätnud kaks puhastajat ja üldise

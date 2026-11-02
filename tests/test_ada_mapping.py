@@ -136,7 +136,7 @@ def test_ester_id_parsitakse_urlist(item):
 
 def test_archive_ref_tur_vaikimisi(item):
     assert mapping.dc_vuttiks(item)["archive_refs"] == [
-        {"archive_id": "TÜR", "reference": "F 3,Mrg CCCXLII,kd.8,l.246-362"}
+        {"archive_id": "Tartu TÜR", "reference": "F 3,Mrg CCCXLII,kd.8,l.246-362"}
     ]
 
 

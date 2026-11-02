@@ -17,7 +17,8 @@ class FakeClient:
 
     def api_get(self, path, params=None):
         if path == "/config/archives":
-            return {"status": "success", "archives": {"TÜR": {"name": "Tartu Ülikooli Raamatukogu"},
+            return {"status": "success", "archives": {"TÜR": {"name": "Tartu Ülikooli Raamatukogu",
+                                                              "aliases": ["Tartu ÜR"]},
                                                       "RA": {"name": "Rahvusarhiiv", "url": "https://x"}}}
         assert path == "/works/w1ab/exemplars"
         if self.fail:
@@ -40,6 +41,7 @@ def test_eksemplarid_ja_hoidjad():
     # Serveri väljad, mida agent ei pakkuda tohi, ei ole väljundis (lehed, lipp, allikas)
     assert "pages" not in x and "needs_review" not in x and "source" not in x
     assert out["holders"] == {"TÜR": "Tartu Ülikooli Raamatukogu", "RA": "Rahvusarhiiv"}
+    assert out["holder_aliases"] == {"Tartu ÜR": "TÜR"}
 
 
 @pytest.mark.parametrize("err", [VuttNotFound("x"), VuttConfigError("HTTP 403")])

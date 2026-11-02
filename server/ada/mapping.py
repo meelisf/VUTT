@@ -18,7 +18,7 @@ KEELE_KAART = {
 }
 
 # ADA on TÜ raamatukogu repositoorium. VAIKEVÄÄRTUS, mitte tõde — admin muudab.
-VAIKE_ARHIIV = "TÜR"
+VAIKE_ARHIIV = "Tartu TÜR"
 
 _TAIS = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
 _KUU = re.compile(r"^(\d{2})\.(\d{4})$")

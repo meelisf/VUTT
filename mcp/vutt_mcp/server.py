@@ -558,7 +558,8 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         (kohaviit), url, condition, binding, provenance, notes, convolute
         ({reference, position, total, contents}) ja text_witness (kas skaneering
         on sellest eksemplarist). `holders` = hoidjate register (võti → nimi);
-        uue eksemplari hoidja peab olema selle võti.
+        uue eksemplari hoidja peab olema selle võti. `holder_aliases` = teised
+        nimekujud (ajaloolised nimed, Jaansoni lühendid) → võti.
         Kasuta enne submit_exemplar_proposal'it: olemasolevat eksemplari ei
         pakuta uuena, ja muudatuse `base` tuleb siit. Piiratud teose eksemplare
         ei anta (ettepanekut ei saa teha).
@@ -588,7 +589,8 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           get_work_exemplars'ist; puuduv = null}, source}.
         Kui eksemplar on get_work_exemplars'is juba olemas (sama hoidja +
         kohaviit — migratsioon lõi need vanadest viidetest), esita UPDATE, mitte
-        CREATE: topelt-rida blokeeritakse. Hoidja AINULT `holders` võtmete seast;
+        CREATE: topelt-rida blokeeritakse. Hoidja AINULT `holders` võtmete seast
+        (`holder_aliases` kuju lahendab server võtmeks);
         kui õiget pole, kirjuta lähim võti ja maini seda `note`-is (toimetaja
         lisab hoidja registrisse).
 

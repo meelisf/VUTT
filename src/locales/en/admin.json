@@ -444,6 +444,8 @@
     "addArchive": "Add archive",
     "id": "ID",
     "idPlaceholder": "ID (e.g. \"BL\")",
+    "aliases": "Other name forms",
+    "aliasesPlaceholder": "Other name forms (separate with semicolons)",
     "name": "Name",
     "url": "URL (optional)",
     "selectPlaceholder": "Archive",

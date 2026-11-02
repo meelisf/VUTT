@@ -27,7 +27,7 @@ def _check_work_id(work_id: str) -> None:
 
 
 def work_exemplars(client, work_id: str) -> str:
-    """Eksemplarid + hoidjate register (`holders`: võti → nimi)."""
+    """Eksemplarid + hoidjate register (`holders`: võti → nimi, `holder_aliases`: kuju → võti)."""
     _check_work_id(work_id)
     try:
         data = client.api_get(f"/works/{quote(work_id, safe='')}/exemplars")
@@ -40,8 +40,15 @@ def work_exemplars(client, work_id: str) -> str:
     registry = client.api_get("/config/archives")
     archives = (registry or {}).get("archives") if isinstance(registry, dict) else None
     holders = {k: (v or {}).get("name") or k for k, v in (archives or {}).items()}
+    # Teised nimekujud (ajaloolised, Jaansoni lühendid) → võti. Esitamisel lahendab server
+    # aliase ise võtmeks, aga agent näeb nii, et „Tallinn ERR" on juba registris.
+    aliases = {a: k for k, v in (archives or {}).items()
+               for a in ((v or {}).get("aliases") or []) if isinstance(a, str)}
     rows = [{k: x[k] for k in _SHOWN if k in x} for x in data["exemplars"] if isinstance(x, dict)]
-    return json.dumps({"work_id": work_id, "exemplars": rows, "holders": holders},
+    out = {"work_id": work_id, "exemplars": rows, "holders": holders}
+    if aliases:
+        out["holder_aliases"] = aliases
+    return json.dumps(out,
                       ensure_ascii=False, indent=1)
 
 

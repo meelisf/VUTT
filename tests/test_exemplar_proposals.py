@@ -198,6 +198,17 @@ def test_hoidja_lisamine_vabastab_rea(work):
     assert _meta(work)["exemplars"][1]["holder"] == "RR"
 
 
+def test_alias_lahendatakse_votmeks(work):
+    """Agendi esitatud ajalooline kuju („Tartu ÜR") salvestub registri võtmena."""
+    import importlib
+    config = importlib.import_module("server.config")
+    json.dump({"TÜR": {"name": "Tartu Ülikooli Raamatukogu", "aliases": ["Tartu ÜR"]}},
+              open(config.ARCHIVES_FILE, "w"))
+    _submit(work, [{**NEW, "fields": {"holder": "tartu ür", "shelfmark": "R 9"}}])
+    (row,) = _rows(work)
+    assert row["fields"]["holder"] == "TÜR" and row["review_state"] == "pending"
+
+
 def test_teine_partii_vana_alusega_on_stale(work):
     p1 = _submit(work, [UPD])["proposal_id"]
     p2 = _submit(work, [UPD])["proposal_id"]
