@@ -55,13 +55,19 @@ const onlyBlank = (s: string) => s.replace(/<[^>]*>/g, '').trim() === '';
  *   pesastust ei teki, ankru tekst jääb lihtsalt samuti puhtaks;
  * - peidetud marginaaliaplokke (`hidden`) ei puudutata.
  * Valiku servatühik jääb välja (nagu mähkimisel).
+ *
+ * `only` piirab eemaldatavad tägid nendega (lüliti lahtipakkimine, `<f>`/`<i>`
+ * välistus); muud tägid jäävad alles.
  */
 export function cleanSelectionChanges(
   doc: string,
   from: number,
   to: number,
   hidden: { from: number; to: number }[],
+  only?: readonly string[],
 ): CleanChangeSpec[] {
+  const removable = (name: string) => (only ? only.includes(name) : REMOVABLE.has(name));
+  const splittable = (name: string) => SPLIT.has(name) && removable(name);
   let s = from;
   let e = to;
   while (s < e && /\s/.test(doc[s])) s++;
@@ -88,9 +94,9 @@ export function cleanSelectionChanges(
     const oIn = tokIn(p.o1, p.o2);
     const cIn = tokIn(p.c1, p.c2);
     const touchesHidden = inHidden(p.o1, p.o2) || inHidden(p.c1, p.c2);
-    if (!REMOVABLE.has(p.name) || touchesHidden) { kept.push(p); continue; }
+    if (!removable(p.name) || touchesHidden) { kept.push(p); continue; }
     if (oIn && cIn) { dels.push([p.o1, p.o2], [p.c1, p.c2]); continue; }
-    if (SPLIT.has(p.name)) {
+    if (splittable(p.name)) {
       if (p.c2 <= s || p.o1 >= e) continue; // täiesti valikust väljas
       splitPairs.push(p);
       continue;
@@ -121,7 +127,7 @@ export function cleanSelectionChanges(
   }
 
   for (const t of loose) {
-    if (REMOVABLE.has(t.name) && tokIn(t.from, t.to)) dels.push([t.from, t.to]);
+    if (removable(t.name) && tokIn(t.from, t.to)) dels.push([t.from, t.to]);
   }
 
   // Ühes kohas: sulgemised seest välja (hiliseim avaja enne), avamised väljast sisse.

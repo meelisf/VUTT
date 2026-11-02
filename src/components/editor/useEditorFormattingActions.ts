@@ -3,7 +3,7 @@ import type { EditorView } from '@codemirror/view';
 import { EditorSelection, Transaction } from '@codemirror/state';
 import { vuttMarkupField } from './VuttMarkupExtension';
 import { hiddenBlockRanges, marginaliaField, openMarginalia } from './MarginaliaExtension';
-import { findContainer, selectionWrapChanges } from './wrapTagUtils';
+import { findContainerGlobal, selectionWrapChanges } from './wrapTagUtils';
 import { applyCombiningMark } from './combiningMarkCommand';
 import { cleanSelectionChanges } from './cleanSelection';
 import { pageMarkEdit, type PageMarkRefusal } from './pageMarkEdit';
@@ -49,8 +49,7 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
           return;
         }
       }
-      const line = view.state.doc.lineAt(from);
-      const container = findContainer(tag, from, docText, line.from, line.to);
+      const container = findContainerGlobal(tag, from, docText);
       if (container) {
         // Kui kursor on tägi sees, eemaldame tägi
         const changes = [
@@ -75,13 +74,10 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     // 2. KÄSITLUS VALIKUGA (võib olla mitu rida)
     const changes = selectionWrapChanges(view.state, tag);
 
-    if (changes.length > 0) {
+    if (!changes.empty) {
       const tr = view.state.update({
         changes,
-        selection: EditorSelection.range(
-          view.state.changes(changes).mapPos(from, 1),
-          view.state.changes(changes).mapPos(to, -1)
-        ),
+        selection: EditorSelection.range(changes.mapPos(from, 1), changes.mapPos(to, -1)),
         scrollIntoView: false,
         annotations: Transaction.userEvent.of('input.format')
       });

@@ -119,3 +119,23 @@ describe('selectionWrapChanges — paari poolitamine', () => {
     expect(lulita('<i>dium </i>⟦lectio⟧')).toBe('<i>dium lectio</i>');
   });
 });
+
+describe('selectionWrapChanges — ADR 0077', () => {
+  it('mitmerealine <f> (Enter keset rida): lüliti pakib lahti, ei mähi topelt', () => {
+    expect(lulita('<f>esimene ⟦exercitiis⟧\nteine rida</f>', 'f'))
+      .toBe('<f>esimene </f>exercitiis<f>\nteine rida</f>');
+  });
+
+  it('<i> mähkimine poolitab ümbritseva <f>-i', () => {
+    expect(lulita('<f>den ⟦exercitiis⟧ finden</f>', 'i'))
+      .toBe('<f>den </f><i>exercitiis</i><f> finden</f>');
+  });
+
+  it('<f> mähkimine eemaldab valikult <i>-', () => {
+    expect(lulita('⟦den <i>Gott</i> finden⟧', 'f')).toBe('<f>den Gott finden</f>');
+  });
+
+  it('<i> lahtipakkimine ei puuduta <f>-i', () => {
+    expect(lulita('<f>a</f> <i>⟦b⟧</i>', 'i')).toBe('<f>a</f> b');
+  });
+});
