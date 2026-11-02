@@ -36,11 +36,32 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
    migratsioonis ja ka seal tuletatakse see andmetest.
 
 2. **Fraktuurteose tekst on täies ulatuses `<f>`-is.** Toimetaja ei näe tägi, vaid
-   kujundust (`<f>` kuvatakse sama kerge halli taustaga kui praegu `<cs>`; proovitud
-   2026-11-02 terve lehe peal, lugemist ei sega). Toimetaja töö pöördub:
-   fraktuurlehel eemaldab ta antiikvasõnadelt märgenduse. See on olemasolev
-   toiming: `selectionWrapChanges` poolitab paari valiku kohalt
+   kujundust (punkt 2a). Toimetaja töö pöördub: fraktuurlehel eemaldab ta
+   antiikvasõnadelt märgenduse. See on olemasolev toiming: `selectionWrapChanges`
+   ja „Puhasta“ (`cleanSelectionChanges`) poolitavad paari valiku kohalt
    (`<f>den exercitiis finden</f>` + „exercitiis“ → `<f>den </f>exercitiis<f> finden</f>`).
+
+2a. **Andmed on absoluutsed, kuvamine on lehe kaupa suhteline.** Kerge hall taust
+   (praegune `.vutt-cs`) tõstab esile lehe **vähemuskirja**: antiikvalehel `<f>`
+   (nagu praegu `<cs>`), fraktuurlehel märgendamata ladina tähestiku teksti. Hall
+   tähendab toimetajale endiselt „lehe põhikirjast erinev“, nii et harjumus ei muutu.
+   - **Enamus arvutatakse lehe laadimisel**, mitte iga muudatusega: ladina tähed
+     `<f>`-is vs väljas; kreeka, heebrea, numbrid ja kirjavahemärgid ei loe. Kui
+     arvutataks elavalt, võiks ~50/50 lehel kogu esiletõst toimetamise ajal ümber
+     pöörduda. Arvutus kordub lehevahetusel. Lehe vahetus remounti ei tee
+     (ADR 0010), seega tuleb arvutus seal selgesõnaliselt uuesti käivitada.
+   - **Režiim on nähtav:** tööriistariba juures silt, nt „Põhikiri: fraktuur ·
+     esile tõstetud antiikva“. Ilma sildita ei tea toimetaja, kumba halli ta näeb.
+   - **Miks mitte absoluutne taust:** taustakanalit kasutavad `<m>` ja `<hi>` (kollane)
+     ning lehe tähistused. `<f>` on nende sees (`<m><f>…</f></m>`) ja sisemise
+     elemendi taust katab välimise. Täielikult halli fraktuurlehel kaotaks
+     marginaalia oma kollase tausta.
+   - **Miks mitte font** (proovitud mõttes 2026-11-02): fraktuurifont peidab
+     transkriptsiooniotsused (`I`/`J` üks kuju, `ſ`/`f` ja `u`/`n` lähedased,
+     makron) ja aeglustab lugemist. Serif ja sans-serif tähti ei sulanda, aga nende
+     vahet ei märka silm lehte lappides lühikestes sõnades ega kirjavahemärkides,
+     ja vahemiku ulatus (tühik, `/` sees või väljas) jääb nähtamatuks. Font võib
+     hiljem olla teine kanal, mitte esimene.
 
 3. **Mis on `<f>`, mis mitte:**
    - Švaabahher ja teised gooti trükikirjad on `<f>`.
