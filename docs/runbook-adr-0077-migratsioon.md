@@ -46,19 +46,17 @@ docker cp ~/VUTT/docs/decisions/0077-otsused.json vutt-backend:/tmp/otsused.json
 docker exec vutt-backend python3 scripts/migrate_cs_to_f.py --decisions /tmp/otsused.json
 ```
 
-Oodatav (kuivkäivitus koopial 2026-11-02; päevased parandused võivad numbreid veidi muuta):
+Oodatav (kuivkäivitus koopial 2026-11-02 pärast ülevaatust; päevased parandused võivad numbreid veidi muuta):
 
 | Rida | Väärtus |
 |---|---|
-| Otsustamata | **0** teost |
-| Segateosed | signaalita lehti **0** (või teadlikult puutumata jäetud) |
+| Lehed liigi järgi | antiqua ~15 700, cs ~850, whole ~4 470, mixed ~440, manuscript 1 |
+| Muutuvaid teoseid / lehti | ~537 / ~5 740 |
+| Ülevaatuseks | ainult `segaleht (rea kaupa)` (~436); **`keel tundmatu` ja `poolitus vastuolus keelega` = 0** |
 | Käsikirjad `<cs>`-iga | 3 teost |
 
-Teiste ridade numbrid sõltuvad ülevaatuse otsustest. Võrdle sama käsuga lokaalselt tehtud
-kuivkäivitusega.
-
-**Peatu, kui „Otsustamata“ > 0 või „signaalita `<cs>`-lehti“ > 0.** Mõni teos sai
-päeval uue `<cs>`-i. Aruanne on `/tmp/cs_to_f_aruanne.json`
+**Peatu, kui „keel tundmatu“ või „poolitus vastuolus keelega“ > 0.** Mõni leht muutus
+päeval. Aruanne on `/tmp/cs_to_f_aruanne.json`
 (`docker cp vutt-backend:/tmp/cs_to_f_aruanne.json /tmp/`). Lisa otsus faili ja
 käivita uuesti.
 

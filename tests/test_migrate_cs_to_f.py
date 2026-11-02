@@ -97,3 +97,10 @@ def test_apply_vahepeal_muutunud_leht_jaab_valja(tmp_path, monkeypatch):
                          {"a.txt": {"base": "F", "kind": "whole"}}, {"version": 1, "works": {}})
     assert res == {"written": 0, "raced": ["a.txt"], "commit": None}
     assert commits == []
+
+
+def test_kasikirjaline_leht_trukises():
+    plans, infos = mig.plan_work({"m.txt": "R Acad. Born. 1697: 32\n<cs>koopia: Lund UB</cs>"}, {},
+                                 page_decisions={"m.txt": "H"})
+    assert plans["m.txt"] == "R Acad. Born. 1697: 32\n<hi>koopia: Lund UB</hi>"
+    assert infos["m.txt"]["kind"] == "manuscript" and not mig.needs_review(infos["m.txt"])

@@ -11,7 +11,8 @@ Iga leht läbib `server.script_migration.to_absolute` — SAMA funktsiooni, mida
   - `--decisions otsused.json`: `{"work_id": "F"|"A"}` = teose varuvariant, kui lehe keel
     on tundmatu; `{"work_id": "F!"|"A!"}` = kõva otsus kogu teosele (nt kaasaegne
     sekundaarkirjandus, kus saksa tekst on antiikvas); `{"work_id/leht.txt": "F"|"A"}` =
-    lehe otsus, võidab keele.
+    lehe otsus, võidab keele; `"H"` = käsikirjaline leht trükises (nt arhiivimärge):
+    `<f>`-i ei tule, `<cs>` → `<hi>` nagu käsikirjades.
 Ülevaatust vajavad lehed (tundmatu keel, vastuolu, segaleht) lähevad aruandesse
 `review`-loendisse; tundmatu keelega `<cs>`-leht jääb muutmata, kuni saab otsuse.
 
@@ -88,8 +89,13 @@ def plan_work(texts: dict, statuses: dict, decision=None, entry=None, page_decis
                 continue  # juba teisendatud ja muutmata
             if "<cs>" not in t and fn not in page_decisions:
                 continue  # korduskäivitus: ainult <cs>-lehed (vana mudeli väljund)
-        new, info = to_absolute(t, statuses.get(fn), fallback=fallback,
-                                override=page_decisions.get(fn) or forced)
+        if page_decisions.get(fn) == "H":
+            new = manuscript_cs(t, "hi")
+            info = {"kind": "manuscript", "base": None, "lang": None, "conflict": False,
+                    "reason": "lehe otsus: käsikiri"}
+        else:
+            new, info = to_absolute(t, statuses.get(fn), fallback=fallback,
+                                    override=page_decisions.get(fn) or forced)
         infos[fn] = info
         if new != t or "<cs>" in t:
             plans[fn] = new
@@ -183,7 +189,7 @@ def load_decisions(path):
     for k, v in raw.items():
         if "/" in k:
             wid, fn = k.split("/", 1)
-            if v not in ("F", "A"):
+            if v not in ("F", "A", "H"):
                 bad[k] = v
             page_decisions.setdefault(wid, {})[fn] = v
         else:
@@ -213,7 +219,7 @@ def main() -> int:
     if args.decisions:
         decisions, page_decisions, bad = load_decisions(args.decisions)
         if bad:
-            print(f"Vigased otsused (teos F|A|F!|A!, leht F|A): {bad}")
+            print(f"Vigased otsused (teos F|A|F!|A!, leht F|A|H): {bad}")
             return 2
 
     manifest = load_manifest()
