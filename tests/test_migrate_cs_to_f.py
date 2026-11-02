@@ -103,3 +103,9 @@ def test_segateos_lehe_kaupa():
     assert extra == {"unresolved": ["x.txt"]}
     _, _, _, plans2, extra2 = mig.plan_work("w", texts, "P", None, {"x.txt": "F"})
     assert plans2["x.txt"] == "Darff <f>sich</f>" and extra2 == {"unresolved": []}
+
+
+def test_kasikirja_cs_esiletostuks_voi_valja():
+    t = "mit Leib u. Seel. <cs>Kangro Jaan</cs>."
+    assert mig.manuscript_cs(t, "hi") == "mit Leib u. Seel. <hi>Kangro Jaan</hi>."
+    assert mig.manuscript_cs(t, "strip") == "mit Leib u. Seel. Kangro Jaan."

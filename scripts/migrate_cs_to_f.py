@@ -15,7 +15,8 @@ Teose põhikiri:
 Antiikvateos ilma `<cs>`-ita ei muutu (ümbernimetamisel pole midagi teha).
 Käsikiri (`type` Q87167) jääb VÄLJA: `<f>` on trükise märgend (ADR 0077 p 3). Käsikirja
 `<cs>` (ladina kiri Kurrendi sees) läheb aruandesse rühma „manuscript"; `--manuscript-cs strip`
-eemaldab tägid (tekst jääb), vaikimisi ei puudutata.
+eemaldab tägid (tekst jääb), `hi` asendab nad esiletõstuga `<hi>` (kasutaja otsus
+2026-11-02: kolm nime jäävad leitavaks), vaikimisi ei puudutata.
 
 Teisendatuse tunnus on MANIFEST (`data/config/migrations/0077-f.json`), mitte
 `<f>`-i olemasolu: korduskäivitus puudutab ainult lehte, mille praegune räsi ei
@@ -172,6 +173,12 @@ def apply_work(work_dir: str, work_id: str, base: str, source: str,
     return {"written": n_pages, "raced": raced, "commit": (res.get("commit_hash") or "")[:8]}
 
 
+def manuscript_cs(text: str, mode: str) -> str:
+    """Käsikirja <cs> (ADR 0077: <f> on trükise märgend): 'strip' → tägid välja, 'hi' → <hi>."""
+    new_open, new_close = ("<hi>", "</hi>") if mode == "hi" else ("", "")
+    return text.replace("<cs>", new_open).replace("</cs>", new_close)
+
+
 def check(base_dir: str) -> int:
     left = []
     for meta_path in sorted(glob.glob(os.path.join(base_dir, "*", "_metadata.json"))):
@@ -190,8 +197,8 @@ def main() -> int:
     ap.add_argument("--decisions", help='käsitsi otsused JSON: {"work_id": "F"|"A"}')
     ap.add_argument("--work", action="append", default=[], help="ainult see work_id (korduv)")
     ap.add_argument("--check", action="store_true", help="loetle <cs>-iga lehed (valvur pärast üleminekut)")
-    ap.add_argument("--manuscript-cs", choices=("skip", "strip"), default="skip",
-                    help="käsikirja <cs>: jäta puutumata (vaikimisi) või eemalda tägid")
+    ap.add_argument("--manuscript-cs", choices=("skip", "strip", "hi"), default="skip",
+                    help="käsikirja <cs>: jäta puutumata (vaikimisi), eemalda tägid või asenda <hi>-ga")
     ap.add_argument("--report", default="/tmp/cs_to_f_aruanne.json", help="aruande JSON")
     args = ap.parse_args()
 
@@ -237,10 +244,10 @@ def main() -> int:
             if cs_pages:
                 report.setdefault("manuscript", {})[work_id] = {
                     "slug": os.path.basename(work_dir), "cs_pages": sorted(cs_pages)}
-                if args.apply and args.manuscript_cs == "strip":
-                    plans = {fn: t.replace("<cs>", "").replace("</cs>", "") for fn, t in cs_pages.items()}
+                if args.apply and args.manuscript_cs != "skip":
+                    plans = {fn: manuscript_cs(t, args.manuscript_cs) for fn, t in cs_pages.items()}
                     res = apply_work(work_dir, work_id, "A", "käsikiri", texts, plans, manifest)
-                    print(f"{work_id} (käsikiri, <cs> eemaldatud): {res['written']} lehte, commit {res['commit']}")
+                    print(f"{work_id} (käsikiri, <cs> → {args.manuscript_cs}): {res['written']} lehte, commit {res['commit']}")
             continue
         status, base, source, plans, signal = plan_work(
             work_id, texts, decisions.get(work_id), manifest["works"].get(work_id),
