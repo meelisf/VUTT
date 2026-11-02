@@ -665,14 +665,15 @@
     "tooltips": {
       "bold": "Paks kiri",
       "italic": "Kaldkiri",
-      "fractur": "Koodivahetus (fraktuur)",
       "addition": "Lisandus rea kohal või all — oma lisamiskohta",
       "marginalia": "Ääremärkus",
       "footnote": "Joonealune märkus",
       "pageBreak": "Lehekülje vahetus",
       "cleanMarkup": "Puhasta valik märgendusest",
       "cleanMarkupButton": "Puhasta",
-      "annotate": "Märgi ja kommenteeri (vali tekst enne)"
+      "annotate": "Märgi ja kommenteeri (vali tekst enne)",
+      "markFraktur": "Märgi fraktuuriks",
+      "markAntiqua": "Märgi antiikvaks"
     },
     "pageMarks": {
       "title": "Lehe tähistus",
@@ -721,6 +722,13 @@
     "reocrGemini": {
       "button": "Re-OCR (Gemini)",
       "hint": "Transkribeerib Google Gemini mudeliga. Ainult superadminile; tulemus tuleb sama ülevaatuse kaudu."
+    },
+    "scriptMode": {
+      "antiqua": "Lehekülje kirjastiil: antiikva",
+      "fraktur": "Lehekülje kirjastiil: fraktuur",
+      "antiquaWord": "antiikva",
+      "frakturWord": "fraktuur",
+      "hint": "Kuvamine, ei salvestata. Hall taust = {{minority}}. Arvutatakse lehe tekstist laadimisel ja salvestamisel; klõps pöörab."
     }
   },
   "annotations": {

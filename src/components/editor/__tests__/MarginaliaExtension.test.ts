@@ -181,7 +181,7 @@ describe('cleanMarkup peidetud marginaalia üle (simulatsioon)', () => {
       cursor = Math.max(cursor, h.to);
     }
     visible += doc.slice(cursor);
-    const cleaned = visible.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, '');
+    const cleaned = visible.replace(/<\/?(?:i|b|f|m|hi|fn|pb)[^>]*>/g, '');
 
     state = state.update({
       changes: { from: 0, to: doc.length, insert: cleaned },

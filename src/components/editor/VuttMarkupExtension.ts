@@ -48,7 +48,7 @@ interface TagDef {
 export const VUTT_TAGS: TagDef[] = [
   { tag: 'i',  cls: 'vutt-italic' },
   { tag: 'b',  cls: 'vutt-bold' },
-  { tag: 'cs', cls: 'vutt-cs' },
+  { tag: 'f',  cls: 'vutt-f' },
   { tag: 'm',  cls: 'vutt-marginalia' },
   { tag: 'hi', cls: 'vutt-highlight' },
   // Interlineaarne/veerise lisandus oma lisamiskohas (ADR 0067)

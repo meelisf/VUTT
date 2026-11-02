@@ -21,7 +21,7 @@ export const VUTT_TAG_REGISTRY: readonly VuttTagDef[] =
 [
   {"name": "i", "tei": "hi rend=\"italic\"", "paired": true, "search": "keep", "pageMark": false, "numbered": false, "marginaliaInline": true, "stripEmpty": true, "cleanMarkup": "remove", "wrapBlock": false},
   {"name": "b", "tei": "hi rend=\"bold\"", "paired": true, "search": "keep", "pageMark": false, "numbered": false, "marginaliaInline": true, "stripEmpty": true, "cleanMarkup": "remove", "wrapBlock": false},
-  {"name": "cs", "tei": "hi (kiri vastupidine teose põhikirjale; ADR 0071 erand)", "paired": true, "search": "keep", "pageMark": false, "numbered": false, "marginaliaInline": true, "stripEmpty": true, "cleanMarkup": "remove", "wrapBlock": false},
+  {"name": "f", "tei": "hi rend=\"fraktur\"", "paired": true, "search": "keep", "pageMark": false, "numbered": false, "marginaliaInline": true, "stripEmpty": true, "cleanMarkup": "remove", "wrapBlock": false},
   {"name": "hi", "tei": "hi", "paired": true, "search": "keep", "pageMark": false, "numbered": false, "marginaliaInline": true, "stripEmpty": true, "cleanMarkup": "remove", "wrapBlock": true},
   {"name": "m", "tei": "note place=\"margin\"", "paired": true, "search": "marginalia", "pageMark": false, "numbered": false, "marginaliaInline": false, "stripEmpty": true, "cleanMarkup": "remove", "wrapBlock": true},
   {"name": "add", "tei": "add", "paired": true, "search": "keep", "pageMark": false, "numbered": false, "marginaliaInline": true, "stripEmpty": true, "cleanMarkup": "remove", "wrapBlock": true},

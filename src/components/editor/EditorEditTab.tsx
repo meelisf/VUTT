@@ -11,6 +11,7 @@ import SpecialCharsPanel from './SpecialCharsPanel';
 import PageMarkPalette, { PageMarkMenu } from './PageMarkPalette';
 import type { PageMarkKind } from '../../markup/vuttTags';
 import type { PageMarkRefusal } from './pageMarkEdit';
+import type { PageScript } from './scriptMode';
 
 interface EditorEditTabProps {
   active: boolean;
@@ -24,9 +25,11 @@ interface EditorEditTabProps {
 
   compactToolbar: boolean;
   narrowPane: boolean;
+  scriptMode: PageScript & { manual: boolean };
+  flipScriptMode: () => void;
   marginaliaCount: number;
   marginaliaUserMode: MarginaliaMode;
-  wrapWithTag: (tag: 'b' | 'i' | 'cs' | 'add') => void;
+  wrapWithTag: (tag: 'b' | 'i' | 'f' | 'add') => void;
   insertMarginalia: () => void;
   insertAtCursor: (text: string) => void;
   cleanMarkup: () => void;
@@ -70,6 +73,8 @@ export default function EditorEditTab({
   pageStatus,
   onStatusChange,
   compactToolbar,
+  scriptMode,
+  flipScriptMode,
   narrowPane,
   marginaliaCount,
   marginaliaUserMode,
@@ -122,6 +127,7 @@ export default function EditorEditTab({
           toggleMarginaliaMode={toggleMarginaliaMode}
           pageMarkPaletteOpen={pageMarkPaletteOpen}
           togglePageMarkPalette={togglePageMarkPalette}
+          scriptMode={scriptMode.mode}
         />
 
         <EditorStatusBar
@@ -161,6 +167,8 @@ export default function EditorEditTab({
       )}
 
       <SpecialCharsPanel
+        scriptMode={scriptMode}
+        flipScriptMode={flipScriptMode}
         authToken={authToken}
         user={user}
         readOnly={readOnly}

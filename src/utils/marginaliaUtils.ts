@@ -203,7 +203,7 @@ export function rangeTouchesOpenMarginalia(
  */
 function wrapMarginaliaLines(text: string): string {
   const active: string[] = [];
-  const inlineTagRe = /<(\/?)((?:i|b|cs|hi)|(?:ann\d*))>/g;
+  const inlineTagRe = /<(\/?)((?:i|b|f|hi)|(?:ann\d*))>/g;
   return text.split('\n').map(line => {
     const inherited = active.map(name => `<${name}>`).join('');
     inlineTagRe.lastIndex = 0;
@@ -218,7 +218,7 @@ function wrapMarginaliaLines(text: string): string {
       }
     }
     // Ainult tagidest/tühikutest koosnev füüsiline rida ei vaja tühja <m>-i.
-    const visible = line.replace(/<\/?(?:(?:i|b|cs|hi)|(?:ann\d*))>/g, '').trim();
+    const visible = line.replace(/<\/?(?:(?:i|b|f|hi)|(?:ann\d*))>/g, '').trim();
     if (visible === '') return '';
     const closes = [...active].reverse().map(name => `</${name}>`).join('');
     return `<m>${inherited}${line}${closes}</m>`;
@@ -317,7 +317,7 @@ function isWhollyWrapped(content: string, tag: string): boolean {
 }
 
 /**
- * Lülitab stiilitägi (`i`, `b`, `cs`) terve marginaaliakaardi peal: iga
+ * Lülitab stiilitägi (`i`, `b`, `f`) terve marginaaliakaardi peal: iga
  * mittetühja `<m>` rea SISU ümber (`<m>` jääb välimiseks, ADR 0003). Kui kõik
  * read on juba tervikuna selles tägis, eemaldatakse see; muidu mähitakse kõik
  * ja sisemised sama tägi paarid eemaldatakse (need oleksid üleliigsed).
@@ -327,7 +327,7 @@ function isWhollyWrapped(content: string, tag: string): boolean {
 export function toggleGroupStyle(
   doc: string,
   group: MarginaliaGroup,
-  tag: 'i' | 'b' | 'cs',
+  tag: 'i' | 'b' | 'f',
 ): CleanChangeSpec[] {
   const nonEmpty = group.blocks.filter(b => doc.slice(b.contentFrom, b.contentTo).trim() !== '');
   if (nonEmpty.length === 0) return [];

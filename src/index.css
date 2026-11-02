@@ -71,8 +71,10 @@ body:has(.workspace-container) {
   font-weight: bold;
 }
 
-/* <cs>tekst</cs> — koodivahetus (Fraktur vs Antiqua) */
-.vutt-cs {
+/* <f>tekst</f> — fraktuur (ADR 0077). Täg on absoluutne ega anna ise kujundust:
+   hall taust tähistab lehe VÄHEMUSKIRJA (antiikvalehel <f>, fraktuurlehel
+   märgendamata antiikva) — scriptMode.ts. Sama klass redaktoris ja lugemisvaates. */
+.vutt-script-minority {
   color: inherit;
   background-color: #f1f5f9; /* slate-100 */
 }
@@ -101,7 +103,7 @@ body:has(.workspace-container) {
 }
 
 /* Lehe tähistus (ADR 0070): <fw> <sig> <catch> <rh> — lehe kui füüsilise objekti
-   tähistus, mitte tekst. Iga liik oma tooniga (hall on <cs>-i oma), vasakul sakk
+   tähistus, mitte tekst. Iga liik oma tooniga (hall on kirjastiili oma, ADR 0077), vasakul sakk
    valge ikooniga (lucide type-outline). Sõnalist silti EI ole (tägi nimi nägi välja
    nagu lehe tekst) — liik on hõljukvihjes. Toonid kattuvad lehe tähistuse paneeli
    nuppudega (PageMarkPalette KIND_CLS). Sakk on inline-block, kõrgus 1em < rea

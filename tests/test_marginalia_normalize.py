@@ -59,7 +59,7 @@ def test_mitu_inline_tagi():
 
 
 def test_cs_ja_hi_tagid():
-    assert norm('<cs><m>verbum</cs></m>') == '<m><cs>verbum</cs></m>'
+    assert norm('<f><m>verbum</f></m>') == '<m><f>verbum</f></m>'
     assert norm('<m><hi>NB</m></hi>') == '<m><hi>NB</hi></m>'
 
 
@@ -93,7 +93,7 @@ def test_split_marginalia_normaliseeritud_sisuga():
 def test_strip_tuhi_inline():
     assert strip('<i></i>') == ''
     assert strip('<b></b>') == ''
-    assert strip('<cs></cs>') == ''
+    assert strip('<f></f>') == ''
     assert strip('<hi></hi>') == ''
 
 

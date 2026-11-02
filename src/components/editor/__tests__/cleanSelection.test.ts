@@ -13,12 +13,12 @@ function puhasta(marked: string, hidden: { from: number; to: number }[] = []): s
 }
 
 describe('cleanSelectionChanges — valik paari sees poolitab paari', () => {
-  it('kolm sõna keset cs-rida', () => {
-    expect(puhasta('<cs>aa ⟦bb cc dd⟧ ee</cs>')).toBe('<cs>aa </cs>bb cc dd<cs> ee</cs>');
+  it('kolm sõna keset f-rida', () => {
+    expect(puhasta('<f>aa ⟦bb cc dd⟧ ee</f>')).toBe('<f>aa </f>bb cc dd<f> ee</f>');
   });
 
   it('valik paari alguses', () => {
-    expect(puhasta('<cs>⟦aa bb⟧ cc</cs>')).toBe('aa bb<cs> cc</cs>');
+    expect(puhasta('<f>⟦aa bb⟧ cc</f>')).toBe('aa bb<f> cc</f>');
   });
 
   it('valik paari lõpus', () => {

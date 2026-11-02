@@ -1,5 +1,5 @@
 import type { EditorState } from '@codemirror/state';
-import { STRUCTURAL_TAGS } from '../../markup/consumers';
+import { STRUCTURAL_TAGS, STYLE_TAGS } from '../../markup/consumers';
 
 // wrapWithTag abifunktsioonid
 
@@ -107,11 +107,11 @@ export function selectionWrapChanges(
   const lineTo = state.doc.lineAt(to);
   const changes: { from: number; to: number; insert: string }[] = [];
 
-  // NUTIKAS PESASTAMINE: stiilitägi (i, b, cs) puhul liigume struktuuri-tägide
+  // NUTIKAS PESASTAMINE: stiilitägi (i, b, f) puhul liigume struktuuri-tägide
   // (registri wrapBlock: m, hi, add, fn, lehe tähistus) SISSE. Nii otsustamisel kui tegevusel — muidu nägi otsus valikut
   // `<m><i>ab</i></m>` mähkimisena ja jättis orvu `<m><i>ab</m>`.
   const skipStructural = (sFrom: number, sTo: number): [number, number] => {
-    if (!['i', 'b', 'cs'].includes(tag)) return [sFrom, sTo];
+    if (!STYLE_TAGS.includes(tag)) return [sFrom, sTo];
     let adjusted = true;
     while (adjusted) {
       adjusted = false;

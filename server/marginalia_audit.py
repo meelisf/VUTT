@@ -9,7 +9,7 @@ import re
 
 
 _M_TAG_RE = re.compile(r"<(/?)m>")
-_VUTT_PAIR_TAG_RE = re.compile(r"<(/?)(m|i|b|cs|hi|ann\d*)>")
+_VUTT_PAIR_TAG_RE = re.compile(r"<(/?)(m|i|b|f|hi|ann\d*)>")
 
 
 @dataclass(frozen=True)

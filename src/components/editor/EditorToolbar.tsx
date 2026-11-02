@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Columns2, Hash, RemoveFormatting, SeparatorHorizontal, SquarePen, StickyNote, Superscript } from 'lucide-react';
 import type { MarginaliaMode } from './MarginaliaExtension';
+import type { ScriptMode } from './scriptMode';
 
 interface EditorToolbarProps {
   readOnly: boolean;
@@ -8,7 +9,7 @@ interface EditorToolbarProps {
   narrowPane: boolean;
   marginaliaCount: number;
   marginaliaUserMode: MarginaliaMode;
-  wrapWithTag: (tag: 'b' | 'i' | 'cs' | 'add') => void;
+  wrapWithTag: (tag: 'b' | 'i' | 'f' | 'add') => void;
   insertMarginalia: () => void;
   insertAtCursor: (text: string) => void;
   cleanMarkup: () => void;
@@ -16,6 +17,8 @@ interface EditorToolbarProps {
   toggleMarginaliaMode: () => void;
   pageMarkPaletteOpen: boolean;
   togglePageMarkPalette: () => void;
+  /** Lehe kuvarežiim (ADR 0077, 2a): nupu silt on täht, mille tähendus on hall. */
+  scriptMode: ScriptMode;
 }
 
 // Transkriptsiooniredaktori vormindamise tööriistariba.
@@ -33,6 +36,7 @@ export default function EditorToolbar({
   toggleMarginaliaMode,
   pageMarkPaletteOpen,
   togglePageMarkPalette,
+  scriptMode,
 }: EditorToolbarProps) {
   const { t } = useTranslation(['workspace']);
 
@@ -43,7 +47,11 @@ export default function EditorToolbar({
       <div className="flex items-center gap-1">
         <button type="button" onClick={() => wrapWithTag('b')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={`${t('editor.tooltips.bold')} (Ctrl+B)`}>B</button>
         <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.italic')} (Ctrl+I)`}>I</button>
-        <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.fractur')} (Ctrl+K)`}>𝔉</button>
+        {/* Lüliti pöörab alati valiku kirja; silt näitab, mida hall praegu tähendab (ADR 0077, 2a). */}
+        <button type="button" onClick={() => wrapWithTag('f')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700"
+          title={`${scriptMode === 'fraktur' ? t('editor.tooltips.markAntiqua') : t('editor.tooltips.markFraktur')} · ${scriptMode === 'fraktur' ? t('editor.scriptMode.fraktur') : t('editor.scriptMode.antiqua')} (Ctrl+K)`}>
+          <span className="vutt-script-minority px-0.5 rounded-sm">{scriptMode === 'fraktur' ? 'A' : '𝔉'}</span>
+        </button>
         <button type="button" onClick={() => wrapWithTag('add')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-emerald-50 font-serif border border-transparent hover:border-emerald-200 text-emerald-700" title={`${t('editor.tooltips.addition')} (Ctrl+Shift+L)`}>‸</button>
         <div className="w-px h-4 bg-gray-300 mx-1"></div>
         <button type="button" onClick={insertMarginalia} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.marginalia')}><StickyNote size={14} />{!compactToolbar && <span>Marginalia</span>}</button>

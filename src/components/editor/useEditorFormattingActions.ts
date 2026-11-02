@@ -31,7 +31,7 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     if (from === to) {
       // Kursor avatud marginaaliakaardi sees → stiil kogu kaardile (kasutaja
       // soov: dispositsioon kursiivi ilma põhiteksti puudutamata).
-      if (tag === 'i' || tag === 'b' || tag === 'cs') {
+      if (tag === 'i' || tag === 'b' || tag === 'f') {
         const { blocks, openMarks } = view.state.field(marginaliaField);
         const group = openGroupAt(blocks, openMarks, from);
         if (group) {
