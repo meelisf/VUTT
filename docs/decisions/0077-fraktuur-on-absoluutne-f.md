@@ -64,19 +64,55 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
      hiljem olla teine kanal, mitte esimene.
 
 3. **Mis on `<f>`, mis mitte:**
+   - **Ulatus on trükis.** `<cs>` on praegu ainult trüki juhistes (LOSSi `prompt.py`,
+     `GEMINI_PRINT_INSTRUCTION`), mitte käekirja omas. Kurrendi ja ladina kirja
+     vahetus käsikirjas on eraldi küsimus ja seda ADR ei lahenda.
    - Švaabahher ja teised gooti trükikirjad on `<f>`.
    - Kreeka ja heebrea **ei ole** `<f>` ka fraktuurlõigu sees. „Mitte-`<f>` =
      antiikva“ kehtib ainult ladina tähestikule.
-   - Antiikva kursiiv fraktuuri sees on `<i>` ilma `<f>`-ita.
-   - `<f>` ei ületa reapiiri. Marginaalias on ta `<m>` sees (`<m><f>Ge⸗</f></m>`),
-     nagu iga inline-täg (`marginalia_inline`).
-   - Ainult numbritest või kirjavahemärkidest koosnevat lõiku ei märgita, sest kirja
-     ei saa sealt määrata.
+   - **`<f>` ja `<i>` välistavad teineteist** (invariant). Gooti kirjal kursiivi ei
+     ole, seega on trükise `<i>` alati antiikva kursiiv. Ei `<f><i>…</i></f>` ega
+     `<i><f>…</f></i>`. Sama põhimõte on juhendis juba olemas: kursiivne leht
+     märgitakse tervikuna kursiiviks, kuigi kursiiv on seal „normaalne“.
+   - **Numbrid ja kirjavahemärgid fraktuurlause sees jäävad `<f>`-i sisse.**
+     `<f>im Jahr 1644. am 3. Martii</f>` on üks paar, mitte
+     `<f>im Jahr </f>1644.<f> am </f>…`. `<f>`-ita jääb ainult lõik, kus ei ole
+     ühtki fraktuuri tähte: eraldi rida või plokk (leheküljenumber, rooma number)
+     või number väljaspool fraktuurlõiku.
+   - **Pesastus:** `<f>` on struktuuritägide **sees**, mitte ümber: `<m><f>Ge⸗</f></m>`,
+     `<catch><f>Vor⸗</f></catch>`, `<sig>`, `<rh>`, `<add>`, `<hi>`. See on sama
+     reegel, millega `skipStructural` (`wrapTagUtils.ts`) juba stiilitäge
+     käsitleb. `<pb/>` ja `<fn>…</fn>` ei ole kunagi `<f>`-i sees. Ainult
+     numbrist koosnev `<fw>12</fw>` ei ole `<f>` üldse.
+   - `<f>` ei ületa reapiiri (punkt 3a).
+
+3a. **Reapiir.** Fraktuurlehel on iga rida `<f>`-is ja tägid on peidetud. Kui
+   toimetaja vajutab rea keskel Enterit, tekib `<f>rida 1\nrida 2</f>` ja hall
+   taust jookseb üle reavahetuse, ilma et ta seda märkaks. 𝔉 / Ctrl+K otsib
+   ümbritsevat paari ainult ühe rea piires (`findContainer(…, line.from, line.to)`),
+   ei leia seda ja **mähib topelt**. „Puhasta“ (`cleanSelectionChanges`) paaritab
+   kogu dokumendi ulatuses ja töötab ka mitmerealise paariga. Lahendus on kahes osas:
+   - **Salvestamisel** poolitatakse üle reavahetuse ulatuv inline-stiilipaar
+     (`CLEAN_SPLIT_TAGS`) rea kaupa `normalize_marginalia_tags`-i sees. Normaliseerimine
+     toimub ainult salvestamisel (ADR 0003). See parandab ka olemasolevad
+     mitmerealised `<cs>`-paarid (6 tükki 1256-st treeningandmetes).
+   - **Redaktoris** otsustab lüliti lahtipakkimise sama globaalse paaritusega nagu
+     „Puhasta“, nii et Ctrl+K töötab ka enne salvestust. Elavat poolitamist Enteri
+     peale ei tehta, sest see oleks klahvivajutuse peale tehtav normaliseerimine
+     (ADR 0003).
 
 4. **Poolitusmärk ja `<f>` peavad klappima:** rea lõpu `⸗` on `<f>`-i sees ja `-`
    väljas. Poolitusmärki **ei tuletata** salvestamisel, see on diplomaatiline
    transkriptsioon ja jääb toimetaja otsuseks. Vastuolu on kontroll treeningekspordis
    (vt Tagajärjed) ja hiljem võimalik redaktori hoiatus.
+   - Kontrollitakse rea **viimast nähtavat märki enne sulgevaid täge**
+     (`Ge⸗</f>`, `<m><f>Ge⸗</f></m>`, `<catch><f>Vor⸗</f></catch>`).
+   - Arvesse läheb ainult tähe järel olev märk (`[^\W\d_]-`), nii et vahemik
+     `1640-` ei ole poolitus.
+   - Kui trükikoda on fraktuuris päriselt kasutanud ühekordset `-`, on transkriptsioon
+     õige ja leht ei tohi jäädavalt välja jääda. Kontrollitud erandid on LOSSi
+     ekspordi käsitsi nimekirjas (lehe võti + põhjus). VUTT-i andmetesse lipp ei
+     lähe.
 
 5. **Kanoniseerimine treeningekspordis, mitte VUTT-i salvestusteel.** Tühjade tägide
    koristus ja `<m>` välimiseks tõstmine on juba olemas ja registripõhised:
@@ -100,8 +136,13 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
       sisendiks. Aruanne loetleb eraldi `<i>` fraktuurteostes, sest nende tähendus
       tuleb enne vaadata.
    3. **Antiikvateos:** `<cs>` → `<f>`.
-   4. **Fraktuurteos:** iga rea fraktuurlõigud (väljaspool `<cs>`-i) mähitakse `<f>`-i ja
-      `<cs>` eemaldatakse (selle sisu on antiikva). Kehtivad punkti 3 reeglid.
+   4. **Fraktuurteos:** iga rea fraktuurlõik mähitakse `<f>`-i ja `<cs>` eemaldatakse
+      (selle sisu on antiikva). Lõik ulatub rea esimesest fraktuuri tähest
+      viimaseni ja vahepealsed numbrid ning kirjavahemärgid jäävad sisse. Lõik
+      katkeb `<cs>`-, `<i>`-, kreeka- ja heebrealõigu, `<fn>`-i ja `<pb/>`-ga. `<i>`
+      jääb `<f>`-ist välja ja `<cs><i>x</i></cs>` muutub `<i>x</i>`-ks. Struktuuritägi
+      sees mähitakse sisu (`<catch><f>…</f></catch>`), mitte tägi ennast. Kehtivad
+      punkti 3 reeglid.
    5. Kõik lehed, ka **Toores**: nende `<cs>` on vana mudeli suhteline väljund.
    6. **Rakendus seisatud backendiga** (nagu ADR 0076): ükski toimetaja salvestus ei
       jookse vahele. Teose kohta üks commit (autor `"Automaatne"`), siis Meili
@@ -125,10 +166,27 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
 - **Registrikirje** `f` (`hi rend="fraktur"`, `marginalia_inline`, `strip_empty`,
   otsingusse jah) mõlemas registris (`server/vutt_tags.py`, `src/markup/vuttTags.ts`)
   ja `VUTT_TAGS` kuvaklass; `cs` kustub. Paarsustest (`tests/test_vutt_tags_parity.py`)
-  ja `vuttTagsConsumers.test.ts` kukuvad, kui midagi jääb puudu. Kõvasti kodeeritud
-  `cs`-loendid väljaspool registrit tuleb üle käia: `wrapTagUtils.ts` (`['i','b','cs']`),
-  `useEditorFormattingActions.ts`, `EditorToolbar.tsx` (𝔉 nupp), LOSSi
-  `convert_marginalia.py` regexid (`i|b|cs|hi`). Juhend: `<f>` reeglid punktist 3.
+  ja `vuttTagsConsumers.test.ts` kukuvad, kui midagi jääb puudu. **Neid valvureid ei
+  tabata** kõvasti kodeeritud `cs`-loendid, mis tuleb üle käia ja võimaluse korral
+  registrist tuletada (`consumers.ts` / `vutt_tags.py`):
+  - redaktor: `wrapTagUtils.ts` (`['i','b','cs']`), `useEditorFormattingActions.ts`,
+    `EditorToolbar.tsx` (𝔉 nupp), `EditorEditTab.tsx` (`wrapWithTag` tüüp),
+    `useCodeMirrorLifecycle.ts` (`Mod-k`), `marginaliaUtils.ts` (`wrapMarginaliaLines`
+    regexid `i|b|cs|hi`, `toggleGroupStyle` tüüp), `index.css` (`.vutt-cs`);
+  - **lugemisvaade:** `renderVuttMarkup.ts` (+ test) kuvab `<cs>`-i praegu kursiivina
+    (`italic tracking-wide`). See peab järgima punkti 2a suhtelist reeglit (sama
+    funktsioon kui redaktoris), mitte tegema oma tõlgendust;
+  - server: `page_merge.py` (`_PAARISTÄG_RE`; sealt puuduvad juba praegu `add` ja lehe
+    tähistused, mis on eraldi viga), `marginalia_audit.py`, `marginalia_migrate.py`;
+  - LOSS: `convert_marginalia.py` regexid (`i|b|cs|hi`);
+  - juhend (`public/transcription_guide*.html`, koodivahetuse lõik) ja tõlked
+    (`editor.tooltips` 𝔉 nupu tekst mõlemas keeles).
+
+  Juhendisse lähevad `<f>` reeglid punktidest 3 ja 3a.
+- **`pageMarkEdit`** paneb lehe tähistuse praegu kahte moodi: ilma valikuta
+  `<catch><f>Vor⸗</f></catch>`, valikuga `<f><catch>Vor⸗</catch></f>`. Punkti 3 järgi
+  on õige ainult esimene. Valikuga tee peab tõstma tähistuse olemasoleva
+  stiilipaari ümber.
 - **„Puhasta“ valiku peal on fraktuurlehe põhitoiming** ja peab töötama ka siis, kui
   valik on paari sees: `cleanSelectionChanges` (`src/components/editor/cleanSelection.ts`)
   poolitab valikust välja ulatuva stiilipaari (`CLEAN_SPLIT_TAGS`, registrist).
