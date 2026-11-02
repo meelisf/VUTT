@@ -3,16 +3,9 @@
 Kuivkäivitus tootmise koopial 2026-11-02, kehtivate otsustega (`0077-otsused.json`). Staatus: V = Valmis, A = Annoteeritud, P = Parandatud, Tö = Töös, To = Toores. Signaal = rea lõpu poolitusmärgid: F = `⸗` väljaspool `<cs>`-i või `-` sees; A = vastupidi.
 
 
-## 1. Otsustamata, `<cs>`-iga (0)
+## 1. Otsustamata, `<cs>`-ita (116)
 
-`<cs>` on olemas, aga poolitussignaal on vastuoluline. Vali F / A / P (segateos: lehe kaupa).
-
-| Teos | F/A | `<cs>`-lehti | Lehti | Staatus | Keeled | Soovitus |
-|---|---|---|---|---|---|---|
-
-## 2. Otsustamata, `<cs>`-ita (116)
-
-Kirja pole kunagi märgitud ja signaal on vastuoluline (tavaliselt ladina + saksa/rootsi juhutrükis). Soovitus P: fraktuurisignaaliga leht mähitakse `<f>`-i, antiikvaleht jääb, vastuoluline leht läheb jaotisse 4. F = kogu teos `<f>`-i; A = ei muutu.
+Kirja pole kunagi märgitud ja signaal on vastuoluline (tavaliselt ladina + saksa/rootsi juhutrükis). Soovitus P: fraktuurisignaaliga leht mähitakse `<f>`-i, antiikvaleht jääb, vastuoluline leht läheb jaotisse 3. F = kogu teos `<f>`-i; A = ei muutu.
 
 | Teos | F/A | `<cs>`-lehti | Lehti | Staatus | Keeled | Soovitus |
 |---|---|---|---|---|---|---|
@@ -133,7 +126,7 @@ Kirja pole kunagi märgitud ja signaal on vastuoluline (tavaliselt ladina + saks
 | [6nwt8g](https://vutt.utlib.ut.ee/work/6nwt8g) 1699-32-Der_gekrönte_Fleiß_Als_Dem_Andreas_Johan_Straet | 1/1 | 0 | 5 | To5 | lat | P (lehe kaupa) |
 | [we88j1](https://vutt.utlib.ut.ee/work/we88j1) 1699-6-Als_Seiner_Excell_Königl_Rath_FeldMarschallen_Ge | 1/1 | 0 | 2 | To2 | deu | P (lehe kaupa) |
 
-## 3. Signaalita ja `<cs>`-ita — jääksid MUUTMATA (77)
+## 2. Signaalita ja `<cs>`-ita — jääksid MUUTMATA (77)
 
 Poolitusi ega `<cs>`-i ei ole (lühikesed trükised, tiitellehed). Kui teos on fraktuuris, on vaja otsust F (või P), muidu jääb ta märgendamata ja kuvatakse antiikvana. ⚑ = keeltes on saksa, rootsi või eesti.
 
@@ -217,14 +210,14 @@ Poolitusi ega `<cs>`-i ei ole (lühikesed trükised, tiitellehed). Kui teos on f
 | [qs8l6h](https://vutt.utlib.ut.ee/work/qs8l6h) 1708-15-Das_Güldene_Seculum_wolte_Als_Ihro_Königl_Majes | 4 | To4 | lat |  |
 | [6t7boi](https://vutt.utlib.ut.ee/work/6t7boi) 1709-2-Skyldig_Willigheet_Och_Willig_Skylldighet_Wisad_ | 4 | To4 | lat |  |
 
-## 4. Segateoste lehed ilma ühese signaalita
+## 3. Segateoste lehed ilma ühese signaalita
 
 Segateoses (P) lehed, kus `⸗` ja `-` on segamini või `<cs>` on signaalita. Vaja otsust `"work_id/leht.txt": "F"|"A"`; seni jäävad puutumata.
 
 - [vb1kk6](https://vutt.utlib.ut.ee/work/vb1kk6) 1695-epicedium-programmaticum-sive-indictio-funeris-quo: lk 18, 22, 24, 25, 26, 27, 28, 29, 31
 - [shj0nu](https://vutt.utlib.ut.ee/work/shj0nu) 1696-elegia-ad-virum-reverendissimum-johannem-fischerum: lk 8, 10, 11, 13, 14, 25, 28, 29, 32, 34, 35, 38, 39
 
-## 5. Poolitusvärava lipud pärast teisendust (79 teost, 666 lehte, neist Valmis 53)
+## 4. Poolitusvärava lipud pärast teisendust (79 teost, 666 lehte, neist Valmis 53)
 
 Rea lõpu `⸗` jääb `<f>`-ist välja või `-` jääb `<f>`-i sisse. Enamasti on see märgendamata antiikvalõik fraktuurteoses (või vastupidi): leht kuvatakse valesti ja **Valmis**-leht jääb treeningust välja. Autentne trükierand → LOSSi `data/f_poolitus_erandid.txt`. Järjestatud Valmis-lehtede järgi.
 
@@ -310,7 +303,7 @@ Rea lõpu `⸗` jääb `<f>`-ist välja või `-` jääb `<f>`-i sisse. Enamasti 
 | [qp0k63](https://vutt.utlib.ut.ee/work/qp0k63) 1632-10-Johan_Skytte_der_Elter_General_Gouverneur_ | F | 1 |  | 1 |
 | [tc80j9](https://vutt.utlib.ut.ee/work/tc80j9) 1516-bulla-vndecime-sessionis-reformationis-predic | A | 1 |  | 1 |
 
-## 6. `<i>` fraktuurteostes (22)
+## 5. `<i>` fraktuurteostes (22)
 
 Migratsioon jätab `<i>`-sisu `<f>`-ist välja (antiikva kursiiv). Näidistena kontrollitud: z0kdh0 (ladina laensõnad), e73lvl (pealkiri, ladina lõigud). Ülejäänud pistelisel kontrollil.
 
