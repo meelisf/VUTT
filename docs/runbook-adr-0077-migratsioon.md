@@ -117,9 +117,16 @@ hilisemad muudatused).
 ## Pärast
 
 - [ ] ADR 0077 staatusest eemalda „migratsioon käivitamata“, docs/decisions/README rida samuti.
-- [ ] LOSS (meelisf/qwen-mudeli-treenimine#1): merge → LOSSis `git pull` → värske varukoopia
-      (`~/bin/vutt_backup.py`) PÄRAST migratsiooni → `build_vutt_dataset.py` → vaata
-      `data/vutt/f_poolitus_lipud.csv` → treening (~5 h) → `eval_print.py` (`f_f1`, `cer_plain`).
-      OCR-teenus kasutab kuni vahetuseni vana `INSTRUCTION_CS`-i, nii et taaskäivitus on ohutu.
+- [ ] Treeningandmed (meelisf/qwen-mudeli-treenimine#1 merge'itud): LOSSis `git pull` → värske
+      varukoopia (`~/bin/vutt_backup.py`) PÄRAST migratsiooni → `build_vutt_dataset.py` →
+      vaata `data/vutt/f_poolitus_lipud.csv` (lipustatud lehed jäävad välja).
+      OCR-teenus kasutab kuni mudeli vahetuseni vana `INSTRUCTION_CS`-i, nii et taaskäivitus on ohutu.
+- [ ] Treening ülikooli GPU-del: klastri repo **PR #1 seisus** (`git log -1` = sama commit mis
+      LOSSis; juhis tuleb `scripts/prompt.py` `INSTRUCTION`-ist, kanoniseerimine
+      `convert_marginalia.py` + `f_markup.py`). Kopeeri `data/vutt/` koos `images/`-iga.
+      Kontroll enne käivitust: `venv/bin/python -m pytest scripts/test_f_markup.py` (9 testi) ja
+      `python -c "from prompt import INSTRUCTION; assert '<f>text</f>' in INSTRUCTION"`.
+- [ ] Mudel LOSSi tagasi → `eval_print.py` holdout'il: `<f>`-vahemike F1, `cer_plain`,
+      lehe tähistus (sig/catch gt/väljund) praeguse mudeli vastu.
 - [ ] Mudeli vahetus alles pärast hindamist ja koos: LOSSi teenus `"print": INSTRUCTION`,
       VUTT `config.OCR_OUTPUT_RELATIVE_CS = False` + Gemini trükijuhis `<f>`-ile (ADR 0077 p 7).
