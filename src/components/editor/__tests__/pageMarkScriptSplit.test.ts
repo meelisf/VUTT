@@ -26,7 +26,15 @@ describe('lehe tähistus ja vähemuskiri', () => {
     const spans = dom.querySelectorAll('.vutt-pm-catch');
     expect(spans.length).toBe(1);
     expect(spans[0].textContent).toBe('II. Hu-');
-    expect(dom.querySelector('.vutt-pm-catch .vutt-script-minority')?.textContent).toBe('II. Hu');
+    // alates #731 on ka poolitusmärk hall (<f>-ist väljas = antiikva)
+    expect(dom.querySelector('.vutt-pm-catch .vutt-script-minority')?.textContent).toBe('II. Hu-');
+  });
+
+  it('hall, mis ei kata kogu tähistust (kreeka sees), ei lõhu tähistust', () => {
+    const dom = render(FRAKTUR + '<rh>Cap. λόγος II.</rh>');
+    const spans = dom.querySelectorAll('.vutt-pm-rh');
+    expect(spans.length).toBe(1);
+    expect(spans[0].textContent).toBe('Cap. λόγος II.');
   });
 
   it('lehenumber punktiga', () => {
