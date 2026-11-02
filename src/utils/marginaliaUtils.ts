@@ -167,37 +167,6 @@ export interface CleanChangeSpec {
   insert: string;
 }
 
-/**
- * Ehitab cleanMarkup'i muudatused valikule nii, et peidetud marginaalia plokid
- * jäävad dokumendis täpselt oma kohale: iga nähtava segmendi kohta eraldi
- * muudatus, peidetud vahemikke EI puudutata. (Üksiku tervet valikut katva
- * muudatuse korral kirjutaks kaitsefilter tehingu ümber ja plokk nihkuks
- * valiku lõppu keset rida — kaotaks ankru ja degradeeruks inline-margiks.)
- *
- * `hidden` peab olema kasvavalt sorteeritud ja mittekattuv (hiddenBlockRanges).
- */
-export function cleanMarkupSpecs(
-  doc: string,
-  from: number,
-  to: number,
-  hidden: { from: number; to: number }[],
-  clean: (s: string) => string,
-): CleanChangeSpec[] {
-  const specs: CleanChangeSpec[] = [];
-  const pushSegment = (segFrom: number, segTo: number) => {
-    if (segTo <= segFrom) return;
-    specs.push({ from: segFrom, to: segTo, insert: clean(doc.slice(segFrom, segTo)) });
-  };
-  let cursor = from;
-  for (const h of hidden) {
-    if (h.to <= from || h.from >= to) continue;
-    pushSegment(cursor, Math.max(cursor, Math.min(h.from, to)));
-    cursor = Math.max(cursor, Math.min(h.to, to));
-  }
-  pushSegment(cursor, to);
-  return specs;
-}
-
 export interface MarginaliaFromSelection {
   changes: CleanChangeSpec[];
   /** Kõigi loodud plokkide sisupositsioonid UUE dokumendi koordinaatides. */
