@@ -52,6 +52,9 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
    (praegune `.vutt-cs`) tõstab esile lehe **vähemuskirja**: antiikvalehel `<f>`
    (nagu praegu `<cs>`), fraktuurlehel märgendamata ladina tähestiku teksti. Hall
    tähendab toimetajale endiselt „lehe põhikirjast erinev“, nii et harjumus ei muutu.
+   Fraktuurlehel on hall kõik `<f>`-ist väljas olev peale servatühiku ja kreeka/heebrea,
+   ka numbrid ja kirjavahemärgid (*täiendus 2026-11-02*: varem ainult esimesest tähest
+   viimaseni, nii et `Lut: 19. &` / `20.` ja kustose `Hu-` poolitusmärk paistsid fraktuurina).
    - **Enamus arvutatakse lehe laadimisel**, mitte iga muudatusega: ladina tähed
      `<f>`-is vs väljas; kreeka, heebrea, numbrid ja kirjavahemärgid ei loe. Kui
      arvutataks elavalt, võiks ~50/50 lehel kogu esiletõst toimetamise ajal ümber

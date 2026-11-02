@@ -44,6 +44,21 @@ describe('minorityRanges', () => {
 
   it('fraktuurirežiim: kreeka katkestab ega ole esile tõstetud', () => {
     expect(slices('<f>vom </f>λόγος<f> wort</f>', 'fraktur')).toEqual([]);
+    // kreeka järel olev kirjavahemärk ei ole antiikva vihje
+    expect(slices('<f>vom </f>λόγος, <f>wort</f>', 'fraktur')).toEqual([]);
+  });
+
+  // `<f>`-ist väljas = antiikva: ka numbrid ja kirjavahemärgid (2026-11-02 — varem
+  // ainult esimesest tähest viimaseni, nii et `Lut: 19. &` / `20.` paistsid fraktuurina).
+  it('fraktuurirežiim: numbrid ja kirjavahemärgid väljaspool <f>-i on hallid', () => {
+    expect(slices('<f>Text vnd mehr</f>\n<m>Lut: 19. &</m>\n<m>20.</m>', 'fraktur'))
+      .toEqual(['Lut: 19. &', '20.']);
+    expect(slices('<f>mens GOttes.</f>\n<catch>II. Hu-</catch>', 'fraktur')).toEqual(['II. Hu-']);
+    expect(slices('<fw>265.</fw>\n<f>Text vnd mehr</f>', 'fraktur')).toEqual(['265.']);
+  });
+
+  it('fraktuurirežiim: tühik <f>-lõikude vahel ei ole hall', () => {
+    expect(slices('<f>sich</f> <f>bey</f>\n<f>den</f>', 'fraktur')).toEqual([]);
   });
 });
 

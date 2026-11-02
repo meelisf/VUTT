@@ -61,32 +61,38 @@ export function pageScript(text: string): PageScript {
 /**
  * Vähemuskirja vahemikud kuvamiseks.
  * - antiikvarežiimis: `<f>`-paaride sisu;
- * - fraktuurirežiimis: ladina tähtede jooksud väljaspool `<f>`-i, rea kaupa,
- *   esimesest tähest viimaseni. Jooksu katkestab `<f>`-i sisu, reavahetus ja
- *   mitteladina täht (kreeka/heebrea ei ole kumbki kiri); tühik, number,
- *   kirjavahemärk ja tägi-token jooksu ei katkesta.
+ * - fraktuurirežiimis: kõik väljaspool `<f>`-i (= antiikva), rea kaupa, esimesest
+ *   mittetühimärgist viimaseni — ka numbrid ja kirjavahemärgid (`Lut: 19. &`,
+ *   `20.`, `Hu-`). Jooksu katkestab `<f>`-i sisu, reavahetus ja mitteladina täht
+ *   (kreeka/heebrea ei ole kumbki kiri; tema järel olev kirjavahemärk ei ava uut
+ *   jooksu enne tühikut); tühik ja tägi-token jooksu ei katkesta ega alusta.
  */
 export function minorityRanges(text: string, mode: ScriptMode): ScriptRange[] {
   const { inF, inTag, fRanges } = scan(text);
   if (mode === 'antiqua') return fRanges.filter(r => r.to > r.from);
   const out: ScriptRange[] = [];
   let start = -1;
-  let lastLetterEnd = -1;
+  let lastEnd = -1;
+  let afterForeign = false; // kreeka/heebrea järel kuni tühikuni
   const flush = () => {
-    if (start !== -1) out.push({ from: start, to: lastLetterEnd });
+    if (start !== -1) out.push({ from: start, to: lastEnd });
     start = -1;
-    lastLetterEnd = -1;
+    lastEnd = -1;
   };
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (inTag[i]) continue;
-    if (inF[i] || ch === '\n') { flush(); continue; }
-    if (LATIN.test(ch)) {
-      if (start === -1) start = i;
-      lastLetterEnd = i + 1;
-    } else if (/\p{L}/u.test(ch)) {
+    if (inF[i] || ch === '\n') { flush(); afterForeign = false; continue; }
+    if (/\s/.test(ch)) { afterForeign = false; continue; }
+    if (/\p{L}/u.test(ch) && !LATIN.test(ch)) {
       flush(); // kreeka, heebrea jne
+      afterForeign = true;
+      continue;
     }
+    if (LATIN.test(ch)) afterForeign = false;
+    else if (afterForeign) continue;
+    if (start === -1) start = i;
+    lastEnd = i + 1;
   }
   flush();
   return out;
