@@ -48,9 +48,20 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
    - **Enamus arvutatakse lehe laadimisel**, mitte iga muudatusega: ladina tähed
      `<f>`-is vs väljas; kreeka, heebrea, numbrid ja kirjavahemärgid ei loe. Kui
      arvutataks elavalt, võiks ~50/50 lehel kogu esiletõst toimetamise ajal ümber
-     pöörduda. Arvutus kordub lehevahetusel. Lehe vahetus remounti ei tee
-     (ADR 0010), seega tuleb arvutus seal selgesõnaliselt uuesti käivitada.
-   - **Režiim on nähtav:** tööriistariba juures silt, nt „Põhikiri: fraktuur ·
+     pöörduda. Arvutus kordub igal sündmusel, mis asendab lehe teksti terviku
+     või kinnitab selle:
+     - lehe laadimine ja lehevahetus (remounti ei toimu (ADR 0010), seega tuleb
+       arvutus selgesõnaliselt uuesti käivitada);
+     - salvestamine;
+     - re-OCR-i tulemuse rakendamine;
+     - ettepaneku või ajaloo versiooni laadimine.
+
+     Näide: märgendamata fraktuurlehel (`<f>` 0 % → režiim „antiikva“) märgib
+     toimetaja Ctrl+A → Ctrl+K kogu teksti `<f>`-iks. Leht on hall kuni
+     salvestamiseni või kuni ta režiimi käsitsi vahetab.
+   - **Käsitsi vahetus:** sildil klõpsamine pöörab kuvarežiimi. See on vaate olek, mida
+     ei salvestata, ja järgmine automaatne arvutus kirjutab selle üle.
+   - **Režiim on nähtav:** tööriistariba juures klõpsatav silt, nt „Põhikiri: fraktuur ·
      esile tõstetud antiikva“. Ilma sildita ei tea toimetaja, kumba halli ta näeb.
    - **Miks mitte absoluutne taust:** taustakanalit kasutavad `<m>` ja `<hi>` (kollane)
      ning lehe tähistused. `<f>` on nende sees (`<m><f>…</f></m>`) ja sisemise
@@ -74,9 +85,15 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
      ole, seega on trükise `<i>` alati antiikva kursiiv. Ei `<f><i>…</i></f>` ega
      `<i><f>…</f></i>`. Sama põhimõte on juhendis juba olemas: kursiivne leht
      märgitakse tervikuna kursiiviks, kuigi kursiiv on seal „normaalne“.
+     **Redaktor kaitseb invarianti ise:** `<i>` mähkimine poolitab ümbritseva
+     `<f>`-paari ja eemaldab valikus olevad `<f>`-id, ning `<f>` mähkimine teeb sama
+     `<i>`-ga (`selectionWrapChanges`, samad poolitusreeglid nagu „Puhasta“).
+     Fraktuurlehel saab antiikva kursiivis sõna märkida ühe klahvivajutusega:
+     `<f>den exercitiis finden</f>` + Ctrl+I → `<f>den </f><i>exercitiis</i><f> finden</f>`.
    - **Numbrid ja kirjavahemärgid fraktuurlause sees jäävad `<f>`-i sisse.**
      `<f>im Jahr 1644. am 3. Martii</f>` on üks paar, mitte
-     `<f>im Jahr </f>1644.<f> am </f>…`. `<f>`-ita jääb ainult lõik, kus ei ole
+     `<f>im Jahr </f>1644.<f> am </f>…`. Sama kehtib lõigu servas olevate
+     märkide kohta (rea lõpu `⸗`, lõpupunkt, sulud). `<f>`-ita jääb ainult lõik, kus ei ole
      ühtki fraktuuri tähte: eraldi rida või plokk (leheküljenumber, rooma number)
      või number väljaspool fraktuurlõiku.
    - **Pesastus:** `<f>` on struktuuritägide **sees**, mitte ümber: `<m><f>Ge⸗</f></m>`,
@@ -137,8 +154,11 @@ Mõõdetud 2026-11-02 LOSSi treeningandmetel (`data/vutt/metadata.csv`, 1488 leh
       tuleb enne vaadata.
    3. **Antiikvateos:** `<cs>` → `<f>`.
    4. **Fraktuurteos:** iga rea fraktuurlõik mähitakse `<f>`-i ja `<cs>` eemaldatakse
-      (selle sisu on antiikva). Lõik ulatub rea esimesest fraktuuri tähest
-      viimaseni ja vahepealsed numbrid ning kirjavahemärgid jäävad sisse. Lõik
+      (selle sisu on antiikva). Lõik on rea maksimaalne jupp, milles on vähemalt
+      üks fraktuuri täht, **koos külgnevate numbrite ja kirjavahemärkidega**: rea
+      lõpu `⸗`, `.`, `,`, sulud jms on sees (`<f>(Gott sey Lob).</f>`, `<f>Ge⸗</f>`,
+      mitte `(<f>Gott sey Lob</f>).`). Muidu läheks migratsioon kohe vastuollu
+      punkti 4 väravaga. Servatühik jääb välja. Lõik
       katkeb `<cs>`-, `<i>`-, kreeka- ja heebrealõigu, `<fn>`-i ja `<pb/>`-ga. `<i>`
       jääb `<f>`-ist välja ja `<cs><i>x</i></cs>` muutub `<i>x</i>`-ks. Struktuuritägi
       sees mähitakse sisu (`<catch><f>…</f></catch>`), mitte tägi ennast. Kehtivad
