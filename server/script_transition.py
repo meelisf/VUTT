@@ -38,10 +38,11 @@ def _work_id(slug: str) -> Optional[str]:
 
 
 def _base_for(slug: str, text: str) -> str:
-    """Põhikiri: manifestist; uue teose puhul lehe poolitusmärgist; muidu 'A'."""
+    """Põhikiri: manifestist; uue teose või segateose puhul lehe poolitusmärgist; muidu 'A'."""
     entry = load_manifest()["works"].get(_work_id(slug) or "")
-    if entry:
+    if entry and entry["base"] in ("A", "F"):
         return entry["base"]
+    # Uus teos või segateos (P, ADR 0077): lehe poolitusmärgist.
     return infer_base([text])[0] or "A"
 
 

@@ -86,3 +86,20 @@ def test_apply_vahepeal_muutunud_leht_jaab_manifestist_valja(tmp_path, monkeypat
     assert res == {"written": 0, "raced": ["a.txt"], "commit": None}
     assert commits == []
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "toimetaja uus"
+
+
+def test_segateos_lehe_kaupa():
+    texts = {
+        "de.txt": "Dort dein Tisbit <cs>expostulirte</cs>/ Kir⸗\nchen",
+        "la.txt": "Thesis ex-\nemplum <cs>Een Juugfru</cs>",
+        "x.txt": "<cs>Darff</cs> sich",          # signaalita
+        "plain.txt": "Text ohne cs",               # <cs>-ita → puutumata
+    }
+    status, base, _, plans, extra = mig.plan_work("w", texts, "P", None)
+    assert (status, base) == ("convert", "P")
+    assert plans["de.txt"] == "<f>Dort dein Tisbit</f> expostulirte<f>/ Kir⸗</f>\n<f>chen</f>"
+    assert plans["la.txt"] == "Thesis ex-\nemplum <f>Een Juugfru</f>"
+    assert "plain.txt" not in plans
+    assert extra == {"unresolved": ["x.txt"]}
+    _, _, _, plans2, extra2 = mig.plan_work("w", texts, "P", None, {"x.txt": "F"})
+    assert plans2["x.txt"] == "Darff <f>sich</f>" and extra2 == {"unresolved": []}

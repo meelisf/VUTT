@@ -5,11 +5,17 @@ Teisendus on `server.script_migration.cs_to_f` — SAMA funktsioon, mida
 kasutavad ajaloo taastamine ja vana mudeli väljundi import.
 
 Teose põhikiri:
-  - käsitsi otsus (`--decisions otsused.json`, `{"work_id": "F" | "A"}`) võidab;
+  - käsitsi otsus (`--decisions otsused.json`, `{"work_id": "F" | "A" | "P"}`) võidab;
+    `P` = segateos (nt ladina osad antiikvas, saksa/rootsi fraktuuris): `<cs>` oli
+    märgitud LEHE põhikirja suhtes, põhikiri tuleb lehe poolitusmärgist; signaalita
+    leht jääb vahele ja aruandesse, kuni ta saab otsuse võtmega `"work_id/leht.txt"`;
   - muidu rea lõpu poolitusmärgist (`infer_base`), kui signaal on ühene;
   - signaalita või vastuoluga teos, millel on `<cs>`, jääb VAHELE ja läheb
     aruandesse rühma „otsustamata" — inimene vaatab pildi ja lisab otsuse.
 Antiikvateos ilma `<cs>`-ita ei muutu (ümbernimetamisel pole midagi teha).
+Käsikiri (`type` Q87167) jääb VÄLJA: `<f>` on trükise märgend (ADR 0077 p 3). Käsikirja
+`<cs>` (ladina kiri Kurrendi sees) läheb aruandesse rühma „manuscript"; `--manuscript-cs strip`
+eemaldab tägid (tekst jääb), vaikimisi ei puudutata.
 
 Teisendatuse tunnus on MANIFEST (`data/config/migrations/0077-f.json`), mitte
 `<f>`-i olemasolu: korduskäivitus puudutab ainult lehte, mille praegune räsi ei
@@ -58,24 +64,39 @@ def read(path: str) -> str:
         return f.read()
 
 
-def plan_work(work_id: str, texts: dict, decision, entry):
+def page_base(work_base: str, fn: str, text: str, page_decisions: dict):
+    """Lehe põhikiri: teose oma; segateosel (`P`) lehe otsus või lehe signaal (None = teadmata)."""
+    if work_base != "P":
+        return work_base
+    return page_decisions.get(fn) or infer_base([text])[0]
+
+
+def plan_work(work_id: str, texts: dict, decision, entry, page_decisions=None):
     """Puhas plaan ühele teosele.
 
-    texts: {failinimi: tekst}; decision: 'F'|'A'|None; entry: manifesti kirje või None.
-    Tagastab (staatus, põhikiri, päritolu, {failinimi: uus}, signaal).
+    texts: {failinimi: tekst}; decision: 'F'|'A'|'P'|None; entry: manifesti kirje või None;
+    page_decisions: {failinimi: 'F'|'A'} segateose signaalita lehtedele.
+    Tagastab (staatus, põhikiri, päritolu, {failinimi: uus}, signaal); segateosel on
+    signaal asemel {'unresolved': [failinimed]}.
     staatus: 'convert' | 'noop' | 'undecided' | 'no_signal'.
     """
+    page_decisions = page_decisions or {}
     has_cs = any("<cs>" in t for t in texts.values())
     if entry:
         base = entry["base"]
         pages = entry.get("pages", {})
-        plans = {}
+        plans, unresolved = {}, []
         for fn, t in texts.items():
             if pages.get(fn, {}).get("out") == text_hash(t):
                 continue  # juba teisendatud ja muutmata
             if "<cs>" in t:
-                plans[fn] = cs_to_f(t, base)
-        return ("convert" if plans else "noop"), base, entry.get("source"), plans, None
+                pb = page_base(base, fn, t, page_decisions)
+                if pb:
+                    plans[fn] = cs_to_f(t, pb)
+                else:
+                    unresolved.append(fn)
+        extra = {"unresolved": unresolved} if base == "P" else None
+        return ("convert" if plans else "noop"), base, entry.get("source"), plans, extra
 
     inferred, f, a = infer_base(texts.values())
     if decision:
@@ -88,12 +109,23 @@ def plan_work(work_id: str, texts: dict, decision, entry):
         return "no_signal", None, None, {}, (f, a)
     if base == "A" and not has_cs:
         return "noop", base, source, {}, (f, a)
+    if base == "P":
+        plans, unresolved = {}, []
+        for fn, t in texts.items():
+            if "<cs>" not in t and fn not in page_decisions:
+                continue  # segateose <cs>-ita leht: kiri teadmata, jääb puutumata
+            pb = page_base(base, fn, t, page_decisions)
+            if pb:
+                plans[fn] = cs_to_f(t, pb)
+            else:
+                unresolved.append(fn)
+        return ("convert" if plans or unresolved else "noop"), base, source, plans, {"unresolved": unresolved}
     plans = {fn: cs_to_f(t, base) for fn, t in texts.items()}
     return "convert", base, source, plans, (f, a)
 
 
 def apply_work(work_dir: str, work_id: str, base: str, source: str,
-               originals: dict, plans: dict, manifest: dict) -> dict:
+               originals: dict, plans: dict, manifest: dict, page_decisions=None) -> dict:
     """Kirjutab teose lehed + manifesti ÜHE commitiga. Tagastab {'written', 'raced', 'commit'}."""
     from server.git_ops import save_with_git
     from server.page_locks import page_lock
@@ -116,6 +148,8 @@ def apply_work(work_dir: str, work_id: str, base: str, source: str,
                 continue
             text, json_write = _reconcile_annotations(work_dir, fn, new)
             page_records[fn] = {"in": text_hash(originals[fn]), "out": text_hash(text)}
+            if base == "P":
+                page_records[fn]["base"] = page_base(base, fn, originals[fn], page_decisions or {})
             if text != originals[fn]:
                 writes.append((txt, text))
                 if json_write:
@@ -156,6 +190,8 @@ def main() -> int:
     ap.add_argument("--decisions", help='käsitsi otsused JSON: {"work_id": "F"|"A"}')
     ap.add_argument("--work", action="append", default=[], help="ainult see work_id (korduv)")
     ap.add_argument("--check", action="store_true", help="loetle <cs>-iga lehed (valvur pärast üleminekut)")
+    ap.add_argument("--manuscript-cs", choices=("skip", "strip"), default="skip",
+                    help="käsikirja <cs>: jäta puutumata (vaikimisi) või eemalda tägid")
     ap.add_argument("--report", default="/tmp/cs_to_f_aruanne.json", help="aruande JSON")
     args = ap.parse_args()
 
@@ -164,13 +200,20 @@ def main() -> int:
     if args.check:
         return check(BASE_DIR)
 
-    decisions = {}
+    decisions, page_decisions = {}, {}
     if args.decisions:
         with open(args.decisions, encoding="utf-8") as f:
-            decisions = {k: v.upper() for k, v in json.load(f).items()}
-        bad = {k: v for k, v in decisions.items() if v not in ("F", "A")}
+            raw = {k: str(v).upper() for k, v in json.load(f).items()}
+        decisions = {k: v for k, v in raw.items() if "/" not in k}
+        page_decisions = {}
+        for k, v in raw.items():
+            if "/" in k:
+                wid, fn = k.split("/", 1)
+                page_decisions.setdefault(wid, {})[fn] = v
+        bad = {k: v for k, v in decisions.items() if v not in ("F", "A", "P")}
+        bad.update({f"{w}/{fn}": v for w, d in page_decisions.items() for fn, v in d.items() if v not in ("F", "A")})
         if bad:
-            print(f"Vigased otsused (lubatud F|A): {bad}")
+            print(f"Vigased otsused (teos F|A|P, leht F|A): {bad}")
             return 2
 
     manifest = load_manifest()
@@ -185,8 +228,23 @@ def main() -> int:
         if not work_id or (args.work and work_id not in args.work):
             continue
         texts = {os.path.basename(t): read(t) for t in page_txts(work_dir)}
+        try:
+            wtype = (json.load(open(meta_path, encoding="utf-8")).get("type") or {})
+        except (OSError, ValueError):
+            wtype = {}
+        if isinstance(wtype, dict) and wtype.get("id") == "Q87167":
+            cs_pages = {fn: t for fn, t in texts.items() if "<cs>" in t}
+            if cs_pages:
+                report.setdefault("manuscript", {})[work_id] = {
+                    "slug": os.path.basename(work_dir), "cs_pages": sorted(cs_pages)}
+                if args.apply and args.manuscript_cs == "strip":
+                    plans = {fn: t.replace("<cs>", "").replace("</cs>", "") for fn, t in cs_pages.items()}
+                    res = apply_work(work_dir, work_id, "A", "käsikiri", texts, plans, manifest)
+                    print(f"{work_id} (käsikiri, <cs> eemaldatud): {res['written']} lehte, commit {res['commit']}")
+            continue
         status, base, source, plans, signal = plan_work(
-            work_id, texts, decisions.get(work_id), manifest["works"].get(work_id))
+            work_id, texts, decisions.get(work_id), manifest["works"].get(work_id),
+            page_decisions.get(work_id))
         slug = os.path.basename(work_dir)
         if status == "undecided":
             report["undecided"][work_id] = {"slug": slug, "signal_F": signal[0], "signal_A": signal[1],
@@ -198,9 +256,11 @@ def main() -> int:
         if status == "noop":
             continue
         changed = {fn: new for fn, new in plans.items() if new != texts[fn]}
-        group = "fraktur" if base == "F" else "antiqua"
-        report[group][work_id] = {"slug": slug, "source": source, "pages": len(changed),
-                                  "signal": list(signal) if signal else None}
+        group = {"F": "fraktur", "A": "antiqua", "P": "mixed"}[base]
+        report.setdefault(group, {})[work_id] = {
+            "slug": slug, "source": source, "pages": len(changed),
+            **({"unresolved_pages": signal["unresolved"]} if isinstance(signal, dict)
+               else {"signal": list(signal) if signal else None})}
         if base == "F":
             n_i = sum(t.count("<i>") for t in texts.values())
             if n_i:
@@ -208,7 +268,8 @@ def main() -> int:
         totals[f"{group}_works"] += 1
         totals[f"{group}_pages"] += len(changed)
         if args.apply:
-            res = apply_work(work_dir, work_id, base, source, texts, plans, manifest)
+            res = apply_work(work_dir, work_id, base, source, texts, plans, manifest,
+                             page_decisions.get(work_id))
             if res["raced"]:
                 report["raced"][work_id] = res["raced"]
             if res["written"]:
@@ -221,8 +282,12 @@ def main() -> int:
         json.dump(report, f, ensure_ascii=False, indent=1)
     print(f"Antiikvateosed (<cs> → <f>): {totals['antiqua_works']} teost, {totals['antiqua_pages']} lehte")
     print(f"Fraktuurteosed (ümberpööramine): {totals['fraktur_works']} teost, {totals['fraktur_pages']} lehte")
+    unresolved = sum(len(v.get("unresolved_pages", [])) for v in report.get("mixed", {}).values())
+    print(f"Segateosed (lehe kaupa): {totals['mixed_works']} teost, {totals['mixed_pages']} lehte; "
+          f"signaalita <cs>-lehti {unresolved} — vaja otsust võtmega \"work_id/leht.txt\"")
     print(f"Otsustamata (<cs> + signaalita/vastuoluga): {len(report['undecided'])} teost — vaja --decisions")
     print(f"<i> fraktuurteostes (vaata üle): {len(report['italic_in_fraktur'])} teost")
+    print(f"Käsikirjad <cs>-iga (välja jäetud, --manuscript-cs): {len(report.get('manuscript', {}))} teost")
     print(f"Signaalita ja <cs>-ita (ei muutu): {report['no_signal']} teost")
     print("(kuivkäivitus, --apply kirjutab)" if not args.apply else f"Vahele (muutus vahepeal): {len(report['raced'])} teost")
     print(f"Aruanne: {args.report}")
