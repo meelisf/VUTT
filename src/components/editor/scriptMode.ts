@@ -5,7 +5,7 @@
 //
 // Enamus arvutatakse lehe laadimisel / tervikasendusel / salvestamisel, MITTE iga
 // muudatusega — muidu pöörduks ~50/50 lehel kogu esiletõst toimetamise ajal ümber.
-import { StateEffect, StateField, type Extension, type Transaction } from '@codemirror/state';
+import { Prec, StateEffect, StateField, type Extension, type Transaction } from '@codemirror/state';
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import { pageSwapAnnotation } from './editorAnnotations';
 
@@ -140,7 +140,10 @@ const scriptDecoField = StateField.define<DecorationSet>({
     if (!tr.docChanged && !modeChanged) return deco;
     return buildDecorations(tr.newDoc.toString(), tr.state.field(scriptModeField).mode);
   },
-  provide: f => EditorView.decorations.from(f),
+  // Kõrgem prioriteet = SISEMINE span: hall jooks poolitub märgendusmärkide sees, mitte
+  // vastupidi. Muidu lõhub ta lehe tähistuse (`<catch>II. Hu-</catch>`: hall katab ainult
+  // tähti) kaheks span'iks ja kumbki saab oma `::before`-saki (Becker lk 76, 2026-11-02).
+  provide: f => Prec.high(EditorView.decorations.from(f)),
 });
 
 export function scriptModeExtension(): Extension {
