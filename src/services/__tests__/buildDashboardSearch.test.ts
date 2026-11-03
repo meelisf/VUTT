@@ -47,6 +47,7 @@ describe('searchWorks päringu tuum (pinnitud enne eraldamist)', () => {
           "part_persons_text",
           "tags_search",
           "genre_search",
+          "archive_refs_text",
         ],
         "filter": [
           "lehekylje_number = 1",
@@ -76,6 +77,7 @@ describe('searchWorks päringu tuum (pinnitud enne eraldamist)', () => {
           "part_persons_text",
           "tags_search",
           "genre_search",
+          "archive_refs_text",
         ],
         "distinct": "work_id",
         "filter": [],

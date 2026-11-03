@@ -404,7 +404,8 @@ export const getScopeFacetCodes = async (
 // Avalehe otsinguväljad. ÜKS allikas otsingule ja filtrivihje loenduritele (#605):
 // teistsuguste väljadega loendur leiaks vasteid, mida avaleht ei näita.
 // `part_persons_text` (ADR 0072) on teose isikute järel — teose enda isik järjestuses eespool.
-export const DASHBOARD_SEARCH_ATTRIBUTES = ['title', 'title_en', 'title_original', 'authors_text', 'part_persons_text', 'tags_search', 'genre_search'];
+// `archive_refs_text` (hoidja kood + nimi + signatuur, ADR 0076) viimasena: kõige nõrgem vaste.
+export const DASHBOARD_SEARCH_ATTRIBUTES = ['title', 'title_en', 'title_original', 'authors_text', 'part_persons_text', 'tags_search', 'genre_search', 'archive_refs_text'];
 
 export interface DashboardSearchCore {
   q: string;
