@@ -1,9 +1,11 @@
+import React from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Work } from '../../types';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import { workDisplayTitle } from '../../utils/workTitle';
 import { getLangCode } from '../../utils/getLangCode';
+import { manuscriptRefLabel } from '../exemplars/exemplarCardUtils';
 import { ErrorBanner } from '../ErrorBanner';
 import type { EditorTab } from './types';
 
@@ -42,13 +44,25 @@ export default function EditorHeader({
         // Pealkiri on rea tugevaim element (#587, makett D); lühendatud pealkiri
         // on hõljumisel tervikuna näha, Info vahekaarti avama ei pea.
         const fullTitle = title.secondary ? `${title.main}\n${title.secondary}` : title.main;
+        // Käsikirja arhiiviviide eristab sama nimega dokumente (nt senati protokollid) —
+        // rea alguses ja lühendamata; lüheneb pealkiri.
+        const msRef = manuscriptRefLabel(work.type, work.archive_refs);
+        const author = work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || '';
+        const year = formatYearDisplay(work.year_display, work.year, t, work.dating);
+        const parts: { key: string; node: React.ReactNode }[] = [];
+        if (msRef) parts.push({ key: 'ref', node: <span className="font-semibold text-gray-700 whitespace-nowrap shrink-0" data-testid="header-archive-ref">{msRef}</span> });
+        if (author) parts.push({ key: 'author', node: <span className="font-semibold text-gray-600 truncate max-w-[200px]">{author}</span> });
+        if (year) parts.push({ key: 'year', node: <span className="text-gray-400 min-w-0 max-w-[50%] leading-snug">{year}</span> });
+        parts.push({ key: 'title', node: <span className="italic truncate flex-1 min-w-0 text-[13px] font-medium text-gray-800" title={fullTitle}>{title.main}</span> });
         return (
           <div className="px-4 py-1 border-b border-gray-50 flex items-center gap-2 text-xs text-gray-500 bg-gray-50/50">
-            <span className="font-semibold text-gray-600 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
-            <span className="text-gray-300">•</span>
-            <span className="text-gray-400 min-w-0 max-w-[50%] leading-snug">{formatYearDisplay(work.year_display, work.year, t, work.dating)}</span>
-            <span className="text-gray-300">•</span>
-            <span className="italic truncate flex-1 min-w-0 text-[13px] font-medium text-gray-800" title={fullTitle}>{title.main}</span>
+            {/* Eraldaja ainult olemasolevate osade vahel — puuduv autor/aasta ei jäta tühja vahet. */}
+            {parts.map((p, i) => (
+              <React.Fragment key={p.key}>
+                {i > 0 && <span className="text-gray-300">•</span>}
+                {p.node}
+              </React.Fragment>
+            ))}
           </div>
         );
       })()}

@@ -19,7 +19,14 @@ vi.mock('../../../services/workApi', () => ({ getWorkExemplars: (...a: unknown[]
 vi.mock('../../../contexts/UserContext', () => ({ useUser: () => ({ user: null, authToken: 'tok' }) }));
 
 import ConvoluteBlocks from '../ConvoluteBlocks';
-import SameVolumeBlock from '../SameVolumeBlock';
+import SameVolumeBlockView from '../SameVolumeBlock';
+import { useWorkExemplars } from '../../exemplars/useWorkExemplars';
+
+// Infopaneeli ühendus: hook laeb, plokk kuvab (päringuloogika elab hookis).
+const SameVolumeBlock = ({ work, lang }: { work: Work; lang: string }) => {
+  const data = useWorkExemplars(work);
+  return <SameVolumeBlockView blocks={data?.convolutes || []} lang={lang} />;
+};
 
 // Näide issue #702-st: TÜR R Est.B-954 (13 trükist) ja R Est.B-954 (I) (4 trükist)
 const blocks: ConvoluteBlock[] = [
@@ -100,6 +107,13 @@ describe('SameVolumeBlock', () => {
   it('konvoluudita teos ei tee päringut ega näita plokki', () => {
     render(<MemoryRouter><SameVolumeBlock work={work(0)} lang="et" /></MemoryRouter>);
     expect(getWorkExemplars).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('same-volume-block')).toBeNull();
+  });
+
+  it('eksemplaridega teos laeb ka konvoluudita (kaartide jaoks), plokki ei näita', async () => {
+    getWorkExemplars.mockResolvedValue({ exemplars: [], convolutes: [] });
+    render(<MemoryRouter><SameVolumeBlock work={work(0, { archive_refs: [{ archive_id: 'Tartu TÜR', reference: 'R 1' }] })} lang="et" /></MemoryRouter>);
+    await waitFor(() => expect(getWorkExemplars).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('same-volume-block')).toBeNull();
   });
 

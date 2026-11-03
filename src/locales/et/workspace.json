@@ -437,7 +437,7 @@
       "choose": "— vali päritolu —",
       "same": "Sama eksemplar kui senine skaneering",
       "unknown": "Teadmata",
-      "witness": "tekstitunnistaja",
+      "witness": "transkriptsiooni alus",
       "required": "Teosel on eksemplarid: vali enne pildi päritolu."
     },
     "exemplarProposals": {
@@ -562,7 +562,6 @@
     "pages": "Lehekülgi",
     "status": "Staatus",
     "viewInEster": "Vaata ESTERis",
-    "archiveRefs": "Arhiiviviited",
     "viewExternal": "Vaata välist linki",
     "filterByAuthor": "Filtreeri autori järgi",
     "filterByRespondens": "Filtreeri respondendi järgi",
@@ -620,7 +619,8 @@
     "tocCopyLink": "Kopeeri link",
     "tocGoToStart": "ava algus (lk {{page}})",
     "tocLinkCopied": "Link kopeeritud",
-    "tocPages": "lk"
+    "tocPages": "lk",
+    "exemplarPages": "lk {{pages}}"
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"
@@ -831,11 +831,11 @@
       "provenance": "Provenients",
       "notes": "Märkused"
     },
-    "witness": "Tekstitunnistaja",
-    "markWitness": "Märgi tekstitunnistajaks",
-    "unmarkWitness": "Eemalda tekstitunnistaja märge",
-    "witnessConfirmTitle": "Tekstitunnistaja vahetus",
-    "witnessConfirm": "Skaneeringu lehed loetakse edaspidi selle eksemplari omaks. Eelmise tunnistaja märge ja selle eksemplari erandlehed eemaldatakse. Jätkan?",
+    "witness": "Transkriptsiooni alus",
+    "markWitness": "Märgi transkriptsiooni aluseks",
+    "unmarkWitness": "Eemalda transkriptsiooni aluse märge",
+    "witnessConfirmTitle": "Transkriptsiooni aluse vahetus",
+    "witnessConfirm": "Skaneeringu lehed loetakse edaspidi selle eksemplari omaks. Eelmise aluse märge ja selle eksemplari erandlehed eemaldatakse. Jätkan?",
     "needsReview": "Kontrollimata",
     "needsReviewHint": "Kirje vastavus füüsilisele eksemplarile on kontrollimata (automaatselt loodud kirje).",
     "markReviewed": "Märgi kontrollituks",
