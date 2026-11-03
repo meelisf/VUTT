@@ -63,7 +63,10 @@ const saveToFileSystem = async (
         (err as any).status = 401;
         throw err;
       }
-      throw new Error(`File server error: ${e.status}`);
+      // Serveri põhjus (nt ADR 0077 „laadi leht uuesti") kasutajale näha; ilma
+      // selleta jäi teateks ainult „File server error: 409".
+      const detail = (e.data as { detail?: unknown } | null)?.detail;
+      throw new Error(typeof detail === 'string' && detail ? detail : `File server error: ${e.status}`);
     }
 
     // Kontrolli git commit hoiatust vastuses
