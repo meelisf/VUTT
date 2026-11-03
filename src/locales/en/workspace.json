@@ -437,7 +437,7 @@
       "choose": "— choose source —",
       "same": "Same copy as the existing scan",
       "unknown": "Unknown",
-      "witness": "text witness",
+      "witness": "basis of transcription",
       "required": "This work has copies: choose the image source first."
     },
     "exemplarProposals": {
@@ -562,7 +562,6 @@
     "pages": "Pages",
     "status": "Status",
     "viewInEster": "View in ESTER",
-    "archiveRefs": "Archival references",
     "viewExternal": "View external link",
     "filterByAuthor": "Filter by author",
     "filterByRespondens": "Filter by respondent",
@@ -620,7 +619,8 @@
     "tocCopyLink": "Copy link",
     "tocGoToStart": "go to start (p. {{page}})",
     "tocLinkCopied": "Link copied",
-    "tocPages": "p."
+    "tocPages": "p.",
+    "exemplarPages": "p. {{pages}}"
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
@@ -831,11 +831,11 @@
       "provenance": "Provenance",
       "notes": "Notes"
     },
-    "witness": "Text witness",
-    "markWitness": "Mark as text witness",
-    "unmarkWitness": "Remove text witness mark",
-    "witnessConfirmTitle": "Change text witness",
-    "witnessConfirm": "The scanned pages will be attributed to this copy. The previous witness mark and this copy's exception pages will be removed. Continue?",
+    "witness": "Basis of transcription",
+    "markWitness": "Mark as basis of transcription",
+    "unmarkWitness": "Remove basis-of-transcription mark",
+    "witnessConfirmTitle": "Change basis of transcription",
+    "witnessConfirm": "The scanned pages will be attributed to this copy. The previous basis mark and this copy's exception pages will be removed. Continue?",
     "needsReview": "Unverified",
     "needsReviewHint": "Correspondence of this record to the physical copy has not been verified (automatically created record).",
     "markReviewed": "Mark as verified",

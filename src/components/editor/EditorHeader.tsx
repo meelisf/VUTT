@@ -4,6 +4,7 @@ import type { Work } from '../../types';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import { workDisplayTitle } from '../../utils/workTitle';
 import { getLangCode } from '../../utils/getLangCode';
+import { manuscriptRefLabel } from '../exemplars/exemplarCardUtils';
 import { ErrorBanner } from '../ErrorBanner';
 import type { EditorTab } from './types';
 
@@ -42,8 +43,17 @@ export default function EditorHeader({
         // Pealkiri on rea tugevaim element (#587, makett D); lühendatud pealkiri
         // on hõljumisel tervikuna näha, Info vahekaarti avama ei pea.
         const fullTitle = title.secondary ? `${title.main}\n${title.secondary}` : title.main;
+        // Käsikirja arhiiviviide eristab sama nimega dokumente (nt senati protokollid) —
+        // rea alguses ja lühendamata; lüheneb pealkiri.
+        const msRef = manuscriptRefLabel(work.type, work.archive_refs);
         return (
           <div className="px-4 py-1 border-b border-gray-50 flex items-center gap-2 text-xs text-gray-500 bg-gray-50/50">
+            {msRef && (
+              <>
+                <span className="font-semibold text-gray-700 whitespace-nowrap shrink-0" data-testid="header-archive-ref">{msRef}</span>
+                <span className="text-gray-300">•</span>
+              </>
+            )}
             <span className="font-semibold text-gray-600 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
             <span className="text-gray-300">•</span>
             <span className="text-gray-400 min-w-0 max-w-[50%] leading-snug">{formatYearDisplay(work.year_display, work.year, t, work.dating)}</span>

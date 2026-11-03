@@ -5,7 +5,9 @@ import { BookDown, BookOpen, Bookmark, Download, ExternalLink, FileSliders, Fold
 import DownloadModal from '../DownloadModal';
 import RelatedWorksBlock from '../relations/RelatedWorksBlock';
 import SameVolumeBlock from '../convolutes/SameVolumeBlock';
-import type { ArchiveRef, Work } from '../../types';
+import ExemplarCards from '../exemplars/ExemplarCards';
+import { useWorkExemplars } from '../exemplars/useWorkExemplars';
+import type { Work } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
@@ -30,6 +32,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
   const { collections } = useCollection();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
+  const exemplarData = useWorkExemplars(work);
 
   // Arhiivide register (nimed kuvamiseks).
   useEffect(() => {
@@ -312,30 +315,16 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
               </div>
             )}
 
-            {/* Arhiiviviited */}
+            {/* Eksemplarid (ADR 0076): kaardid lühiinfoga, transkriptsiooni alus esile tõstetud */}
             {work.archive_refs && work.archive_refs.length > 0 && (
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('info.archiveRefs', 'Arhiiviviited')}</p>
-                <div className="space-y-1.5">
-                  {work.archive_refs.map((ref: ArchiveRef, idx: number) => {
-                    const archiveName = archives[ref.archive_id]?.name;
-                    const isValidUrl = (url: string) => /^https?:\/\//.test(url);
-                    // Link ainult eksemplari enda URL-ile: arhiivi esilehe link eksitas
-                    // (lubas viia eksemplarini, aga viis ainult arhiivi avalehele).
-                    return (
-                      <div key={idx} className="text-sm text-gray-700">
-                        <span className="font-medium text-gray-800">
-                          {ref.archive_id}
-                          {archiveName && <span className="font-normal text-gray-500"> — {archiveName}</span>}
-                        </span>
-                        {ref.reference && <span className="ml-1">{ref.reference}</span>}
-                        {ref.url && isValidUrl(ref.url) && (
-                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="ml-1 text-primary-600 hover:text-primary-800" title={ref.url}>↗</a>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('exemplars.title')}</p>
+                <ExemplarCards
+                  exemplars={exemplarData?.exemplars ?? null}
+                  pageNumbers={exemplarData?.page_numbers ?? {}}
+                  archiveRefs={work.archive_refs}
+                  archives={archives}
+                />
               </div>
             )}
 
@@ -343,7 +332,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
             <RelatedWorksBlock work={work} lang={lang} />
 
             {/* Samas köites — konvoluudi kaaslased (#702, ADR 0076 p 6) */}
-            <SameVolumeBlock work={work} lang={lang} />
+            <SameVolumeBlock blocks={exemplarData?.convolutes ?? []} lang={lang} />
 
             {/* Teose märkused */}
             {work.notes && (
