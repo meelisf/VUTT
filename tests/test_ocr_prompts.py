@@ -38,6 +38,14 @@ def test_trukise_juhis_sisaldab_vutt_margendust():
         assert marker in GEMINI_PRINT_INSTRUCTION
 
 
+def test_trukise_juhis_absoluutne_f():
+    """ADR 0077: Gemini trükijuhis kannab absoluutset <f>-i (LOSSi INSTRUCTION p 8).
+    Vana <cs> tagasi = väljund läheks OCR_OUTPUT_RELATIVE_CS = False all teisendamata korpusesse."""
+    from server.ocr_prompts import GEMINI_PRINT_INSTRUCTION
+    assert "<f>text</f>" in GEMINI_PRINT_INSTRUCTION
+    assert "<cs>" not in GEMINI_PRINT_INSTRUCTION
+
+
 
 def test_kasikirja_juhis_sisaldab_add_ja_m_margendust():
     """Pariteet LOSSi v5 Kurrendi juhisega (ADR 0067): lisandus <add>, veeris <m>.

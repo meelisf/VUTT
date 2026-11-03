@@ -18,10 +18,9 @@ Automaatset valvurit LOSSi vastu ei ole — LOSS ei ole VUTT-i jaoks runtime'is 
 """
 import re
 
-# ADR 0077: juhis kannab üleminekuajal VEEL suhtelist <cs>-i (sama mis LOSSi vana mudel);
-# väljund teisendatakse importimisel <f>-iks (script_transition.ocr_to_absolute).
-# Mudeli vahetusel → absoluutne <f> („mark every Fraktur passage with <f>…</f>,
-# unmarked = Antiqua") JA config.OCR_OUTPUT_RELATIVE_CS = False.
+# ADR 0077: absoluutne <f> — p 8 on sõna-sõnalt LOSSi `INSTRUCTION`-i p 8 (trükimudel
+# print-base-r64-mi-vl-20261102). Koos sellega config.OCR_OUTPUT_RELATIVE_CS = False:
+# väljundit enam ei teisendata.
 GEMINI_PRINT_INSTRUCTION = """You are an expert OCR assistant for historical documents. Transcribe the page using VUTT XML markup.
 
 Instructions:
@@ -47,7 +46,12 @@ Instructions:
 8. Formatting (VUTT XML tags):
    - Italic text: <i>text</i>
    - Bold text: <b>text</b>
-   - Code-switching (Fraktur word in Antiqua text or vice versa): <cs>text</cs>
+   - Fraktur (blackletter, including Schwabacher): <f>text</f>. Mark EVERY Fraktur passage,
+     even when the whole page is set in Fraktur; text without <f> is Antiqua.
+     Italic is always Antiqua: never put <i> inside <f> or <f> inside <i>.
+     Greek and Hebrew are never inside <f>. <f> never spans a line break: close it at the
+     end of the line and reopen on the next. Numbers and punctuation inside or at the edge
+     of a Fraktur passage (line-end ⸗, full stop, brackets) stay inside <f>.
 9. Page breaks: if the image contains a double-page spread, mark the page break with <pb/>.
 10. Marginal notes: place each marginal note inline at the position in the text where it appears,
    using <m>text</m> tags. Each line of a multi-line marginal note is a separate <m> tag.

@@ -38,24 +38,30 @@ def work(monkeypatch):
             os.remove(p)
 
 
+@pytest.fixture
+def vana_mudel(monkeypatch):
+    """Üleminekuaja käitumine (vana <cs>-mudel); tootmises alates mudeli vahetusest väljas."""
+    monkeypatch.setattr(st.config, "OCR_OUTPUT_RELATIVE_CS", True)
+
+
 DE = "vnd die Welt ist nicht mit dem Herrn"
 LA = "Quod est in corpore et non sine Deo"
 
 
-def test_ocr_cs_pohikiri_keelest(work):
+def test_ocr_cs_pohikiri_keelest(work, vana_mudel):
     slug = work("w1")
     assert st.ocr_to_absolute(slug, f"{DE} <cs>Deus</cs>") == f"<f>{DE}</f> Deus"
     assert st.ocr_to_absolute(slug, f"{LA} <cs>Gott</cs>") == f"{LA} <f>Gott</f>"
 
 
-def test_ocr_saksa_leht_mahitakse_ja_idempotentne(work):
+def test_ocr_saksa_leht_mahitakse_ja_idempotentne(work, vana_mudel):
     slug = work("w2")
     once = st.ocr_to_absolute(slug, f"{DE} Ge⸗\nwitter")
     assert once.startswith("<f>")
     assert st.ocr_to_absolute(slug, once) == once
 
 
-def test_ocr_antiikvaleht_ei_maha_teisel_kutsel(work):
+def test_ocr_antiikvaleht_ei_maha_teisel_kutsel(work, vana_mudel):
     slug = work("w3")
     # Terve leht <cs>-is, sisu ladina → põhikiri oli fraktuur, sisu antiikva → <f>-ita
     once = st.ocr_to_absolute(slug, f"<cs>{LA}</cs>")
@@ -63,14 +69,16 @@ def test_ocr_antiikvaleht_ei_maha_teisel_kutsel(work):
     assert st.ocr_to_absolute(slug, once) == once
 
 
-def test_ocr_kasikiri_muutumata(work):
+def test_ocr_kasikiri_muutumata(work, vana_mudel):
     slug = work("w4", manuscript=True)
     assert st.ocr_to_absolute(slug, DE) == DE
 
 
-def test_ocr_lipp_valjas_muutumata(work, monkeypatch):
+def test_ocr_lipp_valjas_muutumata(work):
+    """Vaikimisi (pärast mudeli vahetust) on uue mudeli <f>-väljund juba absoluutne."""
     slug = work("w5")
-    monkeypatch.setattr(st.config, "OCR_OUTPUT_RELATIVE_CS", False)
+    assert st.config.OCR_OUTPUT_RELATIVE_CS is False
+    assert st.ocr_to_absolute(slug, f"<f>{DE}</f> Deus") == f"<f>{DE}</f> Deus"
     assert st.ocr_to_absolute(slug, "a <cs>b</cs>") == "a <cs>b</cs>"
 
 

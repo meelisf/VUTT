@@ -6,9 +6,9 @@ Kolm teed (ADR 0077 p 7), kõik ühe teisendusfunktsiooniga (`cs_to_f`) ja manif
 - vananenud redaktoriseanss (`stale_premigration_base` → `/save` 409) ja vana
   JS-kimp, mis saadab veel `<cs>`-i (`incoming_to_absolute`).
 
-Mudeli vahetusel (uus LOSSi trükimudel + mõlemad juhised `<f>`-ile) pannakse
-`config.OCR_OUTPUT_RELATIVE_CS = False`; siis jääb alles ainult ajaloo ja
-vananenud sisendi kaitse.
+Mudeli vahetusest (LOSSi trükimudel print-base-r64-mi-vl-20261102 + mõlemad juhised
+`<f>`-ile) on `config.OCR_OUTPUT_RELATIVE_CS = False`: `ocr_to_absolute` on no-op ja
+alles jääb ainult ajaloo ja vananenud sisendi kaitse.
 """
 import json
 from typing import Optional

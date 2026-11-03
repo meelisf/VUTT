@@ -325,3 +325,10 @@ Käivitamata — samm-sammult juhis: [`docs/runbook-adr-0077-migratsioon.md`](..
 4. LOSS: eksport + kanoniseerimine + poolitusvärav (punkt 5 ja „Tagajärjed“), treening,
    seejärel mõlemad juhised + `OCR_OUTPUT_RELATIVE_CS = False`.
 
+
+**Mudeli vahetus (2026-11-03).** Trükimudel `print-base-r64-mi-vl-20261102` (LOSS, treenitud
+absoluutse `<f>`-iga, andmestik 1836 lehte) läheb tootmisse koos LOSSi `"print": INSTRUCTION`-iga
+(`scripts/truki_v3_tootmisse.sh`). VUTT-is samal ajal: `OCR_OUTPUT_RELATIVE_CS = False`
+(`ocr_to_absolute` on no-op) ja Gemini trükijuhise p 8 = LOSSi `INSTRUCTION` p 8. Ajaloo
+taaste ja vananenud sisendi kaitse jäävad. Tagasipööramine käib kolmekesi: LOSSi unit, LOSSi
+juhis ja lipp `True`.
