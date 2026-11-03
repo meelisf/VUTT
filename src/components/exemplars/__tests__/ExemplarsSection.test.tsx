@@ -133,7 +133,9 @@ describe('ExemplarsSection — admin', () => {
     expect('needs_review' in put.body).toBe(false);
     expect(screen.getByText('exemplars.needsReview')).toBeTruthy();
     expect(onChanged).toHaveBeenCalled();
-    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    // `onDirtyChange(false)` tuleb effectist pärast commit'i; koormuse all annab Reacti
+    // scheduler vahepeal juhtimise ära ja findByText näeb DOM-i enne effecti → oota.
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
   });
 
   it('lipu mahavõtt ainult selgesõnalise nupuga', async () => {
