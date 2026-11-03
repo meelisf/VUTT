@@ -15,8 +15,8 @@ interface ExemplarCardsProps {
 const isHttpUrl = (url?: string) => !!url && /^https?:\/\//.test(url);
 
 /**
- * Infopaneeli eksemplarikaardid (ADR 0076). Transkriptsiooni alus on esimene ja
- * esile tõstetud; teised on lühikirjed. Kaardil on ainult lühiinfo — pikem
+ * Infopaneeli eksemplarid (ADR 0076), raamideta read. Transkriptsiooni alus on
+ * esimene ja kannab rea lõpus pilli; teised on lühikirjed. Kaardil on ainult lühiinfo — pikem
  * (paber, vaatlused) kuulub eraldi vahekaardile.
  */
 const ExemplarCards: React.FC<ExemplarCardsProps> = ({ exemplars, pageNumbers, archiveRefs, archives }) => {
@@ -34,14 +34,14 @@ const ExemplarCards: React.FC<ExemplarCardsProps> = ({ exemplars, pageNumbers, a
     </div>
   );
 
-  const plain = 'rounded border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700';
+  const row = 'flex items-start gap-2 text-sm text-gray-700';
 
   if (!exemplars) {
-    // Laadimise ajal (või kui päring ebaõnnestus) tuletatud viited ilma esiletõstuta.
+    // Laadimise ajal (või kui päring ebaõnnestus) tuletatud viited ilma pillita.
     return (
       <div className="space-y-1.5">
         {archiveRefs.map((ref, idx) => (
-          <div key={idx} className={plain}>{head(ref.archive_id, ref.reference, ref.url)}</div>
+          <div key={idx} className={row}>{head(ref.archive_id, ref.reference, ref.url)}</div>
         ))}
       </div>
     );
@@ -54,23 +54,15 @@ const ExemplarCards: React.FC<ExemplarCardsProps> = ({ exemplars, pageNumbers, a
         const pages = exceptionPages(x, pageNumbers);
         if (pages) notes.push(t('info.exemplarPages', { pages }));
         if (x.reproduction) notes.push(t(`exemplars.reproduction.kinds.${x.reproduction.kind}`));
-        if (x.text_witness) {
-          return (
-            <div key={x.id} className="rounded border-2 border-primary-300 bg-primary-50/60 px-2.5 py-1.5 text-sm text-gray-700">
-              <div className="flex items-start gap-2">
-                {head(x.holder, x.shelfmark, x.url)}
-                <span className="ml-auto shrink-0 text-[11px] px-1.5 py-0.5 rounded-full border border-primary-300 text-primary-800 bg-white">
-                  {t('exemplars.witness')}
-                </span>
-              </div>
-              {notes.length > 0 && <div className="text-xs text-gray-500 mt-0.5">{notes.join(' · ')}</div>}
-            </div>
-          );
-        }
         return (
-          <div key={x.id} className={`${plain} flex items-start gap-2`}>
+          <div key={x.id} className={row}>
             {head(x.holder, x.shelfmark, x.url)}
-            {notes.length > 0 && <span className="ml-auto shrink-0 text-xs text-gray-500">{notes.join(' · ')}</span>}
+            {notes.length > 0 && <span className="ml-auto shrink-0 text-xs text-gray-500 mt-0.5">{notes.join(' · ')}</span>}
+            {x.text_witness && (
+              <span className={`${notes.length > 0 ? '' : 'ml-auto '}shrink-0 text-[11px] px-1.5 py-0.5 rounded-full border border-primary-300 text-primary-800`}>
+                {t('exemplars.witness')}
+              </span>
+            )}
           </div>
         );
       })}

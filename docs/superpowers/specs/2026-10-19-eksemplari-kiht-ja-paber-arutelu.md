@@ -206,7 +206,7 @@ Etappide 2–4 maht hindamata.
 - Kõik fotod avalikuks.
 - 5Dvisioniga tuleb suhelda (leping, ekspordimoodul).
 - **Kuvamine (2026-11-03):** infopaneelil on eksemplaride kaardid AINULT lühiinfoga (hoidja,
-  kohaviit, link, erandlehed, koopia liik); transkriptsiooni alus on esimene ja esile tõstetud.
+  kohaviit, link, erandlehed, koopia liik); transkriptsiooni alus on esimene, rea lõpus pill, raamideta read.
   Paber ja vaatlused tulevad eraldi vahekaardile „Paber", mitte kaardile. Kasutajaliidese
   nimetus „tekstitunnistaja" asemel on „transkriptsiooni alus" (väli jääb `text_witness`).
 - **Ettepanek: vaatlusel on oma asukohaväli** (`locus`, vabatekst: `a2, a3`, `a4`, `c4, d2`, `fol. 10`,
