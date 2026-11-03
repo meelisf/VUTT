@@ -449,8 +449,9 @@ def check_render_concurrency():
     return None
 
 
-# ADR 0077 üleminek: OCR-väljund (LOSSi trükimudel, Gemini trükijuhis) kannab veel
-# suhtelist <cs>-i ja teisendatakse importimisel <f>-iks (script_transition).
-# Pane False SAMAL ajal, kui uus <f>-ga treenitud mudel ja mõlemad juhised
-# (LOSS prompt.py, ocr_prompts.GEMINI_PRINT_INSTRUCTION) tootmisse lähevad.
-OCR_OUTPUT_RELATIVE_CS = True
+# ADR 0077 üleminek: kuni trükimudeli vahetuseni kandis OCR-väljund (LOSSi trükimudel,
+# Gemini trükijuhis) suhtelist <cs>-i ja teisendati importimisel <f>-iks
+# (script_transition). Alates print-base-r64-mi-vl-20261102 (LOSS) ja <f>-ga Gemini
+# juhisest on väljund absoluutne <f> → teisendus väljas. Uuesti True ainult koos
+# vana mudeli + vana juhise tagasipööramisega (LOSS scripts/truki_v3_tootmisse.sh TAGASI).
+OCR_OUTPUT_RELATIVE_CS = False
