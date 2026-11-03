@@ -59,7 +59,7 @@ const ExemplarCards: React.FC<ExemplarCardsProps> = ({ exemplars, pageNumbers, a
             {head(x.holder, x.shelfmark, x.url)}
             {notes.length > 0 && <span className="ml-auto shrink-0 text-xs text-gray-500 mt-0.5">{notes.join(' · ')}</span>}
             {x.text_witness && (
-              <span className={`${notes.length > 0 ? '' : 'ml-auto '}shrink-0 text-[11px] px-1.5 py-0.5 rounded-full border border-primary-300 text-primary-800`}>
+              <span className={`${notes.length > 0 ? '' : 'ml-auto '}shrink-0 mt-px text-[11px] leading-4 px-1.5 rounded-full border border-primary-300 text-primary-800`}>
                 {t('exemplars.witness')}
               </span>
             )}
