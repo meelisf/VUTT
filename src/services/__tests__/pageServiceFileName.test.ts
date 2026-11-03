@@ -36,3 +36,17 @@ describe('lehe failinimi serveripäringutes on kettal olev kuju', () => {
     expect(sentBody().file_name).toBe('1633-Liefflä-z0kdh0-0p3ks2.txt');
   });
 });
+
+describe('/save vea teade', () => {
+  const fail = (status: number, body: unknown) => fetchMock.mockResolvedValue({
+    ok: false, status, json: async () => body, text: async () => JSON.stringify(body),
+  });
+  it('sõnemi detail (ADR 0077 409) jõuab teatesse', async () => {
+    fail(409, { detail: 'Leht on vahepeal teisendatud — laadi leht uuesti.' });
+    await expect(savePage(page)).rejects.toThrow('Leht on vahepeal teisendatud — laadi leht uuesti.');
+  });
+  it('detailita vastus: endine üldteade', async () => {
+    fail(500, {});
+    await expect(savePage(page)).rejects.toThrow('File server error: 500');
+  });
+});
