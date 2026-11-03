@@ -112,7 +112,8 @@ andmete tagasipööramist on korpuses jälle `<cs>`, mida uus kood ei tunne, nii
 andmed pööratakse tagasi koos.
 
 Viimane abinõu: `~/vutt-pre-0077-f-<kuupäev>.tar.gz` (ainult tekstid; kirjutaks üle ka
-hilisemad muudatused).
+hilisemad muudatused). 2026-11-02 jooksu varukoopia ja logid on serveris tõstetud kausta
+`~/arhiiv/adr-0077-2026-11-02/`.
 
 ## Pärast
 
