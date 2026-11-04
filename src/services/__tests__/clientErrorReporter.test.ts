@@ -22,8 +22,19 @@ function mockFetch() {
 }
 
 describe('clientErrorReporter', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  // Vitest jookseb DEV-režiimis; raportöör saadab ainult tootmisbuildis.
+  beforeEach(() => { vi.useFakeTimers(); vi.stubEnv('DEV', false); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('dev-serveris ei saada midagi (tootmise logi ei risustu)', async () => {
+    vi.stubEnv('DEV', true);
+    const fetchMock = mockFetch();
+    const { reportClientError } = await freshReporter();
+
+    reportClientError({ message: 'HMR-krahh', source: 'window' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it('saadab vea serverisse', async () => {
     const fetchMock = mockFetch();
