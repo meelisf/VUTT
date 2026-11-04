@@ -41,6 +41,12 @@ function shouldSend(key: string): boolean {
 }
 
 export function reportClientError({ message, stack, source }: ClientErrorPayload): void {
+  // Dev-server (`npm run dev`) proksib API tunneli kaudu TOOTMISSE, nii et
+  // arenduse HMR-krahhid (nt uuesti laetud kontekst → „useUser must be used
+  // within a UserProvider") risustasid tootmise hoolduslogi. Dev-is on viga
+  // niikuinii konsoolis näha. Loetakse kutsel, mitte mooduli laadimisel —
+  // testid seavad keskkonna `vi.stubEnv`-iga.
+  if (import.meta.env.DEV) return;
   try {
     const text = (message || '').trim();
     if (!text) return;
