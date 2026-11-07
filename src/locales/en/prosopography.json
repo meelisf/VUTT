@@ -173,7 +173,7 @@
     "relationPlaceholder": "their role (father, spouse…)",
     "relationSentence": "{{other}} is {{self}}'s {{type}}",
     "relationTypeHint": "Describes how the other person is related to the person being edited (e.g. 'father' = they are their father)",
-    "relationsAndNotes": "Relations and notes",
+    "relationsAndNotes": "Related persons and notes",
     "removePhoto": "Remove photo",
     "save": "Save",
     "saveError": "Save failed. Check connection and try again.",

@@ -173,7 +173,7 @@
     "relationPlaceholder": "tema roll (isa, abikaasa…)",
     "relationSentence": "{{other}} on {{self}} {{type}}",
     "relationTypeHint": "Kirjeldab, kuidas teine isik on muudetava isikuga seotud (nt 'isa' = tema on muudetava isiku isa)",
-    "relationsAndNotes": "Seosed ja märkmed",
+    "relationsAndNotes": "Seotud isikud ja märkmed",
     "removePhoto": "Eemalda pilt",
     "save": "Salvesta",
     "saveError": "Salvestamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",

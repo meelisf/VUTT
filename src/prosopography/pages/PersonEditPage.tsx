@@ -960,7 +960,7 @@ const PersonEditPage: React.FC = () => {
           <TagsList tags={draft.tags} onChange={v => set({ tags: v })} suggestions={tagSuggestions} />
         </CollapsibleSection>
 
-        {/* ── Seosed ja märkmed (klapitav) ── */}
+        {/* ── Seotud isikud ja märkmed (klapitav) ── */}
         <CollapsibleSection
           title={t('form.relationsAndNotes')}
           open={relOpen}
