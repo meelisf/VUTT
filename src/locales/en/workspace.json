@@ -488,9 +488,9 @@
     "yearInputWarn": "⚠ Cannot parse year — formats: 1680, ca. 1680, 1670–1690, 17. saj",
     "place": "Place",
     "printer": "Printer",
-    "tags": "Work keywords and related persons",
+    "tags": "Work keywords",
     "tagsHint": "Separate with comma",
-    "tagsPlaceholder": "e.g. theology, Andreas Virginius",
+    "tagsPlaceholder": "e.g. theology, wedding",
     "notes": "Notes",
     "notesPlaceholder": "Free-text notes about the work...",
     "collection": "Collection",
@@ -544,7 +544,13 @@
     "pageNumberingHint": "Meaning of the page's <fw> in the part's address reference (fol. / p.).",
     "viewPersonPage": "View person page",
     "noGenres": "No genres",
-    "genrePlaceholder": "Add a genre..."
+    "genrePlaceholder": "Add a genre...",
+    "creatorsWork": "Authors and contributors",
+    "subjects": "About whom",
+    "subjectsHint": "Persons the text is about or addressed to: the deceased in a funeral print, the dedicatee, the couple in a wedding poem. Only via the persons register or an external source (Wikidata/GND/VIAF).",
+    "noSubjects": "None added",
+    "addSubject": "Add a person the text is about…",
+    "subjectsNeedPerson": "Only a person from the register or from Wikidata/GND/VIAF can be added here. If the person does not exist yet, create a card."
   },
   "download": {
     "title": "Download",

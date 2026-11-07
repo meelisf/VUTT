@@ -22,6 +22,8 @@ import { deriveYearFields } from '../utils/yearDisplayUtils';
 import { cleanCreators, cleanTags, cleanEsterId, cleanArchiveRefs } from '../utils/buildMetadataPayload';
 import ArchiveSelect from './ArchiveSelect';
 import CreatorsEditor from './creators/CreatorsEditor';
+import SubjectPersons from './creators/SubjectPersons';
+import { isSubjectPerson } from './creators/subjectPersons';
 import { vocabularyRoleOptions } from './creators/roleOptions';
 import TitleVariantsFields from './TitleVariantsFields';
 
@@ -305,8 +307,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           textareaClassName="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
         />
 
-        {/* Isikud (creators) */}
+        {/* Autorid ja kaastöölised (creators) + „Kelle kohta" (tags-i isikud, #743) */}
         <CreatorsEditor
+          title={t('workspace:metadata.creatorsWork')}
           creators={form.creators}
           onChange={creators => setForm({ ...form, creators })}
           roles={vocabularyRoleOptions(vocabularies, lang, t)}
@@ -317,7 +320,16 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           suggestions={suggestions.authors}
           peopleRegister={peopleRegister}
           className="bg-white/70"
-        />
+        >
+          <SubjectPersons
+            tags={form.tags}
+            onChange={tags => setForm(prev => ({ ...prev, tags }))}
+            lang={lang}
+            token={authToken}
+            workId={metaWorkId}
+            peopleRegister={peopleRegister}
+          />
+        </CreatorsEditor>
 
         {/* Kolofoon: aasta, koht, trükkal */}
         <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-white/70">
@@ -467,10 +479,11 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               {t('workspace:metadata.tags')}
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {form.tags.length === 0 && (
+              {/* Isikud on „Kelle kohta" all (#743) — siin ainult teemad; indeks jääb terve loendi omaks */}
+              {!form.tags.some(tag => !isSubjectPerson(tag)) && (
                 <span className="text-xs text-gray-400 italic">{t('workspace:info.noTags')}</span>
               )}
-              {form.tags.map((tag, i) => (
+              {form.tags.map((tag, i) => isSubjectPerson(tag) ? null : (
                 <span
                   key={i}
                   className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border ${
@@ -513,7 +526,6 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               placeholder={t('workspace:metadata.tagsPlaceholder', 'Lisa märksõna...')}
               lang={lang}
               localSuggestions={suggestions.tags}
-              showPersonToggle
               token={authToken}
             />
           </div>

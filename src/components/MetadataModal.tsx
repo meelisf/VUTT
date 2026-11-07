@@ -18,6 +18,8 @@ import { buildMetadataPayload, type YearFieldsExisting } from '../utils/buildMet
 import { parseYearDisplayRange, deriveYearFields } from '../utils/yearDisplayUtils';
 import { useDraggablePosition } from '../hooks/useDraggablePosition';
 import CreatorsEditor from './creators/CreatorsEditor';
+import SubjectPersons from './creators/SubjectPersons';
+import { isSubjectPerson } from './creators/subjectPersons';
 import { vocabularyRoleOptions } from './creators/roleOptions';
 import TitleVariantsFields from './TitleVariantsFields';
 
@@ -541,8 +543,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             textareaClassName="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
           />
 
-          {/* Grupp 1: Isikud (creators) */}
+          {/* Grupp 1: Autorid ja kaastöölised (creators) + „Kelle kohta" (tags-i isikud, #743) */}
           <CreatorsEditor
+            title={t('metadata.creatorsWork')}
             creators={metaForm.creators}
             onChange={creators => setMetaForm({ ...metaForm, creators })}
             roles={vocabularyRoleOptions(vocabularies, lang, t)}
@@ -552,7 +555,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             workId={workId}
             suggestions={suggestions.authors}
             peopleRegister={peopleRegister}
-          />
+          >
+            <SubjectPersons
+              tags={metaForm.tags}
+              onChange={tags => setMetaForm(prev => ({ ...prev, tags }))}
+              lang={lang}
+              token={authToken}
+              workId={workId}
+              peopleRegister={peopleRegister}
+            />
+          </CreatorsEditor>
 
           {/* Grupp 2: Kolofoon */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
@@ -708,8 +720,10 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               <label className="block text-xs font-medium text-gray-500 mb-2">{t('metadata.tags')}</label>
               
               <div className="flex flex-wrap gap-2 mb-3">
-                {metaForm.tags.length === 0 && <span className="text-xs text-gray-400 italic">{t('info.noTags')}</span>}
+                {/* Isikud on „Kelle kohta" all (#743) — siin ainult teemad; indeks jääb terve loendi omaks */}
+                {!metaForm.tags.some(tag => !isSubjectPerson(tag)) && <span className="text-xs text-gray-400 italic">{t('info.noTags')}</span>}
                 {metaForm.tags.map((tag, idx) => {
+                  if (isSubjectPerson(tag)) return null;
                   const tagObj = typeof tag !== 'string' ? tag as any : null;
                   const url = tagObj ? getEntityUrl(tagObj.id, tagObj.source) : null;
                   const isPerson = tagObj?.entity_type === 'person' || tagObj?.id?.startsWith('vutt:P');
@@ -765,7 +779,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 placeholder={t('metadata.tagsPlaceholder', 'Lisa märksõna...')}
                 lang={lang}
                 localSuggestions={suggestions.tags}
-                showPersonToggle
                 token={authToken}
               />
               <p className="text-[10px] text-gray-400 mt-1 italic">

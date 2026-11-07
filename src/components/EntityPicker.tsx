@@ -416,7 +416,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       labels: { et: entry.label },
     };
     onChange(entity);
-    setInputValue(entry.label);
+    // value === null: lisav väli (märksõnad, „Kelle kohta") — tühjenda nagu handleSelect
+    setInputValue(value === null ? '' : entry.label);
     setShowSuggestions(false);
   };
 
@@ -424,7 +425,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   const handlePersonPanelDone = (p: { id: string; label: string; created: boolean }) => {
     justSelectedRef.current = true;
     onChange({ id: p.id, label: p.label, source: 'local', entity_type: 'person', labels: { et: p.label } });
-    setInputValue(p.label);
+    setInputValue(value === null ? '' : p.label);
     setPersonPanel(null);
     setShowSuggestions(false);
   };
