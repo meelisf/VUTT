@@ -35,6 +35,7 @@ import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
 import AgentEnrichmentPanel from '../components/personForm/AgentEnrichmentPanel';
 import EvidenceList from '../components/EvidenceList';
 import { EvidenceSourceList } from '../components/PersonSourcesCard';
+import SourceDraftItem from '../components/personForm/SourceDraftItem';
 import { useWorkTitles } from '../hooks/useWorkTitles';
 import { evidenceWorkIds } from '../utils/evidenceRef';
 import type { EnrichmentEvidence } from '../services/prosopographyService';
@@ -73,7 +74,9 @@ const PersonEditPage: React.FC = () => {
   const agentFocus = searchParams.get('agent') === '1';
   const [occupOpen, setOccupOpen] = useState(agentFocus);
   // Tõendiviidete teoste pealkirjad (ametite ja hariduse tõendite loend).
-  const evidenceTitles = useWorkTitles(evidenceWorkIds([...draft.occupations, ...draft.education]), token);
+  const evidenceTitles = useWorkTitles([
+    ...evidenceWorkIds([...draft.occupations, ...draft.education]),
+    ...draft.sources.flatMap(source => source.work_id ? [source.work_id] : [])], token);
   const [relOpen, setRelOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
 
@@ -1051,29 +1054,8 @@ const PersonEditPage: React.FC = () => {
             label={t('form.sources')}
             items={draft.sources}
             renderItem={(item, onChange, onRemove) => (
-              <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
-                <div className="flex items-start gap-2">
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={item.text}
-                      onChange={e => onChange({ ...item, text: e.target.value })}
-                      placeholder={t('form.sourcePlaceholder')}
-                      className={`w-full ${inputCls}`}
-                    />
-                  </div>
-                  <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-0.5">
-                    <X size={14} />
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={item.note}
-                  onChange={e => onChange({ ...item, note: e.target.value })}
-                  placeholder={t('form.sourceNote')}
-                  className={`w-full ${inputCls} bg-white text-gray-600 italic`}
-                />
-              </div>
+              <SourceDraftItem item={item} onChange={onChange} onRemove={onRemove}
+                               titleOf={id => evidenceTitles[id]} lang={lang} token={authToken ?? null} />
             )}
             onAdd={() => set({ sources: [...draft.sources, { text: '', note: '' }] })}
             onChange={items => set({ sources: items })}

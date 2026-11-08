@@ -159,6 +159,19 @@ export interface HistoricalDate {
   notes: string | null;
 }
 
+/** „Allikad ja bibliograafia" kirje (ADR 0078): vabatekst või VUTT-i teose/osa viide.
+ *  VUTT-i kirjel on `text` valikuline täiendus; pealkiri tuleb teoselt. */
+export interface PersonSource {
+  text?: string;
+  note?: string | null;
+  work_id?: string;
+  part_id?: string;
+  /** Lehe järjenumber teoses (/work/{id}/{page}). */
+  page?: number;
+  /** Trükitud leheküljenumber(id) viites, nt „14–16". */
+  printed_page?: string;
+}
+
 export interface ProsopoRecord {
   id: string;
   identifiers: { scheme: string; id: string; checked_at: string | null }[];
@@ -201,7 +214,7 @@ export interface ProsopoRecord {
   burial: any | null;
   relations: { name: string; type?: string; target_id?: string | null }[];
   tags?: any[];
-  sources: { text: string; note?: string | null }[];
+  sources: PersonSource[];
   biography_et: string | null;
   biography_en: string | null;
   /** Album Academicumi toorik — KIRJE, mitte tekst. Ei tõlgita. */

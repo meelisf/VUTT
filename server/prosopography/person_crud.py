@@ -449,6 +449,8 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
 
         from .registries import normalize_person_facts
         data = normalize_person_facts(data)
+        from .person_sources import normalize_sources
+        data = normalize_sources(data)
         _apply_card_update(person, data, now)
         person["updated_at"] = now
         person["updated_by"] = username

@@ -206,7 +206,13 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       target_id: r.target_id ?? null,
       reciprocal_auto: r.reciprocal_auto ?? undefined,
     })),
-    sources: (p.sources ?? []).map((s: any) => ({ text: s.text ?? String(s), note: s.note ?? '' })),
+    sources: (p.sources ?? []).map((s: any) => typeof s === 'string' ? { text: s, note: '' } : {
+      text: s.text ?? '', note: s.note ?? '',
+      ...(s.work_id ? {
+        work_id: s.work_id, part_id: s.part_id ?? null,
+        page: s.page ? String(s.page) : '', printed_page: s.printed_page ?? '',
+      } : {}),
+    }),
     biography_et: p.biography_et ?? '',
     biography_en: p.biography_en ?? '',
     aa_raw: p.aa_raw ?? '',
@@ -346,10 +352,19 @@ export function draftToPayload(
       ...(r.target_id ? { target_id: r.target_id } : {}),
       ...(r.reciprocal_auto !== undefined ? { reciprocal_auto: r.reciprocal_auto } : {}),
     })),
-    sources: draft.sources.filter(s => s.text.trim()).map(s => ({
-      text: s.text.trim(),
-      ...(s.note.trim() ? { note: s.note.trim() } : {}),
-    })),
+    sources: draft.sources.filter(s => s.text.trim() || s.work_id).map(s => {
+      const page = Number.parseInt((s.page ?? '').trim(), 10);
+      return {
+        ...(s.text.trim() ? { text: s.text.trim() } : {}),
+        ...(s.note.trim() ? { note: s.note.trim() } : {}),
+        ...(s.work_id ? {
+          work_id: s.work_id,
+          ...(s.part_id ? { part_id: s.part_id } : {}),
+          ...(Number.isInteger(page) && page > 0 ? { page } : {}),
+          ...(s.printed_page?.trim() ? { printed_page: s.printed_page.trim() } : {}),
+        } : {}),
+      };
+    }),
     biography_et: draft.biography_et.trim() || null,
     biography_en: draft.biography_en.trim() || null,
     aa_raw: draft.aa_raw.trim() || null,

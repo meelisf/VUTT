@@ -30,6 +30,8 @@ import PersonSourcesCard from '../components/PersonSourcesCard';
 import { evidenceRef, evidenceWorkIds, type EvidenceRef } from '../utils/evidenceRef';
 import type { EnrichmentEvidence } from '../services/prosopographyService';
 import { useWorkTitles } from '../hooks/useWorkTitles';
+import { useSourceParts } from '../hooks/useSourceParts';
+import { sourcePartWorkIds, sourceWorkIds } from '../utils/personSources';
 import { quoteFilterValue } from '../../utils/filterUtils';
 import { formatDateTime } from '../../utils/formatDateTime';
 
@@ -317,9 +319,11 @@ const PersonDetailPage: React.FC = () => {
   const [tagsSaving, setTagsSaving] = useState(false);
 
   const token = authToken ?? '';
-  // Tõendiviidete teoste pealkirjad (joonealused viited ametite ja hariduse all).
-  const evidenceTitles = useWorkTitles(
-    evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? [])]), token);
+  // Tõendiviidete ja allikakirjete teoste pealkirjad (ADR 0078: pealkiri tuleb teoselt).
+  const evidenceTitles = useWorkTitles([
+    ...evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? [])]),
+    ...sourceWorkIds(person?.sources)], token);
+  const sourceParts = useSourceParts(sourcePartWorkIds(person?.sources), token);
   const canEdit = isAtLeast(user?.role, 'editor');
   const isAdmin = isAtLeast(user?.role, 'admin');
 
@@ -871,7 +875,7 @@ const PersonDetailPage: React.FC = () => {
         )}
 
         {/* ── Allikad ja bibliograafia: käsitsi loend + tõendites kasutatud ── */}
-        <PersonSourcesCard person={person} workTitles={evidenceTitles} />
+        <PersonSourcesCard person={person} workTitles={evidenceTitles} parts={sourceParts} />
 
         {/* ── Ajalugu (ainult admin) ── */}
         {isAdmin && id && (
