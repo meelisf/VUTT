@@ -15,10 +15,12 @@ export function useSourceParts(workIds: string[], token?: string | null): Source
     void Promise.all(key.split('|').map(workId =>
       getPartsToc(workId, token || null)
         .then(({ parts, pageNumbers }) => [workId, Object.fromEntries(parts.map(part => {
-          const label = [t(`manage.parts.kinds.${part.kind}`, { defaultValue: part.kind }), part.title]
-            .filter(Boolean).join(' · ');
           const numbers = part.pages.map(stem => pageNumbers[stem]).filter((n): n is number => Boolean(n));
-          return [part.id, { label, firstPage: numbers.length ? Math.min(...numbers) : null }];
+          return [part.id, {
+            kindLabel: t(`manage.parts.kinds.${part.kind}`, { defaultValue: part.kind }),
+            title: part.title || null,
+            firstPage: numbers.length ? Math.min(...numbers) : null,
+          }];
         }))] as const)
         .catch(() => null)))
       .then(entries => {
