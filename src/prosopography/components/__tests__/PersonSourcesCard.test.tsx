@@ -26,6 +26,22 @@ describe('isikulehe allikad ja bibliograafia', () => {
     expect(screen.getByText('Sak 1997, Artikkel')).toBeTruthy();
   });
 
+  it('VUTT-i teose kirje: pealkiri teoselt, osa ja lk juures, link osa esimesele lehele (ADR 0078)', () => {
+    render(<MemoryRouter><PersonSourcesCard
+      person={{ sources: [
+        { work_id: 'w1', part_id: 'k1', printed_page: '14', text: 'personaalia', note: 'märkus' },
+        { work_id: 'w1', page: 9 },
+        { text: '   ' },
+      ], occupations: [], education: [] } as unknown as ProsopoRecord}
+      workTitles={{ w1: 'Leichpredigt' }}
+      parts={{ w1: { k1: { label: 'Proosatekst · Personalia', firstPage: 7 } } }} /></MemoryRouter>);
+    const links = screen.getAllByRole('link', { name: 'Leichpredigt' });
+    expect(links.map(a => a.getAttribute('href'))).toEqual(['/work/w1/7', '/work/w1/9']);
+    expect(screen.getByText(/Proosatekst · Personalia, lk 14, personaalia/)).toBeTruthy();
+    expect(screen.getByText('märkus')).toBeTruthy();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
   it('tühja kaardi puhul ei renderda midagi', () => {
     const { container } = renderCard({ sources: [], occupations: [], education: [] });
     expect(container.textContent).toBe('');

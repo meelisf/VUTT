@@ -40,7 +40,12 @@ export interface RelationDraft {
   target_id?: string | null;
   reciprocal_auto?: boolean;
 }
-export interface SourceDraft { text: string; note: string }
+/** Allikakirje mustand (ADR 0078). `work_id` olemas → VUTT-i teose viide;
+ *  `page` on vormis tekst (`inputMode="numeric"`), salvestusel täisarv. */
+export interface SourceDraft {
+  text: string; note: string;
+  work_id?: string | null; part_id?: string | null; page?: string; printed_page?: string;
+}
 
 export interface FormDraft {
   name_label: string;

@@ -546,6 +546,37 @@ def _identifier_url(scheme: str, identifier: str) -> Optional[str]:
     return None
 
 
+def _person_source_html(source) -> str:
+    """Allikakirje botile: vabatekst või VUTT-i teose viide (ADR 0078).
+
+    Pealkiri ei ole salajane (vt POST /prosopography/work-titles), aga link antakse
+    ainult avalikule teosele — sama poliitika mis SPA-l.
+    """
+    if not isinstance(source, dict):
+        return _escape(source) if source else ""
+    text = source.get("text") or ""
+    work_id = source.get("work_id")
+    if not work_id:
+        return _escape(text)
+    meta = {}
+    folder = find_directory_by_id(work_id)
+    if folder:
+        try:
+            with open(os.path.join(folder, "_metadata.json"), "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except Exception:
+            meta = {}
+    if not meta:
+        return _escape(text)
+    from .access_ops import is_work_public
+    title = _escape(meta.get("title") or work_id)
+    page = source.get("page")
+    href = f"{SITE_URL}/work/{_escape(work_id)}" + (f"/{int(page)}" if isinstance(page, int) else "")
+    head = f'<a href="{href}">{title}</a>' if is_work_public(meta) else title
+    extra = [x for x in (source.get("printed_page") and f"lk {source['printed_page']}", text) if x]
+    return head + (f" — {_escape(', '.join(extra))}" if extra else "")
+
+
 def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
     """Genereerib botile sama faktilise isikukaardi, mida näeb SPA kasutaja.
 
@@ -655,9 +686,9 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
     sources = person.get("sources") or []
     source_items = []
     for source in sources:
-        text = source.get("text") if isinstance(source, dict) else source
-        if text:
-            source_items.append(f"<li>{_escape(text)}</li>")
+        item = _person_source_html(source)
+        if item:
+            source_items.append(f"<li>{item}</li>")
     if source_items:
         body_lines.extend(["<h2>Allikad</h2>", "<ul>", *source_items, "</ul>"])
 

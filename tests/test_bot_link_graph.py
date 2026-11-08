@@ -303,3 +303,28 @@ def test_unknown_work_fallback_og_image_is_static_png(patch_find):
     assert OG_STATIC in html
     assert 'content="image/png"' in html
     assert 'content="image/jpeg"' not in html
+
+
+def test_person_source_links_public_vutt_work(patch_person, tmp_path, monkeypatch):
+    """Allikakirje VUTT-i teosele (ADR 0078): pealkiri teoselt, link ainult avalikule."""
+    import json as _json
+    import server.metadata_handler as mh
+    folders = {}
+    for wid, cols in (("pub", []), ("priv", ["salajane"])):
+        d = tmp_path / wid
+        d.mkdir()
+        (d / "_metadata.json").write_text(_json.dumps(
+            {"id": wid, "title": f"Teos {wid}", "collections": cols}), encoding="utf-8")
+        folders[wid] = str(d)
+    monkeypatch.setattr(mh, "find_directory_by_id", folders.get)
+    monkeypatch.setattr("server.access_ops.is_work_public",
+                        lambda meta: not meta.get("collections"))
+    patch_person["sources"] = [
+        {"text": "Recke-Napiersky"},
+        {"work_id": "pub", "page": 7, "printed_page": "14", "text": "personaalia"},
+        {"work_id": "priv"},
+    ]
+    html = mh.build_person_meta_html("vutt:P1", work_links=[])
+    assert "<li>Recke-Napiersky</li>" in html
+    assert '<a href="https://vutt.utlib.ut.ee/work/pub/7">Teos pub</a> — lk 14, personaalia' in html
+    assert "<li>Teos priv</li>" in html
