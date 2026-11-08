@@ -77,7 +77,6 @@ function CreatorsEditor<C extends CreatorLike>({
                   lang={lang}
                   localSuggestions={suggestions}
                   peopleRegister={peopleRegister}
-                  showPersonToggle
                   defaultPersonSearch
                   token={token ?? undefined}
                   personContext={workId ? { work_id: workId, role: creator.role } : undefined}

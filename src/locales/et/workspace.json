@@ -548,7 +548,6 @@
     "creatorsWork": "Autorid ja kaastöölised",
     "subjects": "Kelle kohta",
     "subjectsHint": "Isikud, kellest või kellele tekst on: leinatrükise lahkunu, pühenduse saaja, õnnitletav pruutpaar. Ainult isikuregistri või välisallika (Wikidata/GND/VIAF) kaudu.",
-    "noSubjects": "Pole lisatud",
     "addSubject": "Lisa isik, kelle kohta tekst on…",
     "subjectsNeedPerson": "Siia saab lisada ainult isikuregistri või Wikidata/GND/VIAF isiku. Kui isikut veel ei ole, loo talle kaart."
   },

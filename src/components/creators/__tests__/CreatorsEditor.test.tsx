@@ -34,9 +34,11 @@ describe('CreatorsEditor', () => {
     render(<CreatorsEditor creators={[{ name: 'A', role: 'addressee' }]} onChange={() => {}} roles={ROLES}
       newRole="auctor" lang="et" token="tok" workId="w1" suggestions={sug} peopleRegister={reg} />);
     expect(seen[0]).toMatchObject({
-      type: 'person', showPersonToggle: true, defaultPersonSearch: true, token: 'tok', lang: 'et',
+      type: 'person', defaultPersonSearch: true, token: 'tok', lang: 'et',
       peopleRegister: reg, localSuggestions: sug, personContext: { work_id: 'w1', role: 'addressee' }, value: 'A',
     });
+    // Isiku-lülitit ei näidata: väli on alati isikuotsing
+    expect(seen[0].showPersonToggle).toBeUndefined();
   });
 
   it('ilma teoseta isikukonteksti ei anta', () => {

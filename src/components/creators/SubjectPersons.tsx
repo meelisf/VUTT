@@ -7,7 +7,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { UserRound, X } from 'lucide-react';
+import { Info, UserRound, X } from 'lucide-react';
 import EntityPicker, { type PeopleRegisterEntry } from '../EntityPicker';
 import { useNotify } from '../../contexts/FeedbackContext';
 import { getLabel } from '../../utils/metadataUtils';
@@ -41,13 +41,16 @@ export default function SubjectPersons({ tags, onChange, lang, token, workId, pe
 
   return (
     <div className="border-t border-gray-200 pt-3 space-y-2">
-      <div>
-        <h5 className="text-xs font-bold text-gray-600 uppercase">{t('metadata.subjects')}</h5>
-        <p className="text-xs text-gray-500 mt-0.5">{t('metadata.subjectsHint')}</p>
-      </div>
-      {subjects.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">{t('metadata.noSubjects')}</p>
-      ) : (
+      {/* Selgitus on vihjes, mitte real: kast peab jääma kompaktseks. Tühja
+          oleku teadet ei ole — lisamisvälja kohatäide ütleb sama. */}
+      <h5 className="flex items-center gap-1 text-xs font-bold text-gray-600 uppercase">
+        {t('metadata.subjects')}
+        <span title={t('metadata.subjectsHint')} aria-label={t('metadata.subjectsHint')}
+          className="text-gray-400 hover:text-gray-600 cursor-help">
+          <Info size={12} />
+        </span>
+      </h5>
+      {subjects.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {subjects.map(s => (
             <span key={s.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border bg-primary-50 border-primary-200 text-primary-700">
@@ -75,7 +78,6 @@ export default function SubjectPersons({ tags, onChange, lang, token, workId, pe
         placeholder={t('metadata.addSubject')}
         lang={lang}
         peopleRegister={peopleRegister}
-        showPersonToggle
         defaultPersonSearch
         token={token ?? undefined}
         personContext={workId ? { work_id: workId, role: 'subject' } : undefined}

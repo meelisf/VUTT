@@ -548,7 +548,6 @@
     "creatorsWork": "Authors and contributors",
     "subjects": "About whom",
     "subjectsHint": "Persons the text is about or addressed to: the deceased in a funeral print, the dedicatee, the couple in a wedding poem. Only via the persons register or an external source (Wikidata/GND/VIAF).",
-    "noSubjects": "None added",
     "addSubject": "Add a person the text is about…",
     "subjectsNeedPerson": "Only a person from the register or from Wikidata/GND/VIAF can be added here. If the person does not exist yet, create a card."
   },
