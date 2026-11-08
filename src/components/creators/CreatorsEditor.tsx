@@ -4,7 +4,7 @@
  * register, kohalikud soovitused, keel, token ja teose kontekst isikupaneelile.
  * Rollide loend tuleb kutsujalt (teosel vocabularies.roles, osal PART_ROLES).
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, UserPlus } from 'lucide-react';
@@ -30,11 +30,15 @@ interface Props<C extends CreatorLike> {
   suggestions?: SuggestionItem[];
   peopleRegister?: PeopleRegisterEntry[];
   className?: string;
+  /** Pealkiri; vaikimisi „Isikud". Teose vormid annavad „Autorid ja kaastöölised" (#743). */
+  title?: string;
+  /** Lisasisu kasti lõpus (teose vormides „Kelle kohta", #743). */
+  children?: ReactNode;
 }
 
 function CreatorsEditor<C extends CreatorLike>({
   creators, onChange, roles, newRole, lang, token, workId, suggestions, peopleRegister,
-  className = 'bg-gray-50/50',
+  className = 'bg-gray-50/50', title, children,
 }: Props<C>) {
   const { t } = useTranslation(['workspace']);
   const { user } = useUser();
@@ -48,7 +52,7 @@ function CreatorsEditor<C extends CreatorLike>({
   return (
     <div className={`border border-gray-200 rounded-lg p-3 space-y-3 ${className}`}>
       <div className="flex justify-between items-center -mt-1">
-        <h4 className="text-xs font-bold text-gray-600 uppercase">{t('metadata.creators')}</h4>
+        <h4 className="text-xs font-bold text-gray-600 uppercase">{title ?? t('metadata.creators')}</h4>
         <button
           type="button"
           onClick={() => onChange([...creators, { name: '', role: newRole } as C])}
@@ -73,7 +77,6 @@ function CreatorsEditor<C extends CreatorLike>({
                   lang={lang}
                   localSuggestions={suggestions}
                   peopleRegister={peopleRegister}
-                  showPersonToggle
                   defaultPersonSearch
                   token={token ?? undefined}
                   personContext={workId ? { work_id: workId, role: creator.role } : undefined}
@@ -114,6 +117,7 @@ function CreatorsEditor<C extends CreatorLike>({
           ))}
         </div>
       )}
+      {children}
       {linking !== null && creators[linking] && token && createPortal(
         <PersonAddPanel
           initialQuery={creators[linking].name ?? ''}

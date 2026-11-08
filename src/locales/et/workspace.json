@@ -488,9 +488,9 @@
     "yearInputWarn": "⚠ Ei oska aastat tuletada — formaadid: 1680, ca. 1680, 1670–1690, 17. saj",
     "place": "Koht",
     "printer": "Trükkal",
-    "tags": "Teose märksõnad ja seotud isikud",
+    "tags": "Teose märksõnad",
     "tagsHint": "Komaga eraldatud",
-    "tagsPlaceholder": "nt: teoloogia, Andreas Virginius",
+    "tagsPlaceholder": "nt: teoloogia, pulm",
     "notes": "Märkused",
     "notesPlaceholder": "Vabatekstilised märkused teose kohta...",
     "collection": "Kollektsioon",
@@ -544,7 +544,12 @@
     "pageNumberingHint": "Lehe <fw> tähendus osa aadressiviites (fol. / p.).",
     "viewPersonPage": "Vaata isiku lehte",
     "noGenres": "Žanrid puuduvad",
-    "genrePlaceholder": "Lisa žanr..."
+    "genrePlaceholder": "Lisa žanr...",
+    "creatorsWork": "Autorid ja kaastöölised",
+    "subjects": "Kelle kohta",
+    "subjectsHint": "Isikud, kellest või kellele tekst on: leinatrükise lahkunu, pühenduse saaja, õnnitletav pruutpaar. Ainult isikuregistri või välisallika (Wikidata/GND/VIAF) kaudu.",
+    "addSubject": "Lisa isik, kelle kohta tekst on…",
+    "subjectsNeedPerson": "Siia saab lisada ainult isikuregistri või Wikidata/GND/VIAF isiku. Kui isikut veel ei ole, loo talle kaart."
   },
   "download": {
     "title": "Lae alla",
