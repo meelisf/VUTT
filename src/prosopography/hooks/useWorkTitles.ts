@@ -1,18 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getWorkTitles } from '../services/prosopographyService';
 
-/** Teoste pealkirjad tõendiviidetele. Server annab pealkirja ka kaitstud teosele;
- *  puuduv pealkiri → kutsuja näitab work_id-d. */
-export function useWorkTitles(workIds: string[], token?: string): Record<string, string> {
+export interface WorkInfo { title: string; year: number | null }
+
+/** Teoste pealkiri + aasta. Server annab pealkirja ka kaitstud teosele;
+ *  puuduv kirje → kutsuja näitab work_id-d. */
+export function useWorkInfo(workIds: string[], token?: string): Record<string, WorkInfo> {
   const key = [...new Set(workIds)].sort().join('|');
-  const [titles, setTitles] = useState<Record<string, string>>({});
+  const [info, setInfo] = useState<Record<string, WorkInfo>>({});
   useEffect(() => {
-    if (!key) { setTitles({}); return; }
+    if (!key) { setInfo({}); return; }
     let alive = true;
     void getWorkTitles(key.split('|'), token).then(map => {
-      if (alive) setTitles(Object.fromEntries(Object.entries(map).map(([id, info]) => [id, info.title || id])));
+      if (alive) setInfo(Object.fromEntries(Object.entries(map).map(
+        ([id, w]) => [id, { title: w.title || id, year: w.year ?? null }])));
     });
     return () => { alive = false; };
   }, [key, token]);
-  return titles;
+  return info;
+}
+
+/** Teoste pealkirjad tõendiviidetele. */
+export function useWorkTitles(workIds: string[], token?: string): Record<string, string> {
+  const info = useWorkInfo(workIds, token);
+  // Stabiilne viide: kutsujad võivad tulemust effecti sõltuvusena kasutada.
+  return useMemo(() => Object.fromEntries(Object.entries(info).map(([id, w]) => [id, w.title])), [info]);
 }

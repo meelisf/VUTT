@@ -29,7 +29,7 @@ import PersonWorkParts from '../components/PersonWorkParts';
 import PersonSourcesCard from '../components/PersonSourcesCard';
 import { evidenceRef, evidenceWorkIds, type EvidenceRef } from '../utils/evidenceRef';
 import type { EnrichmentEvidence } from '../services/prosopographyService';
-import { useWorkTitles } from '../hooks/useWorkTitles';
+import { useWorkInfo, useWorkTitles } from '../hooks/useWorkTitles';
 import { useSourceParts } from '../hooks/useSourceParts';
 import { sourcePartWorkIds, sourceWorkIds } from '../utils/personSources';
 import { quoteFilterValue } from '../../utils/filterUtils';
@@ -324,6 +324,7 @@ const PersonDetailPage: React.FC = () => {
     ...evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? [])]),
     ...sourceWorkIds(person?.sources)], token);
   const sourceParts = useSourceParts(sourcePartWorkIds(person?.sources), token);
+  const sourceWorks = useWorkInfo(sourceWorkIds(person?.sources), token);
   const canEdit = isAtLeast(user?.role, 'editor');
   const isAdmin = isAtLeast(user?.role, 'admin');
 
@@ -875,7 +876,7 @@ const PersonDetailPage: React.FC = () => {
         )}
 
         {/* ── Allikad ja bibliograafia: käsitsi loend + tõendites kasutatud ── */}
-        <PersonSourcesCard person={person} workTitles={evidenceTitles} parts={sourceParts} />
+        <PersonSourcesCard person={person} workTitles={evidenceTitles} works={sourceWorks} parts={sourceParts} />
 
         {/* ── Ajalugu (ainult admin) ── */}
         {isAdmin && id && (

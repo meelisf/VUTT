@@ -26,20 +26,26 @@ describe('isikulehe allikad ja bibliograafia', () => {
     expect(screen.getByText('Sak 1997, Artikkel')).toBeTruthy();
   });
 
-  it('VUTT-i teose kirje: pealkiri teoselt, osa ja lk juures, link osa esimesele lehele (ADR 0078)', () => {
+  it('VUTT-i kirje: link on täiendus, all pealkiri · aasta · osa · lk; link osa esimesele lehele (ADR 0078)', () => {
     render(<MemoryRouter><PersonSourcesCard
       person={{ sources: [
+        { text: 'Küng 2010: Enn Küng. Artikkel. Tuna 3. https://www.ra.ee/a.pdf.' },
         { work_id: 'w1', part_id: 'k1', printed_page: '14', text: 'personaalia', note: 'märkus' },
         { work_id: 'w1', page: 9 },
         { text: '   ' },
       ], occupations: [], education: [] } as unknown as ProsopoRecord}
-      workTitles={{ w1: 'Leichpredigt' }}
-      parts={{ w1: { k1: { label: 'Proosatekst · Personalia', firstPage: 7 } } }} /></MemoryRouter>);
-    const links = screen.getAllByRole('link', { name: 'Leichpredigt' });
-    expect(links.map(a => a.getAttribute('href'))).toEqual(['/work/w1/7', '/work/w1/9']);
-    expect(screen.getByText(/Proosatekst · Personalia, lk 14, personaalia/)).toBeTruthy();
+      workTitles={{}}
+      works={{ w1: { title: 'Leichpredigt', year: 1697 } }}
+      parts={{ w1: { k1: { kindLabel: 'Proosatekst', title: 'Personalia', firstPage: 7 } } }} /></MemoryRouter>);
+    expect(screen.getByText('Kirjandus')).toBeTruthy();
+    expect(screen.getByText('VUTTi allikad')).toBeTruthy();
+    expect(screen.getByText('Küng 2010')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'ra.ee' }).getAttribute('href')).toBe('https://www.ra.ee/a.pdf');
+    expect(screen.getByRole('link', { name: 'personaalia' }).getAttribute('href')).toBe('/work/w1/7');
+    expect(screen.getByRole('link', { name: 'Leichpredigt' }).getAttribute('href')).toBe('/work/w1/9');
+    expect(screen.getByText('1697 · Proosatekst · Personalia · lk 14')).toBeTruthy();
     expect(screen.getByText('märkus')).toBeTruthy();
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 
   it('tühja kaardi puhul ei renderda midagi', () => {
