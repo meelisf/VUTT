@@ -194,25 +194,37 @@ olemasolev `data/.gitignore` uuendatakse käsitsi + commit konteinerist enne dep
        kumbki puudub, märgi `job.json` olekuks `aborted`, staging `._trash`-i, lõpp.
        Teose kustutamisel ei ole stagingut enam alles. Taastaja käsitleb kadunud
        `job.json`-i kui katkestatud importi.
-    2. **Failid:** iga `image_id` kohta, mida eksemplari kaustas veel pole, nimeta fail
-       staging'ust ümber (sama failisüsteem, aatomiline). Kaustas olev fail = tehtud.
-    3. **Manifest:** kui `imports`-is pole `import_id`-d, lisa impordi pildid lõppu ja
-       `imports[import_id]` kirje SAMA kirjutusega (`atomic_write_json`), ning tõsta
-       `revision`. Kui kirje on olemas, on samm tehtud. Pilte ei lisata uuesti ka siis,
-       kui kasutaja on need vahepeal kustutanud.
-    4. **Commit:** kui `images.json` erineb `HEAD`-ist, tee commit. Commit'i tõrkel jääb
-       `job.json` olekuks `publishing` ja olekupäring näitab viga. Järgmine katse (taastaja
-       või korduspäring) alustab uuesti 1. sammust ja jõuab siia.
-    5. **URL:** kui `job.json` kannab `set_url: true` ja `url_done` puudub, siis kui
-       eksemplari `url` on tühi, kirjuta täislink `https://hdl.handle.net/{handle}`
-       (`source.ref` jääb paljaks handle'iks). Märgi `job.json`-i `url_done: true`
-       **alati**: ka siis, kui `set_url` on false või `url` oli juba olemas.
-       Kirjutus käib `work_exemplars`-i **lukustatud variandi** kaudu
-       (`update_exemplar(..., locked=True)` → `_write_locked`, nagu
-       `set_page_origin(..., locked=True)`). `work_lock` on tavaline `threading.Lock`,
-       ja tavaline `update_exemplar` → `_write` jääks iseennast ootama. `_metadata.json`-i
-       otse ei kirjutata.
-    6. **Lõpp:** `job.json` olekuks `published`, seejärel staging'u kustutus. Kustutuse
+    2. **Failid ja manifest koos, imporditunnuse järgi.** Kõigepealt kontrolli
+       `imports[import_id]`:
+       - **olemas** → impordi pildid on manifestis juba kord olnud. Jäta failide
+         liigutamine ja pildikirjete lisamine vahele, jätka 3. sammuga. Puuduvat faili ei
+         otsita: kasutaja võis pildi vahepeal kustutada, ja staging'us seda enam pole;
+       - **puudub** → iga `image_id` kohta, mida eksemplari kaustas veel pole, nimeta fail
+         staging'ust ümber (sama failisüsteem, aatomiline; kaustas olev fail = tehtud).
+         Seejärel lisa impordi pildid manifesti lõppu ja `imports[import_id]` kirje SAMA
+         kirjutusega (`atomic_write_json`), ning tõsta `revision`.
+    3. **Manifesti commit:** kui `images.json` erineb `HEAD`-ist, tee commit. Commit'i tõrkel
+       jääb `job.json` olekuks `publishing` ja olekupäring näitab viga. Järgmine katse
+       (taastaja või korduspäring) alustab 1. sammust ja jõuab siia.
+    4. **URL:** kui `url_done` on juba märgitud, jäta samm vahele. Muidu:
+       - kui `set_url` ja eksemplari `url` on tühi, kirjuta täislink
+         `https://hdl.handle.net/{handle}` (`source.ref` jääb paljaks handle'iks).
+         Kirjutus käib `work_exemplars`-i **lukustatud variandi** kaudu
+         (`update_exemplar(..., locked=True)` → `_write_locked`, nagu
+         `set_page_origin(..., locked=True)`). `work_lock` on tavaline `threading.Lock`,
+         ja tavaline `update_exemplar` → `_write` jääks iseennast ootama.
+         `_metadata.json`-i otse ei kirjutata;
+       - **seejärel, igal juhul:** kui `_metadata.json` erineb `HEAD`-ist, tee commit. See
+         lõpetab ka eelmise katse commit'imata URL-i kirjutuse: kordusel on URL kettal juba
+         olemas ja kirjutus jääb vahele, aga commit mitte. Luku all teised kirjutajad
+         commit'ivad alati, nii et lahknevus tähendab ainult ebaõnnestunud commit'i.
+         Lukustatud variant tagastab commit'i tulemuse ja **`git_committed: false` on selle
+         tee jaoks viga**, erinevalt `_bulk`-ist, mis seda veana ei käsitle. Tõrke korral
+         jääb olekuks `publishing`;
+       - `url_done: true` märgitakse alles pärast seda, kui `_metadata.json` ei erine
+         `HEAD`-ist. See kehtib ka siis, kui `set_url` on false või `url` oli juba
+         olemas.
+    5. **Lõpp:** `job.json` olekuks `published`, seejärel staging'u kustutus. Kustutuse
        tõrge ei ole viga, sest olek on juba `published` ja `imports`-kirje olemas.
   - **Taastaja** (serveri stardil, mustriks `ada/fetch.taasta_rippuvad_fetchid`) vaatab iga
     `_imports/*/job.json`-i:
@@ -242,7 +254,10 @@ olemasolev `data/.gitignore` uuendatakse käsitsi + commit konteinerist enne dep
   - katkestus iga protokolli sammu järel: pärast failide liigutamist, pärast manifesti
     kirjutust enne commit'i, pärast commit'i enne URL-i, pärast URL-i enne koristust.
     Igal juhul annab kordus täpselt ühe impordi ja ühe URL-i uuenduse;
-  - commit'i tõrge;
+  - manifesti commit'i tõrge; URL-i commit'i tõrge (`url_done` jääb märkimata, kordus
+    commit'ib);
+  - manifest commit'itud, URL-i uuendus ebaõnnestub, kasutaja kustutab impordipildi →
+    kordus ei otsi kadunud faili ja lõpetab URL-iga;
   - impordi pildid kustutatud enne taastajat: taastaja ei impordi uuesti;
   - `PATCH` katse muuta `import_id`-d või impordipildi `source`-i: väärtus jääb;
   - eksemplari kustutus renderdamise ajal; teose kustutus renderdamise ajal;
