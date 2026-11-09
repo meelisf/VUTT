@@ -98,8 +98,10 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
   baitidega ja see on ise vaatamiskuju (`original` puudub). Sama reegel kehtib
   `can_copy_source_bytes`-is, ADR 0028. Muu (PNG, TIFF, pööratud JPEG) säilitatakse kujul
   `{id}.orig.{ext}` ja `{id}.jpg` on sellest tehtud vaatamiskuju. ADA impordil on
-  lähtefail allalaaditud PDF `_sources/`-is ja lehe JPEG on tuletis. Allalaadimine
-  teenindab ainult toimetajat (`GET …/images/{image_id}/original`, `can_read_work`).
+  lähtefail allalaaditud PDF `_sources/`-is ja lehe JPEG on tuletis. Lähtefaili saab alla
+  laadida `GET …/images/{image_id}/original` kaudu, õigus sama mis vaatamisel
+  (`can_read_work`; nähtavus = teos). ADA pildi puhul antakse PDF-i asemel viide
+  allikale.
 - Eksemplari kustutamisel liigub tema `_exemplars/{id}/` `._trash`-i (nagu
   `replaced_images`). Kui pildid on olemas, nõuab kustutamine kinnitust.
 - `page` on ainult kõrvutamise mugavus. Kui tüve enam pole (lehtede ümberjärjestus,
