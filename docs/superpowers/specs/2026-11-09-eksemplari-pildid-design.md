@@ -56,13 +56,15 @@ data/{kaust}/_exemplars/{exemplar_id}/
   images.json              ← manifest, gitis (autoriteetne)
   {image_id}.jpg           ← vaatamiskuju (tuletis), gitist väljas
   {image_id}.orig.{ext}    ← lähtefail muutmata baitidega, kui see EI OLE vaatamiskuju ise
-  _sources/{import_id}.pdf ← ADA impordi allalaaditud PDF (lähtefail), gitist väljas
-  _imports/{import_id}/    ← impordi staging (renderdus enne avaldamist)
+  _imports/{import_id}/    ← impordi staging: job.json, allalaaditud PDF, renderdus
   _thumbs/                 ← laisad pisipildid, nagu teose _thumbs
 ```
 
-`data/.gitignore` laiendus: `*.pdf`, `*.tif`, `*.tiff`, `*.orig.*` (praegu on ignoreeritud
-ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
+`data/.gitignore` laiendus: `_imports/`, `_thumbs/`, `*.pdf`, `*.tif`, `*.tiff`, `*.orig.*`,
+`*.part`, `*.tmp*`. Praegu on ignoreeritud ainult `jpg/jpeg/png`. `replace_work_content`
+teeb `repo.git.add(slug)` ja commit'iks muidu ka poolelioleva `_imports/*/job.json`-i.
+Sama loend läheb `git_ops._init_repo_locked`-i (uue repo `.gitignore`). Serveri
+olemasolev `data/.gitignore` uuendatakse käsitsi + commit konteinerist enne deploy'd.
 
 `images.json`:
 
@@ -105,13 +107,26 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
   teisenduses. JPEG, mille EXIF-orientatsioon on 1 või puudub, hoitakse muutmata
   baitidega ja see on ise vaatamiskuju (`original` puudub). Sama reegel kehtib
   `can_copy_source_bytes`-is, ADR 0028. Muu (PNG, TIFF, pööratud JPEG) säilitatakse kujul
-  `{id}.orig.{ext}` ja `{id}.jpg` on sellest tehtud vaatamiskuju. ADA impordil on
-  lähtefail allalaaditud PDF `_sources/`-is ja lehe JPEG on tuletis. Lähtefaili saab alla
-  laadida `GET …/images/{image_id}/original` kaudu, õigus sama mis vaatamisel
-  (`can_read_work`; nähtavus = teos). ADA pildi puhul antakse PDF-i asemel viide
-  allikale.
-- Eksemplari kustutamisel liigub tema `_exemplars/{id}/` `._trash`-i (nagu
-  `replaced_images`). Kui pildid on olemas, nõuab kustutamine kinnitust.
+  `{id}.orig.{ext}` ja `{id}.jpg` on sellest tehtud vaatamiskuju. Sama kehtib JPEG-i
+  kohta, mille pikim külg ületab vaatamiskuju lae (vt Üleslaadimine).
+- **ADA import ei hoia PDF-i alles.** Originaal on ADA-s ja `source.ref` + `bitstream` +
+  `page` viitavad sellele üheselt. Konvoluudi PDF (sadu MB) dubleeruks muidu iga teose alla,
+  kuhu sellest vahemik imporditakse. PDF elab ainult staging'us ja kustub koos sellega.
+  Lehe JPEG (300 DPI, sama renderdus mis uploadil) on ADA pildi vaatamiskuju ja `original`
+  puudub.
+- **Eksemplari kustutamine** (`delete_exemplar`): kui pildid on olemas, nõuab kinnitust.
+  Sama luku all ja **samas commit'is** `_metadata.json`-i muudatusega eemaldatakse
+  `_exemplars/{id}/images.json` git-indeksist. Gitist väljas olevad failid liiguvad
+  `._trash/{work_id}/_exemplars/{id}/`-i. Pooleli import sellel eksemplaril katkeb
+  protokolli 1. sammus.
+- **Teose kustutamine ja taastamine:** `admin_work_delete` viib praegu prügikasti ainult
+  juurkausta pildid ja teeb siis `rmtree`. Sellest lähtuvalt:
+  - `admin_work_delete` liigutab ka `_exemplars/` gitist väljas olevad failid
+    `._trash/{work_id}/_exemplars/`-i;
+  - `restore_deleted_work` toob need tagasi (manifest tuleb gitist);
+  - pooleli impordid katkevad.
+
+  Test: kustuta → taasta annab samad eksemplaripildid.
 - `page` on ainult kõrvutamise mugavus. Kui tüve enam pole (lehtede ümberjärjestus,
   kustutus), kuvatakse pilt ilma paarita. Serveri sünki lehetoimingutega **ei tehta**.
 
@@ -131,11 +146,22 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
   Üleslaadimine (`POST`) ainult lisab lõppu ja revisjoni ei nõua.
 - Otspunktid (router: sama, kus `work_exemplars`):
   - `GET  /works/{id}/exemplars/{eid}/images`: lugemisõigus (`can_read_work`).
-  - `POST /works/{id}/exemplars/{eid}/images`: failide üleslaadimine (JPEG/PNG/TIFF,
-    tuvastus magic byte'idest), `source` kaasas. Lähtefaili käsitlus: vt Andmemudel.
+  - `POST /works/{id}/exemplars/{eid}/images`: failide üleslaadimine, `source` kaasas.
+    Lähtefaili käsitlus: vt Andmemudel.
+- **Üleslaadimine.** Olemasolev `detect_and_convert_image` toetab ainult JPG/PNG-d ega
+  pööra EXIF-i, seega tuleb oma töötlus:
+  - magic byte'id: JPEG, PNG, TIFF (`II*\0`, `MM\0*`);
+  - piirid: fail ≤ 100 MB, pikim külg ≤ 12 000 px (pildipommi kaitse,
+    `Image.MAX_IMAGE_PIXELS` vastavalt);
+  - vaatamiskuju `{id}.jpg`: `ImageOps.exif_transpose`, 16-bit halltoon / CMYK / palett →
+    RGB või L, pikim külg ≤ 4000 px, JPEG kvaliteet 92;
+  - pööramata JPEG, mille pikim külg on ≤ 4000 px, jääb baitkoopiaks ilma `original`-ita.
   - `PATCH …/images` `{revision, images: [...]}`: järjekord + `label`/`page`/`source`.
     Loend peab sisaldama täpselt praegused ID-d (lisamine/kustutus siit ei käi), muidu 409.
   - `DELETE …/images/{image_id}?revision=N`: failid `._trash`-i, kirje manifestist.
+  - `GET  …/images/{image_id}/original`: lähtefail (`{id}.orig.{ext}` või `{id}.jpg`),
+    õigus `can_read_work` (nähtavus = teos). ADA pildi puhul 302 aadressile
+    `https://hdl.handle.net/{ref}`.
   - `POST …/images/import-ada` `{handle, from?, to?}` → `import_id`; olek
     `GET …/images/import-ada/{import_id}`.
   - Kirjutusõigus: `can_write_work` (ADR 0031). Uut rolli ei tule.
@@ -146,17 +172,28 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
     teose alla kuulub ainult osa. Iga lehe kohta salvestatakse `source.bitstream` (UUID)
     ja `source.page` = leht SELLES bitstreamis, mitte liidetud PDF-is. Arvutus tuleb
     bitstreamide lehtede arvust.
-  - **Püsiv impordi ID ja piltide ID-d.** `POST` loob `import_id` ja kirjutab
-    `_imports/{import_id}/job.json`: handle, vahemik, eksemplar, kasutaja ja iga
-    väljundlehe kohta eelnevalt määratud `image_id`. Kordus kasutab samu ID-sid.
+  - **Püsiv impordi ID ja leheplaan.**
+    - `POST` loob `import_id` ja kirjutab `_imports/{import_id}/job.json`: impordi
+      parameetrid (handle, vahemik, eksemplar, kasutaja, `set_url`) ja `lookup`-i
+      bitstreamide loendi (nimi, UUID, suurus).
+    - Lehtede arv ei ole enne allalaadimist teada. Pärast allalaadimist ja `pdfinfo`
+      lehearvude lugemist, **enne renderdamist**, arvutatakse leheplaan
+      `[{image_id, pdf_page, bitstream, bitstream_page}]` ja salvestatakse `job.json`-i.
+    - Kui leheplaan on juba olemas, kasutavad kordus ja taastaja samu `image_id`-sid.
+      Vahemik väljaspool lehtede arvu → impordi viga.
+  - **Ühel eksemplaril on korraga üks aktiivne import.** Teine `POST` samale
+    eksemplarile saab 409.
   - **Renderdus staging-kausta** `_imports/{import_id}/` sama renderdajaga, millega teeb
     seda upload (`upload/page_source.py`, `FULL_DPI`/`JPEG_QUALITY`, `RENDER_SEMAPHORE`).
     Valmis leht = `{image_id}.jpg` olemas (`.tmp` + rename). Manifest selle aja jooksul
     ei muutu.
   - **Avaldamine on taastatav protokoll.** Iga samm kontrollib oma tehtust eraldi ja on
     korratav. Kogu protokoll jookseb ühe `work_lock` → `metadata_lock` all:
-    1. **Eksemplar olemas?** Kui ei, märgi `job.json` olekuks `aborted`, staging
-       `._trash`-i, lõpp.
+    1. **Teos ja eksemplar olemas?** Enne luku võtmist `os.path.isdir(work_dir)`, sest
+       `work_lock` avab `{work_dir}/.vutt-lock`. Luku all eksemplari olemasolu. Kui
+       kumbki puudub, märgi `job.json` olekuks `aborted`, staging `._trash`-i, lõpp.
+       Teose kustutamisel ei ole stagingut enam alles. Taastaja käsitleb kadunud
+       `job.json`-i kui katkestatud importi.
     2. **Failid:** iga `image_id` kohta, mida eksemplari kaustas veel pole, nimeta fail
        staging'ust ümber (sama failisüsteem, aatomiline). Kaustas olev fail = tehtud.
     3. **Manifest:** kui `imports`-is pole `import_id`-d, lisa impordi pildid lõppu ja
@@ -168,7 +205,8 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
        või korduspäring) alustab uuesti 1. sammust ja jõuab siia.
     5. **URL:** kui `job.json` kannab `set_url: true` ja `url_done` puudub, siis kui
        eksemplari `url` on tühi, kirjuta täislink `https://hdl.handle.net/{handle}`
-       (`source.ref` jääb paljaks handle'iks), ning märgi `job.json`-i `url_done: true`.
+       (`source.ref` jääb paljaks handle'iks). Märgi `job.json`-i `url_done: true`
+       **alati**: ka siis, kui `set_url` on false või `url` oli juba olemas.
        Kirjutus käib `work_exemplars`-i **lukustatud variandi** kaudu
        (`update_exemplar(..., locked=True)` → `_write_locked`, nagu
        `set_page_origin(..., locked=True)`). `work_lock` on tavaline `threading.Lock`,
@@ -188,10 +226,13 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
 - Teose olemasolevate lehepiltide viimine eksemplari alla (nt `7zot7j` vana Uppsala
   kseroks prügikastis) **ei kuulu** sellesse etappi (minu otsus). Vajaduse korral käib see
   üleslaadimisena `source.kind = "other"`, või hiljem #705 lehtede liigutamise kaudu.
-- **Pildiserver** (`server/image_server.py`): uus tee
-  `/{kaust}/_exemplars/{eid}/{image_id}.jpg` (+ `_thumbs/`). Teose ja õiguse kontroll
+- **Pildiserver** (`server/image_server.py`): uued teed
+  `/{kaust}/_exemplars/{eid}/{image_id}.jpg` (4 osa) ja
+  `/{kaust}/_exemplars/{eid}/_thumbs/_thumb_{image_id}.jpg` (5 osa). Praegune
+  `len(parts) > 3` keeld jääb kõigile teistele teedele. Pisipilt kasutab
+  `get_or_create_page_thumbnail`-i eksemplari kausta peal. Teose ja õiguse kontroll
   on SAMA mis lehepildil (`_check_image_access`, token). `eid` ja `image_id` on rangelt
-  nanoid-kujulised. Lähtefaile, `_sources/` ja `_imports/` pildiserver **ei** serveeri.
+  nanoid-kujulised. Lähtefaile ja `_imports/`-i pildiserver **ei** serveeri.
   Praegune reegel „alakriipsuga alguses = keelatud" jääb kehtima kõigile muudele
   teedele. `get_first_image` ei näe alamkaustu ka edaspidi (kaanepilt).
 - **Valvurid:** teose `_exemplars/` ei tohi sattuda ühtegi lehtede loendisse (Meili sünk,
@@ -204,15 +245,19 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
   - commit'i tõrge;
   - impordi pildid kustutatud enne taastajat: taastaja ei impordi uuesti;
   - `PATCH` katse muuta `import_id`-d või impordipildi `source`-i: väärtus jääb;
-  - eksemplari kustutus renderdamise ajal;
+  - eksemplari kustutus renderdamise ajal; teose kustutus renderdamise ajal;
+  - teine samaaegne import samale eksemplarile → 409;
+  - eksemplari kustutus: `images.json` lahkub git-indeksist samas commit'is;
+  - `_imports/` ei satu `replace_work_content`-i commit'i;
   - tühja URL-iga eksemplari import ei jää ummikusse (lukustatud variant);
   - 409 vananenud revisjoniga.
 
 ## Klient
 
 - Teose lehel on eksemplari kaardil pildiriba (pisipildid + arv). Klõpsuga avaneb
-  **eksemplari vaade**: täisekraani modaal (`z-[1300]`) või alamleht `/work/{id}/exemplar/{eid}`.
-  Valib ehitaja; alamleht annab jagatava lingi.
+  **eksemplari vaade**: alamleht `/work/{id}/exemplar/{eid}`, valikuliste parameetritega
+  `?image={image_id}&compare={tüvi}`. See annab jagatava lingi, millele saavad järgmises
+  etapis viidata ka vaatlused.
 - Eksemplari vaade:
   - pisipiltide rida + suur pilt (zoom/pan sama komponendiga, mida lehepildid kasutavad);
   - allikarida iga pildi all („ADA 10062/14332, lk 3“ lingina; „foto: …“);
@@ -229,11 +274,11 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
 Selles etapis ei muutu. `get_work_exemplars` võib anda piltide arvu. Pildid ise tulevad
 vajadusel koos vaatlustega.
 
-## Avatud ehitajale
+## Lahendatud lahtised küsimused
 
-- Modaal või alamleht (eelistus: alamleht).
-- Üleslaadimise suuruspiir ja vaatamiskuju pikima külje lagi (lähtefail säilib niikuinii).
-- Kas `images.json` muutus kirjutab ka `_metadata.json`-i `updated_at`-i (ettepanek: ei).
+- Eksemplari vaade on alamleht (vt Klient).
+- Piirid ja vaatamiskuju: vt Üleslaadimine.
+- `images.json` muutus **ei** puuduta `_metadata.json`-i `updated_at`-i ega Meili sünki.
 
 ## Pärast
 
