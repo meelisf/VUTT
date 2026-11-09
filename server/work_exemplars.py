@@ -435,9 +435,13 @@ def page_stems(work_dir: str) -> list[str]:
     return _stems(work_dir)
 
 
-def _bulk(work_dir: str, username: str, message: str, mutate, background_tasks=None):
+def _bulk(work_dir: str, username: str, message: str, mutate, background_tasks=None, *,
+          require_commit: bool = False):
     """Loe–muuda–kirjuta `metadata_lock`-i all. `mutate(exemplars, unknown, stems)`
-    tagastab (eksemplarid, teadmata, tulemus). Kutsuja hoiab `work_lock`-i."""
+    tagastab (eksemplarid, teadmata, tulemus). Kutsuja hoiab `work_lock`-i.
+
+    `require_commit=True`: ebaõnnestunud commit on viga (ADR 0079 impordi URL-i
+    samm). Muutusteta kirjutus commit'ib rippuva varasema kirjutuse (#418)."""
     from .metadata_ops import bulk_update_works
     box: dict = {}
     stems = page_stems(work_dir)
@@ -466,6 +470,8 @@ def _bulk(work_dir: str, username: str, message: str, mutate, background_tasks=N
         raise box["error"]
     if res.get("failed"):
         raise ExemplarError("Teose metaandmeid ei saanud kirjutada", 500)
+    if require_commit and res.get("git_committed") is False:
+        raise ExemplarError("Git commit ebaõnnestus", 500)
     return box.get("result")
 
 
@@ -549,7 +555,9 @@ def create_exemplar(work_dir: str, data: dict, username: str, background_tasks=N
     return _read_exemplar(work_dir, ex_id)
 
 
-def update_exemplar(work_dir: str, ex_id: str, data: dict, username: str, background_tasks=None) -> dict:
+def update_exemplar(work_dir: str, ex_id: str, data: dict, username: str, background_tasks=None, *,
+                    locked: bool = False, require_commit: bool = False) -> dict:
+    """`locked=True`: kutsuja hoiab juba `work_lock`-i (eksemplari piltide import, ADR 0079)."""
     data = data or {}
 
     def mutate(exemplars, unknown, _stems):
@@ -558,7 +566,13 @@ def update_exemplar(work_dir: str, ex_id: str, data: dict, username: str, backgr
         exemplars[i] = _apply_fields(exemplars[i], data)
         return _witness_change(exemplars, ex_id, data), unknown, ex_id
 
-    _write(work_dir, username, f"Eksemplar: muuda [{ex_id}]", mutate, background_tasks)
+    message = f"Eksemplar: muuda [{ex_id}]"
+    if locked:
+        _bulk(work_dir, username, message, mutate, background_tasks, require_commit=require_commit)
+    else:
+        from . import admin_page_ops
+        with admin_page_ops.work_lock(os.path.basename(work_dir), work_dir):
+            _bulk(work_dir, username, message, mutate, background_tasks, require_commit=require_commit)
     return _read_exemplar(work_dir, ex_id)
 
 
