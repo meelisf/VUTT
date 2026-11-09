@@ -83,7 +83,9 @@ const RelationsMap: React.FC<{
         {layer === 'originPrint' && <> <b>{t('network.linkCount', { count: links.length })}</b></>}
       </p>
       <div className="h-[520px] overflow-hidden rounded-lg border border-gray-200">
-        <MapContainer center={[57.5, 24.5]} zoom={5} minZoom={1} scrollWheelZoom className="h-full w-full">
+        {/* SVG-tuvastuse tõrkel tagastab Leaflet null-renderdaja ja viskab uuesti
+            pooleli jäänud joone eemaldamisel. Canvas väldib mõlemat viga. */}
+        <MapContainer center={[57.5, 24.5]} zoom={5} minZoom={1} preferCanvas scrollWheelZoom className="h-full w-full">
           <HistoricalMapLayer year={year} lang={lang} />
           <FitToPoints points={points} />
           {(layer === 'origin' || layer === 'originPrint') && focusCoords && (
