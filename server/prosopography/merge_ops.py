@@ -139,6 +139,12 @@ def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
         target["origin"] = src_origin
         target_changed = True
 
+    # Neiupõlvenimi: ainult tühja täitmine, sihtkaardi väärtus jääb.
+    src_maiden = ((source.get("name") or {}).get("maiden_name") or "").strip()
+    if src_maiden and not ((target.get("name") or {}).get("maiden_name") or "").strip():
+        target.setdefault("name", {})["maiden_name"] = src_maiden
+        target_changed = True
+
     src_occs = source.get("occupations") or []
     tgt_occs = target.get("occupations") or []
     if src_occs:

@@ -542,6 +542,18 @@ const PersonEditPage: React.FC = () => {
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">{t('form.nameMaiden')}</label>
+            <input
+              type="text"
+              value={draft.name_maiden}
+              onChange={e => set({ name_maiden: e.target.value })}
+              placeholder="Marckthaler"
+              className={`w-full ${inputCls}`}
+            />
+            <p className="mt-1 text-xs text-gray-400">{t('form.nameMaidenHint')}</p>
+          </div>
+
           {/* Sugu */}
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1.5">{t('form.gender')}</label>

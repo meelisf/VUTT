@@ -52,6 +52,8 @@ export interface FormDraft {
   name_family: string;
   name_first: string;
   name_qualifier: string;
+  /** Neiupõlve perekonnanimi (ainult perekonnanimi, mitte täisnimi). */
+  name_maiden: string;
   name_aliases: string[];
   gender: '' | 'M' | 'F';
   birth: DateDraft;
@@ -85,6 +87,7 @@ export const emptyDraft = (): FormDraft => ({
   name_family: '',
   name_first: '',
   name_qualifier: '',
+  name_maiden: '',
   name_aliases: [],
   gender: '',
   birth: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: null },
