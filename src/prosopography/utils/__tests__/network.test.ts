@@ -1,6 +1,6 @@
 // src/prosopography/utils/__tests__/network.test.ts
 import { describe, it, expect } from 'vitest';
-import { applyFilters, coEdges, evidenceTarget, familyLabel, personKinds, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
+import { applyFilters, coEdges, evidenceTarget, familyRelation, personKinds, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
 import type { PersonNetwork, NetworkEdge } from '../../services/networkService';
 
 const F = 'vutt:Pfocus';
@@ -144,25 +144,34 @@ describe('otherEnd', () => {
   });
 });
 
-describe('familyLabel', () => {
+describe('familyRelation', () => {
   const edge: NetworkEdge = {
     kind: 'family', from: 'a', to: F, directed: false, year: null, place: null, evidence: null,
     records: [{ source_id: F, target_id: 'a', type: 'isa' }, { source_id: 'a', target_id: F, type: 'poeg' }],
   };
   const labelOf = (id: string) => ({ a: 'Hackspan', [F]: 'Fischer' } as Record<string, string>)[id] ?? id;
 
-  it('eelistab fookuse kaardi kirjet', () => {
-    expect(familyLabel(edge, F, labelOf)).toBe('isa');
+  it('eelistab fookuse kaardi kirjet: sihtisik on omaniku <tüüp>', () => {
+    expect(familyRelation(edge, F, labelOf)).toEqual({ subject: 'Hackspan', owner: 'Fischer', type: 'isa' });
   });
 
-  it('teise kaardi kirje koos allikaga', () => {
+  it('teise kaardi kirje: suunda ei pöörata', () => {
     const e2 = { ...edge, records: [edge.records![1]] };
-    expect(familyLabel(e2, F, labelOf)).toBe('Hackspan: poeg');
+    expect(familyRelation(e2, F, labelOf)).toEqual({ subject: 'Fischer', owner: 'Hackspan', type: 'poeg' });
+  });
+
+  it('Wikidata tüüp UI keeles, varuks en ja toorväärtus', () => {
+    const labels = { en: 'wife', et: 'abielunaine' };
+    const e4 = { ...edge, records: [{ source_id: F, target_id: 'a', type: 'wife', type_labels: labels }] };
+    expect(familyRelation(e4, F, labelOf, 'et')?.type).toBe('abielunaine');
+    expect(familyRelation(e4, F, labelOf, 'en')?.type).toBe('wife');
+    const e5 = { ...edge, records: [{ source_id: F, target_id: 'a', type: 'wife', type_labels: { en: 'wife' } }] };
+    expect(familyRelation(e5, F, labelOf, 'et')?.type).toBe('wife');
   });
 
   it('tüübita kirje → null', () => {
     const e3 = { ...edge, records: [{ source_id: F, target_id: 'a', type: null }] };
-    expect(familyLabel(e3, F, labelOf)).toBeNull();
+    expect(familyRelation(e3, F, labelOf)).toBeNull();
   });
 });
 
