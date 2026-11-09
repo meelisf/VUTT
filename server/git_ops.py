@@ -259,6 +259,13 @@ def get_or_init_repo():
         return _init_repo_locked()
 
 
+# Eksemplari pildid (ADR 0079): lähtefailid, impordi staging ja pisipildid gitist
+# väljas. Serveri olemasolev `data/.gitignore` uuendatakse käsitsi enne deploy'd.
+DATA_GITIGNORE_EXTRA: tuple[str, ...] = (
+    "_imports/", "_thumbs/", "*.pdf", "*.tif", "*.tiff", "*.orig.*", "*.part", "*.tmp*",
+)
+
+
 def _init_repo_locked():
     global _git_repo
     try:
@@ -278,6 +285,8 @@ def _init_repo_locked():
                 f.write("*.jpeg\n")
                 f.write("*.png\n")
                 f.write("*.backup.*\n")  # Vanad backup failid
+                for rida in DATA_GITIGNORE_EXTRA:
+                    f.write(rida + "\n")
             logger.info("Loodud .gitignore")
 
     return _git_repo

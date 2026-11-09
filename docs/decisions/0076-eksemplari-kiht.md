@@ -375,3 +375,5 @@ eksemplar (hoidja riiulil olemas asi), aga tema tekst pärineb originaalist.
   - upload'i meta-vaade (`upload_ops`, `UploadMetaForm` asendusrežiimis).
 - Uus eksemplari väli, mis peab jõudma konvoluudi rühmitusse või otsingusse, läheb
   `update_work_facts` / `meili_doc` kaudu. Uut paralleelset indeksi kirjutajat ei looda.
+- Eksemplari pildid elavad `_exemplars/{id}/`-s oma manifestiga ja eksemplari kustutus
+  eemaldab ka need (ADR 0079).
