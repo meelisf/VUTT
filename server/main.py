@@ -38,6 +38,7 @@ from .routers.work_sets import router as work_sets_router
 from .routers.work_parts import router as work_parts_router
 from .routers.work_relations import router as work_relations_router
 from .routers.work_exemplars import router as work_exemplars_router
+from .routers.exemplar_images import router as exemplar_images_router
 from .routers.page_text_proposals import router as page_text_proposals_router
 from .routers.agent_proposals import router as agent_proposals_router
 from .routers.collections import router as collections_router
@@ -148,6 +149,7 @@ app.include_router(work_sets_router)
 app.include_router(work_parts_router)
 app.include_router(work_relations_router)
 app.include_router(work_exemplars_router)
+app.include_router(exemplar_images_router)
 app.include_router(page_text_proposals_router)
 app.include_router(agent_proposals_router)
 
