@@ -127,6 +127,8 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
   const canEdit = isAtLeast(userRole, 'admin');
 
   const [exemplars, setExemplars] = useState<Exemplar[] | null>(null);
+  // Eksemplari piltide arv (ADR 0079): kustutuse kinnitus nimetab, mis prügikasti läheb.
+  const [imageCounts, setImageCounts] = useState<Record<string, number>>({});
   const [loadFailed, setLoadFailed] = useState(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -142,6 +144,7 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
     try {
       const res = await getWorkExemplars(workId, authToken);
       setExemplars(res.exemplars || []);
+      setImageCounts(Object.fromEntries(Object.entries(res.images ?? {}).map(([id, v]) => [id, v.count])));
       setLoadFailed(false);
     } catch {
       setLoadFailed(true);
@@ -229,7 +232,10 @@ const ExemplarsSection: React.FC<ExemplarsSectionProps> = ({
   const remove = async (x: Exemplar) => {
     const ok = await askConfirm({
       title: t('exemplars.deleteTitle'),
-      message: t('exemplars.deleteConfirm', { label: [x.holder, x.shelfmark].filter(Boolean).join(' ') }),
+      message: imageCounts[x.id]
+        ? t('exemplars.deleteConfirmImages', {
+          label: [x.holder, x.shelfmark].filter(Boolean).join(' '), count: imageCounts[x.id] })
+        : t('exemplars.deleteConfirm', { label: [x.holder, x.shelfmark].filter(Boolean).join(' ') }),
       confirmText: t('exemplars.delete'),
       variant: 'danger',
     });

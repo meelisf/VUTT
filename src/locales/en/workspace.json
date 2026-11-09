@@ -936,6 +936,7 @@
     "delete": "Delete",
     "deleteTitle": "Delete copy",
     "deleteConfirm": "Delete copy “{{label}}”? This cannot be undone here.",
+    "deleteConfirmImages": "Delete copy “{{label}}” with its {{count}} images? The image files go to the trash; the copy cannot be restored here.",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "saveExemplar": "Save copy",

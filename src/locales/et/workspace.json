@@ -936,6 +936,7 @@
     "delete": "Kustuta",
     "deleteTitle": "Kustuta eksemplar",
     "deleteConfirm": "Kustutan eksemplari „{{label}}“? Seda ei saa siit tagasi võtta.",
+    "deleteConfirmImages": "Kustutan eksemplari „{{label}}“ koos {{count}} pildiga? Pildifailid lähevad prügikasti, eksemplari siit tagasi võtta ei saa.",
     "moveUp": "Liiguta üles",
     "moveDown": "Liiguta alla",
     "saveExemplar": "Salvesta eksemplar",
