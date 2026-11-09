@@ -89,12 +89,15 @@ function getExternalLabel(scheme: string): string {
 const CardHeader: React.FC<{
   icon: React.ReactNode;
   title: string;
+  /** Pealkirja järel hallis, nt neiupõlvenimi „sünd. Marckthaler". */
+  subtitle?: string;
   count?: number;
   action?: React.ReactNode;
-}> = ({ icon, title, count, action }) => (
+}> = ({ icon, title, subtitle, count, action }) => (
   <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
     <span className="text-primary-600">{icon}</span>
     <h4 className="font-bold">{title}</h4>
+    {subtitle && <span className="text-sm text-gray-500">{subtitle}</span>}
     {count !== undefined && (
       <span className="text-xs text-gray-400 font-normal">({count})</span>
     )}
@@ -254,6 +257,10 @@ export const StructuredInfoCard: React.FC<{ person: ProsopoRecord; workTitles: R
         </span>
       ),
     });
+  }
+  // Neiupõlvenimi on päises juba näha; siin on ta koos teiste nimeandmetega.
+  if (person.name.maiden_name) {
+    rows.push({ label: t('maidenName', 'Neiupõlvenimi'), value: person.name.maiden_name });
   }
   // Nimevariandid on sekundaarne info — viimasena, ameti ja seoste järel.
   const aliases = person.name.aliases ?? [];
@@ -524,6 +531,7 @@ const PersonDetailPage: React.FC = () => {
           <CardHeader
             icon={<User size={18} />}
             title={person.name.label}
+            subtitle={person.name.maiden_name ? t('maidenNameShort', { name: person.name.maiden_name }) : undefined}
             action={(
               <div className="flex items-center gap-2">
                 <Link

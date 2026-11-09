@@ -162,6 +162,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     name_family: p.name.family_name ?? '',
     name_first: p.name.first_name ?? '',
     name_qualifier: p.name.qualifier ?? '',
+    name_maiden: p.name.maiden_name ?? '',
     name_aliases: p.name.aliases ?? [],
     gender: p.gender ?? '',
     // Sama teisendus mis haridus-/ametikuupäevadel — sh `0000` tühjaks (#240)
@@ -279,7 +280,7 @@ export function draftToPayload(
       qualifier: draft.name_qualifier.trim() || null,
       qualifier_type: original?.name?.qualifier_type ?? null,
       noble_status: original?.name?.noble_status ?? null,
-      maiden_name: original?.name?.maiden_name ?? null,
+      maiden_name: draft.name_maiden.trim() || null,
       aliases: draft.name_aliases.filter(Boolean),
       family_name_variants: original?.name?.family_name_variants ?? [],
       first_name_variants: original?.name?.first_name_variants ?? [],

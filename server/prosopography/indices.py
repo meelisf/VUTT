@@ -263,13 +263,31 @@ def _on_kaardi_voti(key: str) -> bool:
     return isinstance(key, str) and key.startswith("vutt:")
 
 
+def card_search_names(name_obj: dict) -> list[str]:
+    """Kaardi otsitavad nimekujud: kanooniline nimi, variandid ja neiupõlvenimi.
+
+    Neiupõlvenimi (ainult perekonnanimi) tuletatakse kahe kujuna — paljalt
+    („Marckthaler") ja eesnimega („Rosine Elisabeth Marckthaler"). Kaardi
+    `aliases`-isse neid EI kirjutata: variandid on toimetaja sisestus.
+    Järjekord on stabiilne (dict.fromkeys), et indeksifail ei müraks.
+    """
+    label = name_obj.get("label") or ""
+    names = [label, *(name_obj.get("aliases") or [])]
+    maiden = (name_obj.get("maiden_name") or "").strip()
+    if maiden:
+        names.append(maiden)
+        first = (name_obj.get("first_name") or "").strip()
+        if first:
+            names.append(f"{first} {maiden}")
+    return list(dict.fromkeys(n for n in names if isinstance(n, str) and n))
+
+
 def _update_aliases_entry(person: dict):
     """Uuendab person_aliases.json — vutt:P ID → nimevariandid."""
     person_id = person["id"]
     name_obj = person.get("name") or {}
     label = name_obj.get("label") or ""
-    aliases = name_obj.get("aliases") or []
-    all_names = list({label} | set(aliases))
+    all_names = card_search_names(name_obj)
 
     from .person_search import _load_person_aliases
 
@@ -437,8 +455,7 @@ def rebuild_indices():
 
         name_obj = person.get("name") or {}
         label = name_obj.get("label") or ""
-        person_aliases = name_obj.get("aliases") or []
-        all_names = list({label} | set(person_aliases))
+        all_names = card_search_names(name_obj)
         aliases_data[pid] = {
             "primary_name": label,
             "aliases": all_names,
