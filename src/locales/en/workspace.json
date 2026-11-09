@@ -818,6 +818,26 @@
     "handoffAll": "Code for agent (all works)",
     "packPagesGone": "The pack's pages are no longer in the work — the pack can be rejected."
   },
+  "exemplarImages": {
+    "title": "Exemplar images",
+    "back": "Back to the work",
+    "notFound": "Exemplar not found.",
+    "loadError": "Could not load the images.",
+    "empty": "This exemplar has no images yet.",
+    "count_one": "{{count}} image",
+    "count_other": "{{count}} images",
+    "open": "Open exemplar images",
+    "imageAlt": "Exemplar image {{n}}",
+    "edit": "Edit images",
+    "source": {
+      "ada": "ADA {{ref}}",
+      "adaPage": "ADA {{ref}}, p. {{page}}",
+      "url": "{{ref}}",
+      "photo": "Photo: {{ref}}",
+      "paber_ut": "paber.ut.ee {{ref}}",
+      "other": "{{ref}}"
+    }
+  },
   "exemplars": {
     "title": "Copies",
     "savesImmediately": "Changes to copies are saved immediately, not with the metadata save button.",

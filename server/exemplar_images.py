@@ -75,6 +75,21 @@ def read_manifest(work_dir: str, eid: str) -> dict:
             "imports": dict(data.get("imports") or {})}
 
 
+PREVIEW_COUNT = 6
+
+
+def image_previews(work_dir: str, exemplar_ids) -> dict:
+    """Eksemplari kaardi pildiriba: `{eid: {count, preview: [id ≤ 6]}}`, ainult piltidega."""
+    out = {}
+    for eid in exemplar_ids:
+        if not isinstance(eid, str) or not ID_RE.match(eid):
+            continue
+        images = read_manifest(work_dir, eid)["images"]
+        if images:
+            out[eid] = {"count": len(images), "preview": [i["id"] for i in images[:PREVIEW_COUNT]]}
+    return out
+
+
 def _read_meta(work_dir: str) -> dict:
     with open(os.path.join(work_dir, "_metadata.json"), "r", encoding="utf-8") as f:
         return json.load(f) or {}

@@ -126,3 +126,22 @@ def test_ada_import_otspunktid(client, monkeypatch):
     assert client.get(f"{BASE}/import-ada/q1q1q1").json()["state"] == "rendering"
     client.state["write"] = False
     assert client.post(f"{BASE}/import-ada", json={"handle": "x"}).status_code == 403
+
+
+def test_eksemplaride_loend_kannab_pildiarvu(client, monkeypatch):
+    from server.routers import work_exemplars as wr
+    env = client.env
+    monkeypatch.setattr(wr, "find_directory_by_id", lambda wid: env["work_dir"] if wid == "w1" else None)
+    monkeypatch.setattr(wr, "load_work_metadata_by_id",
+                        lambda wid: json.load(open(env["meta_path"], encoding="utf-8")) if wid == "w1" else None)
+    monkeypatch.setattr(wr, "can_read_work", lambda m, u: True)
+    monkeypatch.setattr("server.work_exemplars.resolve_convolutes", lambda *a: [])
+    app = FastAPI()
+    app.include_router(wr.router)
+    from server import deps
+    app.dependency_overrides[deps.optional_user] = lambda: None
+    c = TestClient(app)
+    assert c.get("/works/w1/exemplars").json()["images"] == {}
+    ids = [i["id"] for i in _upload(client, 8).json()["images"]]
+    body = c.get("/works/w1/exemplars").json()
+    assert body["images"] == {"a1b2c3": {"count": 8, "preview": ids[:6]}}

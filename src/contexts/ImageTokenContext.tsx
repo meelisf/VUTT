@@ -10,24 +10,17 @@ import { ApiError } from '../services/apiClient';
  * seega käib allkiri URL-is (`?exp=…&sig=…`). Enne küsiti seda 7 kohas kolmel
  * viisil; nüüd käib iga küsimine siit.
  */
-export interface ImageToken {
-  exp: number;
-  sig: string;
-}
+import type { ImageToken } from '../utils/imageTokenUrl';
+export type { ImageToken } from '../utils/imageTokenUrl';
+// URL-abilised elavad sõltuvusteta moodulis: komponent, mis vajab ainult URL-i,
+// ei pea konteksti (ja sellega UserContext-i/i18n-i) importima.
+export { imageTokenQuery, withImageToken } from '../utils/imageTokenUrl';
 
 /** Allkiri on serveris 1 h; uus küsitakse enne, kui vana aegub. */
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
 const isFresh = (t: ImageToken) => t.exp * 1000 - Date.now() > REFRESH_MARGIN_MS;
 
-/** `exp=…&sig=…` ilma eraldajata — kutsuja paneb `?` või `&`. */
-export const imageTokenQuery = (t: ImageToken | null | undefined): string =>
-  t ? `exp=${t.exp}&sig=${t.sig}` : '';
-
-export function withImageToken(url: string, t: ImageToken | null | undefined): string {
-  if (!t) return url;
-  return `${url}${url.includes('?') ? '&' : '?'}${imageTokenQuery(t)}`;
-}
 
 type Entry = Promise<ImageToken | null>;
 type GetImageToken = (workId: string) => Entry;

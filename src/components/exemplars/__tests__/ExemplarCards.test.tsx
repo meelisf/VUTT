@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import { render, screen, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import type { Exemplar } from '../../../types';
 
 vi.mock('react-i18next', () => ({
@@ -41,5 +42,22 @@ describe('ExemplarCards', () => {
     expect(screen.getByText('Rar 10:252')).toBeTruthy();
     expect(screen.queryByText('exemplars.witness')).toBeNull();
     expect(screen.queryByTestId('exemplar-cards')).toBeNull();
+  });
+
+  it('piltidega eksemplaril pildiriba (kuni 6) ja link alamlehele', () => {
+    const preview = ['p00001', 'p00002', 'p00003', 'p00004', 'p00005', 'p00006'];
+    const { container } = render(
+      <MemoryRouter>
+        <ExemplarCards exemplars={exemplars} pageNumbers={{}} archiveRefs={[]} archives={archives}
+          workId="w1" images={{ d6gcpv: { count: 9, preview } }} imageToken={null} />
+      </MemoryRouter>,
+    );
+    const strips = container.querySelectorAll('[data-testid="exemplar-image-strip"]');
+    expect(strips).toHaveLength(1);
+    expect(strips[0].querySelectorAll('img')).toHaveLength(6);
+    expect(strips[0].querySelector('img')?.getAttribute('src')).toBe('/api/images/w1/_exemplars/d6gcpv/_thumbs/_thumb_p00001.jpg');
+    // Riba ise on link (<a>).
+    expect(strips[0].getAttribute('href')).toBe('/work/w1/exemplar/d6gcpv');
+    expect(strips[0].textContent).toContain('exemplarImages.count');
   });
 });

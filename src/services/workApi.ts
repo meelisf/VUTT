@@ -324,6 +324,8 @@ export interface WorkExemplarsResponse {
   page_numbers: Record<string, number>;
   page_count: number;
   convolutes: ConvoluteBlock[];
+  /** Eksemplari pildid (ADR 0079): ainult piltidega eksemplarid, kuni 6 eelvaate ID-d. */
+  images?: Record<string, { count: number; preview: string[] }>;
 }
 
 export function getWorkExemplars(workId: string, token?: string | null): Promise<WorkExemplarsResponse> {

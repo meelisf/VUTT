@@ -818,6 +818,26 @@
     "handoffAll": "Kood agendile (kõik teosed)",
     "packPagesGone": "Paki lehed on teosest kadunud — pakki saab tagasi lükata."
   },
+  "exemplarImages": {
+    "title": "Eksemplari pildid",
+    "back": "Tagasi teose juurde",
+    "notFound": "Eksemplari ei leitud.",
+    "loadError": "Pilte ei õnnestunud laadida.",
+    "empty": "Sellel eksemplaril pole veel pilte.",
+    "count_one": "{{count}} pilt",
+    "count_other": "{{count}} pilti",
+    "open": "Ava eksemplari pildid",
+    "imageAlt": "Eksemplari pilt {{n}}",
+    "edit": "Muuda pilte",
+    "source": {
+      "ada": "ADA {{ref}}",
+      "adaPage": "ADA {{ref}}, lk {{page}}",
+      "url": "{{ref}}",
+      "photo": "Foto: {{ref}}",
+      "paber_ut": "paber.ut.ee {{ref}}",
+      "other": "{{ref}}"
+    }
+  },
   "exemplars": {
     "title": "Eksemplarid",
     "savesImmediately": "Eksemplari muudatused salvestuvad kohe, mitte metaandmete salvestusnupuga.",
