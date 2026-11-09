@@ -115,8 +115,11 @@ olemasolev `data/.gitignore` uuendatakse käsitsi + commit konteinerist enne dep
   Lehe JPEG (300 DPI, sama renderdus mis uploadil) on ADA pildi vaatamiskuju ja `original`
   puudub.
 - **Eksemplari kustutamine** (`delete_exemplar`): kui pildid on olemas, nõuab kinnitust.
-  Sama luku all ja **samas commit'is** `_metadata.json`-i muudatusega eemaldatakse
-  `_exemplars/{id}/images.json` git-indeksist. Gitist väljas olevad failid liiguvad
+  Sama luku all, **kohe pärast** `_metadata.json`-i commit'i, eemaldatakse
+  `_exemplars/{id}/images.json` git-indeksist eraldi commit'iga (`delete_file_from_git`).
+  `bulk_update_works` ei toeta eemaldamist samas commit'is. Kui teine commit ebaõnnestub,
+  jääb gitti olematu eksemplari manifest. Lugejad ignoreerivad seda, ja järgmine
+  eksemplari kustutus või reindeks seda ei vaja. Gitist väljas olevad failid liiguvad
   `._trash/{work_id}/_exemplars/{id}/`-i. Pooleli import sellel eksemplaril katkeb
   protokolli 1. sammus.
 - **Teose kustutamine ja taastamine:** `admin_work_delete` viib praegu prügikasti ainult
@@ -262,7 +265,7 @@ olemasolev `data/.gitignore` uuendatakse käsitsi + commit konteinerist enne dep
   - `PATCH` katse muuta `import_id`-d või impordipildi `source`-i: väärtus jääb;
   - eksemplari kustutus renderdamise ajal; teose kustutus renderdamise ajal;
   - teine samaaegne import samale eksemplarile → 409;
-  - eksemplari kustutus: `images.json` lahkub git-indeksist samas commit'is;
+  - eksemplari kustutus: `images.json` lahkub git-indeksist (sama luku all);
   - `_imports/` ei satu `replace_work_content`-i commit'i;
   - tühja URL-iga eksemplari import ei jää ummikusse (lukustatud variant);
   - 409 vananenud revisjoniga.
