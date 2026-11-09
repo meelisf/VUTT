@@ -3,6 +3,7 @@
  * Seoste vaadete puhas loogika (#461). Järjekord (spekk): filtreeri servad →
  * eemalda seosteta isikud → arvuta NÄHTAVATEST servadest liik, suurus, loendurid.
  */
+import { formatRelationTypeLabel } from './estonianName';
 import type { NetworkEdge, NetworkPart, NetworkPerson, NetworkWork, PersonNetwork, RelationKind } from '../services/networkService';
 
 // Isiku liik (sõlm) = tugevaim liik selles järjekorras. Perekond on teostest tulenevate
@@ -106,13 +107,24 @@ export function coEdges(v: VisibleNetwork): Array<{ a: string; b: string; weight
   });
 }
 
-/** Pereserva kuvatekst: fookuse kaardi kirje eelistatud, muidu teise kaardi kirje allikaga. */
-export function familyLabel(edge: NetworkEdge, focusId: string, labelOf: (id: string) => string): string | null {
+/**
+ * Pereserva seos lausena kuvamiseks: `subject` on `owner`-i `type` (kirje kannab tüüpi
+ * sihtisiku kohta: source = kaardi omanik, target = see, kes on „isa" jne).
+ * Fookuse kaardi kirje eelistatud, muidu teise kaardi kirje. Suunda EI pöörata —
+ * pöördtüüp sõltub soost ja liinist (isa → poeg/tütar), vt `reciprocal_ops`.
+ */
+export function familyRelation(
+  edge: NetworkEdge, focusId: string, labelOf: (id: string) => string, lang = 'et',
+): { subject: string; owner: string; type: string } | null {
   const recs = edge.records ?? [];
-  const own = recs.find(r => r.source_id === focusId && r.type);
-  if (own) return own.type;
-  const other = recs.find(r => r.type);
-  return other ? `${labelOf(other.source_id)}: ${other.type}` : null;
+  const rec = recs.find(r => r.source_id === focusId && r.type) ?? recs.find(r => r.type);
+  if (!rec) return null;
+  return {
+    subject: labelOf(rec.target_id),
+    owner: labelOf(rec.source_id),
+    // Tüüp UI keeles: keelesilt → en → toorväärtus (sama ahel nagu isikulehe seostes)
+    type: formatRelationTypeLabel(rec.type!, rec.type_labels, lang),
+  };
 }
 export interface RadialNode { person: VisiblePerson; x: number; y: number; angle: number; r: number; labelled: boolean; }
 

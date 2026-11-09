@@ -37,7 +37,13 @@ export interface NetworkPart {
   first_page: number | null;
 }
 
-export interface FamilyRecord { source_id: string; target_id: string; type: string | null; }
+export interface FamilyRecord {
+  source_id: string;
+  target_id: string;
+  type: string | null;
+  // Wikidata keelesildid; puudub vabateksti-tüübil
+  type_labels?: Record<string, string> | null;
+}
 
 export interface NetworkEdge {
   kind: RelationKind;

@@ -133,6 +133,17 @@ def test_pereseosed_mõlemast_suunast_uks_serv(net):
     assert by_other["vutt:Pfam"]["directed"] is False and by_other["vutt:Pfam"]["evidence"] is None
 
 
+
+def test_pereseose_tyybi_keelesildid_tulevad_kaasa(net):
+    # Ilma type_labels-ita näitas popover eesti UI-s toorväärtust „wife"
+    lab = {"en": "wife", "et": "abielunaine"}
+    net.write("focus", relations=[{"target_id": "vutt:Pfam", "type": "wife", "type_labels": lab}])
+    net.write("other", relations=[{"target_id": F, "type": "husband", "type_labels": {"en": "husband"}}])
+    res = _build(F)
+    fam = {({e["from"], e["to"]} - {F}).pop(): e for e in res["edges"] if e["kind"] == "family"}
+    assert fam["vutt:Pfam"]["records"][0]["type_labels"] == lab
+    assert fam["vutt:Pother"]["records"][0]["type_labels"] == {"en": "husband"}
+
 def test_pereserv_summeetriline(net):
     net.write("focus", relations=[{"target_id": "vutt:Pfam", "type": "isa"}])
     net.write("fam", relations=[{"target_id": F, "type": "poeg"}])

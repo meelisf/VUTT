@@ -10,7 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { VisibleNetwork } from '../../utils/network';
 import type { NetworkEdge, NetworkWork } from '../../services/networkService';
-import { evidenceTarget, familyLabel } from '../../utils/network';
+import { evidenceTarget, familyRelation } from '../../utils/network';
+import { formatRelationOwnerName } from '../../utils/estonianName';
 
 /** Rea koht. Osa real osa enda koht (saatmis- või toimumiskoht), trükikoht ei ole kirja
  *  koht (#464). Teose real trükikoht; „teadmata" ainult trükisel — käsikirjal trükikohta pole. */
@@ -56,7 +57,7 @@ const surname = (n: string) => n.trim().split(/\s+/).pop() ?? n;
 const MAX_HOVER_WORKS = 4;
 
 const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwork; onClose: () => void }> = ({ state, net, onClose }) => {
-  const { t } = useTranslation(['prosopography', 'workspace']);
+  const { t, i18n } = useTranslation(['prosopography', 'workspace']);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: 0, top: 0 });
 
@@ -81,6 +82,12 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
     .sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999));
   const shown = state.pinned ? workEdges : workEdges.slice(0, MAX_HOVER_WORKS);
   const fam = p.edges.find(e => e.kind === 'family');
+  const lang = i18n.language?.slice(0, 2) ?? 'et';
+  const famRel = fam ? familyRelation(fam, net.focus.id, labelOf, lang) : null;
+  // Täislause („X on Y-i isa"): lühikuju „Y: isa" loeti valesti suunas
+  const famLabel = famRel
+    ? t('form.relationSentence', { other: famRel.subject, self: formatRelationOwnerName(famRel.owner, lang), type: famRel.type })
+    : null;
   const years = p.birth_year || p.death_year ? `${p.birth_year ?? '?'}–${p.death_year ?? '?'}` : '';
 
   return (
@@ -88,68 +95,68 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
       ref={ref}
       data-relation-popover
       role={state.pinned ? 'dialog' : 'tooltip'}
-      className={`fixed z-[1300] max-w-sm rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg ${state.pinned ? 'max-h-[70vh] overflow-auto' : 'pointer-events-none'}`}
+      className={`fixed z-[1300] max-w-sm rounded-lg border border-gray-200 bg-white text-xs shadow-lg ${state.pinned ? 'flex max-h-[70vh] flex-col' : 'pointer-events-none'}`}
       style={pos}
     >
-      <div className="text-sm font-semibold text-gray-900">{p.label}</div>
-      <div className="text-gray-500">
-        {years}{years ? ' · ' : ''}
-        {p.origin?.place ? t('network.origin', { place: p.origin.place }) : t('network.originUnknown')}
-      </div>
-      <div className="text-gray-500">
-        {t(`network.kinds.${p.kind}`)} · {t('network.sharedWorks', { count: p.workCount })}
-      </div>
-      {fam && familyLabel(fam, net.focus.id, labelOf) && (
-        <div className="mt-1 text-gray-700">{familyLabel(fam, net.focus.id, labelOf)}</div>
-      )}
-      {shown.length > 0 && (
-        <ul className="mt-2 space-y-1.5 pl-3 list-disc">
-          {shown.map((e, i) => {
-            const w = net.works.get(e.evidence!.work_id);
-            const { page, part } = evidenceTarget(e, net);
-            const title = w?.title ? (w.title.length > 90 ? `${w.title.slice(0, 89)}…` : w.title) : e.evidence!.work_id;
-            const place = placeLabel(e, w, !!part, t('network.unknownPlace'));
-            return (
-              <li key={`${e.evidence!.work_id}-${i}`}>
-                <span className="text-gray-500">
-                  {e.year ?? w?.year ?? '?'}
-                  {place && <> · {place}</>}
-                  {' · '}{t(`network.kinds.${e.kind}`)}
-                </span>
-                {part && (
-                  <div className="text-gray-700">
-                    {t(`workspace:manage.parts.kinds.${part.kind}`)}{part.title ? `: ${part.title}` : ''}
-                  </div>
-                )}
-                <div className="text-gray-700">
-                  <b>{surname(p.label)}:</b> {roles(e.roles?.[p.id])} · <b>{surname(net.focus.label)}:</b> {roles(e.roles?.[net.focus.id])}
-                </div>
-                <div>
-                  {state.pinned && w && !w.restricted
-                    ? <Link to={`/work/${w.work_id}/${page}`} className="text-primary-700 hover:underline">{title}</Link>
-                    : <span className="text-gray-500">{title}</span>}
-                  {w?.restricted && <span className="ml-1 text-gray-400">({t('network.restricted')})</span>}
-                  {e.evidence!.pages.length > 0 && (
-                    <span className="ml-1 text-gray-400">({t('network.pages', { pages: e.evidence!.pages.join(', ') })})</span>
+      {/* Kinnitatud aknas kerib ainult sisu; tegevusjalus (ava/sulge) jääb alati nähtavale */}
+      <div className={`p-3 ${state.pinned ? 'min-h-0 flex-1 overflow-auto' : ''}`}>
+        <div className="text-sm font-semibold text-gray-900">{p.label}</div>
+        <div className="text-gray-500">
+          {years}{years ? ' · ' : ''}
+          {p.origin?.place ? t('network.origin', { place: p.origin.place }) : t('network.originUnknown')}
+        </div>
+        <div className="text-gray-500">
+          {t(`network.kinds.${p.kind}`)} · {t('network.sharedWorks', { count: p.workCount })}
+        </div>
+        {famLabel && <div className="mt-1 text-gray-700">{famLabel}</div>}
+        {shown.length > 0 && (
+          <ul className="mt-2 space-y-1.5 pl-3 list-disc">
+            {shown.map((e, i) => {
+              const w = net.works.get(e.evidence!.work_id);
+              const { page, part } = evidenceTarget(e, net);
+              const title = w?.title ? (w.title.length > 90 ? `${w.title.slice(0, 89)}…` : w.title) : e.evidence!.work_id;
+              const place = placeLabel(e, w, !!part, t('network.unknownPlace'));
+              return (
+                <li key={`${e.evidence!.work_id}-${i}`}>
+                  <span className="text-gray-500">
+                    {e.year ?? w?.year ?? '?'}
+                    {place && <> · {place}</>}
+                    {' · '}{t(`network.kinds.${e.kind}`)}
+                  </span>
+                  {part && (
+                    <div className="text-gray-700">
+                      {t(`workspace:manage.parts.kinds.${part.kind}`)}{part.title ? `: ${part.title}` : ''}
+                    </div>
                   )}
-                </div>
-              </li>
-            );
-          })}
-          {!state.pinned && workEdges.length > MAX_HOVER_WORKS && (
-            <li className="list-none text-gray-400">{t('network.moreWorks', { count: workEdges.length - MAX_HOVER_WORKS })}</li>
-          )}
-        </ul>
-      )}
-      {state.pinned ? (
-        <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2">
+                  <div className="text-gray-700">
+                    <b>{surname(p.label)}:</b> {roles(e.roles?.[p.id])} · <b>{surname(net.focus.label)}:</b> {roles(e.roles?.[net.focus.id])}
+                  </div>
+                  <div>
+                    {state.pinned && w && !w.restricted
+                      ? <Link to={`/work/${w.work_id}/${page}`} className="text-primary-700 hover:underline">{title}</Link>
+                      : <span className="text-gray-500">{title}</span>}
+                    {w?.restricted && <span className="ml-1 text-gray-400">({t('network.restricted')})</span>}
+                    {e.evidence!.pages.length > 0 && (
+                      <span className="ml-1 text-gray-400">({t('network.pages', { pages: e.evidence!.pages.join(', ') })})</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+            {!state.pinned && workEdges.length > MAX_HOVER_WORKS && (
+              <li className="list-none text-gray-400">{t('network.moreWorks', { count: workEdges.length - MAX_HOVER_WORKS })}</li>
+            )}
+          </ul>
+        )}
+        {!state.pinned && <div className="mt-2 text-gray-400">{t('network.pinHint')}</div>}
+      </div>
+      {state.pinned && (
+        <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-3 py-2">
           <Link to={`/persons/${p.id}`} className="text-primary-700 hover:underline">{t('network.openPerson')} ↗</Link>
           <button type="button" onClick={onClose} className="flex items-center gap-1 text-gray-500 hover:text-gray-800">
             <X size={12} /> {t('network.close')}
           </button>
         </div>
-      ) : (
-        <div className="mt-2 text-gray-400">{t('network.pinHint')}</div>
       )}
     </div>
   );

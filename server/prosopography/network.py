@@ -183,30 +183,36 @@ def _reverse_relations() -> dict:
                 continue
             for r in card.get("relations") or []:
                 if isinstance(r, dict) and isinstance(r.get("target_id"), str):
-                    rev.setdefault(r["target_id"], []).append((oid, r.get("type")))
+                    rev.setdefault(r["target_id"], []).append((oid, r.get("type"), r.get("type_labels")))
         _reverse_cache["sig"] = sig
         _reverse_cache["map"] = rev
         return rev
 
 
 def _family_records(person_id: str, focus_card: dict) -> dict:
-    """{teine_id: [{source_id, target_id, type}]} mõlemast suunast, tombstone'ideta."""
+    """{teine_id: [{source_id, target_id, type, type_labels?}]} mõlemast suunast, tombstone'ideta.
+
+    `type_labels` (Wikidata keelesildid) tuleb kaasa, et klient saaks seose tüübi
+    UI keeles kuvada — `type` üksi on sisestuskeelne toorväärtus (nt „wife").
+    """
     recs: dict = {}
 
-    def add(src: str, tgt: str, typ):
+    def add(src: str, tgt: str, typ, labels=None):
         other = tgt if src == person_id else src
         if other == person_id or not isinstance(other, str) or not other.startswith("vutt:P"):
             return
         rec = {"source_id": src, "target_id": tgt, "type": typ or None}
+        if isinstance(labels, dict) and labels:
+            rec["type_labels"] = labels
         if rec not in recs.setdefault(other, []):
             recs[other].append(rec)
 
     for r in focus_card.get("relations") or []:
         if isinstance(r, dict):
-            add(person_id, r.get("target_id"), r.get("type"))
-    for oid, typ in _reverse_relations().get(person_id, []):
+            add(person_id, r.get("target_id"), r.get("type"), r.get("type_labels"))
+    for oid, typ, labels in _reverse_relations().get(person_id, []):
         if oid != person_id:
-            add(oid, person_id, typ)
+            add(oid, person_id, typ, labels)
     return recs
 
 
