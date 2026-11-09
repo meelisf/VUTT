@@ -62,8 +62,11 @@ def _kaivitustaasted() -> None:
     # „Rakenda" on `rendering` ajal disabled — kasutaja näeb külmunud
     # edenemisnumbrit, ilma vea ja väljapääsuta.
     from .upload.prepress import taasta_rippuvad_eelvaated
+    # Pooleli eksemplari piltide ADA import (ADR 0079): jätka failidest.
+    from .exemplar_import import recover_imports as taasta_eksemplari_impordid
     for taaste in (taasta_rippuvad_fetchid, taasta_rippuvad_applyd,
-                   taasta_rippuvad_impordid, taasta_rippuvad_eelvaated):
+                   taasta_rippuvad_impordid, taasta_rippuvad_eelvaated,
+                   taasta_eksemplari_impordid):
         # Erand EI TOHI käivitust peatada: taasteta server on parem kui
         # server, mis ei tõuse. Iga taaste püüab ka ise upload'i kaupa.
         try:

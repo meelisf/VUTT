@@ -109,3 +109,20 @@ def test_vigane_fail_400(client):
     r = client.post(BASE, files=[("files", ("x.pdf", b"%PDF-1.4", "application/pdf"))],
                     data={"source": json.dumps({"kind": "photo"})})
     assert r.status_code == 400
+
+
+def test_ada_import_otspunktid(client, monkeypatch):
+    from server import exemplar_import as eimp
+    seen = {}
+
+    def fake_start(path, eid, handle, frm, to, username, set_url=True):
+        seen.update(handle=handle, frm=frm, to=to, set_url=set_url)
+        return "q1q1q1"
+    monkeypatch.setattr(eimp, "start_import", fake_start)
+    monkeypatch.setattr(eimp, "import_status", lambda path, eid, iid: {"state": "rendering", "pages_done": 2})
+    r = client.post(f"{BASE}/import-ada", json={"handle": "10062/14332", "from": 3, "to": 7})
+    assert r.status_code == 200 and r.json() == {"import_id": "q1q1q1"}
+    assert seen == {"handle": "10062/14332", "frm": 3, "to": 7, "set_url": True}
+    assert client.get(f"{BASE}/import-ada/q1q1q1").json()["state"] == "rendering"
+    client.state["write"] = False
+    assert client.post(f"{BASE}/import-ada", json={"handle": "x"}).status_code == 403

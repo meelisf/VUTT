@@ -13,6 +13,7 @@ from ..exemplar_image_files import MAX_UPLOAD_BYTES
 from ..utils import find_directory_by_id
 from ..work_sets_access import load_work_metadata_by_id
 from .. import exemplar_images as ei
+from .. import exemplar_import as eimp
 
 router = APIRouter()
 
@@ -78,6 +79,22 @@ def upload_images(work_id: str, eid: str, files: list[UploadFile] = File(...),
             raise HTTPException(status_code=413, detail=f"Fail on liiga suur: {f.filename}")
         items.append((content, src))
     return _call(ei.add_uploads, path, eid, items, user["username"])
+
+
+# Impordi teed enne `{image_id}`-teid: `import-ada` ei ole pildi ID.
+@router.post("/works/{work_id}/exemplars/{eid}/images/import-ada")
+def start_ada_import(work_id: str, eid: str, body: dict = Body(...), user=Depends(require_role("admin"))):
+    """`{handle, from?, to?}` — 1-põhine lehevahemik liidetud PDF-is. Taustatöö."""
+    path = _writable(work_id, user)
+    import_id = _call(eimp.start_import, path, eid, body.get("handle"), body.get("from"), body.get("to"),
+                      user["username"], set_url=body.get("set_url", True) is not False)
+    return {"import_id": import_id}
+
+
+@router.get("/works/{work_id}/exemplars/{eid}/images/import-ada/{import_id}")
+def ada_import_status(work_id: str, eid: str, import_id: str, user=Depends(require_role("admin"))):
+    path = _writable(work_id, user)
+    return _call(eimp.import_status, path, eid, import_id)
 
 
 @router.patch("/works/{work_id}/exemplars/{eid}/images")
