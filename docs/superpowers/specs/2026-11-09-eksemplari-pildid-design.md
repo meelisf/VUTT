@@ -68,7 +68,10 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
 
 ```jsonc
 {
-  "revision": 7,                       // kasvab iga kirjutusega (optimistlik lukk, vt Server)
+  "revision": 7,                       // serveri väli: kasvab iga kirjutusega (optimistlik lukk)
+  "imports": {                         // serveri väli: avaldatud impordid, piltidest sõltumatu
+    "q8x2mz": {"kind": "ada", "ref": "10062/14332", "count": 12, "by": "meelisf", "at": "2026-11-09"}
+  },
   "images": [
     {
       "id": "k3j9qa",                  // nanoid, püsiv; vaatamiskuju = {id}.jpg
@@ -80,7 +83,7 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
         "ref": "10062/14332",          // handle / URL / vabatekst („M. F. foto, TÜR lugemissaal")
         "bitstream": "…uuid…",         // ainult ada: bitstreami UUID
         "page": 3,                     // valikuline: 1-põhine leht SELLES failis (ada: bitstreamis)
-        "import_id": "q8x2mz",         // ainult importidel: mis impordiga lisati
+        "import_id": "q8x2mz",         // serveri väli, ainult importidel
         "license": null,               // valikuline vabatekst
         "added_by": "meelisf",
         "at": "2026-11-09"
@@ -91,6 +94,11 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
 ```
 
 - Järjekord = massiivi järjekord. Väärtuseta võtit ei salvestata (ADR 0076 p 2).
+- **Serveri väljad:** `revision`, `imports`, `source.import_id`, `source.added_by`,
+  `source.at`. `PATCH` võtab need alati salvestatud kirjest, kliendi väärtus jäetakse
+  arvestamata (nagu `strip_server_fields` isikukaardil). Impordiga lisatud pildil on
+  kogu `source` peale `license`-i muutumatu, sest viide originaalile ei tohi kaduda.
+  Kustutamine on lubatud, aga `imports`-kirje jääb alles.
 - Manifest on eraldi failis, mitte `_metadata.json`-is. Kümnete lehtedega ADA import ei
   paisuta teose metaandmeid ega puuduta Meili sünki (ADR 0012/0013).
 - **Lähtefail ja tuletis.** Vesimärgi ja paberistruktuuri detail ei tohi kaduda kadudega
@@ -145,21 +153,38 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
     seda upload (`upload/page_source.py`, `FULL_DPI`/`JPEG_QUALITY`, `RENDER_SEMAPHORE`).
     Valmis leht = `{image_id}.jpg` olemas (`.tmp` + rename). Manifest selle aja jooksul
     ei muutu.
-  - **Avaldamine on üks lukustatud toiming** (`work_lock` → `metadata_lock`):
-    1. kontrolli uuesti, et eksemplar on olemas. Kui ei, märgi import katkestatuks ja
-       staging `._trash`-i;
-    2. kui manifestis on juba mõni pilt selle `import_id`-ga, on import avaldatud.
-       Lõpeta ilma kirjutuseta (idempotentne: kordus avaldab täpselt ühe korra);
-    3. liiguta failid staging'ust eksemplari kausta, lisa kirjed manifesti lõppu, tõsta
-       `revision`, üks commit;
-    4. kui eksemplari `url` on tühi, sea see **täislingiks**
-       `https://hdl.handle.net/{handle}` (`source.ref` jääb paljaks handle'iks). See käib
-       **olemasoleva `work_exemplars` kirjutustee kaudu** samas lukus, mitte otse
-       `_metadata.json`-i;
-    5. staging kustutatakse pärast edukat commit'i.
-  - Serveri stardil jätkab taastaja pooleli jäänud importe `job.json` järgi (mustriks
-    `ada/fetch.taasta_rippuvad_fetchid`): renderdab puuduvad lehed ja avaldab. Juba
-    avaldatud impordi staging koristatakse.
+  - **Avaldamine on taastatav protokoll.** Iga samm kontrollib oma tehtust eraldi ja on
+    korratav. Kogu protokoll jookseb ühe `work_lock` → `metadata_lock` all:
+    1. **Eksemplar olemas?** Kui ei, märgi `job.json` olekuks `aborted`, staging
+       `._trash`-i, lõpp.
+    2. **Failid:** iga `image_id` kohta, mida eksemplari kaustas veel pole, nimeta fail
+       staging'ust ümber (sama failisüsteem, aatomiline). Kaustas olev fail = tehtud.
+    3. **Manifest:** kui `imports`-is pole `import_id`-d, lisa impordi pildid lõppu ja
+       `imports[import_id]` kirje SAMA kirjutusega (`atomic_write_json`), ning tõsta
+       `revision`. Kui kirje on olemas, on samm tehtud. Pilte ei lisata uuesti ka siis,
+       kui kasutaja on need vahepeal kustutanud.
+    4. **Commit:** kui `images.json` erineb `HEAD`-ist, tee commit. Commit'i tõrkel jääb
+       `job.json` olekuks `publishing` ja olekupäring näitab viga. Järgmine katse (taastaja
+       või korduspäring) alustab uuesti 1. sammust ja jõuab siia.
+    5. **URL:** kui `job.json` kannab `set_url: true` ja `url_done` puudub, siis kui
+       eksemplari `url` on tühi, kirjuta täislink `https://hdl.handle.net/{handle}`
+       (`source.ref` jääb paljaks handle'iks), ning märgi `job.json`-i `url_done: true`.
+       Kirjutus käib `work_exemplars`-i **lukustatud variandi** kaudu
+       (`update_exemplar(..., locked=True)` → `_write_locked`, nagu
+       `set_page_origin(..., locked=True)`). `work_lock` on tavaline `threading.Lock`,
+       ja tavaline `update_exemplar` → `_write` jääks iseennast ootama. `_metadata.json`-i
+       otse ei kirjutata.
+    6. **Lõpp:** `job.json` olekuks `published`, seejärel staging'u kustutus. Kustutuse
+       tõrge ei ole viga, sest olek on juba `published` ja `imports`-kirje olemas.
+  - **Taastaja** (serveri stardil, mustriks `ada/fetch.taasta_rippuvad_fetchid`) vaatab iga
+    `_imports/*/job.json`-i:
+    - `published` → ainult koristus;
+    - `aborted` → koristus;
+    - renderdus pooleli → renderda puuduvad lehed;
+    - muidu → käivita avaldamisprotokoll algusest.
+
+    Lõpetatuse tunnus on `imports[import_id]` + commit'itud manifest + `url_done`, igaüks
+    eraldi kontrollitud. Pildikirjete olemasolu tunnusena **ei kasutata**.
 - Teose olemasolevate lehepiltide viimine eksemplari alla (nt `7zot7j` vana Uppsala
   kseroks prügikastis) **ei kuulu** sellesse etappi (minu otsus). Vajaduse korral käib see
   üleslaadimisena `source.kind = "other"`, või hiljem #705 lehtede liigutamise kaudu.
@@ -172,8 +197,16 @@ ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
 - **Valvurid:** teose `_exemplars/` ei tohi sattuda ühtegi lehtede loendisse (Meili sünk,
   `lehekylje_number`, `refresh_work_mentions`, poolitus/järjestus, kaanepilt). Test:
   eksemplaripildiga teose lehtede loend ja Meili dokumendid on samad mis ilma.
-  Impordi testid: katkestus enne ja pärast manifesti kirjutust (kordus ei tekita
-  topelte), eksemplari kustutus renderdamise ajal, 409 vananenud revisjoniga.
+  Impordi testid:
+  - katkestus iga protokolli sammu järel: pärast failide liigutamist, pärast manifesti
+    kirjutust enne commit'i, pärast commit'i enne URL-i, pärast URL-i enne koristust.
+    Igal juhul annab kordus täpselt ühe impordi ja ühe URL-i uuenduse;
+  - commit'i tõrge;
+  - impordi pildid kustutatud enne taastajat: taastaja ei impordi uuesti;
+  - `PATCH` katse muuta `import_id`-d või impordipildi `source`-i: väärtus jääb;
+  - eksemplari kustutus renderdamise ajal;
+  - tühja URL-iga eksemplari import ei jää ummikusse (lukustatud variant);
+  - 409 vananenud revisjoniga.
 
 ## Klient
 
