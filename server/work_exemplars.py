@@ -475,12 +475,16 @@ def _bulk(work_dir: str, username: str, message: str, mutate, background_tasks=N
     return box.get("result")
 
 
-def _write(work_dir: str, username: str, message: str, mutate, background_tasks=None):
+def _write(work_dir: str, username: str, message: str, mutate, background_tasks=None, after=None):
     # Tüvede lugemine ja kirjutus teose luku all: sama järjekord mis lehetoimingutel
     # (work_lock → metadata_lock), muidu võib samaaegne poolitus tüve vahepeal asendada.
+    # `after()` jookseb sama `work_lock`-i all pärast edukat kirjutust (ADR 0079).
     from . import admin_page_ops
     with admin_page_ops.work_lock(os.path.basename(work_dir), work_dir):
-        return _bulk(work_dir, username, message, mutate, background_tasks)
+        result = _bulk(work_dir, username, message, mutate, background_tasks)
+        if after is not None:
+            after()
+        return result
 
 
 def _find(exemplars: list, ex_id: str) -> int:
@@ -687,7 +691,14 @@ def delete_exemplar(work_dir: str, ex_id: str, username: str, background_tasks=N
         _find(exemplars, ex_id)
         return drop_reproduction_links([x for x in exemplars if x["id"] != ex_id], ex_id), unknown, None
 
-    _write(work_dir, username, f"Eksemplar: kustuta [{ex_id}]", mutate, background_tasks)
+    def remove_images():
+        # Eksemplari pildid (ADR 0079): failid prügikasti, manifest gitist järgmise commit'iga.
+        from .exemplar_images import remove_exemplar_images_locked
+        work_id = _read(work_dir).get("id") or os.path.basename(work_dir)
+        remove_exemplar_images_locked(work_dir, ex_id, work_id, username)
+
+    _write(work_dir, username, f"Eksemplar: kustuta [{ex_id}]", mutate, background_tasks,
+           after=remove_images)
 
 
 def reorder_exemplars(work_dir: str, ids: list, username: str, background_tasks=None) -> list:

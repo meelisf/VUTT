@@ -314,3 +314,79 @@ def original_path(work_dir: str, eid: str, image_id: str) -> tuple[Optional[str]
     if not os.path.isfile(path):
         raise ExemplarImagesError("Lähtefail puudub", 404)
     return path, None
+
+
+# ── Eksemplari ja teose kustutus/taastamine (ADR 0079 tagajärjed) ───────────
+
+def _non_git_files(ex_dir: str) -> list[str]:
+    """Gitist väljas olevad failid: kõik peale manifesti ja impordi staging'u."""
+    out = []
+    for root, dirs, files in os.walk(ex_dir):
+        dirs[:] = [x for x in dirs if not (root == ex_dir and x == "_imports")]
+        out.extend(os.path.join(root, f) for f in files
+                   if not (root == ex_dir and f == MANIFEST_NAME))
+    return out
+
+
+def trash_exemplar_files(work_dir: str, eid: str, work_id: str) -> None:
+    """Eksemplari pildifailid `._trash/{work_id}/_exemplars/{eid}/`-i."""
+    d = exemplar_dir(work_dir, eid)
+    if os.path.isdir(d):
+        _move_to_trash(_non_git_files(d), d, trash_root(work_dir, work_id, eid))
+
+
+def trash_all_exemplar_files(work_dir: str, work_id: str) -> None:
+    """Teose kustutus: kõigi eksemplaride pildifailid prügikasti (staging jääb maha)."""
+    root = os.path.join(work_dir, EXEMPLARS_DIRNAME)
+    if not os.path.isdir(root):
+        return
+    for eid in os.listdir(root):
+        if ID_RE.match(eid) and os.path.isdir(os.path.join(root, eid)):
+            trash_exemplar_files(work_dir, eid, work_id)
+
+
+def remove_exemplar_images_locked(work_dir: str, eid: str, work_id: str, username: str) -> None:
+    """Eksemplari kustutuse järel (kutsuja hoiab `work_lock`-i): failid prügikasti,
+    `images.json` gitist eraldi commit'iga. `bulk_update_works` ei oska faili samas
+    commit'is eemaldada; tõrke korral jääb gitti olematu eksemplari manifest, mida
+    lugejad ignoreerivad. Pooleli import katkeb oma protokolli 1. sammus."""
+    from .git_ops import delete_file_from_git
+    d = exemplar_dir(work_dir, eid)
+    path = os.path.join(d, MANIFEST_NAME)
+    if not os.path.isdir(d):
+        return
+    trash_exemplar_files(work_dir, eid, work_id)
+    if os.path.exists(path):
+        if not delete_file_from_git(path, f"Eksemplar: kustuta pildid [{eid}]", username):
+            logger.warning("Eksemplari %s manifesti ei saanud gitist eemaldada", eid)
+            with contextlib.suppress(OSError):
+                os.remove(path)
+    # Tühjad kaustad ära; `_imports/` jääb, kuni import selle ise koristab.
+    for sub in (os.path.join(d, "_thumbs"), d, os.path.dirname(d)):
+        with contextlib.suppress(OSError):
+            os.rmdir(sub)
+
+
+def restore_exemplar_files(trash_dir: str, work_dir: str) -> None:
+    """Teose taastamine: prügikastist tagasi ainult taastatud manifestis olevate
+    piltide failid. Kustutatud pilt või kustutatud eksemplar orvuna tagasi ei tule."""
+    root = os.path.join(trash_dir, EXEMPLARS_DIRNAME)
+    if not os.path.isdir(root):
+        return
+    for eid in os.listdir(root):
+        if not ID_RE.match(eid) or not os.path.isfile(manifest_path(work_dir, eid)):
+            continue
+        src_dir = os.path.join(root, eid)
+        dst_dir = exemplar_dir(work_dir, eid)
+        for img in read_manifest(work_dir, eid)["images"]:
+            if not isinstance(img.get("id"), str) or not ID_RE.match(img["id"]):
+                continue
+            for dst in _image_files(work_dir, eid, img):
+                src = os.path.join(src_dir, os.path.relpath(dst, dst_dir))
+                if os.path.exists(src) and not os.path.exists(dst):
+                    try:
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                        shutil.move(src, dst)
+                    except OSError as e:
+                        logger.warning("Eksemplari pildi taastamine ebaõnnestus (%s): %s", src, e)
+

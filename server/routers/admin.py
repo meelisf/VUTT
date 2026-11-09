@@ -422,6 +422,10 @@ def admin_work_delete(work_id: str, background_tasks: BackgroundTasks, user=Depe
 
         trash_dir = os.path.join(BASE_DIR, "._trash", work_id)
         os.makedirs(trash_dir, exist_ok=True)
+        # Eksemplari pildid (ADR 0079): gitist väljas olevad failid prügikasti,
+        # manifest tuleb taastamisel gitist. Pooleli impordid katkevad.
+        from ..exemplar_images import trash_all_exemplar_files
+        trash_all_exemplar_files(path, work_id)
         for fname in os.listdir(path):
             if fname.lower().endswith((".jpg", ".jpeg", ".png")):
                 shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
