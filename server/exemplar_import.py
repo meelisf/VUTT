@@ -25,7 +25,6 @@ import threading
 from datetime import date
 from typing import Callable, Optional
 
-from . import config
 from . import exemplar_images as ei
 from .config import get_logger
 from .utils import atomic_write_json, generate_nanoid
@@ -448,7 +447,9 @@ def _publish_claimed(work_dir: str, eid: str, import_id: str) -> None:
 
 def recover_imports(background: bool = True) -> None:
     """Iga `_imports/*/job.json`: valmis/katkestatud → koristus, muu → jätka."""
-    base = config.BASE_DIR
+    # Andmejuur sama, mida kasutab git (`git_ops.BASE_DIR`), loetud kutsehetkel.
+    from . import git_ops
+    base = git_ops.BASE_DIR
     if not os.path.isdir(base):
         return
     for name in os.listdir(base):

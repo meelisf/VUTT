@@ -17,7 +17,15 @@ vi.mock('../../contexts/ImageTokenContext', () => ({
   useImageToken: () => null,
   withImageToken: (u: string) => u,
 }));
-vi.mock('../../contexts/MeilisearchContext', () => ({ useMeiliIndex: () => null }));
+vi.mock('../../contexts/MeilisearchContext', () => ({ useMeiliIndex: () => ({}) }));
+vi.mock('../../contexts/FeedbackContext', () => ({ useNotify: () => vi.fn(), useConfirm: () => vi.fn() }));
+vi.mock('../../services/workService', () => ({
+  getWorkMetadata: () => Promise.resolve({ title: 'Teos' }),
+  getWorkPageList: () => Promise.resolve([
+    { pageNum: 1, stem: 'w-001', imageUrl: '/api/images/f/w-001.jpg' },
+    { pageNum: 2, stem: 'w-002', imageUrl: '/api/images/f/w-002.jpg' },
+  ]),
+}));
 
 const getWorkExemplars = vi.fn();
 vi.mock('../../services/workApi', () => ({ getWorkExemplars: (...a: unknown[]) => getWorkExemplars(...a) }));
@@ -102,5 +110,20 @@ describe('ExemplarPage', () => {
     fetchExemplarImages.mockResolvedValue({ revision: 0, images: [], imports: {} });
     renderAt('/work/w1/exemplar/a1b2c3');
     expect(await screen.findByText('exemplarImages.empty')).toBeTruthy();
+  });
+
+  it('kõrvuta avab tunnistaja lehe pildi `page` järgi ja kirjutab ?compare=', async () => {
+    fetchExemplarImages.mockResolvedValue({ ...manifest, images: [{ ...manifest.images[0], page: 'w-002' }] });
+    renderAt('/work/w1/exemplar/a1b2c3');
+    await screen.findByTestId('viewer');
+    fireEvent.click(screen.getByText('exemplarImages.compare.open'));
+    expect(await screen.findByTestId('compare-witness')).toBeTruthy();
+    expect(screen.getByTestId('compare-witness').getAttribute('src')).toBe('/api/images/f/w-002.jpg');
+    expect(screen.getByTestId('loc').textContent).toContain('compare=w-002');
+  });
+
+  it('?compare= tühjana: paar puudub', async () => {
+    renderAt('/work/w1/exemplar/a1b2c3?compare=');
+    expect(await screen.findByText('exemplarImages.compare.noPair')).toBeTruthy();
   });
 });

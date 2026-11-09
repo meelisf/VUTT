@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import os
+from typing import Optional
 
 from PIL import Image, ImageOps
 
@@ -69,7 +70,7 @@ def _view_image(img: Image.Image) -> Image.Image:
     return img
 
 
-def store_image(content: bytes, dest_dir: str, image_id: str) -> str | None:
+def store_image(content: bytes, dest_dir: str, image_id: str) -> Optional[str]:
     """Kirjutab `{id}.jpg` ja vajadusel `{id}.orig.{ext}`. Tagastab lähtefaili nime
     või `None`, kui `{id}.jpg` on ise lähtefail. Viga → midagi ei kirjutata."""
     if len(content) > MAX_UPLOAD_BYTES:

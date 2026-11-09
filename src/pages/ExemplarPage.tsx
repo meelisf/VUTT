@@ -5,13 +5,20 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import Header from '../components/Header';
 import ImageViewer from '../components/ImageViewer';
 import ExemplarImageStrip from '../components/exemplars/ExemplarImageStrip';
+import ExemplarCompare, { type WitnessPage } from '../components/exemplars/ExemplarCompare';
+import ExemplarImageEditor from '../components/exemplars/ExemplarImageEditor';
+import AdaImportDialog from '../components/exemplars/AdaImportDialog';
+import { useNotify } from '../contexts/FeedbackContext';
 import { useUser } from '../contexts/UserContext';
 import { useImageToken, withImageToken } from '../contexts/ImageTokenContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getWorkExemplars } from '../services/workApi';
-import { fetchExemplarImages, sourceLabel, type ExemplarManifest } from '../services/exemplarImagesService';
+import {
+  ManifestConflictError, fetchExemplarImages, patchExemplarImages, sourceLabel, type ExemplarManifest,
+} from '../services/exemplarImagesService';
+import { apiErrorMessage } from '../services/apiClient';
 import { getExemplarImageUrl } from '../services/workImageService';
-import { getWorkMetadata } from '../services/workService';
+import { getWorkMetadata, getWorkPageList } from '../services/workService';
 import { isAtLeast } from '../utils/roleUtils';
 import type { Exemplar } from '../types';
 
@@ -35,6 +42,10 @@ const ExemplarPage: React.FC = () => {
   const [manifest, setManifest] = useState<ExemplarManifest | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [adaOpen, setAdaOpen] = useState(false);
+  const [pageCount, setPageCount] = useState(0);
+  const [witnessPages, setWitnessPages] = useState<WitnessPage[] | null>(null);
+  const notify = useNotify();
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +55,7 @@ const ExemplarPage: React.FC = () => {
     getWorkExemplars(workId, authToken)
       .then(res => {
         if (cancelled) return;
+        setPageCount(res.page_count);
         const found = res.exemplars.find(x => x.id === exemplarId) ?? null;
         setExemplar(found);
         if (!found) return;
@@ -60,6 +72,21 @@ const ExemplarPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [index, workId]);
 
+  const reload = useCallback(() => {
+    fetchExemplarImages(workId, exemplarId, authToken).then(setManifest).catch(() => setLoadError(true));
+  }, [workId, exemplarId, authToken]);
+
+  const compareStem = searchParams.get('compare');
+  const comparing = compareStem !== null;
+
+  // Tunnistaja lehed laetakse alles kõrvutamise avamisel.
+  useEffect(() => {
+    if (!comparing || witnessPages || !index || !pageCount) return;
+    let cancelled = false;
+    getWorkPageList(index, workId, pageCount).then(p => { if (!cancelled) setWitnessPages(p); });
+    return () => { cancelled = true; };
+  }, [comparing, witnessPages, index, workId, pageCount]);
+
   const images = useMemo(() => manifest?.images ?? [], [manifest]);
   const requested = searchParams.get('image');
   const selected = images.find(i => i.id === requested) ?? images[0] ?? null;
@@ -75,6 +102,30 @@ const ExemplarPage: React.FC = () => {
     const i = images.findIndex(x => x.id === selected.id) + (dir === 'next' ? 1 : -1);
     if (i >= 0 && i < images.length) select(images[i].id);
   }, [images, selected, select]);
+
+  const setCompare = useCallback((stem: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (stem === null) next.delete('compare'); else next.set('compare', stem);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const savePair = useCallback(async (stem: string) => {
+    if (!manifest || !selected) return;
+    const updated = manifest.images.map(i => (i.id === selected.id ? { ...i, page: stem } : i));
+    try {
+      const m = await patchExemplarImages(workId, exemplarId, manifest.revision, updated, authToken);
+      setManifest(m);
+      notify(t(m.git_committed === false ? 'exemplarImages.editor.notCommitted' : 'exemplarImages.compare.pairSaved'),
+        m.git_committed === false ? 'warning' : 'success');
+    } catch (e) {
+      if (e instanceof ManifestConflictError) {
+        notify(t('exemplarImages.editor.conflict'), 'warning');
+        setManifest(e.current);
+      } else {
+        notify(apiErrorMessage(e, t('exemplarImages.editor.error')), 'error');
+      }
+    }
+  }, [manifest, selected, workId, exemplarId, authToken, notify, t]);
 
   const source = selected ? sourceLabel(selected.source, t) : null;
 
@@ -102,15 +153,36 @@ const ExemplarPage: React.FC = () => {
               {manifest && images.length > 0 && (
                 <span className="text-sm text-gray-500">{t('exemplarImages.count', { count: images.length })}</span>
               )}
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={() => setEditing(e => !e)}
-                  className="ml-auto text-sm px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
-                >
-                  {t('exemplarImages.edit')}
-                </button>
-              )}
+              <div className="ml-auto flex gap-2">
+                {selected && (
+                  <button
+                    type="button"
+                    onClick={() => setCompare(comparing ? null : (selected.page ?? ''))}
+                    className="text-sm px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
+                  >
+                    {t(comparing ? 'exemplarImages.compare.close' : 'exemplarImages.compare.open')}
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setAdaOpen(true)}
+                    className="text-sm px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
+                  >
+                    {t('exemplarImages.ada.open')}
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(e => !e)}
+                    aria-pressed={editing}
+                    className="text-sm px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50"
+                  >
+                    {t('exemplarImages.edit')}
+                  </button>
+                )}
+              </div>
             </div>
 
             {manifest && images.length === 0 && (
@@ -127,12 +199,26 @@ const ExemplarPage: React.FC = () => {
                   onSelect={select}
                   imageToken={imageToken}
                 />
-                <div className="h-[70vh] bg-slate-900 rounded relative overflow-hidden">
-                  <ImageViewer
-                    src={withImageToken(getExemplarImageUrl(workId, exemplarId, selected.id), imageToken)}
-                    onNavigate={navigateImage}
+                {comparing ? (
+                  <ExemplarCompare
+                    workId={workId}
+                    exemplarId={exemplarId}
+                    image={selected}
+                    pages={witnessPages ?? []}
+                    stem={compareStem || null}
+                    onStemChange={setCompare}
+                    onSavePair={savePair}
+                    canEdit={canEdit}
+                    imageToken={imageToken}
                   />
-                </div>
+                ) : (
+                  <div className="h-[70vh] bg-slate-900 rounded relative overflow-hidden">
+                    <ImageViewer
+                      src={withImageToken(getExemplarImageUrl(workId, exemplarId, selected.id), imageToken)}
+                      onNavigate={navigateImage}
+                    />
+                  </div>
+                )}
                 <div data-testid="exemplar-source" className="text-sm text-gray-700 flex flex-wrap gap-x-3">
                   {selected.label && <span className="font-medium">{selected.label}</span>}
                   {source && (source.href
@@ -142,7 +228,24 @@ const ExemplarPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {editing && null}
+            {editing && canEdit && manifest && (
+              <ExemplarImageEditor
+                workId={workId}
+                exemplarId={exemplarId}
+                manifest={manifest}
+                authToken={authToken}
+                onManifest={setManifest}
+              />
+            )}
+            {adaOpen && (
+              <AdaImportDialog
+                workId={workId}
+                exemplarId={exemplarId}
+                authToken={authToken}
+                onPublished={() => { setAdaOpen(false); reload(); }}
+                onClose={() => setAdaOpen(false)}
+              />
+            )}
           </>
         )}
       </div>
