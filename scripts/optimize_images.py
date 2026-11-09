@@ -31,10 +31,17 @@ RECOMPRESS_QUALITY = 85    # Suurte JPG-de rekompressiooni kvaliteet
 SIZE_THRESHOLD_MB = 3      # Ainult >3MB JPG-sid kompressitakse
 
 
+def _prune(dirs):
+    """Eksemplari pildid (ADR 0079) ja prügikast jäävad puutumata: lähtefail on
+    muutmata baitidega ja eksemplari vaatamiskuju on juba tehtud."""
+    dirs[:] = [d for d in dirs if d not in ("_exemplars", "._trash")]
+
+
 def find_png_files(base_dir):
     """Leiab kõik PNG failid, v.a. thumbnailid."""
     results = []
     for root, dirs, files in os.walk(base_dir):
+        _prune(dirs)
         for f in files:
             if f.lower().endswith('.png') and not f.startswith('_thumb_'):
                 results.append(os.path.join(root, f))
@@ -45,6 +52,7 @@ def find_large_jpgs(base_dir, threshold_bytes):
     """Leiab JPG failid, mis ületavad suuruspiiri."""
     results = []
     for root, dirs, files in os.walk(base_dir):
+        _prune(dirs)
         for f in files:
             if f.lower().endswith('.jpg') and not f.startswith('_thumb_'):
                 path = os.path.join(root, f)
