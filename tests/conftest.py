@@ -380,3 +380,40 @@ def prosopo_env(tmp_path, monkeypatch):
 
     yield SimpleNamespace(dir=d, write=write, read=read, index=index)
     ext_id_index.invalidate()
+
+
+@pytest.fixture
+def exemplar_work(tmp_path, monkeypatch):
+    """Päris git-repoga teos eksemplariga `a1b2c3` (ADR 0079 testid).
+
+    `save_with_git`/`uncommitted_paths` jäävad päris — eksemplari piltide testid
+    kontrollivad commit'e. Meili ja tuletatud indeksid on vaigistatud.
+    """
+    from git import Actor
+    from PIL import Image
+    from server import config, git_ops, metadata_ops
+
+    data = tmp_path / "data"
+    data.mkdir()
+    work = data / "1640-test-w1"
+    work.mkdir()
+    stem = "1640-test-w1-001"
+    Image.new("RGB", (8, 8), (9, 9, 9)).save(str(work / f"{stem}.jpg"), "JPEG")
+    (work / f"{stem}.txt").write_text("tekst", encoding="utf-8")
+    (work / f"{stem}.json").write_text(json.dumps({"status": "Toores"}), encoding="utf-8")
+    meta = {"id": "w1", "title": "Test", "exemplars": [{"id": "a1b2c3", "holder": "TÜR"}]}
+    (work / "_metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                                         encoding="utf-8")
+
+    monkeypatch.setattr(config, "BASE_DIR", str(data))
+    monkeypatch.setattr(git_ops, "BASE_DIR", str(data))
+    monkeypatch.setattr(git_ops, "_git_repo", None)
+    for name in ("sync_work_to_meilisearch", "sync_work_to_meilisearch_async",
+                 "update_person_to_works", "update_work_collections", "update_work_facts"):
+        monkeypatch.setattr(metadata_ops, name, lambda *a, **k: None)
+    repo = git_ops.get_or_init_repo()
+    actor = Actor("test", "test@vutt.local")
+    repo.git.add(A=True)
+    repo.index.commit("init", author=actor, committer=actor)
+    return {"data": data, "work_dir": str(work), "work_id": "w1", "eid": "a1b2c3",
+            "repo": repo, "meta_path": str(work / "_metadata.json")}

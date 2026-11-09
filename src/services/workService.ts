@@ -4,7 +4,7 @@
 
 import { Work, WorkStatus, PageStatus } from '../types';
 import { calculateWorkStatus, checkMixedContent, normalizeWork } from './meiliService';
-import { getPageThumbUrl } from './workImageService';
+import { getFullImageUrl, getPageThumbUrl } from './workImageService';
 import type { Index } from 'meilisearch';
 import { quoteFilterValue } from '../utils/filterUtils';
 
@@ -116,6 +116,34 @@ export const getWorkPageImages = async (
     }));
   } catch (e) {
     console.error('getWorkPageImages error:', e);
+    return [];
+  }
+};
+
+/**
+ * Tekstitunnistaja lehed kõrvutamiseks (ADR 0079): tüvi + täispilt, teose järjekorras.
+ * Tüvi = pildifaili nimi ilma laiendita (sama, mida kannab eksemplari pildi `page`).
+ */
+export const getWorkPageList = async (
+  index: Index,
+  workId: string,
+  pageCount: number,
+): Promise<{ pageNum: number; stem: string; imageUrl: string }[]> => {
+  const limit = Math.min(Math.ceil(pageCount * 1.1) + 10, 1000);
+  try {
+    const response = await index.search('', {
+      filter: [`work_id = ${quoteFilterValue(workId)}`],
+      attributesToRetrieve: ['lehekylje_number', 'lehekylje_pilt'],
+      limit,
+    });
+    const hits = (response.hits as any[]).filter(h => h.lehekylje_pilt);
+    hits.sort((a, b) => (a.lehekylje_number || 0) - (b.lehekylje_number || 0));
+    return hits.map(h => {
+      const file = String(h.lehekylje_pilt).split('/').pop() || '';
+      return { pageNum: h.lehekylje_number, stem: file.replace(/\.[^.]+$/, ''), imageUrl: getFullImageUrl(h.lehekylje_pilt) };
+    });
+  } catch (e) {
+    console.error('getWorkPageList error:', e);
     return [];
   }
 };

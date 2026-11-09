@@ -38,6 +38,7 @@ from .routers.work_sets import router as work_sets_router
 from .routers.work_parts import router as work_parts_router
 from .routers.work_relations import router as work_relations_router
 from .routers.work_exemplars import router as work_exemplars_router
+from .routers.exemplar_images import router as exemplar_images_router
 from .routers.page_text_proposals import router as page_text_proposals_router
 from .routers.agent_proposals import router as agent_proposals_router
 from .routers.collections import router as collections_router
@@ -61,8 +62,13 @@ def _kaivitustaasted() -> None:
     # „Rakenda" on `rendering` ajal disabled — kasutaja näeb külmunud
     # edenemisnumbrit, ilma vea ja väljapääsuta.
     from .upload.prepress import taasta_rippuvad_eelvaated
-    for taaste in (taasta_rippuvad_fetchid, taasta_rippuvad_applyd,
-                   taasta_rippuvad_impordid, taasta_rippuvad_eelvaated):
+    # Pooleli eksemplari piltide ADA import (ADR 0079): jätka failidest.
+    from .exemplar_import import recover_imports as taasta_eksemplari_impordid
+    # `data/.gitignore` eksemplari piltide read ENNE impordi taastajat (ADR 0079).
+    from .git_ops import ensure_data_gitignore
+    for taaste in (ensure_data_gitignore, taasta_rippuvad_fetchid, taasta_rippuvad_applyd,
+                   taasta_rippuvad_impordid, taasta_rippuvad_eelvaated,
+                   taasta_eksemplari_impordid):
         # Erand EI TOHI käivitust peatada: taasteta server on parem kui
         # server, mis ei tõuse. Iga taaste püüab ka ise upload'i kaupa.
         try:
@@ -148,6 +154,7 @@ app.include_router(work_sets_router)
 app.include_router(work_parts_router)
 app.include_router(work_relations_router)
 app.include_router(work_exemplars_router)
+app.include_router(exemplar_images_router)
 app.include_router(page_text_proposals_router)
 app.include_router(agent_proposals_router)
 

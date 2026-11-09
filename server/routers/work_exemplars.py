@@ -11,6 +11,7 @@ from ..deps import optional_user, require_role
 from ..utils import find_directory_by_id
 from ..work_sets_access import load_work_metadata_by_id
 from .. import work_exemplars as we
+from ..exemplar_images import image_previews
 from .. import exemplar_proposals as epp
 from ..rate_limit import check_rate_limit, get_client_ip
 
@@ -62,6 +63,8 @@ def list_exemplars(work_id: str, user=Depends(optional_user)):
         "page_numbers": numbers,
         "page_count": len(stems),
         "convolutes": we.resolve_convolutes(work_id, meta, user),
+        # Eksemplari pildid (ADR 0079): kaardi pildiriba ilma eksemplari kohta eraldi päringuta.
+        "images": image_previews(path, [x.get("id") for x in exemplars]),
     }
 
 

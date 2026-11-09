@@ -22,7 +22,7 @@ vi.mock('../../ArchiveSelect', () => ({
 }));
 
 /** Väike võltsserver: hoiab eksemplaride seisu ja jõustab tunnistaja reegli nagu päris server. */
-let server: { exemplars: Exemplar[]; manuscript: boolean };
+let server: { exemplars: Exemplar[]; manuscript: boolean; images?: Record<string, { count: number; preview: string[] }> };
 const calls: { method: string; url: string; body: any }[] = [];
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
@@ -35,7 +35,8 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
   if (!m) return json({});
   const sub = m[1];
   if (method === 'GET') {
-    return json({ exemplars: server.exemplars, unknown_pages: [], page_numbers: {}, page_count: 3, convolutes: [] });
+    return json({ exemplars: server.exemplars, unknown_pages: [], page_numbers: {}, page_count: 3, convolutes: [],
+      images: server.images ?? {} });
   }
   if (method === 'POST' && sub === 'order') {
     const byId = Object.fromEntries(server.exemplars.map(x => [x.id, x]));
@@ -188,6 +189,16 @@ describe('ExemplarsSection — admin', () => {
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
     expect(writes()[1].method).toBe('DELETE');
     expect(writes()[1].url).toMatch(/\/exemplars\/b2$/);
+  });
+
+  it('piltidega eksemplari kustutus nimetab pildid (ADR 0079)', async () => {
+    server.images = { a1: { count: 12, preview: [] } };
+    renderSection();
+    await screen.findByText('· R Est.B-954');
+    const idx = screen.getAllByRole('listitem').findIndex(li => li.textContent?.includes('R Est.B-954'));
+    fireEvent.click(screen.getAllByLabelText('exemplars.delete')[idx]);
+    expect(await screen.findByText('exemplars.deleteConfirmImages')).toBeTruthy();
+    server.images = undefined;
   });
 
   it('serveri 400 põhjendus jõuab teatesse', async () => {

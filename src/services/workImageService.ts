@@ -44,3 +44,11 @@ export const getPageThumbUrl = (workId: string, imagePath: string): string => {
   const filename = imagePath.split('/').pop() || '';
   return `${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${filename}`;
 };
+
+// Eksemplari pilt ja pisipilt (ADR 0079). Piiratud teosel lisab kutsuja allkirja
+// (`withImageToken`), nagu lehepiltidel.
+export const getExemplarImageUrl = (workId: string, eid: string, imageId: string): string =>
+  `${IMAGE_BASE_URL}/${workId}/_exemplars/${eid}/${imageId}.jpg`;
+
+export const getExemplarThumbUrl = (workId: string, eid: string, imageId: string): string =>
+  `${IMAGE_BASE_URL}/${workId}/_exemplars/${eid}/_thumbs/_thumb_${imageId}.jpg`;

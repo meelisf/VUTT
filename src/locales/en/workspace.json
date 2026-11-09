@@ -818,6 +818,84 @@
     "handoffAll": "Code for agent (all works)",
     "packPagesGone": "The pack's pages are no longer in the work — the pack can be rejected."
   },
+  "exemplarImages": {
+    "title": "Exemplar images",
+    "back": "Back to the work",
+    "notFound": "Exemplar not found.",
+    "loadError": "Could not load the images.",
+    "empty": "This exemplar has no images yet.",
+    "count_one": "{{count}} image",
+    "count_other": "{{count}} images",
+    "open": "Open exemplar images",
+    "imageAlt": "Exemplar image {{n}}",
+    "edit": "Edit images",
+    "source": {
+      "ada": "ADA {{ref}}",
+      "adaPage": "ADA {{ref}}, p. {{page}}",
+      "url": "{{ref}}",
+      "photo": "Photo: {{ref}}",
+      "paber_ut": "paber.ut.ee {{ref}}",
+      "other": "{{ref}}"
+    },
+    "compare": {
+      "open": "Compare with text witness",
+      "close": "Close comparison",
+      "witness": "Text witness",
+      "prev": "Previous page",
+      "next": "Next page",
+      "page": "p. {{n}}",
+      "noPair": "No pair",
+      "savePair": "Save pair",
+      "pairSaved": "Pair saved"
+    },
+    "editor": {
+      "upload": "Add images",
+      "uploadRef": "Source (free text or URL)",
+      "dropHint": "Drop JPEG, PNG or TIFF files here (up to 100 MB each).",
+      "sourceKind": "Source type",
+      "sourceRef": "Source",
+      "license": "Licence",
+      "label": "Label",
+      "page": "Witness page (stem)",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "delete": "Delete image",
+      "deleteConfirm": "Delete this image? The file goes to the trash.",
+      "save": "Save changes",
+      "saved": "Images saved",
+      "conflict": "The image list was changed meanwhile. The current state was loaded; your edits are kept — check and save again.",
+      "notCommitted": "Saved, but writing to the version history failed.",
+      "error": "Saving failed.",
+      "importOnlyLicense": "The source of an image imported from ADA cannot be changed, only its licence.",
+      "kinds": {
+        "photo": "Photo",
+        "url": "Web source",
+        "ada": "ADA",
+        "other": "Other"
+      }
+    },
+    "ada": {
+      "open": "Import from ADA",
+      "title": "Import from ADA",
+      "handle": "Handle or ADA link",
+      "from": "From page",
+      "to": "To page",
+      "rangeHint": "Pages are counted across the whole record (all PDFs in order). Empty = whole record.",
+      "start": "Start import",
+      "progress": "{{done}}/{{total}}",
+      "published": "Import finished",
+      "error": "Import failed.",
+      "already": "An import is already running for this exemplar.",
+      "state": {
+        "fetching": "Downloading…",
+        "rendering": "Rendering pages…",
+        "publishing": "Publishing…",
+        "published": "Done",
+        "aborted": "Aborted",
+        "error": "Error"
+      }
+    }
+  },
   "exemplars": {
     "title": "Copies",
     "savesImmediately": "Changes to copies are saved immediately, not with the metadata save button.",
@@ -858,6 +936,7 @@
     "delete": "Delete",
     "deleteTitle": "Delete copy",
     "deleteConfirm": "Delete copy “{{label}}”? This cannot be undone here.",
+    "deleteConfirmImages": "Delete copy “{{label}}” with its {{count}} images? The image files go to the trash; the copy cannot be restored here.",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "saveExemplar": "Save copy",

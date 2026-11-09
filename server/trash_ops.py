@@ -160,6 +160,9 @@ def restore_deleted_work(work_id, username="VUTT Server"):
                         os.path.join(trash_dir, fname),
                         os.path.join(folder_path, fname)
                     )
+            # Eksemplari pildid (ADR 0079): manifest tuli checkout'iga, failid prügikastist.
+            from .exemplar_images import restore_exemplar_files
+            restore_exemplar_files(trash_dir, folder_path)
         except Exception as e:
             return {'ok': False, 'error': f'JPG-de liigutamine ebaõnnestus: {e}'}
 

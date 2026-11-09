@@ -8,6 +8,7 @@ import email.utils
 import http.server
 import json
 import os
+import re
 import shutil
 import socketserver
 import sys
@@ -27,6 +28,21 @@ from .utils import find_directory_by_id, build_work_id_cache
 from .access_ops import is_work_public
 
 _ALLOWED_IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png'})
+
+# Eksemplari pildid (ADR 0079): ainult vaatamiskuju ja pisipilt, rangelt nanoid-kujul.
+# Lähtefail (`*.orig.*`), `_imports/` ja `images.json` jäävad serveerimata.
+_EXEMPLAR_ID = re.compile(r'^[a-z0-9]{6}$')
+_EXEMPLAR_IMAGE = re.compile(r'^[a-z0-9]{6}\.jpg$')
+_EXEMPLAR_THUMB = re.compile(r'^_thumb_[a-z0-9]{6}\.jpg$')
+
+
+def _is_exemplar_path(parts) -> bool:
+    """`{teos}/_exemplars/{eid}/{id}.jpg` või `{teos}/_exemplars/{eid}/_thumbs/_thumb_{id}.jpg`."""
+    if len(parts) not in (4, 5) or parts[1] != '_exemplars' or not _EXEMPLAR_ID.match(parts[2]):
+        return False
+    if len(parts) == 4:
+        return bool(_EXEMPLAR_IMAGE.match(parts[3]))
+    return parts[3] == '_thumbs' and bool(_EXEMPLAR_THUMB.match(parts[4]))
 
 
 def _validate_image_token(work_id: str, exp: str, sig: str) -> bool:
@@ -445,7 +461,7 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
                 parts[0].startswith(('.', '_')) or
                 parts[0] in ('config', 'state') or
                 any(p in ('.', '..') or '\\' in p or '\x00' in p for p in parts) or
-                len(parts) > 3):
+                (len(parts) > 3 and not _is_exemplar_path(parts))):
             self.send_error(403, "Keelatud")
             return
 
@@ -477,7 +493,19 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
                               if is_work_public(meta) else 'no-store')
 
         image_path = None
-        if len(parts) == 2 and parts[1] in ('_thumb', '_og'):
+        if _is_exemplar_path(parts):
+            ex_dir = os.path.join(work_dir, '_exemplars', parts[2])
+            if len(parts) == 4:
+                image_path = os.path.join(ex_dir, parts[3])
+            else:
+                source = os.path.join(ex_dir, parts[4][len('_thumb_'):])
+                output = os.path.join(ex_dir, '_thumbs', parts[4])
+                if (not _is_safe_image_path(source, work_dir) or
+                        not _is_safe_image_path(output, work_dir)):
+                    self.send_error(403, "Keelatud")
+                    return
+                image_path = get_or_create_page_thumbnail(ex_dir, parts[4])
+        elif len(parts) == 2 and parts[1] in ('_thumb', '_og'):
             first_image = get_first_image(work_dir)
             thumbs_dir = os.path.join(work_dir, '_thumbs')
             if not first_image:

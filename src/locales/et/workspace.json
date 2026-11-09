@@ -818,6 +818,84 @@
     "handoffAll": "Kood agendile (kõik teosed)",
     "packPagesGone": "Paki lehed on teosest kadunud — pakki saab tagasi lükata."
   },
+  "exemplarImages": {
+    "title": "Eksemplari pildid",
+    "back": "Tagasi teose juurde",
+    "notFound": "Eksemplari ei leitud.",
+    "loadError": "Pilte ei õnnestunud laadida.",
+    "empty": "Sellel eksemplaril pole veel pilte.",
+    "count_one": "{{count}} pilt",
+    "count_other": "{{count}} pilti",
+    "open": "Ava eksemplari pildid",
+    "imageAlt": "Eksemplari pilt {{n}}",
+    "edit": "Muuda pilte",
+    "source": {
+      "ada": "ADA {{ref}}",
+      "adaPage": "ADA {{ref}}, lk {{page}}",
+      "url": "{{ref}}",
+      "photo": "Foto: {{ref}}",
+      "paber_ut": "paber.ut.ee {{ref}}",
+      "other": "{{ref}}"
+    },
+    "compare": {
+      "open": "Kõrvuta tekstitunnistajaga",
+      "close": "Sulge kõrvutamine",
+      "witness": "Tekstitunnistaja",
+      "prev": "Eelmine leht",
+      "next": "Järgmine leht",
+      "page": "lk {{n}}",
+      "noPair": "Paar puudub",
+      "savePair": "Salvesta paar",
+      "pairSaved": "Paar salvestatud"
+    },
+    "editor": {
+      "upload": "Lisa pilte",
+      "uploadRef": "Allikas (vabatekst või URL)",
+      "dropHint": "Lohista JPEG-, PNG- või TIFF-failid siia (kuni 100 MB faili kohta).",
+      "sourceKind": "Allika liik",
+      "sourceRef": "Allikas",
+      "license": "Litsents",
+      "label": "Silt",
+      "page": "Tunnistaja leht (tüvi)",
+      "moveUp": "Liiguta üles",
+      "moveDown": "Liiguta alla",
+      "delete": "Kustuta pilt",
+      "deleteConfirm": "Kas kustutada see pilt? Fail läheb prügikasti.",
+      "save": "Salvesta muudatused",
+      "saved": "Pildid salvestatud",
+      "conflict": "Pildiloendit on vahepeal muudetud. Laadisin praeguse seisu; sinu muudatused on alles, kontrolli ja salvesta uuesti.",
+      "notCommitted": "Salvestatud, aga versiooniajalukku kirjutamine ebaõnnestus.",
+      "error": "Salvestamine ebaõnnestus.",
+      "importOnlyLicense": "ADA-st imporditud pildi allikat muuta ei saa, ainult litsentsi.",
+      "kinds": {
+        "photo": "Foto",
+        "url": "Veebiallikas",
+        "ada": "ADA",
+        "other": "Muu"
+      }
+    },
+    "ada": {
+      "open": "Impordi ADA-st",
+      "title": "Import ADA-st",
+      "handle": "Handle või ADA link",
+      "from": "Alates lehest",
+      "to": "Kuni leheni",
+      "rangeHint": "Lehed on loetud kogu kirje (kõigi PDF-ide) järjekorras. Tühi = kogu kirje.",
+      "start": "Alusta importi",
+      "progress": "{{done}}/{{total}}",
+      "published": "Import valmis",
+      "error": "Import ebaõnnestus.",
+      "already": "Sellel eksemplaril juba käib import.",
+      "state": {
+        "fetching": "Laen alla…",
+        "rendering": "Renderdan lehti…",
+        "publishing": "Avaldan…",
+        "published": "Valmis",
+        "aborted": "Katkestatud",
+        "error": "Viga"
+      }
+    }
+  },
   "exemplars": {
     "title": "Eksemplarid",
     "savesImmediately": "Eksemplari muudatused salvestuvad kohe, mitte metaandmete salvestusnupuga.",
@@ -858,6 +936,7 @@
     "delete": "Kustuta",
     "deleteTitle": "Kustuta eksemplar",
     "deleteConfirm": "Kustutan eksemplari „{{label}}“? Seda ei saa siit tagasi võtta.",
+    "deleteConfirmImages": "Kustutan eksemplari „{{label}}“ koos {{count}} pildiga? Pildifailid lähevad prügikasti, eksemplari siit tagasi võtta ei saa.",
     "moveUp": "Liiguta üles",
     "moveDown": "Liiguta alla",
     "saveExemplar": "Salvesta eksemplar",
