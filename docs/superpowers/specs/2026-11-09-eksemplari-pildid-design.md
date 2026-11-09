@@ -53,24 +53,34 @@ Eksemplari piltidel on kaks rolli:
 
 ```
 data/{kaust}/_exemplars/{exemplar_id}/
-  images.json          ← manifest, gitis (autoriteetne)
-  {image_id}.jpg       ← gitist väljas (data/.gitignore *.jpg), nagu lehepildid
-  _thumbs/             ← laisad pisipildid, nagu teose _thumbs
+  images.json              ← manifest, gitis (autoriteetne)
+  {image_id}.jpg           ← vaatamiskuju (tuletis), gitist väljas
+  {image_id}.orig.{ext}    ← lähtefail muutmata baitidega, kui see EI OLE vaatamiskuju ise
+  _sources/{import_id}.pdf ← ADA impordi allalaaditud PDF (lähtefail), gitist väljas
+  _imports/{import_id}/    ← impordi staging (renderdus enne avaldamist)
+  _thumbs/                 ← laisad pisipildid, nagu teose _thumbs
 ```
+
+`data/.gitignore` laiendus: `*.pdf`, `*.tif`, `*.tiff`, `*.orig.*` (praegu on ignoreeritud
+ainult `jpg/jpeg/png`, PDF/TIFF satuks muidu `data/` gitti).
 
 `images.json`:
 
 ```jsonc
 {
+  "revision": 7,                       // kasvab iga kirjutusega (optimistlik lukk, vt Server)
   "images": [
     {
-      "id": "k3j9qa",                  // nanoid, püsiv; failinimi = {id}.jpg
+      "id": "k3j9qa",                  // nanoid, püsiv; vaatamiskuju = {id}.jpg
+      "original": "k3j9qa.orig.tif",   // valikuline; puudub = {id}.jpg ON lähtefail
       "label": "a2 r",                 // valikuline vabatekst: asukoht, „tiitelleht", „köide"
       "page": "…-003",                 // valikuline: tekstitunnistaja lehe tüvi kõrvutamiseks (käsitsi)
       "source": {                      // kohustuslik
         "kind": "ada",                 // ada | url | photo | paber_ut (järgmine etapp) | other
         "ref": "10062/14332",          // handle / URL / vabatekst („M. F. foto, TÜR lugemissaal")
-        "page": 3,                     // valikuline: lehekülg allikas
+        "bitstream": "…uuid…",         // ainult ada: bitstreami UUID
+        "page": 3,                     // valikuline: 1-põhine leht SELLES failis (ada: bitstreamis)
+        "import_id": "q8x2mz",         // ainult importidel: mis impordiga lisati
         "license": null,               // valikuline vabatekst
         "added_by": "meelisf",
         "at": "2026-11-09"
@@ -83,6 +93,13 @@ data/{kaust}/_exemplars/{exemplar_id}/
 - Järjekord = massiivi järjekord. Väärtuseta võtit ei salvestata (ADR 0076 p 2).
 - Manifest on eraldi failis, mitte `_metadata.json`-is. Kümnete lehtedega ADA import ei
   paisuta teose metaandmeid ega puuduta Meili sünki (ADR 0012/0013).
+- **Lähtefail ja tuletis.** Vesimärgi ja paberistruktuuri detail ei tohi kaduda kadudega
+  teisenduses. JPEG, mille EXIF-orientatsioon on 1 või puudub, hoitakse muutmata
+  baitidega ja see on ise vaatamiskuju (`original` puudub). Sama reegel kehtib
+  `can_copy_source_bytes`-is, ADR 0028. Muu (PNG, TIFF, pööratud JPEG) säilitatakse kujul
+  `{id}.orig.{ext}` ja `{id}.jpg` on sellest tehtud vaatamiskuju. ADA impordil on
+  lähtefail allalaaditud PDF `_sources/`-is ja lehe JPEG on tuletis. Allalaadimine
+  teenindab ainult toimetajat (`GET …/images/{image_id}/original`, `can_read_work`).
 - Eksemplari kustutamisel liigub tema `_exemplars/{id}/` `._trash`-i (nagu
   `replaced_images`). Kui pildid on olemas, nõuab kustutamine kinnitust.
 - `page` on ainult kõrvutamise mugavus. Kui tüve enam pole (lehtede ümberjärjestus,
@@ -90,34 +107,71 @@ data/{kaust}/_exemplars/{exemplar_id}/
 
 ## Server
 
-- Uus moodul `server/exemplar_images.py`: manifesti lugemine/kirjutamine `work_lock` või
-  `metadata_lock` all, iga muudatus = üks git-commit (`images.json`), autor toimingust.
+- Uus moodul `server/exemplar_images.py`. **Lukustusjärjekord on sama mis eksemplaride
+  kirjutusteel: `work_lock` → `metadata_lock`.** Iga manifesti kirjutus (üleslaadimine,
+  muutmine, kustutus, impordi avaldamine) ja eksemplari kustutus hoiavad mõlemat. Nii ei
+  saa eksemplar kaduda manifesti kirjutamise ajal, ega manifest tekkida kustutatud
+  eksemplarile. Iga kirjutus kontrollib luku all, et eksemplar on `_metadata.json`-is
+  olemas (muidu 404). Iga muudatus = üks git-commit (`images.json`), autor toimingust.
+- **Revisjon (optimistlik lukk).** `GET` tagastab `revision`. Kliendi kirjutus
+  (`PATCH`, `DELETE`) kannab oma `revision`-it. Kui see erineb luku all loetust, vastab
+  server **409** ja praeguse manifestiga, ning klient laeb uuesti (salvestamata muudatused
+  jäävad dialoogi). Serveripoolne impordi avaldamine tõstab revisjoni, nii et vananenud
+  loendi salvestus ei saa impordi pilte ära kaotada ega järjekorda lõhkuda.
+  Üleslaadimine (`POST`) ainult lisab lõppu ja revisjoni ei nõua.
 - Otspunktid (router: sama, kus `work_exemplars`):
   - `GET  /works/{id}/exemplars/{eid}/images`: lugemisõigus (`can_read_work`).
   - `POST /works/{id}/exemplars/{eid}/images`: failide üleslaadimine (JPEG/PNG/TIFF,
-    tuvastus magic byte'idest, teisendus JPEG-iks, EXIF-orientatsioon rakendatakse), `source` kaasas.
-  - `PATCH …/images`: järjekord + `label`/`page`/`source` muutmine ühe kirjutusena.
-  - `DELETE …/images/{image_id}`: fail `._trash`-i, kirje manifestist.
-  - `POST …/images/import-ada`: `{handle}` → taustatöö (vt allpool), olek pollitav.
+    tuvastus magic byte'idest), `source` kaasas. Lähtefaili käsitlus: vt Andmemudel.
+  - `PATCH …/images` `{revision, images: [...]}`: järjekord + `label`/`page`/`source`.
+    Loend peab sisaldama täpselt praegused ID-d (lisamine/kustutus siit ei käi), muidu 409.
+  - `DELETE …/images/{image_id}?revision=N`: failid `._trash`-i, kirje manifestist.
+  - `POST …/images/import-ada` `{handle, from?, to?}` → `import_id`; olek
+    `GET …/images/import-ada/{import_id}`.
   - Kirjutusõigus: `can_write_work` (ADR 0031). Uut rolli ei tule.
-- **ADA import:** kasutab olemasolevat `server/ada/client` + `fetch`-i (handle → bitstreamid
-  → PDF), renderdab lehed JPEG-iks sama renderdajaga, millega teeb seda upload
-  (`upload/page_source.py`, `RENDER_SEMAPHORE`), ja lisab need manifesti lõppu kujul
-  `source.kind = "ada"`, `ref = handle`, `page = n`. Kui eksemplari `url` on tühi, seab
-  import selle handle'iks. Taustatöö on restartitav ja failipõhine nagu `ada/fetch`.
-  **Lehevahemik** (`from`–`to`, valikuline; minu otsus): ADA kirje võib olla terve
-  konvoluut (nt TÜR R Est.A-5085), millest selle teose alla kuulub ainult osa.
+- **ADA import.** Kasutab olemasolevat `server/ada/client` + `fetch`-i: handle →
+  bitstreamid (sorteeritud nagu `mapping.sordi_bitstreamid`) → PDF-id → liidetud PDF.
+  - `from`–`to` on **1-põhine lehevahemik liidetud PDF-is** (valikuline, puudub = kõik).
+    Vajalik, sest ADA kirje võib olla terve konvoluut (nt TÜR R Est.A-5085), millest selle
+    teose alla kuulub ainult osa. Iga lehe kohta salvestatakse `source.bitstream` (UUID)
+    ja `source.page` = leht SELLES bitstreamis, mitte liidetud PDF-is. Arvutus tuleb
+    bitstreamide lehtede arvust.
+  - **Püsiv impordi ID ja piltide ID-d.** `POST` loob `import_id` ja kirjutab
+    `_imports/{import_id}/job.json`: handle, vahemik, eksemplar, kasutaja ja iga
+    väljundlehe kohta eelnevalt määratud `image_id`. Kordus kasutab samu ID-sid.
+  - **Renderdus staging-kausta** `_imports/{import_id}/` sama renderdajaga, millega teeb
+    seda upload (`upload/page_source.py`, `FULL_DPI`/`JPEG_QUALITY`, `RENDER_SEMAPHORE`).
+    Valmis leht = `{image_id}.jpg` olemas (`.tmp` + rename). Manifest selle aja jooksul
+    ei muutu.
+  - **Avaldamine on üks lukustatud toiming** (`work_lock` → `metadata_lock`):
+    1. kontrolli uuesti, et eksemplar on olemas. Kui ei, märgi import katkestatuks ja
+       staging `._trash`-i;
+    2. kui manifestis on juba mõni pilt selle `import_id`-ga, on import avaldatud.
+       Lõpeta ilma kirjutuseta (idempotentne: kordus avaldab täpselt ühe korra);
+    3. liiguta failid staging'ust eksemplari kausta, lisa kirjed manifesti lõppu, tõsta
+       `revision`, üks commit;
+    4. kui eksemplari `url` on tühi, sea see **täislingiks**
+       `https://hdl.handle.net/{handle}` (`source.ref` jääb paljaks handle'iks). See käib
+       **olemasoleva `work_exemplars` kirjutustee kaudu** samas lukus, mitte otse
+       `_metadata.json`-i;
+    5. staging kustutatakse pärast edukat commit'i.
+  - Serveri stardil jätkab taastaja pooleli jäänud importe `job.json` järgi (mustriks
+    `ada/fetch.taasta_rippuvad_fetchid`): renderdab puuduvad lehed ja avaldab. Juba
+    avaldatud impordi staging koristatakse.
 - Teose olemasolevate lehepiltide viimine eksemplari alla (nt `7zot7j` vana Uppsala
   kseroks prügikastis) **ei kuulu** sellesse etappi (minu otsus). Vajaduse korral käib see
   üleslaadimisena `source.kind = "other"`, või hiljem #705 lehtede liigutamise kaudu.
 - **Pildiserver** (`server/image_server.py`): uus tee
   `/{kaust}/_exemplars/{eid}/{image_id}.jpg` (+ `_thumbs/`). Teose ja õiguse kontroll
   on SAMA mis lehepildil (`_check_image_access`, token). `eid` ja `image_id` on rangelt
-  nanoid-kujulised. Praegune reegel „alakriipsuga alguses = keelatud" jääb kehtima kõigile
-  muudele teedele. `get_first_image` ei näe alamkaustu ka edaspidi (kaanepilt).
+  nanoid-kujulised. Lähtefaile, `_sources/` ja `_imports/` pildiserver **ei** serveeri.
+  Praegune reegel „alakriipsuga alguses = keelatud" jääb kehtima kõigile muudele
+  teedele. `get_first_image` ei näe alamkaustu ka edaspidi (kaanepilt).
 - **Valvurid:** teose `_exemplars/` ei tohi sattuda ühtegi lehtede loendisse (Meili sünk,
   `lehekylje_number`, `refresh_work_mentions`, poolitus/järjestus, kaanepilt). Test:
   eksemplaripildiga teose lehtede loend ja Meili dokumendid on samad mis ilma.
+  Impordi testid: katkestus enne ja pärast manifesti kirjutust (kordus ei tekita
+  topelte), eksemplari kustutus renderdamise ajal, 409 vananenud revisjoniga.
 
 ## Klient
 
@@ -143,8 +197,7 @@ vajadusel koos vaatlustega.
 ## Avatud ehitajale
 
 - Modaal või alamleht (eelistus: alamleht).
-- Üleslaadimise suuruspiir ja pikima külje lagi (ettepanek: originaali hoida, eelvaade
-  pildiserverist nagu lehtedel).
+- Üleslaadimise suuruspiir ja vaatamiskuju pikima külje lagi (lähtefail säilib niikuinii).
 - Kas `images.json` muutus kirjutab ka `_metadata.json`-i `updated_at`-i (ettepanek: ei).
 
 ## Pärast
