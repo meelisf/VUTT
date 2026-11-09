@@ -175,3 +175,47 @@ def test_original_path(env):
     assert path.endswith(m["images"][0]["id"] + ".jpg") and url is None
     _import_image(env)
     assert ei.original_path(env["work_dir"], env["eid"], "imp001") == (None, "https://hdl.handle.net/10062/14332")
+
+
+def test_uleslaadimine_ei_toota_pilti_metadata_lock_all(env, monkeypatch):
+    """Pildi dekodeerimine ei tohi hoida globaalset metadata_lock-i (kõik teosed ootaks)."""
+    import threading
+    from server.utils import metadata_lock
+    held = []
+    real = ei.store_image
+
+    def spy(content, dest_dir, image_id):
+        res = {}
+
+        def probe():
+            res["free"] = metadata_lock.acquire(blocking=False)
+            if res["free"]:
+                metadata_lock.release()
+        t = threading.Thread(target=probe)
+        t.start()
+        t.join()
+        held.append(not res["free"])
+        return real(content, dest_dir, image_id)
+    monkeypatch.setattr(ei, "store_image", spy)
+    _add(env, n=2)
+    assert held == [False, False]
+
+
+def test_eksemplar_kadus_tootluse_ajal_failid_ara_ja_404(env, monkeypatch):
+    from server import work_exemplars as we
+    real = ei.store_image
+    state = {"n": 0}
+
+    def store_then_delete(content, dest_dir, image_id):
+        out = real(content, dest_dir, image_id)
+        if state["n"] == 0:
+            state["n"] += 1
+            we.delete_exemplar(env["work_dir"], env["eid"], "u")
+        return out
+    monkeypatch.setattr(ei, "store_image", store_then_delete)
+    with pytest.raises(ei.ExemplarImagesError) as e:
+        _add(env, n=1)
+    assert e.value.status == 404
+    d = ei.exemplar_dir(env["work_dir"], env["eid"])
+    assert not os.path.exists(d) or not [f for f in os.listdir(d) if f.endswith(".jpg")]
+    assert not os.path.exists(ei.manifest_path(env["work_dir"], env["eid"]))

@@ -204,37 +204,63 @@ def _check_revision(current: dict, revision) -> None:
 
 
 def add_uploads(work_dir: str, eid: str, files: list, username: str) -> dict:
-    """Lisab pildid manifesti lõppu. `files` = [(baidid, allikas)]. Revisjoni ei nõua."""
+    """Lisab pildid manifesti lõppu. `files` = [(baidid, allikas)]. Revisjoni ei nõua.
+
+    Pilditöötlus (dekodeerimine, pööre, vähendus) käib ENNE lukke: `metadata_lock` on
+    protsessiülene ja suur TIFF-ide partii peataks muidu iga teose metaandmete
+    salvestuse. Failid on nähtamatud, kuni ID on manifestis; luku all kontrollitakse
+    eksemplar uuesti ja kadunud eksemplari korral failid eemaldatakse.
+    """
     if not files:
         raise ExemplarImagesError("Faile pole")
     sources = [_client_source(src, UPLOAD_KINDS) for _, src in files]
     today = date.today().isoformat()
-    with exemplar_locks(work_dir):
+    with metadata_lock:
         require_exemplar(work_dir, eid)
-        current = read_manifest(work_dir, eid)
-        taken = {i.get("id") for i in current["images"]}
-        d = exemplar_dir(work_dir, eid)
-        written: list[str] = []
-        new_images = []
-        try:
-            for (content, _), src in zip(files, sources):
-                image_id = _new_image_id(work_dir, eid, taken)
-                original = store_image(content, d, image_id)
-                written.append(os.path.join(d, f"{image_id}.jpg"))
-                if original:
-                    written.append(os.path.join(d, original))
-                new_images.append({"id": image_id, "original": original,
-                                   "source": {**src, "added_by": username, "at": today}})
-        except ImageFileError as e:
-            for p in written:
-                with contextlib.suppress(OSError):
-                    os.remove(p)
-            raise ExemplarImagesError(str(e), e.status)
-        manifest = {**current, "revision": current["revision"] + 1,
-                    "images": current["images"] + new_images}
-        ok = write_manifest_locked(work_dir, eid, manifest, username,
-                                   f"Eksemplar: lisa {len(new_images)} pilti [{eid}]")
-        return _with_commit_flag(manifest, ok)
+    taken = {i.get("id") for i in read_manifest(work_dir, eid)["images"]}
+    d = exemplar_dir(work_dir, eid)
+    written: list[str] = []
+    new_images = []
+
+    def drop_written():
+        for p in written:
+            with contextlib.suppress(OSError):
+                os.remove(p)
+
+    try:
+        for (content, _), src in zip(files, sources):
+            image_id = _new_image_id(work_dir, eid, taken)
+            original = store_image(content, d, image_id)
+            written.append(os.path.join(d, f"{image_id}.jpg"))
+            if original:
+                written.append(os.path.join(d, original))
+            new_images.append({"id": image_id, "original": original,
+                               "source": {**src, "added_by": username, "at": today}})
+    except ImageFileError as e:
+        drop_written()
+        raise ExemplarImagesError(str(e), e.status)
+    except BaseException:
+        drop_written()
+        raise
+
+    try:
+        with exemplar_locks(work_dir):
+            require_exemplar(work_dir, eid)
+            current = read_manifest(work_dir, eid)
+            if {i["id"] for i in new_images} & {i.get("id") for i in current["images"]}:
+                raise ExemplarImagesError("Pildi ID kattus samaaegse lisamisega, proovi uuesti", 409)
+            manifest = {**current, "revision": current["revision"] + 1,
+                        "images": current["images"] + new_images}
+            ok = write_manifest_locked(work_dir, eid, manifest, username,
+                                       f"Eksemplar: lisa {len(new_images)} pilti [{eid}]")
+            return _with_commit_flag(manifest, ok)
+    except BaseException:
+        # Manifesti ei kirjutatud (eksemplar kadus, ID kattus, kirjutus viskas): failid ära.
+        drop_written()
+        with contextlib.suppress(OSError):
+            os.rmdir(d)
+            os.rmdir(os.path.dirname(d))
+        raise
 
 
 def _merge_image(stored: dict, incoming: dict) -> dict:

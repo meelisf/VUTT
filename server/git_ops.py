@@ -292,6 +292,32 @@ def _init_repo_locked():
     return _git_repo
 
 
+def ensure_data_gitignore() -> bool:
+    """Serveri stardil: olemasoleva repo `.gitignore` saab puuduvad `DATA_GITIGNORE_EXTRA`
+    read (ADR 0079) ja commit'i. Ilma nendeta commit'iks `replace_work_content`-i
+    `git add <kaust>` pooleli impordi staging'u (PDF-id, TIFF-id) ajalukku tagasivõtmatult.
+    Tagastab, kas faili muudeti."""
+    get_or_init_repo()
+    path = os.path.join(BASE_DIR, '.gitignore')
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            current = f.read()
+    except FileNotFoundError:
+        current = ""
+    have = {line.strip() for line in current.splitlines()}
+    missing = [r for r in DATA_GITIGNORE_EXTRA if r not in have]
+    if not missing:
+        return False
+    content = current + ("" if not current or current.endswith("\n") else "\n")
+    content += "# Eksemplari pildid (ADR 0079)\n" + "".join(r + "\n" for r in missing)
+    res = save_with_git(path, content, "Automaatne", message="data/.gitignore: eksemplari piltide read (ADR 0079)")
+    if isinstance(res, dict) and res.get("success") is False:
+        logger.error("data/.gitignore uuendus kirjutati, aga commit ebaõnnestus: %s", res.get("error"))
+    else:
+        logger.info("data/.gitignore: lisatud %s", ", ".join(missing))
+    return True
+
+
 def _record_git_failure(filepath, username, error):
     """Salvestab git commit ebaõnnestumise info."""
     with _git_failures_lock:

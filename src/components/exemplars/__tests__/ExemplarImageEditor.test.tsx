@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import React from 'react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
@@ -41,11 +42,18 @@ beforeEach(() => {
 
 function setup(m: ExemplarManifest = manifest) {
   const onManifest = vi.fn();
-  const router = createMemoryRouter([{ path: '/', element:
-    <ExemplarImageEditor workId="w1" exemplarId="a1b2c3" manifest={m} authToken="tok" onManifest={onManifest} /> }]);
+  let setM: (m: ExemplarManifest) => void = () => {};
+  function Host() {
+    const [cur, setCur] = React.useState(m);
+    setM = setCur;
+    return <ExemplarImageEditor workId="w1" exemplarId="a1b2c3" manifest={cur} authToken="tok" onManifest={onManifest} />;
+  }
+  const router = createMemoryRouter([{ path: '/', element: <Host /> }]);
   render(<RouterProvider router={router} />);
-  return { onManifest };
+  return { onManifest, setManifest: (x: ExemplarManifest) => act(() => setM(x)) };
 }
+
+const rowIds = () => screen.getAllByTestId('exemplar-editor-row').map(r => r.getAttribute('data-image-id'));
 
 describe('ExemplarImageEditor', () => {
   it('failide valik → üleslaadimine allikaga', async () => {
@@ -107,5 +115,27 @@ describe('ExemplarImageEditor', () => {
     fireEvent.click(screen.getByText('exemplarImages.editor.save'));
     await waitFor(() => expect(notify).toHaveBeenCalledWith('exemplarImages.editor.conflict', 'warning'));
     expect(onManifest).toHaveBeenCalledWith(current);
+  });
+
+  it('salvestamata järjekord säilib, kui manifest uueneb (üleslaadimine); uus pilt lõppu', () => {
+    const { setManifest } = setup();
+    fireEvent.click(screen.getAllByLabelText('exemplarImages.editor.moveDown')[0]);
+    expect(rowIds()).toEqual(['img002', 'img001']);
+    setManifest({ ...manifest, revision: 5, images: [...manifest.images, { id: 'img003', source: { kind: 'photo' } }] });
+    expect(rowIds()).toEqual(['img002', 'img001', 'img003']);
+    expect(guard.isDirty).toBe(true);
+  });
+
+  it('409 järel jääb salvestamata järjekord alles, kustutatud pilt kaob', async () => {
+    const three = { ...manifest, images: [...manifest.images, { id: 'img003', source: { kind: 'photo' as const } }] };
+    const current = { ...three, revision: 9, images: [three.images[0], three.images[1]] };
+    api.patch.mockRejectedValue(new ManifestConflictError('m', current));
+    const { onManifest, setManifest } = setup(three);
+    fireEvent.click(screen.getAllByLabelText('exemplarImages.editor.moveDown')[0]);   // 2,1,3
+    fireEvent.click(screen.getByText('exemplarImages.editor.save'));
+    await waitFor(() => expect(onManifest).toHaveBeenCalledWith(current));
+    setManifest(current);
+    expect(rowIds()).toEqual(['img002', 'img001']);
+    expect(guard.isDirty).toBe(true);
   });
 });

@@ -64,7 +64,9 @@ def _kaivitustaasted() -> None:
     from .upload.prepress import taasta_rippuvad_eelvaated
     # Pooleli eksemplari piltide ADA import (ADR 0079): jätka failidest.
     from .exemplar_import import recover_imports as taasta_eksemplari_impordid
-    for taaste in (taasta_rippuvad_fetchid, taasta_rippuvad_applyd,
+    # `data/.gitignore` eksemplari piltide read ENNE impordi taastajat (ADR 0079).
+    from .git_ops import ensure_data_gitignore
+    for taaste in (ensure_data_gitignore, taasta_rippuvad_fetchid, taasta_rippuvad_applyd,
                    taasta_rippuvad_impordid, taasta_rippuvad_eelvaated,
                    taasta_eksemplari_impordid):
         # Erand EI TOHI käivitust peatada: taasteta server on parem kui

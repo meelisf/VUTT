@@ -23,15 +23,21 @@ const EDIT_KINDS = ['photo', 'url', 'ada', 'other'] as const;
 
 const sameImages = (a: ExemplarImage[], b: ExemplarImage[]) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Mustandi muudatused (silt, leht, allikas) uuele manifestile, ID-de kaupa; järjekord tuleb serverist. */
+/**
+ * Mustand uuele manifestile (üleslaadimine, teise kasutaja muudatus, 409): mustandi
+ * järjekord ja muudatused (silt, leht, allikas) jäävad alles nende piltide jaoks, mis
+ * on endiselt olemas; uued pildid lisanduvad lõppu serveri järjekorras. Serveri väljad
+ * tulevad uuest manifestist.
+ */
 function reapply(draft: ExemplarImage[], current: ExemplarImage[]): ExemplarImage[] {
-  const edited = new Map(draft.map(i => [i.id, i]));
-  return current.map(i => {
-    const d = edited.get(i.id);
-    if (!d) return i;
+  const byId = new Map(current.map(i => [i.id, i]));
+  const kept = draft.filter(d => byId.has(d.id)).map(d => {
+    const i = byId.get(d.id)!;
     const source = i.source.import_id ? { ...i.source, license: d.source.license } : { ...i.source, ...d.source };
     return { ...i, label: d.label, page: d.page, source };
   });
+  const seen = new Set(draft.map(d => d.id));
+  return [...kept, ...current.filter(i => !seen.has(i.id))];
 }
 
 /**
@@ -168,7 +174,7 @@ const ExemplarImageEditor: React.FC<ExemplarImageEditorProps> = ({
         {draft.map((img, i) => {
           const imported = !!img.source.import_id;
           return (
-            <li key={img.id} data-testid="exemplar-editor-row" className="flex flex-wrap items-center gap-2 text-sm border-b border-gray-100 pb-2">
+            <li key={img.id} data-testid="exemplar-editor-row" data-image-id={img.id} className="flex flex-wrap items-center gap-2 text-sm border-b border-gray-100 pb-2">
               <span className="w-6 text-gray-400 text-right">{i + 1}</span>
               <button type="button" aria-label={t('exemplarImages.editor.moveUp')} onClick={() => move(i, -1)}
                 disabled={busy || i === 0} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30">

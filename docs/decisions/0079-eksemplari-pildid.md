@@ -77,7 +77,9 @@ olemasolu. Detailid: spetsi jaotis „Avaldamine on taastatav protokoll".
 - `data/.gitignore` peab ignoreerima `_imports/`, `_thumbs/`, `*.pdf`, `*.tif`, `*.tiff`,
   `*.orig.*`, `*.part`, `*.tmp*` (`git_ops.DATA_GITIGNORE_EXTRA`). Muidu commit'iks
   `replace_work_content` (`git add <kaust>`) poolelioleva impordi. Uus repo saab read
-  `_init_repo_locked`-ist; serveri olemasolev fail uuendatakse käsitsi enne deploy'd.
+  `_init_repo_locked`-ist; olemasoleva repo faili täiendab serveri start
+  (`ensure_data_gitignore`, autor „Automaatne", üks commit), sest unustatud käsitsi samm
+  oleks tagasivõtmatu.
 - Eksemplari kustutus eemaldab `images.json`-i gitist kohe järgmise commit'iga sama luku
   all (`bulk_update_works` ei oska samas commit'is eemaldada). Gitist väljas olevad
   failid lähevad `._trash/{work_id}/_exemplars/{eid}/`-i.
