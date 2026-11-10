@@ -2,6 +2,7 @@
 """Teose eksemplaride otspunktid (ADR 0076). Eksemplarid muutuvad AINULT siin —
 üldine /update-work-metadata lükkab `exemplars`-i ja `archive_refs`-i tagasi."""
 import json
+import os
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, Response
 from starlette.concurrency import run_in_threadpool
@@ -12,6 +13,7 @@ from ..utils import find_directory_by_id
 from ..work_sets_access import load_work_metadata_by_id
 from .. import work_exemplars as we
 from ..exemplar_images import image_previews
+from ..meili_doc import enumerate_page_images
 from .. import exemplar_proposals as epp
 from ..rate_limit import check_rate_limit, get_client_ip
 
@@ -51,16 +53,17 @@ def list_exemplars(work_id: str, user=Depends(optional_user)):
     path, meta = _dir_and_meta(work_id)
     if not can_read_work(meta, user):
         raise HTTPException(status_code=403, detail="Puudub ligipääs")
-    stems = we.page_stems(path)
+    # Täielik leheloend KETTALT (mitte Meilist — selle sünk on asünkroonne, ADR 0013):
+    # eksemplari lehe teose lehtede võrk, kõrvutuse jada ja paari kehtivus loevad seda.
+    files = enumerate_page_images(path)
+    stems = [os.path.splitext(f)[0] for f in files]
     exemplars = meta.get("exemplars") or []
     unknown = meta.get(we.UNKNOWN_FIELD) or []
-    # Lehenumbrid ainult erandlehtedele — vaade ei tea lehtede loendit.
-    used = {s for x in exemplars for s in x.get("pages") or []} | set(unknown)
-    numbers = {s: i + 1 for i, s in enumerate(stems) if s in used}
     return {
         "exemplars": exemplars,
         "unknown_pages": unknown,
-        "page_numbers": numbers,
+        "page_numbers": {s: i + 1 for i, s in enumerate(stems)},
+        "page_files": files,
         "page_count": len(stems),
         "convolutes": we.resolve_convolutes(work_id, meta, user),
         # Eksemplari pildid (ADR 0079): kaardi pildiriba ilma eksemplari kohta eraldi päringuta.

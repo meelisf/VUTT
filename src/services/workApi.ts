@@ -324,7 +324,10 @@ function appendOrigin(formData: FormData, origin?: string | null) {
 export interface WorkExemplarsResponse {
   exemplars: Exemplar[];
   unknown_pages: string[];
+  /** KÕIK teose lehetüved → järjekorranumber (kettalt, mitte Meilist). */
   page_numbers: Record<string, number>;
+  /** Lehtede failinimed teose järjekorras (tüvi = nimi ilma laiendita). Vana server: puudub. */
+  page_files?: string[];
   page_count: number;
   convolutes: ConvoluteBlock[];
   /** Eksemplari pildid (ADR 0079): ainult piltidega eksemplarid, kuni 6 eelvaate ID-d. */

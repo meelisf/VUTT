@@ -388,7 +388,7 @@ def test_endpointide_voog(client):
     r = client.post("/works/w1/exemplars/page-origin", json={"stems": ["t-003"], "origin": ex_id})
     assert r.json()["exemplars"][0]["pages"] == ["t-003"]
     body = client.get("/works/w1/exemplars").json()
-    assert body["page_numbers"] == {"t-003": 3} and body["page_count"] == 4 and body["convolutes"] == []
+    assert body["page_numbers"] == {"t-001": 1, "t-002": 2, "t-003": 3, "t-004": 4} and body["page_count"] == 4 and body["convolutes"] == []
     assert client.post("/works/w1/exemplars/order", json={"ids": [ex_id]}).status_code == 200
     assert client.delete(f"/works/w1/exemplars/{ex_id}").status_code == 204
 
