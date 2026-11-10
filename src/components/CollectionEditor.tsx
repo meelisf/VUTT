@@ -3,7 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Trash2 } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { useUser } from '../contexts/UserContext';
-import { buildCollectionTree, isCollectionRestricted } from '../services/collectionService';
+import {
+  buildCollectionTree, collectionDefaultSort, COLLECTION_DEFAULT_SORTS, isCollectionRestricted,
+  type CollectionDefaultSort,
+} from '../services/collectionService';
 import { FILE_API_URL } from '../config';
 import { apiDelete, apiErrorMessage, apiGet, apiPut } from '../services/apiClient';
 import { apiPost } from '../services/apiClient';
@@ -40,11 +43,19 @@ interface CollectionEditorProps {
   showAccessPanel?: boolean;
 }
 
+// Järjestuse väärtus → avalehe sorteerimisvaliku silt (sama sõnastus mõlemas kohas).
+const SORT_LABEL_KEYS: Record<CollectionDefaultSort, string> = {
+  year_asc: 'dashboard:sort.yearAsc',
+  year_desc: 'dashboard:sort.yearDesc',
+  az: 'dashboard:sort.az',
+  recent: 'dashboard:sort.recent',
+};
+
 const CollectionEditor: React.FC<CollectionEditorProps> = ({
   canEditSettings = true, selectedId, onSelectId, showPicker = true,
   showAccessPanel = true,
 }) => {
-  const { t } = useTranslation(['admin', 'common']);
+  const { t } = useTranslation(['admin', 'common', 'dashboard']);
   const { user, authToken } = useUser();
   const { collections, refreshCollections } = useCollection();
   // Paneelile stabiilne viide: objektiliteraal iga renderduse peal
@@ -69,6 +80,8 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
   const [descLongEt, setDescLongEt] = useState('');
   const [descLongEn, setDescLongEn] = useState('');
   const [editColor, setEditColor] = useState('indigo');
+  // '' = kogu ei määra (pärib ülemkogult või rakenduse vaikimisi), ADR 0080
+  const [editDefaultSort, setEditDefaultSort] = useState<CollectionDefaultSort | ''>('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -124,6 +137,7 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
     setDescLongEt(col.description_long?.et || '');
     setDescLongEn(col.description_long?.en || '');
     setEditColor(col.color || 'indigo');
+    setEditDefaultSort(col.default_sort || '');
     setEditVisibility((col.visibility as 'public' | 'restricted') || 'public');
   }, [valitud, collections]);
 
@@ -138,6 +152,7 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
         description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
         color: editColor,
         visibility: editVisibility,
+        default_sort: editDefaultSort || null,
       }, { token: authToken, timeout: 10000 });
       if (data?.status === 'success') {
         await refreshCollections();
@@ -265,6 +280,35 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
             {collections[valitud]?.parent && isCollectionRestricted(collections, collections[valitud].parent!) && (
               <p className="text-xs text-amber-700 mt-1">{t('collections.visibilityInherited')}</p>
             )}
+          </div>
+
+          {/* Vaikejärjestus (ADR 0080) */}
+          <div>
+            <label htmlFor="collection-default-sort" className="block text-sm font-semibold text-gray-700 mb-2">
+              {t('collections.defaultSort')}
+            </label>
+            {(() => {
+              const parentId = collections[valitud]?.parent;
+              const inherited = parentId ? collectionDefaultSort(collections, parentId) : undefined;
+              return (
+                <select
+                  id="collection-default-sort"
+                  value={editDefaultSort}
+                  onChange={(e) => setEditDefaultSort(e.target.value as CollectionDefaultSort | '')}
+                  className="w-full p-2 border border-gray-300 rounded text-sm bg-white"
+                >
+                  <option value="">
+                    {inherited
+                      ? t('collections.defaultSortInherited', { sort: t(SORT_LABEL_KEYS[inherited]) })
+                      : t('collections.defaultSortNone')}
+                  </option>
+                  {COLLECTION_DEFAULT_SORTS.map(v => (
+                    <option key={v} value={v}>{t(SORT_LABEL_KEYS[v])}</option>
+                  ))}
+                </select>
+              );
+            })()}
+            <p className="text-xs text-gray-400 mt-1">{t('collections.defaultSortHint')}</p>
           </div>
             </>
           )}

@@ -22,6 +22,11 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+# Avalehe järjestused, mida kogu tohib vaikimisi kanda (ADR 0080). Peab
+# kattuma frontendi `COLLECTION_DEFAULT_SORTS`-iga (`collectionService.ts`).
+COLLECTION_DEFAULT_SORTS = ("year_asc", "year_desc", "az", "recent")
+
+
 def _read_json(path):
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -118,7 +123,7 @@ def delete_archive(archive_id: str, force: bool = False, user=Depends(require_ro
 
 @router.put("/admin/collections/{collection_id}")
 async def admin_update_collection(collection_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("superadmin"))):
-    """Uuendab kollektsiooni description, description_long, color ja visibility välju."""
+    """Uuendab kollektsiooni description, description_long, color, visibility ja default_sort välju."""
     body = await request.json()
 
     # Õigused liikusid eraldi delta-toimingule (ADR 0043 p2):
@@ -129,6 +134,15 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
             status_code=400,
             detail="allowed_users ei ole enam selle endpoint'i osa — "
                    "kasuta POST /admin/users/collection-rights")
+
+    # Kogu vaikejärjestus (ADR 0080). Kontroll ENNE ühtki muutust: vale väärtus
+    # ei tohi lasta paketi ülejäänud välju vaikselt salvestada. `relevance` ei
+    # kuulu siia — ilma päringuta pole tal tähendust.
+    sort_antud = "default_sort" in body
+    default_sort = body.get("default_sort")
+    if sort_antud and default_sort not in (None, "") and default_sort not in COLLECTION_DEFAULT_SORTS:
+        return {"status": "error",
+                "message": f"default_sort peab olema üks järgmistest: {', '.join(COLLECTION_DEFAULT_SORTS)}"}
 
     description = body.get("description")      # { et, en }
     description_long = body.get("description_long")  # { et, en }
@@ -166,6 +180,13 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
             data[collection_id]["color"] = color.strip()
         elif "color" in data[collection_id]:
             del data[collection_id]["color"]
+
+    # Puuduv võti = ära puutu (vana klient); tühi/None = eemalda.
+    if sort_antud:
+        if default_sort:
+            data[collection_id]["default_sort"] = default_sort
+        else:
+            data[collection_id].pop("default_sort", None)
 
     # Nähtavus
     visibility = body.get("visibility")

@@ -250,3 +250,38 @@ describe('isCollectionRestricted / isCollectionAllowed (#617)', () => {
     expect(isCollectionAllowed(kogud, 'priv', ['laps'])).toBe(false);
   });
 });
+
+import { collectionDefaultSort } from '../collectionService';
+
+describe('collectionDefaultSort (ADR 0080)', () => {
+  const kogud = {
+    emil: { name: { et: 'EMIL', en: 'EMIL' }, default_sort: 'az' },
+    manuskriptid: { name: { et: 'M', en: 'M' }, parent: 'emil' },
+    erand: { name: { et: 'E', en: 'E' }, parent: 'emil', default_sort: 'year_desc' },
+    tavaline: { name: { et: 'T', en: 'T' } },
+    vigane: { name: { et: 'V', en: 'V' }, default_sort: 'relevance' },
+    tsukkel1: { name: { et: '1', en: '1' }, parent: 'tsukkel2' },
+    tsukkel2: { name: { et: '2', en: '2' }, parent: 'tsukkel1' },
+  } as unknown as Parameters<typeof collectionDefaultSort>[0];
+
+  it('kogu enda väärtus', () => {
+    expect(collectionDefaultSort(kogud, 'emil')).toBe('az');
+  });
+  it('alamkogu pärib lähimalt esivanemalt', () => {
+    expect(collectionDefaultSort(kogud, 'manuskriptid')).toBe('az');
+  });
+  it('alamkogu oma väärtus võidab', () => {
+    expect(collectionDefaultSort(kogud, 'erand')).toBe('year_desc');
+  });
+  it('määramata, tundmatu ja valiku puudumine → undefined', () => {
+    expect(collectionDefaultSort(kogud, 'tavaline')).toBeUndefined();
+    expect(collectionDefaultSort(kogud, 'puudub')).toBeUndefined();
+    expect(collectionDefaultSort(kogud, null)).toBeUndefined();
+  });
+  it('lubamatu väärtus jäetakse tähelepanuta', () => {
+    expect(collectionDefaultSort(kogud, 'vigane')).toBeUndefined();
+  });
+  it('tsükkel ei jää kinni', () => {
+    expect(collectionDefaultSort(kogud, 'tsukkel1')).toBeUndefined();
+  });
+});

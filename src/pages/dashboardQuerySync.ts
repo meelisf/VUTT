@@ -1,10 +1,21 @@
 /**
+ * Avalehe vaikejärjestus, kui URL-is `sort`-i ei ole (ADR 0080): päringuga
+ * relevantsus, muidu aktiivse kogu `default_sort`, muidu aasta järgi.
+ * URL-i `sort` võidab alati — see on kasutaja enda valik.
+ */
+export function dashboardDefaultSort(query: string, collectionSort: string | undefined): string {
+  if (query) return 'relevance';
+  return collectionSort || 'year_asc';
+}
+
+/**
  * Avalehe päringu ↔ sort reegel, eraldatud URL-i sünkrooniva effecti seest,
  * et see oleks testitav (#605: vihje vastuvõtt võib päringu tühjendada).
- * Ilma päringuta pole relevantsusel tähendust → aasta järgi.
+ * Ilma päringuta pole relevantsusel tähendust → päringuta vaikejärjestus
+ * (kogu oma või aasta järgi, ADR 0080).
  */
-export function sortAfterQueryChange(sort: string, newQuery: string): string {
-  return !newQuery && sort === 'relevance' ? 'year_asc' : sort;
+export function sortAfterQueryChange(sort: string, newQuery: string, noQueryDefault = 'year_asc'): string {
+  return !newQuery && sort === 'relevance' ? noQueryDefault : sort;
 }
 
 // Avalehe filtriparameetrid URL-is — need, mida URL → olek effect olekusse kannab
