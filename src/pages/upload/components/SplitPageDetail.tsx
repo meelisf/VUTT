@@ -12,6 +12,7 @@ import { useSplitDrag } from '../../../components/pagePrep/useSplitDrag';
 import SplitLine from '../../../components/pagePrep/SplitLine';
 import { useCropBox } from '../../../components/pagePrep/useCropBox';
 import CropOverlay from '../../../components/pagePrep/CropOverlay';
+import CroppedPreviewMark from '../../../components/pagePrep/CroppedPreviewMark';
 import EditToolbar from '../../../components/pagePrep/EditToolbar';
 import EditorTabs, { type EditorTab } from '../../../components/pagePrep/EditorTabs';
 import PageNavFooter from '../../../components/pagePrep/PageNavFooter';
@@ -276,6 +277,13 @@ const SplitPageDetail: React.FC<Props> = ({
                 )}
                 <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />
               </div>
+            )}
+
+            {/* Ootel kärbega leht: eelvaade on kärbitud — raam ütleb, et pilt pole veel lõigatud. */}
+            {tab === 'split' && page.adjust && imgBox.width > 0 && (
+              <CroppedPreviewMark className="absolute box-border" style={{
+                left: imgBox.left, top: imgBox.top, width: imgBox.width, height: imgBox.height,
+              }} />
             )}
 
             {tab === 'split' && splits && imgBox.width > 0 && (

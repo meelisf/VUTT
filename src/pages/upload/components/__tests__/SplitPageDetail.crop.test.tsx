@@ -53,6 +53,17 @@ describe('SplitPageDetail vahekaardid ja kärpimine', () => {
     expect(img().src).toContain('adj=');
     expect(screen.getByTestId('detail-edit-pending')).toBeTruthy();
     expect(screen.queryByTestId('detail-toolbar')).toBeNull();
+    // Kärbitud eelvaade on märgitud kollase raamiga (ei näe välja rakendatud).
+    expect(screen.getByTestId('cropped-preview-mark')).toBeTruthy();
+  });
+
+  it('raami ei ole kärbeta lehel ega „Pööra ja kärbi" vahekaardil', () => {
+    const first = renderDetail(plan());
+    expect(screen.queryByTestId('cropped-preview-mark')).toBeNull();
+    first.unmount();
+    renderDetail(plan({ adjust: KÄRBE }));
+    toEditTab();
+    expect(screen.queryByTestId('cropped-preview-mark')).toBeNull();
   });
 
   it('„Pööra ja kärbi" näitab kohandamata eelvaadet, kärpekasti ja ühist riba', () => {

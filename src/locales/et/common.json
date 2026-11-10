@@ -367,7 +367,8 @@
     "splitAt": "Poolitatakse joonelt {{percent}}%",
     "notSplit": "Ei poolitata",
     "page": "Leht {{cur}} / {{total}}",
-    "resetToGlobal": "Lähtesta üldjoonele"
+    "resetToGlobal": "Lähtesta üldjoonele",
+    "croppedPreview": "Eelvaade kärpega, pilt pole veel lõigatud"
   },
   "filterPanel": {
     "title": "Filtrid",
