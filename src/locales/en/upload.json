@@ -144,11 +144,12 @@
       "resetToGlobal": "Reset to global line",
       "headerExcluded": "Page {{n}} of {{total}} · excluded",
       "crop": "Crop / straighten",
-      "cropApply": "Confirm crop",
+      "cropApply": "Mark crop",
       "cropCancel": "Cancel",
       "cropRemove": "Remove crop",
       "cropReplaces": "A new crop replaces the current one. Rotating removes the crop.",
-      "cropped": "cropped"
+      "cropped": "crop pending",
+      "cropPendingHint": "The preview shows the crop, but the image is only cut when you press “Continue”."
     },
     "excludedExplain": "Not OCR’d and not split — this page will not appear in the work",
     "waitingRender": "Preview is finishing — the button unlocks shortly ({{done}} / {{total}})"
