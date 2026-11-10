@@ -123,7 +123,7 @@ def delete_archive(archive_id: str, force: bool = False, user=Depends(require_ro
 
 @router.put("/admin/collections/{collection_id}")
 async def admin_update_collection(collection_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("superadmin"))):
-    """Uuendab kollektsiooni description, description_long, color, visibility ja default_sort välju."""
+    """Uuendab kollektsiooni name, description, description_long, color, visibility ja default_sort välju."""
     body = await request.json()
 
     # Õigused liikusid eraldi delta-toimingule (ADR 0043 p2):
@@ -144,6 +144,17 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
         return {"status": "error",
                 "message": f"default_sort peab olema üks järgmistest: {', '.join(COLLECTION_DEFAULT_SORTS)}"}
 
+    # Nimi { et, en }: puuduv võti = ära puutu. Kontroll ENNE ühtki muutust.
+    # Identiteet on id — Meili nimesid ei hoia, nimevahetus reindeksit ei vaja.
+    uus_nimi = None
+    if "name" in body:
+        nimi = body.get("name")
+        name_et = str(nimi.get("et") or "").strip() if isinstance(nimi, dict) else ""
+        if not name_et:
+            return {"status": "error", "message": "Eestikeelne nimi on kohustuslik"}
+        # Sama reegel mis loomisel: tühi ingliskeelne võtab eestikeelse.
+        uus_nimi = {"et": name_et, "en": str(nimi.get("en") or "").strip() or name_et}
+
     description = body.get("description")      # { et, en }
     description_long = body.get("description_long")  # { et, en }
     color = body.get("color")  # string või None
@@ -156,7 +167,10 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     if collection_id not in data:
         return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
 
-    # Uuenda description, description_long ja color väljad (mitte nimi, hierarhia)
+    if uus_nimi is not None:
+        data[collection_id]["name"] = uus_nimi
+
+    # Uuenda description, description_long ja color väljad (mitte hierarhia)
     if description is not None:
         if description.get("et") or description.get("en"):
             data[collection_id]["description"] = {

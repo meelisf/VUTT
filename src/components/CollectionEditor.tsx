@@ -75,6 +75,8 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
     if (!juhitud) setOmaValik(id);
     onSelectId?.(id);
   };
+  const [nameEt, setNameEt] = useState('');
+  const [nameEn, setNameEn] = useState('');
   const [descEt, setDescEt] = useState('');
   const [descEn, setDescEn] = useState('');
   const [descLongEt, setDescLongEt] = useState('');
@@ -128,10 +130,13 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
   // Lae valitud kollektsiooni andmed vormi
   useEffect(() => {
     if (!valitud || !collections[valitud]) {
+      setNameEt(''); setNameEn('');
       setDescEt(''); setDescEn(''); setDescLongEt(''); setDescLongEn('');
       return;
     }
     const col = collections[valitud];
+    setNameEt(col.name?.et || '');
+    setNameEn(col.name?.en || '');
     setDescEt(col.description?.et || '');
     setDescEn(col.description?.en || '');
     setDescLongEt(col.description_long?.et || '');
@@ -148,6 +153,8 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
     setSaved(false);
     try {
       const data = await apiPut<any>(`${FILE_API_URL}/admin/collections/${valitud}`, {
+        // Tühi ingliskeelne nimi võtab serveris eestikeelse (nagu loomisel)
+        name: { et: nameEt.trim(), en: nameEn.trim() },
         description: { et: descEt.trim(), en: descEn.trim() },
         description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
         color: editColor,
@@ -333,6 +340,37 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
 
           {canEditSettings && (
             <>
+          {/* Nimi — id jääb samaks, viited ei katke */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-3">{t('collections.name')}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="collection-name-et" className="block text-xs font-medium text-gray-500 mb-1">{t('collections.langEt')}</label>
+                <input
+                  id="collection-name-et"
+                  type="text"
+                  value={nameEt}
+                  onChange={e => setNameEt(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+                {!nameEt.trim() && (
+                  <p className="text-xs text-red-600 mt-1">{t('collections.nameRequired')}</p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="collection-name-en" className="block text-xs font-medium text-gray-500 mb-1">{t('collections.langEn')}</label>
+                <input
+                  id="collection-name-en"
+                  type="text"
+                  value={nameEn}
+                  onChange={e => setNameEn(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">{t('collections.nameHint')}</p>
+          </div>
+
           {/* Lühikirjeldus */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-3">{t('collections.description')}</p>
@@ -393,7 +431,7 @@ const CollectionEditor: React.FC<CollectionEditorProps> = ({
           <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !nameEt.trim()}
               className="inline-flex items-center gap-2 px-5 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? (
