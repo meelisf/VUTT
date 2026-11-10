@@ -12,13 +12,19 @@ from .heartbeat import mark_error, mark_success, register_job
 _rate_limit_store = {}
 _rate_limit_lock = threading.Lock()
 
-# Konto-põhine ebaõnnestunud login-katsete ajalugu: {username: [timestamp, ...]}
+# Konto-põhine ebaõnnestunud login-katsete ajalugu: {username: [(timestamp, ip), ...]}
 # Kaitseb credential-stuffingu eest: IP-limiit ei aita, kui ründaja kasutab
-# paljusid IP-sid ühe konto vastu. Loendur on IP-st sõltumatu.
+# paljusid IP-sid ühe konto vastu.
+#
+# Kaks läve (#762): kasutajanimed on avalikud (kommentaarid, ajalugu), seega
+# ainult kontole võtmestatud madal lävi laseks igaühel suvalise toimetaja
+# 10 päringuga välja lukustada. Madal lävi kehtib seepärast (konto, IP) paarile;
+# kontoülene lävi on kõrgem ja jääb hajutatud äraarvamise laeks.
 _account_failures = {}
 _account_lock = threading.Lock()
 
-ACCOUNT_LOCKOUT_THRESHOLD = 10   # mitu ebaõnnestumist akna jooksul lukustab konto
+ACCOUNT_LOCKOUT_THRESHOLD = 10   # ebaõnnestumisi akna jooksul ÜHELT IP-lt → see IP on selle konto jaoks lukus
+ACCOUNT_LOCKOUT_GLOBAL_THRESHOLD = 50  # kõigilt IP-delt kokku → konto on lukus kõigile
 ACCOUNT_LOCKOUT_WINDOW = 900     # libisev aken sekundites (15 min)
 
 # Puhastuse intervall (sekundites)
@@ -64,8 +70,8 @@ def _cleanup_rate_limit_store():
             # Puhasta ka konto-throttle aegunud kirjed
             with _account_lock:
                 for username in list(_account_failures.keys()):
-                    valid = [ts for ts in _account_failures[username]
-                             if now - ts < ACCOUNT_LOCKOUT_WINDOW]
+                    valid = [e for e in _account_failures[username]
+                             if now - e[0] < ACCOUNT_LOCKOUT_WINDOW]
                     if valid:
                         _account_failures[username] = valid
                     else:
@@ -139,10 +145,21 @@ def check_rate_limit(ip, endpoint):
         return True, 0
 
 
-def check_account_lockout(username):
+def refund_rate_limit(ip, endpoint):
+    """Võtab tagasi selle IP viimase kirje (#762). Õnnestunud sisselogimine ei
+    ole äraarvamiskatse: ühe NAT-i taga olev seminarirühm ei tohi IP-eelarvet
+    ausate sisselogimistega ära kulutada."""
+    with _rate_limit_lock:
+        kirjed = _rate_limit_store.get(endpoint, {}).get(ip)
+        if kirjed:
+            kirjed.pop()
+
+
+def check_account_lockout(username, ip=None):
     """
-    Kontrollib, kas konto on liiga paljude ebaõnnestunud login-katsete tõttu lukus.
-    IP-st sõltumatu — kaitse credential-stuffingu vastu (palju IP-sid, üks konto).
+    Kontrollib, kas konto on liiga paljude ebaõnnestunud login-katsete tõttu lukus:
+    kas SELLELT IP-lt (`ACCOUNT_LOCKOUT_THRESHOLD`) või kõigilt kokku
+    (`ACCOUNT_LOCKOUT_GLOBAL_THRESHOLD` — palju IP-sid, üks konto).
     Tagastab (locked, retry_after_seconds).
     """
     now = time.time()
@@ -151,28 +168,30 @@ def check_account_lockout(username):
         if not timestamps:
             return False, 0
         # Hoia ainult akna sees olevad ebaõnnestumised
-        valid = [ts for ts in timestamps if now - ts < ACCOUNT_LOCKOUT_WINDOW]
+        valid = [e for e in timestamps if now - e[0] < ACCOUNT_LOCKOUT_WINDOW]
         if valid:
             _account_failures[username] = valid
         else:
             del _account_failures[username]
             return False, 0
 
-        if len(valid) >= ACCOUNT_LOCKOUT_THRESHOLD:
-            oldest = min(valid)
-            retry_after = int(ACCOUNT_LOCKOUT_WINDOW - (now - oldest)) + 1
-            return True, retry_after
+        oma = [ts for ts, kirje_ip in valid if kirje_ip == ip]
+        for hulk, lavi in ((oma, ACCOUNT_LOCKOUT_THRESHOLD),
+                           ([ts for ts, _ in valid], ACCOUNT_LOCKOUT_GLOBAL_THRESHOLD)):
+            if len(hulk) >= lavi:
+                retry_after = int(ACCOUNT_LOCKOUT_WINDOW - (now - min(hulk))) + 1
+                return True, retry_after
         return False, 0
 
 
-def record_login_failure(username):
-    """Registreerib ühe ebaõnnestunud login-katse kasutajanime kohta."""
+def record_login_failure(username, ip=None):
+    """Registreerib ühe ebaõnnestunud login-katse kasutajanime ja IP kohta."""
     now = time.time()
     with _account_lock:
         bucket = _account_failures.setdefault(username, [])
         # Prune aknast välja jäänud kirjed, et list ei kasvaks lõpmatult
-        bucket[:] = [ts for ts in bucket if now - ts < ACCOUNT_LOCKOUT_WINDOW]
-        bucket.append(now)
+        bucket[:] = [e for e in bucket if now - e[0] < ACCOUNT_LOCKOUT_WINDOW]
+        bucket.append((now, ip))
 
 
 def clear_login_failures(username):

@@ -38,7 +38,7 @@ function plan(page: Partial<PrepressPage> = {}): PrepressPlan {
 function renderDetail(p: PrepressPlan) {
   const onPageChange = vi.fn();
   const utils = render(
-    <SplitPageDetail uploadId="u1" token="tok" plan={p} pageNum={1}
+    <SplitPageDetail uploadId="u1" ticket={{ exp: 99, sig: "abc" }} plan={p} pageNum={1}
       onPageChange={onPageChange} onNavigate={vi.fn()} onClose={vi.fn()} />,
   );
   const img = () => utils.container.querySelector('img') as HTMLImageElement;

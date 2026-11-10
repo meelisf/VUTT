@@ -15,7 +15,7 @@ export default defineConfig(() => {
     return {
       server: {
         port: 3000,
-        host: '0.0.0.0',
+        host: 'localhost',
         proxy: {
           '/meili': {
             target: `http://${DEV_BACKEND}:7700`,

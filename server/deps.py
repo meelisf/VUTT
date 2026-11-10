@@ -6,8 +6,9 @@ Need on tõstetud ``server/main.py``-st Faas 0 refaktoreeringus
 auth-dependency'dele, mida kõik domeeni-routerid saavad jagada.
 
 Semantika (main.py päritolu):
-- ``get_user``: loeb tokeni ``Authorization: Bearer`` headerist; kui puudub,
-  ``query``-parameetrist ``token`` (ainult ``<img src>`` tüüpi GET-id, nt upload thumb).
+- ``get_user``: loeb tokeni AINULT ``Authorization: Bearer`` headerist.
+  Sessioonitoken ei käi URL-is (jääks access-logi, #764); ``<img src>`` tüüpi
+  admini-GET-id kasutavad ``admin_image_access``-i (lühiajaline pilet).
 - ``optional_user``: loeb tokeni ``Authorization`` headerist; tagastab ``None``
   anonüümsele. Ei nõua autentimist. Kasutaja on sama mis ``get_user``-il.
 
@@ -19,23 +20,17 @@ import hashlib
 
 from fastapi import HTTPException, Request
 
+from . import image_tickets
 from .auth import require_token
 
 
 async def get_user(request: Request, min_role: str = "contributor"):
-    """
-    Ühtne autentimine. Järjekord:
-    1. Authorization: Bearer <token> header (eelistatud)
-    2. query-param 'token' (ainult <img src> tüüpi GET-id, nt upload thumb)
-    """
+    """Ühtne autentimine: Authorization: Bearer <token> header."""
     token = None
 
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
-
-    if not token:
-        token = request.query_params.get("token")
 
     if not token:
         raise HTTPException(status_code=401, detail="Autentimine nõutud")
@@ -54,6 +49,18 @@ def require_role(role: str):
     async def role_dependency(request: Request):
         return await get_user(request, min_role=role)
     return role_dependency
+
+
+def admin_image_access(kind: str, param: str):
+    """Dependency admini `<img src>` otspunktile: kehtiv pilet SELLE ulatuse
+    kohta (`{kind}:{tee-parameeter}`, vt `image_tickets.py`) VÕI admini päis."""
+    async def dependency(request: Request):
+        scope = f"{kind}:{request.path_params.get(param, '')}"
+        q = request.query_params
+        if image_tickets.is_valid(scope, q.get("exp"), q.get("sig")):
+            return None
+        return await get_user(request, min_role="admin")
+    return dependency
 
 
 async def get_json_data(request: Request):

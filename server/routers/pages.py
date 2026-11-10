@@ -27,7 +27,7 @@ from ..admin_page_ops import (
     _validate_base_names,
 )
 from ..config import BASE_DIR, get_logger
-from ..deps import get_json_data, require_role
+from ..deps import admin_image_access, get_json_data, require_role
 from ..git_ops import delete_page_from_git, save_with_git
 from .. import add_pdf_pages, page_ops_jobs, work_exemplars
 from ..image_server import generate_thumbnail, invalidate_cover
@@ -455,10 +455,10 @@ def admin_page_ops_status(work_id: str, user=Depends(require_role("admin"))):
 
 @router.get("/admin/work/{work_id}/page-image/{filename}/preview")
 def admin_page_preview(work_id: str, filename: str, rot: int = 0, adj: Optional[str] = None,
-                       size: str = "thumb", user=Depends(require_role("admin"))):
+                       size: str = "thumb", _=Depends(admin_image_access("work", "work_id"))):
     """Ootel pöörde/kärpe eelvaade (`?rot=90&adj=<JSON>&size=thumb|view`, ADR 0061).
 
-    `<img src>` jaoks: token tuleb `?token=`-ist (deps.get_user). Kettal midagi ei muutu.
+    `<img src>` jaoks: pilet `?exp=&sig=` (`GET /admin/image-ticket`, #764). Kettal midagi ei muutu.
     """
     try:
         data = render_page_preview(work_id, filename, rot, json.loads(adj) if adj else None, size)

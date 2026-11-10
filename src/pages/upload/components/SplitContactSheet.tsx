@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
 import { Check, Columns2, Eye, EyeOff, Loader2, Maximize2 } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
@@ -8,7 +9,7 @@ import type { PrepressPage, PrepressPlan } from '../types';
 
 interface Props {
   uploadId: string;
-  token: string | null;
+  ticket: ImageToken | null;
   plan: PrepressPlan;
   gridCols: number;
   selected: Set<number>;
@@ -35,7 +36,7 @@ const cornerBtn = (active: boolean) =>
  * täisvaate avab eraldi nurgaikoon (§4).
  */
 const SplitContactSheet: React.FC<Props> = ({
-  uploadId, token, plan, gridCols, selected, onToggleSelect, onPageChange, onOpenPage,
+  uploadId, ticket, plan, gridCols, selected, onToggleSelect, onPageChange, onOpenPage,
 }) => {
   const { t } = useTranslation(['upload']);
   // Pildi loomulik kuvasuhe lehe kaupa — teada alles pärast laadimist.
@@ -74,7 +75,7 @@ const SplitContactSheet: React.FC<Props> = ({
             >
               {ready ? (
                 <img
-                  src={prepressPreviewUrl(uploadId, page.n, token, page.rotate ?? 0, page.adjust ?? null)}
+                  src={prepressPreviewUrl(uploadId, page.n, ticket, page.rotate ?? 0, page.adjust ?? null) || undefined}
                   alt={`${page.n}`}
                   loading="lazy"
                   onLoad={(e) => {

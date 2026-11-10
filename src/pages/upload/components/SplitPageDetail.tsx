@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Check, CircleX, Columns2, Crop, Eye, EyeOff, Frame, LayoutGrid } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
@@ -13,7 +14,7 @@ import type { PrepressPage, PrepressPlan } from '../types';
 
 interface Props {
   uploadId: string;
-  token: string | null;
+  ticket: ImageToken | null;
   plan: PrepressPlan;
   pageNum: number;
   onPageChange: (n: number, patch: Partial<PrepressPage>) => void;
@@ -37,7 +38,7 @@ interface Props {
  * poolitusjoon asetub täpselt nagu apply lõikab (pööre → adjust → poolitus).
  */
 const SplitPageDetail: React.FC<Props> = ({
-  uploadId, token, plan, pageNum, onPageChange, onNavigate, onClose,
+  uploadId, ticket, plan, pageNum, onPageChange, onNavigate, onClose,
 }) => {
   const { t } = useTranslation(['upload', 'common']);
   const page = plan.pages.find((p) => p.n === pageNum);
@@ -191,9 +192,9 @@ const SplitPageDetail: React.FC<Props> = ({
             <img
               ref={imgRef}
               src={prepressPreviewUrl(
-                uploadId, pageNum, token, page?.rotate ?? 0,
+                uploadId, pageNum, ticket, page?.rotate ?? 0,
                 cropMode ? null : page?.adjust ?? null,
-              )}
+              ) || undefined}
               alt={`${pageNum}`}
               onLoad={measure}
               className="block max-h-full max-w-full object-contain"

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -88,6 +89,7 @@ const WorkManage: React.FC = () => {
   const { workId } = useParams<{ workId: string }>();
   const navigate = useNavigate();
   const { user, authToken } = useUser();
+  const imageTicket = useAdminImageTicket(workId ? `work:${workId}` : null, authToken);
   const [searchParams] = useSearchParams();
   const focus = parseFocusParam(searchParams.get('focus'));
   const focusedCardRef = useRef<HTMLDivElement | null>(null);
@@ -1509,11 +1511,11 @@ const WorkManage: React.FC = () => {
             const { deleted, split } = ruhmita(trashPages);
             return (
               <>
-                <TrashDeletedPages pages={deleted} workId={workId!} token={authToken}
+                <TrashDeletedPages pages={deleted} workId={workId!} ticket={imageTicket}
                   restoringPage={restoringPage} onRestore={handleRestorePage} t={t} />
-                <TrashModifiedImages images={modifiedImages} workId={workId!} token={authToken}
+                <TrashModifiedImages images={modifiedImages} workId={workId!} ticket={imageTicket}
                   restoringOriginal={restoringOriginal} onRestoreOriginal={handleRestoreOriginal} t={t} />
-                <TrashSplitRemnants pages={split} workId={workId!} token={authToken} t={t} />
+                <TrashSplitRemnants pages={split} workId={workId!} ticket={imageTicket} t={t} />
               </>
             );
           })()}

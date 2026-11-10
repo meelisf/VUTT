@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAdminImageTicket } from '../../../hooks/useAdminImageTicket';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import {
@@ -33,6 +34,7 @@ interface Props {
  * Otsustusloogika elab `prepressPlan.ts`-is; see komponent on raam ja vormindaja.
  */
 const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
+  const ticket = useAdminImageTicket(`upload:${uploadId}`, token);
   const { t } = useTranslation(['upload', 'common']);
   const [plan, setPlan] = useState<PrepressPlan | null>(null);
   const [detailPage, setDetailPage] = useState<number | null>(null);
@@ -327,7 +329,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
         <div className={selected.size > 0 ? 'pb-24' : ''}>
           <SplitContactSheet
             uploadId={uploadId}
-            token={token}
+            ticket={ticket}
             plan={plan}
             gridCols={gridCols}
             selected={selected}
@@ -372,7 +374,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
       {detailPage !== null && (
         <SplitPageDetail
           uploadId={uploadId}
-          token={token}
+          ticket={ticket}
           plan={plan}
           pageNum={detailPage}
           onPageChange={handlePageChange}

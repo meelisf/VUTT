@@ -33,10 +33,12 @@ describe('ruhmita', () => {
 });
 
 describe('historyThumbUrl', () => {
-  it('kannab versiooni ja tokeni kaasa', () => {
-    const url = historyThumbUrl('w1', 'trash', 'a b.jpg', 12345, 'tok');
+  it('kannab versiooni ja pileti kaasa, mitte sessioonitokenit (#764)', () => {
+    const url = historyThumbUrl('w1', 'trash', 'a b.jpg', 12345, { exp: 99, sig: 'abc' });
     expect(url).toContain('/admin/work/w1/history-thumb/trash/a%20b.jpg');
     expect(url).toContain('v=12345');
-    expect(url).toContain('token=tok');
+    expect(url).toContain('exp=99&sig=abc');
+    expect(url).not.toContain('token=');
+    expect(historyThumbUrl('w1', 'trash', 'a.jpg', 1, null)).toBe('');
   });
 });

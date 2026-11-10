@@ -225,17 +225,27 @@ describe('uploadApi failide üleslaadimine', () => {
 });
 
 describe('prepressPreviewUrl (#431)', () => {
+  it('URL kannab piletit, mitte sessioonitokenit; piletita on tühi (#764)', async () => {
+    const { prepressPreviewUrl, uploadThumbUrl } = await import('../uploadApi');
+    const url = prepressPreviewUrl('u1', 3, { exp: 99, sig: 'abc' }, 90);
+    expect(url).toContain('exp=99&sig=abc');
+    expect(url).not.toContain('token=');
+    expect(prepressPreviewUrl('u1', 3, null)).toBe('');
+    expect(uploadThumbUrl('u1', 2, { exp: 99, sig: 'abc' })).toContain('/thumb/2?exp=99&sig=abc');
+    expect(uploadThumbUrl('u1', 2, null)).toBe('');
+  });
+
   it('ilma adjustita URL ei muutu', async () => {
     const { prepressPreviewUrl } = await import('../uploadApi');
-    expect(prepressPreviewUrl('u1', 3, 'tok', 90)).not.toContain('adj=');
+    expect(prepressPreviewUrl('u1', 3, { exp: 99, sig: 'abc' }, 90)).not.toContain('adj=');
   });
 
   it('adjust käib URL-is: iga kärbe annab eri pildi-URL-i', async () => {
     const { prepressPreviewUrl } = await import('../uploadApi');
     const a = { angle: 0, crop: { x: 0, y: 0, w: 0.5, h: 1 }, quad: null };
-    const url = prepressPreviewUrl('u1', 3, 'tok', 0, a);
+    const url = prepressPreviewUrl('u1', 3, { exp: 99, sig: 'abc' }, 0, a);
     const adj = new URL(url, 'http://x').searchParams.get('adj');
     expect(JSON.parse(adj!)).toEqual(a);
-    expect(prepressPreviewUrl('u1', 3, 'tok', 0, { ...a, crop: { ...a.crop, w: 0.6 } })).not.toBe(url);
+    expect(prepressPreviewUrl('u1', 3, { exp: 99, sig: 'abc' }, 0, { ...a, crop: { ...a.crop, w: 0.6 } })).not.toBe(url);
   });
 });

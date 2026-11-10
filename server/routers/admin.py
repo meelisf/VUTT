@@ -16,7 +16,8 @@ from ..auth import (
     update_user_role,
 )
 from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
-from ..deps import get_json_data, require_role
+from .. import image_tickets
+from ..deps import admin_image_access, get_json_data, require_role
 from ..git_ops import (
     clear_git_failures,
     delete_work_from_git,
@@ -315,13 +316,22 @@ def admin_work_metadata(work_id: str, user=Depends(require_role("admin"))):
         return json.load(f)
 
 
+@router.get("/admin/image-ticket")
+def admin_image_ticket(scope: str, user=Depends(require_role("admin"))):
+    """Lühiajaline pilet admini `<img src>` piltidele ühe ulatuse piires
+    (`upload:<id>` | `work:<id>`). Sessioonitoken ei käi URL-is (#764)."""
+    if not image_tickets.is_valid_scope(scope):
+        raise HTTPException(status_code=400, detail="Vigane ulatus")
+    return image_tickets.issue(scope)
+
+
 @router.get("/admin/work/{work_id}/history-thumb/{kind}/{filename}")
 def admin_history_thumb(work_id: str, kind: str, filename: str,
-                        user=Depends(require_role("admin"))):
+                        _=Depends(admin_image_access("work", "work_id"))):
     """Pisipilt prügikasti või originaalide kaustast.
 
-    `<img src>` ei saa saata Authorization päist — `get_user` võtab tokeni ka
-    query-parameetrist (`deps.py:29`), seega klient lisab `?token=`.
+    `<img src>` ei saa saata Authorization päist — klient lisab pileti
+    (`?exp=&sig=`, `GET /admin/image-ticket`), mitte sessioonitokenit (#764).
     """
     try:
         # ALGNE failinimi, mitte basename: valideerimine kuulub abifunktsiooni,

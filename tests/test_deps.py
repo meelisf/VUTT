@@ -47,8 +47,8 @@ def test_get_user_missing_token_raises_401(backend_env):
     assert exc.value.status_code == 401
 
 
-def test_get_user_with_query_param_token(login):
-    """query-param 'token' on <img src> tüüpi GET-id jaoks (nt upload thumb)."""
+def test_get_user_ei_loe_tokenit_queryst(login):
+    """Sessioonitoken URL-is jääks access-logi (#764): `?token=` EI autendi."""
     from server.deps import get_user
     from starlette.requests import Request
 
@@ -60,8 +60,9 @@ def test_get_user_with_query_param_token(login):
     }
     request = Request(scope)
 
-    user = asyncio.run(get_user(request))
-    assert user["username"] == "editor"
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(get_user(request))
+    assert exc.value.status_code == 401
 
 
 def test_get_user_invalid_token_raises_401(backend_env):

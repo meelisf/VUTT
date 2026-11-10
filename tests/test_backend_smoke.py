@@ -152,14 +152,22 @@ def test_admin_upload_status_returns_staged_state(client, login, make_upload):
     }
 
 
-def test_admin_upload_thumb_serves_file_with_legacy_query_token(client, login, make_upload):
+def test_admin_upload_thumb_serves_file_with_image_ticket(client, login, make_upload):
     upload_dir, state = make_upload("upl456")
     thumb_path = upload_dir / "thumbs" / "001.jpg"
     thumb_bytes = b"fake-jpeg-bytes"
     thumb_path.write_bytes(thumb_bytes)
     token = login("admin", "adminpass")
 
-    response = client.get(f"/admin/upload/{state['id']}/thumb/1?token={token}")
+    url = f"/admin/upload/{state['id']}/thumb/1"
+    # Sessioonitoken URL-is ei kehti enam (#764); pilet on seotud SELLE upload'iga.
+    assert client.get(f"{url}?token={token}").status_code == 401
+    h = {"Authorization": f"Bearer {token}"}
+    t = client.get(f"/admin/image-ticket?scope=upload:{state['id']}", headers=h).json()
+    muu = client.get("/admin/image-ticket?scope=upload:teine", headers=h).json()
+    assert client.get(f"{url}?exp={muu['exp']}&sig={muu['sig']}").status_code == 401
+    assert client.get(f"{url}?exp=1&sig={t['sig']}").status_code == 401
+    response = client.get(f"{url}?exp={t['exp']}&sig={t['sig']}")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/jpeg"
