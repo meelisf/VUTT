@@ -20,6 +20,7 @@ from typing import Optional
 from .config import get_logger
 from .exemplar_image_files import ImageFileError, store_image
 from .utils import generate_nanoid, metadata_lock
+from .work_parts import page_stems
 
 logger = get_logger(__name__)
 
@@ -294,6 +295,14 @@ def patch_images(work_dir: str, eid: str, revision, images, username: str) -> di
             raise ExemplarImagesError("Loend peab sisaldama täpselt praegused pildid", 409,
                                       clean_manifest(current))
         merged = [_merge_image(by_id[i["id"]], i) for i in images]
+        # Sihtlehe kontroll SAMA luku all (lehe kustutus hoiab sama work_lock-i): muudetud
+        # paar peab osutama teose praegusele lehele. Muutmata väärtust ei kontrollita —
+        # rippuv vana paar ei tohi blokeerida sildi muutmist, selle koristab sünk.
+        changed = {m["page"] for m in merged
+                   if m.get("page") and m["page"] != by_id[m["id"]].get("page")}
+        if changed and not changed <= set(page_stems(work_dir)):
+            raise ExemplarImagesError("Paar osutab lehele, mida teosel enam ei ole", 409,
+                                      clean_manifest(current))
         new = clean_manifest({**current, "images": merged})
         if new["images"] == clean_manifest(current)["images"]:
             return _with_commit_flag(current, True)          # ADR 0012: no-op

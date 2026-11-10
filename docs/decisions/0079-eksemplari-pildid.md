@@ -53,7 +53,29 @@ lugemisõiguse kontrolliga.
 Eksemplari pilt ei ole teose leht. `_exemplars/` ei sattu ühtegi lehtede loendisse (Meili
 sünk, `lehekylje_number`, `refresh_work_mentions`, poolitus/järjestus, kaanepilt) ja
 Workspace ei näe neid. Vaade on alamleht `/work/{id}/exemplar/{eid}`. Pildi `page` on
-ainult kõrvutamise mugavus; lehetoimingutega seda ei sünkroniseerita.
+ainult kõrvutamise mugavus.
+
+**Täiendus 2026-11-10 (paarid ja lehetoimingud).** Paar kehtib ainult siis, kui tema tüvi
+on teose praeguste lehetüvede hulgas. Sellest tuleneb:
+
+1. **Koristus on olekupõhine.** `refresh_work_mentions` kutsub
+   `exemplar_images.prune_dangling_pairs`-i, mis eemaldab igast manifestist paarid, mille
+   tüve teosel enam ei ole. Idempotentne; võtab AINULT `metadata_lock`-i, sest
+   `work_lock` ei ole taassisenetav ja kutsuja võib seda hoida.
+2. **Poolitus ei jaota paare pooltele** — paar eemaldatakse (kaks sama lehega seotud
+   pilti võivad olla üldvaade ja detail). Lehetoimingu vastus kannab `pairs_removed`-i ja
+   haldus näitab seda teatena.
+3. **Lugemine ei usalda manifesti.** Paar, mille tüve täielikus leheloendis
+   (`GET /works/{id}/exemplars` → `page_numbers`, kettalt) ei ole, on paari puudumine.
+4. **Kirjutus kontrollib sihtlehte** sama luku all: muudetud `page`, mida teose lehtede
+   hulgas ei ole → 409 koos praeguse manifestiga. Muutmata `page`-i ei kontrollita.
+5. **Lehestiku asendus** kasutab tüved uuesti, seega eemaldab `clear_all_pairs` kõik
+   paarid ENNE sisu asendamist; ebaõnnestumisel asendus katkeb.
+6. **Ebaõnnestumine on nähtav:** ühenduskoht neelab koristuse vea, aga kirjutab selle
+   `record_server_error`-iga kliendivigade ringi (#133).
+
+Detailid: `docs/superpowers/specs/2026-11-10-eksemplari-leht-design.md`, jaotis „Paarid ja
+lehetoimingud".
 
 ### 4. Lukustus ja revisjon
 
