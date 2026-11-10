@@ -367,7 +367,8 @@
     "splitAt": "Split at {{percent}}%",
     "notSplit": "Not split",
     "page": "Page {{cur}} / {{total}}",
-    "resetToGlobal": "Reset to global line"
+    "resetToGlobal": "Reset to global line",
+    "croppedPreview": "Preview with crop, the image is not cut yet"
   },
   "filterPanel": {
     "title": "Filters",

@@ -16,6 +16,7 @@ import { addRotation, clampSplitX } from './pagePrep/geometry';
 import { useSplitDrag } from './pagePrep/useSplitDrag';
 import SplitLine from './pagePrep/SplitLine';
 import EditToolbar from './pagePrep/EditToolbar';
+import CroppedPreviewMark from './pagePrep/CroppedPreviewMark';
 import EditorTabs from './pagePrep/EditorTabs';
 import PageNavFooter from './pagePrep/PageNavFooter';
 import PendingGroup from './pagePrep/PendingGroup';
@@ -526,6 +527,8 @@ const PageImageEditorModal: React.FC<Props> = ({
                       }}
                     />
                   )}
+                  {/* Ootel kärbega leht: eelvaade on kärbitud — raam ütleb, et pilt pole veel lõigatud. */}
+                  {splitPreviewUrl && <CroppedPreviewMark />}
                   {willSplit ? (
                     <SplitLine
                       x={splitX}
