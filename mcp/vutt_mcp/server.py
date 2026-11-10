@@ -567,6 +567,19 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         return exemplars_mod.work_exemplars(client, work_id)
 
     @mcp.tool(structured_output=False)
+    async def get_works_exemplars(work_ids: list[str]) -> str:
+        """Mitme teose eksemplarid ÜHE päringuga (kuni 50 work_id-d).
+
+        Kasuta selle asemel, et kutsuda get_work_exemplars teose kaupa tsüklis:
+        server piirab sagedust (~10 päringut sekundis kogu ülikooli IP kohta) ja
+        tsükkel jookseb selle lakke. Vastus: `works` ({work_id: {exemplars: [...]}},
+        väljad nagu get_work_exemplars'is), `holders`, `holder_aliases` ja
+        `errors` ({work_id: põhjus}) piiratud/puuduvate teoste kohta — need ei
+        kuku kogu vastust. Pikema loendi jaga 50 kaupa osadeks.
+        """
+        return exemplars_mod.works_exemplars(client, work_ids)
+
+    @mcp.tool(structured_output=False)
     async def submit_exemplar_proposal(handoff_code: str, work_id: str, rows: list[dict],
                                        note: str | None = None) -> str:
         """Esitab teose eksemplaride ettepaneku (ESTERi põhjal) superadmini ülevaatuseks.
