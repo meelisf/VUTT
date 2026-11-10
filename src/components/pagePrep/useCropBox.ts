@@ -54,13 +54,15 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
   }, [cropRect]);
 
   /** Lähtesta leheks: kõik tühjaks, siis "kleepuv" suurus tsentreeritud kastina. */
-  const reset = useCallback(() => {
+  // `withSticky=false`: kleepuvat kasti ei panda (suurus jääb meelde) — nt lehel, kus on
+  // juba ootel kärbe: tühi kast peidaks ootel kärbe kontuuri.
+  const reset = useCallback((withSticky = true) => {
     setBoxAngle(0);
     setCropDraft(null);
     setPerspective(false);
     setQuad(null);
     interaction.current = null;
-    if (lastCropSizeRef.current) {
+    if (withSticky && lastCropSizeRef.current) {
       const w = Math.min(Math.max(lastCropSizeRef.current.w, 0.01), 0.98);
       const h = Math.min(Math.max(lastCropSizeRef.current.h, 0.01), 0.98);
       setCropRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });

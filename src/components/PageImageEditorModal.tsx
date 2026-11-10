@@ -117,6 +117,9 @@ const PageImageEditorModal: React.FC<Props> = ({
   // pöörde muutusel uuesti joosta — see pühiks pildi mõõdud ja kärpekasti).
   const pendingRotateRef = useRef(pendingRotate);
   pendingRotateRef.current = pendingRotate;
+  // Sama lehe-vahetuse effectile: ootel kärbega lehele ei panda kleepuvat kasti.
+  const hasPendingAdjustRef = useRef(false);
+  hasPendingAdjustRef.current = !!pendingAdjust;
 
   // Mõõda lava tegelik suurus (uueneb akna/modaali muutudes ja tabi vahetusel).
   // Korraga on mountitud ainult ühe tabi lava → re-attach [tab] muutudes.
@@ -194,7 +197,7 @@ const PageImageEditorModal: React.FC<Props> = ({
     setGrossAngle(pendingRotateRef.current);
     setImgNatural(null);
     setError(null);
-    resetCrop();
+    resetCrop(!hasPendingAdjustRef.current);
   }, [current?.filename, cacheBust, resetCrop]);
 
   // Jäme 90°/180° pööre rakendub PILDILE; kärbe/kalle lähtestatakse (display-raam muutub).
