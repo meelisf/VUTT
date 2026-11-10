@@ -41,7 +41,7 @@ const ADJ = { angle: 0, crop: { x: 0.1, y: 0, w: 0.5, h: 1 }, quad: null };
 describe('PageImageEditorModal poolitus', () => {
   it('lehekohane joon tuleb plaanist ka uuel avamisel', () => {
     renderModal({ 'a.jpg': { rotate: 0, split: true, split_x: 0.42 } });
-    expect(screen.getByTestId('editor-split-state').textContent).toContain('manage.editor.splitAt:42');
+    expect(screen.getByTestId('editor-split-state').textContent).toContain('pagePrep.splitAt:42');
   });
 
   it('„Ära poolita" saadab split:false (WorkManage kustutab ka joone, nagu upload\'i nosplit)', () => {
@@ -52,7 +52,7 @@ describe('PageImageEditorModal poolitus', () => {
 
   it('ootel toiminguta leht ei poolitu; „Poolita" märgib üldjoonele', () => {
     const onSplitChange = renderModal();
-    expect(screen.getByTestId('editor-split-state').textContent).toContain('manage.editor.notSplit');
+    expect(screen.getByTestId('editor-split-state').textContent).toContain('common:pagePrep.notSplit');
     fireEvent.click(screen.getByTestId('editor-split-toggle'));
     expect(onSplitChange).toHaveBeenCalledWith('a.jpg', { split: true, split_x: null });
   });
@@ -62,17 +62,17 @@ describe('PageImageEditorModal pööre ja kärbe on ootel plaan (ADR 0061)', () 
   it('muutmata leht: nupp on „Järgmine", liigub edasi ega puuduta plaani', () => {
     const { onEditChange } = renderModal({}, 'edit');
     const btn = screen.getByTestId('editor-mark');
-    expect(btn.textContent).toContain('manage.editor.next');
+    expect(btn.textContent).toContain('common:pagePrep.next');
     fireEvent.click(btn);
     expect(onEditChange).not.toHaveBeenCalled();
-    expect(screen.getByText('manage.editor.page')).toBeTruthy();
+    expect(screen.getByText('common:pagePrep.page')).toBeTruthy();
     // viimasel lehel pole kuhugi minna
     expect((screen.getByTestId('editor-mark') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('ootel kärbe on näha ja eemaldatav', () => {
     const { onAdjustClear } = renderModal({ 'a.jpg': { rotate: 90, split: false, adjust: ADJ } }, 'edit');
-    expect(screen.getByTestId('editor-edit-pending').textContent).toContain('manage.editor.cropPending');
+    expect(screen.getByTestId('editor-edit-pending').textContent).toContain('pagePrep.cropPending');
     fireEvent.click(screen.getByTestId('editor-crop-remove'));
     expect(onAdjustClear).toHaveBeenCalledWith('a.jpg');
   });
@@ -80,7 +80,7 @@ describe('PageImageEditorModal pööre ja kärbe on ootel plaan (ADR 0061)', () 
   it('pööre märgitakse plaani (kasti pole → kärbe kaob)', () => {
     const { onEditChange } = renderModal({}, 'edit');
     fireEvent.click(screen.getByTitle('pagePrep.rotateRight'));
-    expect(screen.getByTestId('editor-mark').textContent).toContain('manage.editor.markAndNext');
+    expect(screen.getByTestId('editor-mark').textContent).toContain('common:pagePrep.markAndNext');
     fireEvent.click(screen.getByTestId('editor-mark'));
     expect(onEditChange).toHaveBeenCalledWith('a.jpg', 90, null);
   });

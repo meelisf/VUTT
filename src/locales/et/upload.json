@@ -138,18 +138,9 @@
     "gridLarger": "Suuremad pisipildid",
     "gridColumns": "Pisipiltide suurus",
     "detail": {
-      "header": "Lk {{n}} · {{total}}-st · poolitatakse joonelt {{percent}}%",
-      "headerNoSplit": "Lk {{n}} · {{total}}-st · ei poolitata",
-      "arrowHint": "← → liigub lehtede vahel",
       "resetToGlobal": "Lähtesta üldjoonele",
-      "headerExcluded": "Lk {{n}} · {{total}}-st · jäetakse välja",
-      "crop": "Kärbi / sirgesta",
-      "cropApply": "Märgi kärbe",
-      "cropCancel": "Tühista",
-      "cropRemove": "Eemalda kärbe",
-      "cropReplaces": "Uus kärbe asendab praeguse. Pööramine eemaldab kärpe.",
-      "cropped": "kärbe ootel",
-      "cropPendingHint": "Eelvaade näitab kärbet, aga pilt lõigatakse alles siis, kui vajutad „Edasi”."
+      "splitHint": "Lohista joont või klõpsa pildil. Poolitus jääb ootele: leht lõigatakse alles siis, kui vajutad „Edasi”.",
+      "editHint": "Pööre ja kärbe jäävad ootele: pilt muutub alles siis, kui vajutad „Edasi”. Uus kärbe asendab praeguse, pööramine eemaldab kärpe."
     },
     "excludedExplain": "Ei OCR-ita ega poolitata — seda lehte teosesse ei teki",
     "waitingRender": "Eelvaade lõpetab — nupp avaneb kohe ({{done}} / {{total}})"

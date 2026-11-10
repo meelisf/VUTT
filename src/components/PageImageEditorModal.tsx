@@ -3,7 +3,7 @@
 // (vt CLAUDE.md „Kaks pildiredaktorit“).
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
-import { X, Crop, Columns2, LayoutGrid, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, Undo2, MoreHorizontal, Clock } from 'lucide-react';
+import { X, Columns2, Loader2, AlertTriangle, ChevronRight, Check, Upload, Undo2, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -16,6 +16,9 @@ import { addRotation, clampSplitX } from './pagePrep/geometry';
 import { useSplitDrag } from './pagePrep/useSplitDrag';
 import SplitLine from './pagePrep/SplitLine';
 import EditToolbar from './pagePrep/EditToolbar';
+import EditorTabs from './pagePrep/EditorTabs';
+import PageNavFooter from './pagePrep/PageNavFooter';
+import PendingGroup from './pagePrep/PendingGroup';
 import PendingOutline from './pagePrep/PendingOutline';
 import { useCropBox } from './pagePrep/useCropBox';
 import CropOverlay from './pagePrep/CropOverlay';
@@ -181,15 +184,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   const crop = useCropBox(displayW, displayH, !!imgNatural);
   const resetCrop = crop.reset;
 
-  // Ootel muudatuse sõnastus ja kontuur — mis täpselt on plaanis (kärbe, perspektiiv, kalle).
-  const adjustLabel = !pendingAdjust ? '' : pendingAdjust.quad
-    ? t('manage.editor.perspectivePending')
-    : pendingAdjust.crop
-      ? (Math.abs(pendingAdjust.angle) >= 0.05
-        ? t('manage.editor.cropTiltPending', { deg: pendingAdjust.angle.toFixed(1) })
-        : t('manage.editor.cropPending'))
-      : t('manage.editor.tiltPending', { deg: pendingAdjust.angle.toFixed(1) });
-
   // Lähtesta teisendused + mõõda uuesti, kui leht vahetub VÕI pildi sisu muutub
   // (cacheBust uueneb iga mutatsiooni järel — nt kärbe muudab kuvasuhet).
   // crop.reset taastab "kleepuva" kärpe-suuruse tsentreeritud kastina (kui mõni
@@ -348,11 +342,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   );
 
 
-  const toolBtn = 'rounded border border-gray-300 bg-white p-2 hover:bg-gray-100';
-  const tabBtn = (active: boolean) =>
-    `flex items-center gap-1.5 rounded-md px-3 py-1 text-sm transition-colors ${
-      active ? 'bg-white font-medium text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`;
-
   return (
     // Raam, kõrgus ja jaluse nupurühm järgivad upload'i detailvaadet
     // (`SplitPageDetail`): sama töö („vaata → otsusta → järgmine"), sama kuju.
@@ -366,63 +355,29 @@ const PageImageEditorModal: React.FC<Props> = ({
         {/* Päis: mis leht, mis vaade, mis selle lehega juhtub. */}
         <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-t border-b border-gray-200 bg-white px-4 py-2.5">
           <h2 className="whitespace-nowrap font-semibold text-gray-900">
-            {t('manage.editor.page', { cur: safeIndex + 1, total: pages.length })}
+            {t('common:pagePrep.page', { cur: safeIndex + 1, total: pages.length })}
           </h2>
-          <div role="tablist" className="flex flex-shrink-0 rounded-lg bg-gray-100 p-0.5">
-            <button role="tab" aria-selected={tab === 'edit'}
-              onClick={() => switchTab('edit')} className={tabBtn(tab === 'edit')}>
-              <Crop size={14} />{t('manage.editor.tabEdit')}
-            </button>
-            <button role="tab" aria-selected={tab === 'split'}
-              onClick={() => switchTab('split')} className={tabBtn(tab === 'split')}>
-              <Columns2 size={14} />{t('manage.editor.tabSplit')}
-            </button>
-          </div>
+          <EditorTabs tab={tab} onChange={switchTab} />
 
           {/* Ootel olek ühes rühmas: vasakul selle lehe muudatused (mõlemal vahekaardil),
               paremal „Rakenda kõik" kogu teose kohta. Üks kollane kujund, mitte kaks
               pilli, ja kogu info on ühes kohas. Rühm asub päises, et jalus ei kasvaks
               ja pilt ei hüppaks. */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {(totalPending > 0 || willSplit) && (
-              <div data-testid="editor-pending-group"
-                className="flex min-w-0 items-stretch overflow-hidden rounded-full border border-amber-300 bg-amber-50 text-xs font-medium text-amber-900">
-                {(pendingAdjust || pendingRotate !== 0 || willSplit) && (
-                  <span data-testid="editor-edit-pending" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1">
-                    <Clock size={12} className="flex-shrink-0" />
-                    {pendingRotate !== 0 && <span>{t('manage.editor.rotatePending', { deg: pendingRotate })}</span>}
-                    {pendingAdjust && (
-                      <span className="flex items-center gap-1">
-                        {adjustLabel}
-                        <button
-                          data-testid="editor-crop-remove"
-                          onClick={() => onAdjustClear(current.filename)}
-                          title={t('manage.editor.cropRemove')}
-                          aria-label={t('manage.editor.cropRemove')}
-                          className="rounded-full p-0.5 hover:bg-amber-200"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    )}
-                    {willSplit && (
-                      <span data-testid="editor-split-state">
-                        {t('manage.editor.splitAt', { percent: Math.round(splitX * 1000) / 10 })}
-                      </span>
-                    )}
-                  </span>
-                )}
-                {totalPending > 0 && onApplyAll && (
-                  <button data-testid="editor-apply-all" onClick={applyAll}
-                    title={t('manage.editor.pendingChipTitle')}
-                    className="flex items-center gap-1.5 bg-amber-600 px-3 py-1 text-white hover:bg-amber-700">
-                    <Check size={12} />{t('manage.editor.applyAll', { count: totalPending })}
-                  </button>
-                )}
-              </div>
-            )}
+            <PendingGroup
+              rotate={pendingRotate} adjust={pendingAdjust}
+              splitPercent={willSplit ? Math.round(splitX * 1000) / 10 : null}
+              onAdjustClear={() => onAdjustClear(current.filename)} testIdPrefix="editor">
+              {totalPending > 0 && onApplyAll && (
+                <button data-testid="editor-apply-all" onClick={applyAll}
+                  title={t('manage.editor.pendingChipTitle')}
+                  className="flex items-center gap-1.5 bg-amber-600 px-3 py-1 text-white hover:bg-amber-700">
+                  <Check size={12} />{t('manage.editor.applyAll', { count: totalPending })}
+                </button>
+              )}
+            </PendingGroup>
             {tab === 'split' && !willSplit && (
-              <span data-testid="editor-split-state" className="text-xs text-gray-500">{t('manage.editor.notSplit')}</span>
+              <span data-testid="editor-split-state" className="text-xs text-gray-500">{t('common:pagePrep.notSplit')}</span>
             )}
             {tab === 'split' && pendingRotate !== 0 && (
               <span className="text-xs text-amber-700">{t('manage.editor.splitAfterRotate', { deg: pendingRotate })}</span>
@@ -581,7 +536,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                     // Sama märk nagu upload'i detailvaates: vaade ei näita joont, mida ei lõigata.
                     <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-6">
                       <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
-                        <Columns2 size={15} />{t('manage.editor.notSplit')}
+                        <Columns2 size={15} />{t('common:pagePrep.notSplit')}
                       </span>
                     </div>
                   )}
@@ -640,23 +595,8 @@ const PageImageEditorModal: React.FC<Props> = ({
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-1">
-              {/* Sama nupp nagu upload'i detailvaates: Escape üksi ei ütle, kuhu ta viib. */}
-              <button
-                data-testid="back-to-overview"
-                onClick={onClose}
-                className="mr-2 flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-100"
-              >
-                <LayoutGrid size={15} />
-                {t('manage.editor.backToOverview')}
-              </button>
-              <button onClick={() => goTo(currentIndex - 1)} disabled={safeIndex <= 0}
-                title={t('manage.editor.prev')} className={`${toolBtn} disabled:opacity-40`}>
-                <ChevronLeft size={16} />
-              </button>
-              <button onClick={() => goTo(currentIndex + 1)} disabled={safeIndex >= pages.length - 1}
-                title={t('manage.editor.next')} className={`${toolBtn} disabled:opacity-40`}>
-                <ChevronRight size={16} />
-              </button>
+              <PageNavFooter onBack={onClose} onPrev={() => goTo(currentIndex - 1)}
+                onNext={() => goTo(currentIndex + 1)} hasPrev={safeIndex > 0} hasNext={safeIndex < pages.length - 1} />
 
               {tab === 'split' && (
               <div className="ml-2 flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3">
@@ -678,7 +618,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                         onClick={() => onSplitChange(current.filename, { split: true, split_x: null })}
                         className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100"
                       >
-                        {t('manage.editor.resetToGlobal')}
+                        {t('common:pagePrep.resetToGlobal')}
                       </button>
                     )}
                   </>
@@ -695,8 +635,8 @@ const PageImageEditorModal: React.FC<Props> = ({
                 className="flex items-center gap-2 rounded bg-indigo-600 px-5 py-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
               >
                 {noEditChange
-                  ? t('manage.editor.next')
-                  : isLast ? <><Check size={14} />{t('manage.editor.markPending')}</> : t('manage.editor.markAndNext')}
+                  ? t('common:pagePrep.next')
+                  : isLast ? <><Check size={14} />{t('common:pagePrep.markPending')}</> : t('common:pagePrep.markAndNext')}
                 {!isLast && <ChevronRight size={14} />}
               </button>
             )}

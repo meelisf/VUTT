@@ -45,59 +45,82 @@ function renderDetail(p: PrepressPlan) {
   return { ...utils, onPageChange, img };
 }
 
-describe('SplitPageDetail kärpimine', () => {
-  it('kärbitud leht: tavavaade kannab adj-i, päis ütleb „kärbitud"', () => {
+const toEditTab = () => fireEvent.click(screen.getByTestId('editor-tab-edit'));
+
+describe('SplitPageDetail vahekaardid ja kärpimine', () => {
+  it('avaneb „Poolita" vahekaardil: kärbitud leht kannab adj-i ja ootel-kapslit', () => {
     const { img } = renderDetail(plan({ adjust: KÄRBE }));
     expect(img().src).toContain('adj=');
-    expect(screen.getByTestId('detail-cropped')).toBeTruthy();
+    expect(screen.getByTestId('detail-edit-pending')).toBeTruthy();
+    expect(screen.queryByTestId('detail-toolbar')).toBeNull();
   });
 
-  it('kärpimisrežiim näitab kohandamata eelvaadet ja kärpekasti', () => {
+  it('„Pööra ja kärbi" näitab kohandamata eelvaadet, kärpekasti ja ühist riba', () => {
     const { img } = renderDetail(plan({ adjust: KÄRBE }));
-    fireEvent.click(screen.getByTestId('detail-crop'));
+    toEditTab();
     expect(img().src).not.toContain('adj=');
     expect(screen.getByTestId('detail-crop-area')).toBeTruthy();
-    // Kasti veel ei ole → kinnitada ei saa.
-    expect((screen.getByTestId('detail-crop-apply') as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByTestId('detail-crop-cancel'));
-    expect(screen.queryByTestId('detail-crop-area')).toBeNull();
+    expect(screen.getByTestId('detail-toolbar')).toBeTruthy();
+    // Kasti veel pole ja see on ainus leht → märkida pole midagi.
+    expect((screen.getByTestId('detail-mark') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('kärpimisrežiim: ühine tööriistaveerg ja ootel kärbe kontuur (sama mis halduses)', () => {
+  it('ootel kärbe kontuur on nähtav; kärbeta lehel ei ole', () => {
     renderDetail(plan({ adjust: KÄRBE }));
-    expect(screen.queryByTestId('detail-toolbar')).toBeNull();
-    fireEvent.click(screen.getByTestId('detail-crop'));
-    expect(screen.getByTestId('detail-toolbar')).toBeTruthy();
+    toEditTab();
     expect(screen.getByTestId('detail-pending-outline')).toBeTruthy();
   });
 
   it('kärbeta lehel kontuuri ei ole', () => {
     renderDetail(plan());
-    fireEvent.click(screen.getByTestId('detail-crop'));
+    toEditTab();
     expect(screen.queryByTestId('detail-pending-outline')).toBeNull();
   });
 
-  it('perspektiiv + kinnitus kirjutab plaani quad-i serveri kujul', () => {
+  it('perspektiiv + „Märgi" kirjutab plaani quad-i serveri kujul', () => {
     const { onPageChange } = renderDetail(plan());
-    fireEvent.click(screen.getByTestId('detail-crop'));
+    toEditTab();
     fireEvent.click(screen.getByTestId('detail-tool-perspective'));
-    fireEvent.click(screen.getByTestId('detail-crop-apply'));
+    fireEvent.click(screen.getByTestId('detail-mark'));
     const patch = onPageChange.mock.calls[0][1];
     expect(patch.adjust.crop).toBeNull();
     expect(patch.adjust.quad).toHaveLength(4);
     expect(Array.isArray(patch.adjust.quad[0])).toBe(true);
-    expect(screen.queryByTestId('detail-crop-area')).toBeNull();
   });
 
-  it('pööre eemaldab kärpe', () => {
+  it('vahekaardi vahetus kirjutab märkimata kasti plaani (nagu halduses)', () => {
+    const { onPageChange } = renderDetail(plan());
+    toEditTab();
+    fireEvent.click(screen.getByTestId('detail-tool-perspective'));
+    fireEvent.click(screen.getByTestId('editor-tab-split'));
+    expect(onPageChange.mock.calls[0][1].adjust.quad).toHaveLength(4);
+  });
+
+  it('pööre (ribal) eemaldab kärpe', () => {
     const { onPageChange } = renderDetail(plan({ adjust: KÄRBE }));
+    toEditTab();
     fireEvent.click(screen.getByTestId('detail-rotate-right'));
     expect(onPageChange).toHaveBeenCalledWith(1, { rotate: 90, adjust: null });
   });
 
-  it('„Eemalda kärbe" kirjutab null-i', () => {
+  it('kapsli ✕ eemaldab kärbe (null)', () => {
     const { onPageChange } = renderDetail(plan({ adjust: KÄRBE }));
     fireEvent.click(screen.getByTestId('detail-crop-remove'));
     expect(onPageChange).toHaveBeenCalledWith(1, { adjust: null });
+  });
+
+  it('„Välista leht" on päises mõlemal vahekaardil', () => {
+    const { onPageChange } = renderDetail(plan());
+    fireEvent.click(screen.getByTestId('detail-exclude'));
+    expect(onPageChange).toHaveBeenCalledWith(1, { excluded: true });
+    toEditTab();
+    expect(screen.getByTestId('detail-exclude')).toBeTruthy();
+  });
+
+  it('jalus: Tagasi ülevaatesse ja lehenooled on ühised', () => {
+    renderDetail(plan());
+    expect(screen.getByTestId('back-to-overview')).toBeTruthy();
+    expect(screen.getByTestId('page-prev')).toBeTruthy();
+    expect(screen.getByTestId('page-next')).toBeTruthy();
   });
 });
