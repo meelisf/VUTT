@@ -478,7 +478,10 @@
       }
     },
     "pairsRemoved_one": "{{count}} eksemplari pildipaar eemaldati, sest leht muutus.",
-    "pairsRemoved_other": "{{count}} eksemplari pildipaari eemaldati, sest lehed muutusid."
+    "pairsRemoved_other": "{{count}} eksemplari pildipaari eemaldati, sest lehed muutusid.",
+    "scanOrigin": "Skaneering:",
+    "scanOriginUnset": "alus märkimata",
+    "scanOriginMark": "Märgi alus…"
   },
   "metadata": {
     "title": "Metaandmed",
@@ -559,7 +562,8 @@
     "subjects": "Kelle kohta",
     "subjectsHint": "Isikud, kellest või kellele tekst on: leinatrükise lahkunu, pühenduse saaja, õnnitletav pruutpaar. Ainult isikuregistri või välisallika (Wikidata/GND/VIAF) kaudu.",
     "addSubject": "Lisa isik, kelle kohta tekst on…",
-    "subjectsNeedPerson": "Siia saab lisada ainult isikuregistri või Wikidata/GND/VIAF isiku. Kui isikut veel ei ole, loo talle kaart."
+    "subjectsNeedPerson": "Siia saab lisada ainult isikuregistri või Wikidata/GND/VIAF isiku. Kui isikut veel ei ole, loo talle kaart.",
+    "exemplarsMoved": "Muuda eksemplaride lehel →"
   },
   "download": {
     "title": "Lae alla",
@@ -635,7 +639,8 @@
     "tocGoToStart": "ava algus (lk {{page}})",
     "tocLinkCopied": "Link kopeeritud",
     "tocPages": "lk",
-    "exemplarPages": "lk {{pages}}"
+    "exemplarPages": "lk {{pages}}",
+    "exemplarsAll": "Kõik andmed →"
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"
@@ -829,15 +834,11 @@
     "packPagesGone": "Paki lehed on teosest kadunud — pakki saab tagasi lükata."
   },
   "exemplarImages": {
-    "title": "Eksemplari pildid",
     "back": "Tagasi teose juurde",
     "notFound": "Eksemplari ei leitud.",
-    "loadError": "Pilte ei õnnestunud laadida.",
-    "empty": "Sellel eksemplaril pole veel pilte.",
     "count_one": "{{count}} pilt",
     "count_other": "{{count}} pilti",
     "open": "Ava eksemplari pildid",
-    "imageAlt": "Eksemplari pilt {{n}}",
     "edit": "Muuda pilte",
     "source": {
       "ada": "ADA {{ref}}",
@@ -878,7 +879,6 @@
       }
     },
     "ada": {
-      "open": "Impordi ADA-st",
       "title": "Import ADA-st",
       "handle": "Handle või ADA link",
       "from": "Alates lehest",
@@ -901,8 +901,6 @@
   },
   "exemplars": {
     "title": "Eksemplarid",
-    "savesImmediately": "Eksemplari muudatused salvestuvad kohe, mitte metaandmete salvestusnupuga.",
-    "none": "Eksemplare ei ole lisatud.",
     "loadError": "Eksemplaride laadimine ebaõnnestus.",
     "saveError": "Eksemplari muudatust ei salvestatud.",
     "holder": "Hoidja",
@@ -910,7 +908,6 @@
     "shelfmark": "Kohaviit",
     "shelfmarkPlaceholder": "nt R Est.B-954",
     "url": "URL (valikuline)",
-    "more": "Rohkem",
     "fields": {
       "condition": "Seisund",
       "binding": "Köide",
@@ -960,7 +957,6 @@
       }
     },
     "convolute": {
-      "toggle": "Konvoluut",
       "label": "Konvoluut",
       "hint": "Täida, kui eksemplar on köidetud koos teiste trükistega. Samas köites on eksemplarid, millel on sama hoidja ja sama konvoluudi kohaviit.",
       "reference": "Konvoluudi kohaviit",

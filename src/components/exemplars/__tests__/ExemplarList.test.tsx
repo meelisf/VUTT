@@ -183,7 +183,7 @@ describe('ExemplarList — toimetamine', () => {
     expect(screen.getByLabelText('exemplars.fields.condition')).toBeTruthy();
   });
 
-  it('6. salvestus: PUT samade väljadega mis ExemplarsSection-is', async () => {
+  it('6. salvestus: PUT samade väljadega mis modaali endine sektsioon', async () => {
     const onChangedSpy = vi.fn();
     renderList({ userRole: 'admin', initialSelected: 'a1', onChangedSpy });
     fireEvent.click(await screen.findByText('exemplars.edit'));

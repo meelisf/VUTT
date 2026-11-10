@@ -478,7 +478,10 @@
       }
     },
     "pairsRemoved_one": "{{count}} exemplar image pairing was removed because the page changed.",
-    "pairsRemoved_other": "{{count}} exemplar image pairings were removed because pages changed."
+    "pairsRemoved_other": "{{count}} exemplar image pairings were removed because pages changed.",
+    "scanOrigin": "Scan:",
+    "scanOriginUnset": "source not marked",
+    "scanOriginMark": "Mark source…"
   },
   "metadata": {
     "title": "Metadata",
@@ -559,7 +562,8 @@
     "subjects": "About whom",
     "subjectsHint": "Persons the text is about or addressed to: the deceased in a funeral print, the dedicatee, the couple in a wedding poem. Only via the persons register or an external source (Wikidata/GND/VIAF).",
     "addSubject": "Add a person the text is about…",
-    "subjectsNeedPerson": "Only a person from the register or from Wikidata/GND/VIAF can be added here. If the person does not exist yet, create a card."
+    "subjectsNeedPerson": "Only a person from the register or from Wikidata/GND/VIAF can be added here. If the person does not exist yet, create a card.",
+    "exemplarsMoved": "Edit on the exemplars page →"
   },
   "download": {
     "title": "Download",
@@ -635,7 +639,8 @@
     "tocGoToStart": "go to start (p. {{page}})",
     "tocLinkCopied": "Link copied",
     "tocPages": "p.",
-    "exemplarPages": "p. {{pages}}"
+    "exemplarPages": "p. {{pages}}",
+    "exemplarsAll": "All details →"
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
@@ -829,15 +834,11 @@
     "packPagesGone": "The pack's pages are no longer in the work — the pack can be rejected."
   },
   "exemplarImages": {
-    "title": "Exemplar images",
     "back": "Back to the work",
     "notFound": "Exemplar not found.",
-    "loadError": "Could not load the images.",
-    "empty": "This exemplar has no images yet.",
     "count_one": "{{count}} image",
     "count_other": "{{count}} images",
     "open": "Open exemplar images",
-    "imageAlt": "Exemplar image {{n}}",
     "edit": "Edit images",
     "source": {
       "ada": "ADA {{ref}}",
@@ -878,7 +879,6 @@
       }
     },
     "ada": {
-      "open": "Import from ADA",
       "title": "Import from ADA",
       "handle": "Handle or ADA link",
       "from": "From page",
@@ -901,8 +901,6 @@
   },
   "exemplars": {
     "title": "Copies",
-    "savesImmediately": "Changes to copies are saved immediately, not with the metadata save button.",
-    "none": "No copies have been added.",
     "loadError": "Failed to load copies.",
     "saveError": "The change to the copy was not saved.",
     "holder": "Holding institution",
@@ -910,7 +908,6 @@
     "shelfmark": "Shelfmark",
     "shelfmarkPlaceholder": "e.g. R Est.B-954",
     "url": "URL (optional)",
-    "more": "More",
     "fields": {
       "condition": "Condition",
       "binding": "Binding",
@@ -960,7 +957,6 @@
       }
     },
     "convolute": {
-      "toggle": "Bound volume (convolute)",
       "label": "Convolute",
       "hint": "Fill in if the copy is bound together with other printed items. Copies with the same holding institution and convolute shelfmark are grouped together.",
       "reference": "Convolute shelfmark",

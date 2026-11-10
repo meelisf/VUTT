@@ -1,6 +1,6 @@
 /**
  * Eksemplari kirje mustand ja selle teisendus PUT/POST-i kujule (ADR 0076 p 5).
- * Tõstetud `ExemplarsSection`-ist: üks vormi loogika, üks kirjutustee.
+ * Tõstetud metaandmete modaali endisest eksemplaride sektsioonist: üks vormi loogika, üks kirjutustee.
  */
 import type { Exemplar, ExemplarConvolute, ExemplarReproduction, ReproductionKind } from '../../types';
 import type { ExemplarInput } from '../../services/workApi';

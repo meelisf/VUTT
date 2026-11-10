@@ -59,6 +59,7 @@ import PageCard from './manage/PageCard';
 import PartsTab from './manage/parts/PartsTab';
 import { initialManageTab, tabSwitch, type ManageTab } from './manage/partsModel';
 import PageActionBar from './manage/PageActionBar';
+import ScanOriginRow from './manage/ScanOriginRow';
 import {
   PendingPageOps, clearPendingAdjust, pendingCount, pruneMissing, rotatePending, setPendingEdit,
   dropApplied, setPendingSplit, setPendingSplitX, toRequest,
@@ -1098,6 +1099,7 @@ const WorkManage: React.FC = () => {
                 <span className="text-sm text-gray-500">{pages.length} {t('manage.pagesCount', { count: pages.length })}</span>
               </div>
             </div>
+            <ScanOriginRow workId={workId!} exemplars={exemplars} />
 
             {loading ? (
               <div className="flex items-center justify-center py-12 text-gray-400">

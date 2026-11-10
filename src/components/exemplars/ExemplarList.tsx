@@ -2,7 +2,7 @@
  * Eksemplari lehe kaart „Eksemplarid": loend, valitud rea kirje täisvaade ja
  * toimetamine (ADR 0076 p 5; spets 2026-11-10 „Kaart Eksemplarid").
  *
- * Vorm ja kirjutused on tõstetud `ExemplarsSection`-ist (metaandmete modaal):
+ * Vorm ja kirjutused on tõstetud metaandmete modaali endisest eksemplaride sektsioonist:
  * samad väljad, sama valideerimine (`exemplarDraft.ts`), samad otspunktid.
  * Uut kirjutusteed ei ole. Pärast iga kirjutust laeb leht andmed serverist
  * uuesti (`onChanged`) — klient ei arvuta ise, kellelt aluse märge kadus.
