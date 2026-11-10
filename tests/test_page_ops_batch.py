@@ -192,16 +192,25 @@ def test_endpoint_nouab_admini(backend_env, login):
     assert r.status_code == 401
 
 
-def test_eelvaate_endpoint_nouab_admini_ja_lubab_query_tokenit(backend_env, login, monkeypatch):
-    """`<img src>` saadab tokeni `?token=`-iga; editor ei saa eelvaadet."""
+def test_eelvaate_endpoint_nouab_admini_piletit(backend_env, login, monkeypatch):
+    """`<img src>` kannab admini piletit (`?exp=&sig=`, #764); sessioonitoken
+    URL-is ei kehti ja editor piletit ei saa."""
     from server.routers import pages as pages_router
     monkeypatch.setattr(pages_router, "render_page_preview", lambda *a, **kw: b"jpg")
     c = backend_env["client"]
     url = "/admin/work/w1/page-image/a.jpg/preview"
-    assert c.get(f"{url}?token={login('editor', 'editorpass')}").status_code == 401
-    r = c.get(f"{url}?rot=90&token={login('admin', 'adminpass')}")
+    assert c.get(f"{url}?token={login('admin', 'adminpass')}").status_code == 401
+    eh = {"Authorization": f"Bearer {login('editor', 'editorpass')}"}
+    assert c.get("/admin/image-ticket?scope=work:w1", headers=eh).status_code == 401
+    ah = {"Authorization": f"Bearer {login('admin', 'adminpass')}"}
+    assert c.get("/admin/image-ticket?scope=work:../x", headers=ah).status_code == 400
+    t = c.get("/admin/image-ticket?scope=work:w1", headers=ah).json()
+    q = f"exp={t['exp']}&sig={t['sig']}"
+    r = c.get(f"{url}?rot=90&{q}")
     assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
-    assert c.get(f"{url}?adj=%7Bkatki&token={login('admin', 'adminpass')}").status_code == 400
+    assert c.get(f"{url}?adj=%7Bkatki&{q}").status_code == 400
+    # Päisega admin pääseb endiselt (API-kutsed, testid).
+    assert c.get(url, headers=ah).status_code == 200
 
 
 def test_endpoint_kontroll_ja_start(backend_env, login, monkeypatch):

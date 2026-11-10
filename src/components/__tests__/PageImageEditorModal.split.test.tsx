@@ -12,6 +12,8 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, o?: { percent?: number }) => (o?.percent != null ? `${k}:${o.percent}` : k) }),
 }));
 vi.mock('../../contexts/UserContext', () => ({ useUser: () => ({ authToken: 't' }) }));
+// Pilet (#764) on kohe olemas — päringut testis ei tehta.
+vi.mock('../../hooks/useAdminImageTicket', () => ({ useAdminImageTicket: () => ({ exp: 99, sig: 'abc' }) }));
 
 beforeAll(() => {
   globalThis.ResizeObserver = class { observe() {} disconnect() {} unobserve() {} } as never;

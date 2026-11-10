@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAdminImageTicket } from '../../hooks/useAdminImageTicket';
 import { useTranslation } from 'react-i18next';
 import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
 import PageThumbnail from '../../components/PageThumbnail';
@@ -52,6 +53,7 @@ const statusColor = (status: string) => {
 const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
+  const ticket = useAdminImageTicket(`work:${p.workId}`, authToken);
   const imageTokenQuery = p.imageToken ? `&exp=${p.imageToken.exp}&sig=${p.imageToken.sig}` : '';
   const [aspect, setAspect] = React.useState<number | undefined>(undefined);
   const op = p.pendingOp;
@@ -59,8 +61,9 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const lineLeft = showsCardLine(op) ? cardLineLeftPercent(aspect, effectiveSplitX(op, p.splitX)) : null;
   // Kärbet/kallet CSS ei näita → server renderdab pisipildist eelvaate (pööre sees).
   const serverPreview = needsServerPreview(op);
-  const thumbSrc = serverPreview
-    ? workPagePreviewUrl(p.workId, p.filename, authToken, op!.rotate, op!.adjust ?? null, 'thumb', p.thumbCacheBust)
+  // Pilet veel teel → tavaline pisipilt, kuni eelvaate URL-i saab allkirjastada.
+  const thumbSrc = serverPreview && ticket
+    ? workPagePreviewUrl(p.workId, p.filename, ticket, op!.rotate, op!.adjust ?? null, 'thumb', p.thumbCacheBust)
     : `${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}${imageTokenQuery}`;
   return (
     <div

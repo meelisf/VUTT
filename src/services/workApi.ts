@@ -1,3 +1,4 @@
+import type { ImageToken } from '../utils/imageTokenUrl';
 import { LinkedEntity } from '../types/LinkedEntity';
 import type { ConvoluteBlock, Exemplar, ExemplarConvolute, ExemplarReproduction } from '../types';
 import { ApiRequestOptions, apiDelete, apiGet, apiPost, apiPut } from './apiClient';
@@ -295,10 +296,12 @@ export function startWorkPageOps(
  * `thumb` = ruudustiku pisipilt, `view` = pildiredaktori lava.
  */
 export function workPagePreviewUrl(
-  workId: string, filename: string, token: string | null,
+  workId: string, filename: string, ticket: ImageToken | null,
   rotate: number, adjust: PageAdjust | null, size: 'thumb' | 'view', cacheBust = 0,
 ): string {
-  const params = new URLSearchParams({ token: token ?? '', size });
+  // Pilet (`useAdminImageTicket`, ulatus `work:<id>`), mitte sessioonitoken (#764).
+  if (!ticket) return '';
+  const params = new URLSearchParams({ exp: String(ticket.exp), sig: ticket.sig, size });
   if (rotate) params.set('rot', String(rotate));
   if (adjust) params.set('adj', JSON.stringify(adjust));
   if (cacheBust) params.set('v', String(cacheBust));

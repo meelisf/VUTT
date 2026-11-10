@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
 import { X, Crop, Columns2, LayoutGrid, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
@@ -66,6 +67,7 @@ const PageImageEditorModal: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
+  const ticket = useAdminImageTicket(`work:${workId}`, authToken);
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [tab, setTab] = useState<'edit' | 'split'>(initialTab);
@@ -152,8 +154,8 @@ const PageImageEditorModal: React.FC<Props> = ({
   // vahetavad laiuse ja kõrguse), pilt pööratakse CSS-iga selle sisse.
   // Ootel kärpe korral näitab poolitusvahekaart serveri eelvaadet, milles pööre
   // ja kärbe on juba sees — joon asetub täpselt nagu apply lõikab.
-  const splitPreviewUrl = current && pendingAdjust
-    ? workPagePreviewUrl(workId, current.filename, authToken, pendingRotate, pendingAdjust, 'view', cacheBust)
+  const splitPreviewUrl = current && pendingAdjust && ticket
+    ? workPagePreviewUrl(workId, current.filename, ticket, pendingRotate, pendingAdjust, 'view', cacheBust)
     : null;
   useEffect(() => { setPreviewNatural(null); }, [splitPreviewUrl]);
   const splitRot90 = !splitPreviewUrl && (pendingRotate === 90 || pendingRotate === 270);

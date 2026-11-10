@@ -1,4 +1,5 @@
 import { FILE_API_URL } from '../../config';
+import { imageTokenQuery, type ImageToken } from '../../utils/imageTokenUrl';
 import { apiDelete, apiGet, apiPost, ApiError } from '../../services/apiClient';
 import { getAuthHeaders } from '../../utils/fetchWithTimeout';
 import type {
@@ -511,19 +512,26 @@ export async function applyPrepressWithRecovery(
 
 /**
  * Pildipäringud lähevad <img src>-ina, mis EI saada Authorization päist.
- * Token käib query-parameetrina — SAMA muster nagu olemasoleval pisipildil
- * (UploadStepReview.tsx: `/admin/upload/${uploadId}/thumb/${page}?token=…`).
+ * URL-is käib lühiajaline PILET (`useAdminImageTicket`, ulatus `upload:<id>`),
+ * mitte sessioonitoken (#764). Piletita (`null`) tagastatakse '' — kutsuja
+ * ei pane siis `src`-i üldse.
  */
+export function uploadThumbUrl(uploadId: string, page: number, ticket: ImageToken | null): string {
+  if (!ticket) return '';
+  return `${FILE_API_URL}/admin/upload/${uploadId}/thumb/${page}?${imageTokenQuery(ticket)}`;
+}
+
 /** Eelvaate URL. `rotate` on RENDERDUSPARAMEETER — server annab juba pööratud
  *  pildi, seega joone- ja kuvasuhte-matemaatika ei tea pöördest midagi. Ühtlasi
  *  muutub `src` string pöörde muutumisel iseenesest (ei vaja cache-bust'i). */
 export function prepressPreviewUrl(
-  uploadId: string, n: number, token: string | null, rotate = 0,
+  uploadId: string, n: number, ticket: ImageToken | null, rotate = 0,
   adjust: PageAdjust | null = null,
 ): string {
+  if (!ticket) return '';
   const rot = rotate ? `&rot=${rotate}` : '';
   // adjust käib URL-is, mitte plaanist: pilt on siis deterministlik ja
   // salvestamata muudatus ei jäta brauseri vahemällu valet pilti (#431).
   const adj = adjust ? `&adj=${encodeURIComponent(JSON.stringify(adjust))}` : '';
-  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}${rot}${adj}`;
+  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?${imageTokenQuery(ticket)}${rot}${adj}`;
 }

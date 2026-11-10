@@ -1,7 +1,8 @@
 import React from 'react';
+import { useAdminImageTicket } from '../../../hooks/useAdminImageTicket';
+import { uploadThumbUrl } from '../uploadApi';
 import { AlertTriangle, CheckCircle, Clock, Info, Loader2 } from 'lucide-react';
 import UploadMetaForm from '../../../components/UploadMetaForm';
-import { FILE_API_URL } from '../../../config';
 import type { Collections } from '../../../services/collectionService';
 import type { FileEntry, PollResult } from '../types';
 import { impordiEdenemine } from '../utils';
@@ -22,7 +23,8 @@ const ThumbCard: React.FC<{
   authToken: string;
   t: (key: string) => string;
 }> = ({ entry, uploadId, authToken, t }) => {
-  const thumbUrl = `${FILE_API_URL}/admin/upload/${uploadId}/thumb/${entry.page}?token=${authToken}`;
+  const ticket = useAdminImageTicket(`upload:${uploadId}`, authToken);
+  const thumbUrl = uploadThumbUrl(uploadId, entry.page, ticket);
   // Ebaõnnestunud leht EI ole ootel: OCR-server ei võta .err-iga lehte enam ette
   // (#250). Ilma selle haruta keerleks spinner igavesti ja valetaks kasutajale.
   const failed = !entry.has_ocr && !!entry.ocr_error;
@@ -49,7 +51,7 @@ const ThumbCard: React.FC<{
       <div className="relative aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
         {showImage ? (
           <img
-            src={thumbUrl}
+            src={thumbUrl || undefined}
             alt={`Lk ${entry.page}`}
             className="w-full h-full object-contain"
             loading="lazy"

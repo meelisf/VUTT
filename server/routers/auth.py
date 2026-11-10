@@ -11,6 +11,7 @@ from ..rate_limit import (
     clear_login_failures,
     get_client_ip,
     record_login_failure,
+    refund_rate_limit,
 )
 from ..registration import (
     add_registration,
@@ -46,7 +47,7 @@ async def login(request: Request):
     data = await request.json()
     username = data.get("username", "").strip()
     # Konto-põhine lockout (kaitse credential-stuffingu vastu — palju IP-sid, üks konto)
-    locked, acc_retry = check_account_lockout(username)
+    locked, acc_retry = check_account_lockout(username, client_ip)
     if locked:
         logger.warning(f"Login blokeeritud (konto lukus): username={username!r} ip={client_ip} retry_after={acc_retry}s")
         return JSONResponse(status_code=429, content={"status": "error", "message": f"Liiga palju ebaõnnestunud katseid. Proovi uuesti {acc_retry}s pärast"})
@@ -54,6 +55,8 @@ async def login(request: Request):
     user = await run_in_threadpool(verify_user, username, data.get("password", ""))
     if user:
         clear_login_failures(username)
+        # Õnnestunud sisselogimine ei kuluta IP-eelarvet (#762).
+        refund_rate_limit(client_ip, "/login")
         from ..meilisearch_ops import generate_meili_token
         try:
             meili_token = generate_meili_token(user=user, ttl_seconds=USER_MEILI_TOKEN_TTL_SECONDS)
@@ -66,7 +69,7 @@ async def login(request: Request):
             "token": create_session(user),
             "meili_token": meili_token,
         }
-    record_login_failure(username)
+    record_login_failure(username, client_ip)
     logger.warning(f"Ebaõnnestunud login: username={username!r} ip={client_ip}")
     return {"status": "error", "message": "Vale kasutajanimi või parool"}
 

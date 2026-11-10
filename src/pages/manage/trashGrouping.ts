@@ -1,3 +1,4 @@
+import { imageTokenQuery, type ImageToken } from '../../utils/imageTokenUrl';
 import { FILE_API_URL } from '../../config';
 import type { DeletedWorkPage } from '../../services/workApi';
 
@@ -13,15 +14,17 @@ export function ruhmita(pages: DeletedWorkPage[]): {
   return { deleted, split };
 }
 
-/** `<img src>` ei saa saata Authorization päist → token käib query-parameetris
- *  (server toetab seda `deps.py`-s). `v` on lähtefaili mtime_ns: failinimi ei
+/** `<img src>` ei saa saata Authorization päist → URL-is käib lühiajaline pilet
+ *  (`useAdminImageTicket`, ulatus `work:<id>`), mitte sessioonitoken (#764).
+ *  Piletita tagastatakse ''. `v` on lähtefaili mtime_ns: failinimi ei
  *  muutu, seega ilma selleta näitaks brauser asendatud pildi asemel vana. */
 export type ThumbKind = 'trash' | 'original' | 'current';
 
 export function historyThumbUrl(
   workId: string, kind: ThumbKind, filename: string,
-  v: number, token: string | null,
+  v: number, ticket: ImageToken | null,
 ): string {
+  if (!ticket) return '';
   const base = `${FILE_API_URL}/admin/work/${workId}/history-thumb/${kind}/${encodeURIComponent(filename)}`;
-  return `${base}?v=${v}&token=${encodeURIComponent(token ?? '')}`;
+  return `${base}?v=${v}&${imageTokenQuery(ticket)}`;
 }

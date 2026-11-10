@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ImageToken } from '../../utils/imageTokenUrl';
 import { Loader2, RotateCcw } from 'lucide-react';
 import type { ModifiedImage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
@@ -7,7 +8,7 @@ import { parseServerDate } from '../../utils/formatDateTime';
 interface Props {
   images: ModifiedImage[];
   workId: string;
-  token: string | null;
+  ticket: ImageToken | null;
   restoringOriginal: string | null;
   onRestoreOriginal: (filename: string) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -23,7 +24,7 @@ const TEGEVUSE_VOTI: Record<string, string> = {
 };
 
 const TrashModifiedImages: React.FC<Props> = ({
-  images, workId, token, restoringOriginal, onRestoreOriginal, t,
+  images, workId, ticket, restoringOriginal, onRestoreOriginal, t,
 }) => (
   <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
     <div className="px-5 py-4 border-b border-gray-100">
@@ -47,12 +48,12 @@ const TrashModifiedImages: React.FC<Props> = ({
                 ([kind, versioon, silt]) => (
                   <figure key={kind} className="m-0 w-16">
                     <a
-                      href={historyThumbUrl(workId, kind, i.filename, versioon, token)}
+                      href={historyThumbUrl(workId, kind, i.filename, versioon, ticket) || undefined}
                       target="_blank"
                       rel="noreferrer"
                     >
                       <img
-                        src={historyThumbUrl(workId, kind, i.filename, versioon, token)}
+                        src={historyThumbUrl(workId, kind, i.filename, versioon, ticket) || undefined}
                         alt=""
                         loading="lazy"
                         className="h-20 w-16 rounded border border-gray-200 bg-gray-50 object-contain"

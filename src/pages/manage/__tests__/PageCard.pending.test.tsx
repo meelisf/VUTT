@@ -10,6 +10,8 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'et' } }),
 }));
 vi.mock('../../../contexts/UserContext', () => ({ useUser: () => ({ authToken: 't' }) }));
+// Pilet (#764) on kohe olemas — päringut testis ei tehta.
+vi.mock('../../../hooks/useAdminImageTicket', () => ({ useAdminImageTicket: () => ({ exp: 99, sig: 'abc' }) }));
 vi.mock('../../../contexts/ImageTokenContext', async (orig) => ({
   ...(await orig<typeof import('../../../contexts/ImageTokenContext')>()),
   useImageTokenFetcher: () => () => Promise.resolve(null),

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { ImageToken } from '../../utils/imageTokenUrl';
 import { Info } from 'lucide-react';
 import type { DeletedWorkPage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
@@ -7,13 +8,13 @@ import { parseServerDate } from '../../utils/formatDateTime';
 interface Props {
   pages: DeletedWorkPage[];
   workId: string;
-  token: string | null;
+  ticket: ImageToken | null;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }
 
 /** Poolituse jäägid: kahe elava lehe LÄHTEPILDID. Taastenuppu ei ole — juhis
  *  on ploki päises ÜKS kord, mitte iga kirje juures (#325). */
-const TrashSplitRemnants: React.FC<Props> = ({ pages, workId, token, t }) => {
+const TrashSplitRemnants: React.FC<Props> = ({ pages, workId, ticket, t }) => {
   const [avatud, setAvatud] = useState(false);
   if (pages.length === 0) return null;
   return (
@@ -39,7 +40,7 @@ const TrashSplitRemnants: React.FC<Props> = ({ pages, workId, token, t }) => {
             {pages.map((p) => (
               <div key={p.filename} className="flex items-center gap-3 px-5 py-3">
                 <img
-                  src={historyThumbUrl(workId, 'trash', p.filename, p.v, token)}
+                  src={historyThumbUrl(workId, 'trash', p.filename, p.v, ticket) || undefined}
                   alt=""
                   loading="lazy"
                   className="h-16 w-12 flex-shrink-0 rounded border border-gray-200 bg-gray-50 object-contain"

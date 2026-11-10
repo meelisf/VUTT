@@ -61,7 +61,7 @@ def test_window_expiry_unlocks():
     """Pärast akna möödumist aeguvad ebaõnnestumised ja lukk avaneb."""
     old = time.time() - rl.ACCOUNT_LOCKOUT_WINDOW - 1
     with rl._account_lock:
-        rl._account_failures["mari"] = [old] * rl.ACCOUNT_LOCKOUT_THRESHOLD
+        rl._account_failures["mari"] = [(old, None)] * rl.ACCOUNT_LOCKOUT_THRESHOLD
     locked, retry = rl.check_account_lockout("mari")
     assert locked is False
     assert retry == 0
@@ -128,3 +128,31 @@ def test_rate_limit_isolated_per_ip_and_endpoint():
     assert rl.check_rate_limit("2.2.2.2", "/login")[0] is True
     # Sama IP, teine endpoint — endiselt lubatud
     assert rl.check_rate_limit("1.1.1.1", "/register")[0] is True
+
+
+# --- #762: (konto, IP) lävi, kontoülene lävi ja eduka sisselogimise tagastus ---
+
+def test_teise_ip_valed_katsed_ei_lukusta_kasutajat():
+    """Kasutajanimed on avalikud: võõras ei tohi 10 päringuga toimetajat välja lukustada."""
+    for _ in range(rl.ACCOUNT_LOCKOUT_THRESHOLD):
+        rl.record_login_failure("mari", "6.6.6.6")
+    assert rl.check_account_lockout("mari", "6.6.6.6")[0] is True
+    assert rl.check_account_lockout("mari", "1.2.3.4")[0] is False
+
+
+def test_kontoylene_lavi_lukustab_koigile():
+    """Hajutatud äraarvamine (palju IP-sid, üks konto) jääb piiratuks."""
+    for i in range(rl.ACCOUNT_LOCKOUT_GLOBAL_THRESHOLD):
+        rl.record_login_failure("mari", f"10.0.0.{i}")
+    locked, retry = rl.check_account_lockout("mari", "1.2.3.4")
+    assert locked is True and retry > 0
+
+
+def test_edukas_sisselogimine_ei_kuluta_ip_eelarvet():
+    """Seminarirühm ühe NAT-i taga: ausad sisselogimised ei täida IP-limiiti."""
+    for _ in range(_LOGIN_MAX * 3):
+        assert rl.check_rate_limit("1.2.3.4", "/login")[0] is True
+        rl.refund_rate_limit("1.2.3.4", "/login")
+    # Tagastus tundmatule IP-le/endpointile on ohutu no-op.
+    rl.refund_rate_limit("9.9.9.9", "/login")
+    rl.refund_rate_limit("1.2.3.4", "/tundmatu")

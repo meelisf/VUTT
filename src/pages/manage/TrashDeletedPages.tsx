@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ImageToken } from '../../utils/imageTokenUrl';
 import { Loader2, RotateCcw, HelpCircle } from 'lucide-react';
 import type { DeletedWorkPage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
@@ -7,7 +8,7 @@ import { parseServerDate } from '../../utils/formatDateTime';
 interface Props {
   pages: DeletedWorkPage[];
   workId: string;
-  token: string | null;
+  ticket: ImageToken | null;
   restoringPage: string | null;
   onRestore: (filename: string) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -17,7 +18,7 @@ interface Props {
  *  ilma taastenuputa: fail on kettal olemas, ja nähtamatu kirje on halvem kui
  *  sildistatud (#325). */
 const TrashDeletedPages: React.FC<Props> = ({
-  pages, workId, token, restoringPage, onRestore, t,
+  pages, workId, ticket, restoringPage, onRestore, t,
 }) => (
   <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
     <div className="px-5 py-4 border-b border-gray-100">
@@ -32,7 +33,7 @@ const TrashDeletedPages: React.FC<Props> = ({
         {pages.map((p) => (
           <div key={p.filename} className="flex items-center gap-3 px-5 py-3">
             <img
-              src={historyThumbUrl(workId, 'trash', p.filename, p.v, token)}
+              src={historyThumbUrl(workId, 'trash', p.filename, p.v, ticket) || undefined}
               alt=""
               loading="lazy"
               className="h-16 w-12 flex-shrink-0 rounded border border-gray-200 bg-gray-50 object-contain"

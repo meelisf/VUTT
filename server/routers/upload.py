@@ -14,7 +14,7 @@ from .. import image_transform
 from ..ada import client as ada_client
 from ..ada import fetch as ada_fetch
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
-from ..deps import get_json_data, require_role
+from ..deps import admin_image_access, get_json_data, require_role
 from ..ocr_providers import gemini
 from ..upload import prepress, prepress_apply, prepress_plan
 from ..upload import chunked
@@ -151,7 +151,8 @@ def admin_upload_ada_fetch(upload_id: str, user=Depends(require_role("admin"))):
 
 
 @router.get("/admin/upload/{upload_id}/thumb/{page_num}")
-async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require_role("admin"))):
+async def admin_upload_thumb(upload_id: str, page_num: int,
+                             _=Depends(admin_image_access("upload", "upload_id"))):
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
     path = os.path.join(UPLOADS_DIR, upload_id, "thumbs", f"{page_num:03d}.jpg")
@@ -220,7 +221,7 @@ def admin_prepress_start(upload_id: str, user=Depends(require_role("admin"))):
 @router.get("/admin/upload/{upload_id}/preview/{page_num}")
 def admin_prepress_preview(upload_id: str, page_num: int, rot: int = 0,
                            adj: Optional[str] = None,
-                           user=Depends(require_role("admin"))):
+                           _=Depends(admin_image_access("upload", "upload_id"))):
     """100 DPI kontaktlehe pisipilt, valikuliselt pööratuna (`?rot=90`) ja
     kärbituna/kallutatuna (`?adj=<JSON>`, #431).
 
