@@ -1626,6 +1626,8 @@ const WorkManage: React.FC = () => {
           onSplitChange={handleEditorSplitChange}
           onEditChange={handleEditorEditChange}
           onAdjustClear={handleEditorAdjustClear}
+          // Järjekorra mustandi ajal on lehetoimingud blokeeritud (ADR 0050) — siis teed ei pakuta.
+          onApplyAll={hasReorderChanges || pageOpsSaving ? undefined : () => { setEditorTarget(null); setPageOpsConfirmOpen(true); }}
         />
       )}
 

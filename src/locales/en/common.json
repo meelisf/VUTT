@@ -345,6 +345,7 @@
     "rotateRight": "Rotate right 90°",
     "rotate180": "Rotate 180°",
     "deskew": "Fine-tune (degrees)",
+    "cropTool": "Crop",
     "perspective": "Perspective",
     "perspectiveReset": "Reset perspective corners",
     "cropReset": "Remove crop box and forget last used size",
