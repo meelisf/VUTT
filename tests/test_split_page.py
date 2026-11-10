@@ -347,3 +347,26 @@ def test_lehtede_kustutus_uhtlustab_osad(work_dir, monkeypatch):
 
     part = json.loads((folder / "_metadata.json").read_text())["parts"][0]
     assert part["pages"] == [] and part["needs_review"] is True
+
+
+def test_poolitus_eemaldab_pildipaari(work_dir, monkeypatch):
+    """ADR 0079 p 3 täiendus: poolitus EI jaota paare pooltele — algse tüve paar
+    eemaldatakse ja tulemus kannab pairs_removed-i."""
+    from server import exemplar_images as ei
+    from server.admin_page_ops import split_page
+    folder = work_dir["folder"]
+    stem = "1690-test-work-testwork1-pg001"
+    d = folder / "_exemplars" / "a1b2c3"
+    d.mkdir(parents=True)
+    (d / "images.json").write_text(json.dumps({"revision": 1, "imports": {}, "images": [
+        {"id": "i1i1i1", "page": stem, "source": {"kind": "photo"}},
+        {"id": "i2i2i2", "page": stem, "source": {"kind": "photo"}},
+    ]}))
+    written = {}
+    monkeypatch.setattr(ei, "write_manifest_locked",
+                        lambda wd, eid, m, u, msg: written.setdefault(eid, m) or True)
+
+    result = split_page(work_dir["work_id"], 1, 0.5, "testadmin")
+
+    assert result["pairs_removed"] == 2
+    assert all("page" not in img for img in written["a1b2c3"]["images"])

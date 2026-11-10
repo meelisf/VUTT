@@ -20,6 +20,7 @@ import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import PageImageEditorModal from '../components/PageImageEditorModal';
 import { useUser } from '../contexts/UserContext';
+import { useNotify } from '../contexts/FeedbackContext';
 import { useImageToken } from '../contexts/ImageTokenContext';
 import { ApiError } from '../services/apiClient';
 import {
@@ -86,6 +87,11 @@ type ActiveTab = ManageTab;
 
 const WorkManage: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common']);
+  const notify = useNotify();
+  // Lehetoiming eemaldas rippuvad eksemplari pildipaarid (ADR 0079 p 3) — ütle seda.
+  const notifyPairsRemoved = (count?: number) => {
+    if (count && count > 0) notify(t('manage.pairsRemoved', { count }), 'warning');
+  };
   const { workId } = useParams<{ workId: string }>();
   const navigate = useNavigate();
   const { user, authToken } = useUser();
@@ -646,6 +652,7 @@ const WorkManage: React.FC = () => {
       } else if (st?.state === 'done') {
         const r = st.result ?? {};
         setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, adjusted: r.adjusted ?? 0, split: r.split ?? 0 }));
+        notifyPairsRemoved(r.pairs_removed);
         ok = true;
       } else if (st?.state === 'error') {
         setPageOpsError(st.error || t('manage.pageOps.error'));
@@ -740,7 +747,8 @@ const WorkManage: React.FC = () => {
     setBulkDeleting(true);
     setBulkDeleteError(null);
     try {
-      await deleteWorkPages(workId, authToken, baseNames);
+      const res = await deleteWorkPages(workId, authToken, baseNames);
+      notifyPairsRemoved(res.pairs_removed);
       await loadPages();
       if (trashLoaded) loadTrashPages();
       setSelectedFiles(new Set());

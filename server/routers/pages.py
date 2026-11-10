@@ -421,7 +421,8 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):
         raise HTTPException(status_code=404, detail="Teost või lehekülge ei leitud")
-    return {"status": "success", "new_page_count": result["new_page_count"]}
+    return {"status": "success", "new_page_count": result["new_page_count"],
+            "pairs_removed": result.get("pairs_removed", 0)}
 
 
 @router.post("/admin/work/{work_id}/page-ops")

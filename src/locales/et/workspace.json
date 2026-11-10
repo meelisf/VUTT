@@ -476,7 +476,9 @@
         "rejected": "tagasi lükatud",
         "pending": "ootel"
       }
-    }
+    },
+    "pairsRemoved_one": "{{count}} eksemplari pildipaar eemaldati, sest leht muutus.",
+    "pairsRemoved_other": "{{count}} eksemplari pildipaari eemaldati, sest lehed muutusid."
   },
   "metadata": {
     "title": "Metaandmed",

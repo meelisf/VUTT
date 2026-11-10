@@ -476,7 +476,9 @@
         "rejected": "rejected",
         "pending": "pending"
       }
-    }
+    },
+    "pairsRemoved_one": "{{count}} exemplar image pairing was removed because the page changed.",
+    "pairsRemoved_other": "{{count}} exemplar image pairings were removed because pages changed."
   },
   "metadata": {
     "title": "Metadata",

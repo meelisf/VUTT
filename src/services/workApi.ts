@@ -260,6 +260,8 @@ export interface PageOpsResult {
   adjusted?: number;
   split?: number;
   new_page_count?: number;
+  /** Eemaldatud eksemplari pildipaarid (ADR 0079 p 3 täiendus). */
+  pairs_removed?: number;
 }
 
 /** Teose taustatöö liik (ADR 0074): teose kohta käib korraga üks, liigist sõltumata. */
@@ -312,8 +314,8 @@ export function getWorkPageOpsStatus(workId: string, token: string): Promise<Pag
   return apiGet<PageOpsStatus>(`/admin/work/${workId}/page-ops/status`, auth(token, { timeout: 15000 }));
 }
 
-export function deleteWorkPages(workId: string, token: string, baseNames: string[]): Promise<ApiStatusResponse> {
-  return apiPost<ApiStatusResponse>(`/admin/work/${workId}/delete-pages`, { base_names: baseNames }, authJson(token, { timeout: 30000 }));
+export function deleteWorkPages(workId: string, token: string, baseNames: string[]): Promise<ApiStatusResponse & { pairs_removed?: number }> {
+  return apiPost<ApiStatusResponse & { pairs_removed?: number }>(`/admin/work/${workId}/delete-pages`, { base_names: baseNames }, authJson(token, { timeout: 30000 }));
 }
 
 /** Uue pildi päritolu eksemplaridega teosel (ADR 0076 p 4): 'same' | 'unknown' | eksemplari id. */
