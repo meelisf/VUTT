@@ -92,6 +92,7 @@ Kolm asja, mis üllatavad:
 | `get_work_parts` | Teose olemasolevad osad leheküljenumbritega, lehtede arv ja `pages_version`; käsikirjal määratud lehenummerdusega ka osa `address` (nt `fol. 10r–[10v]`, nurksulgudes tuletatud; #630) |
 | `submit_work_parts_proposal` | Teose osade (kirjad, istungid jm) ootel ettepanek toimetaja koodiga; teost ei muuda |
 | `get_work_exemplars` | Teose eksemplarid püsiva `id`-ga (hoidja, kohaviit, konvoluut jm) + hoidjate register; piiratud teose kohta viga (#703) |
+| `get_works_exemplars` | Sama mitme teose kohta ühe päringuga (kuni 50 `work_id`-d); piiratud/puuduv teos läheb `errors`-i. Kasuta tsükli asemel — server piirab sagedust (nginx `vutt_api`, ~10 päringut sekundis kogu ülikooli IP kohta) |
 | `submit_exemplar_proposal` | Eksemplaride ettepanek ESTERi põhjal (uus eksemplar / olemasoleva muudatus `base`-iga, igal real ESTERi allikas); superadmin kinnitab teose halduse „Eksemplarid" vahekaardil; teost ei muuda |
 | `get_page_source` | Lehe toortekst (märgendus, reavahetused) + `stem` + `text_hash` + lubatud tägid; nõuab superadmini koodi (#641) |
 | `submit_page_text_proposal` | Lehe teksti asendused (`old` → `new`) ootel ettepanekuna; superadmin vaatab Workspace'is pildi kõrval üle; lehti ei muuda |

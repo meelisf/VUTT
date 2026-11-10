@@ -68,3 +68,31 @@ def test_ridade_lagi_ja_vigane_sisend(work_id, rows):
     with pytest.raises(VuttError):
         exemplars.submit_exemplars(c, "kood", work_id, rows)
     assert c.posts == []
+
+
+class BatchClient(FakeClient):
+    def api_get(self, path, params=None):
+        if path == "/exemplars/batch":
+            self.params = params
+            return {"results": {
+                "w1ab": {"exemplars": [{"id": "a1", "holder": "TÜR", "pages": ["t-001"]}]},
+                "w2cd": {"error": {"status": 403, "detail": "Puudub ligipääs"}},
+                "w3ef": {"error": {"status": 404, "detail": "Teost ei leitud"}},
+            }}
+        return super().api_get(path, params)
+
+
+def test_koguparing_uks_kutse_ja_vead_eraldi():
+    c = BatchClient()
+    out = json.loads(exemplars.works_exemplars(c, ["w1ab", "w2cd", "w3ef", "w1ab"]))
+    assert c.params == {"work_ids": "w1ab,w2cd,w3ef"}          # dubleeritud id korra
+    assert out["works"]["w1ab"]["exemplars"][0]["id"] == "a1"
+    assert "pages" not in out["works"]["w1ab"]["exemplars"][0]
+    assert "piiratud" in out["errors"]["w2cd"] and out["errors"]["w3ef"] == "ei leitud"
+    assert out["holders"]["TÜR"] == "Tartu Ülikooli Raamatukogu"
+
+
+@pytest.mark.parametrize("ids", [[], "w1ab", ["w1ab"] * 0, [f"w{i:03d}ab" for i in range(51)], ["viga/!"]])
+def test_koguparing_vigane_sisend(ids):
+    with pytest.raises(VuttError):
+        exemplars.works_exemplars(BatchClient(), ids)

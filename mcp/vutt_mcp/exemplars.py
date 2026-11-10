@@ -26,6 +26,22 @@ def _check_work_id(work_id: str) -> None:
         raise VuttError("Vigane work_id; kasuta search_works'i tulemuse work_id-d.")
 
 
+def _holders(client) -> tuple[dict, dict]:
+    """Hoidjate register: (võti → nimi, nimekuju → võti)."""
+    registry = client.api_get("/config/archives")
+    archives = (registry or {}).get("archives") if isinstance(registry, dict) else None
+    holders = {k: (v or {}).get("name") or k for k, v in (archives or {}).items()}
+    # Teised nimekujud (ajaloolised, Jaansoni lühendid) → võti. Esitamisel lahendab server
+    # aliase ise võtmeks, aga agent näeb nii, et „Tallinn ERR" on juba registris.
+    aliases = {a: k for k, v in (archives or {}).items()
+               for a in ((v or {}).get("aliases") or []) if isinstance(a, str)}
+    return holders, aliases
+
+
+def _rows(data: dict) -> list[dict]:
+    return [{k: x[k] for k in _SHOWN if k in x} for x in data["exemplars"] if isinstance(x, dict)]
+
+
 def work_exemplars(client, work_id: str) -> str:
     """Eksemplarid + hoidjate register (`holders`: võti → nimi, `holder_aliases`: kuju → võti)."""
     _check_work_id(work_id)
@@ -37,19 +53,49 @@ def work_exemplars(client, work_id: str) -> str:
                            "eksemplare ei saa praegu pakkuda).") from exc
     if not isinstance(data, dict) or not isinstance(data.get("exemplars"), list):
         raise VuttError("VUTT ei tagastanud teose eksemplare.")
-    registry = client.api_get("/config/archives")
-    archives = (registry or {}).get("archives") if isinstance(registry, dict) else None
-    holders = {k: (v or {}).get("name") or k for k, v in (archives or {}).items()}
-    # Teised nimekujud (ajaloolised, Jaansoni lühendid) → võti. Esitamisel lahendab server
-    # aliase ise võtmeks, aga agent näeb nii, et „Tallinn ERR" on juba registris.
-    aliases = {a: k for k, v in (archives or {}).items()
-               for a in ((v or {}).get("aliases") or []) if isinstance(a, str)}
-    rows = [{k: x[k] for k in _SHOWN if k in x} for x in data["exemplars"] if isinstance(x, dict)]
-    out = {"work_id": work_id, "exemplars": rows, "holders": holders}
+    holders, aliases = _holders(client)
+    out = {"work_id": work_id, "exemplars": _rows(data), "holders": holders}
     if aliases:
         out["holder_aliases"] = aliases
     return json.dumps(out,
                       ensure_ascii=False, indent=1)
+
+
+MAX_BATCH = 50   # = serveri BATCH_MAX_WORKS
+
+
+def works_exemplars(client, work_ids: list) -> str:
+    """Mitme teose eksemplarid ühe päringuga; hoidjate register ainult üks kord.
+
+    Ühe teose tõrge (piiratud / ei leitud) läheb `errors`-i, ülejäänud tulevad ikka.
+    """
+    if not isinstance(work_ids, list) or not work_ids:
+        raise VuttError("work_ids peab olema mittetühi loend.")
+    ids = list(dict.fromkeys(work_ids))
+    if len(ids) > MAX_BATCH:
+        raise VuttError(f"Kuni {MAX_BATCH} teost korraga; jaga loend osadeks.")
+    for wid in ids:
+        _check_work_id(wid)
+    data = client.api_get("/exemplars/batch", params={"work_ids": ",".join(ids)})
+    results = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(results, dict):
+        raise VuttError("VUTT ei tagastanud eksemplaride kogupäringu vastust.")
+    holders, aliases = _holders(client)
+    works, errors = {}, {}
+    for wid in ids:
+        r = results.get(wid)
+        if isinstance(r, dict) and isinstance(r.get("exemplars"), list):
+            works[wid] = {"exemplars": _rows(r)}
+        else:
+            status = ((r or {}).get("error") or {}).get("status")
+            errors[wid] = ("ei leitud" if status == 404
+                           else "pole avalik (piiratud teose eksemplare ei saa pakkuda)")
+    out = {"works": works, "holders": holders}
+    if errors:
+        out["errors"] = errors
+    if aliases:
+        out["holder_aliases"] = aliases
+    return json.dumps(out, ensure_ascii=False, indent=1)
 
 
 def submit_exemplars(client, handoff_code: str, work_id: str, rows: list, note: str | None = None) -> str:
