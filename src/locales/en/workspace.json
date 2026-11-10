@@ -973,9 +973,21 @@
       "reference": "Convolute shelfmark",
       "position": "Position (0 = main work)",
       "total": "Number of items in the volume",
-      "contents": "Contents (free text)",
+      "contents": "Volume contents",
       "countInvalid": "Convolute position and number of items must be whole numbers.",
-      "referenceRequired": "The convolute shelfmark is missing. To remove the convolute entry, clear all convolute fields."
+      "referenceRequired": "The convolute shelfmark is missing. To remove the convolute entry, clear all convolute fields.",
+      "contentsHint": "All prints bound in the same volume, including those not in VUTT."
     }
+  },
+  "exemplarPage": {
+    "none": "This work has no exemplars.",
+    "pagesRow": "Work pages",
+    "pagesRowHint": "not marked which exemplar this scan is from",
+    "markWitness": "Mark source…",
+    "unknownPagesRow": "Pages of unknown origin",
+    "pageCount_one": "{{count}} page",
+    "pageCount_other": "{{count}} pages",
+    "exceptionPages": "Exception pages",
+    "physical": "Physical copy"
   }
 }

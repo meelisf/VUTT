@@ -973,9 +973,21 @@
       "reference": "Konvoluudi kohaviit",
       "position": "Koht (0 = põhiteos)",
       "total": "Trükiste arv köites",
-      "contents": "Sisukord (vabatekst)",
+      "contents": "Köite sisu",
       "countInvalid": "Konvoluudi koht ja trükiste arv peavad olema täisarvud.",
-      "referenceRequired": "Konvoluudi kohaviit puudub. Märke eemaldamiseks tühjenda kõik konvoluudi väljad."
+      "referenceRequired": "Konvoluudi kohaviit puudub. Märke eemaldamiseks tühjenda kõik konvoluudi väljad.",
+      "contentsHint": "Kõik samas köites olevad trükised, ka need, mida VUTT-is ei ole."
     }
+  },
+  "exemplarPage": {
+    "none": "Teosel ei ole eksemplare.",
+    "pagesRow": "Teose lehed",
+    "pagesRowHint": "pole märgitud, millise eksemplari skaneering see on",
+    "markWitness": "Märgi alus…",
+    "unknownPagesRow": "Teadmata päritoluga lehed",
+    "pageCount_one": "{{count}} leht",
+    "pageCount_other": "{{count}} lehte",
+    "exceptionPages": "Erandlehed",
+    "physical": "Füüsiline eksemplar"
   }
 }
