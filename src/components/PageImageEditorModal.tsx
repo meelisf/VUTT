@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
-import { X, Crop, Columns2, LayoutGrid, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
+import { X, Crop, Columns2, LayoutGrid, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, CircleX, Frame, Undo2, MoreHorizontal, Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -8,6 +8,7 @@ import { restoreOriginalPageImage } from '../services/pageService';
 import { workPagePreviewUrl } from '../services/workApi';
 import { adjustFromParams } from '../pages/upload/prepressPlan';
 import type { PageAdjust } from '../pages/upload/types';
+import { pendingAdjustOutline } from '../utils/pendingAdjustOutline';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
 import { addRotation, clampSplitX } from './pagePrep/geometry';
 import { useSplitDrag } from './pagePrep/useSplitDrag';
@@ -15,7 +16,7 @@ import SplitLine from './pagePrep/SplitLine';
 import RotateButtons from './pagePrep/RotateButtons';
 import { useCropBox } from './pagePrep/useCropBox';
 import CropOverlay from './pagePrep/CropOverlay';
-import type { PendingPageOp } from '../pages/manage/pageOpsPlan';
+import { pendingCount, type PendingPageOp } from '../pages/manage/pageOpsPlan';
 import ExemplarOriginSelect from '../pages/manage/ExemplarOriginSelect';
 import type { Exemplar } from '../types';
 
@@ -54,6 +55,12 @@ interface Props {
   onEditChange: (filename: string, rotate: number, adjust: PageAdjust | null) => void;
   /** „Eemalda kärbe" — pööre ja poolitus jäävad. */
   onAdjustClear: (filename: string) => void;
+  /**
+   * „Rakenda kõik" otse redaktorist: sulgeb redaktori ja avab teose halduse
+   * rakendamise kinnituse. Kasutaja ei pidanud varem aru saama, et pööre, kärbe
+   * ja poolitus on OOTEL ning rakendus käib ülevaate ribalt — nüüd on tee siin.
+   */
+  onApplyAll?: () => void;
 }
 
 // Eelvaate vaikimisi mõõdud (px) — kasutatakse ainult esimese paindeni, enne kui
@@ -63,7 +70,7 @@ const DEFAULT_STAGE_H = 540;
 
 const PageImageEditorModal: React.FC<Props> = ({
   workId, pages, initialIndex, initialTab, imageToken, onClose, onPagesChanged, onReplaceImage, cacheBust,
-  pendingOps, globalSplitX, onSplitChange, onEditChange, onAdjustClear, exemplars = [],
+  pendingOps, globalSplitX, onSplitChange, onEditChange, onAdjustClear, onApplyAll, exemplars = [],
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
@@ -82,6 +89,10 @@ const PageImageEditorModal: React.FC<Props> = ({
   const [replacing, setReplacing] = useState(false);          // pildi asendamine käib
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const [replaceOrigin, setReplaceOrigin] = useState('');
+  // Harvad toimingud (asenda pilt, taasta originaal) on „Veel" menüüs; päritolu
+  // küsitakse alles asenduse juures, mitte päises kogu aeg (ADR 0076 p 4 reegel jääb).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showReplace, setShowReplace] = useState(false);
   const originMissing = exemplars.length > 0 && !replaceOrigin;
   const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
 
@@ -90,12 +101,6 @@ const PageImageEditorModal: React.FC<Props> = ({
   // et pilt mahuks alati ekraanile (ei jää modaali serva taha kitsal vertikaalruumil).
   const stageRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<{ w: number; h: number }>({ w: DEFAULT_STAGE_W, h: DEFAULT_STAGE_H });
-
-  // Hõljuv nupupaneel: vabalt lohistatav (piiratud lava raamiga). null = vaikeasend (parem ülanurk).
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
-  const [toolbarDragging, setToolbarDragging] = useState(false);
-  const toolbarGrab = useRef<{ offX: number; offY: number } | null>(null);
 
   const safeIndex = Math.max(0, Math.min(currentIndex, pages.length - 1));
   const current = pages[safeIndex];
@@ -170,6 +175,17 @@ const PageImageEditorModal: React.FC<Props> = ({
   const crop = useCropBox(displayW, displayH, !!imgNatural);
   const resetCrop = crop.reset;
 
+  // Ootel muudatuse sõnastus ja kontuur — mis täpselt on plaanis (kärbe, perspektiiv, kalle).
+  const adjustLabel = !pendingAdjust ? '' : pendingAdjust.quad
+    ? t('manage.editor.perspectivePending')
+    : pendingAdjust.crop
+      ? (Math.abs(pendingAdjust.angle) >= 0.05
+        ? t('manage.editor.cropTiltPending', { deg: pendingAdjust.angle.toFixed(1) })
+        : t('manage.editor.cropPending'))
+      : t('manage.editor.tiltPending', { deg: pendingAdjust.angle.toFixed(1) });
+  // Kontuuri näitame ainult siis, kui kasutaja ei ole uut kasti joonistanud.
+  const outline = !crop.hasEdit ? pendingAdjustOutline(pendingAdjust, displayW, displayH) : null;
+
   // Lähtesta teisendused + mõõda uuesti, kui leht vahetub VÕI pildi sisu muutub
   // (cacheBust uueneb iga mutatsiooni järel — nt kärbe muudab kuvasuhet).
   // crop.reset taastab "kleepuva" kärpe-suuruse tsentreeritud kastina (kui mõni
@@ -181,44 +197,11 @@ const PageImageEditorModal: React.FC<Props> = ({
     resetCrop();
   }, [current?.filename, cacheBust, resetCrop]);
 
-  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
   // Jäme 90°/180° pööre rakendub PILDILE; kärbe/kalle lähtestatakse (display-raam muutub).
   const rotateBy = (delta: number) => {
     setGrossAngle((a) => addRotation(a, delta));
     crop.onGrossRotate();
   };
-
-  // --- Hõljuva nupupaneeli lohistus ---
-  // Pide haarab paneeli; positsioon arvutatakse lava (stageRef) suhtes ja klambitakse
-  // raami sisse. Kuulame AKNAST, et lohistus ei katkeks kursori liikudes paneelilt ära.
-  const onToolbarDown = (e: React.MouseEvent) => {
-    if (!toolbarRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const tRect = toolbarRef.current.getBoundingClientRect();
-    toolbarGrab.current = { offX: e.clientX - tRect.left, offY: e.clientY - tRect.top };
-    setToolbarDragging(true);
-  };
-  const onToolbarMove = useCallback((e: MouseEvent) => {
-    if (!stageRef.current || !toolbarRef.current || !toolbarGrab.current) return;
-    const sRect = stageRef.current.getBoundingClientRect();
-    const tRect = toolbarRef.current.getBoundingClientRect();
-    const x = clamp(e.clientX - sRect.left - toolbarGrab.current.offX, 0, sRect.width - tRect.width);
-    const y = clamp(e.clientY - sRect.top - toolbarGrab.current.offY, 0, sRect.height - tRect.height);
-    setToolbarPos({ x, y });
-  }, []);
-  useEffect(() => {
-    if (!toolbarDragging) return;
-    const move = (e: MouseEvent) => onToolbarMove(e);
-    const up = () => { setToolbarDragging(false); toolbarGrab.current = null; };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    return () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-  }, [toolbarDragging, onToolbarMove]);
 
   // --- Split-lohistus (split-tab) --- ühine upload'i ülevaatusega (#431)
   const currentFilename = current?.filename;
@@ -230,6 +213,13 @@ const PageImageEditorModal: React.FC<Props> = ({
   );
 
   // --- Navigeerimine ---
+  // Teade kaob ise (lisategevusega teade jääb, kuni kasutaja otsustab).
+  useEffect(() => {
+    if (!toast || toast.action) return;
+    const id = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
   const goTo = useCallback((idx: number) => {
     setCurrentIndex(Math.max(0, Math.min(pages.length - 1, idx)));
     setToast(null);
@@ -242,11 +232,11 @@ const PageImageEditorModal: React.FC<Props> = ({
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || role === 'slider') return;
       if (e.key === 'ArrowLeft') goTo(currentIndex - 1);
       else if (e.key === 'ArrowRight') goTo(currentIndex + 1);
-      else if (e.key === 'Escape') onClose();
+      else if (e.key === 'Escape') { if (menuOpen) setMenuOpen(false); else onClose(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [currentIndex, goTo, onClose]);
+  }, [currentIndex, goTo, onClose, menuOpen]);
 
   // --- Märgi ja järgmine (ootel plaan, ADR 0061) ---
   // Üks nupp: muudatus läheb plaani JA redaktor liigub edasi; muutmata leht = „Järgmine".
@@ -271,6 +261,16 @@ const PageImageEditorModal: React.FC<Props> = ({
       crop.clearCrop();
       setToast({ text: t('manage.editor.allDone') });
     }
+  };
+
+  // Vahekaardi vahetus: Poolita eelvaade ehitatakse ootel plaanist, seega märkimata
+  // pööre/kärbe läheb enne plaani — muidu näitaks poolitus pilti, kus kärpet ei ole.
+  const switchTab = (next: 'edit' | 'split') => {
+    if (next === 'split' && tab === 'edit' && current && !noEditChange) {
+      onEditChange(current.filename, grossAngle, crop.hasEdit ? adjustFromParams(crop.toServerParams(0)) : null);
+    }
+    setTab(next);
+    setError(null);
   };
 
   // Taasta lehe ._originals pristine pilt (destruktiivne: kõik pildimuudatused kaovad).
@@ -306,6 +306,7 @@ const PageImageEditorModal: React.FC<Props> = ({
     setError(null);
     try {
       await onReplaceImage(file, current.page_num, replaceOrigin || undefined);
+      setShowReplace(false);
       onAdjustClear(current.filename);  // ootel kärbe oli vana pildi raamis
       // cacheBust uueneb parent'is (thumbCacheBust) → reset-effekt mõõdab pildi uuesti ja lähtestab teisendused
     } catch (e: unknown) {
@@ -313,6 +314,24 @@ const PageImageEditorModal: React.FC<Props> = ({
     } finally {
       setReplacing(false);
     }
+  };
+
+  // Kogu teose ootel lehed (mitte ainult see leht) — riba ja „Rakenda kõik".
+  const totalPending = pendingCount(pendingOps);
+  // „Rakenda kõik": märkimata muudatus sellel lehel läheb enne plaani, muidu
+  // kaoks see redaktori sulgemisel vaikselt.
+  const applyAll = () => {
+    if (!onApplyAll) return;
+    if (current && !noEditChange) {
+      onEditChange(current.filename, grossAngle, crop.hasEdit ? adjustFromParams(crop.toServerParams(0)) : null);
+    }
+    onApplyAll();
+  };
+  const startReplace = () => {
+    setMenuOpen(false);
+    setShowRestoreConfirm(false);
+    if (exemplars.length > 0) setShowReplace(true);
+    else replaceInputRef.current?.click();
   };
 
   if (!current) return null;
@@ -324,32 +343,90 @@ const PageImageEditorModal: React.FC<Props> = ({
     </div>
   );
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-[1300] flex items-center justify-center p-4">
-      {/* Kindel kõrgus (mitte ainult max-h): flex-1 "lava" vajab jaotamiseks definiitset
-          kõrgust, muidu kahaneb 0-ks ja pilt ei mahu. */}
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col h-[92vh] max-h-[92vh]">
 
-        {/* Päis */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Crop size={18} className="text-indigo-600" />
-            <h2 className="font-semibold text-gray-900">{t('manage.editor.title')}</h2>
-            <span className="text-sm text-gray-400">
-              {t('manage.editor.page', { cur: safeIndex + 1, total: pages.length })}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowRestoreConfirm(true)}
-              disabled={restoring || replacing}
-              title={t('manage.editor.restoreOriginal')}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
-            >
-              {restoring ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />}
-              {t('manage.editor.restoreOriginal')}
+  const toolBtn = 'rounded border border-gray-300 bg-white p-2 hover:bg-gray-100';
+  const tabBtn = (active: boolean) =>
+    `flex items-center gap-1.5 rounded-md px-3 py-1 text-sm transition-colors ${
+      active ? 'bg-white font-medium text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`;
+
+  return (
+    // Raam, kõrgus ja jaluse nupurühm järgivad upload'i detailvaadet
+    // (`SplitPageDetail`): sama töö („vaata → otsusta → järgmine"), sama kuju.
+    // Ühine moodul nad ei ole — vajadused erinevad (vahekaardid, asendus, taaste).
+    <div className="fixed inset-0 z-[1300] flex items-center justify-center overflow-hidden bg-black/70 p-2 sm:p-4">
+      <div
+        role="dialog"
+        aria-label={t('manage.editor.title')}
+        className="flex h-[calc(100vh-1rem)] w-full max-w-6xl flex-col rounded bg-white sm:h-[calc(100vh-2rem)]"
+      >
+        {/* Päis: mis leht, mis vaade, mis selle lehega juhtub. */}
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-t border-b border-gray-200 bg-white px-4 py-2.5">
+          <h2 className="whitespace-nowrap font-semibold text-gray-900">
+            {t('manage.editor.page', { cur: safeIndex + 1, total: pages.length })}
+          </h2>
+          <div role="tablist" className="flex flex-shrink-0 rounded-lg bg-gray-100 p-0.5">
+            <button role="tab" aria-selected={tab === 'edit'}
+              onClick={() => switchTab('edit')} className={tabBtn(tab === 'edit')}>
+              <Crop size={14} />{t('manage.editor.tabEdit')}
             </button>
-            {/* Asenda pilt (harv: parema kvaliteediga skann) */}
+            <button role="tab" aria-selected={tab === 'split'}
+              onClick={() => switchTab('split')} className={tabBtn(tab === 'split')}>
+              <Columns2 size={14} />{t('manage.editor.tabSplit')}
+            </button>
+          </div>
+
+          {/* Ootel olek ühes rühmas: vasakul selle lehe muudatused (mõlemal vahekaardil),
+              paremal „Rakenda kõik" kogu teose kohta. Üks kollane kujund, mitte kaks
+              pilli, ja kogu info on ühes kohas. Rühm asub päises, et jalus ei kasvaks
+              ja pilt ei hüppaks. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {(totalPending > 0 || willSplit) && (
+              <div data-testid="editor-pending-group"
+                className="flex min-w-0 items-stretch overflow-hidden rounded-full border border-amber-300 bg-amber-50 text-xs font-medium text-amber-900">
+                {(pendingAdjust || pendingRotate !== 0 || willSplit) && (
+                  <span data-testid="editor-edit-pending" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1">
+                    <Clock size={12} className="flex-shrink-0" />
+                    {pendingRotate !== 0 && <span>{t('manage.editor.rotatePending', { deg: pendingRotate })}</span>}
+                    {pendingAdjust && (
+                      <span className="flex items-center gap-1">
+                        {adjustLabel}
+                        <button
+                          data-testid="editor-crop-remove"
+                          onClick={() => onAdjustClear(current.filename)}
+                          title={t('manage.editor.cropRemove')}
+                          aria-label={t('manage.editor.cropRemove')}
+                          className="rounded-full p-0.5 hover:bg-amber-200"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    )}
+                    {willSplit && (
+                      <span data-testid="editor-split-state">
+                        {t('manage.editor.splitAt', { percent: Math.round(splitX * 1000) / 10 })}
+                      </span>
+                    )}
+                  </span>
+                )}
+                {totalPending > 0 && onApplyAll && (
+                  <button data-testid="editor-apply-all" onClick={applyAll}
+                    title={t('manage.editor.pendingChipTitle')}
+                    className="flex items-center gap-1.5 bg-amber-600 px-3 py-1 text-white hover:bg-amber-700">
+                    <Check size={12} />{t('manage.editor.applyAll', { count: totalPending })}
+                  </button>
+                )}
+              </div>
+            )}
+            {tab === 'split' && !willSplit && (
+              <span data-testid="editor-split-state" className="text-xs text-gray-500">{t('manage.editor.notSplit')}</span>
+            )}
+            {tab === 'split' && pendingRotate !== 0 && (
+              <span className="text-xs text-amber-700">{t('manage.editor.splitAfterRotate', { deg: pendingRotate })}</span>
+            )}
+          </div>
+
+          {/* Harvad toimingud */}
+          <div className="relative flex flex-shrink-0 items-center gap-1">
             <input
               ref={replaceInputRef}
               type="file"
@@ -361,41 +438,101 @@ const PageImageEditorModal: React.FC<Props> = ({
                 if (replaceInputRef.current) replaceInputRef.current.value = '';
               }}
             />
-            <ExemplarOriginSelect exemplars={exemplars} value={replaceOrigin} onChange={setReplaceOrigin}
-                                  disabled={replacing} compact />
             <button
-              onClick={() => replaceInputRef.current?.click()}
-              disabled={replacing || originMissing}
-              title={originMissing ? t('manage.exemplarOrigin.required') : t('manage.replaceImage')}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              data-testid="editor-more"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              disabled={restoring || replacing}
+              className="flex items-center gap-1.5 rounded border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
             >
-              {replacing ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-              {t('manage.replaceImage')}
+              {restoring || replacing ? <Loader2 size={15} className="animate-spin" /> : <MoreHorizontal size={15} />}
+              {t('manage.editor.more')}
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" aria-label={t('manage.editor.close')}>
-              <X size={20} />
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div role="menu" className="absolute right-8 top-full z-20 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                  <button role="menuitem" data-testid="editor-replace" onClick={startReplace}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">
+                    <Upload size={14} />{t('manage.editor.replaceMenu')}
+                  </button>
+                  <button role="menuitem" data-testid="editor-restore"
+                    onClick={() => { setMenuOpen(false); setShowReplace(false); setShowRestoreConfirm(true); }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">
+                    <Undo2 size={14} />{t('manage.editor.restoreOriginal')}
+                  </button>
+                </div>
+              </>
+            )}
+            <button onClick={onClose} aria-label={t('manage.editor.close')}
+              className="-mr-1 rounded p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900">
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Tabid */}
-        <div className="flex gap-1 px-5 pt-3 flex-shrink-0">
-          <button
-            onClick={() => { setTab('edit'); setError(null); }}
-            className={`px-3 py-1.5 text-sm rounded-t-md border-b-2 transition-colors ${tab === 'edit' ? 'border-indigo-600 text-indigo-700 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-          >
-            {t('manage.editor.tabEdit')}
-          </button>
-          <button
-            onClick={() => { setTab('split'); setError(null); }}
-            className={`px-3 py-1.5 text-sm rounded-t-md border-b-2 transition-colors ${tab === 'split' ? 'border-indigo-600 text-indigo-700 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-          >
-            {t('manage.editor.tabSplit')}
-          </button>
-        </div>
-
-        {/* Sisu */}
-        <div className="flex-1 min-h-0 overflow-hidden p-4 bg-gray-50 flex flex-col">
+        {/* Lava: pilt saab kogu ruumi; pööre/perspektiiv on vasakul fikseeritud ribal
+            (ei hõlju ega kata pilti, jalus ei kasva). */}
+        <div className="relative flex min-h-0 flex-1 flex-row gap-3 overflow-hidden bg-gray-50 p-4">
+          {/* Teade hõljub lava peal (ei kuulu jaluse voogu) — jalus ei kasva ja pilt ei hüppa. */}
+          {toast && (
+            <div role="status" data-testid="editor-toast"
+              className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800 shadow-lg">
+              <span className="flex items-center gap-2"><Check size={14} /> {toast.text}</span>
+              {toast.action && (
+                <button onClick={toast.action.run} className="font-medium text-emerald-700 underline hover:text-emerald-900">
+                  {toast.action.label}
+                </button>
+              )}
+              <button onClick={() => setToast(null)} aria-label={t('manage.editor.close')}
+                className="-mr-1 rounded p-0.5 text-emerald-600 hover:bg-emerald-100"><X size={14} /></button>
+            </div>
+          )}
+          {/* Poolita-vahekaardil hoiab tühi koht riba laiust, et lava mõõt ja pilt
+              vahekaarti vahetades ei nihkuks ega muudaks suurust. */}
+          {tab === 'split' && <div aria-hidden="true" className="w-14 flex-shrink-0" />}
+          {tab === 'edit' && (
+            <div data-testid="editor-toolbar" role="toolbar" aria-orientation="vertical"
+              className="flex w-14 flex-shrink-0 flex-col items-center gap-1.5 self-start rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
+              <RotateButtons onRotate={rotateBy} buttonClassName={`${toolBtn} flex w-full justify-center`} iconSize={16} />
+              <div className="my-0.5 h-px w-full bg-gray-200" />
+              {/* Kaks erinevat tööriista, üks on alati aktiivne: kärbe (vaikimisi) või perspektiiv. */}
+              {[
+                { id: 'crop', active: !crop.perspective, label: t('common:pagePrep.cropTool'), icon: <Crop size={16} /> },
+                { id: 'perspective', active: crop.perspective, label: t('common:pagePrep.perspective'), icon: <Frame size={16} /> },
+              ].map((tool) => (
+                <button
+                  key={tool.id}
+                  data-testid={`editor-tool-${tool.id}`}
+                  onClick={() => { if (!tool.active) crop.togglePerspective(); }}
+                  aria-pressed={tool.active}
+                  aria-label={tool.label}
+                  title={tool.label}
+                  className={`flex w-full justify-center rounded border p-2 ${tool.active ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
+                >
+                  {tool.icon}
+                </button>
+              ))}
+              {crop.perspective && crop.quad && (
+                <button onClick={crop.resetQuad} title={t('common:pagePrep.perspectiveReset')}
+                  className={`${toolBtn} flex w-full justify-center text-gray-500 hover:text-gray-700`}>
+                  <CircleX size={16} />
+                </button>
+              )}
+              {crop.cropRect && !crop.perspective && (
+                <button onClick={crop.clearCrop} title={t('common:pagePrep.cropReset')}
+                  className={`${toolBtn} flex w-full justify-center text-gray-500 hover:text-gray-700`}>
+                  <CircleX size={16} />
+                </button>
+              )}
+              {crop.cropRect && !crop.perspective && Math.abs(crop.boxAngle) > 0.05 && (
+                <span title={t('common:pagePrep.deskew')} className="text-[11px] tabular-nums text-gray-600">
+                  {crop.boxAngle.toFixed(1)}°
+                </span>
+              )}
+            </div>
+          )}
           {/* Peidetud laadija: mõõdab pildi naturaalmõõdud enne kuvamist (väldib aspect-venitust) */}
           {!imgNatural && (
             <img
@@ -407,274 +544,210 @@ const PageImageEditorModal: React.FC<Props> = ({
             />
           )}
           {tab === 'edit' ? (
-            <div className="flex flex-col items-center gap-2 h-full min-h-0 w-full">
-              <p className="text-xs text-gray-400 flex-shrink-0">
-                {crop.perspective ? t('common:pagePrep.perspectiveHint') : t('common:pagePrep.cropHint')}
-              </p>
-              {(pendingAdjust || pendingRotate !== 0) && (
-                <p data-testid="editor-edit-pending" className="flex items-center gap-2 text-sm text-amber-700 flex-shrink-0">
-                  {pendingRotate !== 0 && <span>{t('manage.editor.rotatePending', { deg: pendingRotate })}</span>}
-                  {pendingAdjust && (
-                    <>
-                      <span>{t('manage.editor.cropPending')}</span>
-                      <button
-                        data-testid="editor-crop-remove"
-                        onClick={() => onAdjustClear(current.filename)}
-                        className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
-                      >
-                        {t('manage.editor.cropRemove')}
-                      </button>
-                    </>
-                  )}
-                </p>
-              )}
-
-              {/* Lava: mõõdetav paindlik ala, kuhu eelvaade mahutatakse. Pööramisnupud
-                  hõljuvad pildi peal (absolute) → ei söö ei kõrgust ega laiust, pilt saab
-                  kogu ruumi (sama suurus ka split-tabil). */}
-              <div ref={stageRef} className="relative flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
-                {/* Eelvaade: pilt seisab (jäme pööre), kärpe-kasti saab kallutada */}
-                {!imgNatural ? loadingBox : (
-              <div
-                className="relative bg-white shadow-inner border border-gray-200"
-                style={{ width: displayW, height: displayH }}
-              >
-                <img
-                  src={imageUrl}
-                  alt={current.filename}
-                  draggable={false}
-                  // max-w-none: Tailwindi preflight seab img-le max-width:100%, mis 90°/270°
-                  // pöördel kärbiks RÕHTSA pildi laiuse konteineri (expand'itud kasti) laiuseks
-                  // — element muutuks ruuduks ja eelvaade paistaks kokkusurutud.
-                  className="absolute pointer-events-none select-none max-w-none"
-                  style={{
-                    width: imgDispW,
-                    height: imgDispH,
-                    left: '50%', top: '50%',
-                    transform: `translate(-50%, -50%) rotate(${grossAngle}deg)`,
-                  }}
-                />
-                {/* Kärpe-overlay (püüab hiire) */}
-                <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />
-              </div>
-              )}
-
-                {/* Tööriistad: pööramine hõljub pildi peal, vabalt lohistatav (vaikimisi parem ülanurk) */}
+            <div ref={stageRef} className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
+              {/* Eelvaade: pilt seisab (jäme pööre), kärpe-kasti saab kallutada */}
+              {!imgNatural ? loadingBox : (
                 <div
-                  ref={toolbarRef}
-                  className="absolute z-20 flex flex-col items-center gap-2 p-1.5 rounded-lg bg-white/80 backdrop-blur-sm shadow-md border border-gray-200"
-                  style={toolbarPos ? { left: toolbarPos.x, top: toolbarPos.y } : { top: 8, right: 8 }}
+                  className="relative border border-gray-200 bg-white shadow-inner"
+                  style={{ width: displayW, height: displayH }}
                 >
-                  {/* Lohistuspide */}
-                  <div
-                    onMouseDown={onToolbarDown}
-                    title={t('manage.editor.dragPanel')}
-                    className={`w-full flex items-center justify-center text-gray-400 hover:text-gray-600 ${toolbarDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                  >
-                    <GripHorizontal size={14} />
-                  </div>
-                  <RotateButtons
-                    onRotate={rotateBy}
-                    buttonClassName="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100"
-                    iconSize={16}
+                  <img
+                    src={imageUrl}
+                    alt={current.filename}
+                    draggable={false}
+                    // max-w-none: Tailwindi preflight seab img-le max-width:100%, mis 90°/270°
+                    // pöördel kärbiks RÕHTSA pildi laiuse konteineri (expand'itud kasti) laiuseks
+                    // — element muutuks ruuduks ja eelvaade paistaks kokkusurutud.
+                    className="pointer-events-none absolute max-w-none select-none"
+                    style={{
+                      width: imgDispW,
+                      height: imgDispH,
+                      left: '50%', top: '50%',
+                      transform: `translate(-50%, -50%) rotate(${grossAngle}deg)`,
+                    }}
                   />
-                  <button
-                    onClick={crop.togglePerspective}
-                    title={t('common:pagePrep.perspective')}
-                    className={`p-2 rounded border ${crop.perspective ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
-                  >
-                    <Frame size={16} />
-                  </button>
-                  {crop.perspective && crop.quad && (
-                    <button onClick={crop.resetQuad} title={t('common:pagePrep.perspectiveReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
-                      <CircleX size={16} />
-                    </button>
+                  {outline && (
+                    <svg data-testid="editor-pending-outline" aria-hidden="true"
+                      className="pointer-events-none absolute inset-0" width={displayW} height={displayH}>
+                      <polygon points={outline.map(([x, y]) => `${x},${y}`).join(' ')}
+                        fill="rgba(245,158,11,0.12)" stroke="#d97706" strokeWidth={2} strokeDasharray="6 4" />
+                    </svg>
                   )}
-                  {crop.cropRect && !crop.perspective && (
-                    <button onClick={crop.clearCrop} title={t('common:pagePrep.cropReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
-                      <CircleX size={16} />
-                    </button>
-                  )}
-                  {crop.cropRect && !crop.perspective && Math.abs(crop.boxAngle) > 0.05 && (
-                    <span title={t('common:pagePrep.deskew')} className="text-xs text-gray-600 tabular-nums text-center">
-                      {crop.boxAngle.toFixed(1)}°
-                    </span>
-                  )}
+                  {/* Kärpe-overlay (püüab hiire) */}
+                  <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />
                 </div>
-              </div>
+              )}
             </div>
           ) : (
-            <div className="flex flex-col items-center h-full min-h-0 w-full">
-              <p className="text-sm text-gray-500 mb-3 self-start flex-shrink-0" data-testid="editor-split-state">
-                {willSplit
-                  ? t('manage.editor.splitAt', { percent: Math.round(splitX * 1000) / 10 })
-                  : t('manage.editor.notSplit')}
-                {pendingRotate !== 0 && (
-                  <span className="ml-2 text-amber-700">· {t('manage.editor.splitAfterRotate', { deg: pendingRotate })}</span>
-                )}
-              </p>
-              {/* Lava: sama mõõdetav ala ka poolitamise tabil */}
-              <div ref={stageRef} className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+            <div ref={stageRef} className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
               {!imgNatural ? loadingBox : (
-              <div
-                ref={splitContainerRef}
-                className={`relative select-none overflow-hidden rounded border border-gray-200 ${willSplit ? 'cursor-col-resize' : ''}`}
-                style={{ width: splitBoxW, height: splitBoxH }}
-                onPointerDown={(e) => { if (willSplit) splitAtClientX(e.clientX); }}
-              >
-                {splitPreviewUrl ? (
-                  <img
-                    data-testid="editor-split-preview"
-                    src={splitPreviewUrl}
-                    alt={current.filename}
-                    className="absolute inset-0 pointer-events-none max-w-none"
-                    draggable={false}
-                    style={{ width: splitBoxW, height: splitBoxH }}
-                    onLoad={(e) => setPreviewNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-                  />
-                ) : (
-                <img
-                  src={imageUrl}
-                  alt={current.filename}
-                  className="absolute pointer-events-none max-w-none"
-                  draggable={false}
-                  style={{
-                    width: natural.w * splitFit,
-                    height: natural.h * splitFit,
-                    left: '50%', top: '50%',
-                    transform: `translate(-50%, -50%) rotate(${pendingRotate}deg)`,
-                  }}
-                />
-                )}
-                {willSplit ? (
-                  <SplitLine
-                    x={splitX}
-                    box={{ left: 0, top: 0, width: splitBoxW, height: splitBoxH }}
-                    onHandleDown={startSplitDrag}
-                  />
-                ) : (
-                  // Sama märk nagu upload'i detailvaates: vaade ei näita joont, mida ei lõigata.
-                  <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-6">
-                    <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
-                      <Columns2 size={15} />{t('manage.editor.notSplit')}
-                    </span>
-                  </div>
-                )}
-              </div>
+                <div
+                  ref={splitContainerRef}
+                  className={`relative select-none overflow-hidden rounded border border-gray-200 ${willSplit ? 'cursor-col-resize' : ''}`}
+                  style={{ width: splitBoxW, height: splitBoxH }}
+                  onPointerDown={(e) => { if (willSplit) splitAtClientX(e.clientX); }}
+                >
+                  {splitPreviewUrl ? (
+                    <img
+                      data-testid="editor-split-preview"
+                      src={splitPreviewUrl}
+                      alt={current.filename}
+                      className="pointer-events-none absolute inset-0 max-w-none"
+                      draggable={false}
+                      style={{ width: splitBoxW, height: splitBoxH }}
+                      onLoad={(e) => setPreviewNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                    />
+                  ) : (
+                    <img
+                      src={imageUrl}
+                      alt={current.filename}
+                      className="pointer-events-none absolute max-w-none"
+                      draggable={false}
+                      style={{
+                        width: natural.w * splitFit,
+                        height: natural.h * splitFit,
+                        left: '50%', top: '50%',
+                        transform: `translate(-50%, -50%) rotate(${pendingRotate}deg)`,
+                      }}
+                    />
+                  )}
+                  {willSplit ? (
+                    <SplitLine
+                      x={splitX}
+                      box={{ left: 0, top: 0, width: splitBoxW, height: splitBoxH }}
+                      onHandleDown={startSplitDrag}
+                    />
+                  ) : (
+                    // Sama märk nagu upload'i detailvaates: vaade ei näita joont, mida ei lõigata.
+                    <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-6">
+                      <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
+                        <Columns2 size={15} />{t('manage.editor.notSplit')}
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
-              </div>
             </div>
           )}
         </div>
 
         {/* Jalus */}
-        <div className="px-5 py-3 border-t border-gray-100 flex-shrink-0 space-y-3">
+        <div className="flex-shrink-0 space-y-2 rounded-b border-t border-gray-200 bg-white px-4 py-3">
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            <div className="flex items-center gap-2 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               <AlertTriangle size={14} /> {error}
             </div>
           )}
-          {toast && (
-            <div className="flex items-center justify-between gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded text-sm text-emerald-800">
-              <span className="flex items-center gap-2"><Check size={14} /> {toast.text}</span>
-              {toast.action && (
-                <button onClick={toast.action.run} className="text-emerald-700 underline hover:text-emerald-900 font-medium">
-                  {toast.action.label}
-                </button>
-              )}
-            </div>
-          )}
-
           {showRestoreConfirm && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded space-y-2">
+            <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-3">
               <p className="text-sm text-amber-800">{t('manage.editor.restoreConfirmBody')}</p>
               <div className="flex gap-2">
-                <button
-                  onClick={doRestoreOriginal}
-                  className="px-3 py-1 text-sm bg-amber-600 hover:bg-amber-700 text-white rounded"
-                >
+                <button onClick={doRestoreOriginal} className="rounded bg-amber-600 px-3 py-1 text-sm text-white hover:bg-amber-700">
                   {t('manage.editor.restoreOriginal')}
                 </button>
-                <button
-                  onClick={() => setShowRestoreConfirm(false)}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
-                >
+                <button onClick={() => setShowRestoreConfirm(false)} className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100">
                   {t('manage.editor.cancel')}
                 </button>
               </div>
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            {/* Navigeerimine */}
-            <div className="flex items-center gap-1">
+          {/* Asendus eksemplaridega teosel: päritolu küsitakse SIIN, koos selgitusega
+              (ADR 0076 p 4 — vaikevalikut ei ole). */}
+          {showReplace && (
+            <div data-testid="editor-replace-panel" className="space-y-2 rounded border border-gray-200 bg-gray-50 p-3">
+              <p className="text-sm text-gray-800">{t('manage.editor.replaceBody')}</p>
+              <div className="flex flex-wrap items-end gap-2">
+                <ExemplarOriginSelect exemplars={exemplars} value={replaceOrigin} onChange={setReplaceOrigin}
+                  disabled={replacing} />
+                <button
+                  data-testid="editor-replace-choose"
+                  onClick={() => replaceInputRef.current?.click()}
+                  disabled={replacing || originMissing}
+                  title={originMissing ? t('manage.exemplarOrigin.required') : undefined}
+                  className="flex items-center gap-1.5 rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {replacing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {t('manage.editor.replaceChoose')}
+                </button>
+                <button onClick={() => setShowReplace(false)} disabled={replacing}
+                  className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100">
+                  {t('manage.editor.cancel')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1">
               {/* Sama nupp nagu upload'i detailvaates: Escape üksi ei ütle, kuhu ta viib. */}
               <button
                 data-testid="back-to-overview"
                 onClick={onClose}
-                className="mr-2 flex items-center gap-1.5 px-3 py-2 text-sm rounded border border-gray-300 bg-white hover:bg-gray-100"
+                className="mr-2 flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-100"
               >
                 <LayoutGrid size={15} />
                 {t('manage.editor.backToOverview')}
               </button>
-              <button
-                onClick={() => goTo(currentIndex - 1)}
-                disabled={safeIndex <= 0}
-                title={t('manage.editor.prev')}
-                className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40"
-              >
+              <button onClick={() => goTo(currentIndex - 1)} disabled={safeIndex <= 0}
+                title={t('manage.editor.prev')} className={`${toolBtn} disabled:opacity-40`}>
                 <ChevronLeft size={16} />
               </button>
-              <button
-                onClick={() => goTo(currentIndex + 1)}
-                disabled={safeIndex >= pages.length - 1}
-                title={t('manage.editor.next')}
-                className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-40"
-              >
+              <button onClick={() => goTo(currentIndex + 1)} disabled={safeIndex >= pages.length - 1}
+                title={t('manage.editor.next')} className={`${toolBtn} disabled:opacity-40`}>
                 <ChevronRight size={16} />
               </button>
+
+              {tab === 'split' && (
+              <div className="ml-2 flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3">
+                {(
+                  <>
+                    <button
+                      data-testid="editor-split-toggle"
+                      aria-pressed={!willSplit}
+                      onClick={() => onSplitChange(current.filename, { split: !willSplit, split_x: pendingOp?.split_x ?? null })}
+                      className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm ${
+                        willSplit ? 'border-gray-300 hover:bg-gray-100' : 'border-gray-900 bg-gray-900 font-medium text-white'
+                      }`}
+                    >
+                      <Columns2 size={15} />
+                      {willSplit ? t('manage.pageOps.noSplit') : t('manage.pageOps.split')}
+                    </button>
+                    {willSplit && pendingOp?.split_x != null && (
+                      <button
+                        onClick={() => onSplitChange(current.filename, { split: true, split_x: null })}
+                        className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100"
+                      >
+                        {t('manage.editor.resetToGlobal')}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              )}
             </div>
 
-            {tab === 'split' ? (
-              // Poolitus on ootel plaan: siin ainult märgitakse, rakendus käib
-              // teose halduse riba „Rakenda" nupust (nagu upload'is „Rakenda").
-              <div className="flex items-center gap-2">
-                {willSplit && pendingOp?.split_x != null && (
-                  <button
-                    onClick={() => onSplitChange(current.filename, { split: true, split_x: null })}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-100"
-                  >
-                    {t('manage.editor.resetToGlobal')}
-                  </button>
-                )}
-                <button
-                  data-testid="editor-split-toggle"
-                  aria-pressed={!willSplit}
-                  onClick={() => onSplitChange(current.filename, { split: !willSplit, split_x: pendingOp?.split_x ?? null })}
-                  className={`flex items-center gap-2 px-4 py-2 text-sm rounded border ${
-                    willSplit ? 'border-gray-300 hover:bg-gray-100' : 'border-gray-900 bg-gray-900 text-white'
-                  }`}
-                >
-                  <Columns2 size={14} />
-                  {willSplit ? t('manage.pageOps.noSplit') : t('manage.pageOps.split')}
-                </button>
-              </div>
-            ) : (
-            <button
-              data-testid="editor-mark"
-              onClick={markPending}
-              disabled={noEditChange && isLast}
-              className="flex items-center gap-2 px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded transition-colors"
-            >
-              {noEditChange
-                ? t('manage.editor.next')
-                : isLast ? <><Check size={14} />{t('manage.editor.markPending')}</> : t('manage.editor.markAndNext')}
-              {!isLast && <ChevronRight size={14} />}
-            </button>
+            {tab === 'edit' && (
+              <button
+                data-testid="editor-mark"
+                onClick={markPending}
+                disabled={noEditChange && isLast}
+                className="flex items-center gap-2 rounded bg-indigo-600 px-5 py-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {noEditChange
+                  ? t('manage.editor.next')
+                  : isLast ? <><Check size={14} />{t('manage.editor.markPending')}</> : t('manage.editor.markAndNext')}
+                {!isLast && <ChevronRight size={14} />}
+              </button>
             )}
           </div>
           <p className="text-xs text-gray-500">
-            {tab === 'split' ? t('manage.editor.splitPendingHint') : t('manage.editor.editPendingHint')}
+            {tab === 'split'
+              ? t('manage.editor.splitPendingHint')
+              : <>
+                {crop.perspective ? t('common:pagePrep.perspectiveHint') : t('common:pagePrep.cropHint')}
+                {' '}{t('manage.editor.editPendingHint')}
+              </>}
           </p>
         </div>
       </div>

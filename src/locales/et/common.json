@@ -345,6 +345,7 @@
     "rotateRight": "Pööra paremale 90°",
     "rotate180": "Pööra 180°",
     "deskew": "Peenhäälestus (kraadid)",
+    "cropTool": "Kärbi",
     "perspective": "Perspektiiv",
     "perspectiveReset": "Lähtesta perspektiivinurgad",
     "cropReset": "Eemalda kärpekast ja unusta viimati kasutatud suurus",
