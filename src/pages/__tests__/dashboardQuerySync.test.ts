@@ -11,6 +11,24 @@ describe('sortAfterQueryChange', () => {
   it('muu sort ei muutu ka tühjenemisel', () => {
     expect(sortAfterQueryChange('az', '')).toBe('az');
   });
+  it('kogu vaikejärjestusega läheb relevance kogu järjestusele (ADR 0080)', () => {
+    expect(sortAfterQueryChange('relevance', '', 'az')).toBe('az');
+    expect(sortAfterQueryChange('year_desc', '', 'az')).toBe('year_desc');
+  });
+});
+
+import { dashboardDefaultSort } from '../dashboardQuerySync';
+
+describe('dashboardDefaultSort (ADR 0080)', () => {
+  it('päringuga relevantsus, ka kogu vaikejärjestuse korral', () => {
+    expect(dashboardDefaultSort('risin', 'az')).toBe('relevance');
+  });
+  it('ilma päringuta kogu järjestus', () => {
+    expect(dashboardDefaultSort('', 'az')).toBe('az');
+  });
+  it('ilma päringu ja kogu järjestuseta aasta järgi', () => {
+    expect(dashboardDefaultSort('', undefined)).toBe('year_asc');
+  });
 });
 
 import { filterUrlKey, createUrlEchoGuard } from '../dashboardQuerySync';

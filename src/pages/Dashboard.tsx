@@ -9,6 +9,7 @@ import Header from '../components/Header';
 import LoginModal from '../components/LoginModal';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
+import { collectionDefaultSort } from '../services/collectionService';
 import { useSelectionScope } from '../hooks/useSelectionScope';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, X, Lock, LogIn } from 'lucide-react';
@@ -37,7 +38,7 @@ import WorkFilterSections from '../components/workFilters/WorkFilterSections';
 import WorkFilterChips, { FilterChip, FilterHintChip } from '../components/workFilters/WorkFilterChips';
 import { useFilterHints, FilterHint } from '../services/filterHints/useFilterHints';
 import { trackEvent } from '../services/analytics';
-import { sortAfterQueryChange, createUrlEchoGuard } from './dashboardQuerySync';
+import { sortAfterQueryChange, createUrlEchoGuard, dashboardDefaultSort } from './dashboardQuerySync';
 import { useWorkFilterModel } from '../components/workFilters/useWorkFilterModel';
 import WorkListRow from '../components/WorkListRow';
 
@@ -71,7 +72,12 @@ const Dashboard: React.FC = () => {
   const queryParam = searchParams.get('q') || '';
   const yearStartParam = searchParams.get('ys');
   const yearEndParam = searchParams.get('ye');
-  const defaultSort = searchParams.get('q') ? 'relevance' : 'year_asc';
+  // Kogu vaikejärjestus (ADR 0080): sortita URL — menüülink, kogu valija,
+  // jagatud link — saab kogu järjestuse; URL-i `sort` võidab alati. Kogude
+  // laadimise järel muutub `sortParam` ja URL → olek effect kannab ta olekusse.
+  const collectionSort = collectionDefaultSort(collections, selectedCollection);
+  const noQuerySort = dashboardDefaultSort('', collectionSort);
+  const defaultSort = dashboardDefaultSort(searchParams.get('q') || '', collectionSort);
   const sortParam = searchParams.get('sort') || defaultSort;
   const authorParam = searchParams.get('author') || '';
   const respondensParam = searchParams.get('respondens') || '';
@@ -428,11 +434,14 @@ const Dashboard: React.FC = () => {
         if (inputValue) newParams.set('q', inputValue);
         else {
           newParams.delete('q');
-          // Kui otsing tühjendatakse ja sort on relevantsus, muuda aasta järgi
-          const nextSort = sortAfterQueryChange(sort, '');
+          // Kui otsing tühjendatakse ja sort on relevantsus, mine päringuta
+          // vaikejärjestusele. Vaikimisi väärtust URL-i ei kirjutata: siis
+          // järgib ta kogu vahetust, mitte ei kinnistu kasutaja valikuna.
+          const nextSort = sortAfterQueryChange(sort, '', noQuerySort);
           if (nextSort !== sort) {
             setSort(nextSort);
-            newParams.set('sort', nextSort);
+            if (nextSort === noQuerySort) newParams.delete('sort');
+            else newParams.set('sort', nextSort);
           }
         }
         changed = true;
@@ -528,7 +537,7 @@ const Dashboard: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [urlEcho, inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedLanguages, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, langsKey, statusParam, genreLabelToId, tagsLabelToId, typeLabelToId]);
+  }, [urlEcho, inputValue, yearStart, yearEnd, sort, noQuerySort, selectedTags, selectedGenre, selectedType, selectedLanguages, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, langsKey, statusParam, genreLabelToId, tagsLabelToId, typeLabelToId]);
 
   // Perform search when params change
   useEffect(() => {

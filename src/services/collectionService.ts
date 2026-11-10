@@ -25,7 +25,17 @@ export interface Collection {
   description_long?: CollectionName;
   color?: string;          // Tailwind värvi nimi (nt 'amber', 'teal', 'violet')
   visibility?: 'public' | 'restricted';
+  /** Avalehe vaikejärjestus selles kogus (ADR 0080); alamkogu pärib. */
+  default_sort?: CollectionDefaultSort;
 }
+
+/**
+ * Järjestused, mida kogu tohib vaikimisi kanda (ADR 0080). Peab kattuma
+ * serveri `COLLECTION_DEFAULT_SORTS`-iga (`server/routers/collections.py`).
+ * `relevance` ei kuulu siia — ilma päringuta pole tal tähendust.
+ */
+export const COLLECTION_DEFAULT_SORTS = ['year_asc', 'year_desc', 'az', 'recent'] as const;
+export type CollectionDefaultSort = typeof COLLECTION_DEFAULT_SORTS[number];
 
 // Tailwind värviklassid kollektsioonide jaoks
 // NB: Klassid peavad olema täielikult välja kirjutatud, et Tailwind neid kompileeriks
@@ -197,6 +207,22 @@ function collectionChain(collections: Collections, id: string): string[] {
     currentId = collections[currentId]?.parent;
   }
   return chain;
+}
+
+/**
+ * Kogu kehtiv vaikejärjestus (ADR 0080): kogu enda või lähima esivanema
+ * `default_sort`. `undefined` = kogu ei määra, kehtib rakenduse vaikimisi.
+ * Lubamatu väärtus jäetakse vahele (käsitsi muudetud fail ei murra avalehte).
+ */
+export function collectionDefaultSort(
+  collections: Collections, id: string | null | undefined,
+): CollectionDefaultSort | undefined {
+  if (!id) return undefined;
+  for (const cid of collectionChain(collections, id)) {
+    const s = collections[cid]?.default_sort;
+    if (s && (COLLECTION_DEFAULT_SORTS as readonly string[]).includes(s)) return s;
+  }
+  return undefined;
 }
 
 /**
