@@ -4,7 +4,7 @@ import type { WorkExemplarsResponse } from '../../../services/workApi';
 import type { ExemplarImage } from '../../../services/exemplarImagesService';
 import {
   PAGES_KEY, defaultSelection, externalLinkLabel, hasWitness, imagesSequence, isCitationSource,
-  ownPages, pageOwners, pagesSequence, stepLocked, unassignedPages, validPairStem,
+  materialParts, ownPages, pageOwners, pagesSequence, stepLocked, unassignedPages, validPairStem,
 } from '../exemplarSequences';
 
 const ex = (id: string, extra: Partial<Exemplar> = {}): Exemplar => ({ id, holder: `H${id}`, ...extra });
@@ -168,5 +168,19 @@ describe('isCitationSource', () => {
     expect(isCitationSource('migration')).toBe(false);
     expect(isCitationSource('manual')).toBe(false);
     expect(isCitationSource(undefined)).toBe(false);
+  });
+});
+
+describe('materialParts', () => {
+  const d = resp({ exemplars: [ex('a', { text_witness: true }), ex('b', { pages: ['s2'] })] });
+  it('alus: tema lehed, pildid manifestist', () => {
+    const p = materialParts('w1', d, 'a', [img('i1')]);
+    expect(p.pages.items.map(i => i.stem)).toEqual(['s1', 's3']);
+    expect(p.images?.items.map(i => i.key)).toEqual(['i1']);
+  });
+  it('PAGES_KEY: pildijada pole', () => {
+    const p = materialParts('w1', resp({ exemplars: [ex('b', { pages: ['s2'] })] }), PAGES_KEY, null);
+    expect(p.pages.items.map(i => i.stem)).toEqual(['s1', 's3']);
+    expect(p.images).toBeNull();
   });
 });

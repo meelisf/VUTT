@@ -160,3 +160,17 @@ const CITATION_SOURCES = new Set(['ester', 'jaanson', 'ada']);
 export function isCitationSource(kind?: string): boolean {
   return !!kind && CITATION_SOURCES.has(kind);
 }
+
+/** Valitud võtme pildimaterjal: teose lehed (vaatamiseks) ja eksemplari oma pildid. */
+export interface MaterialParts { pages: Sequence; images: Sequence | null }
+
+/** Eksemplari lehe jaotis (spets „Pildimaterjal: üks reegel"):
+ *  PAGES_KEY → kõik lehed peale erandlehtede; eksemplar → tema teose lehed + oma pildid. */
+export function materialParts(workId: string, data: WorkExemplarsResponse, selected: string,
+  images: ExemplarImage[] | null): MaterialParts {
+  const items = selected === PAGES_KEY ? unassignedPages(workId, data) : ownPages(workId, data, selected);
+  return {
+    pages: { key: PAGES_KEY, kind: 'pages', items },
+    images: selected !== PAGES_KEY && images ? imagesSequence(workId, selected, images, data.page_numbers) : null,
+  };
+}

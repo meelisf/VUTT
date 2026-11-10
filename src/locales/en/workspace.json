@@ -988,6 +988,19 @@
     "pageCount_one": "{{count}} page",
     "pageCount_other": "{{count}} pages",
     "exceptionPages": "Exception pages",
-    "physical": "Physical copy"
+    "physical": "Physical copy",
+    "title": "Exemplars",
+    "backToPage": "Back to page {{n}}",
+    "viewOnly": "view only",
+    "managePages": "Manage pages →",
+    "showAll": "Show all",
+    "more": "… {{count}} more",
+    "noImages": "No images.",
+    "editImages": "Edit images",
+    "ownPages": "Work pages",
+    "ownImages": "Images",
+    "pageLabel": "p. {{n}}",
+    "compare": "Compare",
+    "adaImport": "ADA import…"
   }
 }

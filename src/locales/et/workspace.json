@@ -988,6 +988,19 @@
     "pageCount_one": "{{count}} leht",
     "pageCount_other": "{{count}} lehte",
     "exceptionPages": "Erandlehed",
-    "physical": "Füüsiline eksemplar"
+    "physical": "Füüsiline eksemplar",
+    "title": "Eksemplarid",
+    "backToPage": "Tagasi lehele {{n}}",
+    "viewOnly": "ainult vaatamiseks",
+    "managePages": "Halda lehti →",
+    "showAll": "Näita kõiki",
+    "more": "… {{count}} veel",
+    "noImages": "Pilte ei ole.",
+    "editImages": "Muuda pilte",
+    "ownPages": "Teose lehed",
+    "ownImages": "Pildid",
+    "pageLabel": "lk {{n}}",
+    "compare": "Kõrvuta",
+    "adaImport": "ADA import…"
   }
 }
