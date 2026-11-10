@@ -639,6 +639,18 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     repo = get_or_init_repo()
     old_head = repo.head.commit.hexsha
 
+    # Asendus kasutab tüved uuesti → eksemplaride pildipaarid osutaksid vaikselt uutele
+    # lehtedele. Eemalda KÕIK paarid enne ühegi faili liigutamist (sama work_lock);
+    # ebaõnnestumisel katkesta. Rollback (checkout old_head) taastaks vana sisu koos
+    # vanade paaridega — see on kooskõlaline (ADR 0079 p 3 täiendus).
+    try:
+        from . import exemplar_images
+        exemplar_images.clear_all_pairs(work_dir, username)
+    except Exception as e:
+        logger.error(f"replace {upload_id}: pildipaaride eemaldamine ebaõnnestus: {e}")
+        raise HTTPException(status_code=500,
+                            detail="Eksemplaride pildipaaride eemaldamine ebaõnnestus; teose sisu ei asendatud")
+
     # Lipp: kas destruktiivsed sammud on alanud (arhiveerimine/git rm)
     destructive_started = False
 

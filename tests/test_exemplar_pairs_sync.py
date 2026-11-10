@@ -92,3 +92,38 @@ def test_refresh_tagastab_arvu_ja_viga_ei_levi(env, monkeypatch):
                         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x")))
     assert relations.refresh_work_mentions(env["work_dir"], "w1") == {"pairs_removed": 0}
     assert recorded == ["server:thread"]
+
+
+# ── Lehestiku asendus (ADR 0079 p 3 täiendus, punkt 5) ───────────────────────
+
+def test_clear_all_pairs_eemaldab_ka_kehtiva(env):
+    # pilt 0 → kehtiv paar, pilt 1 → rippuv: mõlemad eemaldatakse
+    assert ei.clear_all_pairs(env["work_dir"], "meelisf") == 2
+    m = ei.read_manifest(env["work_dir"], env["eid"])
+    assert all("page" not in img for img in m["images"])
+
+
+def test_asendus_katkeb_kui_paaride_eemaldus_ebaonnestub(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+    import server.git_ops as git_ops
+    from server import upload_ops
+    from tests.test_replace_work_content import _FakeRepo, _ListSftp, _setup_replace_files
+
+    upload_id, work_id, _slug, work_dir, data_dir = _setup_replace_files(tmp_path, monkeypatch)
+    monkeypatch.setattr(upload_ops, "_sftp_open",
+                        lambda _u: _ListSftp(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    monkeypatch.setattr(git_ops, "get_or_init_repo", lambda: _FakeRepo())
+    monkeypatch.setattr(ei, "clear_all_pairs",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("lukk")))
+    def files():
+        return sorted(f for f in os.listdir(work_dir) if f != ".vutt-lock")   # lukufail
+    before = files()
+
+    with pytest.raises(HTTPException) as exc:
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+
+    assert exc.value.status_code == 500
+    assert "pildipaaride eemaldamine ebaõnnestus" in exc.value.detail
+    assert files() == before
+    assert (work_dir / "vana-teos_pg_001.jpg").read_bytes() == b"vana jpg"
+    assert not list((data_dir / "._trash").glob("**/*.jpg"))
