@@ -441,7 +441,7 @@ const SplitPageDetail: React.FC<Props> = ({
                 {crop.perspective ? t('common:pagePrep.perspectiveHint') : t('common:pagePrep.cropHint')}
                 {' '}{t('step3split.detail.cropReplaces')}
               </>
-              : t('step3split.detail.arrowHint')}
+              : <>{t('step3split.detail.arrowHint')}{page.adjust && <>{' · '}{t('step3split.detail.cropPendingHint')}</>}</>}
           </p>
         </div>
       </div>
