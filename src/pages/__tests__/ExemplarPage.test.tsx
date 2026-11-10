@@ -41,9 +41,11 @@ vi.mock('../../services/workApi', async (orig) => ({
   getWorkExemplars: (...a: unknown[]) => getWorkExemplars(...a),
 }));
 const fetchExemplarImages = vi.fn();
+const patchExemplarImages = vi.fn();
 vi.mock('../../services/exemplarImagesService', async (orig) => ({
   ...(await orig<typeof import('../../services/exemplarImagesService')>()),
   fetchExemplarImages: (...a: unknown[]) => fetchExemplarImages(...a),
+  patchExemplarImages: (...a: unknown[]) => patchExemplarImages(...a),
 }));
 
 import ExemplarPage from '../ExemplarPage';
@@ -174,5 +176,51 @@ describe('ExemplarPage', () => {
     const imgs = within(material).getAllByTestId('material-thumb').map(b => b.querySelector('img')?.getAttribute('src'));
     expect(imgs).toHaveLength(2);
     expect(imgs.some(s => s?.includes('w-002'))).toBe(false);
+  });
+
+  it('?cmp=katkine → kõrvutust ei ole, leht renderdub', async () => {
+    getWorkExemplars.mockResolvedValue(resp({
+      exemplars: [{ id: 'b2', holder: 'UUB' }], images: { b2: { count: 6, preview: [] } },
+    }));
+    fetchExemplarImages.mockResolvedValue(manifest);
+    renderAt('/work/w1/exemplar/b2?cmp=katkine');
+    await screen.findByTestId('exemplar-material');
+    expect(screen.queryByTestId('exemplar-compare-modal')).toBeNull();
+  });
+
+  it('piirist väljas indeks → kõrvutust ei ole', async () => {
+    getWorkExemplars.mockResolvedValue(resp({
+      exemplars: [{ id: 'b2', holder: 'UUB' }], images: { b2: { count: 6, preview: [] } },
+    }));
+    fetchExemplarImages.mockResolvedValue(manifest);
+    renderAt('/work/w1/exemplar/b2?cmp=b2:99~pages:0');
+    await screen.findByTestId('exemplar-material');
+    await waitFor(() => expect(fetchExemplarImages).toHaveBeenCalled());
+    expect(screen.queryByTestId('exemplar-compare-modal')).toBeNull();
+  });
+
+  it('„Kõrvuta" → parem pool paari lehel; admin salvestab paari', async () => {
+    state.role = 'admin';
+    getWorkExemplars.mockResolvedValue(resp({
+      exemplars: [{ id: 'b2', holder: 'UUB' }], images: { b2: { count: 6, preview: [] } },
+    }));
+    fetchExemplarImages.mockResolvedValue(manifest);
+    patchExemplarImages.mockResolvedValue({ ...manifest, revision: 3 });
+    renderAt('/work/w1/exemplar/b2');
+    const material = await screen.findByTestId('exemplar-material');
+    await waitFor(() => expect(within(material).getAllByTestId('material-thumb')).toHaveLength(6));
+    fireEvent.click(within(material).getByText('exemplarPage.compare'));
+    // img001 paar on w-003 → parem pool indeksil 2
+    await waitFor(() => expect(screen.getByTestId('loc').textContent).toContain('cmp=b2%3A0%7Epages%3A2'));
+    const modal = await screen.findByTestId('exemplar-compare-modal');
+    expect(within(modal).getByText('compare.pairSaved')).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    await waitFor(() => expect(screen.getByTestId('loc').textContent).toContain('cmp=b2%3A1%7Epages%3A3'));
+    fireEvent.click(within(screen.getByTestId('exemplar-compare-modal')).getByText(/compare\.savePair/));
+    await waitFor(() => expect(patchExemplarImages).toHaveBeenCalled());
+    const [, eid, rev, imgs] = patchExemplarImages.mock.calls[0];
+    expect(eid).toBe('b2');
+    expect(rev).toBe(2);
+    expect(imgs[1].page).toBe('w-004');
   });
 });

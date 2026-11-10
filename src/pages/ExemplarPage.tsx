@@ -7,16 +7,21 @@ import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import ExemplarList, { type ExemplarListHandle } from '../components/exemplars/ExemplarList';
 import ExemplarMaterial from '../components/exemplars/ExemplarMaterial';
 import ExemplarImageModal from '../components/exemplars/ExemplarImageModal';
+import ExemplarCompareModal, { type CompareSide } from '../components/exemplars/ExemplarCompareModal';
 import {
-  PAGES_KEY, defaultSelection, materialParts, type Sequence,
+  PAGES_KEY, defaultSelection, imagesSequence, materialParts, pagesSequence, type Sequence,
 } from '../components/exemplars/exemplarSequences';
+import { orderExemplars } from '../components/exemplars/exemplarCardUtils';
+import { useNotify } from '../contexts/FeedbackContext';
 import { useUser } from '../contexts/UserContext';
 import { useImageToken, withImageToken } from '../contexts/ImageTokenContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { getWorkExemplars, type WorkExemplarsResponse } from '../services/workApi';
-import { fetchExemplarImages, sourceLabel, type ExemplarManifest } from '../services/exemplarImagesService';
-import { apiGet } from '../services/apiClient';
+import {
+  ManifestConflictError, fetchExemplarImages, patchExemplarImages, sourceLabel, type ExemplarManifest,
+} from '../services/exemplarImagesService';
+import { apiErrorMessage, apiGet } from '../services/apiClient';
 import { getWorkMetadata } from '../services/workService';
 import { FILE_API_URL } from '../config';
 import { isAtLeast } from '../utils/roleUtils';
@@ -24,6 +29,22 @@ import { isManuscriptType } from '../utils/metadataUtils';
 
 type Archives = Record<string, { name: string; url?: string }>;
 const EMPTY_MANIFEST: ExemplarManifest = { revision: 0, images: [], imports: {} };
+
+/** `?cmp=<vasak jada>:<indeks>~<parem jada>:<indeks>`; vigane → null (kõrvutust ei avata). */
+export function parseCompareParam(raw: string | null): [CompareSide, CompareSide] | null {
+  if (!raw) return null;
+  const sides = raw.split('~');
+  if (sides.length !== 2) return null;
+  const out: CompareSide[] = [];
+  for (const part of sides) {
+    const m = /^([A-Za-z0-9_-]+):(\d+)$/.exec(part);
+    if (!m) return null;
+    out.push({ seq: m[1], index: Number(m[2]) });
+  }
+  return [out[0], out[1]];
+}
+
+const compareParam = (l: CompareSide, r: CompareSide) => `${l.seq}:${l.index}~${r.seq}:${r.index}`;
 
 /**
  * Eksemplari leht (spets 2026-11-10, ADR 0076/0079): `/work/:workId/exemplar/:exemplarId?`.
@@ -53,7 +74,10 @@ const ExemplarPage: React.FC = () => {
   const [archives, setArchives] = useState<Archives>({});
   // Manifest koos eksemplari id-ga: teise eksemplari vana manifest ei tohi vilksatada.
   const [manifestState, setManifestState] = useState<{ eid: string; m: ExemplarManifest } | null>(null);
+  // Kõrvutuse jadade jaoks: kõigi piltidega eksemplaride manifestid (laetakse avamisel).
+  const [otherManifests, setOtherManifests] = useState<Record<string, ExemplarManifest>>({});
   const [listDirty, setListDirty] = useState(false);
+  const notify = useNotify();
   const listRef = useRef<ExemplarListHandle>(null);
 
   const pageParam = searchParams.get('page');
@@ -118,6 +142,118 @@ const ExemplarPage: React.FC = () => {
   }, [selectedExemplar?.id, imageCount, canEdit, loadManifest]);
 
   const manifest = manifestState && manifestState.eid === selectedExemplar?.id ? manifestState.m : null;
+  const manifestOf = (eid: string): ExemplarManifest | undefined =>
+    (manifestState?.eid === eid ? manifestState.m : undefined) ?? otherManifests[eid];
+
+  // ── Kõrvutus ──────────────────────────────────────────────────────────────
+  const cmp = parseCompareParam(searchParams.get('cmp'));
+  const withImages = data ? orderExemplars(data.exemplars).filter(x => (data.images?.[x.id]?.count ?? 0) > 0) : [];
+  const canCompare = !!data && ((data.page_files?.length ?? 0) > 0 ? 1 : 0) + withImages.length >= 2;
+  const missingManifests = withImages.filter(x => !manifestOf(x.id)).map(x => x.id);
+  const missingKey = missingManifests.join(',');
+  useEffect(() => {
+    if (!cmp || !missingKey) return;
+    let cancelled = false;
+    for (const eid of missingKey.split(',')) {
+      fetchExemplarImages(workId, eid, authToken)
+        .then(m => { if (!cancelled) setOtherManifests(prev => ({ ...prev, [eid]: m })); })
+        .catch(() => { if (!cancelled) setOtherManifests(prev => ({ ...prev, [eid]: EMPTY_MANIFEST })); });
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!cmp, missingKey, workId, authToken]);
+
+  const compareSeqs: Sequence[] | null = data && cmp && missingManifests.length === 0 ? [
+    pagesSequence(workId, data),
+    ...orderExemplars(data.exemplars).map(x =>
+      imagesSequence(workId, x.id, manifestOf(x.id)?.images ?? [], data.page_numbers)),
+  ] : null;
+  const cmpValid = !!(compareSeqs && cmp && cmp.every(side => {
+    const seq = compareSeqs.find(q => q.key === side.seq);
+    return !!seq && side.index < seq.items.length;
+  }));
+
+  /** Kõrvutuse avamine: vasak = kust vajutati; parem = paari leht → ?page → algus. */
+  const openCompare = (seqKey: string, item: { key: string; stem?: string; pairStem?: string } | undefined) => {
+    if (!data || !item) return;
+    const all = pagesSequence(workId, data);
+    const pageIdx = (stem?: string) => (stem ? all.items.findIndex(it => it.stem === stem) : -1);
+    let left: CompareSide;
+    if (seqKey === PAGES_KEY) {
+      left = { seq: PAGES_KEY, index: Math.max(0, pageIdx(item.stem)) };
+    } else {
+      const imgs = manifestOf(seqKey)?.images ?? [];
+      left = { seq: seqKey, index: Math.max(0, imgs.findIndex(im => im.id === item.key)) };
+    }
+    let right: CompareSide;
+    if (left.seq !== PAGES_KEY && all.items.length > 0) {
+      let i = pageIdx(item.pairStem);
+      if (i < 0 && backPage) i = Math.min(backPage - 1, all.items.length - 1);
+      right = { seq: PAGES_KEY, index: Math.max(0, i) };
+    } else {
+      const other = withImages.find(x => x.id !== left.seq);
+      right = other ? { seq: other.id, index: 0 } : { seq: PAGES_KEY, index: 0 };
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('image');
+    next.set('cmp', compareParam(left, right));
+    setSearchParams(next, { replace: true });
+  };
+
+  const setCompare = (l: CompareSide, r: CompareSide) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('cmp', compareParam(l, r));
+    setSearchParams(next, { replace: true });
+  };
+  const closeCompare = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('cmp');
+    setSearchParams(next, { replace: true });
+  };
+
+  const storeManifest = (eid: string, m: ExemplarManifest) => {
+    setOtherManifests(prev => ({ ...prev, [eid]: m }));
+    if (manifestState?.eid === eid) setManifestState({ eid, m });
+  };
+
+  /** Paari salvestus: pildi `page` uueks tüveks. 409 (revisjon või kadunud leht) →
+   *  teade, manifest veast ja leheloend serverist uuesti. */
+  const savePair = async (eid: string, imageKey: string, stem: string) => {
+    const m = manifestOf(eid);
+    if (!m) return;
+    const images = m.images.map(im => (im.id === imageKey ? { ...im, page: stem } : im));
+    try {
+      const out = await patchExemplarImages(workId, eid, m.revision, images, authToken);
+      storeManifest(eid, out);
+      notify(t(out.git_committed === false ? 'exemplarImages.editor.notCommitted' : 'compare.pairSaved'),
+        out.git_committed === false ? 'warning' : 'success');
+    } catch (e) {
+      if (e instanceof ManifestConflictError) {
+        notify(t('exemplarImages.editor.conflict'), 'warning');
+        storeManifest(eid, e.current);
+        void loadData();
+      } else {
+        notify(apiErrorMessage(e, t('exemplarImages.editor.error')), 'error');
+      }
+    }
+  };
+
+  const seqLabel = (key: string) => {
+    if (!data) return { main: key };
+    if (key === PAGES_KEY) {
+      const w = data.exemplars.find(x => x.text_witness);
+      return {
+        main: t('compare.pagesSeq'),
+        sub: w ? t('compare.witnessIs', { name: [w.holder, w.shelfmark].filter(Boolean).join(' ') }) : t('compare.witnessUnset'),
+      };
+    }
+    const x = data.exemplars.find(e => e.id === key);
+    const n = data.images?.[key]?.count ?? 0;
+    return {
+      main: x ? [x.holder, x.shelfmark].filter(Boolean).join(' ') : key,
+      sub: n ? t('exemplarImages.count', { count: n }) : t('compare.noMaterial'),
+    };
+  };
 
   const { dialogProps } = useUnsavedChangesGuard({
     isDirty: listDirty,
@@ -204,8 +340,9 @@ const ExemplarPage: React.FC = () => {
 
             {selected && !notFound && (
               <ExemplarMaterial workId={workId} selected={selected} data={data} manifest={manifest}
-                canEdit={canEdit} canCompare={false} imageToken={imageToken} authToken={authToken}
-                onOpen={openItem} onCompare={() => {}}
+                canEdit={canEdit} canCompare={canCompare} imageToken={imageToken} authToken={authToken}
+                onOpen={openItem}
+                onCompare={(seqKey, i) => openCompare(seqKey, seqs.find(q => q.key === seqKey)?.items[i])}
                 onManifest={m => { if (selectedExemplar) setManifestState({ eid: selectedExemplar.id, m }); void loadData(); }}
                 onImported={() => { if (selectedExemplar) void loadManifest(selectedExemplar.id); void loadData(); }} />
             )}
@@ -216,7 +353,15 @@ const ExemplarPage: React.FC = () => {
       {open && data && (
         <ExemplarImageModal title={modalTitle} sequence={open.seq} index={open.index}
           onIndex={i => setImage(open.seq.items[i]?.key ?? null)} onClose={() => setImage(null)}
-          sourceLine={sourceLine} pageNumbers={data.page_numbers} sign={u => withImageToken(u, imageToken)} />
+          sourceLine={sourceLine} pageNumbers={data.page_numbers} sign={u => withImageToken(u, imageToken)}
+          onCompare={canCompare ? () => openCompare(open.seq.kind === 'pages' ? PAGES_KEY : open.seq.key,
+            open.seq.items[open.index]) : undefined} />
+      )}
+      {cmp && cmpValid && compareSeqs && (
+        <ExemplarCompareModal title={title} sequences={compareSeqs} seqLabel={seqLabel}
+          left={cmp[0]} right={cmp[1]} onChange={setCompare} canEdit={canEdit}
+          onSavePair={canEdit ? savePair : undefined} onClose={closeCompare}
+          sign={u => withImageToken(u, imageToken)} />
       )}
       <UnsavedChangesDialog {...dialogProps} />
     </div>

@@ -848,15 +848,8 @@
       "other": "{{ref}}"
     },
     "compare": {
-      "open": "Kõrvuta tekstitunnistajaga",
-      "close": "Sulge kõrvutamine",
-      "witness": "Tekstitunnistaja",
       "prev": "Eelmine leht",
-      "next": "Järgmine leht",
-      "page": "lk {{n}}",
-      "noPair": "Paar puudub",
-      "savePair": "Salvesta paar",
-      "pairSaved": "Paar salvestatud"
+      "next": "Järgmine leht"
     },
     "editor": {
       "upload": "Lisa pilte",
@@ -1002,5 +995,22 @@
     "pageLabel": "lk {{n}}",
     "compare": "Kõrvuta",
     "adaImport": "ADA import…"
+  },
+  "compare": {
+    "title": "Kõrvutus",
+    "locked": "Liigub koos",
+    "unlocked": "Pooled eraldi · Lukusta",
+    "zoomTogether": "suurendus koos",
+    "zoomLevel": "Suurendus",
+    "now": "praegu {{left}} ↔ {{right}}",
+    "savePair": "Salvesta paar {{image}} ↔ lk {{n}}",
+    "pairSaved": "paar salvestatud",
+    "pairElsewhere": "paar: lk {{n}}",
+    "alignHint": "Sea pooled kohakuti ja lukusta.",
+    "pagesSeq": "Teose lehed",
+    "witnessIs": "alus: {{name}}",
+    "witnessUnset": "alus märkimata",
+    "unknownOrigin": "päritolu teadmata",
+    "noMaterial": "pilte ei ole"
   }
 }

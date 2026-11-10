@@ -848,15 +848,8 @@
       "other": "{{ref}}"
     },
     "compare": {
-      "open": "Compare with text witness",
-      "close": "Close comparison",
-      "witness": "Text witness",
       "prev": "Previous page",
-      "next": "Next page",
-      "page": "p. {{n}}",
-      "noPair": "No pair",
-      "savePair": "Save pair",
-      "pairSaved": "Pair saved"
+      "next": "Next page"
     },
     "editor": {
       "upload": "Add images",
@@ -1002,5 +995,22 @@
     "pageLabel": "p. {{n}}",
     "compare": "Compare",
     "adaImport": "ADA import…"
+  },
+  "compare": {
+    "title": "Compare",
+    "locked": "Moving together",
+    "unlocked": "Sides separate · Lock",
+    "zoomTogether": "zoom together",
+    "zoomLevel": "Zoom",
+    "now": "now {{left}} ↔ {{right}}",
+    "savePair": "Save pairing {{image}} ↔ p. {{n}}",
+    "pairSaved": "pairing saved",
+    "pairElsewhere": "paired: p. {{n}}",
+    "alignHint": "Align both sides, then lock.",
+    "pagesSeq": "Work pages",
+    "witnessIs": "source: {{name}}",
+    "witnessUnset": "source not marked",
+    "unknownOrigin": "origin unknown",
+    "noMaterial": "no images"
   }
 }
