@@ -1,7 +1,10 @@
+// ⚠ KAKS PILDIREDAKTORIT: see ja components/PageImageEditorModal.tsx peavad välja nägema ja käituma ühtmoodi.
+// Ühine osa on `components/pagePrep/`; muudatus ühes vaates tähendab, et kontrolli ka teist
+// (vt CLAUDE.md „Kaks pildiredaktorit“).
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronLeft, ChevronRight, Check, CircleX, Columns2, Crop, Eye, EyeOff, Frame, LayoutGrid } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Check, Columns2, Crop, Eye, EyeOff, LayoutGrid } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
 import { adjustFromParams, willSplit, withRotation } from '../prepressPlan';
 import { addRotation, clampSplitX } from '../../../components/pagePrep/geometry';
@@ -10,6 +13,8 @@ import SplitLine from '../../../components/pagePrep/SplitLine';
 import RotateButtons from '../../../components/pagePrep/RotateButtons';
 import { useCropBox } from '../../../components/pagePrep/useCropBox';
 import CropOverlay from '../../../components/pagePrep/CropOverlay';
+import EditToolbar from '../../../components/pagePrep/EditToolbar';
+import PendingOutline from '../../../components/pagePrep/PendingOutline';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 interface Props {
@@ -65,7 +70,8 @@ const SplitPageDetail: React.FC<Props> = ({
   const [cropMode, setCropMode] = useState(false);
   const crop = useCropBox(imgBox.width, imgBox.height, cropMode && imgBox.width > 0);
   const resetCrop = crop.reset;
-  useEffect(() => { resetCrop(); }, [pageNum, cropMode, resetCrop]);
+  // page?.rotate: pööre muudab kärpe raami → kast lähtestatakse.
+  useEffect(() => { resetCrop(); }, [pageNum, cropMode, page?.rotate, resetCrop]);
 
   // Kas seda lehte päriselt poolitatakse. Joon ja käepide EI TOHI olla nähtaval,
   // kui vastus on ei — muidu näitab vaade tegevust, mida ei toimu.
@@ -84,6 +90,15 @@ const SplitPageDetail: React.FC<Props> = ({
     const target = plan.pages[i];
     if (target) onNavigate(target.n);
   }, [plan.pages, onNavigate]);
+
+  // Pööre on KOGUV: kaks klõpsu paremale = 180°. Pööre rakendub enne poolitamist,
+  // seega joon liigub pööratud pildiga kaasa. withRotation eemaldab kärpe: see on
+  // eelmise pöörde raamis.
+  const rotateBy = (delta: number) => {
+    if (!page) return;
+    const next = withRotation(page, addRotation(page.rotate ?? 0, delta));
+    onPageChange(pageNum, { rotate: next.rotate, adjust: next.adjust });
+  };
 
   const setX = (x: number) =>
     onPageChange(pageNum, { mode: 'custom', split_x: clampSplitX(Number(x.toFixed(4))) });
@@ -183,10 +198,15 @@ const SplitPageDetail: React.FC<Props> = ({
         </div>
 
         {/* overflow-hidden, MITTE auto: pilt mahutatakse, mitte ei keritata. */}
-        <div className="min-h-0 flex-1 overflow-hidden p-4">
+        <div className="flex min-h-0 flex-1 flex-row gap-3 overflow-hidden p-4">
+          {/* Kärpimisrežiimis vasak tööriistaveerg (ühine halduse redaktoriga);
+              muidu hoiab tühi koht riba laiust, et pilt režiimi vahetades ei nihkuks. */}
+          {cropMode
+            ? <EditToolbar crop={crop} onRotate={rotateBy} testIdPrefix="detail" />
+            : <div aria-hidden="true" className="w-14 flex-shrink-0" />}
           <div
             ref={boxRef}
-            className={`relative flex h-full w-full select-none touch-none items-center justify-center ${splits && !cropMode ? 'cursor-col-resize' : ''}`}
+            className={`relative flex h-full min-w-0 flex-1 select-none touch-none items-center justify-center ${splits && !cropMode ? 'cursor-col-resize' : ''}`}
             onPointerDown={(e) => { if (splits && !cropMode) updateFromClientX(e.clientX); }}
           >
             <img
@@ -211,6 +231,10 @@ const SplitPageDetail: React.FC<Props> = ({
                   width: imgBox.width, height: imgBox.height,
                 }}
               >
+                {!crop.hasEdit && (
+                  <PendingOutline adjust={page.adjust} width={imgBox.width} height={imgBox.height}
+                    testId="detail-pending-outline" />
+                )}
                 <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />
               </div>
             )}
@@ -302,35 +326,6 @@ const SplitPageDetail: React.FC<Props> = ({
               <div className="ml-2 flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3">
                 {cropMode ? (
                   <>
-                    {/* Kärpimisrežiim: samad tööriistad nagu teose halduse
-                        pildiredaktoris (common:pagePrep). */}
-                    <button
-                      type="button"
-                      data-testid="detail-perspective"
-                      onClick={crop.togglePerspective}
-                      title={t('common:pagePrep.perspective')}
-                      aria-pressed={crop.perspective}
-                      className={`rounded border p-2 ${crop.perspective ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
-                    >
-                      <Frame size={15} />
-                    </button>
-                    {crop.perspective && crop.quad && (
-                      <button type="button" onClick={crop.resetQuad} title={t('common:pagePrep.perspectiveReset')}
-                        className="rounded border border-gray-300 bg-white p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
-                        <CircleX size={15} />
-                      </button>
-                    )}
-                    {crop.cropRect && !crop.perspective && (
-                      <button type="button" onClick={crop.clearCrop} title={t('common:pagePrep.cropReset')}
-                        className="rounded border border-gray-300 bg-white p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
-                        <CircleX size={15} />
-                      </button>
-                    )}
-                    {crop.cropRect && !crop.perspective && Math.abs(crop.boxAngle) > 0.05 && (
-                      <span title={t('common:pagePrep.deskew')} className="text-xs tabular-nums text-gray-600">
-                        {crop.boxAngle.toFixed(1)}°
-                      </span>
-                    )}
                     <button
                       type="button"
                       data-testid="detail-crop-apply"
@@ -372,14 +367,8 @@ const SplitPageDetail: React.FC<Props> = ({
                   <Columns2 size={15} />
                   {noSplitMode ? t('step3split.card.split') : t('step3split.card.noSplit')}
                 </button>
-                {/* Pööre on KOGUV: kaks klõpsu paremale = 180°. Pööre rakendub
-                    enne poolitamist, seega joon liigub pööratud pildiga kaasa. */}
                 <RotateButtons
-                  onRotate={(delta) => {
-                    // withRotation eemaldab kärpe: see on eelmise pöörde raamis.
-                    const next = withRotation(page, addRotation(page.rotate ?? 0, delta));
-                    onPageChange(pageNum, { rotate: next.rotate, adjust: next.adjust });
-                  }}
+                  onRotate={rotateBy}
                   buttonClassName="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100"
                   iconSize={15}
                   testIdPrefix="detail-rotate"

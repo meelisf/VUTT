@@ -63,10 +63,24 @@ describe('SplitPageDetail kärpimine', () => {
     expect(screen.queryByTestId('detail-crop-area')).toBeNull();
   });
 
+  it('kärpimisrežiim: ühine tööriistaveerg ja ootel kärbe kontuur (sama mis halduses)', () => {
+    renderDetail(plan({ adjust: KÄRBE }));
+    expect(screen.queryByTestId('detail-toolbar')).toBeNull();
+    fireEvent.click(screen.getByTestId('detail-crop'));
+    expect(screen.getByTestId('detail-toolbar')).toBeTruthy();
+    expect(screen.getByTestId('detail-pending-outline')).toBeTruthy();
+  });
+
+  it('kärbeta lehel kontuuri ei ole', () => {
+    renderDetail(plan());
+    fireEvent.click(screen.getByTestId('detail-crop'));
+    expect(screen.queryByTestId('detail-pending-outline')).toBeNull();
+  });
+
   it('perspektiiv + kinnitus kirjutab plaani quad-i serveri kujul', () => {
     const { onPageChange } = renderDetail(plan());
     fireEvent.click(screen.getByTestId('detail-crop'));
-    fireEvent.click(screen.getByTestId('detail-perspective'));
+    fireEvent.click(screen.getByTestId('detail-tool-perspective'));
     fireEvent.click(screen.getByTestId('detail-crop-apply'));
     const patch = onPageChange.mock.calls[0][1];
     expect(patch.adjust.crop).toBeNull();

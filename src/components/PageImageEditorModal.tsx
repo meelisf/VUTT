@@ -1,6 +1,9 @@
+// ⚠ KAKS PILDIREDAKTORIT: see ja upload/components/SplitPageDetail.tsx peavad välja nägema ja käituma ühtmoodi.
+// Ühine osa on `components/pagePrep/`; muudatus ühes vaates tähendab, et kontrolli ka teist
+// (vt CLAUDE.md „Kaks pildiredaktorit“).
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
-import { X, Crop, Columns2, LayoutGrid, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, CircleX, Frame, Undo2, MoreHorizontal, Clock } from 'lucide-react';
+import { X, Crop, Columns2, LayoutGrid, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, Undo2, MoreHorizontal, Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -8,12 +11,12 @@ import { restoreOriginalPageImage } from '../services/pageService';
 import { workPagePreviewUrl } from '../services/workApi';
 import { adjustFromParams } from '../pages/upload/prepressPlan';
 import type { PageAdjust } from '../pages/upload/types';
-import { pendingAdjustOutline } from '../utils/pendingAdjustOutline';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
 import { addRotation, clampSplitX } from './pagePrep/geometry';
 import { useSplitDrag } from './pagePrep/useSplitDrag';
 import SplitLine from './pagePrep/SplitLine';
-import RotateButtons from './pagePrep/RotateButtons';
+import EditToolbar from './pagePrep/EditToolbar';
+import PendingOutline from './pagePrep/PendingOutline';
 import { useCropBox } from './pagePrep/useCropBox';
 import CropOverlay from './pagePrep/CropOverlay';
 import { pendingCount, type PendingPageOp } from '../pages/manage/pageOpsPlan';
@@ -186,8 +189,6 @@ const PageImageEditorModal: React.FC<Props> = ({
         ? t('manage.editor.cropTiltPending', { deg: pendingAdjust.angle.toFixed(1) })
         : t('manage.editor.cropPending'))
       : t('manage.editor.tiltPending', { deg: pendingAdjust.angle.toFixed(1) });
-  // Kontuuri näitame ainult siis, kui kasutaja ei ole uut kasti joonistanud.
-  const outline = !crop.hasEdit ? pendingAdjustOutline(pendingAdjust, displayW, displayH) : null;
 
   // Lähtesta teisendused + mõõda uuesti, kui leht vahetub VÕI pildi sisu muutub
   // (cacheBust uueneb iga mutatsiooni järel — nt kärbe muudab kuvasuhet).
@@ -495,47 +496,7 @@ const PageImageEditorModal: React.FC<Props> = ({
           {/* Poolita-vahekaardil hoiab tühi koht riba laiust, et lava mõõt ja pilt
               vahekaarti vahetades ei nihkuks ega muudaks suurust. */}
           {tab === 'split' && <div aria-hidden="true" className="w-14 flex-shrink-0" />}
-          {tab === 'edit' && (
-            <div data-testid="editor-toolbar" role="toolbar" aria-orientation="vertical"
-              className="flex w-14 flex-shrink-0 flex-col items-center gap-1.5 self-start rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
-              <RotateButtons onRotate={rotateBy} buttonClassName={`${toolBtn} flex w-full justify-center`} iconSize={16} />
-              <div className="my-0.5 h-px w-full bg-gray-200" />
-              {/* Kaks erinevat tööriista, üks on alati aktiivne: kärbe (vaikimisi) või perspektiiv. */}
-              {[
-                { id: 'crop', active: !crop.perspective, label: t('common:pagePrep.cropTool'), icon: <Crop size={16} /> },
-                { id: 'perspective', active: crop.perspective, label: t('common:pagePrep.perspective'), icon: <Frame size={16} /> },
-              ].map((tool) => (
-                <button
-                  key={tool.id}
-                  data-testid={`editor-tool-${tool.id}`}
-                  onClick={() => { if (!tool.active) crop.togglePerspective(); }}
-                  aria-pressed={tool.active}
-                  aria-label={tool.label}
-                  title={tool.label}
-                  className={`flex w-full justify-center rounded border p-2 ${tool.active ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
-                >
-                  {tool.icon}
-                </button>
-              ))}
-              {crop.perspective && crop.quad && (
-                <button onClick={crop.resetQuad} title={t('common:pagePrep.perspectiveReset')}
-                  className={`${toolBtn} flex w-full justify-center text-gray-500 hover:text-gray-700`}>
-                  <CircleX size={16} />
-                </button>
-              )}
-              {crop.cropRect && !crop.perspective && (
-                <button onClick={crop.clearCrop} title={t('common:pagePrep.cropReset')}
-                  className={`${toolBtn} flex w-full justify-center text-gray-500 hover:text-gray-700`}>
-                  <CircleX size={16} />
-                </button>
-              )}
-              {crop.cropRect && !crop.perspective && Math.abs(crop.boxAngle) > 0.05 && (
-                <span title={t('common:pagePrep.deskew')} className="text-[11px] tabular-nums text-gray-600">
-                  {crop.boxAngle.toFixed(1)}°
-                </span>
-              )}
-            </div>
-          )}
+          {tab === 'edit' && <EditToolbar crop={crop} onRotate={rotateBy} testIdPrefix="editor" />}
           {/* Peidetud laadija: mõõdab pildi naturaalmõõdud enne kuvamist (väldib aspect-venitust) */}
           {!imgNatural && (
             <img
@@ -569,12 +530,8 @@ const PageImageEditorModal: React.FC<Props> = ({
                       transform: `translate(-50%, -50%) rotate(${grossAngle}deg)`,
                     }}
                   />
-                  {outline && (
-                    <svg data-testid="editor-pending-outline" aria-hidden="true"
-                      className="pointer-events-none absolute inset-0" width={displayW} height={displayH}>
-                      <polygon points={outline.map(([x, y]) => `${x},${y}`).join(' ')}
-                        fill="rgba(245,158,11,0.12)" stroke="#d97706" strokeWidth={2} strokeDasharray="6 4" />
-                    </svg>
+                  {!crop.hasEdit && (
+                    <PendingOutline adjust={pendingAdjust} width={displayW} height={displayH} />
                   )}
                   {/* Kärpe-overlay (püüab hiire) */}
                   <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />

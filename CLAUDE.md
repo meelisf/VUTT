@@ -444,6 +444,18 @@ nullib) ja seda kontrollitakse IGA lehe alguses — apply ja eelvaade jagavad
 `RENDER_SEMAPHORE(1)`-i. Renderdaja tohib staatust lähtestada ainult siis, kui ta on
 selle omanik (`_reset_status_if_prepping`), muidu lubaks ta teise apply CAS-i sisse.
 
+**Kaks pildiredaktorit — muudatus tuleb teha MÕLEMAS (ADR 0049)** — teose halduse
+`PageImageEditorModal` ja upload'i `SplitPageDetail` on kaks vaadet ühe tööriistakomplekti
+peal ja peavad kasutajale tunduma ühesugused. Ühine on `src/components/pagePrep/`
+(`useCropBox`, `CropOverlay`, `EditToolbar`, `PendingOutline`, `SplitLine`, `RotateButtons`,
+`useSplitDrag`, `geometry`): sinna käib KÕIK, mis on mõlemal sama (tööriistaribad, kontuurid,
+kasti loogika) — ära kopeeri oma versiooni. Muudad ühist osa → ava ja kontrolli MÕLEMAT vaadet
+(`/work/<id>/manage` → lehe redaktor ja `/upload` → poolitusvaade); muudad ühes vaates midagi, mis
+võiks olla mõlemas → tee mõlemasse või kirjuta, miks mitte. Päris ühte moodulisse neid ei panda:
+andmeallikas (upload: plaan + 100 DPI eelvaade; haldus: ootel plaan + serveri eelvaade pileti
+kaudu) ja haldusele omased toimingud (asenda pilt, taasta originaal, eksemplari päritolu) erinevad.
+Päis/vahekaardid/jalus on veel kahes eri kujus (ühtlustamine: järgmised PR-id).
+
 **Lehe teisendus (ADR 0049)** — kalle/kärbe/perspektiiv käib AINULT
 `server/image_transform.py` kaudu (teose haldus JA upload'i prepress); UI osad
 `src/components/pagePrep/`. Upload'i apply järjekord: **pööre → `adjust` → poolitus**;
