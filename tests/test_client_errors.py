@@ -317,3 +317,59 @@ def test_kaivitus_puhastab_logi_enne_ulejaanud_lifespan_i(logi, monkeypatch):
     asyncio.run(start())
     assert threads and threads[0] != main_thread
     assert "synthetic-short" not in logi.read_text()
+
+
+# --- Kliendivigade kordused ---------------------------------------------------
+#
+# 2026-11-09 täitis üks hajutatud robot (233 IP-d, 6 brauseritunnust) 498 kohta
+# 500-st ühe ja sama Leafleti veaga ja tõrjus kõik varasemad vead ringist välja.
+# Kliendi dedupe on lehesessioonipõhine — 233 IP-d on 233 sessiooni.
+
+LEAFLET = {
+    "message": "Cannot read properties of undefined (reading '_removePath')",
+    "stack": "TypeError: Cannot read properties of undefined (reading '_removePath')\n"
+             "    at e.onRemove (https://vutt.utlib.ut.ee/assets/TileLayer-DNnpeOkD.js:4:80666)\n"
+             "    at e.removeLayer (https://vutt.utlib.ut.ee/assets/TileLayer-DNnpeOkD.js:4:69330)",
+    "url": "/persons/vutt:P1",
+}
+
+
+def test_sama_klientviga_eri_ipdelt_salvestub_aknas_uks_kord(logi):
+    for i in range(50):
+        client_errors.record_error(dict(LEAFLET, url=f"/persons/vutt:P{i}"), ip=f"10.0.0.{i}")
+    assert len(client_errors.list_errors()) == 1
+
+
+def test_kordus_parast_akent_salvestub_uuesti(logi, monkeypatch):
+    kell = [1000.0]
+    monkeypatch.setattr(client_errors.time, "monotonic", lambda: kell[0])
+    assert client_errors.record_error(LEAFLET, ip="10.0.0.1")
+    kell[0] += client_errors.CLIENT_DEDUPE_SECONDS - 1
+    assert not client_errors.record_error(LEAFLET, ip="10.0.0.2")
+    kell[0] += 2
+    assert client_errors.record_error(LEAFLET, ip="10.0.0.3")
+    assert len(client_errors.list_errors()) == 2
+
+
+def test_sama_teade_eri_viskekohast_on_eri_viga(logi):
+    teine = dict(LEAFLET, stack=LEAFLET["stack"].replace("4:80666", "4:99999"))
+    client_errors.record_error(LEAFLET, ip="10.0.0.1")
+    client_errors.record_error(teine, ip="10.0.0.1")
+    assert len(client_errors.list_errors()) == 2
+
+
+def test_firefoxi_stack_kuju_annab_ka_viskekoha(logi):
+    a = {"message": "x is null", "stack": "fe@https://h/a.js:1:10\ngd@https://h/a.js:1:20"}
+    b = {"message": "x is null", "stack": "zz@https://h/b.js:9:9\ngd@https://h/a.js:1:20"}
+    client_errors.record_error(a, ip="1")
+    client_errors.record_error(a, ip="2")
+    client_errors.record_error(b, ip="3")
+    assert len(client_errors.list_errors()) == 2
+
+
+def test_kordusvotmete_tabel_ei_kasva_piiramatult(logi, monkeypatch):
+    # Avalik endpoint: juhuslike teadetega ujutus ei tohi mälu täita.
+    monkeypatch.setattr(client_errors, "CLIENT_DEDUPE_MAX_KEYS", 10)
+    for i in range(100):
+        client_errors.record_error({"message": f"juhuslik {i}"}, ip="1")
+    assert len(client_errors._klient_viimati) <= 10
