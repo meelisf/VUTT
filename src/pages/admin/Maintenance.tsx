@@ -8,6 +8,7 @@ import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
 import { ApiError, apiDelete, apiErrorMessage, apiGet, apiPost, apiPut } from '../../services/apiClient';
 import ClientErrorsPanel from './ClientErrorsPanel';
+import TrafficPanel from './TrafficPanel';
 
 type ActionState = 'idle' | 'running' | 'done' | 'error';
 
@@ -208,6 +209,10 @@ const Maintenance: React.FC = () => {
         {/* Kliendipoolsed vead (#133) — kõige ees, sest see on ainus koht, kus
             kasutaja juurde jõudmata vead nähtavaks saavad. */}
         <ClientErrorsPanel token={authToken ?? undefined} />
+
+        {/* Liiklus (#786) — ainult superadmin: häired lähevad ainult talle ja
+            endpoint on `require_role("superadmin")`. */}
+        {isAtLeast(user.role, 'superadmin') && <TrafficPanel token={authToken ?? undefined} />}
 
         {/* Arhiivide register */}
         <div className="mb-6">

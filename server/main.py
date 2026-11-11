@@ -119,6 +119,9 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_ensure_filterable_attributes, daemon=True).start()
     threading.Thread(target=_ensure_letters_index, daemon=True).start()  # kirjade indeks (#526)
     start_historical_regions_warm_loop()
+    # Liikluse häire superadminile (#786); mõõtmine ise on vahevaras.
+    from .traffic_monitor import start_background as start_traffic_monitor
+    start_traffic_monitor()
     start_upload_sync_loop()  # upload taustasünk — AINULT API-protsessis (mitte image_server import)
     start_reocr_background()  # re-OCR restardi-jätkamine (AINULT API-protsessis); orbude
                               # taaste + reaper käivad taustalõimes, et maas OCR-server ei
@@ -160,6 +163,10 @@ app.include_router(work_exemplars_router)
 app.include_router(exemplar_images_router)
 app.include_router(page_text_proposals_router)
 app.include_router(agent_proposals_router)
+
+# Liikluse mõõtmine (#786). Lisatud enne CORS-i = sisemine kiht; puhas ASGI.
+from .traffic_monitor import TrafficMiddleware
+app.add_middleware(TrafficMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

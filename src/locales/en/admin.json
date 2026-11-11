@@ -479,5 +479,28 @@
     "empty": "No errors recorded.",
     "loadError": "Failed to load errors.",
     "title": "Error log (client and server)"
+  },
+  "traffic": {
+    "title": "Traffic (backend, 24 h)",
+    "loadFailed": "Failed to load traffic data.",
+    "rps": "Requests per second",
+    "anonShare": "Anonymous",
+    "ipsPerMinute": "IPs per minute (max)",
+    "errors": "5xx responses",
+    "windowNote": "Last {{minutes}} full minutes — the same window the alert uses.",
+    "empty": "No data yet — the chart fills up after the server starts.",
+    "chartTitle": "Requests per {{minutes}} minutes",
+    "tipTotal": "{{n}} requests",
+    "tipAnon": "{{n}} anonymous",
+    "tipIps": "up to {{n}} IPs per minute",
+    "tipErrors": "{{n}} × 5xx",
+    "tipSlow": "{{n}} slow (≥ 2 s)",
+    "legendErrors": "Orange bar = there were 5xx responses in this interval.",
+    "thresholds": "Alert to superadmins (email + notification): over {{rps}} requests per second every minute for {{minutes}} minutes, or a 5xx share over {{share}} % (at least {{min}}). The same alert type is repeated at most every {{hours}} h.",
+    "scopeNote": "Only requests that reach the backend are counted (not Meili or static files); a restart resets the chart.",
+    "alertsTitle": "Alerts",
+    "noAlerts": "No alerts so far.",
+    "alertLoad": "high load: ~{{rps}} requests/s, up to {{ips}} IPs per minute",
+    "alertErrors": "server errors: {{errors}} × 5xx ({{share}} %)"
   }
 }
