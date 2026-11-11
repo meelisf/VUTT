@@ -6,7 +6,6 @@ import DownloadModal from '../DownloadModal';
 import RelatedWorksBlock from '../relations/RelatedWorksBlock';
 import SameVolumeBlock from '../convolutes/SameVolumeBlock';
 import ExemplarCards from '../exemplars/ExemplarCards';
-import { useImageToken } from '../../contexts/ImageTokenContext';
 import { useWorkExemplars } from '../exemplars/useWorkExemplars';
 import type { Work } from '../../types';
 import { FILE_API_URL } from '../../config';
@@ -34,10 +33,6 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const exemplarData = useWorkExemplars(work);
-  // Eksemplari pisipiltide allkiri (piiratud teos) — ainult siis, kui pilte on.
-  const exemplarImageToken = useImageToken(work?.work_id, {
-    enabled: Object.keys(exemplarData?.images ?? {}).length > 0,
-  });
 
   // Arhiivide register (nimed kuvamiseks).
   useEffect(() => {
@@ -323,7 +318,12 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
             {/* Eksemplarid (ADR 0076): kaardid lühiinfoga, transkriptsiooni alus esile tõstetud */}
             {work.archive_refs && work.archive_refs.length > 0 && (
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('exemplars.title')}</p>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase">{t('exemplars.title')}</p>
+                  <Link to={`/work/${work.work_id}/exemplar`} className="ml-auto text-xs text-primary-700 hover:text-primary-900">
+                    {t('info.exemplarsAll')}
+                  </Link>
+                </div>
                 <ExemplarCards
                   exemplars={exemplarData?.exemplars ?? null}
                   pageNumbers={exemplarData?.page_numbers ?? {}}
@@ -331,7 +331,6 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                   archives={archives}
                   workId={work.work_id}
                   images={exemplarData?.images}
-                  imageToken={exemplarImageToken}
                 />
               </div>
             )}

@@ -16,8 +16,20 @@ function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 }
 
+/**
+ * Väljast juhitud vaade (eksemplaride kõrvutus „suurendus koos"). Suhteline, sest
+ * poolte pildid on eri pikslimõõduga: `scale` 1 = „mahub aknasse" (algväärtus),
+ * `x`/`y` = nihe konteineri laiuse/kõrguse OSANA.
+ */
+export interface ViewState { scale: number; x: number; y: number }
+
 interface ImageViewerProps {
   src: string;
+  /** Antud → komponent on juhitud: rull, lohistamine ja nupud kutsuvad
+   *  `onViewChange`-i, sisemist olekut ei muudeta ja src-i vahetus vaadet ei
+   *  lähtesta. Puudub → käitumine nagu alati (töölaud). */
+  view?: ViewState;
+  onViewChange?: (v: ViewState) => void;
   pageNum?: number;
   /**
    * Jäta lehevahetuse fade vahele. Fade'i mõte on teha märkamatuks jäänud
@@ -32,9 +44,13 @@ interface ImageViewerProps {
   onManage?: () => void;
 }
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = false, onGridView, onNavigate, isAdmin, onManage }) => {
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+/** Juhitud režiimi suurenduse piirid (kõrvutuse liugur 1–8). */
+const CONTROLLED_MIN_SCALE = 0.5;
+const CONTROLLED_MAX_SCALE = 8;
+
+const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = false, onGridView, onNavigate, isAdmin, onManage, view, onViewChange }) => {
+  const [innerScale, setInnerScale] = useState(1);
+  const [innerPosition, setInnerPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +58,31 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
   const imgRef = useRef<HTMLImageElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation('workspace');
+
+  // Üks „praegune vaade" allikas ja üks kirjutaja: juhitud režiimis tuleb vaade
+  // propist ja muutus läheb `onViewChange`-ile (px ↔ konteineri mõõdu osa).
+  const controlled = view !== undefined;
+  const boxSize = () => ({
+    w: containerRef.current?.clientWidth || 1,
+    h: containerRef.current?.clientHeight || 1,
+  });
+  const scale = controlled ? view.scale : innerScale;
+  const position = controlled
+    ? (() => { const b = boxSize(); return { x: view.x * b.w, y: view.y * b.h }; })()
+    : innerPosition;
+  const emit = (next: { scale?: number; pos?: { x: number; y: number } }) => {
+    const b = boxSize();
+    const pos = next.pos ?? position;
+    onViewChange?.({ scale: next.scale ?? scale, x: pos.x / b.w, y: pos.y / b.h });
+  };
+  const setScale = (v: number | ((prev: number) => number)) => {
+    if (!controlled) { setInnerScale(v); return; }
+    emit({ scale: typeof v === 'function' ? v(scale) : v });
+  };
+  const setPosition = (p: { x: number; y: number }) => {
+    if (!controlled) { setInnerPosition(p); return; }
+    emit({ pos: p });
+  };
 
   // Lehe vahetusel hoiab brauser <img>-is eelmise lehe dekodeeritud pilti kuni
   // uus on laetud. Tekst vahetub aga kohe, nii et vana skaneering jääks hetkeks
@@ -82,8 +123,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
   const resetPanToTop = useCallback(() => {
     const img = imgRef.current;
     const container = containerRef.current;
+    // Ainult juhtimata režiimis (juhitud vaadet src-i vahetus ei lähtesta).
     if (!img || !container) {
-      setPosition({ x: 0, y: 0 });
+      setInnerPosition({ x: 0, y: 0 });
       return;
     }
     // Juhtnupud on pildi peal `absolute` ribana ja kataksid muidu skaneeringu
@@ -91,7 +133,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
     // ei jätaks arvutust vaikselt valeks.
     const controls = controlsRef.current;
     const topInset = controls ? controls.offsetTop + controls.offsetHeight + CONTROLS_GAP_PX : 0;
-    setPosition({ x: 0, y: panOffsetForTop(img.clientHeight, scale, container.clientHeight, topInset) });
+    setInnerPosition({ x: 0, y: panOffsetForTop(img.clientHeight, scale, container.clientHeight, topInset) });
   }, [scale]);
 
   // Iga src saab ülaserva-nihke täpselt ühe korra, et suurendamine või
@@ -101,11 +143,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
     setLoadedSrc(src);
     if (resetForSrcRef.current === src) return;
     resetForSrcRef.current = src;
+    // Juhitud vaade jääb lehevahetusel samaks (lappamine suurendatult sama rea peal).
+    if (controlledRef.current) return;
     // rAF: paigutus peab olema arvutatud, enne kui clientHeight't loeme.
     requestAnimationFrame(resetPanToTop);
   }, [src, resetPanToTop]);
 
   const handleImageLoadedRef = useRef(handleImageLoaded);
+  const controlledRef = useRef(controlled);
+  controlledRef.current = controlled;
   handleImageLoadedRef.current = handleImageLoaded;
 
   // Vahemälust (nt eellaetud kõrvalleht) tulev pilt võib olla valmis juba enne
@@ -147,10 +193,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
   }, [onNavigate]);
 
   const handleZoom = (delta: number) => {
+    if (controlled) {
+      setScale(Math.max(CONTROLLED_MIN_SCALE, Math.min(CONTROLLED_MAX_SCALE, scale + delta)));
+      return;
+    }
     setScale(prev => Math.max(0.5, Math.min(5, prev + delta)));
   };
 
   const handleReset = () => {
+    if (controlled) { onViewChange?.({ scale: 1, x: 0, y: 0 }); return; }
     setScale(1);
     setPosition({ x: 0, y: 0 });
   };
@@ -245,12 +296,19 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
 
       // Skaala muutus
       const ratio = newDist / ts.lastDist;
+      const dx = newCenter.x - ts.lastCenter.x;
+      const dy = newCenter.y - ts.lastCenter.y;
+      if (controlled) {
+        emit({
+          scale: Math.max(CONTROLLED_MIN_SCALE, Math.min(CONTROLLED_MAX_SCALE, ts.lastScale * ratio)),
+          pos: { x: ts.lastPos.x + dx, y: ts.lastPos.y + dy },
+        });
+        return;
+      }
       const newScale = Math.max(0.5, Math.min(5, ts.lastScale * ratio));
       setScale(newScale);
 
       // Panniga liikumine pinch ajal
-      const dx = newCenter.x - ts.lastCenter.x;
-      const dy = newCenter.y - ts.lastCenter.y;
       setPosition({ x: ts.lastPos.x + dx, y: ts.lastPos.y + dy });
     }
   };

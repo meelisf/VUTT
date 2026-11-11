@@ -219,3 +219,34 @@ def test_eksemplar_kadus_tootluse_ajal_failid_ara_ja_404(env, monkeypatch):
     d = ei.exemplar_dir(env["work_dir"], env["eid"])
     assert not os.path.exists(d) or not [f for f in os.listdir(d) if f.endswith(".jpg")]
     assert not os.path.exists(ei.manifest_path(env["work_dir"], env["eid"]))
+
+
+# ── Paari sihtlehe kontroll (ADR 0079 p 3 täiendus 2026-11-10) ───────────────
+
+def test_paar_olematule_lehele_409(env):
+    m = _add(env)
+    imgs = [{**m["images"][0], "page": "olematu-tyvi"}, m["images"][1]]
+    with pytest.raises(ei.ExemplarImagesError) as e:
+        ei.patch_images(env["work_dir"], env["eid"], m["revision"], imgs, "meelisf")
+    assert e.value.status == 409
+    assert e.value.current["revision"] == m["revision"]
+
+
+def test_paar_olemasolevale_lehele_salvestub(env):
+    m = _add(env)
+    imgs = [{**m["images"][0], "page": "1640-test-w1-001"}, m["images"][1]]
+    out = ei.patch_images(env["work_dir"], env["eid"], m["revision"], imgs, "meelisf")
+    assert out["images"][0]["page"] == "1640-test-w1-001"
+
+
+def test_muutmata_rippuv_paar_ei_blokeeri_sildi_muutmist(env):
+    # kirjuta rippuv paar otse manifesti (möödudes kontrollist), siis muuda ainult silti
+    m = _add(env)
+    m = {k: v for k, v in m.items() if k != "git_committed"}
+    m["images"][0]["page"] = "kadunud-tyvi"
+    with ei.exemplar_locks(env["work_dir"]):
+        ei.write_manifest_locked(env["work_dir"], env["eid"], {**m, "revision": m["revision"] + 1}, "t", "test")
+    cur = ei.read_manifest(env["work_dir"], env["eid"])
+    imgs = [{**cur["images"][0], "label": "kaas"}, cur["images"][1]]
+    out = ei.patch_images(env["work_dir"], env["eid"], cur["revision"], imgs, "meelisf")
+    assert out["images"][0]["label"] == "kaas"

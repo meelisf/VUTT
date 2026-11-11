@@ -344,6 +344,17 @@ vastastikune ühe range `bulk_update_works(all_or_nothing=True)` partiiga — ü
 mitte midagi. Praegu ainult `isVersionOf`. Tühi = võtme puudumine; `label` ei ole tõeallikas.
 Teose kustutus koristab seosed `metadata_lock`-i all enne kausta eemaldamist.
 
+**Eksemplari leht (ADR 0079 p 3 täiendus, spets `2026-11-10-eksemplari-leht-design.md`)** —
+`/work/:id/exemplar/:eid?` (`:eid` = id või `pages`). Eksemplari kirje toimetamine käib AINULT
+`ExemplarList`-is (vormi loogika `exemplarDraft.ts`); metaandmete modaalis on ainult viiterida.
+Rida „Teose lehed" (alus märkimata) EI OLE eksemplar. Leheloend ja paari kehtivus tulevad
+`GET /works/{id}/exemplars` vastusest (`page_numbers` = KÕIK tüved, `page_files` = failinimed,
+kettalt), MITTE Meilist. Paar, mille tüve loendis pole, on paari puudumine. Paaride koristus
+(`exemplar_images.prune_dangling_pairs`, kutsub `refresh_work_mentions`) võtab AINULT
+`metadata_lock`-i — `work_lock` ei ole taassisenetav ja kutsuja hoiab seda. Poolitus paari ei
+jaota; lehestiku asendus eemaldab kõik paarid enne sisu asendamist. `ImageViewer` ilma `view`
+propita käitub nagu alati (töölaud); kõrvutus kasutab juhitud režiimi.
+
 **Kirjaindeks (ADR 0065)** — `kirjad`: üks dokument kirja-osa kohta, tuletatakse
 `meili_doc.build_letter_documents`-iga sama teose LEHEDOKUMENTIDEST (ligipääsuväljad ja
 tekst ühest allikast). Iga tee, mis kirjutab/kustutab `teosed`-i, võtab `kirjad`-i kaasa
@@ -611,6 +622,7 @@ Sihtkoormus ~300 samaaegset kasutajat. Peamised valikud:
 
 | Ülesanne | Prioriteet |
 |---|---|
+| `MetadataModal`: salvestamata muudatuste kaitse nagu mujal — muutunud `metaForm` (hetktõmmis laadimisel) → sulgemine (rist, taust, „Tühista") ja link „Muuda eksemplaride lehel →" küsivad `UnsavedChangesDialog`-iga. Praegu kaovad muudatused vaikselt; varasem dialoog kaitses ainult eksemplari mustandit | keskmine |
 | `tags`-fallbacki eemaldamine (35 lk kasutab veel vana välja) | madal |
 | JSON-i koristus (`page_number` eemaldamine) | madal |
 

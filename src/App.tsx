@@ -81,7 +81,7 @@ const router = createBrowserRouter([
   },
   {
     // Eksemplari vaade (ADR 0079) — enne töölaua marsruuti
-    path: "/work/:workId/exemplar/:exemplarId",
+    path: "/work/:workId/exemplar/:exemplarId?",
     element: <Lazy><ExemplarPage /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },

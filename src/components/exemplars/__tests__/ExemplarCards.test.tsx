@@ -1,11 +1,11 @@
 /** @vitest-environment jsdom */
 import { render, screen, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Exemplar } from '../../../types';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string, o?: Record<string, string>) => (o?.pages ? `${k}:${o.pages}` : k) }),
+  useTranslation: () => ({ t: (k: string, o?: Record<string, string | number>) => (o?.pages ? `${k}:${o.pages}` : o?.count !== undefined ? `${k}:${o.count}` : k) }),
 }));
 
 import ExemplarCards from '../ExemplarCards';
@@ -44,20 +44,41 @@ describe('ExemplarCards', () => {
     expect(screen.queryByTestId('exemplar-cards')).toBeNull();
   });
 
-  it('piltidega eksemplaril pildiriba (kuni 6) ja link alamlehele', () => {
-    const preview = ['p00001', 'p00002', 'p00003', 'p00004', 'p00005', 'p00006'];
+  it('hoidja nimi on link eksemplari lehele; välislink sildiga kiibina', () => {
     const { container } = render(
       <MemoryRouter>
-        <ExemplarCards exemplars={exemplars} pageNumbers={{}} archiveRefs={[]} archives={archives}
-          workId="w1" images={{ d6gcpv: { count: 9, preview } }} imageToken={null} />
+        <ExemplarCards exemplars={exemplars} pageNumbers={{}} archiveRefs={[]} archives={archives} workId="w1" />
       </MemoryRouter>,
     );
-    const strips = container.querySelectorAll('[data-testid="exemplar-image-strip"]');
-    expect(strips).toHaveLength(1);
-    expect(strips[0].querySelectorAll('img')).toHaveLength(6);
-    expect(strips[0].querySelector('img')?.getAttribute('src')).toBe('/api/images/w1/_exemplars/d6gcpv/_thumbs/_thumb_p00001.jpg');
-    // Riba ise on link (<a>).
-    expect(strips[0].getAttribute('href')).toBe('/work/w1/exemplar/d6gcpv');
-    expect(strips[0].textContent).toContain('exemplarImages.count');
+    const witness = screen.getByText('Uppsala UB').closest('a');
+    expect(witness?.getAttribute('href')).toBe('/work/w1/exemplar/ecb2kb');
+    const ext = container.querySelector('a[href="https://www.ester.ee/record=b1510692"]');
+    expect(ext?.textContent).toContain('ESTER');
+  });
+
+  it('töölaua leht avatud → link kannab ?page=N', () => {
+    render(
+      <MemoryRouter initialEntries={['/work/w1/7']}>
+        <Routes>
+          <Route path="/work/:workId/:pageNum?" element={
+            <ExemplarCards exemplars={exemplars} pageNumbers={{}} archiveRefs={[]} archives={archives} workId="w1" />
+          } />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Uppsala UB').closest('a')?.getAttribute('href')).toBe('/work/w1/exemplar/ecb2kb?page=7');
+  });
+
+  it('ADA link → silt ADA; pildiriba pole, piltide arv tekstina', () => {
+    const ada: Exemplar[] = [{ id: 'a1', holder: 'Tartu TÜR', url: 'http://hdl.handle.net/10062/14332' }];
+    render(
+      <MemoryRouter>
+        <ExemplarCards exemplars={ada} pageNumbers={{}} archiveRefs={[]} archives={{}} workId="w1"
+          images={{ a1: { count: 6, preview: ['p1', 'p2'] } }} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/ADA/)).toBeTruthy();
+    expect(screen.queryByTestId('exemplar-image-strip')).toBeNull();
+    expect(screen.getByText(/exemplarImages\.count/).textContent).toContain('6');
   });
 });

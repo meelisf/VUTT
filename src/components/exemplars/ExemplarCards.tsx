@@ -1,10 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { withImageToken, type ImageToken } from '../../utils/imageTokenUrl';
-import { getExemplarThumbUrl } from '../../services/workImageService';
+import { Link, useParams } from 'react-router-dom';
 import type { ArchiveRef, Exemplar } from '../../types';
 import { exceptionPages, orderExemplars } from './exemplarCardUtils';
+import { externalLinkLabel } from './exemplarSequences';
 
 interface ExemplarCardsProps {
   /** Serverist laetud eksemplarid; `null` = veel laadimata või päring ebaõnnestus. */
@@ -13,10 +12,10 @@ interface ExemplarCardsProps {
   /** Meili `archive_refs` — kuvatakse seni, kuni eksemplarid pole kohal (ei vilgu). */
   archiveRefs: ArchiveRef[];
   archives: Record<string, { name: string; url?: string }>;
-  /** Eksemplari pildid (ADR 0079): `{eid: {count, preview}}` serveri eksemplaride vastusest. */
+  /** Antud → hoidja nimi on link eksemplari lehele. */
   workId?: string;
+  /** Eksemplari pildid (ADR 0079): `{eid: {count, preview}}` — kuvatakse ainult arv. */
   images?: Record<string, { count: number; preview: string[] }>;
-  imageToken?: ImageToken | null;
 }
 
 const isHttpUrl = (url?: string) => !!url && /^https?:\/\//.test(url);
@@ -27,18 +26,27 @@ const isHttpUrl = (url?: string) => !!url && /^https?:\/\//.test(url);
  * (paber, vaatlused) kuulub eraldi vahekaardile.
  */
 const ExemplarCards: React.FC<ExemplarCardsProps> = ({
-  exemplars, pageNumbers, archiveRefs, archives, workId, images, imageToken = null,
+  exemplars, pageNumbers, archiveRefs, archives, workId, images,
 }) => {
   const { t } = useTranslation(['workspace']);
+  // Töölaual avatud leht → eksemplari lehe tagasilink „Tagasi lehele N".
+  const { pageNum } = useParams();
+  const pageQuery = pageNum && /^\d+$/.test(pageNum) ? `?page=${pageNum}` : '';
 
-  // Ühe kaardi rida: hoidja (+ nimi), kohaviit, link.
-  const head = (holder: string, shelfmark?: string, url?: string) => (
+  // Ühe kaardi rida: hoidja (+ nimi), kohaviit, välislink sildiga kiibina.
+  const head = (holder: string, shelfmark?: string, url?: string, exemplarId?: string) => (
     <div className="min-w-0">
-      <span className="font-medium text-gray-800">{holder}</span>
+      {workId && exemplarId ? (
+        <Link to={`/work/${workId}/exemplar/${exemplarId}${pageQuery}`} title={t('exemplarImages.open')}
+          className="font-medium text-gray-800 hover:text-primary-700 hover:underline">{holder}</Link>
+      ) : <span className="font-medium text-gray-800">{holder}</span>}
       {archives[holder]?.name && <span className="text-gray-500"> — {archives[holder].name}</span>}
       {shelfmark && <span className="ml-1">{shelfmark}</span>}
       {isHttpUrl(url) && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="ml-1 text-primary-600 hover:text-primary-800" title={url}>↗</a>
+        <a href={url} target="_blank" rel="noopener noreferrer" title={url}
+          className="ml-1.5 text-[11px] leading-4 px-1.5 rounded-full border border-gray-300 text-primary-700 hover:text-primary-900 whitespace-nowrap">
+          {externalLinkLabel(url!)} ↗
+        </a>
       )}
     </div>
   );
@@ -63,11 +71,12 @@ const ExemplarCards: React.FC<ExemplarCardsProps> = ({
         const pages = exceptionPages(x, pageNumbers);
         if (pages) notes.push(t('info.exemplarPages', { pages }));
         if (x.reproduction) notes.push(t(`exemplars.reproduction.kinds.${x.reproduction.kind}`));
-        const pics = workId ? images?.[x.id] : undefined;
+        const pics = images?.[x.id]?.count ?? 0;
+        if (pics > 0) notes.push(t('exemplarImages.count', { count: pics }));
         return (
           <div key={x.id}>
           <div className={row}>
-            {head(x.holder, x.shelfmark, x.url)}
+            {head(x.holder, x.shelfmark, x.url, x.id)}
             {notes.length > 0 && <span className="ml-auto shrink-0 text-xs text-gray-500 mt-0.5">{notes.join(' · ')}</span>}
             {x.text_witness && (
               <span className={`${notes.length > 0 ? '' : 'ml-auto '}shrink-0 mt-px text-[11px] leading-4 px-1.5 rounded-full border border-primary-300 text-primary-800`}>
@@ -75,28 +84,6 @@ const ExemplarCards: React.FC<ExemplarCardsProps> = ({
               </span>
             )}
           </div>
-          {pics && pics.count > 0 && (
-            // Pildiriba: eelvaade + arv, klõps viib eksemplari vaatesse (ADR 0079).
-            <Link
-              to={`/work/${workId}/exemplar/${x.id}`}
-              data-testid="exemplar-image-strip"
-              title={t('exemplarImages.open')}
-              className="mt-1 flex items-center gap-1 group"
-            >
-              {pics.preview.map(id => (
-                <img
-                  key={id}
-                  src={withImageToken(getExemplarThumbUrl(workId!, x.id, id), imageToken)}
-                  alt=""
-                  loading="lazy"
-                  className="h-10 w-8 object-cover rounded-sm bg-gray-200 border border-gray-200 group-hover:border-primary-300"
-                />
-              ))}
-              <span className="ml-1 text-xs text-primary-700 group-hover:text-primary-900">
-                {t('exemplarImages.count', { count: pics.count })}
-              </span>
-            </Link>
-          )}
           </div>
         );
       })}

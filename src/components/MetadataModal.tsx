@@ -1,6 +1,6 @@
 import WorkDatingInput from './WorkDatingInput';
 import { datingError, WorkDating } from '../utils/workDating';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Edit3, X, Save, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
@@ -24,8 +24,6 @@ import { vocabularyRoleOptions } from './creators/roleOptions';
 import TitleVariantsFields from './TitleVariantsFields';
 
 import { useNotify } from '../contexts/FeedbackContext';
-import ExemplarsSection, { type ExemplarsSectionHandle } from './exemplars/ExemplarsSection';
-import UnsavedChangesDialog from './UnsavedChangesDialog';
 interface MetadataModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -33,7 +31,7 @@ interface MetadataModalProps {
   work?: Work;
   workId: string;
   authToken: string;
-  userRole?: string;  // eksemplaride toimetamine ainult admin+ (ADR 0076)
+  userRole?: string;
   collections: Collections;
   onSaveSuccess: (updatedPage: Partial<Page>, updatedWork: Partial<Work>) => void;
 }
@@ -193,7 +191,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   work,
   workId,
   authToken,
-  userRole,
   collections,
   onSaveSuccess
 }) => {
@@ -202,7 +199,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const lang = getLangCode(i18n.language);
 
   const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
-  const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const [metaForm, setMetaForm] = useState<MetadataForm>({
     title: '',
     title_en: '',
@@ -235,48 +231,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Eksemplari mustand salvestub oma nupuga (ADR 0076 p 5), mitte üldise
-  // „Salvesta" kaudu. Salvestamata mustandiga sulgemine küsib ühtse dialoogiga.
-  const exemplarsRef = useRef<ExemplarsSectionHandle>(null);
-  // Ref, sest sulgemine võib tulla vanast sulundist (üldise salvestuse setTimeout).
-  const exemplarsDirtyRef = useRef(false);
-  const setExemplarsDirty = useCallback((dirty: boolean) => { exemplarsDirtyRef.current = dirty; }, []);
-  const [closeGuard, setCloseGuard] = useState<{ open: boolean; saving: boolean; saveFailed: boolean }>(
-    { open: false, saving: false, saveFailed: false });
-
-  const requestClose = () => {
-    if (exemplarsDirtyRef.current) setCloseGuard({ open: true, saving: false, saveFailed: false });
-    else onClose();
-  };
-
-  const closeGuardSave = async () => {
-    setCloseGuard(g => ({ ...g, saving: true, saveFailed: false }));
-    let ok = false;
-    try { ok = (await exemplarsRef.current?.saveDraft()) ?? true; } catch { ok = false; }
-    if (ok) {
-      setCloseGuard({ open: false, saving: false, saveFailed: false });
-      onClose();
-    } else {
-      setCloseGuard({ open: true, saving: false, saveFailed: true });
-    }
-  };
-
-  // Eksemplari muudatus muudab tuletatud arhiiviviiteid (infopaneel, kaart). Loeme
-  // need serverist — klient ei tuleta `archive_refs`-i ise (ADR 0076 p 1).
-  const handleExemplarsChanged = useCallback(async () => {
-    try {
-      const data = await apiPost<any>(`${FILE_API_URL}/get-work-metadata`, { work_id: workId }, { token: authToken });
-      const m = data?.metadata;
-      // `convolute_count` tuleb samuti serverist: infopaneeli „Samas köites" plokk sõltub sellest (#702).
-      if (Array.isArray(m?.archive_refs)) {
-        onSaveSuccess({}, {
-          archive_refs: m.archive_refs,
-          convolute_count: m.convolute_count || 0,
-          exemplars_rev: Date.now(),  // ainult muutumine loeb; sulundi `work` võib olla vana
-        });
-      }
-    } catch { /* kuva värskendub järgmisel laadimisel */ }
-  }, [workId, authToken, onSaveSuccess]);
+  // Eksemplaride arv viidereale; toimetamine käib eksemplaride lehel (/work/:id/exemplar).
+  const [exemplarCount, setExemplarCount] = useState(0);
+  const requestClose = onClose;
 
   // Päisest lohistatav (ühine hook osade paneeliga)
   const drag = useDraggablePosition();
@@ -289,8 +246,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   // Lae andmed kui modal avatakse
   useEffect(() => {
     if (isOpen) {
-      setExemplarsDirty(false);
-      setCloseGuard({ open: false, saving: false, saveFailed: false });
       loadData();
       drag.reset();
     }
@@ -336,12 +291,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     // Lae sõnavara
     const vocabs = await getVocabularies();
     setVocabularies(vocabs);
-
-    // Lae arhiivide register
-    try {
-      const archivesData = await apiGet<any>(`${FILE_API_URL}/config/archives`);
-      if (archivesData?.archives) setArchives(archivesData.archives);
-    } catch { /* kasuta tühja loendit kui ei õnnestu */ }
 
     // Lae soovitused ja isikute register paralleelselt
     fetchSuggestions();
@@ -430,6 +379,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           collections: Array.isArray(m.collections) ? m.collections : [],
           archive_refs: Array.isArray(m.archive_refs) ? m.archive_refs : [],
         });
+        // Ainult `exemplars`: `archive_refs` on tuletatud viiteloend, mitte eksemplaride arv.
+        setExemplarCount(Array.isArray(m.exemplars) ? m.exemplars.length : 0);
         // Re-set existing snap-shot pärast ESTER/server auto-filli, et ka
         // auto-fillitud `year` säiliks, kui kasutaja kuvastringi ei muuda (reegel 4).
         existingYearRef.current = { year: year ? parseInt(year) : 0, year_display: m.year_display || '' };
@@ -799,18 +750,15 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             </div>
           </div>
 
-          {/* Grupp 4: Eksemplarid (ADR 0076) — salvestuvad kohe oma otspunktidesse, mitte üldise „Salvesta" kaudu */}
-          <ExemplarsSection
-            ref={exemplarsRef}
-            workId={workId}
-            authToken={authToken}
-            userRole={userRole}
-            isManuscript={isManuscriptType(metaForm.type)}
-            archives={archives}
-            onArchiveAdded={(id, info) => setArchives(prev => ({ ...prev, [id]: info }))}
-            onDirtyChange={setExemplarsDirty}
-            onChanged={handleExemplarsChanged}
-          />
+          {/* Grupp 4: Eksemplarid (ADR 0076) — toimetamine on eksemplaride lehel */}
+          <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50/50 flex flex-wrap items-center gap-2 text-sm"
+            data-testid="exemplars-row">
+            <span className="text-xs font-bold text-gray-600 uppercase">{t('exemplars.title')}</span>
+            <span className="text-gray-600">· {exemplarCount}</span>
+            <Link to={`/work/${workId}/exemplar`} className="ml-auto text-xs font-medium text-primary-700 hover:text-primary-900">
+              {t('metadata.exemplarsMoved')}
+            </Link>
+          </div>
 
           {/* Grupp 5: Välised lingid */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
@@ -892,15 +840,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         </div>
       </div>
     </div>
-      {/* Väljaspool tausta-div'i: muidu jõuaks dialoogi klõps Reacti puus taustani (requestClose). */}
-      <UnsavedChangesDialog
-        open={closeGuard.open}
-        saving={closeGuard.saving}
-        saveFailed={closeGuard.saveFailed}
-        onStay={() => setCloseGuard({ open: false, saving: false, saveFailed: false })}
-        onDiscard={() => { setCloseGuard({ open: false, saving: false, saveFailed: false }); onClose(); }}
-        onSaveAndContinue={() => void closeGuardSave()}
-      />
     </>
   );
 };

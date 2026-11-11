@@ -459,7 +459,12 @@
         "rejected": "rejected",
         "pending": "pending"
       }
-    }
+    },
+    "pairsRemoved_one": "{{count}} exemplar image pairing was removed because the page changed.",
+    "pairsRemoved_other": "{{count}} exemplar image pairings were removed because pages changed.",
+    "scanOrigin": "Scan:",
+    "scanOriginUnset": "source not marked",
+    "scanOriginMark": "Mark source…"
   },
   "metadata": {
     "title": "Metadata",
@@ -540,7 +545,8 @@
     "subjects": "About whom",
     "subjectsHint": "Persons the text is about or addressed to: the deceased in a funeral print, the dedicatee, the couple in a wedding poem. Only via the persons register or an external source (Wikidata/GND/VIAF).",
     "addSubject": "Add a person the text is about…",
-    "subjectsNeedPerson": "Only a person from the register or from Wikidata/GND/VIAF can be added here. If the person does not exist yet, create a card."
+    "subjectsNeedPerson": "Only a person from the register or from Wikidata/GND/VIAF can be added here. If the person does not exist yet, create a card.",
+    "exemplarsMoved": "Edit on the exemplars page →"
   },
   "download": {
     "title": "Download",
@@ -616,7 +622,8 @@
     "tocGoToStart": "go to start (p. {{page}})",
     "tocLinkCopied": "Link copied",
     "tocPages": "p.",
-    "exemplarPages": "p. {{pages}}"
+    "exemplarPages": "p. {{pages}}",
+    "exemplarsAll": "All details →"
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
@@ -810,15 +817,11 @@
     "packPagesGone": "The pack's pages are no longer in the work — the pack can be rejected."
   },
   "exemplarImages": {
-    "title": "Exemplar images",
     "back": "Back to the work",
     "notFound": "Exemplar not found.",
-    "loadError": "Could not load the images.",
-    "empty": "This exemplar has no images yet.",
     "count_one": "{{count}} image",
     "count_other": "{{count}} images",
     "open": "Open exemplar images",
-    "imageAlt": "Exemplar image {{n}}",
     "edit": "Edit images",
     "source": {
       "ada": "ADA {{ref}}",
@@ -829,15 +832,8 @@
       "other": "{{ref}}"
     },
     "compare": {
-      "open": "Compare with text witness",
-      "close": "Close comparison",
-      "witness": "Text witness",
       "prev": "Previous page",
-      "next": "Next page",
-      "page": "p. {{n}}",
-      "noPair": "No pair",
-      "savePair": "Save pair",
-      "pairSaved": "Pair saved"
+      "next": "Next page"
     },
     "editor": {
       "upload": "Add images",
@@ -866,7 +862,6 @@
       }
     },
     "ada": {
-      "open": "Import from ADA",
       "title": "Import from ADA",
       "handle": "Handle or ADA link",
       "from": "From page",
@@ -889,8 +884,6 @@
   },
   "exemplars": {
     "title": "Copies",
-    "savesImmediately": "Changes to copies are saved immediately, not with the metadata save button.",
-    "none": "No copies have been added.",
     "loadError": "Failed to load copies.",
     "saveError": "The change to the copy was not saved.",
     "holder": "Holding institution",
@@ -898,7 +891,6 @@
     "shelfmark": "Shelfmark",
     "shelfmarkPlaceholder": "e.g. R Est.B-954",
     "url": "URL (optional)",
-    "more": "More",
     "fields": {
       "condition": "Condition",
       "binding": "Binding",
@@ -948,15 +940,56 @@
       }
     },
     "convolute": {
-      "toggle": "Bound volume (convolute)",
       "label": "Convolute",
       "hint": "Fill in if the copy is bound together with other printed items. Copies with the same holding institution and convolute shelfmark are grouped together.",
       "reference": "Convolute shelfmark",
       "position": "Position (0 = main work)",
       "total": "Number of items in the volume",
-      "contents": "Contents (free text)",
+      "contents": "Volume contents",
       "countInvalid": "Convolute position and number of items must be whole numbers.",
-      "referenceRequired": "The convolute shelfmark is missing. To remove the convolute entry, clear all convolute fields."
+      "referenceRequired": "The convolute shelfmark is missing. To remove the convolute entry, clear all convolute fields.",
+      "contentsHint": "All prints bound in the same volume, including those not in VUTT."
     }
+  },
+  "exemplarPage": {
+    "none": "This work has no exemplars.",
+    "pagesRow": "Work pages",
+    "pagesRowHint": "not marked which exemplar this scan is from",
+    "markWitness": "Mark source…",
+    "unknownPagesRow": "Pages of unknown origin",
+    "pageCount_one": "{{count}} page",
+    "pageCount_other": "{{count}} pages",
+    "exceptionPages": "Exception pages",
+    "physical": "Physical copy",
+    "title": "Exemplars",
+    "backToPage": "Back to page {{n}}",
+    "viewOnly": "view only",
+    "managePages": "Manage pages →",
+    "showAll": "Show all",
+    "more": "… {{count}} more",
+    "noImages": "No images.",
+    "editImages": "Edit images",
+    "ownPages": "Work pages",
+    "ownImages": "Images",
+    "pageLabel": "p. {{n}}",
+    "compare": "Compare",
+    "adaImport": "ADA import…"
+  },
+  "compare": {
+    "title": "Compare",
+    "locked": "Moving together",
+    "unlocked": "Sides separate · Lock",
+    "zoomTogether": "zoom together",
+    "zoomLevel": "Zoom",
+    "now": "now {{left}} ↔ {{right}}",
+    "savePair": "Save pairing {{image}} ↔ p. {{n}}",
+    "pairSaved": "pairing saved",
+    "pairElsewhere": "paired: p. {{n}}",
+    "alignHint": "Align both sides, then lock.",
+    "pagesSeq": "Work pages",
+    "witnessIs": "source: {{name}}",
+    "witnessUnset": "source not marked",
+    "unknownOrigin": "origin unknown",
+    "noMaterial": "no images"
   }
 }

@@ -507,10 +507,12 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
         # Poolitus nihutab järgmiste lehtede numbreid (#420); osades asendub algne
         # tüvi mõlema poolega (#464).
         renamed = {orig_stem: [os.path.splitext(h)[0] for h in halves]} if halves else None
-        refresh_work_mentions(path, work_id, renamed=renamed)
+        sync = refresh_work_mentions(path, work_id, renamed=renamed) or {}
 
         new_page_count = len(get_sorted_images(path))
-        return {"success": True, "new_page_count": new_page_count}
+        # Poolitus EI jaota pildipaare pooltele — algse tüve paar eemaldatakse (ADR 0079 p 3).
+        return {"success": True, "new_page_count": new_page_count,
+                "pairs_removed": sync.get("pairs_removed", 0)}
 
 
 # Teisenduse geomeetria elab puhtas moodulis, mida kasutab ka upload'i
@@ -723,7 +725,7 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
         return {"found": False}
 
     folder_name = os.path.basename(path)
-    rotated = adjusted = split = 0
+    rotated = adjusted = split = pairs_removed = 0
     with work_lock(folder_name, path):
         images = get_sorted_images(path)
         missing = [op["filename"] for op in clean if op["filename"] not in images]
@@ -774,13 +776,13 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
         finally:
             if split:
                 sync_work_to_meilisearch(folder_name)
-                refresh_work_mentions(path, work_id, renamed=renamed)
+                pairs_removed = (refresh_work_mentions(path, work_id, renamed=renamed) or {}).get("pairs_removed", 0)
 
         new_page_count = len(get_sorted_images(path))
     logger.info(f"PAGE-OPS {folder_name}: {rotated} pööret, {adjusted} kärbet, "
                 f"{split} poolitust ({username})")
     return {"success": True, "changed": True, "rotated": rotated, "adjusted": adjusted,
-            "split": split, "new_page_count": new_page_count}
+            "split": split, "new_page_count": new_page_count, "pairs_removed": pairs_removed}
 
 
 PREVIEW_VIEW_MAX = 1600     # redaktori eelvaate pikem külg (px)
@@ -1292,6 +1294,7 @@ def delete_pages(work_id, base_names, username):
         # Kustutatud lehe isiku-tägid ei tohi 'mentioned' indeksisse rippuma jääda ja
         # kustutatud leht peab osadest kaduma (#464) — refresh_work_mentions teeb mõlemat
         # ega viska (vead logitakse).
-        refresh_work_mentions(path, work_id)
+        sync = refresh_work_mentions(path, work_id) or {}
         new_page_count = len(get_sorted_images(path))
-        return {"status": "success", "deleted": list(base_names), "new_page_count": new_page_count}
+        return {"status": "success", "deleted": list(base_names), "new_page_count": new_page_count,
+                "pairs_removed": sync.get("pairs_removed", 0)}

@@ -637,6 +637,23 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     # Salvesta git HEAD rollback'i jaoks
     from .git_ops import get_or_init_repo, git_write_lock
     repo = get_or_init_repo()
+
+    # Asendus kasutab tüved uuesti → eksemplaride pildipaarid osutaksid vaikselt uutele
+    # lehtedele. Eemalda KÕIK paarid enne ühegi faili liigutamist (sama work_lock);
+    # ebaõnnestumisel katkesta (ADR 0079 p 3 täiendus).
+    try:
+        from . import exemplar_images
+        exemplar_images.clear_all_pairs(work_dir, username)
+    except Exception as e:
+        logger.error(f"replace {upload_id}: pildipaaride eemaldamine ebaõnnestus: {e}")
+        raise HTTPException(status_code=500,
+                            detail="Eksemplaride pildipaaride eemaldamine ebaõnnestus; teose sisu ei asendatud")
+
+    # Rollback'i punkt ALLES paaride eemalduse järel: `checkout old_head -- slug` peab
+    # langema kokku HEAD-iga. Enne eemaldust võetud punkt taastaks manifestid paaridega
+    # töökausta ja indeksisse, HEAD-is oleks paarideta seis → stage'itud commitimata
+    # muudatus, mis sõidaks järgmise manifesti kirjutuse commitiga kaasa. Paarideta
+    # vana sisu on kooskõlaline (paari puudumine ≠ vale paar).
     old_head = repo.head.commit.hexsha
 
     # Lipp: kas destruktiivsed sammud on alanud (arhiveerimine/git rm)

@@ -154,7 +154,7 @@ def update_page_person_mentions(work_id: str, work_dir: str):
 
 
 def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None,
-                          renamed: Optional[dict] = None) -> None:
+                          renamed: Optional[dict] = None) -> dict:
     """Teose 'mentioned' seosed uuesti pärast lehtede hulga või järjekorra
     muutust (#420). Salvestus skannib ainult isikutägide muutusel, seega PEAB
     iga lehenumbreid nihutav tee selle ise kutsuma — muidu jäävad numbrid vanaks.
@@ -163,8 +163,12 @@ def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None,
     (ADR 0076): osade lehed ja mainimiste osa-viited sõltuvad samast lehehulgast. Poolitus annab `renamed`
     = {algne_tüvi: [vasak, parem]}.
 
+    Viimasena koristatakse eksemplaride pildipaarid, mille tüve teosel enam ei ole
+    (ADR 0079 p 3 täiendus). Tagastab {"pairs_removed": N}.
+
     Viga logitakse, ei visata: lehetoiming on juba kettal ja commititud.
     """
+    pairs_removed = 0
     try:
         # Moodulile viitamine (mitte funktsioonile), et testide patch jõuaks kohale.
         from .. import work_parts
@@ -184,6 +188,17 @@ def refresh_work_mentions(work_dir: str, work_id: Optional[str] = None,
         update_page_person_mentions(work_id, work_dir)
     except Exception:
         logger.exception(f"Mainimiste indeksi uuendus ebaõnnestus ({work_id or work_dir})")
+    try:
+        # Olekupõhine ja idempotentne: ebaõnnestunud käivituse töö teeb ära järgmine.
+        # Võtab ainult metadata_lock-i — kutsuja võib hoida work_lock-i.
+        from .. import exemplar_images
+        pairs_removed = exemplar_images.prune_dangling_pairs(work_dir)
+    except Exception as exc:
+        logger.exception(f"Eksemplaride pildipaaride koristus ebaõnnestus ({work_id or work_dir})")
+        # Nähtav kliendivigade vaates (#133); record_server_error ei viska.
+        from .. import client_errors
+        client_errors.record_server_error("server:thread", exc)
+    return {"pairs_removed": pairs_removed}
 
 
 __all__ = ['get_person_with_works', '_build_work_to_persons', 'get_persons_for_work', '_structured_relation_ids', 'get_person_relation_network_ids', 'get_relation_type_suggestions', 'update_page_person_mentions', 'refresh_work_mentions']

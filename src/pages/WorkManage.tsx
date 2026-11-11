@@ -20,6 +20,7 @@ import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import PageImageEditorModal from '../components/PageImageEditorModal';
 import { useUser } from '../contexts/UserContext';
+import { useNotify } from '../contexts/FeedbackContext';
 import { useImageToken } from '../contexts/ImageTokenContext';
 import { ApiError } from '../services/apiClient';
 import {
@@ -58,6 +59,7 @@ import PageCard from './manage/PageCard';
 import PartsTab from './manage/parts/PartsTab';
 import { initialManageTab, tabSwitch, type ManageTab } from './manage/partsModel';
 import PageActionBar from './manage/PageActionBar';
+import ScanOriginRow from './manage/ScanOriginRow';
 import {
   PendingPageOps, clearPendingAdjust, pendingCount, pruneMissing, rotatePending, setPendingEdit,
   dropApplied, setPendingSplit, setPendingSplitX, toRequest,
@@ -86,6 +88,11 @@ type ActiveTab = ManageTab;
 
 const WorkManage: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common']);
+  const notify = useNotify();
+  // Lehetoiming eemaldas rippuvad eksemplari pildipaarid (ADR 0079 p 3) — ütle seda.
+  const notifyPairsRemoved = (count?: number) => {
+    if (count && count > 0) notify(t('manage.pairsRemoved', { count }), 'warning');
+  };
   const { workId } = useParams<{ workId: string }>();
   const navigate = useNavigate();
   const { user, authToken } = useUser();
@@ -646,6 +653,7 @@ const WorkManage: React.FC = () => {
       } else if (st?.state === 'done') {
         const r = st.result ?? {};
         setPageOpsResult(t('manage.pageOps.done', { rotated: r.rotated ?? 0, adjusted: r.adjusted ?? 0, split: r.split ?? 0 }));
+        notifyPairsRemoved(r.pairs_removed);
         ok = true;
       } else if (st?.state === 'error') {
         setPageOpsError(st.error || t('manage.pageOps.error'));
@@ -740,7 +748,8 @@ const WorkManage: React.FC = () => {
     setBulkDeleting(true);
     setBulkDeleteError(null);
     try {
-      await deleteWorkPages(workId, authToken, baseNames);
+      const res = await deleteWorkPages(workId, authToken, baseNames);
+      notifyPairsRemoved(res.pairs_removed);
       await loadPages();
       if (trashLoaded) loadTrashPages();
       setSelectedFiles(new Set());
@@ -1090,6 +1099,7 @@ const WorkManage: React.FC = () => {
                 <span className="text-sm text-gray-500">{pages.length} {t('manage.pagesCount', { count: pages.length })}</span>
               </div>
             </div>
+            <ScanOriginRow workId={workId!} exemplars={exemplars} />
 
             {loading ? (
               <div className="flex items-center justify-center py-12 text-gray-400">

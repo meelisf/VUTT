@@ -20,6 +20,7 @@ from typing import Optional
 from .config import get_logger
 from .exemplar_image_files import ImageFileError, store_image
 from .utils import generate_nanoid, metadata_lock
+from .work_parts import page_stems
 
 logger = get_logger(__name__)
 
@@ -294,12 +295,73 @@ def patch_images(work_dir: str, eid: str, revision, images, username: str) -> di
             raise ExemplarImagesError("Loend peab sisaldama täpselt praegused pildid", 409,
                                       clean_manifest(current))
         merged = [_merge_image(by_id[i["id"]], i) for i in images]
+        # Sihtlehe kontroll SAMA luku all (lehe kustutus hoiab sama work_lock-i): muudetud
+        # paar peab osutama teose praegusele lehele. Muutmata väärtust ei kontrollita —
+        # rippuv vana paar ei tohi blokeerida sildi muutmist, selle koristab sünk.
+        changed = {m["page"] for m in merged
+                   if m.get("page") and m["page"] != by_id[m["id"]].get("page")}
+        if changed and not changed <= set(page_stems(work_dir)):
+            raise ExemplarImagesError("Paar osutab lehele, mida teosel enam ei ole", 409,
+                                      clean_manifest(current))
         new = clean_manifest({**current, "images": merged})
         if new["images"] == clean_manifest(current)["images"]:
             return _with_commit_flag(current, True)          # ADR 0012: no-op
         new["revision"] = current["revision"] + 1
         ok = write_manifest_locked(work_dir, eid, new, username, f"Eksemplar: muuda pilte [{eid}]")
         return _with_commit_flag(new, ok)
+
+
+# ── Paarid ja lehetoimingud (ADR 0079 p 3 täiendus 2026-11-10) ───────────────
+
+def _manifest_ids(work_dir: str) -> list[str]:
+    root = os.path.join(work_dir, EXEMPLARS_DIRNAME)
+    try:
+        names = sorted(os.listdir(root))
+    except OSError:
+        return []
+    return [n for n in names if ID_RE.match(n) and os.path.isfile(os.path.join(root, n, MANIFEST_NAME))]
+
+
+def _strip_pairs_locked(work_dir: str, keep, username: str, message: str) -> int:
+    """Eemaldab igast teose manifestist paarid, mille kohta `keep(page)` on väär.
+    Kutsuja hoiab `metadata_lock`-i. Muutusteta manifesti ei kirjutata (ADR 0012);
+    muutunu saab `revision + 1` ja ühe commit'i eksemplari kohta."""
+    removed = 0
+    for eid in _manifest_ids(work_dir):
+        current = read_manifest(work_dir, eid)
+        images, n = [], 0
+        for img in current["images"]:
+            page = img.get("page")
+            if page and not keep(page):
+                img = {k: v for k, v in img.items() if k != "page"}
+                n += 1
+            images.append(img)
+        if not n:
+            continue
+        new = clean_manifest({**current, "images": images, "revision": current["revision"] + 1})
+        write_manifest_locked(work_dir, eid, new, username, message.format(eid=eid))
+        removed += n
+    return removed
+
+
+def prune_dangling_pairs(work_dir: str, username: str = "Automaatne") -> int:
+    """Olekupõhine koristus: eemaldab paarid, mille tüve teosel enam ei ole.
+
+    Võtab AINULT `metadata_lock`-i (RLock): `work_lock` ei ole taassisenetav ja
+    `refresh_work_mentions`-i kutsuja võib seda juba hoida. Vastastikune välistus
+    `patch_images`-iga tuleb samast `metadata_lock`-ist. Idempotentne."""
+    with metadata_lock:
+        stems = set(page_stems(work_dir))
+        return _strip_pairs_locked(work_dir, lambda p: p in stems, username,
+                                   "Eksemplar: paarid ühtlustatud lehetoimingu järel [{eid}]")
+
+
+def clear_all_pairs(work_dir: str, username: str) -> int:
+    """Lehestiku asendus kasutab tüved uuesti → kõik paarid eemaldatakse ENNE sisu
+    asendamist. Erindit EI neela: kutsuja katkestab asenduse."""
+    with metadata_lock:
+        return _strip_pairs_locked(work_dir, lambda p: False, username,
+                                   "Eksemplar: paarid eemaldatud, lehestik asendatakse [{eid}]")
 
 
 def _image_files(work_dir: str, eid: str, img: dict) -> list[str]:
