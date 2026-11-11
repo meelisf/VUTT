@@ -973,6 +973,10 @@
     "ownImages": "Pildid",
     "pageLabel": "lk {{n}}",
     "compare": "Kõrvuta",
+    "copyLink": "Kopeeri link",
+    "copyLinkHint": "Püsiv link sellele vaatele (nt lehe kommentaari)",
+    "linkCopied": "Link kopeeritud",
+    "copyLinkFailed": "Linki ei õnnestunud kopeerida",
     "adaImport": "ADA import…"
   },
   "compare": {

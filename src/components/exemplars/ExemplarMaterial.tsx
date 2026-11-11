@@ -81,7 +81,9 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
     return (
       <button key={it.key} type="button" data-testid="material-thumb" onClick={() => onOpen(seq.key, i)}
         className="group text-left border border-gray-200 rounded-lg overflow-hidden bg-white hover:border-primary-300">
-        <img src={sign(it.thumb)} alt="" loading="lazy" className="block w-full aspect-[3/4] object-cover bg-gray-100" />
+        {/* `object-contain`, MITTE `cover` (nagu halduse PageCard): rõhtne pilt — kaas,
+            köide, topeltleht — jääb tervikuna näha; `cover` lõikas küljed 3/4 portreeks. */}
+        <img src={sign(it.thumb)} alt="" loading="lazy" className="block w-full aspect-[3/4] object-contain bg-gray-100" />
         <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-gray-700 border-t border-gray-100">
           <span className="truncate">{seq.kind === 'pages' ? t('exemplarPage.pageLabel', { n: it.label }) : it.label}</span>
           {pairN !== undefined && (

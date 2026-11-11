@@ -973,6 +973,10 @@
     "ownImages": "Images",
     "pageLabel": "p. {{n}}",
     "compare": "Compare",
+    "copyLink": "Copy link",
+    "copyLinkHint": "Permanent link to this view (e.g. for a page comment)",
+    "linkCopied": "Link copied",
+    "copyLinkFailed": "Could not copy the link",
     "adaImport": "ADA import…"
   },
   "compare": {

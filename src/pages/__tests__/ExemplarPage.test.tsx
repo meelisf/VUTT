@@ -210,17 +210,64 @@ describe('ExemplarPage', () => {
     const material = await screen.findByTestId('exemplar-material');
     await waitFor(() => expect(within(material).getAllByTestId('material-thumb')).toHaveLength(6));
     fireEvent.click(within(material).getByText('exemplarPage.compare'));
-    // img001 paar on w-003 → parem pool indeksil 2
-    await waitFor(() => expect(screen.getByTestId('loc').textContent).toContain('cmp=b2%3A0%7Epages%3A2'));
+    // img001 paar on w-003 → parem pool sellel lehel; URL kannab võtmeid, mitte indekseid
+    await waitFor(() => expect(screen.getByTestId('loc').textContent).toContain('cmp=b2%3Aimg001%7Epages%3Aw-003'));
     const modal = await screen.findByTestId('exemplar-compare-modal');
     expect(within(modal).getByText('compare.pairSaved')).toBeTruthy();
     fireEvent.keyDown(window, { key: 'ArrowRight' });
-    await waitFor(() => expect(screen.getByTestId('loc').textContent).toContain('cmp=b2%3A1%7Epages%3A3'));
+    await waitFor(() => expect(screen.getByTestId('loc').textContent).toContain('cmp=b2%3Aimg002%7Epages%3Aw-004'));
     fireEvent.click(within(screen.getByTestId('exemplar-compare-modal')).getByText(/compare\.savePair/));
     await waitFor(() => expect(patchExemplarImages).toHaveBeenCalled());
     const [, eid, rev, imgs] = patchExemplarImages.mock.calls[0];
     expect(eid).toBe('b2');
     expect(rev).toBe(2);
     expect(imgs[1].page).toBe('w-004');
+  });
+
+  it('vana indeksilink (enne 2026-11-11) avab sama kõrvutuse', async () => {
+    getWorkExemplars.mockResolvedValue(resp({
+      exemplars: [{ id: 'b2', holder: 'UUB' }], images: { b2: { count: 6, preview: [] } },
+    }));
+    fetchExemplarImages.mockResolvedValue(manifest);
+    renderAt('/work/w1/exemplar/b2?cmp=b2:0~pages:2');
+    const modal = await screen.findByTestId('exemplar-compare-modal');
+    const srcs = within(modal).getAllByTestId('viewer').map(v => v.getAttribute('src'));
+    expect(srcs[0]).toContain('/b2/img001.jpg');
+    expect(srcs[1]).toContain('w-003');
+  });
+
+  it('võtmelink jääb samale pildile ka pärast piltide ümberjärjestust', async () => {
+    getWorkExemplars.mockResolvedValue(resp({
+      exemplars: [{ id: 'b2', holder: 'UUB' }], images: { b2: { count: 6, preview: [] } },
+    }));
+    // img005 on nüüd esimene — indeksilink näitaks valet pilti, võtmelink mitte
+    fetchExemplarImages.mockResolvedValue({ ...manifest, images: [...manifest.images].reverse() });
+    renderAt('/work/w1/exemplar/b2?cmp=b2:img005~pages:w-010');
+    const modal = await screen.findByTestId('exemplar-compare-modal');
+    const srcs = within(modal).getAllByTestId('viewer').map(v => v.getAttribute('src'));
+    expect(srcs[0]).toContain('/b2/img005.jpg');
+    expect(srcs[1]).toContain('w-010');
+  });
+
+  it('„Kopeeri link": püsiv link ilma ?page= kontekstita (pilt ja kõrvutus)', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    getWorkExemplars.mockResolvedValue(resp({
+      exemplars: [{ id: 'b2', holder: 'UUB' }], images: { b2: { count: 6, preview: [] } },
+    }));
+    fetchExemplarImages.mockResolvedValue(manifest);
+    renderAt('/work/w1/exemplar/b2?page=7&image=img004');
+    const modal = await screen.findByTestId('exemplar-image-modal');
+    fireEvent.click(within(modal).getByTestId('copy-link'));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(writeText.mock.calls[0][0]).toBe(`${window.location.origin}/work/w1/exemplar/b2?image=img004`);
+
+    cleanup();
+    renderAt('/work/w1/exemplar/b2?page=7&cmp=b2:img001~pages:w-003');
+    const cmpModal = await screen.findByTestId('exemplar-compare-modal');
+    fireEvent.click(within(cmpModal).getByTestId('copy-link'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+    expect(writeText.mock.calls[1][0])
+      .toBe(`${window.location.origin}/work/w1/exemplar/b2?cmp=b2%3Aimg001%7Epages%3Aw-003`);
   });
 });

@@ -30,28 +30,51 @@ import { isManuscriptType } from '../utils/metadataUtils';
 type Archives = Record<string, { name: string; url?: string }>;
 const EMPTY_MANIFEST: ExemplarManifest = { revision: 0, images: [], imports: {} };
 
-/** `?cmp=<vasak jada>:<indeks>~<parem jada>:<indeks>`; vigane → null (kõrvutust ei avata). */
-export function parseCompareParam(raw: string | null): [CompareSide, CompareSide] | null {
+/** Kõrvutuse pool URL-is: jada + üksuse viide (pildi id | lehe tüvi | vana indeks). */
+export interface CompareRef { seq: string; ref: string }
+
+/** `?cmp=<vasak jada>:<viide>~<parem jada>:<viide>`; vigane → null (kõrvutust ei avata).
+ *  Viide on üksuse VÕTI (pildi id, lehe tüvi), et link jääks kehtima ka siis, kui
+ *  pilte ümber järjestatakse või teosele lehti lisatakse — lingid lähevad kommentaaridesse. */
+export function parseCompareParam(raw: string | null): [CompareRef, CompareRef] | null {
   if (!raw) return null;
   const sides = raw.split('~');
   if (sides.length !== 2) return null;
-  const out: CompareSide[] = [];
+  const out: CompareRef[] = [];
   for (const part of sides) {
-    const m = /^([A-Za-z0-9_-]+):(\d+)$/.exec(part);
+    const m = /^([A-Za-z0-9_-]+):([^~:]+)$/.exec(part);
     if (!m) return null;
-    out.push({ seq: m[1], index: Number(m[2]) });
+    out.push({ seq: m[1], ref: m[2] });
   }
   return [out[0], out[1]];
 }
 
-const compareParam = (l: CompareSide, r: CompareSide) => `${l.seq}:${l.index}~${r.seq}:${r.index}`;
+/** Viide → indeks jadas: esmalt üksuse võti; kui sellist pole ja viide on number, siis
+ *  vana kuju (`:<indeks>`, enne 2026-11-11 tehtud lingid). Lahendamatu → null. */
+export function resolveCompareRef(r: CompareRef, seqs: Sequence[]): CompareSide | null {
+  const seq = seqs.find(q => q.key === r.seq);
+  if (!seq) return null;
+  const i = seq.items.findIndex(it => it.key === r.ref);
+  if (i >= 0) return { seq: r.seq, index: i };
+  if (/^\d+$/.test(r.ref) && Number(r.ref) < seq.items.length) return { seq: r.seq, index: Number(r.ref) };
+  return null;
+}
+
+/** Indeks → viide (üksuse võti); tühja jada korral indeks ise. */
+export function compareRefOf(side: CompareSide, seqs: Sequence[]): CompareRef {
+  const key = seqs.find(q => q.key === side.seq)?.items[side.index]?.key;
+  return { seq: side.seq, ref: key ?? String(side.index) };
+}
+
+const compareParam = (l: CompareRef, r: CompareRef) => `${l.seq}:${l.ref}~${r.seq}:${r.ref}`;
 
 /**
  * Eksemplari leht (spets 2026-11-10, ADR 0076/0079): `/work/:workId/exemplar/:exemplarId?`.
  *
  * `:exemplarId` = eksemplari id või `pages` (rida „Teose lehed", alus märkimata);
  * puudub → vaikimisi valik (`defaultSelection`), mis kirjutatakse URL-i `replace`-iga.
- * `?image=<võti>` = suur pilt avatud; `?page=N` = töölaual avatud leht (tagasilink).
+ * `?image=<võti>` = suur pilt avatud; `?cmp=…` = kõrvutus (võtmed, vt `parseCompareParam`);
+ * `?page=N` = töölaual avatud leht (tagasilink, püsilinki ei lähe).
  *
  * Leheloend tuleb `GET /works/{id}/exemplars` vastusest (kettalt), MITTE Meilist.
  * Kirje toimetamine käib `ExemplarList`-is; töövaade eksemplari pilte ei näe.
@@ -168,31 +191,32 @@ const ExemplarPage: React.FC = () => {
     ...orderExemplars(data.exemplars).map(x =>
       imagesSequence(workId, x.id, manifestOf(x.id)?.images ?? [], data.page_numbers)),
   ] : null;
-  const cmpValid = !!(compareSeqs && cmp && cmp.every(side => {
-    const seq = compareSeqs.find(q => q.key === side.seq);
-    return !!seq && side.index < seq.items.length;
-  }));
+  const cmpSides: [CompareSide, CompareSide] | null = compareSeqs && cmp
+    ? (() => {
+      const l = resolveCompareRef(cmp[0], compareSeqs);
+      const r = resolveCompareRef(cmp[1], compareSeqs);
+      return l && r ? [l, r] : null;
+    })()
+    : null;
 
-  /** Kõrvutuse avamine: vasak = kust vajutati; parem = paari leht → ?page → algus. */
+  /** Kõrvutuse avamine: vasak = kust vajutati; parem = paari leht → ?page → algus.
+   *  Kirjutab võtmed (pildi id / lehe tüvi); teise eksemplari manifest ei pruugi veel
+   *  laetud olla — siis „0" (vana indeksikuju lahendub esimeseks pildiks). */
   const openCompare = (seqKey: string, item: { key: string; stem?: string; pairStem?: string } | undefined) => {
     if (!data || !item) return;
     const all = pagesSequence(workId, data);
-    const pageIdx = (stem?: string) => (stem ? all.items.findIndex(it => it.stem === stem) : -1);
-    let left: CompareSide;
-    if (seqKey === PAGES_KEY) {
-      left = { seq: PAGES_KEY, index: Math.max(0, pageIdx(item.stem)) };
-    } else {
-      const imgs = manifestOf(seqKey)?.images ?? [];
-      left = { seq: seqKey, index: Math.max(0, imgs.findIndex(im => im.id === item.key)) };
-    }
-    let right: CompareSide;
+    const left: CompareRef = seqKey === PAGES_KEY
+      ? { seq: PAGES_KEY, ref: item.stem ?? item.key }
+      : { seq: seqKey, ref: item.key };
+    let right: CompareRef;
     if (left.seq !== PAGES_KEY && all.items.length > 0) {
-      let i = pageIdx(item.pairStem);
-      if (i < 0 && backPage) i = Math.min(backPage - 1, all.items.length - 1);
-      right = { seq: PAGES_KEY, index: Math.max(0, i) };
+      const paired = item.pairStem && all.items.some(it => it.stem === item.pairStem) ? item.pairStem : undefined;
+      const fromBack = backPage ? all.items[Math.min(backPage - 1, all.items.length - 1)].key : undefined;
+      right = { seq: PAGES_KEY, ref: paired ?? fromBack ?? all.items[0].key };
     } else {
       const other = withImages.find(x => x.id !== left.seq);
-      right = other ? { seq: other.id, index: 0 } : { seq: PAGES_KEY, index: 0 };
+      right = other ? { seq: other.id, ref: manifestOf(other.id)?.images[0]?.id ?? '0' }
+        : { seq: PAGES_KEY, ref: all.items[0]?.key ?? '0' };
     }
     const next = new URLSearchParams(searchParams);
     next.delete('image');
@@ -201,9 +225,17 @@ const ExemplarPage: React.FC = () => {
   };
 
   const setCompare = (l: CompareSide, r: CompareSide) => {
+    if (!compareSeqs) return;
     const next = new URLSearchParams(searchParams);
-    next.set('cmp', compareParam(l, r));
+    next.set('cmp', compareParam(compareRefOf(l, compareSeqs), compareRefOf(r, compareSeqs)));
     setSearchParams(next, { replace: true });
+  };
+
+  /** Jagatav link: ainult tee + vaate parameeter (`image` või `cmp`). `?page=` on
+   *  töölaua tagasilingi kontekst ega kuulu püsilinki. */
+  const shareUrl = (param: 'image' | 'cmp', value: string) => {
+    const q = new URLSearchParams({ [param]: value });
+    return `${window.location.origin}/work/${workId}/exemplar/${selected}?${q.toString()}`;
   };
   const closeCompare = () => {
     const next = new URLSearchParams(searchParams);
@@ -354,14 +386,17 @@ const ExemplarPage: React.FC = () => {
         <ExemplarImageModal title={modalTitle} sequence={open.seq} index={open.index}
           onIndex={i => setImage(open.seq.items[i]?.key ?? null)} onClose={() => setImage(null)}
           sourceLine={sourceLine} pageNumbers={data.page_numbers} sign={u => withImageToken(u, imageToken)}
+          shareUrl={shareUrl('image', open.seq.items[open.index].key)}
           onCompare={canCompare ? () => openCompare(open.seq.kind === 'pages' ? PAGES_KEY : open.seq.key,
             open.seq.items[open.index]) : undefined} />
       )}
-      {cmp && cmpValid && compareSeqs && (
+      {cmpSides && compareSeqs && (
         <ExemplarCompareModal title={title} sequences={compareSeqs} seqLabel={seqLabel}
-          left={cmp[0]} right={cmp[1]} onChange={setCompare} canEdit={canEdit}
+          left={cmpSides[0]} right={cmpSides[1]} onChange={setCompare} canEdit={canEdit}
           onSavePair={canEdit ? savePair : undefined} onClose={closeCompare}
-          sign={u => withImageToken(u, imageToken)} />
+          sign={u => withImageToken(u, imageToken)}
+          shareUrl={shareUrl('cmp', compareParam(compareRefOf(cmpSides[0], compareSeqs),
+            compareRefOf(cmpSides[1], compareSeqs)))} />
       )}
       <UnsavedChangesDialog {...dialogProps} />
     </div>

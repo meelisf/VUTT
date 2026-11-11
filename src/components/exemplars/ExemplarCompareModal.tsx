@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Lock, LockOpen, X } from 'lucide-react';
 import ImageViewer, { type ViewState } from '../ImageViewer';
 import { PAGES_KEY, stepLocked, type SeqItem, type Sequence } from './exemplarSequences';
+import CopyLinkButton from './CopyLinkButton';
 
 export interface CompareSide { seq: string; index: number }
 
@@ -31,13 +32,15 @@ interface ExemplarCompareModalProps {
   onClose: () => void;
   /** Pildi URL-ile allkiri (`withImageToken`); vaikimisi muutmata. */
   sign?: (url: string) => string;
+  /** Püsiv link sellele kõrvutusele (nupp „Kopeeri link"). */
+  shareUrl?: string;
 }
 
 type SideName = 'left' | 'right';
 const DEFAULT_VIEW: ViewState = { scale: 1, x: 0, y: 0 };
 
 const ExemplarCompareModal: React.FC<ExemplarCompareModalProps> = ({
-  title, sequences, seqLabel, left, right, onChange, canEdit, onSavePair, onClose, sign = u => u,
+  title, sequences, seqLabel, left, right, onChange, canEdit, onSavePair, onClose, sign = u => u, shareUrl,
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const [locked, setLocked] = useState(true);
@@ -200,6 +203,7 @@ const ExemplarCompareModal: React.FC<ExemplarCompareModalProps> = ({
             <input type="range" min={1} max={8} step={0.1} value={view.scale} disabled={!zoomTogether}
               aria-label={t('compare.zoomLevel')} className="w-28 disabled:opacity-40"
               onChange={e => setView(v => ({ ...v, scale: Number(e.target.value) }))} />
+            {shareUrl && <CopyLinkButton url={shareUrl} />}
             <button type="button" onClick={onClose} aria-label={t('common:buttons.close')} title={t('common:buttons.close')}
               className="p-1.5 rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100">
               <X size={20} />
@@ -245,7 +249,8 @@ const Strip: React.FC<{ seq?: Sequence; index: number; onPick: (i: number) => vo
       {seq.items.map((it, i) => (
         <button key={it.key} type="button" data-index={i} onClick={() => onPick(i)}
           className={`shrink-0 rounded-sm ${i === index ? 'outline outline-2 outline-offset-1 outline-primary-600' : ''}`}>
-          <img src={sign(it.thumb)} alt="" loading="lazy" className="h-12 w-9 object-cover rounded-sm bg-gray-200" />
+          {/* `object-contain`: rõhtne pilt jääb tervikuna näha (nagu halduse PageCard). */}
+          <img src={sign(it.thumb)} alt="" loading="lazy" className="h-12 w-9 object-contain rounded-sm bg-gray-200" />
         </button>
       ))}
     </div>
