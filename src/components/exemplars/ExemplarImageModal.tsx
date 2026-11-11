@@ -8,6 +8,7 @@ import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Columns2, X } from 'lucide-react';
 import ImageViewer from '../ImageViewer';
+import CopyLinkButton from './CopyLinkButton';
 import type { Sequence } from './exemplarSequences';
 
 interface ExemplarImageModalProps {
@@ -22,10 +23,12 @@ interface ExemplarImageModalProps {
   pageNumbers: Record<string, number>;
   /** Pildi URL-ile allkiri (`withImageToken`). */
   sign: (url: string) => string;
+  /** Püsiv link avatud pildile (nupp „Kopeeri link"). */
+  shareUrl?: string;
 }
 
 const ExemplarImageModal: React.FC<ExemplarImageModalProps> = ({
-  title, sequence, index, onIndex, onClose, onCompare, sourceLine, pageNumbers, sign,
+  title, sequence, index, onIndex, onClose, onCompare, sourceLine, pageNumbers, sign, shareUrl,
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const items = sequence.items;
@@ -66,6 +69,7 @@ const ExemplarImageModal: React.FC<ExemplarImageModalProps> = ({
             </p>
           </div>
           <div className="ml-auto flex items-center gap-1">
+            {shareUrl && <CopyLinkButton url={shareUrl} />}
             {onCompare && (
               <button type="button" onClick={onCompare}
                 className="text-sm px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50 inline-flex items-center gap-1">
@@ -97,7 +101,8 @@ const ExemplarImageModal: React.FC<ExemplarImageModalProps> = ({
           {items.map((it, i) => (
             <button key={it.key} type="button" data-index={i} onClick={() => onIndex(i)}
               className={`shrink-0 rounded-sm ${i === index ? 'outline outline-2 outline-offset-1 outline-primary-600' : ''}`}>
-              <img src={sign(it.thumb)} alt="" loading="lazy" className="h-12 w-9 object-cover rounded-sm bg-gray-200" />
+              {/* `object-contain`: rõhtne pilt (kaas, köide, topeltleht) jääb tervikuna näha. */}
+              <img src={sign(it.thumb)} alt="" loading="lazy" className="h-12 w-9 object-contain rounded-sm bg-gray-200" />
             </button>
           ))}
         </div>
