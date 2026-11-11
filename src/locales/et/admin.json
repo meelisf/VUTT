@@ -479,5 +479,28 @@
     "empty": "Vigu ei ole registreeritud.",
     "loadError": "Vigade laadimine ebaõnnestus.",
     "title": "Vealogi (klient ja server)"
+  },
+  "traffic": {
+    "title": "Liiklus (backend, 24 h)",
+    "loadFailed": "Liiklusandmete laadimine ebaõnnestus.",
+    "rps": "Päringuid sekundis",
+    "anonShare": "Anonüümseid",
+    "ipsPerMinute": "IP-sid minutis (max)",
+    "errors": "5xx vastuseid",
+    "windowNote": "Viimased {{minutes}} täis minutit — sama aken, mida häire vaatab.",
+    "empty": "Andmeid veel ei ole — graafik täitub pärast serveri käivitust.",
+    "chartTitle": "Päringud {{minutes}} minuti kaupa",
+    "tipTotal": "{{n}} päringut",
+    "tipAnon": "{{n}} anonüümset",
+    "tipIps": "kuni {{n}} IP-d minutis",
+    "tipErrors": "{{n}} × 5xx",
+    "tipSlow": "{{n}} aeglast (≥ 2 s)",
+    "legendErrors": "Oranž tulp = selles vahemikus oli 5xx vastuseid.",
+    "thresholds": "Häire superadminile (e-kiri + teatis): üle {{rps}} päringu sekundis igal minutil {{minutes}} minuti jooksul või 5xx osakaal üle {{share}} % (vähemalt {{min}} tk). Sama liiki uus häire kõige varem {{hours}} h pärast.",
+    "scopeNote": "Mõõdetakse ainult backendi jõudnud päringuid (Meili ja staatilised failid mitte); restart nullib graafiku.",
+    "alertsTitle": "Häired",
+    "noAlerts": "Häireid ei ole olnud.",
+    "alertLoad": "kõrge koormus: ~{{rps}} päringut/s, kuni {{ips}} IP-d minutis",
+    "alertErrors": "serverivead: {{errors}} × 5xx ({{share}} %)"
   }
 }

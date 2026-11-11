@@ -73,6 +73,28 @@ def _render_and_send(template: str, language: str, to: str, **context) -> dict:
 
 
 
+@router.get("/admin/traffic")
+def admin_traffic(user=Depends(require_role("superadmin"))):
+    """Backendi liikluse minutigraafik (24 h, mälus) + häirete ajalugu (#786).
+
+    Ainult superadmin: häired lähevad ainult talle, teistel pole sellega midagi
+    peale hakata. Sync route — häirete ajalugu loetakse kettalt (ADR 0002).
+    """
+    from .. import traffic_monitor as tm
+    return {
+        "status": "success",
+        "minutes": tm.snapshot(),
+        "alerts": tm.list_alerts(),
+        "thresholds": {
+            "rps": tm.TRAFFIC_ALERT_RPS,
+            "minutes": tm.TRAFFIC_ALERT_MINUTES,
+            "error_share": tm.TRAFFIC_5XX_SHARE,
+            "error_min": tm.TRAFFIC_5XX_MIN,
+            "cooldown_hours": tm.TRAFFIC_ALERT_COOLDOWN // 3600,
+        },
+    }
+
+
 @router.get("/admin/ocr/providers")
 def admin_ocr_providers(user=Depends(require_role("superadmin"))):
     """Millised OCR-pakkujad on saadaval. VÕTIT EGA SELLE OSA EI TAGASTATA KUNAGI —
