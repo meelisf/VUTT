@@ -274,3 +274,26 @@ def test_lubatud_muudatus_salvestub(client, work_sets, admin_token, ws_id):
                    headers=auth(admin_token))
     assert r.status_code == 200, r.text
     assert ops.load_work_set(ws_id)["access"]["contrib"] == "manager"
+
+
+# Surnud sessioon EI OLE anonüümne kasutaja: 404 „ei leitud" näitas kasutajale
+# „ligipääs kadus", aga klient avab sisselogimise ainult 401 peale. Pärast
+# deploy'd jäi kasutaja nii veateatesse kinni, kuni mõni muu päring andis 401.
+SURNUD = {"Authorization": "Bearer surnud-sessioon-0000"}
+
+
+@pytest.mark.parametrize("tee", [
+    "/work-sets",
+    "/work-sets/for-work/w_puudub",
+    "/work-sets/{id}",
+    "/work-sets/{id}/works",
+])
+def test_surnud_sessioon_annab_401_mitte_anonuumset_vastust(client, work_sets, ws_id, tee):
+    r = client.get(tee.format(id=ws_id), headers=SURNUD)
+    assert r.status_code == 401
+
+
+def test_tokenita_paring_on_endiselt_anonuumne(client, work_sets, ws_id):
+    # Tokenita päring jääb anonüümseks: privaatne kogu = 404, loend = 200.
+    assert client.get(f"/work-sets/{ws_id}/works").status_code == 404
+    assert client.get("/work-sets").status_code == 200
