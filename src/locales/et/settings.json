@@ -32,5 +32,26 @@
     "workSetManager": "haldur",
     "workSetViewer": "vaataja",
     "workSetsHint": "Haldurina saad kogu sisu kureerida, vaatajana valida ta päises töökontekstiks. Avalikud kogud on nähtavad kõigile ka ilma isikliku ligipääsuta."
+  },
+  "account": {
+    "heading": "Konto",
+    "email": {
+      "label": "E-post",
+      "description": "Siia saadetakse parooli taastamise link ja süsteemi teated. Muutmiseks on vaja praegust parooli.",
+      "none": "määramata",
+      "change": "Muuda",
+      "newLabel": "Uus e-posti aadress",
+      "passwordLabel": "Praegune parool",
+      "save": "Salvesta",
+      "cancel": "Loobu",
+      "saved": "E-post on muudetud.",
+      "errors": {
+        "wrongPassword": "Parool ei ole õige.",
+        "invalid": "See ei ole kehtiv e-posti aadress.",
+        "taken": "See aadress on juba teise kasutaja oma.",
+        "locked": "Liiga palju valesid katseid. Proovi mõne minuti pärast uuesti.",
+        "failed": "E-posti muutmine ebaõnnestus."
+      }
+    }
   }
 }

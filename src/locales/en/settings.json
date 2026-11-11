@@ -32,5 +32,26 @@
     "workSetManager": "manager",
     "workSetViewer": "viewer",
     "workSetsHint": "As a manager you curate the contents; as a viewer you can pick the collection as your work context in the header. Public collections are visible to everyone without personal access."
+  },
+  "account": {
+    "heading": "Account",
+    "email": {
+      "label": "Email",
+      "description": "Password reset links and system notices are sent here. Changing it requires your current password.",
+      "none": "not set",
+      "change": "Change",
+      "newLabel": "New email address",
+      "passwordLabel": "Current password",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Email updated.",
+      "errors": {
+        "wrongPassword": "The password is incorrect.",
+        "invalid": "This is not a valid email address.",
+        "taken": "This address already belongs to another user.",
+        "locked": "Too many failed attempts. Try again in a few minutes.",
+        "failed": "Changing the email failed."
+      }
+    }
   }
 }

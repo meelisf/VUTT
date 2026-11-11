@@ -2,6 +2,7 @@
 Autentimise ja sessioonide haldus.
 """
 import json
+import re
 import os
 import hashlib
 import uuid
@@ -11,6 +12,7 @@ import logging
 import unicodedata
 import bcrypt
 from contextlib import contextmanager
+from typing import Optional
 from datetime import datetime
 from .cache import get_cached_collections
 from .collection_tree import is_collection_public
@@ -440,6 +442,40 @@ def verify_user(username, password):
         "allowed_collections": users[username].get("allowed_collections", []),
         "edit_collections": users[username].get("edit_collections", []),
     }
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MAX_EMAIL_LEN = 254
+
+
+def normalize_email(email) -> Optional[str]:
+    """Kärbitud väiketähtedes aadress või None, kui kuju ei kõlba."""
+    if not isinstance(email, str):
+        return None
+    email = email.strip().lower()
+    if not email or len(email) > MAX_EMAIL_LEN or not _EMAIL_RE.match(email):
+        return None
+    return email
+
+
+def set_own_email(username: str, email: str) -> Optional[str]:
+    """Salvestab kasutaja e-posti. Tagastab veakoodi või None.
+
+    Parooli kontroll on kutsuja töö ENNE seda (bcrypt ei käi luku all).
+    Aadress on unikaalne nagu registreerimisel (`add_registration`): sama
+    aadress kahel kontol teeks parooli taastamise mitmeseks.
+    """
+    with users_transaction() as users:
+        if username not in users:
+            return "unknown_user"
+        for teine, andmed in users.items():
+            if teine != username and (andmed.get("email") or "").lower() == email:
+                return "email_taken"
+        if users[username].get("email") == email:
+            return None
+        users[username]["email"] = email
+        save_users(users)
+    return None
 
 
 def create_session(user):
