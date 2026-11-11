@@ -138,17 +138,9 @@
     "gridLarger": "Larger thumbnails",
     "gridColumns": "Thumbnail size",
     "detail": {
-      "header": "Page {{n}} of {{total}} · split at {{percent}}%",
-      "headerNoSplit": "Page {{n}} of {{total}} · not split",
-      "arrowHint": "← → moves between pages",
       "resetToGlobal": "Reset to global line",
-      "headerExcluded": "Page {{n}} of {{total}} · excluded",
-      "crop": "Crop / straighten",
-      "cropApply": "Confirm crop",
-      "cropCancel": "Cancel",
-      "cropRemove": "Remove crop",
-      "cropReplaces": "A new crop replaces the current one. Rotating removes the crop.",
-      "cropped": "cropped"
+      "splitHint": "Drag the line or click on the image. The split stays pending: the page is cut only when you press “Continue”.",
+      "editHint": "Rotation and crop stay pending: the image changes only when you press “Continue”. A new crop replaces the current one; rotating removes it."
     },
     "excludedExplain": "Not OCR’d and not split — this page will not appear in the work",
     "waitingRender": "Preview is finishing — the button unlocks shortly ({{done}} / {{total}})"

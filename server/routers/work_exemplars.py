@@ -44,17 +44,11 @@ def _writable(work_id: str, user: dict) -> str:
     return path
 
 
-@router.get("/works/{work_id}/exemplars")
-def list_exemplars(work_id: str, user=Depends(optional_user)):
-    """Eksemplarid, lehtede päritolu ja konvoluudi kaaslased.
+def _exemplars_view(work_id: str, path: str, meta: dict, user) -> dict:
+    """Ühe teose eksemplarivaade — üks tõde üksik- ja kogupäringule.
 
-    Vastus sõltub kasutajast (kaaslase `readable`) → EI lähe `server/cache.py`-sse.
-    """
-    path, meta = _dir_and_meta(work_id)
-    if not can_read_work(meta, user):
-        raise HTTPException(status_code=403, detail="Puudub ligipääs")
-    # Täielik leheloend KETTALT (mitte Meilist — selle sünk on asünkroonne, ADR 0013):
-    # eksemplari lehe teose lehtede võrk, kõrvutuse jada ja paari kehtivus loevad seda.
+    Täielik leheloend KETTALT (mitte Meilist — selle sünk on asünkroonne, ADR 0013):
+    eksemplari lehe teose lehtede võrk, kõrvutuse jada ja paari kehtivus loevad seda."""
     files = enumerate_page_images(path)
     stems = [os.path.splitext(f)[0] for f in files]
     exemplars = meta.get("exemplars") or []
@@ -69,6 +63,47 @@ def list_exemplars(work_id: str, user=Depends(optional_user)):
         # Eksemplari pildid (ADR 0079): kaardi pildiriba ilma eksemplari kohta eraldi päringuta.
         "images": image_previews(path, [x.get("id") for x in exemplars]),
     }
+
+
+@router.get("/works/{work_id}/exemplars")
+def list_exemplars(work_id: str, user=Depends(optional_user)):
+    """Eksemplarid, lehtede päritolu ja konvoluudi kaaslased.
+
+    Vastus sõltub kasutajast (kaaslase `readable`) → EI lähe `server/cache.py`-sse.
+    """
+    path, meta = _dir_and_meta(work_id)
+    if not can_read_work(meta, user):
+        raise HTTPException(status_code=403, detail="Puudub ligipääs")
+    return _exemplars_view(work_id, path, meta, user)
+
+
+# Kogupäringu lagi: iga teos on kettalugemine (metaandmed + lehtede loend + pildid).
+BATCH_MAX_WORKS = 50
+
+
+@router.get("/exemplars/batch")
+def list_exemplars_batch(work_ids: str, user=Depends(optional_user)):
+    """Mitme teose eksemplarid ühe päringuga (`?work_ids=a,b,c`, kuni 50).
+
+    Iga teos käib läbi SAMA õiguskontrolli nagu `GET /works/{id}/exemplars`; ühe teose
+    tõrge (404/403/503) ei kuku kogu vastust — see tuleb `results[id].error` all.
+    Vastus sõltub kasutajast → EI lähe `server/cache.py`-sse.
+    """
+    ids = list(dict.fromkeys(i.strip() for i in work_ids.split(",") if i.strip()))
+    if not ids:
+        raise HTTPException(status_code=400, detail="work_ids on tühi")
+    if len(ids) > BATCH_MAX_WORKS:
+        raise HTTPException(status_code=400, detail=f"Kuni {BATCH_MAX_WORKS} teost päringu kohta")
+    results: dict = {}
+    for wid in ids:
+        try:
+            path, meta = _dir_and_meta(wid)
+            if not can_read_work(meta, user):
+                raise HTTPException(status_code=403, detail="Puudub ligipääs")
+            results[wid] = _exemplars_view(wid, path, meta, user)
+        except HTTPException as e:
+            results[wid] = {"error": {"status": e.status_code, "detail": e.detail}}
+    return {"results": results}
 
 
 @router.post("/works/{work_id}/exemplars", status_code=201)
