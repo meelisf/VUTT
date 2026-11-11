@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import http.client
 import json
+import os
 import threading
 import time
 import builtins
@@ -71,7 +72,7 @@ def _signed(work_id, *, offset=3600):
 def test_public_and_shared_images_are_accessible(image_http, method, suffix):
     request, _, _ = image_http
     for alias, cache in (('public-slug', 'public, max-age=0, must-revalidate'),
-                         ('shared-slug', 'no-store')):
+                         ('shared-slug', 'private, no-cache')):
         status, headers, body = request(method, f'/{alias}{suffix}')
         assert status == 200
         assert headers['Cache-Control'] == cache
@@ -91,7 +92,8 @@ def test_private_images_require_canonical_work_token(image_http, method, suffix)
         assert headers['Cache-Control'] == 'no-store'
     status, headers, body = request(method, path + _signed('priv123'))
     assert status == 200
-    assert headers['Cache-Control'] == 'no-store'
+    # #757: brauser võib hoida (ainult enda jaoks), aga revalideerib iga kasutuse
+    assert headers['Cache-Control'] == 'private, no-cache'
     assert (bool(body) if method == 'GET' else not body)
 
 
@@ -191,6 +193,35 @@ def test_conditional_request_still_checks_access(image_http):
         'GET', path, {'If-Modified-Since': headers['Last-Modified']})
     assert status == 403
     assert cached_headers['Cache-Control'] == 'no-store'
+
+
+def test_private_revalidation_requires_valid_token(image_http):
+    """#757: piiratud pildi 304 läbib sama allkirjakontrolli; muutunud fail (pööre,
+    kärbe — sama failinimi) annab revalideerimisel 200, mitte vana vahemälu."""
+    request, _, root = image_http
+    path = '/private-slug/page.jpg'
+    status, headers, _ = request('GET', path + _signed('priv123'))
+    assert status == 200
+    ims = {'If-Modified-Since': headers['Last-Modified']}
+
+    status, cached, body = request('GET', path + _signed('priv123'), ims)
+    assert status == 304
+    assert cached['Cache-Control'] == 'private, no-cache'
+    assert not body
+
+    # Allkirjata või aegunud allkirjaga revalideerimine ei anna 304-t
+    for query in ('', _signed('priv123', offset=-1)):
+        status, cached, _ = request('GET', path + query, ims)
+        assert status == 403
+        assert cached['Cache-Control'] == 'no-store'
+
+    # Pilt muutus (mtime edasi) → revalideerimine annab uue sisu
+    page = root / 'private-slug' / 'page.jpg'
+    later = time.time() + 5
+    os.utime(page, (later, later))
+    status, fresh, body = request('GET', path + _signed('priv123'), ims)
+    assert status == 200
+    assert body
 
 
 @pytest.mark.parametrize('extension', ['png', 'jpeg'])

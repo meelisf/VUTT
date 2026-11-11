@@ -22,8 +22,10 @@ interface UseAdjacentPagePrefetchParams {
  * teadlikult ei cache'ita: vahemälust serveeritud vananenud transkriptsioon
  * oleks transkribeerimistööriistas korrektsusviga, mitte jõudlusvõit.
  *
- * Pildid on pika cache-elueaga (image server `max-age=86400`, nginx 30 p), seega
- * eellaetud pilt on tegeliku pöörde ajaks brauseri vahemälus.
+ * Pildiserver lubab brauseril pilti hoida, aga nõuab igal kasutusel revalideerimist
+ * (avalik `max-age=0, must-revalidate`, piiratud `private, no-cache`; #757). Eellaetud
+ * pilt on pöörde ajaks vahemälus ja päris pööre maksab ainult 304 (~14 ms), mitte
+ * uut allalaadimist. nginx päiseid ei muuda.
  */
 export function useAdjacentPagePrefetch({
   index,
