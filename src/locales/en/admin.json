@@ -496,11 +496,13 @@
     "tipErrors": "{{n}} × 5xx",
     "tipSlow": "{{n}} slow (≥ 2 s)",
     "legendErrors": "Orange bar = there were 5xx responses in this interval.",
-    "thresholds": "Alert to superadmins (email + notification): over {{rps}} requests per second every minute for {{minutes}} minutes, or a 5xx share over {{share}} % (at least {{min}}). The same alert type is repeated at most every {{hours}} h.",
+    "thresholds": "Alert to superadmins (email + notification): over {{rps}} requests per second in at least {{minMinutes}} of {{minutes}} minutes, a 5xx share over {{share}} % (at least {{min}}), or requests over {{slowSeconds}} s above {{slowShare}} % (at least {{slowMin}}). The same alert type is repeated at most every {{hours}} h.",
     "scopeNote": "Only requests that reach the backend are counted (not Meili or static files); a restart resets the chart.",
     "alertsTitle": "Alerts",
     "noAlerts": "No alerts so far.",
     "alertLoad": "high load: ~{{rps}} requests/s, up to {{ips}} IPs per minute",
-    "alertErrors": "server errors: {{errors}} × 5xx ({{share}} %)"
+    "alertErrors": "server errors: {{errors}} × 5xx ({{share}} %)",
+    "alertSlow": "slow: {{slow}} requests over the limit ({{share}} %)",
+    "notDelivered": "not delivered, retrying"
   }
 }

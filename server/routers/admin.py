@@ -88,6 +88,10 @@ def admin_traffic(user=Depends(require_role("superadmin"))):
         "thresholds": {
             "rps": tm.TRAFFIC_ALERT_RPS,
             "minutes": tm.TRAFFIC_ALERT_MINUTES,
+            "min_minutes": tm.TRAFFIC_ALERT_MIN_MINUTES,
+            "slow_share": tm.TRAFFIC_SLOW_SHARE,
+            "slow_min": tm.TRAFFIC_SLOW_MIN,
+            "slow_seconds": tm.SLOW_SECONDS,
             "error_share": tm.TRAFFIC_5XX_SHARE,
             "error_min": tm.TRAFFIC_5XX_MIN,
             "cooldown_hours": tm.TRAFFIC_ALERT_COOLDOWN // 3600,

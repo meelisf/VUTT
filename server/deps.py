@@ -22,7 +22,7 @@ kustutatud. Valvur: ``tests/test_token_lugeja_uks_reegel.py``.
 from fastapi import HTTPException, Request
 
 from . import image_tickets
-from .auth import require_token, token_key
+from .auth import require_token, session_is_valid, token_key
 
 
 async def get_user(request: Request, min_role: str = "contributor"):
@@ -114,3 +114,14 @@ def optional_user_or_401(request: Request):
     if error:
         raise HTTPException(status_code=401, detail=error["message"])
     return dict(user)
+
+
+def has_valid_session(headers: dict) -> bool:
+    """ASGI päiste (baidid) põhjal: kas päringul on KEHTIV sessioon? (#786)
+
+    Liikluse vahevara jaoks: tokenit loeb ainult see moodul. Ainult lugev —
+    sessiooni ei pikendata. Puuduv, vigane või aegunud token = väär.
+    """
+    raw = (headers.get(b"authorization") or b"").decode("latin-1")
+    token = raw.removeprefix("Bearer ").strip()
+    return session_is_valid(token)

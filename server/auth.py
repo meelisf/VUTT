@@ -489,6 +489,22 @@ def delete_user_sessions(username):
     return len(keys_to_delete)
 
 
+def session_is_valid(token: str) -> bool:
+    """AINULT LUGEV: kas token kuulub kehtivale sessioonile?
+
+    Erinevalt `require_token`-ist EI pikenda sessiooni ega eemalda aegunut —
+    liikluse mõõtmine (#786) ei ole kasutaja tegevus. Päise olemasolu ei tõenda
+    midagi: robot saab saata suvalise `Bearer x`.
+    """
+    if not token:
+        return False
+    key = token_key(token)
+    now = datetime.now()
+    with _sessions_lock:
+        session = sessions.get(key)
+        return bool(session) and not _session_expired(session, now)
+
+
 def require_token(data, min_role=None):
     """
     Kontrollib tokenit päringus.
