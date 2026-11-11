@@ -379,8 +379,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           collections: Array.isArray(m.collections) ? m.collections : [],
           archive_refs: Array.isArray(m.archive_refs) ? m.archive_refs : [],
         });
-        setExemplarCount(Array.isArray(m.exemplars) ? m.exemplars.length
-          : Array.isArray(m.archive_refs) ? m.archive_refs.length : 0);
+        // Ainult `exemplars`: `archive_refs` on tuletatud viiteloend, mitte eksemplaride arv.
+        setExemplarCount(Array.isArray(m.exemplars) ? m.exemplars.length : 0);
         // Re-set existing snap-shot pärast ESTER/server auto-filli, et ka
         // auto-fillitud `year` säiliks, kui kasutaja kuvastringi ei muuda (reegel 4).
         existingYearRef.current = { year: year ? parseInt(year) : 0, year_display: m.year_display || '' };

@@ -29,7 +29,7 @@ import ArchiveSelect from '../ArchiveSelect';
 import SameVolumeBlock from '../convolutes/SameVolumeBlock';
 import { exceptionPages, orderExemplars } from './exemplarCardUtils';
 import { MORE_FIELDS, bodyFromDraft, convoluteFromDraft, sameDraft, toDraft, type Draft } from './exemplarDraft';
-import { PAGES_KEY, externalLinkLabel, hasWitness, isCitationSource } from './exemplarSequences';
+import { PAGES_KEY, externalLinkLabel, hasWitness, isCitationSource, ownerCounts } from './exemplarSequences';
 
 interface ArchiveInfo { name: string; url?: string }
 
@@ -85,8 +85,10 @@ const ExemplarList: React.FC<ExemplarListProps> = ({
   const saved = data.exemplars;
   const list = orderExemplars(saved);
   const imageCount = (id: string) => data.images?.[id]?.count ?? 0;
-  const exceptionStems = new Set(saved.flatMap(x => x.pages ?? []));
-  const unknownCount = data.unknown_pages.length;
+  // Arvud tulevad samast omaniku-lahendusest mis pildimaterjali jaotis (exemplarSequences).
+  const counts = ownerCounts(data);
+  const unknownCount = counts.get('unknown') ?? 0;
+  const unassignedCount = (counts.get(null) ?? 0) + unknownCount;
   const witnessed = hasWitness(data);
 
   /** Üks kirjutus: viga → teade serveri põhjendusega; alati loend serverist uuesti.
@@ -201,9 +203,7 @@ const ExemplarList: React.FC<ExemplarListProps> = ({
 
   /** Materjali arv kinnisel real: oma teose lehed ja oma pildid. */
   const materialCount = (x: Exemplar) => {
-    const pages = x.text_witness
-      ? Math.max(0, data.page_count - exceptionStems.size - unknownCount)
-      : (x.pages?.length ?? 0);
+    const pages = counts.get(x.id) ?? 0;
     const out: string[] = [];
     if (pages) out.push(t('exemplarPage.pageCount', { count: pages }));
     if (imageCount(x.id)) out.push(t('exemplarImages.count', { count: imageCount(x.id) }));
@@ -472,7 +472,7 @@ const ExemplarList: React.FC<ExemplarListProps> = ({
               <button type="button" onClick={() => onSelect(PAGES_KEY)} aria-expanded={selected === PAGES_KEY}
                 className="flex flex-wrap items-baseline gap-x-2 text-left hover:text-primary-800">
                 <span className="font-semibold text-amber-900">{t('exemplarPage.pagesRow')}</span>
-                <span className="text-amber-900">· {Math.max(0, data.page_count - exceptionStems.size)}</span>
+                <span className="text-amber-900">· {unassignedCount}</span>
                 <span className="text-xs text-amber-800">— {t('exemplarPage.pagesRowHint')}</span>
               </button>
               {canEdit && saved.length > 0 && (

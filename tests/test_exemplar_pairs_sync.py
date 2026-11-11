@@ -103,6 +103,53 @@ def test_clear_all_pairs_eemaldab_ka_kehtiva(env):
     assert all("page" not in img for img in m["images"])
 
 
+def test_katkenud_asenduse_rollback_jatab_repo_puhtaks(tmp_path, monkeypatch):
+    """Paaride eemaldus commitib ENNE asendust; hilisem tõrge ja rollback ei tohi jätta
+    manifesti stage'itud commitimata muudatusena (rollback'i punkt = eemalduse järel)."""
+    from fastapi import HTTPException
+    from git import Repo
+    import server.git_ops as git_ops
+    from server import upload_ops
+    from tests.test_replace_work_content import _ListSftp, _setup_replace_files
+
+    upload_id, work_id, slug, work_dir, data_dir = _setup_replace_files(tmp_path, monkeypatch)
+    rel = f"{slug}/{ei.EXEMPLARS_DIRNAME}/e1/{ei.MANIFEST_NAME}"
+    manifest = data_dir / rel
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text('{"revision": 1, "images": [{"id": "i1", "page": "vana-teos_pg_001"}]}',
+                        encoding="utf-8")
+    repo = Repo.init(str(data_dir))
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "test").set_value("user", "email", "test@example.test")
+    repo.index.add([f"{slug}/_metadata.json", f"{slug}/vana-teos_pg_001.txt",
+                    f"{slug}/vana-teos_pg_001.json", rel])
+    repo.index.commit("Algseis")
+
+    paarideta = '{"revision": 2, "images": [{"id": "i1"}]}'
+
+    def fake_clear(_work_dir, _username):
+        # Sama mõju mis päris eemaldusel: manifest kirjutatud ja commititud.
+        manifest.write_text(paarideta, encoding="utf-8")
+        repo.index.add([rel])
+        repo.index.commit("Eksemplar: paarid eemaldatud")
+        return 1
+
+    monkeypatch.setattr(ei, "clear_all_pairs", fake_clear)
+    # Teine listdir (allalaadimise ees) näeb TXT kadunuks → tõrge pärast git rm-i → rollback.
+    sftps = [_ListSftp(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]),
+             _ListSftp(["uus-teos_pg_001.jpg"])]
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: sftps.pop(0))
+    monkeypatch.setattr(git_ops, "get_or_init_repo", lambda: repo)
+
+    with pytest.raises(HTTPException):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+
+    assert sftps == []
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
+    assert manifest.read_text(encoding="utf-8") == paarideta
+    assert not repo.is_dirty(untracked_files=False), repo.git.status()
+
+
 def test_asendus_katkeb_kui_paaride_eemaldus_ebaonnestub(tmp_path, monkeypatch):
     from fastapi import HTTPException
     import server.git_ops as git_ops

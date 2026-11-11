@@ -54,6 +54,15 @@ export function pageOwners(data: WorkExemplarsResponse): Map<string, string | 'u
   return out;
 }
 
+/** Lehtede arv omaniku kaupa (võti: eksemplari id | 'unknown' | null). Sama lahendus
+ *  mis `ownPages`/`unassignedPages`-il, nii et loendi arvud ja jaotise sisu ei lähe lahku
+ *  (rippuv tüvi `pages`-is ega kattuvus `unknown_pages`-iga ei loe). */
+export function ownerCounts(data: WorkExemplarsResponse): Map<string | null, number> {
+  const out = new Map<string | null, number>();
+  for (const owner of pageOwners(data).values()) out.set(owner, (out.get(owner) ?? 0) + 1);
+  return out;
+}
+
 /** Rippuv või tühi → undefined. */
 export function validPairStem(image: ExemplarImage, pageNumbers: Record<string, number>): string | undefined {
   const p = image.page;

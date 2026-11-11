@@ -4,7 +4,7 @@ import type { WorkExemplarsResponse } from '../../../services/workApi';
 import type { ExemplarImage } from '../../../services/exemplarImagesService';
 import {
   PAGES_KEY, defaultSelection, externalLinkLabel, hasWitness, imagesSequence, isCitationSource,
-  materialParts, ownPages, pageOwners, pagesSequence, stepLocked, unassignedPages, validPairStem,
+  materialParts, ownerCounts, ownPages, pageOwners, pagesSequence, stepLocked, unassignedPages, validPairStem,
 } from '../exemplarSequences';
 
 const ex = (id: string, extra: Partial<Exemplar> = {}): Exemplar => ({ id, holder: `H${id}`, ...extra });
@@ -37,6 +37,28 @@ describe('pageOwners', () => {
   it('alust pole → null', () => {
     const o = pageOwners(resp({ exemplars: [ex('a')] }));
     expect(o.get('s1')).toBeNull();
+  });
+});
+
+describe('ownerCounts', () => {
+  it('rippuv erandleht ja unknown-kattuvus ei moonuta arve; summa = lehtede arv', () => {
+    const d = resp({
+      // 'gone' on rippuv; s2 on nii b erandleht kui unknown_pages-is → b võidab
+      exemplars: [ex('a', { text_witness: true }), ex('b', { pages: ['s2', 'gone'] })],
+      unknown_pages: ['s2', 's3'],
+    });
+    const c = ownerCounts(d);
+    expect(c.get('a')).toBe(1);
+    expect(c.get('b')).toBe(1);
+    expect(c.get('unknown')).toBe(1);
+    expect([...c.values()].reduce((s, n) => s + n, 0)).toBe(d.page_count);
+    // Sama lahendus mis jaotise sisul
+    expect(c.get('a')).toBe(ownPages('w', d, 'a').length);
+  });
+  it('alust pole: null + unknown = unassignedPages', () => {
+    const d = resp({ exemplars: [ex('b', { pages: ['s1'] })], unknown_pages: ['s3'] });
+    const c = ownerCounts(d);
+    expect((c.get(null) ?? 0) + (c.get('unknown') ?? 0)).toBe(unassignedPages('w', d).length);
   });
 });
 
