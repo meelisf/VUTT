@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -104,7 +105,52 @@ def _load_json_or_default(path: str, default: Any) -> Any:
 
 
 def _load_index() -> dict:
+    """Värske, MUUDETAV koopia — kirjutajatele (luku all loe–muuda–kirjuta)."""
     return _load_json_or_default(state.PROSOPOGRAPHY_INDEX_FILE, {"rebuilt_at": None, "entries": []})
+
+
+# ── Lugemisvahemälu (#759) ───────────────────────────────────────────────────
+# `prosopography_index.json` (~3,4 MB) parsiti igal /prosopography, /facets ja /map
+# päringul; json.load hoiab GIL-i ja ühe workeri juures seisid sel ajal ka teised
+# päringud. Võti = faili allkiri (mtime_ns, suurus, inode): atomic_write_json teeb
+# rename'i, nii et iga kirjutus annab uue allkirja ja järgmine lugemine laeb uuesti.
+#
+# Tagastatud struktuur on JAGATUD kõigi päringute vahel — kutsuja EI TOHI seda ega
+# selle kirjeid muuta (sorteeri/filtreeri uude loendisse, ära `update`/`pop`/`setdefault`).
+# Kirjutajad kasutavad `_load_index()`-i. Valvur: tests/test_person_index_cache.py.
+# Vahemälu ei ole kasutajapõhine — indeks ei sõltu kutsujast (ADR 0042 reegel ei puutu).
+_readonly_cache: dict = {}
+_readonly_lock = threading.Lock()
+
+
+def _file_sig(path: str) -> tuple:
+    try:
+        st = os.stat(path)
+        return (st.st_mtime_ns, st.st_size, st.st_ino)
+    except OSError:
+        return (None, None, None)
+
+
+def _cached_json(path: str, default_factory) -> Any:
+    sig = _file_sig(path)
+    with _readonly_lock:
+        hit = _readonly_cache.get(path)
+        if hit and hit[0] == sig:
+            return hit[1]
+    value = _load_json_or_default(path, default_factory())
+    with _readonly_lock:
+        _readonly_cache[path] = (sig, value)
+    return value
+
+
+def _load_index_readonly() -> dict:
+    """Isikuindeks lugejatele, vahemälust. Tulemust EI TOHI muuta (vt ülal)."""
+    return _cached_json(state.PROSOPOGRAPHY_INDEX_FILE, lambda: {"rebuilt_at": None, "entries": []})
+
+
+def _load_person_aliases_readonly() -> dict:
+    """`person_aliases.json` (~400 KB) relevantsusotsingule, vahemälust. EI TOHI muuta."""
+    return _cached_json(state.PERSON_ALIASES_FILE, dict)
 
 
 def _load_person_to_works() -> dict:
@@ -193,7 +239,7 @@ def _persons_in_collection(collection_id: str) -> set:
     }
 
     membership_institutions = _collection_membership_institutions(collection_id, collections)
-    for entry in _load_index().get("entries", []):
+    for entry in _load_index_readonly().get("entries", []):
         pid = entry.get("id")
         if pid and entry.get("record_status") != "tombstone" and _entry_matches_collection_membership(entry, membership_institutions):
             result.add(pid)

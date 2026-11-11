@@ -20,7 +20,7 @@ from ..config import BASE_DIR
 from ..deps import optional_user as _get_optional_user, require_role
 from ..metadata_handler import build_home_meta_html, build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml, cached_person_meta_html, cached_work_meta_html
 from ..metadata_ops import save_work_metadata
-from ..prosopography.indices import _load_index, _load_work_collections
+from ..prosopography.indices import _load_index_readonly, _load_work_collections
 from ..prosopography.relations import get_person_with_works, get_persons_for_work
 from ..rate_limit import check_rate_limit, get_client_ip
 from ..utils import find_directory_by_id
@@ -287,7 +287,7 @@ def home_meta(request: Request):
 
 @router.get("/meta/persons")
 def persons_meta(request: Request):
-    entries = _load_index().get("entries", [])
+    entries = _load_index_readonly().get("entries", [])
     return HTMLResponse(content=build_persons_meta_html(entries))
 
 
@@ -347,7 +347,7 @@ def sitemap_xml():
     from .. import utils as utils_module
     now = time.time()
     if _sitemap_cache["xml"] is None or now > _sitemap_cache["expires"]:
-        person_index = _load_index()
+        person_index = _load_index_readonly()
         _sitemap_cache["xml"] = build_sitemap_xml(
             dict(utils_module.WORK_ID_CACHE),
             is_work_public,

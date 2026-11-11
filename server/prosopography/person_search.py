@@ -10,7 +10,8 @@ from functools import lru_cache
 from typing import Optional
 
 from . import state
-from .indices import (ACADEMIA_INSTITUTION_NAMES, _load_index, _persons_in_collection,
+from .indices import (ACADEMIA_INSTITUTION_NAMES, _load_index_readonly, _load_person_aliases_readonly,
+                      _persons_in_collection,
                       _persons_in_work_set, _person_collections)
 from .person_crud import _make_snippets, get_person
 from .relations import get_person_relation_network_ids
@@ -346,7 +347,8 @@ def _filter_index_entries(
     status_id, source, verification_level = f.status_id, f.source, f.verification_level
     year_from, year_to = f.year_from, f.year_to
     imm_year_from, imm_year_to, tags = f.imm_year_from, f.imm_year_to, f.tags
-    index = _load_index()
+    # Jagatud vahemälu (#759): tulemus on UUS loend, kirjeid endid ei muudeta.
+    index = _load_index_readonly()
     results = [
         e for e in index.get("entries", [])
         if e.get("record_status") != "tombstone"
@@ -358,7 +360,7 @@ def _filter_index_entries(
     if q:
         q_lower = q.casefold()
         if aliases_data is None:
-            aliases_data = _load_person_aliases()
+            aliases_data = _load_person_aliases_readonly()
 
         def _matches_tags(entry: dict) -> bool:
             for tag in _entry_tags(entry):
@@ -471,7 +473,7 @@ def list_persons(
 
     # Relevantsus vajab aliaseid nii filtris kui järjestuses — 350 KB faili
     # teistkordne parsimine iga klahvivajutuse peale oleks puhas raiskamine.
-    aliases_data = _load_person_aliases() if (q and sort_by == "relevance") else None
+    aliases_data = _load_person_aliases_readonly() if (q and sort_by == "relevance") else None
 
     results = _filter_index_entries(filters, ids=ids, aliases_data=aliases_data)
 
@@ -585,7 +587,7 @@ def get_person_map_markers(
     }
     if related_to:
         focus_label = next(
-            (e.get("label") for e in _load_index().get("entries", []) if e.get("id") == related_to),
+            (e.get("label") for e in _load_index_readonly().get("entries", []) if e.get("id") == related_to),
             None,
         )
         response["focus"] = {

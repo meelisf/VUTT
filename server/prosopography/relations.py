@@ -7,7 +7,7 @@ import time
 from typing import Optional
 
 from . import state
-from .indices import _load_index, _load_person_to_works, mention_entries
+from .indices import _load_index_readonly, _load_person_to_works, mention_entries
 from ..config import get_logger
 from .person_crud import get_person
 
@@ -49,7 +49,7 @@ def _with_part_facts(entries: list) -> list:
 def _build_work_to_persons() -> dict:
     """Pöörab person_to_works → {work_id: [{id, label}]}, label isikuindeksist."""
     ptw = _load_person_to_works()
-    index = _load_index()
+    index = _load_index_readonly()
     labels = {e.get("id"): (e.get("label") or e.get("name") or e.get("id"))
               for e in index.get("entries", [])}
     result: dict = {}
