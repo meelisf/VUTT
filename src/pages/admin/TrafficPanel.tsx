@@ -7,11 +7,14 @@ import { parseServerDate } from '../../utils/formatDateTime';
 import { binMinutes, lastWindow, TrafficBin, TrafficMinute } from './trafficBins';
 
 interface TrafficAlert {
-  kind: 'load' | 'errors';
+  kind: 'load' | 'errors' | 'slow';
   at: string;
   requests: number;
+  /** false = ükski kanal ei jõudnud kohale (server proovib uuesti). */
+  delivered?: boolean;
   rps?: number;
   errors?: number;
+  slow?: number;
   share?: number;
   max_ips_per_minute?: number;
 }
@@ -19,7 +22,12 @@ interface TrafficAlert {
 interface TrafficData {
   minutes: TrafficMinute[];
   alerts: TrafficAlert[];
-  thresholds: { rps: number; minutes: number; error_share: number; error_min: number; cooldown_hours: number };
+  thresholds: {
+    rps: number; minutes: number; min_minutes: number;
+    error_share: number; error_min: number;
+    slow_share: number; slow_min: number; slow_seconds: number;
+    cooldown_hours: number;
+  };
 }
 
 const BIN_MINUTES = 10;
@@ -163,9 +171,13 @@ const TrafficPanel: React.FC<{ token?: string }> = ({ token }) => {
             <p className="text-xs text-gray-500">
               {t('admin:traffic.thresholds', {
                 rps: data.thresholds.rps,
+                minMinutes: data.thresholds.min_minutes,
                 minutes: data.thresholds.minutes,
                 share: Math.round(data.thresholds.error_share * 100),
                 min: data.thresholds.error_min,
+                slowShare: Math.round(data.thresholds.slow_share * 100),
+                slowMin: data.thresholds.slow_min,
+                slowSeconds: data.thresholds.slow_seconds,
                 hours: data.thresholds.cooldown_hours,
               })}
               {' '}{t('admin:traffic.scopeNote')}
@@ -182,7 +194,10 @@ const TrafficPanel: React.FC<{ token?: string }> = ({ token }) => {
                       <span className="text-gray-500">{time(a.at, true)}</span>{' · '}
                       {a.kind === 'load'
                         ? t('admin:traffic.alertLoad', { rps: a.rps, ips: a.max_ips_per_minute })
-                        : t('admin:traffic.alertErrors', { errors: a.errors, share: ((a.share ?? 0) * 100).toFixed(1) })}
+                        : a.kind === 'slow'
+                          ? t('admin:traffic.alertSlow', { slow: a.slow, share: ((a.share ?? 0) * 100).toFixed(1) })
+                          : t('admin:traffic.alertErrors', { errors: a.errors, share: ((a.share ?? 0) * 100).toFixed(1) })}
+                      {a.delivered === false && <span className="ml-1 text-red-600">({t('admin:traffic.notDelivered')})</span>}
                     </li>
                   ))}
                 </ul>

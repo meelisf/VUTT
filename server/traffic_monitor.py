@@ -14,12 +14,19 @@ Ainult mälus, 24 h; restart nullib graafiku (häirete ajalugu on kettal).
 voogvastused ümber ja murrab taustatöid. Salvestus on O(1) luku all; I/O-d
 päringuteel ei ole (ADR 0002).
 
-**Häire.** Taustalõim kontrollib iga minut viimaseid täis minuteid. Kaks liiki:
-`load` (iga minut üle `TRAFFIC_ALERT_RPS`) ja `errors` (5xx osakaal üle lävendi
-JA vähemalt `TRAFFIC_5XX_MIN` tükki — väike valim ei ole häire). Sama liigi uus
-häire alles `TRAFFIC_ALERT_COOLDOWN` järel; viimane saatmisaeg on kettal, et
-deploy ei saadaks sama häiret uuesti. Saajad: AINULT superadminid (e-kiri +
-VUTT-i teatis) — teistel pole sellega midagi peale hakata.
+**Häire.** Taustalõim kontrollib iga minut viimaseid täis minuteid. Kolm liiki:
+`load` (vähemalt `TRAFFIC_ALERT_MIN_MINUTES` minutil aknas üle `TRAFFIC_ALERT_RPS`),
+`errors` (5xx osakaal üle lävendi JA vähemalt `TRAFFIC_5XX_MIN` tükki) ja `slow`
+(aeglaste osakaal üle lävendi JA vähemalt `TRAFFIC_SLOW_MIN`) — väike valim ei
+ole häire. Sama liigi uus häire alles `TRAFFIC_ALERT_COOLDOWN` järel; viimane
+saatmisaeg on kettal, et deploy ei saadaks sama häiret uuesti. Kui ükski kanal
+ei jõudnud kohale, ooteaeg ei alga (uus katse `RETRY_SECONDS` pärast);
+ebaõnnestunud kiri proovitakse uuesti kuni `MAIL_MAX_RETRIES` korda.
+Saajad: AINULT superadminid (e-kiri + VUTT-i teatis).
+
+**Anonüümne = kehtiva sessioonita.** `Authorization` päise olemasolu ei tõenda
+midagi — robot saab saata suvalise `Bearer x`. Kontroll on ainult lugev
+(`deps.has_valid_session`), sessiooni ei pikendata.
 """
 from __future__ import annotations
 
@@ -46,9 +53,18 @@ SLOW_SECONDS = 2.0
 # on kümnekordne ja tähendab, et midagi on päriselt muutunud.
 TRAFFIC_ALERT_RPS = 20
 TRAFFIC_ALERT_MINUTES = 10
+# Üks vaiksem minut ei tohi häiret nullida: piisab 8 minutist 10-st.
+TRAFFIC_ALERT_MIN_MINUTES = 8
 TRAFFIC_5XX_SHARE = 0.05
 TRAFFIC_5XX_MIN = 50
+# Aeglustumine on ise häire, ka ilma kõrge koormuseta.
+TRAFFIC_SLOW_SHARE = 0.2
+TRAFFIC_SLOW_MIN = 30
 TRAFFIC_ALERT_COOLDOWN = 6 * 3600
+# Saatmistõrke kordus: ebaõnnestunud kiri uuesti iga 15 min, kuni 3 korda;
+# kui ükski kanal ei õnnestunud, ei alga ka ooteaeg (uus katse 15 min pärast).
+RETRY_SECONDS = 15 * 60
+MAIL_MAX_RETRIES = 3
 MAX_ALERT_HISTORY = 50
 CHECK_INTERVAL = 60
 
@@ -121,17 +137,17 @@ def evaluate(now_minute: int) -> List[dict]:
     """
     with _lock:
         aken = [_buckets.get(m) for m in range(now_minute - TRAFFIC_ALERT_MINUTES, now_minute)]
-        read = [(b["total"], b["errors"], len(b["ips"])) if b else (0, 0, 0) for b in aken]
+        read = [(b["total"], b["errors"], len(b["ips"]), b["slow"]) if b else (0, 0, 0, 0)
+                for b in aken]
+    kokku = sum(r[0] for r in read)
     tulemus = []
-    if all(total >= TRAFFIC_ALERT_RPS * 60 for total, _, _ in read):
-        kokku = sum(r[0] for r in read)
+    if sum(1 for r in read if r[0] >= TRAFFIC_ALERT_RPS * 60) >= TRAFFIC_ALERT_MIN_MINUTES:
         tulemus.append({
             "kind": "load",
             "requests": kokku,
             "rps": round(kokku / (TRAFFIC_ALERT_MINUTES * 60), 1),
             "max_ips_per_minute": max(r[2] for r in read),
         })
-    kokku = sum(r[0] for r in read)
     vigu = sum(r[1] for r in read)
     if vigu >= TRAFFIC_5XX_MIN and kokku and vigu / kokku >= TRAFFIC_5XX_SHARE:
         tulemus.append({
@@ -140,20 +156,31 @@ def evaluate(now_minute: int) -> List[dict]:
             "errors": vigu,
             "share": round(vigu / kokku, 3),
         })
+    aeglasi = sum(r[3] for r in read)
+    if aeglasi >= TRAFFIC_SLOW_MIN and kokku and aeglasi / kokku >= TRAFFIC_SLOW_SHARE:
+        tulemus.append({
+            "kind": "slow",
+            "requests": kokku,
+            "slow": aeglasi,
+            "share": round(aeglasi / kokku, 3),
+        })
     return tulemus
 
 
 def _load_alerts() -> dict:
     import json
+    olek = {"last_sent": {}, "retry_at": {}, "pending_mail": [], "history": []}
     try:
         with open(TRAFFIC_ALERTS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, dict):
-            return {"last_sent": dict(data.get("last_sent") or {}),
-                    "history": list(data.get("history") or [])}
+            olek["last_sent"] = dict(data.get("last_sent") or {})
+            olek["retry_at"] = dict(data.get("retry_at") or {})
+            olek["pending_mail"] = list(data.get("pending_mail") or [])
+            olek["history"] = list(data.get("history") or [])
     except (OSError, ValueError):
         pass
-    return {"last_sent": {}, "history": []}
+    return olek
 
 
 def list_alerts() -> List[dict]:
@@ -171,9 +198,14 @@ def _message(alert: dict) -> tuple:
     if alert["kind"] == "load":
         subject = "VUTT: liiklus püsivalt kõrge"
         body = (f"Viimase {TRAFFIC_ALERT_MINUTES} minuti jooksul jõudis backendi "
-                f"{alert['requests']} päringut (~{alert['rps']}/s, lävend "
-                f"{TRAFFIC_ALERT_RPS}/s igal minutil). Kuni {alert['max_ips_per_minute']} "
-                f"eri IP-d minutis.")
+                f"{alert['requests']} päringut (~{alert['rps']}/s; lävend {TRAFFIC_ALERT_RPS}/s "
+                f"vähemalt {TRAFFIC_ALERT_MIN_MINUTES} minutil). Kuni "
+                f"{alert['max_ips_per_minute']} eri IP-d minutis.")
+    elif alert["kind"] == "slow":
+        subject = "VUTT: backend on aeglane"
+        body = (f"Viimase {TRAFFIC_ALERT_MINUTES} minuti jooksul {alert['slow']} päringut "
+                f"{alert['requests']}-st ({alert['share'] * 100:.1f} %) kestis üle "
+                f"{SLOW_SECONDS:g} s.")
     else:
         subject = "VUTT: palju serverivigu (5xx)"
         body = (f"Viimase {TRAFFIC_ALERT_MINUTES} minuti jooksul {alert['errors']} "
@@ -183,51 +215,125 @@ def _message(alert: dict) -> tuple:
     return subject, body
 
 
-def _notify(alert: dict) -> None:
-    """Saadab superadminidele. Iga saaja tõrge eraldi — üks ei peata teist."""
+def _send_mail(username: str, subject: str, body: str) -> bool:
+    """Kiri superadminile. Saaja aadress loetakse IGAL katsel — vahepeal muudetud
+    aadress või kaotatud roll kehtib ka korduskatsel."""
     from .mailer import send_mail
+    saaja = next((u for u in _superadmins() if u["username"] == username), None)
+    if not saaja or not saaja.get("email"):
+        return False
+    ok, viga = send_mail(saaja["email"], subject, body)
+    if not ok:
+        logger.warning("Liiklushäire kirja saatmine ebaõnnestus: %s", viga)
+    return ok
+
+
+def _notify(alert: dict) -> dict:
+    """Saadab superadminidele. Iga saaja ja kanal eraldi — üks ei peata teist.
+
+    Tagastab `{"delivered": bool, "failed_mail": [kasutajanimi, …]}`;
+    `delivered` = vähemalt üks kanal jõudis vähemalt ühe superadminini.
+    """
     from .notifications_ops import create_notification
     subject, body = _message(alert)
+    delivered = False
+    failed_mail = []
     for u in _superadmins():
         try:
             create_notification(u["username"], "traffic_alert", subject, body,
                                 link="/admin/maintenance", metadata={"kind": alert["kind"]})
+            delivered = True
         except Exception:
             logger.warning("Liiklushäire teatise loomine ebaõnnestus", exc_info=True)
         if u.get("email"):
-            ok, viga = send_mail(u["email"], subject, body)
-            if not ok:
-                logger.warning("Liiklushäire kirja saatmine ebaõnnestus: %s", viga)
+            if _send_mail(u["username"], subject, body):
+                delivered = True
+            else:
+                failed_mail.append(u["username"])
+    return {"delivered": delivered, "failed_mail": failed_mail}
+
+
+def _retry_pending_mail(olek: dict, now: float) -> bool:
+    """Saadab tähtaja jõudnud ebaõnnestunud kirjad uuesti. Tagastab, kas olek muutus."""
+    muutus = False
+    alles = []
+    for kiri in olek["pending_mail"]:
+        if float(kiri.get("next_at", 0)) > now:
+            alles.append(kiri)
+            continue
+        muutus = True
+        if _send_mail(kiri["username"], kiri["subject"], kiri["body"]):
+            continue
+        kiri = dict(kiri, attempts=int(kiri.get("attempts", 0)) + 1, next_at=now + RETRY_SECONDS)
+        if kiri["attempts"] >= MAIL_MAX_RETRIES:
+            logger.warning("Liiklushäire kiri jäi saatmata pärast %d kordust (%s)",
+                           MAIL_MAX_RETRIES, kiri.get("kind"))
+            continue
+        alles.append(kiri)
+    olek["pending_mail"] = alles
+    return muutus
+
+
+def _write(olek: dict) -> bool:
+    try:
+        atomic_write_json(TRAFFIC_ALERTS_FILE, olek)
+        return True
+    except OSError:
+        logger.warning("traffic_alerts.json kirjutamine ebaõnnestus", exc_info=True)
+        return False
 
 
 def check_and_alert(now: Optional[float] = None) -> List[dict]:
     """Üks kontrollsamm. Tagastab tegelikult saadetud häired."""
     now = now if now is not None else time.time()
-    kehtivad = evaluate(int(now // 60))
-    if not kehtivad:
-        return []
     olek = _load_alerts()
+    muutus = _retry_pending_mail(olek, now)
+    kehtivad = evaluate(int(now // 60))
+
     saadetud = []
+    eelmised = {}
     for alert in kehtivad:
-        eelmine = olek["last_sent"].get(alert["kind"])
+        kind = alert["kind"]
+        eelmine = olek["last_sent"].get(kind)
         if eelmine is not None and now - float(eelmine) < TRAFFIC_ALERT_COOLDOWN:
             continue
+        if now < float(olek["retry_at"].get(kind, 0)):
+            continue
         alert = dict(alert, at=datetime.fromtimestamp(now, timezone.utc).isoformat())
-        olek["last_sent"][alert["kind"]] = now
+        eelmised[kind] = eelmine
+        olek["last_sent"][kind] = now
         olek["history"].insert(0, alert)
         saadetud.append(alert)
+
     if not saadetud:
+        if muutus:
+            _write(olek)
         return []
     del olek["history"][MAX_ALERT_HISTORY:]
-    try:
-        # Enne saatmist: kirjutustõrge ei tohi tähendada iga minut uut kirja.
-        atomic_write_json(TRAFFIC_ALERTS_FILE, olek)
-    except OSError:
-        logger.warning("traffic_alerts.json kirjutamine ebaõnnestus; häiret ei saadeta",
-                       exc_info=True)
+    # Ooteaeg kettale ENNE saatmist: kirjutustõrge ei tohi tähendada iga minut uut kirja.
+    if not _write(olek):
         return []
+
     for alert in saadetud:
-        _notify(alert)
+        kind = alert["kind"]
+        tulemus = _notify(alert) or {"delivered": False, "failed_mail": []}
+        alert["delivered"] = bool(tulemus["delivered"])
+        if not tulemus["delivered"]:
+            # Ükski kanal ei jõudnud kohale: ooteaeg ei alga, uus katse piiratud sagedusega.
+            if eelmised[kind] is None:
+                olek["last_sent"].pop(kind, None)
+            else:
+                olek["last_sent"][kind] = eelmised[kind]
+            olek["retry_at"][kind] = now + RETRY_SECONDS
+            continue
+        olek["retry_at"].pop(kind, None)
+        subject, body = _message(alert)
+        for username in tulemus["failed_mail"]:
+            olek["pending_mail"].append({"kind": kind, "username": username, "subject": subject,
+                                         "body": body, "attempts": 0,
+                                         "next_at": now + RETRY_SECONDS})
+    # Ajalookirje on sama objekt mis `saadetud` element — `delivered` jõuab kettale.
+    _write(olek)
     return saadetud
 
 
@@ -274,7 +380,10 @@ class TrafficMiddleware:
         finally:
             try:
                 headers = dict(scope.get("headers") or [])
-                anon = not headers.get(b"authorization", b"").strip()
+                # Päise olemasolu ei tõenda sisselogimist (robot saadab suvalise
+                # `Bearer x`): anonüümne = kehtiva sessioonita.
+                from .deps import has_valid_session
+                anon = not has_valid_session(headers)
                 ip = (headers.get(b"x-real-ip")
                       or (headers.get(b"x-forwarded-for") or b"").split(b",")[0]
                       or b"").decode("latin-1").strip()
