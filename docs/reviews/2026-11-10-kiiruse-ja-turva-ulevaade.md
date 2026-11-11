@@ -22,7 +22,7 @@ lõigus 4. Dashboardi päringuid päris andmetega ei mõõdetud.
 | **N10-01** | Piiratud teose pildid `no-store` → iga lehepööre laeb ~2 MB uuesti, eellaadimine topelt | kiirus | kõrge | avatud — #757 |
 | **N10-02** | Töölaud näitab alati täissuuruses skaneeringut (vahevarianti ei ole) | kiirus | keskmine (featuur) | avatud — #758 |
 | **N10-03** | Isikuloend parsib `prosopography_index.json` igal päringul | kiirus / GIL | keskmine | avatud — #759 |
-| **N10-04** | Iga salvestus saadab Meilisse kogu teose | kiirus | madal | teadlik (ADR 0013) — #760 |
+| **N10-04** | Iga salvestus saadab Meilisse kogu teose | kiirus | madal | mõõdetud 2026-11-11, ei tehta — #760 (suletud) |
 | **N10-05** | IP-põhised piirangud pöördproksi taga võivad olla kõigi peale ühised | töökindlus | madal | **ei kinnitunud** (lõik 4); NAT-i juhtum **parandatud** — #762 / PR #765 |
 | **N10-06** | Sessioonid ainult mälus; 24 h sisselogimisest, mitte tegevusest | mugavus | keskmine | avatud — #761 |
 | **N10-07** | Konto lukustus kõrvalisele kättesaadav (kasutajanimed avalikud) | töökindlus | madal | **parandatud** — #762 / PR #765 ((konto, IP) lävi 10, kontoülene 50) |
@@ -98,6 +98,12 @@ ADR 0013 teadlik otsus; sünk peab jääma kettapõhiseks ja idempotentseks. Koo
 variant: sünk ehitab kõik dokumendid nagu praegu, aga saadab ainult need, mille räsi
 erineb viimati saadetust (protsessi-lokaalne räsitabel; tühi tabel = saada kõik).
 Ette võtta ainult siis, kui pika teose indekseerimisviivitus päriselt häirib.
+
+**Mõõdetud 2026-11-11 — ei tehta** (#760, suletud „not planned"; täismõõtmine issue's).
+Suurim teos 706 lehte: dokumentide ehitus 0,19 s. Meili tegelik indekseerimine
+(935 tavasünki, nädal): mediaan 0,63 s, 252 dokumenti ~2,5 s; `/save` ei oota seda.
+Aeglaseimad (kuni 57 s) olid 9–11 dokumendiga — külmkäivitus/taustatöö, mitte
+dokumentide arv, delta ei aitaks. Uuesti üles võtta ainult uue mõõtmisega.
 
 ### Mis on korras
 
