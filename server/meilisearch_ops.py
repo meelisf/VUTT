@@ -183,6 +183,11 @@ def sync_work_to_meilisearch(dir_name):
     täpselt sama, mida kasutab seed/reseed-tee (scripts/1-1_consolidate_data.py).
     See on AINUS dokumendi-ehitamise tee → live ja seed EI SAA lahkneda (issue #23).
     Siin jääb ainult live-spetsiifiline I/O-saba: konfig laadimine + upsert Meili API-le.
+
+    Saadab TEADLIKULT kõik teose lehed (ADR 0013). Delta-sünk (ainult muutunud räsiga
+    dokumendid) on mõõdetud ja tagasi lükatud: #760 (2026-11-11) — 706-lehelise teose
+    ehitus 0,19 s, tavaline indekseerimine < 1 s, aeglased juhud ei sõltu dokumentide
+    arvust. Enne „optimeerimist" mõõda uuesti (vt #760).
     """
     dir_path = os.path.join(BASE_DIR, dir_name)
     if not os.path.exists(dir_path):
