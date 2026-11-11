@@ -137,7 +137,11 @@ services:
 
   # Otsingumootor
   meilisearch:
-    image: getmeili/meilisearch:v1
+    # Täpne versioon, MITTE ujuv `v1` (#764 N10-10): Meili andmekaust on versioonitundlik
+    # ja käsitsi `pull` võiks versiooni andmete alt ära nihutada. Uuendus = teadlik samm
+    # (vt Meili upgrade-juhend / reindeks `server_seed_data.sh`), tagi muutus loob konteineri
+    # uuesti → otsingu külmkäivitus, tee vaiksel ajal. Digest = tootmises 2026-11-11 jooksnu.
+    image: getmeili/meilisearch:v1.33.1
     container_name: vutt-meili
     restart: always
     logging: *default-logging
@@ -170,7 +174,9 @@ services:
 
   # Umami Analytics App
   umami:
-    image: ghcr.io/umami-software/umami:postgresql-latest
+    # Täpne versioon, MITTE `postgresql-latest` (#764 N10-10). v3 avaldab ühe (Postgres)
+    # pildi ilma andmebaasi-eesliiteta; digest = tootmises 2026-11-11 jooksnu.
+    image: ghcr.io/umami-software/umami:3.0.3
     container_name: vutt-umami
     restart: always
     logging: *default-logging
