@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
+import AccountEmailSection from '../components/AccountEmailSection';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
@@ -11,7 +12,7 @@ import { Navigate } from 'react-router-dom';
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation(['settings', 'common']);
-  const { user, userSettings, updateSettings } = useUser();
+  const { user, authToken, userSettings, updateSettings } = useUser();
   const { collections, getCollectionName, workSets, workSetsError } = useCollection();
 
   // Kirjutamisulatus (ADR 0031) — sama fail-closed loogika mis canEditWork'il.
@@ -204,6 +205,14 @@ const Settings: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Konto: e-post on parooli taastamise kanal (#786 kõrvalleid) */}
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            {t('settings:account.heading')}
+          </h2>
+          <AccountEmailSection token={authToken} />
         </div>
 
         {/* Workspace */}

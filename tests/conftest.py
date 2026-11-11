@@ -213,6 +213,9 @@ def backend_env(tmp_path, monkeypatch):
     upload_ops.upload_progress.clear()
 
     rate_limit._rate_limit_store.clear()
+    # Konto-lukustus on moodulitasandi olek nagu IP-loendurid: ühe testi valed
+    # paroolid ei tohi järgmise testi sisselogimist 429-ga lukku panna.
+    rate_limit._account_failures.clear()
 
     @asynccontextmanager
     async def _noop_lifespan(_app):
@@ -242,6 +245,7 @@ def backend_env(tmp_path, monkeypatch):
 
     auth.sessions.clear()
     rate_limit._rate_limit_store.clear()
+    rate_limit._account_failures.clear()
     upload_ops.upload_progress.clear()
 
 

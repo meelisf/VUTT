@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from ..auth import create_session, delete_session, require_token, verify_user
+from ..auth import (create_session, delete_session, load_users, normalize_email,
+                    require_token, set_own_email, verify_user)
 from ..config import get_logger
-from ..deps import get_user
+from ..deps import get_json_data, get_user
 from ..rate_limit import (
     check_account_lockout,
     check_rate_limit,
@@ -73,6 +74,47 @@ async def login(request: Request):
     record_login_failure(username, client_ip)
     logger.warning(f"Ebaõnnestunud login: username={username!r} ip={client_ip}")
     return {"status": "error", "message": "Vale kasutajanimi või parool"}
+
+
+@router.get("/account")
+def get_account(user=Depends(get_user)):
+    """Kasutaja enda konto andmed seadete jaoks. E-post ei ole sessioonis."""
+    andmed = load_users().get(user["username"], {})
+    return {"username": user["username"], "name": andmed.get("name", ""),
+            "email": andmed.get("email", "")}
+
+
+@router.post("/account/email")
+async def change_own_email(request: Request, user=Depends(get_user)):
+    """Oma e-posti muutmine, kinnitus praeguse parooliga.
+
+    E-post on parooli taastamise kanal — varastatud sessiooniga vahetus annaks
+    konto üle. Vale parool läbib SAMA konto-lukustuse nagu sisselogimine,
+    muidu oleks see lukustusest mööda viiv parooliarvamise tee.
+    Vale parool = 403, MITTE 401: klient loeb tokeniga 401 sessiooni surmaks.
+    """
+    username = user["username"]
+    client_ip = get_client_ip(request)
+    locked, retry = check_account_lockout(username, client_ip)
+    if locked:
+        return JSONResponse(status_code=429, content={"detail": "locked", "retry_after": retry})
+    data = await get_json_data(request)
+    email = normalize_email(data.get("email"))
+    if email is None:
+        raise HTTPException(status_code=400, detail="invalid_email")
+    # bcrypt ~100 ms → threadpool (ADR 0002).
+    if not await run_in_threadpool(verify_user, username, data.get("password") or ""):
+        record_login_failure(username, client_ip)
+        logger.warning(f"E-posti muutmine: vale parool username={username!r} ip={client_ip}")
+        raise HTTPException(status_code=403, detail="wrong_password")
+    clear_login_failures(username)
+    viga = await run_in_threadpool(set_own_email, username, email)
+    if viga == "email_taken":
+        raise HTTPException(status_code=409, detail="email_taken")
+    if viga:
+        raise HTTPException(status_code=400, detail=viga)
+    logger.info(f"Kasutaja {username!r} muutis oma e-posti")
+    return {"status": "success", "email": email}
 
 
 @router.post("/verify-token")
