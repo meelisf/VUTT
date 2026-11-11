@@ -11,6 +11,8 @@ Semantika (main.py päritolu):
   admini-GET-id kasutavad ``admin_image_access``-i (lühiajaline pilet).
 - ``optional_user``: loeb tokeni ``Authorization`` headerist; tagastab ``None``
   anonüümsele. Ei nõua autentimist. Kasutaja on sama mis ``get_user``-il.
+- ``optional_user_or_401``: nagu eelmine, aga kaasa antud surnud token → 401
+  (töökollektsioonid: anonüümne 404 näitas „ligipääs kadus").
 
 Need on AINSAD kutsuja-lugejad (#356). Prosopograafia routeri oma ``_get_user``
 (luges tokeni ka JSON-kehast) ja ``_optional_user`` (ainult ``?token=``) on
@@ -89,4 +91,26 @@ def optional_user(request: Request):
     user, error = require_token({"auth_token": token_str})
     if error:
         return None
+    return dict(user)
+
+
+def optional_user_or_401(request: Request):
+    """
+    Nagu ``optional_user``, aga KAASA ANTUD surnud tokeniga tõstab 401.
+
+    Tokenita päring on anonüümne (``None``). Surnud sessioon ei ole anonüümne
+    kasutaja: privaatse ressursi „ei leitud" (404) näitaks kasutajale
+    „ligipääs kadus", aga klient avab sisselogimise ainult 401 peale
+    (``apiClient.ts``). Kasuta seda seal, kus anonüümne vastus erineb
+    sisselogitu omast ja viga oleks muidu vaikne (töökollektsioonid).
+
+    ``optional_user`` jääb leebeks: avalikud teed (viewer-token, allalaadimine,
+    SEO meta) peavad aegunud tokeniga ka edasi anonüümselt töötama.
+    """
+    token_str = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not token_str:
+        return None
+    user, error = require_token({"auth_token": token_str})
+    if error:
+        raise HTTPException(status_code=401, detail=error["message"])
     return dict(user)

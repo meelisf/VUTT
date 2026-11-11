@@ -11,6 +11,7 @@ import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { collectionDefaultSort } from '../services/collectionService';
 import { useSelectionScope } from '../hooks/useSelectionScope';
+import { isSessionExpired } from '../utils/apiErrorText';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, X, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
@@ -766,9 +767,11 @@ const Dashboard: React.FC = () => {
               <div>
                 <h3 className="font-bold text-red-800">{t('error.connectionError')}</h3>
                 <p className="text-sm text-red-700 mt-1">{error || scopeError?.message}</p>
-                {scopeError ? (
+                {scopeError && isSessionExpired(scopeError) ? null : scopeError ? (
                   <>
-                    {/* Ligipääsu kadumine EI OLE tühi kogu ega piiramata otsing
+                    {/* Aegunud sessioon (401) EI OLE ligipääsu kadu: siis on ainult
+                        „logi uuesti sisse" tekst, valikut ei lähtestata.
+                        Ligipääsu kadumine EI OLE tühi kogu ega piiramata otsing
                         (ADR 0042). Üleminek on KASUTAJA tegevus — automaatne
                         effect siin annaks piiramata päringu ja kaks
                         tingimusteta peeglit URL-i vastu annaksid tsükli (#333). */}

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..auth import is_at_least, users_role_snapshot
-from ..deps import get_json_data, get_user, optional_user, require_role
+from ..deps import get_json_data, get_user, optional_user_or_401, require_role
 from ..work_sets_access import can_manage_set, can_view_set, search_visible_work_ids
 from ..work_sets_ops import (
     WorkSetAccessDenied,
@@ -71,7 +71,7 @@ def _public_view(ws: dict, user) -> dict:
 
 
 @router.get("/work-sets")
-def get_work_sets(include_archived: bool = False, user=Depends(optional_user)):
+def get_work_sets(include_archived: bool = False, user=Depends(optional_user_or_401)):
     sets = [ws for ws in list_work_sets() if can_view_set(ws, user)]
     if not include_archived:
         sets = [ws for ws in sets if ws.get("status", "active") == "active"]
@@ -103,7 +103,7 @@ async def post_work_set(request: Request, user=Depends(require_role("admin"))):
 
 
 @router.get("/work-sets/for-work/{work_id}")
-def get_work_sets_for_work(work_id: str, user=Depends(optional_user)):
+def get_work_sets_for_work(work_id: str, user=Depends(optional_user_or_401)):
     """Kogud, kuhu see teos kuulub ja mida kutsuja näeb (#354).
 
     Deklareeritud ENNE `/work-sets/{set_id}` mustreid: FastAPI võtab esimese
@@ -133,7 +133,7 @@ def get_work_sets_for_work(work_id: str, user=Depends(optional_user)):
 
 
 @router.get("/work-sets/{set_id}")
-def get_work_set(set_id: str, user=Depends(optional_user)):
+def get_work_set(set_id: str, user=Depends(optional_user_or_401)):
     ws = _load_viewable_or_404(set_id, user)
     return {"status": "success", "work_set": _public_view(ws, user)}
 
@@ -205,7 +205,7 @@ def delete_work_set_route(set_id: str, user=Depends(require_role("admin"))):
 
 
 @router.get("/work-sets/{set_id}/works")
-def get_work_set_works(set_id: str, user=Depends(optional_user)):
+def get_work_set_works(set_id: str, user=Depends(optional_user_or_401)):
     """Otsingufiltri sisend. Autoriseerib IGA päringu — vt mooduli docstring."""
     ws = _load_viewable_or_404(set_id, user)
     ids = search_visible_work_ids(ws, user)
