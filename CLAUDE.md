@@ -622,7 +622,6 @@ Sihtkoormus ~300 samaaegset kasutajat. Peamised valikud:
 
 | Ülesanne | Prioriteet |
 |---|---|
-| `MetadataModal`: salvestamata muudatuste kaitse nagu mujal — muutunud `metaForm` (hetktõmmis laadimisel) → sulgemine (rist, taust, „Tühista") ja link „Muuda eksemplaride lehel →" küsivad `UnsavedChangesDialog`-iga. Praegu kaovad muudatused vaikselt; varasem dialoog kaitses ainult eksemplari mustandit | keskmine |
 | `tags`-fallbacki eemaldamine (35 lk kasutab veel vana välja) | madal |
 | JSON-i koristus (`page_number` eemaldamine) | madal |
 

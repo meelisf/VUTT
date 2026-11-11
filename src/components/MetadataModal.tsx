@@ -2,7 +2,7 @@ import WorkDatingInput from './WorkDatingInput';
 import { datingError, WorkDating } from '../utils/workDating';
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Edit3, X, Save, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
 import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { Creator, Page, Work, ArchiveRef, PageNumbering } from '../types';
@@ -24,6 +24,8 @@ import { vocabularyRoleOptions } from './creators/roleOptions';
 import TitleVariantsFields from './TitleVariantsFields';
 
 import { useNotify } from '../contexts/FeedbackContext';
+import UnsavedChangesDialog from './UnsavedChangesDialog';
+import { isMetadataFormDirty } from './metadataFormDirty';
 interface MetadataModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -233,7 +235,24 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
   // Eksemplaride arv viidereale; toimetamine käib eksemplaride lehel (/work/:id/exemplar).
   const [exemplarCount, setExemplarCount] = useState(0);
-  const requestClose = onClose;
+
+  // Salvestamata muudatuste kaitse: hetktõmmis laadimisel (ja serveri värskema kuju
+  // saabumisel); sulgemine ja lahkumislink küsivad ühtse dialoogiga. Routeri
+  // `useUnsavedChangesGuard`-i siin EI kasutata — töölaud hoiab juba oma `useBlocker`-it
+  // ja router toetab korraga üht.
+  const [baseline, setBaseline] = useState<MetadataForm | null>(null);
+  const resetForm = (form: MetadataForm) => { setMetaForm(form); setBaseline(form); };
+  const [guard, setGuard] = useState<{ action: (() => void) | null; saving: boolean; saveFailed: boolean }>(
+    { action: null, saving: false, saveFailed: false });
+  const navigate = useNavigate();
+
+  /** `action` kohe, või muudetud vormi korral pärast dialoogi otsust. */
+  const guarded = (action: () => void) => {
+    const dirty = baseline !== null && isMetadataFormDirty(baseline, metaForm, existingYearRef.current);
+    if (dirty) setGuard({ action, saving: false, saveFailed: false });
+    else action();
+  };
+  const requestClose = () => guarded(onClose);
 
   // Päisest lohistatav (ühine hook osade paneeliga)
   const drag = useDraggablePosition();
@@ -246,6 +265,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   // Lae andmed kui modal avatakse
   useEffect(() => {
     if (isOpen) {
+      setGuard({ action: null, saving: false, saveFailed: false });
       loadData();
       drag.reset();
     }
@@ -267,7 +287,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     // Üks tekstilahter: kuva eelistatult, muidu number (0-st ei teki "0" lahtris)
     const initYearInput = initYearDisplay || (initYear ? String(initYear) : '');
     existingYearRef.current = { year: initYear, year_display: initYearDisplay };
-    setMetaForm({
+    resetForm({
       title: work?.title || page.title || '',
       title_en: work?.title_en ?? page.title_en ?? '',
       title_original: work?.title_original ?? page.title_original ?? '',
@@ -358,7 +378,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           if (m.respondens) creators.push({ name: m.respondens, role: 'respondens' });
         }
 
-        setMetaForm({
+        resetForm({
           title: title,
           title_en: m.title_en || '',
           title_original: m.title_original || '',
@@ -390,8 +410,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     }
   };
 
-  const handleSave = async () => {
-    if (datingError(metaForm.dating)) { setSaveStatus('error'); return; }
+  /** Salvestus ilma sulgemiseta; `true` = server kinnitas. Ühine nupule ja dialoogile. */
+  const saveMetadata = async (): Promise<boolean> => {
+    if (datingError(metaForm.dating)) { setSaveStatus('error'); return false; }
     const saveStartedAt = performance.now();
     setIsSaving(true);
     setSaveStatus('idle');
@@ -429,24 +450,44 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         if (data.git_committed === false) notify(t('common:error.gitCommitFailed'), 'warning');
 
         setSaveStatus('success');
-        // Lühike kinnitus on piisav; pikk viivitus jättis mulje, et salvestamine
-        // kestab edasi ka pärast serveri edukat vastust.
-        setTimeout(() => {
-          console.info(`[Metadata] Salvestus kuni modaali sulgemiseni: ${(performance.now() - saveStartedAt).toFixed(0)} ms`);
-          requestClose();
-          setSaveStatus('idle');
-        }, 400);
-      } else {
-        setSaveStatus('error');
-        setSaveError(t('editor.saveErrorWithMessage', { message: data?.message }));
+        setBaseline(metaForm);   // salvestatu on uus võrdluspunkt
+        return true;
       }
+      setSaveStatus('error');
+      setSaveError(t('editor.saveErrorWithMessage', { message: data?.message }));
+      return false;
     } catch (e) {
       console.error("Metadata save failed", e);
       setSaveStatus('error');
       // Serveri põhjendus (nt `parts` tagasilükkamine) on kasutajale kasulikum kui üldine teade.
       setSaveError(e instanceof ApiError ? t('editor.saveErrorWithMessage', { message: e.message }) : t('editor.saveErrorServer'));
+      return false;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    const startedAt = performance.now();
+    if (!(await saveMetadata())) return;
+    // Lühike kinnitus on piisav; pikk viivitus jättis mulje, et salvestamine
+    // kestab edasi ka pärast serveri edukat vastust. Otse `onClose`: vorm on salvestatud
+    // ja sulund näeks vana `baseline`-i.
+    setTimeout(() => {
+      console.info(`[Metadata] Salvestus kuni modaali sulgemiseni: ${(performance.now() - startedAt).toFixed(0)} ms`);
+      onClose();
+      setSaveStatus('idle');
+    }, 400);
+  };
+
+  const guardSave = async () => {
+    const action = guard.action;
+    setGuard(g => ({ ...g, saving: true, saveFailed: false }));
+    if (await saveMetadata()) {
+      setGuard({ action: null, saving: false, saveFailed: false });
+      action?.();
+    } else {
+      setGuard(g => ({ ...g, saving: false, saveFailed: true }));
     }
   };
 
@@ -755,7 +796,13 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             data-testid="exemplars-row">
             <span className="text-xs font-bold text-gray-600 uppercase">{t('exemplars.title')}</span>
             <span className="text-gray-600">· {exemplarCount}</span>
-            <Link to={`/work/${workId}/exemplar`} className="ml-auto text-xs font-medium text-primary-700 hover:text-primary-900">
+            <Link to={`/work/${workId}/exemplar`} className="ml-auto text-xs font-medium text-primary-700 hover:text-primary-900"
+              onClick={e => {
+                // Muudetud vorm: lahkumine alles pärast dialoogi otsust (modaal kaoks lehega).
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;  // uus vaheleht
+                e.preventDefault();
+                guarded(() => navigate(`/work/${workId}/exemplar`));
+              }}>
               {t('metadata.exemplarsMoved')}
             </Link>
           </div>
@@ -840,6 +887,19 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         </div>
       </div>
     </div>
+      {/* Väljaspool tausta-div'i: muidu jõuaks dialoogi klõps Reacti puus taustani (requestClose). */}
+      <UnsavedChangesDialog
+        open={guard.action !== null}
+        saving={guard.saving}
+        saveFailed={guard.saveFailed}
+        onStay={() => setGuard({ action: null, saving: false, saveFailed: false })}
+        onDiscard={() => {
+          const action = guard.action;
+          setGuard({ action: null, saving: false, saveFailed: false });
+          action?.();
+        }}
+        onSaveAndContinue={() => void guardSave()}
+      />
     </>
   );
 };
