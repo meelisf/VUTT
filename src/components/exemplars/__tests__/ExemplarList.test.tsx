@@ -231,3 +231,23 @@ describe('ExemplarList — toimetamine', () => {
     expect(screen.getByTestId('manuscript-hint')).toBeTruthy();
   });
 });
+
+describe('ExemplarList — kustutamine', () => {
+  it('„Kustuta" küsib kinnitust; „Ei" ei kustuta, kinnitus kustutab', async () => {
+    renderList({ userRole: 'admin', initialSelected: 'b2' });
+    const open = await screen.findByTestId('exemplar-detail');
+
+    fireEvent.click(within(open).getByText('exemplars.delete'));
+    // Kinnitusdialoog (ConfirmModal): sõnum + ohtlik kinnitusnupp
+    expect(await screen.findByText('exemplars.deleteConfirm')).toBeTruthy();
+    fireEvent.click(screen.getByText('buttons.deny'));
+    await waitFor(() => expect(screen.queryByText('exemplars.deleteConfirm')).toBeNull());
+    expect(writes().some(c => c.method === 'DELETE')).toBe(false);
+
+    fireEvent.click(within(screen.getByTestId('exemplar-detail')).getByText('exemplars.delete'));
+    await screen.findByText('exemplars.deleteConfirm');
+    const buttons = screen.getAllByText('exemplars.delete');
+    fireEvent.click(buttons[buttons.length - 1]);   // dialoogi nupp (renderdub viimasena)
+    await waitFor(() => expect(writes().some(c => c.method === 'DELETE' && c.url.endsWith('/works/w1/exemplars/b2'))).toBe(true));
+  });
+});

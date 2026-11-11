@@ -870,10 +870,11 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               ? 'bg-green-600 text-white'
               : saveStatus === 'error'
                 ? 'bg-red-600 text-white'
-                // Oranž ainult salvestamata muudatustega; muidu neutraalne (salvestus on siis no-op).
+                // Sama kokkulepe mis töölaua ja upload'i salvestusnupul (EditorHeader,
+                // UploadMetaForm): muudetud = oranž, muutmata = sinine.
                 : isDirty
-                  ? 'bg-amber-600 text-white hover:bg-amber-700'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-primary-600 text-white hover:bg-primary-700'
               } disabled:opacity-70`}
             data-dirty={isDirty}
           >

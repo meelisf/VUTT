@@ -141,10 +141,10 @@ describe('MetadataModal — salvestamata muudatuste kaitse', () => {
     await screen.findByDisplayValue('Trost-Zeilen');
     const save = () => screen.getByText('metadata.save').closest('button')!;
     expect(save().getAttribute('data-dirty')).toBe('false');
-    expect(save().className).not.toContain('bg-amber-600');
+    expect(save().className).toContain('bg-primary-600');
     await editTitle();
     expect(save().getAttribute('data-dirty')).toBe('true');
-    expect(save().className).toContain('bg-amber-600');
+    expect(save().className).toContain('bg-amber-500');
     // Tagasi algväärtusele → jälle puhas
     fireEvent.change(screen.getByDisplayValue('Trost-Zeilen, uus'), { target: { value: 'Trost-Zeilen' } });
     expect(save().getAttribute('data-dirty')).toBe('false');
