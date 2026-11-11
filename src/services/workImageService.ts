@@ -12,9 +12,9 @@ export const getFullImageUrl = (imagePath: string): string => {
 };
 
 // Dashboardi kaanepildi versioon — peab kattuma image_server.py COVER_VERSION-iga.
-// URL on stabiilne (/{work_id}/_thumb) ja pildid on 30 päeva brauseri-cache'is, seega
-// serveripoolsest failinime-versioonist üksi ei piisa: ilma ?v-ta näeks olemasolev
-// kasutaja vana 560 px pilti kuni cache aegumiseni.
+// URL on stabiilne (/{work_id}/_thumb); brauser revalideerib pilte Last-Modified'i järgi
+// (`max-age=0, must-revalidate` / `private, no-cache`, image_server.py). ?v vahetab
+// versioonimuutusel URL-i, et uus kuju ei sõltuks revalideerimise tulemusest.
 const COVER_VERSION = 2;
 
 /**

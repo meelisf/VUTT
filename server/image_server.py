@@ -489,8 +489,14 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
         if not meta or not _check_image_access(meta['id'], meta, parsed.query):
             self.send_error(403, "Keelatud")
             return
+        # Avalik: jagatud vahemälu lubatud, iga kasutus revalideeritakse (304 ~14 ms).
+        # Piiratud/jagatav (#757): brauser TOHIB hoida, aga ainult enda jaoks (`private`)
+        # ja revalideerib iga kasutuse (`no-cache`) — 304 läbib sama õiguskontrolli kui
+        # 200, nii et ära võetud õigus kehtib kohe. `max-age>0` EI sobi: töölaua lehe-URL
+        # ei kanna versiooni ja pööre/kärbe (sama failinimi) jääks vahemälus vanaks.
+        # Varem `no-store`: iga pööre ja eellaadimine tõmbas ~2 MB skaneeringu uuesti.
         self._cache_policy = ('public, max-age=0, must-revalidate'
-                              if is_work_public(meta) else 'no-store')
+                              if is_work_public(meta) else 'private, no-cache')
 
         image_path = None
         if _is_exemplar_path(parts):
