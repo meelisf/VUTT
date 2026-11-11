@@ -10,8 +10,11 @@ import type { Page } from '../../types';
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, d?: any) => (typeof d === 'string' ? d : k), i18n: { language: 'et' } }),
 }));
+const navigateMock = vi.fn();
 vi.mock('react-router-dom', () => ({
-  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+  Link: ({ to, children, onClick }: { to: string; children: React.ReactNode; onClick?: React.MouseEventHandler }) =>
+    <a href={to} onClick={onClick}>{children}</a>,
+  useNavigate: () => navigateMock,
 }));
 // Raskemad alamkomponendid ei puutu eksemplaride voogu
 vi.mock('../EntityPicker', () => ({ default: () => null }));
@@ -68,7 +71,7 @@ function renderModal(onClose = vi.fn(), onSaveSuccess = vi.fn()) {
   return { onClose, onSaveSuccess };
 }
 
-beforeEach(() => { calls.length = 0; });
+beforeEach(() => { calls.length = 0; navigateMock.mockReset(); });
 afterEach(() => cleanup());
 
 describe('MetadataModal — eksemplarid on eksemplaride lehel', () => {
@@ -98,5 +101,74 @@ describe('MetadataModal — eksemplarid on eksemplaride lehel', () => {
     const save = calls.find(c => c.url.endsWith('/update-work-metadata'))!;
     expect('exemplars' in save.body.metadata).toBe(false);
     expect('archive_refs' in save.body.metadata).toBe(false);
+  });
+});
+
+describe('MetadataModal — salvestamata muudatuste kaitse', () => {
+  /** Oota serveri kuju (pealkiri), siis muuda pealkirja. */
+  async function editTitle(value = 'Trost-Zeilen, uus') {
+    const title = await screen.findByDisplayValue('Trost-Zeilen');
+    fireEvent.change(title, { target: { value } });
+  }
+  const notes = () => screen.getByPlaceholderText('Vabatekstilised märkused teose kohta...');
+
+  it('muudetud vorm + rist → dialoog; „Jää" jätab lahti, „Loobu" sulgeb', async () => {
+    const { onClose } = renderModal();
+    await editTitle();
+    fireEvent.click(screen.getByLabelText('common:buttons.close'));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByText('unsavedChanges.stay'));
+    expect(screen.queryByText('unsavedChanges.saveAndContinue')).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText('common:buttons.close'));
+    fireEvent.click(await screen.findByText('unsavedChanges.discard'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(calls.some(c => c.url.endsWith('/update-work-metadata'))).toBe(false);
+  });
+
+  it('„Tühista" + „Salvesta ja jätka" → salvestab muudetu ja sulgeb', async () => {
+    const { onClose, onSaveSuccess } = renderModal();
+    await editTitle('Uus pealkiri');
+    fireEvent.click(screen.getByText('common:buttons.cancel'));
+    fireEvent.click(await screen.findByText('unsavedChanges.saveAndContinue'));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const save = calls.find(c => c.url.endsWith('/update-work-metadata'))!;
+    expect(save.body.metadata.title).toBe('Uus pealkiri');
+    expect(onSaveSuccess).toHaveBeenCalled();
+  });
+
+  it('taustaklõps muudetud vormiga küsib', async () => {
+    const { onClose } = renderModal();
+    await editTitle();
+    // Taust on modaali välimine div; klõps selle peal (mitte sisu peal)
+    const backdrop = document.querySelector('.fixed.inset-0.bg-black\\/50') as HTMLElement;
+    fireEvent.click(backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(await screen.findByText('unsavedChanges.saveAndContinue')).toBeTruthy();
+  });
+
+  it('ainult salvestusel kaduv muudatus (tühikud märkustes) ei küsi', async () => {
+    const { onClose } = renderModal();
+    await screen.findByDisplayValue('Trost-Zeilen');
+    fireEvent.change(notes(), { target: { value: '   ' } });
+    fireEvent.click(screen.getByLabelText('common:buttons.close'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('link eksemplaride lehele muudetud vormiga küsib; „Loobu" → navigeerib', async () => {
+    renderModal();
+    await editTitle();
+    fireEvent.click(screen.getByText(/metadata\.exemplarsMoved/));
+    expect(navigateMock).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByText('unsavedChanges.discard'));
+    expect(navigateMock).toHaveBeenCalledWith('/work/w1/exemplar');
+  });
+
+  it('puhta vormiga link navigeerib kohe', async () => {
+    renderModal();
+    await screen.findByDisplayValue('Trost-Zeilen');
+    fireEvent.click(screen.getByText(/metadata\.exemplarsMoved/));
+    expect(navigateMock).toHaveBeenCalledWith('/work/w1/exemplar');
   });
 });
