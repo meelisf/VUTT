@@ -152,8 +152,8 @@ INDEX_ENTRIES = [
 
 @pytest.fixture
 def indeks(ps, monkeypatch):
-    monkeypatch.setattr(ps, "_load_index", lambda: {"entries": INDEX_ENTRIES})
-    monkeypatch.setattr(ps, "_load_person_aliases", lambda: {})
+    monkeypatch.setattr(ps, "_load_index_readonly", lambda: {"entries": INDEX_ENTRIES})
+    monkeypatch.setattr(ps, "_load_person_aliases_readonly", lambda: {})
     return ps
 
 
@@ -226,7 +226,7 @@ def test_valija_leiab_kaardi_lahedase_nimekuju_jargi(ps, monkeypatch):
     card = kirje("Christianus Muller", "Muller", aliases=[
         "Christian Muller", "Christian Møller", "Christianus Müller", "Christ. Möller"], pid="vutt:Pfolxea3")
     other = kirje("Christian Schmidt", "Schmidt", pid="vutt:Pother")
-    monkeypatch.setattr(ps, "_load_index", lambda: {"entries": [card, other]})
+    monkeypatch.setattr(ps, "_load_index_readonly", lambda: {"entries": [card, other]})
     found = ps._filter_index_entries(q="Christian Müller", aliases_data={})
     assert [e["id"] for e in found] == ["vutt:Pfolxea3"]
     # Aste: sõnade kaupa vaste sildis → 0 (sama mis täpne nimesõna).
