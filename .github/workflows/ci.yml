@@ -13,7 +13,8 @@ concurrency:
 jobs:
   backend:
     name: Backend pytest
-    runs-on: ubuntu-latest
+    # Kinnitatud LTS: `ubuntu-latest` vahetub GitHubi otsusel (19.10.2026 → 26.04).
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -25,9 +26,10 @@ jobs:
           cache: pip
 
       - name: Install system dependencies
+        # Korduskatsed: peeglite ajutine võrgutõrge kukutas töö enne teste (11.11.2026).
         run: |
-          sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get -o Acquire::Retries=5 update
+          sudo apt-get -o Acquire::Retries=5 install -y poppler-utils
 
       - name: Install Python dependencies
         run: |
@@ -45,7 +47,8 @@ jobs:
 
   frontend:
     name: Frontend typecheck/test/build
-    runs-on: ubuntu-latest
+    # Kinnitatud LTS: `ubuntu-latest` vahetub GitHubi otsusel (19.10.2026 → 26.04).
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
