@@ -14,20 +14,116 @@ from contextlib import contextmanager
 from datetime import datetime
 from .cache import get_cached_collections
 from .collection_tree import is_collection_public
-from .config import USERS_FILE, SESSION_DURATION, DELETED_USERNAMES_FILE
+from .config import (USERS_FILE, SESSION_IDLE_TIMEOUT, SESSION_MAX_AGE, SESSIONS_FILE,
+                     DELETED_USERNAMES_FILE)
 from .utils import atomic_write_json
 from .heartbeat import mark_error, mark_success, register_job
 
 logger = logging.getLogger(__name__)
 
-# Sessioonide hoidla (token -> user info)
-# NB: Serveri restart kustutab kõik sessioonid
+# =========================================================
+# SESSIOONID (ADR 0046, ADR 0081)
+# =========================================================
+# Mälus olev hoidla on päringu teel ainus allikas: `token_key(token)` → kirje
+# {user, created_at, last_seen}. Võti on tokeni SHA-256 — toortokenit ei hoita
+# ei mälus ega kettal, nii et `state/sessions.json`-i lugeja ei saa sessiooni üle võtta.
+#
+# Püsikiht `SESSIONS_FILE`: restart/deploy ei logi välja. Kirjutusreeglid:
+#   - loomine, kustutamine ja õiguste äravõtmine kirjutatakse KOHE (`_persist`) —
+#     äravõetud sessioon ei tohi restardi järel kettalt tagasi tulla (ADR 0046 p 2);
+#   - `last_seen` uueneb päringu teel AINULT mälus (get_user on `async def`, kettale
+#     kirjutamine seal oleks blokeeriv I/O, ADR 0002); taustalõim kirjutab ta
+#     `SESSION_FLUSH_INTERVAL` järel ja lifespan sulgemisel (`flush_sessions`).
+# Muutjad, mis kutsuvad `_persist`-i, PEAVAD jooksma threadpool'is, mitte event-loopis.
 sessions = {}
 _sessions_lock = threading.Lock()
+_persist_lock = threading.Lock()   # kirjutajate järjekord; _sessions_lock-i ei hoita I/O ajal
+_version = 0             # suureneb igal muudatusel (_sessions_lock all)
+_persisted_version = 0   # viimati kettale jõudnud versioon (_persist_lock all)
 
-# Sessioonide puhastamise intervall (sekundites)
-SESSION_CLEANUP_INTERVAL = 300  # 5 minutit
-register_job("session_cleanup", interval_seconds=SESSION_CLEANUP_INTERVAL, description="Aegunud kasutajasessioonide puhastus")
+# Taustalõim: aegunute puhastus + last_seen'i kettale kirjutus.
+SESSION_FLUSH_INTERVAL = 60
+# last_seen'i ei puudutata sagedamini — iga päring ei pea versiooni tõstma.
+SESSION_TOUCH_GRANULARITY = 60
+register_job("session_cleanup", interval_seconds=SESSION_FLUSH_INTERVAL,
+             description="Aegunud kasutajasessioonide puhastus ja püsikihi kirjutus")
+
+
+def token_key(token: str) -> str:
+    """Sessiooni võti: tokeni SHA-256 (hex)."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _session_expired(session: dict, now: datetime) -> bool:
+    """Libisev aegumine ülempiiriga: tegevusetus > IDLE või vanus > MAX_AGE."""
+    created_at = datetime.fromisoformat(session["created_at"])
+    last_seen = datetime.fromisoformat(session.get("last_seen") or session["created_at"])
+    return now - last_seen > SESSION_IDLE_TIMEOUT or now - created_at > SESSION_MAX_AGE
+
+
+def _bump_locked():
+    """Kutsuja hoiab `_sessions_lock`-i."""
+    global _version
+    _version += 1
+
+
+def _persist():
+    """Kirjutab hetke hoidla kettale, kui see on viimasest kirjutusest muutunud.
+
+    Hetktõmmis võetakse `_persist_lock`-i SEES: hilisem kirjutaja näeb alati
+    vähemalt sama uut versiooni, nii et vanem tõmmis ei saa uuemat üle kirjutada.
+    `_sessions_lock`-i ei hoita kirjutuse ajal — päringu tee ei oota ketast.
+    Tõrge logitakse, ei visata: mälu jääb kehtima, järgmine kirjutus proovib uuesti.
+    """
+    global _persisted_version
+    with _persist_lock:
+        with _sessions_lock:
+            version = _version
+            snapshot = {k: dict(v) for k, v in sessions.items()}
+        if version <= _persisted_version:
+            return
+        try:
+            atomic_write_json(SESSIONS_FILE, {"version": 1, "sessions": snapshot})
+            _persisted_version = version
+        except Exception as e:
+            logger.error("Sessioonide püsikihi kirjutus ebaõnnestus: %s", e)
+
+
+def flush_sessions():
+    """Avalik: kirjutab ootel `last_seen`-id kettale (taustalõim, lifespan sulgemine)."""
+    _persist()
+
+
+def load_persisted_sessions():
+    """Käivitusel: laeb kehtivad sessioonid kettalt. Vigane/puuduv fail → tühi hoidla
+    (fail-closed: kasutaja logib uuesti sisse, keegi ei saa võõrast sessiooni)."""
+    global _version, _persisted_version
+    try:
+        with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        stored = data.get("sessions") if isinstance(data, dict) else None
+        if not isinstance(stored, dict):
+            raise ValueError("oodatud {'sessions': {...}}")
+    except FileNotFoundError:
+        return 0
+    except (OSError, ValueError) as e:
+        logger.error("Sessioonide püsikiht loetamatu, alustan tühjalt: %s", e)
+        return 0
+    now = datetime.now()
+    loaded = {}
+    for key, session in stored.items():
+        try:
+            if (isinstance(key, str) and len(key) == 64 and isinstance(session, dict)
+                    and isinstance(session.get("user"), dict)
+                    and not _session_expired(session, now)):
+                loaded[key] = session
+        except (KeyError, TypeError, ValueError):
+            continue   # üksik vigane kirje ei kuku teisi
+    with _sessions_lock:
+        sessions.update(loaded)
+        _bump_locked()
+    _persist()   # aegunud/vigased kirjed kettalt maha
+    return len(loaded)
 
 # =========================================================
 # ROLLIDE HIERARHIA — üks tõeallikas
@@ -92,26 +188,28 @@ def warn_if_no_superadmin() -> bool:
     return False
 
 
+def cleanup_expired_sessions() -> int:
+    """Eemaldab aegunud sessioonid ja kirjutab püsikihi (ka ootel last_seen-id)."""
+    now = datetime.now()
+    with _sessions_lock:
+        expired = [k for k, s in sessions.items() if _session_expired(s, now)]
+        for k in expired:
+            del sessions[k]
+        if expired:
+            _bump_locked()
+    _persist()
+    return len(expired)
+
+
 def _cleanup_expired_sessions():
-    """Taustalõim, mis puhastab aegunud sessioonid perioodiliselt."""
+    """Taustalõim: aegunute puhastus + last_seen'i kettale kirjutus."""
     while True:
-        time.sleep(SESSION_CLEANUP_INTERVAL)
+        time.sleep(SESSION_FLUSH_INTERVAL)
         try:
-            now = datetime.now()
-            expired_tokens = []
-
-            with _sessions_lock:
-                for token, session in sessions.items():
-                    created_at = datetime.fromisoformat(session["created_at"])
-                    if now - created_at > SESSION_DURATION:
-                        expired_tokens.append(token)
-
-                for token in expired_tokens:
-                    del sessions[token]
-
-            mark_success("session_cleanup", detail={"removed": len(expired_tokens), "active": len(sessions)})
-            if expired_tokens:
-                print(f"Sessioonide puhastus: eemaldatud {len(expired_tokens)} aegunud sessiooni (aktiivseid: {len(sessions)})")
+            removed = cleanup_expired_sessions()
+            mark_success("session_cleanup", detail={"removed": removed, "active": len(sessions)})
+            if removed:
+                print(f"Sessioonide puhastus: eemaldatud {removed} aegunud sessiooni (aktiivseid: {len(sessions)})")
         except Exception as e:
             mark_error("session_cleanup", e)
             print(f"Sessioonide puhastuse viga: {e}")
@@ -263,6 +361,10 @@ def start_background():
     global _cleanup_thread
     load_users()
     if _cleanup_thread is None:
+        # Püsisessioonid ENNE esimest päringut (lifespan kutsub enne yield'i).
+        restored = load_persisted_sessions()
+        if restored:
+            print(f"Sessioonid taastatud püsikihist: {restored}")
         _cleanup_thread = threading.Thread(
             target=_cleanup_expired_sessions, daemon=True, name="session-cleanup",
         )
@@ -341,14 +443,14 @@ def verify_user(username, password):
 
 
 def create_session(user):
-    """Loob uue sessiooni ja tagastab tokeni."""
+    """Loob uue sessiooni ja tagastab tokeni. Kirjutab püsikihi → kutsu threadpool'ist."""
     token = str(uuid.uuid4())
+    now = datetime.now().isoformat()
     with _sessions_lock:
-        sessions[token] = {
-            "user": user,
-            "created_at": datetime.now().isoformat()
-        }
+        sessions[token_key(token)] = {"user": user, "created_at": now, "last_seen": now}
+        _bump_locked()
         count = len(sessions)
+    _persist()
     print(f"Uus sessioon loodud: {user['username']} (aktiivseid sessioone: {count})")
     return token
 
@@ -356,29 +458,35 @@ def create_session(user):
 def get_session(token):
     """Tagastab sessiooni tokeni järgi või None."""
     with _sessions_lock:
-        return sessions.get(token)
+        return sessions.get(token_key(token))
 
 
 def delete_session(token):
-    """Kustutab sessiooni."""
+    """Kustutab sessiooni (logout). Kirjutab püsikihi → kutsu threadpool'ist."""
     with _sessions_lock:
-        sessions.pop(token, None)
+        if sessions.pop(token_key(token), None) is not None:
+            _bump_locked()
+    _persist()
 
 
 def delete_user_sessions(username):
     """Kustutab kõik kasutaja aktiivsed sessioonid. Tagastab kustutatud sessioonide arvu.
 
-    Kasutatakse kasutaja kustutamisel JA rolli muutmisel — sunnib kasutaja uuesti
+    Kasutatakse kasutaja kustutamisel JA rolli/õiguste muutmisel — sunnib kasutaja uuesti
     sisse logima, et roll/õigused jõustuksid kohe (sessioon hoiab user-hetktõmmist).
+    Püsikiht kirjutatakse KOHE: äravõetud sessioon ei tohi restardi järel tagasi tulla.
     """
     with _sessions_lock:
-        tokens_to_delete = [
-            token for token, session_data in sessions.items()
+        keys_to_delete = [
+            key for key, session_data in sessions.items()
             if session_data["user"]["username"] == username
         ]
-        for token in tokens_to_delete:
-            del sessions[token]
-    return len(tokens_to_delete)
+        for key in keys_to_delete:
+            del sessions[key]
+        if keys_to_delete:
+            _bump_locked()
+    _persist()
+    return len(keys_to_delete)
 
 
 def require_token(data, min_role=None):
@@ -393,17 +501,26 @@ def require_token(data, min_role=None):
     if not token:
         return None, {"status": "error", "message": "Autentimine nõutud (token puudub)"}
 
+    key = token_key(token)
+    now = datetime.now()
     with _sessions_lock:
-        session = sessions.get(token)
+        session = sessions.get(key)
         if not session:
             return None, {"status": "error", "message": "Sessioon aegunud, palun logi uuesti sisse"}
 
-        # Kontrolli sessiooni aegumist (24h)
-        created_at = datetime.fromisoformat(session["created_at"])
-        if datetime.now() - created_at > SESSION_DURATION:
-            # Eemalda aegunud sessioon
-            del sessions[token]
-            return None, {"status": "error", "message": "Sessioon aegunud (24h), palun logi uuesti sisse"}
+        # Libisev aegumine ülempiiriga (ADR 0081). Eemaldus ainult mälus — kettalt
+        # koristab taustalõim; aegunud kirjet ei laeta ka käivitusel.
+        if _session_expired(session, now):
+            del sessions[key]
+            _bump_locked()
+            return None, {"status": "error", "message": "Sessioon aegunud, palun logi uuesti sisse"}
+
+        # Tegevus pikendab sessiooni. AINULT mälus (see tee võib olla event-loopis);
+        # kettale jõuab taustalõimega. Mitte sagedamini kui SESSION_TOUCH_GRANULARITY.
+        last_seen = datetime.fromisoformat(session.get("last_seen") or session["created_at"])
+        if (now - last_seen).total_seconds() >= SESSION_TOUCH_GRANULARITY:
+            session["last_seen"] = now.isoformat()
+            _bump_locked()
 
         user = session["user"]
 

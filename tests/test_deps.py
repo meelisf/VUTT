@@ -223,15 +223,15 @@ def test_optional_user_ja_get_user_annavad_sama_kasutaja(login):
 
 
 def test_optional_user_ei_anna_aegunud_sessiooni(login):
-    """`get_user` lükkab üle 24 h sessiooni tagasi; `optional_user` ei tohi seda
-    enne taustapuhastust (5 min tsükkel) kasutajana tagastada."""
+    """`get_user` lükkab üle 24 h tegevusetu sessiooni tagasi (ADR 0081); `optional_user`
+    ei tohi seda enne taustapuhastust kasutajana tagastada."""
     from datetime import datetime, timedelta
     from server import auth
     from server.deps import optional_user
 
     token = login("editor", "editorpass")
     with auth._sessions_lock:
-        auth.sessions[token]["created_at"] = (datetime.now() - timedelta(hours=25)).isoformat()
+        auth.sessions[auth.token_key(token)]["last_seen"] = (datetime.now() - timedelta(hours=25)).isoformat()
 
     assert optional_user(_paisega(token)) is None
 

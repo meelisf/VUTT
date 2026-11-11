@@ -16,12 +16,11 @@ Need on AINSAD kutsuja-lugejad (#356). Prosopograafia routeri oma ``_get_user``
 (luges tokeni ka JSON-kehast) ja ``_optional_user`` (ainult ``?token=``) on
 kustutatud. Valvur: ``tests/test_token_lugeja_uks_reegel.py``.
 """
-import hashlib
 
 from fastapi import HTTPException, Request
 
 from . import image_tickets
-from .auth import require_token
+from .auth import require_token, token_key
 
 
 async def get_user(request: Request, min_role: str = "contributor"):
@@ -40,7 +39,8 @@ async def get_user(request: Request, min_role: str = "contributor"):
         raise HTTPException(status_code=401, detail=error["message"])
     # Piiratud agendi üleandmine seotakse just selle sessiooniga; toortoken
     # jääb deps.py-sse ega jõua domeeni endpointi või ajutisse andmebaasi.
-    request.state.session_fingerprint = hashlib.sha256(token.encode()).hexdigest()
+    # Sama võti, millega sessioon on hoidlas (ADR 0081).
+    request.state.session_fingerprint = token_key(token)
     return user
 
 
@@ -74,7 +74,7 @@ def optional_user(request: Request):
     ``get_user``-st ei tõsta 401.
 
     Kasutaja on SAMA mis ``get_user``-il (``require_token``: sessiooni
-    hetktõmmis + 24 h aegumine) — ainult puudumise käitumine erineb. Varem
+    hetktõmmis + aegumine, ADR 0081) — ainult puudumise käitumine erineb. Varem
     kirjutas see ``allowed_collections``-i üle värskest ``users.json``-ist ega
     kontrollinud aegumist: kaks lugejat andsid sama tokeni peale eri vastuse.
     Sessioon on õiguste ainus tõde, sest iga õigusvälja kirjutus katkestab

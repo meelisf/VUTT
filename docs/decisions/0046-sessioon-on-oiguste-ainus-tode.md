@@ -44,6 +44,8 @@ alles kaks allikat, mis juba korra lahknesid.
   `tests/test_oigusvalja_kirjutus_katkestab_sessiooni.py` (struktuurne;
   põhjendatud erandid: uus konto, kutsuja-invalideeriv abifunktsioon).
 - Otse käsitsi muudetud `users.json` ei mõju enne sessiooni lõppu (≤ 24 h)
-  või uut sisselogimist.
+  või uut sisselogimist. **Täiendus 2026-11-11 (ADR 0081):** sessioonid on
+  püsivad ja libisevad — lagi on nüüd 14 päeva; `delete_user_sessions` kirjutab
+  ka püsikihi kohe.
 - Valvurid: `tests/test_token_lugeja_uks_reegel.py` (routeris ei loeta tokenit),
   `tests/test_deps.py` (kaks lugejat annavad sama kasutaja).

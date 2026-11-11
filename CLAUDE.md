@@ -98,7 +98,7 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP agendikood (`agent_handoff.sqlite3`) ja ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`, `page_text_proposals.sqlite3`, `exemplar_proposals.sqlite3`) | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, `sessions.json` (püsisessioonid, ADR 0081), tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP agendikood (`agent_handoff.sqlite3`) ja ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`, `page_text_proposals.sqlite3`, `exemplar_proposals.sqlite3`) | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
 `labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`occupations.json`**, **`institutions.json`**
@@ -577,7 +577,9 @@ ID, `people_ops.py` tõmbab taustal aliased (`et, en, de, la`) → `person_alias
 tee (järjestus, poolitus, lisamine, kustutamine, taaste) PEAB kutsuma `refresh_work_mentions`-it.
 
 **Autentimine** — rollid `contributor` < `editor` < `admin` < `superadmin`. Kontroll ALATI
-`is_at_least()` / `isAtLeast()`, **mitte** `role == "admin"`. Token UUID, 24h;
+`is_at_least()` / `isAtLeast()`, **mitte** `role == "admin"`. Token UUID; sessioon püsib üle
+restardi (`state/sessions.json`, võti tokeni SHA-256) ja aegub 24 h tegevusetuse või 14 päeva
+järel (ADR 0081). Kettale kirjutav sessioonimuutja kutsutakse `async`-ruuterist `run_in_threadpool`-iga;
 localStorage `vutt_user`, `vutt_token`. `contributor`-i eelkinnitust EI OLE (eemaldatud 099d0ad, ADR 0031) — järelevalve käib nähtavuse kaudu.
 Login: kahekihiline rate-limit (nginx 1r/s + app 5/60s) + konto-lockout.
 
@@ -612,7 +614,7 @@ Sihtkoormus ~300 samaaegset kasutajat. Peamised valikud:
   `prefixSearch: "indexingTime"` skannib igal updateil kogu FST-i. `prefixSearch: "disabled"`
   EI SOBI — „risin" ei leiaks „Risingh" (ADR 0005).
 - **Cache** (`server/cache.py`, `CACHE_TTL_SECONDS = 300`) + `users.json` mälus.
-- **Taustapuhastus** — sessioonid 5 min (`auth.py`), rate-limit 10 min (`rate_limit.py`).
+- **Taustapuhastus** — sessioonid 60 s (`auth.py`: aegunud maha + `last_seen` kettale), rate-limit 10 min (`rate_limit.py`).
 - **Dashboard** — server-side pagineerimine, 12/lk, `page`/`hitsPerPage` (mitte `estimatedTotalHits`,
   oli 7,5× vale). `distinct` EI mõjuta Meili `facetDistribution`-it.
 - Kaanepilt mõõdetakse kaardi kastile (`object-cover` seob LAIUSE); `COVER_VERSION` tõsta MÕLEMAS otsas.

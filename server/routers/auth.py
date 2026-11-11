@@ -66,7 +66,8 @@ async def login(request: Request):
         return {
             "status": "success",
             "user": user,
-            "token": create_session(user),
+            # Kirjutab püsikihi (ADR 0081) → threadpool, mitte event-loop (ADR 0002).
+            "token": await run_in_threadpool(create_session, user),
             "meili_token": meili_token,
         }
     record_login_failure(username, client_ip)
@@ -93,7 +94,7 @@ async def logout(request: Request):
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
         if token:
-            delete_session(token)
+            await run_in_threadpool(delete_session, token)   # püsikiht (ADR 0081)
     return {"status": "success"}
 
 

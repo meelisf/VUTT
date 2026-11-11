@@ -133,6 +133,9 @@ async def lifespan(app: FastAPI):
     await run_in_threadpool(_kaivitustaasted)
     yield
     print("VUTT FastAPI sulgemine.")
+    # Ootel last_seen-id kettale (ADR 0081): deploy ei lühenda kellegi sessiooni.
+    from .auth import flush_sessions
+    await run_in_threadpool(flush_sessions)
 
 app = FastAPI(title="VUTT API", version="1.0.0", lifespan=lifespan)
 # Käsitlemata erind (500) → admini vealogi (#133); vastus jääb samaks.
