@@ -127,10 +127,33 @@ describe('MetadataModal — salvestamata muudatuste kaitse', () => {
     expect(calls.some(c => c.url.endsWith('/update-work-metadata'))).toBe(false);
   });
 
-  it('„Tühista" + „Salvesta ja jätka" → salvestab muudetu ja sulgeb', async () => {
+  it('„Tühista" loobub muudatustest kohe: dialoogi ei ole, ei salvestata', async () => {
+    const { onClose } = renderModal();
+    await editTitle();
+    fireEvent.click(screen.getByText('common:buttons.cancel'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('unsavedChanges.saveAndContinue')).toBeNull();
+    expect(calls.some(c => c.url.endsWith('/update-work-metadata'))).toBe(false);
+  });
+
+  it('salvestusnupp on oranž ainult muudatustega', async () => {
+    renderModal();
+    await screen.findByDisplayValue('Trost-Zeilen');
+    const save = () => screen.getByText('metadata.save').closest('button')!;
+    expect(save().getAttribute('data-dirty')).toBe('false');
+    expect(save().className).not.toContain('bg-amber-600');
+    await editTitle();
+    expect(save().getAttribute('data-dirty')).toBe('true');
+    expect(save().className).toContain('bg-amber-600');
+    // Tagasi algväärtusele → jälle puhas
+    fireEvent.change(screen.getByDisplayValue('Trost-Zeilen, uus'), { target: { value: 'Trost-Zeilen' } });
+    expect(save().getAttribute('data-dirty')).toBe('false');
+  });
+
+  it('rist + „Salvesta ja jätka" → salvestab muudetu ja sulgeb', async () => {
     const { onClose, onSaveSuccess } = renderModal();
     await editTitle('Uus pealkiri');
-    fireEvent.click(screen.getByText('common:buttons.cancel'));
+    fireEvent.click(screen.getByLabelText('common:buttons.close'));
     fireEvent.click(await screen.findByText('unsavedChanges.saveAndContinue'));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     const save = calls.find(c => c.url.endsWith('/update-work-metadata'))!;

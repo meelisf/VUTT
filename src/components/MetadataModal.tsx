@@ -246,14 +246,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     { action: null, saving: false, saveFailed: false });
   const navigate = useNavigate();
 
-  /** `action` kohe, või muudetud vormi korral pärast dialoogi otsust. */
-  const guarded = (action: () => void) => {
-    const dirty = baseline !== null && isMetadataFormDirty(baseline, metaForm, existingYearRef.current);
-    if (dirty) setGuard({ action, saving: false, saveFailed: false });
-    else action();
-  };
-  const requestClose = () => guarded(onClose);
-
   // Päisest lohistatav (ühine hook osade paneeliga)
   const drag = useDraggablePosition();
 
@@ -261,6 +253,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   // snap-shotitud algne { year, year_display }. Kui kasutaja kuvastringi ei muuda,
   // säilitatakse olemasolev `year` isegi kui see ei parsi (väldib vaikset andmekao).
   const existingYearRef = useRef<YearFieldsExisting>({});
+
+  const isDirty = baseline !== null && isMetadataFormDirty(baseline, metaForm, existingYearRef.current);
+
+  /** `action` kohe, või muudetud vormi korral pärast dialoogi otsust. */
+  const guarded = (action: () => void) => {
+    if (isDirty) setGuard({ action, saving: false, saveFailed: false });
+    else action();
+  };
+  // Rist, taust ja lahkumislink küsivad; „Tühista" on ise selgesõnaline loobumine ja sulgeb kohe.
+  const requestClose = () => guarded(onClose);
 
   // Lae andmed kui modal avatakse
   useEffect(() => {
@@ -856,7 +858,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         )}
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2 shrink-0">
           <button
-            onClick={requestClose}
+            onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
           >
             {t('common:buttons.cancel')}
@@ -868,8 +870,12 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               ? 'bg-green-600 text-white'
               : saveStatus === 'error'
                 ? 'bg-red-600 text-white'
-                : 'bg-amber-600 text-white hover:bg-amber-700'
+                // Oranž ainult salvestamata muudatustega; muidu neutraalne (salvestus on siis no-op).
+                : isDirty
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
               } disabled:opacity-70`}
+            data-dirty={isDirty}
           >
             {isSaving ? (
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
