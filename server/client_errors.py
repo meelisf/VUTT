@@ -131,10 +131,58 @@ _cache: Optional[List[dict]] = None
 
 
 def invalidate_cache() -> None:
-    """Sunnib järgmise lugemise kettalt. Testidele ja käsitsi muutmisele."""
+    """Sunnib järgmise lugemise kettalt. Testidele ja käsitsi muutmisele.
+
+    Nullib ka kliendivigade kordusakna: tühjast logist alustaja ei tohi saada
+    eelmise logi kordusotsuseid.
+    """
     global _cache
     with _lock:
         _cache = None
+    with _klient_lock:
+        _klient_viimati.clear()
+
+
+# --- Kliendivigade kordused ---------------------------------------------------
+#
+# Kliendi dedupe on lehesessioonipõhine (`clientErrorReporter.ts`). Hajutatud
+# robot on iga IP-ga uus sessioon: 2026-11-09 täitis üks robot (233 IP-d) 498
+# kohta 500-st sama Leafleti veaga ja pühkis kõik varasemad vead ringist välja.
+# Võti on TEADE + ESIMENE STACK-RIDA (viskekoht): sama teade eri kohast on eri
+# viga. Kordus ei lisa kirjet; esimene kirje aknas jääb tõendiks.
+CLIENT_DEDUPE_SECONDS = 300
+# Avalik endpoint: juhuslike teadetega ujutus ei tohi tabelit piiramatult kasvatada.
+CLIENT_DEDUPE_MAX_KEYS = 2000
+_klient_viimati: dict = {}
+_klient_lock = threading.Lock()
+
+
+def _kliendi_viskekoht(stack: Optional[str]) -> str:
+    """Esimene kaadririda: Chrome `    at f (url:r:v)`, Firefox/Safari `f@url:r:v`."""
+    for rida in (stack or "").splitlines():
+        rida = rida.strip()
+        if rida.startswith("at ") or "@" in rida:
+            return rida
+    return ""
+
+
+def _on_kliendi_kordus(message: str, stack: Optional[str]) -> bool:
+    """Kas sama viga on akna jooksul juba salvestatud? Märgib ühtlasi uue."""
+    votme = (message, _kliendi_viskekoht(stack))
+    nuud = time.monotonic()
+    with _klient_lock:
+        eelmine = _klient_viimati.get(votme)
+        if eelmine is not None and nuud - eelmine < CLIENT_DEDUPE_SECONDS:
+            return True
+        if len(_klient_viimati) >= CLIENT_DEDUPE_MAX_KEYS:
+            for k in [k for k, t in _klient_viimati.items() if nuud - t >= CLIENT_DEDUPE_SECONDS]:
+                del _klient_viimati[k]
+            if len(_klient_viimati) >= CLIENT_DEDUPE_MAX_KEYS:
+                # Kõik on akna sees = ujutus. Tühjendus lubab kordusi, aga mälu
+                # on piiratud; ring ise on niikuinii kaetud.
+                _klient_viimati.clear()
+        _klient_viimati[votme] = nuud
+    return False
 
 
 def _load() -> List[dict]:
@@ -196,10 +244,14 @@ def record_error(payload: dict, *, ip: str = "", username: Optional[str] = None)
         # Teateta kirje ei ütle midagi ja ainult ujutab logi üle.
         return False
 
+    stack = _puhasta_ja_lyhenda(payload.get("stack"), MAX_STACK_LEN)
+    if _on_kliendi_kordus(message.strip(), stack):
+        return False
+
     kirje = {
         "received_at": datetime.now(timezone.utc).isoformat(),
         "message": message.strip(),
-        "stack": _puhasta_ja_lyhenda(payload.get("stack"), MAX_STACK_LEN),
+        "stack": stack,
         "url": _puhasta_ja_lyhenda(payload.get("url"), MAX_URL_LEN),
         "user_agent": _puhasta_ja_lyhenda(payload.get("user_agent"), MAX_UA_LEN),
         # Kust viga tuli: "boundary" (React), "window" (onerror),

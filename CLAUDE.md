@@ -519,6 +519,8 @@ samasse ringi sisemise teega (`record_server_error`, `server/server_errors.py`):
 lõime surm (`threading.excepthook`) ja 500 (`source` = `server:thread` / `server:http`).
 Kordus sama viskekoha pealt 5 min jooksul jäetakse vahele — muidu tõrjuks iga
 päringuga korduv viga kliendivead ringist välja. Executor-tööde erindid siia EI jõua.
+Kliendivigadel sama server-poolne aken (teade + esimene stack-rida, 5 min): kliendi
+dedupe on lehesessioonipõhine ja hajutatud robot (2026-11-09: 233 IP-d) pühkis ringi tühjaks.
 
 **z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
 (nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob
