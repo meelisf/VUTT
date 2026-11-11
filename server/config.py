@@ -218,8 +218,13 @@ PORT = 8002
 # SESSIOONID
 # =========================================================
 
-# Sessiooni kehtivusaeg
-SESSION_DURATION = timedelta(hours=24)
+# Sessiooni kehtivus (ADR 0081): libisev aegumine ülempiiriga.
+# Tegevusetus (viimasest autenditud päringust, sh UserContexti 5-min verify-token)
+SESSION_IDLE_TIMEOUT = timedelta(hours=24)
+# Absoluutne lagi sisselogimisest — siis tuleb igal juhul uuesti sisse logida
+SESSION_MAX_AGE = timedelta(days=14)
+# Püsikiht: deploy/restart ei logi välja. Võti = tokeni SHA-256, mitte toortoken.
+SESSIONS_FILE = os.path.join(_STATE_DIR, "sessions.json")
 
 # =========================================================
 # CORS - lubatud päritolud

@@ -7,7 +7,7 @@ def test_refresh_rejects_expired_session_before_cleanup(client, backend_env, mon
     auth = backend_env['auth']
     token = auth.create_session({'username': 'editor', 'role': 'editor', 'allowed_collections': []})
     with auth._sessions_lock:
-        auth.sessions[token]['created_at'] = (datetime.now() - timedelta(hours=25)).isoformat()
+        auth.sessions[auth.token_key(token)]['last_seen'] = (datetime.now() - timedelta(hours=25)).isoformat()
     calls = []
     monkeypatch.setattr(meilisearch_ops, 'generate_meili_token', lambda **kw: calls.append(kw) or 'signed')
     response = client.post('/api/meili-token/refresh', headers={'Authorization': f'Bearer {token}'})
