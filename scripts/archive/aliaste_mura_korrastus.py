@@ -24,7 +24,8 @@ import urllib.parse
 import urllib.request
 
 API = "http://127.0.0.1:8002"
-SULUD = re.compile(r"\s*\([^()]*\)")
+# Ainult GND eristus (number või rooma number); muud sulud on nime osa.
+SULUD = re.compile(r"\s*\((?:[^()]*\d[^()]*|[IVXLC]+)\)")
 
 
 def paring(meetod, tee, keha=None, token=None):
