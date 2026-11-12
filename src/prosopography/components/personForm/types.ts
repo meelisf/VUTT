@@ -1,3 +1,4 @@
+import type { PersonNameDraft } from '../../utils/personNames';
 import type { LinkedEntity } from '../../../types/LinkedEntity';
 
 export interface DateDraft {
@@ -55,6 +56,8 @@ export interface FormDraft {
   /** Neiupõlve perekonnanimi (ainult perekonnanimi, mitte täisnimi). */
   name_maiden: string;
   name_aliases: string[];
+  /** Liigiga nimed (ADR 0083); `joinNames` tõstab need aliastest välja. */
+  name_names: PersonNameDraft[];
   gender: '' | 'M' | 'F';
   birth: DateDraft;
   death: DateDraft;
@@ -89,6 +92,7 @@ export const emptyDraft = (): FormDraft => ({
   name_qualifier: '',
   name_maiden: '',
   name_aliases: [],
+  name_names: [],
   gender: '',
   birth: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: null },
   death: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: null },

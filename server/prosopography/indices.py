@@ -318,7 +318,9 @@ def card_search_names(name_obj: dict) -> list[str]:
     Järjekord on stabiilne (dict.fromkeys), et indeksifail ei müraks.
     """
     label = name_obj.get("label") or ""
-    names = [label, *(name_obj.get("aliases") or [])]
+    # Liigiga nimed (ADR 0083: aadlinimi jm) on samuti otsitavad — ka teoste autoriotsingus.
+    typed = [n.get("label") for n in (name_obj.get("names") or []) if isinstance(n, dict)]
+    names = [label, *(name_obj.get("aliases") or []), *typed]
     maiden = (name_obj.get("maiden_name") or "").strip()
     if maiden:
         names.append(maiden)

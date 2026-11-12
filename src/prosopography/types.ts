@@ -58,6 +58,10 @@ export interface ProsopoIndexEntry {
   aa_snippet: string;
   image_url: string | null;
   aliases: string[];
+  /** Liigiga nimed (ADR 0083) — loend näitab „ka: …”. */
+  names?: { label: string; type: string; from?: number | null; to?: number | null }[];
+  /** Tööjärjekord: alias näib teise nimena ja nimeajalugu on tühi. */
+  possible_name_change?: boolean;
   occupations?: { id: string | null; label: string; labels?: Record<string, string> | null }[];
   education_institutions: string[];
   // Album Academicum
@@ -197,6 +201,8 @@ export interface ProsopoRecord {
     noble_status: string | null;
     maiden_name: string | null;
     aliases: string[];
+    /** Nimeajalugu (ADR 0083): liigiga nimed; kirjaviisi variandid on `aliases`-is. */
+    names?: import('./utils/personNames').PersonNameEntry[];
     family_name_variants: string[];
     first_name_variants: string[];
   };

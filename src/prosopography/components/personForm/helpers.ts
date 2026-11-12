@@ -1,3 +1,4 @@
+import { joinNames, splitNames } from '../../utils/personNames';
 import type { ProsopoRecord } from '../../types';
 import type { FormDraft, DateDraft, EducationDraft } from './types';
 import { emptyDateDraft } from './types';
@@ -164,6 +165,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     name_qualifier: p.name.qualifier ?? '',
     name_maiden: p.name.maiden_name ?? '',
     name_aliases: p.name.aliases ?? [],
+    name_names: splitNames(p.name.names),
     gender: p.gender ?? '',
     // Sama teisendus mis haridus-/ametikuupäevadel — sh `0000` tühjaks (#240)
     birth: p.birth ? historicalDateToDraft(p.birth) : emptyDateDraft(),
@@ -281,7 +283,7 @@ export function draftToPayload(
       qualifier_type: original?.name?.qualifier_type ?? null,
       noble_status: original?.name?.noble_status ?? null,
       maiden_name: draft.name_maiden.trim() || null,
-      aliases: draft.name_aliases.filter(Boolean),
+      ...joinNames(draft.name_aliases, draft.name_names),
       family_name_variants: original?.name?.family_name_variants ?? [],
       first_name_variants: original?.name?.first_name_variants ?? [],
     },

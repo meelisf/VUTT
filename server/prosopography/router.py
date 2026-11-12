@@ -110,6 +110,7 @@ def person_filters(
     imm_year_from: int = None,
     imm_year_to: int = None,
     tag: Optional[List[str]] = Query(None),
+    name_change: bool = None,
 ) -> PersonFilters:
     """Isikufiltrid URL-ist — loend ja kaart loevad neid SIIT (#670)."""
     return PersonFilters(
@@ -119,6 +120,7 @@ def person_filters(
         year_from=year_from, year_to=year_to,
         imm_year_from=imm_year_from, imm_year_to=imm_year_to,
         tags=_normalize_tag_query(tag),
+        name_change=name_change,
     )
 
 

@@ -394,6 +394,16 @@ def _apply_card_update(person: dict, data: dict, now: str) -> None:
 
     if "identifiers" in data:
         data["identifiers"] = _normalize_identifiers(data["identifiers"])
+    # Nimeajalugu (ADR 0083): `names[]` puhtaks, liigiga kujud aliastest välja.
+    if isinstance(data.get("name"), dict):
+        from .person_names import normalize_name_obj
+        # Klient, kes `names` võtit ei saada (vana vorm, rikastus, skriptid), EI
+        # kustuta nimeajalugu: `person.update` asendab terve `name`-objekti.
+        if "names" not in data["name"]:
+            vanad = (person.get("name") or {}).get("names")
+            if vanad:
+                data["name"] = {**data["name"], "names": vanad}
+        data["name"] = normalize_name_obj(data["name"])  # vigane kuju → ValueError → 400
     person.update(data)
 
     # Ankur on serveri tuletis: räsi arvutatakse SIIN, salvestatava seisu

@@ -161,7 +161,7 @@
     "nameMaiden": "Maiden name",
     "nameMaidenHint": "Family name only. Shown as „née …“ and searchable in person search.",
     "nameRequired": "Name is required.",
-    "namesAndIdentifiers": "Name variants and identifiers",
+    "namesAndIdentifiers": "Names, name forms and identifiers",
     "noItems": "No entries. Click \"Add\" to add.",
     "notesPlaceholder": "Internal notes (not shown publicly)…",
     "occupation": "Occupation",
@@ -468,6 +468,31 @@
   "loadingVocab": "Loading…",
   "scope": {
     "workSet": "Work collection"
+  },
+  "names": {
+    "title": "Names and name forms",
+    "hint": "Spelling variants as chips. If the person bore another name at some point (noble name, married name, pseudonym…), move the form up and choose the type.",
+    "form": "Name form",
+    "type": "Type",
+    "from": "from",
+    "to": "to",
+    "source": "Source (e.g. SBL, Wikidata)",
+    "promote": "Other name?",
+    "promoteTitle": "This form does not resemble the canonical name — is it another name of the person? Move it up as a typed name.",
+    "demote": "Back to spelling variant",
+    "demoteShort": "to variant",
+    "remove": "Remove",
+    "also": "also:",
+    "history": "Names",
+    "types": {
+      "birth": "birth / patronymic name",
+      "latinized": "latinized form",
+      "ennobled": "noble name",
+      "married": "married name",
+      "pseudonym": "pseudonym",
+      "religious": "religious name",
+      "other": "other name"
+    }
   },
   "sameName": {
     "title_one": "Person with the same name in VUTT",
