@@ -295,6 +295,9 @@ const PersonEditPage: React.FC = () => {
     onSave: savePerson,
   });
 
+  // Salvestamata muudatus → kollane nupp, nagu metaandmete modaalis ja redaktoris.
+  const saveBtnColor = isDirty ? 'bg-amber-500 hover:bg-amber-600' : 'bg-primary-600 hover:bg-primary-700';
+
   /** Lehe oma SALVESTA nupp: salvestab ja läheb profiilile. */
   const handleSave = async () => {
     const ok = await savePerson();
@@ -390,7 +393,7 @@ const PersonEditPage: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60 transition-colors"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium text-white disabled:opacity-60 transition-colors ${saveBtnColor}`}
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             {saving ? t('form.saving') : t('form.save')}
@@ -1113,7 +1116,7 @@ const PersonEditPage: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60 transition-colors"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium text-white disabled:opacity-60 transition-colors ${saveBtnColor}`}
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             {saving ? t('form.saving') : t('form.save')}
