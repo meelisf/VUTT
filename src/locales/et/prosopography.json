@@ -154,7 +154,10 @@
     "nameFamily": "Perekonnanimi",
     "nameFirst": "Eesnimi",
     "nameLabel": "Kanooniline nimi",
-    "nameQualifier": "Täiend (qualifier)",
+    "nameQualifier": "Eristav täiend",
+    "nameQualifierPlaceholder": "nt ülikooli professor, noorem",
+    "nameQualifierHint": "Lühike tunnus, mille järgi isikut samanimelistest eristada. Nime osa see ei ole.",
+    "qualifierFromOccupation": "Võta ametist:",
     "nameMaiden": "Neiupõlvenimi",
     "nameMaidenHint": "Ainult perekonnanimi. Kuvatakse „sünd. …“ ja on isikuotsingus otsitav.",
     "nameRequired": "Nimi on kohustuslik.",
@@ -465,6 +468,11 @@
   "loadingVocab": "Laadin…",
   "scope": {
     "workSet": "Töökollektsioon"
+  },
+  "sameName": {
+    "title_one": "Samanimeline isik VUTT-is",
+    "title_other": "Samanimelisi isikuid VUTT-is: {{count}}",
+    "addQualifier": "Lisa sellele isikule eristav täiend, et neid valijas ja loendis eristada."
   },
   "similar": {
     "confirmRequired": "Sama nimega isik on juba olemas. Vaata vaste üle või kinnita, et tegu on teise inimesega.",

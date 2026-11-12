@@ -17,6 +17,7 @@ import { getLabel } from '../../utils/metadataUtils';
 import { isQCode } from '../../utils/qcodeUtils';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import { workDisplayTitle, otherTitles } from '../../utils/workTitle';
+import { listPersons } from '../../prosopography/services/prosopographyService';
 
 interface WorkInfoPanelProps {
   work?: Work;
@@ -33,6 +34,26 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const exemplarData = useWorkExemplars(work);
+  // Isikukaardiga autorite eristavad täiendid (ADR 0082). Ainult kuvamiseks:
+  // tõrge jätab nime lihtsalt täiendita.
+  const [qualifiers, setQualifiers] = useState<Record<string, string>>({});
+  const personIdsKey = (work?.creators ?? [])
+    .map(c => c.id).filter((id): id is string => !!id?.startsWith('vutt:P')).join(',');
+
+  useEffect(() => {
+    if (!personIdsKey) { setQualifiers({}); return; }
+    let tyhistatud = false;
+    const ids = personIdsKey.split(',');
+    listPersons({ ids, limit: ids.length })
+      .then(r => {
+        if (tyhistatud) return;
+        const out: Record<string, string> = {};
+        for (const e of r.results ?? []) if (e.qualifier) out[e.id] = e.qualifier;
+        setQualifiers(out);
+      })
+      .catch(() => {});
+    return () => { tyhistatud = true; };
+  }, [personIdsKey]);
 
   // Arhiivide register (nimed kuvamiseks).
   useEffect(() => {
@@ -96,7 +117,11 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                             >
                               {creator.name}
                             </Link>
-                          ) : (
+                          ) : null}
+                          {hasProsopoId && qualifiers[creator.id!] ? (
+                            <span className="text-xs italic text-gray-500">{qualifiers[creator.id!]}</span>
+                          ) : null}
+                          {hasProsopoId ? null : (
                             <span
                               className="font-medium select-text cursor-pointer hover:text-primary-600 transition-colors"
                               onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}

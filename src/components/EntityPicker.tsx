@@ -588,7 +588,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     >
       <User size={12} className="mt-0.5 shrink-0 text-indigo-500" />
       <span className="flex-1 min-w-0">
-        <span className="font-medium text-gray-900 text-sm block truncate">{entry.label}</span>
+        <span className="font-medium text-gray-900 text-sm block truncate">
+          {entry.label}
+          {entry.qualifier && <span className="ml-1.5 font-normal italic text-gray-500">{entry.qualifier}</span>}
+        </span>
         <span className="text-[10px] text-indigo-500/80 italic flex items-center gap-1.5">
           <span>{entry.id}</span>
           {entry.birth_year && <span>*{entry.birth_year}</span>}

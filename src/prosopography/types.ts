@@ -36,6 +36,7 @@ export interface OriginParent {
 export interface ProsopoIndexEntry {
   id: string;               // vutt:Pxxx
   label: string;            // kanooniline nimi
+  qualifier?: string | null; // eristav täiend (ADR 0082) — EI ole nime osa
   sort_name: string;        // perekond, eesnimi (sortimiseks)
   birth_year: number | null;
   death_year: number | null;
@@ -79,8 +80,11 @@ export interface ProsopoIndexEntry {
 export interface ProsopoMapPerson {
   id: string;
   label: string;
+  qualifier?: string | null;
   birth_year: number | null;
   death_year: number | null;
+  floruit_year_from?: number | null;
+  floruit_year_to?: number | null;
   imm_year: number | null;
   image_url: string | null;
   work_count: number;

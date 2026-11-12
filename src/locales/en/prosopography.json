@@ -154,7 +154,10 @@
     "nameFamily": "Family name",
     "nameFirst": "First name",
     "nameLabel": "Canonical name",
-    "nameQualifier": "Qualifier",
+    "nameQualifier": "Distinguishing qualifier",
+    "nameQualifierPlaceholder": "e.g. university professor, the younger",
+    "nameQualifierHint": "A short feature that tells this person apart from others with the same name. Not part of the name.",
+    "qualifierFromOccupation": "Use occupation:",
     "nameMaiden": "Maiden name",
     "nameMaidenHint": "Family name only. Shown as „née …“ and searchable in person search.",
     "nameRequired": "Name is required.",
@@ -465,6 +468,11 @@
   "loadingVocab": "Loading…",
   "scope": {
     "workSet": "Work collection"
+  },
+  "sameName": {
+    "title_one": "Person with the same name in VUTT",
+    "title_other": "Persons with the same name in VUTT: {{count}}",
+    "addQualifier": "Add a distinguishing qualifier to this person so they can be told apart in pickers and lists."
   },
   "similar": {
     "confirmRequired": "A person with this name already exists. Review the match or confirm this is a different person.",

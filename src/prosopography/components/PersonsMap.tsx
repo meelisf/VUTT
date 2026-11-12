@@ -10,6 +10,7 @@ import { deriveMapYear } from '../utils/mapYear';
 import HistoricalMapLayer from './HistoricalMapLayer';
 import { FitToPoints, resolveLabel, spreadOverlapping } from './map/mapBase';
 import type { ProsopoMapResponse } from '../types';
+import { distinguishingText } from '../utils/distinguishing';
 
 interface PersonsMapProps {
   // Sama kuju mis päringul — filtriloend elab `PersonFilterParams`-is (#670).
@@ -232,10 +233,8 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onF
                       {marker.persons.map(person => (
                         <Link key={person.id} to={`/persons/${person.id}`} className="block rounded px-2 py-1 text-sm text-primary-700 hover:bg-primary-50">
                           {person.label}
-                          {(person.birth_year || person.death_year) && (
-                            <span className="ml-1 text-xs text-gray-400">
-                              {person.birth_year ?? '?'}-{person.death_year ?? '?'}
-                            </span>
+                          {distinguishingText(person) && (
+                            <span className="ml-1 text-xs text-gray-400">{distinguishingText(person)}</span>
                           )}
                         </Link>
                       ))}

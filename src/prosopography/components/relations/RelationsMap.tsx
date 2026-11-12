@@ -103,6 +103,7 @@ const RelationsMap: React.FC<{
                     {g.persons.map(p => (
                       <div key={p.id}>
                         <Link to={`/persons/${p.id}`} className="text-primary-700 hover:underline">{p.label}</Link>
+                        {p.qualifier && <span className="ml-1 text-xs italic text-gray-500">{p.qualifier}</span>}
                         <span className="ml-1 text-xs text-gray-500">{t(`network.kinds.${p.kind}`)}</span>
                       </div>
                     ))}

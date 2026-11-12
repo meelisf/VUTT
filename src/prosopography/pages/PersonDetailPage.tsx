@@ -37,6 +37,8 @@ import { formatDateTime } from '../../utils/formatDateTime';
 
 import { useRestoreAction } from '../../hooks/useRestoreAction';
 import { lazyRetry } from '../../utils/staleChunk';
+import { useSameNamePersons } from '../hooks/useSameNamePersons';
+import SameNameHint from '../components/SameNameHint';
 // Seoste sektsioon on oma chunk'is — isikulehe põhibundle ei kasva (#461).
 const PersonRelations = lazyRetry(() => import('../components/relations/PersonRelations'));
 
@@ -333,6 +335,7 @@ const PersonDetailPage: React.FC = () => {
   const sourceParts = useSourceParts(sourcePartWorkIds(person?.sources), token);
   const sourceWorks = useWorkInfo(sourceWorkIds(person?.sources), token);
   const canEdit = isAtLeast(user?.role, 'editor');
+  const sameName = useSameNamePersons(person?.name?.label ?? '', person?.id, authToken ?? undefined);
   const isAdmin = isAtLeast(user?.role, 'admin');
 
   // Isikutel juba kasutusel olevad märksõnad — soovitused märksõna-pickerile.
@@ -531,7 +534,10 @@ const PersonDetailPage: React.FC = () => {
           <CardHeader
             icon={<User size={18} />}
             title={person.name.label}
-            subtitle={person.name.maiden_name ? t('maidenNameShort', { name: person.name.maiden_name }) : undefined}
+            subtitle={[
+              person.name.qualifier?.trim() || null,
+              person.name.maiden_name ? t('maidenNameShort', { name: person.name.maiden_name }) : null,
+            ].filter(Boolean).join(' · ') || undefined}
             action={(
               <div className="flex items-center gap-2">
                 <Link
@@ -554,6 +560,12 @@ const PersonDetailPage: React.FC = () => {
               </div>
             )}
           />
+
+          {sameName.length > 0 && (
+            <div className="mb-4">
+              <SameNameHint matches={sameName} hasQualifier={!!person.name.qualifier?.trim()} canEdit={canEdit} />
+            </div>
+          )}
 
           <div className="flex gap-4">
             {/* Portreepilt */}

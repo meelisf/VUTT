@@ -495,7 +495,7 @@ export async function fetchSourceDiff(
   return apiGet(`${BASE}/${encodeURIComponent(personId)}/source-diff?field=${field}`, { token, timeout: 15000 });
 }
 
-export interface SimilarPerson { id: string; label: string; birth_year: number | null; death_year: number | null; work_count: number }
+export interface SimilarPerson { id: string; label: string; qualifier?: string | null; birth_year: number | null; death_year: number | null; floruit_year_from?: number | null; floruit_year_to?: number | null; work_count: number }
 
 /** Isikupaneeli kandidaatide kokkuvõtted (spekk §6) + sarnased olemasolevad kaardid. */
 export async function fetchCandidates(
