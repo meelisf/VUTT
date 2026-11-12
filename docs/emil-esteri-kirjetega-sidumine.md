@@ -7,11 +7,11 @@ millel on 16 lehekülge. Esmane kandidaatide loend on seega võimalik ise
 veebikataloogist koguda; ekspordi saabumist ei pea selleks ootama.
 See on tööplaan, mitte valmis teostuse kirjeldus.
 
-**Seis 2026-11-12:** Mscr-registri eksport (`reference_data/mscr-loend.txt`) on
-sedelitega võrreldud, kandidaadid on hinnatud ja kahtlased paarid on saadetud
-inimesele ülevaatamiseks (vt [Võrdlus Mscr-loendiga](#võrdlus-mscr-loendiga-2026-11-12)).
-VUTTi andmeid ei ole muudetud. Kuus sedeli parandust ootavad ettepanekutena
-ülevaatust.
+**Seis 2026-11-12:** esimene voor on tehtud: Mscr-registri eksport on sedelitega
+võrreldud ja 162 seost on kirjutatud lehe märkustena (vt
+[Võrdlus Mscr-loendiga](#võrdlus-mscr-loendiga-2026-11-12)). Teine voor (Z39.50
+otsing autori ja pealkirja järgi) on õigusteaduse jaotusega proovitud ja ootab
+jätkamist (vt [Teine voor](#teine-voor-z3950-otsing-autori-ja-pealkirja-järgi-pooleli)).
 
 ## Eesmärk ja andmete tasand
 
@@ -209,12 +209,103 @@ Andmefaili koostanud generaator ja selle sisendid on scratchpadis ega ole repos.
 Kui ülevaatuslehele lisandub tagasilükkamisi enne käivitamist, tuleb andmefail
 uuesti koostada või vastavad kirjed käsitsi eemaldada.
 
-### Järgmised sammud
+**Tehtud 2026-11-12:** kasutaja käivitas skripti ja 162 märkust kirjutati.
+Kõik kuus sedeli parandusettepanekut on vastu võetud.
 
-1. Ülevaatus ära oodata ja kontrollida, kas tagasilükkamisi lisandus.
-2. Käivitada `emil_ester_markused.py` serveris (kõigepealt kuivkäivitusena).
-3. Ülejäänud umbes 270 sedelinumbri ja 927 Mscr-viiteta sedeli jaoks on vaja
-   täisekspordi andmeid või ESTERi sõnaotsingut.
+## Teine voor: Z39.50 otsing autori ja pealkirja järgi (pooleli)
+
+### Miks
+
+Mscr-eksport ei olnud puudulik. ESTERis on Mscr-kohaviidaga eksemplare ainult
+umbes 400. Pistekontroll 2026-11-12: Mscr 1096, 557, 934, 1140 ja 791 andsid
+kohaviidaotsingus „asuks siin”, ekspordis olevad 1309 ja 1334 leiti kohe.
+Ülejäänud säilikud on ESTERis kas **muude kohaviidete all** või kataloogimata.
+Muud kohaviited on isiku- ja arhiivifondid: F 14 Haubold, F 55 Tartu Ülikool
+1802–1919 (loengukonspektid), F 8 Müthel, F 20 Rummel, F 26 tsensuurikomitee.
+Mõnel on ESTERis kogu viide puudu, näiteks Alexandri kogul „Alex 29xx”.
+Selliseid kirjeid leiab ainult sisu järgi.
+
+### Otsuse põhimõte (kasutaja, 2026-11-12)
+
+Märkus ütleb niikuinii, et seos on leitud automaatselt. Seetõttu **pannakse
+kõik agendi leitud vasted (kinnitatud, osa, kandidaat) märkustena paika ilma
+eraldi inimülevaatuseta.** Vead parandatakse töö käigus. Ülevaatuslehte
+teiseks vooruks ei tehta.
+
+### Allikad, mis ei sobinud
+
+- **OAI-PMH** (`https://www.ester.ee/iii/oai/OAIRepository`): skoobid on
+  raamatukogude kaupa (`utlib`, `utlibrs` jne), lehe laadimine võtab umbes
+  10 s ja kogumahtu server ei avalda. Esimesed 15 lehte (1500 kirjet) olid kõik
+  kustutatud kirjete päised. Dublin Core'is pole eksemplariandmeid. Kogu
+  käsikirjade hulga allalaadimiseks see ei sobi.
+- **Veebiotsing**: töötab, aga päring laieneb vaikselt OR-iks ja müra on palju.
+
+### Z39.50 (kasutusel)
+
+Ühendus: `www.ester.ee:212/innopac` (UTF-8, port 210 = MARC-8), avalik.
+Kliendiks on `yaz-client` (apt-pakett `yaz`). Pythoni teeki PyPI-s ei ole.
+Vastuseks tuleb täielik MARC-kirje, sh `040` (raamatukogu, TÜ = `ErTUR`),
+`300` maht, `500` märkused (**„Endine kohaviit: Mscr …”**), `541` tulme ja
+`773` (kogu või fond, nt „Säilik isikuarhiivist: Haubold, …, Fond 14”).
+
+Mõõdetud omadused (2026-11-12). Ilma nendeta jääb enamik päringuid tühjaks:
+
+| Indeks | Käitumine |
+|---|---|
+| `1=4` pealkiri | Üks sõna = sõna pealkirjas (ka `$p`). Mitu sõna = fraas. Algusartikkel jääb välja: „Die Adresse…” annab 0, „Adresse…” annab 1. Täpitähed töötavad. |
+| `1=1003` autor | Perekonnanimi, täpitähed töötavad („Müthel” 90). |
+| `1=1016` sõna | Mitu sõna = AND, järjekorrast sõltumata („Haubold Basilicorum” 7). **Täpitähtedega sõnu ei leia** („kurländische” 0, „Curländische” 0). |
+| `@and` | Ei tööta, alati 0. Kombineerimine käib `1=1016`-ga või kliendi poolel. |
+| kärpimine | `@attr 5=1` / `*` ei toiminud usaldusväärselt. |
+| lagi | Lai päring annab kuni 500 tulemust. Kogu (`773`) järgi otsida ei saa. |
+
+Leitakse ka teiste raamatukogude kirjeid (näiteks TLÜ käsikiri „[Kochbuch]”).
+Filter: `040 ErTUR` ja käsikirja tunnus (leader/6 `t`/`d`/`f`, `773`,
+`351 Säilik` või `500 Käsikiri`).
+
+### Töövoog (proovitud õigusteaduse jaotusega)
+
+1. **Märksõnad (Haiku-agent).** Igalt seostamata sedelilt võetakse autori(te)
+   perekonnanimed (ka lektor ja kirjutaja, OCR-vead parandatud, nt Kilchen →
+   Hilchen), 1–3 iseloomulikku pealkirjasõna originaalkujul, kohaviit ja aasta.
+   Väljund on `margsonad.jsonl`. Töö on lihtne ja odav, otsuseid see ei nõua.
+2. **Päringud** (`scripts/archive/emil_ester_z3950/z_otsi.py <kaust>`). Igal
+   sedelil kuni 8 päringut: `1003` iga perenimi, `1=4` iga pealkirjasõna
+   eraldi ja `1016` perenimi + sõna ning sõna + sõna (ainult täppideta
+   sõnadega). Kuni 100 kirjet päringu kohta, üle 300 tulemuse päringut ei
+   näidata. Järjestus: kirje, mille leidis mitu eri päringut, enne. Ühe
+   päringu tabamus jääb alles ainult siis, kui see päring andis ≤ 5 TÜ
+   käsikirja. Väljund on `z_kandidaadid.json`. 246 sedelit võttis umbes 15 min.
+3. **Hindamine (Sonnet-agendid, ~50 sedelit agendi kohta).** Olekud nagu
+   esimeses voorus. Juhend: endise kohaviite kattumine on tugev tõend; eri
+   kirjutaja või aastaga konspekt on eri säilik.
+4. **Märkused.** Vt allpool.
+
+Õigusteaduse (Balti) tulemus, 246 seostamata sedelit: kandidaate leiti 107-le,
+neist kinnitatud 14, osa 4, kandidaat 1 ja erinev 88. Pildilt kontrolliti
+lk 71 (Kleinenberg: „136” läbi kriipsutatud → F 55, s.-ü. 100, ESTERis endine
+Mscr 136) ja lk 202 (Schmidt: „Mscr 1165” läbi kriipsutatud → F 55, s.-ü. 134,
+OCR luges 1465). Mõlemad õiged. 139 sedelile ei leitud ühtegi kandidaati,
+enamasti Samson von Himmelstierni käsikirjad ja numbrita sedelid
+(Acc. 1922). Need on tõenäoliselt kataloogimata, aga täpitähtede probleemi
+tõttu pole see tõendatud.
+
+Vahetulemused repos: `scripts/archive/emil_ester_z3950/`
+(`oigusteadus_margsonad.jsonl`, `oigusteadus_otsused.jsonl`).
+
+### Jätkamine
+
+1. Ülejäänud 20 teemajaotust samas töövoos, umbes 920 seostamata sedelit.
+   Sedelite tekstid tulevad avalikust otsinguindeksist (`collections =
+   "emil-manuskriptid"`, `text_content`). Juba seotud lehed jäetakse välja
+   `emil_ester_seosed.json` järgi.
+2. Märkuste andmefail nagu esimeses voorus. Kohaviite rida tuleb `773`-st
+   (näiteks „F 55, nim. 1”). Juurde lisandub „endine Mscr N”, kui ESTERi
+   `500` selle märgib. Olek `kandidaat` saab põhjenduse rea „Ebakindel vaste:
+   …”. Kirjutaja on sama `emil_ester_markused.py`. Dubleerimise kaitse töötab
+   b-numbri järgi, nii et esimese vooru lehti see ei puuduta.
+3. Õigusteaduse 19 seost on hinnatud, aga **märkusi pole veel kirjutatud**.
 
 ## Oodatav eksport
 
