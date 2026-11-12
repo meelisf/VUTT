@@ -98,21 +98,52 @@ _WD_GENDER = {
 _HULGA_VÄLJAD = ("name.aliases",)
 
 
-def _ühenda_variandid(local_val, remote_val) -> Optional[list]:
+_SULUD = re.compile(r"\s*\([^()]*\)")
+
+
+def _ladina_tahestikus(tekst: str) -> bool:
+    """Kõik tähed on ladina tähestikus (täpitähed ja diakriitikud kaasa arvatud)."""
+    return all(not c.isalpha() or "LATIN" in unicodedata.name(c, "") for c in tekst)
+
+
+def _allika_variant(v, label: str) -> Optional[str]:
+    """Allikast tulnud nimekuju aliaseks sobival kujul või None (müra).
+
+    - mitteladina kirjasüsteem (VIAF/Wikidata kõigi keelte sildid) → välja;
+    - sulgudes eristus („Johann (1646-1716/17) Fischer”, GND) → eemaldatakse;
+    - paljas nimeosa („Fischer”) ei lisa otsingule midagi → välja.
+    Kanoonilise nime kordus jääb välja `_ühenda_variandid`-is.
+    """
+    tekst = unicodedata.normalize("NFC", str(v)).strip()
+    if not tekst or not _ladina_tahestikus(tekst):
+        return None
+    tekst = " ".join(_SULUD.sub(" ", tekst).split())
+    if not tekst:
+        return None
+    if " " not in tekst and tekst.casefold() in {t.casefold() for t in label.split()}:
+        return None
+    return tekst
+
+
+def _ühenda_variandid(local_val, remote_val, label: str = "") -> Optional[list]:
     """Kohalikud variandid ees, uued allika omad järele. None = midagi uut ei ole.
 
     Võrdlus käib NFC-normaliseeritud ja trimmitud kujul: GND annab täpitähed
     NFD-na, kaardil on NFC — sama nimi ei tohi teist korda listi tulla.
+    Allika kujud läbivad `_allika_variant`-i; kaardil juba olevaid ei puututa.
     """
     def _võti(v):
         return unicodedata.normalize("NFC", str(v)).strip().casefold()
 
     olemas = [v for v in (local_val or []) if str(v).strip()]
     nähtud = {_võti(v) for v in olemas}
+    if label.strip():
+        nähtud.add(_võti(label))
 
     lisandub = []
-    for v in (remote_val or []):
-        if not str(v).strip():
+    for toores in (remote_val or []):
+        v = _allika_variant(toores, label)
+        if v is None:
             continue
         k = _võti(v)
         if k in nähtud:
@@ -172,7 +203,8 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
         local_val = local_obj.get(last) if isinstance(local_obj, dict) else None
 
         if field_path in _HULGA_VÄLJAD:
-            ühend = _ühenda_variandid(local_val, remote_val)
+            ühend = _ühenda_variandid(local_val, remote_val,
+                                      (person.get("name") or {}).get("label") or "")
             if ühend is not None:
                 auto_filled[field_path] = ühend
             return

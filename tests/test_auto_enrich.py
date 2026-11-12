@@ -174,3 +174,15 @@ def test_finish_review_kui_ykski_id_pole_enam_alles():
     assert r["reasons"] == []
     assert r["auto_filled"] == []
     assert r["source_conflicts"] == []
+
+
+def test_automaatne_rikastus_ei_too_mura_aliaseks():
+    """Helilooja Fischer (2026-11-12): kõigi kirjasüsteemide kujud, GND sulukujud
+    ja paljas perekonnanimi läksid kaardile kümne aliasena."""
+    agg = ae.aggregate([
+        src("wikidata", **{"name.aliases": ["Johannes Fischer", "Иоганн Фишер", "ヨハン・フィッシャー"]}),
+        src("gnd", **{"name.aliases": ["Johann (1646-1716/17) Fischer", "Fischer"]}),
+    ])
+    card = {"name": {"label": "Johann Fischer", "aliases": []}}
+    ae.apply_to_card(card, agg)
+    assert card["name"]["aliases"] == ["Johannes Fischer"]
