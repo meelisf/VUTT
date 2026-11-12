@@ -108,8 +108,10 @@ def _person_view(entry: Optional[dict], pid: str, card: Optional[dict] = None) -
     if e.get("origin_place") or e.get("origin_place_id"):
         origin = {"place": e.get("origin_place"), "place_id": e.get("origin_place_id"),
                   "coordinates": e.get("origin_coordinates")}
-    return {"id": pid, "label": label, "birth_year": e.get("birth_year"),
-            "death_year": e.get("death_year"), "origin": origin}
+    return {"id": pid, "label": label, "qualifier": e.get("qualifier"),
+            "birth_year": e.get("birth_year"), "death_year": e.get("death_year"),
+            "floruit_year_from": e.get("floruit_year_from"),
+            "floruit_year_to": e.get("floruit_year_to"), "origin": origin}
 
 
 def _place_coords(location: Optional[dict]) -> Optional[dict]:

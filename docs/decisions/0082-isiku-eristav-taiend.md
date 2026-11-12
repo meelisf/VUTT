@@ -58,9 +58,12 @@ muud kohta seal pole.
      „Samanimelisi isikuid: N — lisa eristav täiend”. Ka uue isiku loomisel tuleb
      vihje kohe. Nii saab olemasolevad kollisioonid järk-järgult läbi käia ilma
      eraldi kampaaniata.
-5. **Olemasolevad andmed.** 4× „von” viiakse perekonnanime juurde (nimeosake kuulub
-   sinna, vormi perekonnanime vihje on juba „von Münchhausen”). „Junior” ja
-   „noorem” jäävad. „Gripenhielm” eemaldatakse täiendist (ta on aliaste hulgas
+5. **Olemasolevad andmed.** 4× „von” on nimeosake, mitte täiend. Perekonnanimesse
+   seda **ei viida**, sest `sort_name` tuleb perekonnanimest ja „von Pufendorf”
+   sortuks V alla. Saksa tava osakese järgi ei sordi. Kui kanoonilises nimes
+   osakest pole, lisatakse kuju „Eesnimi von Perekonnanimi” aliaseks, et see jääks
+   otsitavaks. Täiend tühjendatakse (skript
+   `scripts/archive/adr0082_taiendi_korrastus.py`). „Junior” ja „noorem” jäävad. „Gripenhielm” eemaldatakse täiendist (ta on aliaste hulgas
    juba olemas) ja nimemuutuse mudel lahendatakse eraldi (vt p 7). Teisendus
    käib kaardi salvestustee kaudu (`_save_person_locked`, ADR 0048), mitte otse
    failidesse.

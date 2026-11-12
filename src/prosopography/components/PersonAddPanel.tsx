@@ -76,7 +76,7 @@ const LifeYears: React.FC<{ birth: number | null; death: number | null }> = ({ b
   );
 };
 
-interface ExistingEntry { id: string; label: string; birth: number | null; death: number | null }
+interface ExistingEntry { id: string; label: string; birth: number | null; death: number | null; qualifier?: string | null }
 
 const ExistingBlock: React.FC<{ entries: ExistingEntry[]; onSelect: (e: ExistingEntry) => void }> = ({ entries, onSelect }) => {
   const { t } = useTranslation(['prosopography']);
@@ -92,7 +92,10 @@ const ExistingBlock: React.FC<{ entries: ExistingEntry[]; onSelect: (e: Existing
         {entries.map(e => (
           <li key={e.id} className="flex items-center justify-between gap-2 rounded border border-emerald-300 border-l-4 border-l-emerald-500 bg-emerald-50 px-2.5 py-1.5">
             <div className="min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">{e.label}</div>
+              <div className="text-sm font-medium text-gray-900 truncate">
+                {e.label}
+                {e.qualifier && <span className="ml-1.5 font-normal italic text-gray-600">{e.qualifier}</span>}
+              </div>
               <p className="text-xs text-gray-600"><LifeYears birth={e.birth} death={e.death} /></p>
             </div>
             <button type="button" onClick={() => onSelect(e)}
@@ -296,7 +299,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
       listPersons({ q: q.trim(), limit: 5 }, token).then(r => {
         if (id !== searchIdRef.current) return;
         setSimilarPersons(r.results.filter(e => e.record_status !== 'tombstone').map(e => ({
-          id: e.id, label: e.label, birth_year: e.birth_year, death_year: e.death_year, work_count: e.work_count,
+          id: e.id, label: e.label, qualifier: e.qualifier, birth_year: e.birth_year, death_year: e.death_year, work_count: e.work_count,
         })));
       }).catch(() => { /* varu: kandidaatide vastus toob samad */ });
     }
@@ -358,7 +361,7 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
   const existingEntries = useMemo<ExistingEntry[]>(() => {
     const map = new Map<string, ExistingEntry>();
     for (const sp of similarPersons) {
-      map.set(sp.id, { id: sp.id, label: sp.label, birth: sp.birth_year, death: sp.death_year });
+      map.set(sp.id, { id: sp.id, label: sp.label, birth: sp.birth_year, death: sp.death_year, qualifier: sp.qualifier });
     }
     for (const g of groups) {
       for (const pid of g.existingPersonIds) {

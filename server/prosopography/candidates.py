@@ -140,7 +140,8 @@ def _similar(name: str) -> list:
     if len((name or "").strip()) < 3:
         return []
     res = list_persons(q=name.strip(), limit=5)
-    return [{k: e.get(k) for k in ("id", "label", "birth_year", "death_year", "work_count")}
+    return [{k: e.get(k) for k in ("id", "label", "qualifier", "birth_year", "death_year",
+                                  "floruit_year_from", "floruit_year_to", "work_count")}
             for e in res.get("results") or [] if e.get("record_status") != "tombstone"]
 
 

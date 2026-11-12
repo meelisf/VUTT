@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +42,8 @@ import type { EnrichmentEvidence } from '../services/prosopographyService';
 import RegistryField from '../components/personForm/RegistryField';
 import { useRegistry } from '../hooks/useRegistry';
 import { sourceFormAfterPick } from '../utils/registryMatch';
+import { useSameNamePersons } from '../hooks/useSameNamePersons';
+import SameNameHint from '../components/SameNameHint';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -109,6 +111,13 @@ const PersonEditPage: React.FC = () => {
 
   // Isikutel juba kasutusel olevad märksõnad — soovitused TagsList'ile.
   const tagSuggestions = usePersonTagSuggestions(lang, canEdit, authToken ?? undefined);
+  // Eristav täiend (ADR 0082): kaardi ametid pakkumistena, samanimeliste vihje.
+  const qualifierSuggestions = useMemo(() => [...new Set(
+    draft.occupations
+      .map(o => (o.labels?.[lang] ?? o.label ?? '').trim())
+      .filter(l => l && l !== draft.name_qualifier.trim()),
+  )].slice(0, 6), [draft.occupations, draft.name_qualifier, lang]);
+  const sameName = useSameNamePersons(draft.name_label, isNew ? null : id, authToken ?? undefined);
   // Ameti- ja asutuseregister (ADR 0059): väljad pakuvad neid enne Wikidatat.
   const occupationRegistry = useRegistry('occupation');
   const institutionRegistry = useRegistry('institution');
@@ -536,9 +545,25 @@ const PersonEditPage: React.FC = () => {
                 type="text"
                 value={draft.name_qualifier}
                 onChange={e => set({ name_qualifier: e.target.value })}
-                placeholder="von, van, de…"
+                placeholder={t('form.nameQualifierPlaceholder')}
                 className={`w-full ${inputCls}`}
               />
+              <p className="mt-1 text-xs text-gray-400">{t('form.nameQualifierHint')}</p>
+              {/* ADR 0082: ametid on pakkumised, mitte automaatne valik */}
+              {qualifierSuggestions.length > 0 && (
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-gray-500">{t('form.qualifierFromOccupation')}</span>
+                  {qualifierSuggestions.map(s => (
+                    <button key={s} type="button" onClick={() => set({ name_qualifier: s })}
+                      className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-700 hover:border-primary-300 hover:bg-primary-50">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2">
+                <SameNameHint matches={sameName} hasQualifier={!!draft.name_qualifier.trim()} canEdit={canEdit} />
+              </div>
             </div>
           </div>
 

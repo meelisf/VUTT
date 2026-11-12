@@ -11,8 +11,11 @@ export type RelationKind = 'academic' | 'dedicated' | 'family' | 'cotext' | 'men
 export interface NetworkPerson {
   id: string;
   label: string;
+  qualifier?: string | null;
   birth_year: number | null;
   death_year: number | null;
+  floruit_year_from?: number | null;
+  floruit_year_to?: number | null;
   origin: { place: string | null; place_id: string | null; coordinates: { lat: number; lon: number } | null } | null;
 }
 

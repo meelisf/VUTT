@@ -139,6 +139,18 @@ def test_index_entry_includes_floruit_years():
     assert entry["floruit_year_to"] == 1670
 
 
+def test_index_entry_includes_qualifier():
+    """ADR 0082: eristav täiend jõuab indeksisse — loend ja valija ei laadi kaarte."""
+    entry = _build_entry({"id": "p10", "name": {"label": "Johannes Holm", "qualifier": "  pastor  "}})
+    assert entry["qualifier"] == "pastor"
+    assert entry["label"] == "Johannes Holm"  # täiend ei ole nime osa
+
+
+def test_index_entry_empty_qualifier_is_none():
+    assert _build_entry({"id": "p11", "name": {"label": "X Y", "qualifier": "  "}})["qualifier"] is None
+    assert _build_entry({"id": "p12", "name": {"label": "X Y"}})["qualifier"] is None
+
+
 # ---- list_persons filter test ----
 
 def test_list_persons_status_id_filter(prosopo_env):

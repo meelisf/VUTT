@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Link2, X } from 'lucide-react';
 import { listPersons } from '../../services/prosopographyService';
+import { distinguishingText } from '../../utils/distinguishing';
 import type { ProsopoIndexEntry } from '../../types';
 import type { RelationDraft } from './types';
 
@@ -95,7 +96,7 @@ const ProsopoPersonPicker: React.FC<{
             >
               <span className="text-gray-800 truncate">{p.label}</span>
               <span className="text-xs text-gray-400 shrink-0">
-                {p.birth_year && p.death_year ? `${p.birth_year}–${p.death_year}` : p.birth_year ? `s. ${p.birth_year}` : ''}
+                {distinguishingText(p)}
               </span>
             </button>
           ))}

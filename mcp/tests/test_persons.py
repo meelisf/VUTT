@@ -395,3 +395,22 @@ def test_detail_kontrollib_id_kuju_enne_paringut(bad):
     with pytest.raises(VuttError, match="Vigane person_id"):
         persons.detail(client, BASE, bad, include_relations=False)
     assert client.gets == []
+
+
+def test_search_naitab_eristavat_taiendit_ja_floruiti():
+    """ADR 0082: samanimelised peavad ka agendile eristuma (täiend + aastad/fl.)."""
+    resp = {"total": 2, "results": [
+        {"id": "vutt:Pa", "label": "Johannes Holm", "qualifier": "pastor", "birth_year": 1608, "death_year": 1660},
+        {"id": "vutt:Pb", "label": "Johannes Holm", "floruit_year_from": 1626, "floruit_year_to": 1645},
+    ]}
+    out = persons.search(FakeClient({"/prosopography": resp}), BASE, q="Holm")
+    assert "Johannes Holm (pastor, 1608–1660)" in out
+    assert "Johannes Holm (fl. 1626–1645)" in out
+
+
+def test_detail_naitab_eristavat_taiendit():
+    client = FakeClient({"/prosopography/vutt%3APa": {
+        "id": "vutt:Pa", "name": {"label": "Johannes Holm", "qualifier": "pastor"}, "works": [],
+    }})
+    out = persons.detail(client, BASE, "vutt:Pa", include_relations=False)
+    assert "pastor" in out

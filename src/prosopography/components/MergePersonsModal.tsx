@@ -33,6 +33,7 @@ const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highli
         {label}
       </p>
       <h3 className="text-base font-bold text-gray-900 leading-tight mb-1">{person.label}</h3>
+      {person.qualifier && <p className="text-sm italic text-gray-600 mb-1">{person.qualifier}</p>}
       <p className="text-sm text-gray-500 mb-2">{lifespanNode}</p>
       {(person.status_labels ?? []).length > 0 && <p className="text-xs text-gray-600">{(person.status_labels ?? []).join(', ')}</p>}
       <div className="mt-3 flex items-center gap-1 flex-wrap">

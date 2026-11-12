@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Users, ExternalLink } from 'lucide-react';
 import { listPersons } from '../../services/prosopographyService';
 import type { ProsopoIndexEntry } from '../../types';
+import { distinguishingText } from '../../utils/distinguishing';
 
 /** Nimi peab olema vähemalt nii pikk, enne kui otsime. Kaks tähte annab
  *  praktiliselt kogu korpuse ja vasteplokk kaotaks mõtte. */
@@ -71,10 +72,7 @@ const SimilarPersonsWarning: React.FC<Props> = ({
 
   if (dismissed || loading || matches.length === 0) return null;
 
-  const years = (p: ProsopoIndexEntry) => {
-    if (!p.birth_year && !p.death_year) return null;
-    return `${p.birth_year ?? '?'}–${p.death_year ?? '?'}`;
-  };
+  const years = (p: ProsopoIndexEntry) => distinguishingText(p) || null;
 
   return (
     <div className="mt-2 rounded border border-amber-200 bg-amber-50/60 p-3">

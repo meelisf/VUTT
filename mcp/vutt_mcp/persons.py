@@ -38,6 +38,30 @@ def _snippet_of(entry: dict) -> str:
     return ""
 
 
+def _years_text(p: dict) -> str:
+    """Eluaastad; nende puudumisel floruit. Sama reegel mis kliendi
+    `src/prosopography/utils/distinguishing.ts` (ADR 0082) — muuda koos."""
+    b, d = p.get("birth_year") or None, p.get("death_year") or None
+    if b and d:
+        return f"{b}–{d}"
+    if b:
+        return f"*{b}"
+    if d:
+        return f"†{d}"
+    f_, t_ = p.get("floruit_year_from") or None, p.get("floruit_year_to") or None
+    if f_ and t_:
+        return f"fl. {f_}–{t_}"
+    if f_ or t_:
+        return f"fl. {f_ or t_}"
+    return ""
+
+
+def _plain_label(label: str, p: dict) -> str:
+    """`Nimi (täiend, 1608–1660)` — samanimelised peavad agendile eristuma."""
+    extra = ", ".join(x for x in ((p.get("qualifier") or "").strip(), _years_text(p)) if x)
+    return f"{label} ({extra})" if extra else label
+
+
 def search(client, base_url: str, **filters) -> str:
     """Isikuotsing. Tühjad filtrid jäetakse päringust välja."""
     params = {k: v for k, v in filters.items() if v not in (None, "")}
@@ -51,12 +75,7 @@ def search(client, base_url: str, **filters) -> str:
         "",
     ]
     for i, person in enumerate(results, start=1):
-        years = "–".join(
-            str(y) for y in (person.get("birth_year"), person.get("death_year")) if y
-        )
-        head = f"[{i}] {person.get('label', '')}"
-        if years:
-            head += f" ({years})"
+        head = f"[{i}] {_plain_label(person.get('label', ''), person)}"
 
         meta = [f"person_id={person.get('id', '')}"]
         if person.get("work_count") is not None:
@@ -96,6 +115,7 @@ def detail(client, base_url: str, person_id: str, include_relations: bool) -> st
     name = (person.get("name") or {}).get("label") or person.get("id", "")
     sections = [fmt.format_fields([
         ("nimi", name),
+        ("eristav täiend", (person.get("name") or {}).get("qualifier")),
         ("person_id", person.get("id")),
         ("sugu", person.get("gender")),
         ("sünd", _date_label(person.get("birth"))),

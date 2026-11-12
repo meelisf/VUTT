@@ -12,6 +12,7 @@ import type { VisibleNetwork } from '../../utils/network';
 import type { NetworkEdge, NetworkWork } from '../../services/networkService';
 import { evidenceTarget, familyRelation } from '../../utils/network';
 import { formatRelationOwnerName } from '../../utils/estonianName';
+import { distinguishingText } from '../../utils/distinguishing';
 
 /** Rea koht. Osa real osa enda koht (saatmis- või toimumiskoht), trükikoht ei ole kirja
  *  koht (#464). Teose real trükikoht; „teadmata" ainult trükisel — käsikirjal trükikohta pole. */
@@ -88,7 +89,7 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
   const famLabel = famRel
     ? t('form.relationSentence', { other: famRel.subject, self: formatRelationOwnerName(famRel.owner, lang), type: famRel.type })
     : null;
-  const years = p.birth_year || p.death_year ? `${p.birth_year ?? '?'}–${p.death_year ?? '?'}` : '';
+  const years = distinguishingText(p);
 
   return (
     <div

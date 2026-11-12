@@ -568,8 +568,11 @@ def get_person_map_markers(
         marker["persons"].append({
             "id": entry.get("id"),
             "label": entry.get("label"),
+            "qualifier": entry.get("qualifier"),
             "birth_year": entry.get("birth_year"),
             "death_year": entry.get("death_year"),
+            "floruit_year_from": entry.get("floruit_year_from"),
+            "floruit_year_to": entry.get("floruit_year_to"),
             "imm_year": entry.get("imm_year"),
             "image_url": entry.get("image_url"),
             "work_count": entry.get("work_count", 0),
@@ -792,6 +795,8 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     return {
         "id": person["id"],
         "label": label,
+        # ADR 0082: käsitsi eristav täiend — EI ole nime osa (otsing/sort ei kasuta).
+        "qualifier": (name_obj.get("qualifier") or "").strip() or None,
         "sort_name": sort_name,
         "birth_year": _extract_year(birth),
         "birth_date": _extract_date(birth),

@@ -110,6 +110,7 @@ const CardInner: React.FC<{
       <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight">
         {person.label}
       </h3>
+      {person.qualifier && <p className="text-sm text-gray-600 italic">{person.qualifier}</p>}
 
       <div className="mt-1 space-y-1.5 flex-1">
         {/* Eluaastad */}
