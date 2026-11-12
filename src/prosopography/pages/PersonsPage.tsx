@@ -55,6 +55,7 @@ const PersonsPage: React.FC = () => {
   const yearTo = explicitYearTo ?? legacyImmYearTo ?? '';
   const hasExplicitYearRange = explicitYearFrom !== null || explicitYearTo !== null;
   const statusId = searchParams.get('status_id') ?? '';
+  const nameChange = searchParams.get('name_change') === '1';
   // Märksõnad — URL toetab kordust (?tag=A&tag=B), UI valib praegu ühe.
   // Stabiilne string on vajalik, sest getAll() annab igal renderdusel uue massiivi
   // ja see destabiliseeriks useCallback deps-listi (lõputu päringutsükkel).
@@ -113,6 +114,7 @@ const PersonsPage: React.FC = () => {
   const setYearFrom = (v: string)     => setYearParam('year_from', 'imm_year_from', v);
   const setYearTo = (v: string)       => setYearParam('year_to', 'imm_year_to', v);
   const setStatusId = (v: string)     => setFilterParam('status_id', v);
+  const setNameChange = (v: boolean)  => setFilterParam('name_change', v ? '1' : '');
   // Uus valik asendab kõik senised märksõnad (UI on üksikvalik).
   const setTag = (v: string) =>
     setSearchParams(p => {
@@ -228,6 +230,8 @@ const PersonsPage: React.FC = () => {
     imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
     status_id: statusId || undefined,
     tag: tags.length ? tags : undefined,
+    // Tööjärjekord on toimetaja vahend; URL-i jäänud lipp ei piira lugejat
+    name_change: canEdit && nameChange ? true : undefined,
   };
   const listParams = {
     ...filterParams,
@@ -279,11 +283,12 @@ const PersonsPage: React.FC = () => {
     getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
   }, []);
 
-  const hasActiveFilters = !!(originGroup || originPlace || institution || source || gender || yearFrom || yearTo || statusId || tags.length);
-  const activeFilterCount = [originGroup, originPlace, institution, source, gender, yearFrom || yearTo, statusId, tags[0]].filter(Boolean).length;
+  const nameChangeActive = canEdit && nameChange;
+  const hasActiveFilters = !!(originGroup || originPlace || institution || source || gender || yearFrom || yearTo || statusId || tags.length || nameChangeActive);
+  const activeFilterCount = [originGroup, originPlace, institution, source, gender, yearFrom || yearTo, statusId, tags[0], nameChangeActive].filter(Boolean).length;
   const clearAllFilters = () => setSearchParams(p => {
     const n = new URLSearchParams(p);
-    ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'tag', 'offset'].forEach(k => n.delete(k));
+    ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'tag', 'name_change', 'offset'].forEach(k => n.delete(k));
     return n;
   }, { replace: true });
   const isEn = !!i18n.language?.startsWith('en');
@@ -387,6 +392,8 @@ const PersonsPage: React.FC = () => {
               onStatusIdChange={setStatusId}
               onGenderChange={setGender}
               onSourceChange={setSource}
+              nameChange={canEdit ? nameChange : undefined}
+              onNameChangeChange={setNameChange}
             />
           </FilterSidebar>
 
@@ -482,6 +489,10 @@ const PersonsPage: React.FC = () => {
                 <FilterChip kind={t('filterSourceAll', 'Allikas')}
                   label={source === 'aa' ? t('filterSourceAA', 'Album Academicum') : source}
                   onRemove={() => setSource('')} />
+              )}
+              {nameChangeActive && (
+                <FilterChip kind={t('names.queueTitle')} label={t('names.filterPossibleChange')}
+                  onRemove={() => setNameChange(false)} />
               )}
               {hasActiveFilters && (
                 <button type="button" onClick={clearAllFilters} className="text-sm text-gray-500 hover:text-red-600 ml-1">
@@ -631,6 +642,7 @@ const PersonsPage: React.FC = () => {
                   selected={selectedIds.has(person.id)}
                   onSelect={() => toggleSelect(person)}
                   statusVocab={seisused}
+                  query={query}
                 />
               ))}
             </div>
@@ -647,6 +659,7 @@ const PersonsPage: React.FC = () => {
                   selected={selectedIds.has(person.id)}
                   onSelect={() => toggleSelect(person)}
                   statusVocab={seisused}
+                  query={query}
                 />
               ))}
             </div>

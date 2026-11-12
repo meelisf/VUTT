@@ -1,6 +1,6 @@
 # 0083 — Isiku nimeajalugu: üks nimeloend
 
-**Staatus:** vastu võetud 2026-11-12, teostamata
+**Staatus:** vastu võetud 2026-11-12, teostatud 2026-11-12 (#795)
 **Seotud:** ADR 0082 (eristav täiend), ADR 0058 (MCP ettepanekud), ADR 0048 (kaardi salvestus)
 **Issue:** #795
 
@@ -37,11 +37,13 @@ leidma ja aliastest eristama.
 2. **Teose juures ei muutu midagi.** `creators[].name` jääb nagu praegu.
    Ajastule vastava nime näitamist teose juures ei tehta.
 3. **Üks nimeloend kasutaja jaoks.** Vormis ja isikulehel on üks plokk
-   „Nimed ja nimekujud”. Iga rida on kuju ja selle liik on vaikimisi
-   „kirjaviis”. Kui liik muudetakse (sünni- või patronüümiline nimi, ladinastatud
-   kuju, aadlinimi, abielunimi, pseudonüüm, ordunimi), ilmuvad väljad „alates”,
-   „kuni” ja „allikas”. Uut lahtrit ei tule: nimed on seal, kus need on alati
-   olnud.
+   „Nimed ja nimekujud”. Kuju on vaikimisi kirjaviisi variant (kiip, nagu
+   aliased alati olid). Kiibi noolega tõstetakse kuju liigiga nimeks (sünni- või
+   patronüümiline nimi, ladinastatud kuju, aadlinimi, abielunimi, pseudonüüm,
+   ordunimi, muu); siis ilmuvad väljad „alates”, „kuni” ja „allikas”, ja
+   „variandiks” viib tagasi. Uut lahtrit ei tule: nimed on seal, kus need on
+   alati olnud. Plokk avaneb vormis ise, kui kaardil on liigiga nimi või
+   punkti 5 vihje.
 4. **Andmekuju.** Kirjaviisi variandid jäävad `name.aliases`-sse (stringid, kõik
    praegused lugejad jäävad tööle). Liigiga nimi elab `name.names[]`-is:
    `{label, type, from, to, source, notes}`. Liigi määramine tõstab kuju aliastest
@@ -55,16 +57,40 @@ leidma ja aliastest eristama.
      ja pakub liigi valiku. Masin ei otsusta, toimetaja otsustab.
    - **Tööjärjekord:** isikute loendis filter „Võimalik nimemuutus”: kaardid,
      kus mõni alias ei sarnane kanoonilise nimega ja `names` on tühi. Täidetakse
-     järk-järgult.
-   - **Isikuleht** näitab nimesid ajajärjestuses
-     („Johannes Erici Stregnensis → Johan Stiernstråle (aadlinimi, alates …)”).
-     Valija ja loend näitavad „ka: …”, kui otsing tabas teise nime.
+     järk-järgult. Filter on toimetaja vahend (külgriba sektsioon
+     „Tööjärjekord”, `editor`+); URL-i param `name_change`.
+   - **Isikuleht** näitab liigiga nimesid ajajärjestuses struktureeritud info
+     esimese reana („Johan Stiernstråle (aadlinimi, alates …) · allikas”);
+     kirjaviisi variandid jäävad reale „Nimevariandid”.
+     Valija ja loend näitavad „ka: …”, kui otsing tabas teise nime
+     (`matchedOtherName`; väliste ID-de aliaste tabamust klient ei näe).
 6. **Automaatne abi käib ADR 0058 kaudu, mitte vormi sees.** Agent võib
    tööjärjekorra läbi käia ja esitada ootel ettepaneku (nimi, liik, aasta,
    allikas), mille toimetaja kinnitab. Keelemudeli päringut vormis (nt Gemini
    Flash) praegu ei tehta. Klassifitseerimisega saab punkti 5 reegel hakkama
    peaaegu tasuta. Faktid (aadeldamise aasta) peavad tulema allikaga, mitte
    väljale ilmuva väärtusena.
+
+## Teostus
+
+- **Reegel „teine nimi?”** on kahes kohas samana: `server/prosopography/person_names.py`
+  (`looks_like_other_name`) ja `src/prosopography/utils/personNames.ts`
+  (`looksLikeOtherName`). Eesnimesid ei võrrelda (Olof/Olaus on keelekuju),
+  ladina lõpud võetakse maha, kuju on variant, kui ta sisaldab kanoonilist
+  perekonnanime või tema perekonnanimi sarnaneb kanoonilise mõne
+  mitte-eesnimelise sõnaga. Testid jagavad juhtumeid (`OTHER_NAME_CASES` ↔
+  `CASES`) — **muuda mõlemat koos**. Tootmisandmetel (2026-11-12) märgib reegel
+  79 kaarti, enamik päris nimemuutused.
+- **Salvestus:** `_apply_card_update` puhastab `names[]` (`normalize_name_obj`:
+  tundmatu liik → `other`, aastad 3–4 kohta, korduv kuju välja) ja eemaldab
+  liigiga kuju `aliases`-ist. Klient, kes `names` võtit ei saada (vana vorm,
+  rikastus, skriptid), nimeajalugu EI kustuta — vana `names` kantakse üle.
+- **Liitmine** ühendab `names` kuju järgi, sihtkaardi kirjed ees.
+- **Indeks:** isikuindeksi kirjel `names` (kuvamiseks), `aliases` sisaldab ka
+  liigiga kujusid (otsing) ja `possible_name_change` (filter);
+  `card_search_names` (→ `person_aliases.json` → `authors_text`) võtab ka
+  liigiga nimed.
+- **MCP** `get_person` näitab nimeajalugu.
 
 ## Tagajärjed
 

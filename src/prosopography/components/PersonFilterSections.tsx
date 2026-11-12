@@ -1,14 +1,15 @@
 /**
  * Isikute filtrite külgriba sisu (#587). Peegeldab teoste `WorkFilterSections`-it:
  * `CollapsibleSection` + `SearchableFilterList`, nähtaval viis sagedasemat.
- * Järjekord: Aasta → Päritolu → Haridusasutus → Märksõnad → Seisus → Sugu → Allikas.
+ * Järjekord: Aasta → Päritolu → Haridusasutus → Märksõnad → Seisus → Sugu → Allikas
+ * (→ toimetajale Tööjärjekord, ADR 0083).
  *
  * Kõik filtrid on üksikvalikud (URL-is üks väärtus): uus valik asendab vana,
  * valitu uus klikk eemaldab. `origin_place` tuleb kaardilt ja on ainult kiip.
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, CalendarDays, Crown, Database, MapPin, Tag, Venus } from 'lucide-react';
+import { BookOpen, CalendarDays, Crown, Database, ListChecks, MapPin, Tag, Venus } from 'lucide-react';
 import CollapsibleSection from '../../components/CollapsibleSection';
 import SearchableFilterList from '../../components/filters/SearchableFilterList';
 
@@ -43,6 +44,9 @@ interface PersonFilterSectionsProps {
   onStatusIdChange: (v: string) => void;
   onGenderChange: (v: GenderFilter) => void;
   onSourceChange: (v: string) => void;
+  /** Tööjärjekord (ADR 0083) — `undefined` = sektsiooni ei näidata (mitte-toimetaja). */
+  nameChange?: boolean;
+  onNameChangeChange?: (v: boolean) => void;
 }
 
 /** Fassetita valikute rida (seisus, sugu, allikas) — sama kuju mis loendil. */
@@ -88,6 +92,7 @@ const PersonFilterSections: React.FC<PersonFilterSectionsProps> = ({
   originGroups, institutions, tagFacets, seisused,
   onYearFromChange, onYearToChange, onOriginGroupChange, onInstitutionChange,
   onTagChange, onStatusIdChange, onGenderChange, onSourceChange,
+  nameChange, onNameChangeChange,
 }) => {
   const { t, i18n } = useTranslation('prosopography');
   const isEn = !!i18n.language?.startsWith('en');
@@ -202,6 +207,21 @@ const PersonFilterSections: React.FC<PersonFilterSectionsProps> = ({
           onToggle={onSourceChange}
         />
       </CollapsibleSection>
+
+      {nameChange !== undefined && onNameChangeChange && (
+        <CollapsibleSection
+          title={t('names.queueTitle')}
+          icon={<ListChecks size={14} />}
+          defaultOpen={nameChange}
+          badge={nameChange ? 1 : undefined}
+        >
+          <OptionList
+            options={[{ value: '1', label: t('names.filterPossibleChange') }]}
+            selected={nameChange ? '1' : ''}
+            onToggle={v => onNameChangeChange(v === '1')}
+          />
+        </CollapsibleSection>
+      )}
     </div>
   );
 };

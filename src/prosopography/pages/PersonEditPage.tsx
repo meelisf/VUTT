@@ -16,7 +16,8 @@ import type { ProsopoRecord } from '../types';
 import { type FormDraft, type OccupationDraft, type EducationDraft, emptyDraft, emptyDateDraft } from '../components/personForm/types';
 import { recordToDraft, draftToPayload } from '../components/personForm/helpers';
 import DateField from '../components/personForm/DateField';
-import AliasesList from '../components/personForm/AliasesList';
+import NamesEditor from '../components/personForm/NamesEditor';
+import { possibleNameChange } from '../utils/personNames';
 import ProsopoPersonPicker from '../components/personForm/ProsopoPersonPicker';
 import TagsList from '../components/personForm/TagsList';
 import { usePersonTagSuggestions } from '../hooks/usePersonTagSuggestions';
@@ -190,6 +191,8 @@ const PersonEditPage: React.FC = () => {
       .then(data => {
         setOriginal(data);
         setDraft(recordToDraft(data));
+        // ADR 0083: nimed ei tohi peituda kokkupandud ploki taha, kui seal on midagi otsustada
+        if (data.name?.names?.length || possibleNameChange(data.name ?? {})) setNamesOpen(true);
         setImageUrl(data.image_url ?? null);
       })
       .catch(() => setError(t('loadErrorSingle')))
@@ -780,9 +783,11 @@ const PersonEditPage: React.FC = () => {
           open={namesOpen}
           onToggle={() => setNamesOpen(v => !v)}
         >
-          <AliasesList
+          <NamesEditor
+            label={draft.name_label}
             aliases={draft.name_aliases}
-            onChange={v => set({ name_aliases: v })}
+            names={draft.name_names}
+            onChange={set}
           />
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">{t('form.identifiers')}</label>

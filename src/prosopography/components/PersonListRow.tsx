@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import type { ProsopoIndexEntry } from '../types';
 import type { VocabularySeisusItem } from '../../services/collectionService';
 import { personImageProps } from '../utils/personImage';
+import AlsoKnownAs from './AlsoKnownAs';
 import { Initials, Lifespan, personOrigin, personStatusText, verificationDotClass } from '../utils/personDisplay';
 
 interface PersonListRowProps {
@@ -13,6 +14,8 @@ interface PersonListRowProps {
   selected?: boolean;
   onSelect?: () => void;
   statusVocab?: VocabularySeisusItem[];
+  /** Otsingupäring — „ka: …”, kui tabati teist nime (ADR 0083). */
+  query?: string;
 }
 
 /**
@@ -20,7 +23,7 @@ interface PersonListRowProps {
  * täisnimi, eluaastad, päritolu ja seisus; paremal kontrollitaseme täpp.
  * Valikurežiimis (liitmine) valib klikk isiku, muidu avab isikulehe.
  */
-const PersonListRow: React.FC<PersonListRowProps> = ({ person, selectMode = false, selected = false, onSelect, statusVocab }) => {
+const PersonListRow: React.FC<PersonListRowProps> = ({ person, selectMode = false, selected = false, onSelect, statusVocab, query }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   const location = useLocation();
   const navigate = useNavigate();
@@ -80,6 +83,7 @@ const PersonListRow: React.FC<PersonListRowProps> = ({ person, selectMode = fals
           {person.label}
         </a>
         {person.qualifier && <span className="ml-1.5 text-sm italic text-gray-600">{person.qualifier}</span>}
+        <AlsoKnownAs person={person} query={query} className="ml-1.5 text-xs text-gray-500" />
         <div className="mt-0.5 text-sm text-gray-600 flex flex-wrap gap-x-4 gap-y-0.5">
           <span className="tabular-nums text-gray-500"><Lifespan person={person} /></span>
           {origin.text && <span className="text-gray-500">{origin.text}</span>}

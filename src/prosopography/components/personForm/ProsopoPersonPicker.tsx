@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, Link2, X } from 'lucide-react';
 import { listPersons } from '../../services/prosopographyService';
 import { distinguishingText } from '../../utils/distinguishing';
+import AlsoKnownAs from '../AlsoKnownAs';
 import type { ProsopoIndexEntry } from '../../types';
 import type { RelationDraft } from './types';
 
@@ -94,7 +95,10 @@ const ProsopoPersonPicker: React.FC<{
               onMouseDown={() => select(p)}
               className="w-full text-left px-3 py-2 hover:bg-primary-50 text-sm flex items-baseline justify-between gap-2"
             >
-              <span className="text-gray-800 truncate">{p.label}</span>
+              <span className="min-w-0 truncate">
+                <span className="text-gray-800">{p.label}</span>
+                <AlsoKnownAs person={p} query={query} className="ml-1.5 text-xs text-gray-500" />
+              </span>
               <span className="text-xs text-gray-400 shrink-0">
                 {distinguishingText(p)}
               </span>

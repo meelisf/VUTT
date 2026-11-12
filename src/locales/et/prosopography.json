@@ -161,7 +161,7 @@
     "nameMaiden": "Neiupõlvenimi",
     "nameMaidenHint": "Ainult perekonnanimi. Kuvatakse „sünd. …“ ja on isikuotsingus otsitav.",
     "nameRequired": "Nimi on kohustuslik.",
-    "namesAndIdentifiers": "Nimevariandid ja identifikaatorid",
+    "namesAndIdentifiers": "Nimed, nimekujud ja identifikaatorid",
     "noItems": "Kirjeid pole. Klõpsa \"Lisa\" lisamiseks.",
     "notesPlaceholder": "Sisemised märkmed (ei kuvata avalikult)…",
     "occupation": "Amet",
@@ -468,6 +468,34 @@
   "loadingVocab": "Laadin…",
   "scope": {
     "workSet": "Töökollektsioon"
+  },
+  "names": {
+    "title": "Nimed ja nimekujud",
+    "hint": "Kirjaviisi variandid kiipidena. Kui isik kandis eri aegadel teist nime (aadlinimi, abielunimi, pseudonüüm…), tõsta kuju üles ja vali liik.",
+    "form": "Nimekuju",
+    "type": "Liik",
+    "from": "alates",
+    "to": "kuni",
+    "source": "Allikas (nt SBL, Wikidata)",
+    "promote": "Teine nimi?",
+    "promoteTitle": "See kuju ei sarnane kanoonilise nimega — kas see on isiku teine nimi? Tõsta liigiga nimeks.",
+    "setType": "Määra nimekuju liik (nt ladinastatud kuju)",
+    "demote": "Tagasi kirjaviisi variandiks",
+    "demoteShort": "variandiks",
+    "remove": "Eemalda",
+    "also": "ka:",
+    "queueTitle": "Tööjärjekord",
+    "filterPossibleChange": "Võimalik nimemuutus",
+    "history": "Nimed",
+    "types": {
+      "birth": "sünni-/patronüümiline nimi",
+      "latinized": "ladinastatud kuju",
+      "ennobled": "aadlinimi",
+      "married": "abielunimi",
+      "pseudonym": "pseudonüüm",
+      "religious": "ordunimi",
+      "other": "muu nimi"
+    }
   },
   "sameName": {
     "title_one": "Samanimeline isik VUTT-is",

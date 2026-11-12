@@ -62,6 +62,26 @@ def _plain_label(label: str, p: dict) -> str:
     return f"{label} ({extra})" if extra else label
 
 
+_NAME_TYPES_ET = {
+    "birth": "sünni-/patronüümiline nimi", "latinized": "ladinastatud kuju",
+    "ennobled": "aadlinimi", "married": "abielunimi", "pseudonym": "pseudonüüm",
+    "religious": "ordunimi", "other": "muu nimi",
+}
+
+
+def _names_history(name_obj: dict) -> list:
+    """ADR 0083: liigiga nimed — `Johan Stiernstråle (aadlinimi, 1650–)`."""
+    out = []
+    for n in name_obj.get("names") or []:
+        if not isinstance(n, dict) or not n.get("label"):
+            continue
+        aeg = ""
+        if n.get("from") or n.get("to"):
+            aeg = f", {n.get('from') or ''}–{n.get('to') or ''}"
+        out.append(f"{n['label']} ({_NAME_TYPES_ET.get(n.get('type'), n.get('type') or 'muu nimi')}{aeg})")
+    return out
+
+
 def search(client, base_url: str, **filters) -> str:
     """Isikuotsing. Tühjad filtrid jäetakse päringust välja."""
     params = {k: v for k, v in filters.items() if v not in (None, "")}
@@ -116,6 +136,7 @@ def detail(client, base_url: str, person_id: str, include_relations: bool) -> st
     sections = [fmt.format_fields([
         ("nimi", name),
         ("eristav täiend", (person.get("name") or {}).get("qualifier")),
+        ("nimeajalugu", _names_history(person.get("name") or {})),
         ("person_id", person.get("id")),
         ("sugu", person.get("gender")),
         ("sünd", _date_label(person.get("birth"))),

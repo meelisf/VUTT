@@ -319,6 +319,8 @@ class PersonFilters:
     imm_year_from: Optional[int] = None
     imm_year_to: Optional[int] = None
     tags: Optional[list] = None
+    # ADR 0083: tööjärjekord „võimalik nimemuutus” (alias näib teise nimena, `names` tühi)
+    name_change: Optional[bool] = None
 
     @classmethod
     def from_body(cls, data: dict) -> "PersonFilters":
@@ -347,6 +349,7 @@ def _filter_index_entries(
     status_id, source, verification_level = f.status_id, f.source, f.verification_level
     year_from, year_to = f.year_from, f.year_to
     imm_year_from, imm_year_to, tags = f.imm_year_from, f.imm_year_to, f.tags
+    name_change = f.name_change
     # Jagatud vahemälu (#759): tulemus on UUS loend, kirjeid endid ei muudeta.
     index = _load_index_readonly()
     results = [
@@ -383,6 +386,8 @@ def _filter_index_entries(
                    if isinstance(a, str))
             or _matches_tags(e)
         ]
+    if name_change:
+        results = [e for e in results if e.get("possible_name_change")]
     if gender:
         results = [e for e in results if e.get("gender") == gender]
     if occupation:
@@ -712,7 +717,13 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         if qualifier and words and words[-1].lower() == qualifier:
             words = words[:-1]
         sort_name = words[-1] if len(words) > 1 else label
-    aliases = name_obj.get("aliases") or []
+    # Otsing leiab ka liigiga nimede järgi (ADR 0083); kuvamiseks eraldi `names`.
+    from .person_names import possible_name_change
+    names = [
+        {k: n.get(k) for k in ("label", "type", "from", "to")}
+        for n in (name_obj.get("names") or []) if isinstance(n, dict) and n.get("label")
+    ]
+    aliases = list(dict.fromkeys([*(name_obj.get("aliases") or []), *(n["label"] for n in names)]))
     occupations = _extract_occupation_entries(person)
 
     education_institutions = list(dict.fromkeys(
@@ -822,6 +833,8 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         **_make_snippets(person),
         "image_url": person.get("image_url"),
         "aliases": aliases,
+        "names": names,
+        "possible_name_change": possible_name_change(name_obj),
         "occupations": occupations,
         "education_institutions": education_institutions,
         "origin_place": place_key,

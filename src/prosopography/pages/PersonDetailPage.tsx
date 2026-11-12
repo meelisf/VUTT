@@ -24,6 +24,7 @@ import type { ProsopoRecord } from '../types';
 import { formatEntryPeriod, institutionLabel } from '../utils/entryPeriod';
 import { mergedRedirectTarget } from '../utils/mergedRedirect';
 import { personImageProps } from '../utils/personImage';
+import { formatNameSpan, sortNamesByTime } from '../utils/personNames';
 import { groupPersonWorks, type PersonWorkEntry } from '../utils/personWorks';
 import PersonWorkParts from '../components/PersonWorkParts';
 import PersonSourcesCard from '../components/PersonSourcesCard';
@@ -128,6 +129,30 @@ export const StructuredInfoCard: React.FC<{ person: ProsopoRecord; workTitles: R
 
   const rows: { label: string; value: React.ReactNode; wide?: boolean }[] = [];
   const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
+  // Nimeajalugu (ADR 0083): liigiga nimed ajajärjestuses — et oleks näha, et
+  // teine nimi on SAMA isiku teine nimi ja millal see kehtis.
+  const typedNames = sortNamesByTime(person.name.names ?? []);
+  if (typedNames.length > 0) {
+    const words = { from: t('names.from'), to: t('names.to') };
+    rows.push({
+      label: t('names.history'),
+      wide: true,
+      value: (
+        <span className="block space-y-0.5">
+          {typedNames.map((n, i) => {
+            const meta = [t(`names.types.${n.type}`), formatNameSpan(n.from, n.to, words)].filter(Boolean).join(', ');
+            return (
+              <span key={i} className="block">
+                <span className="font-medium">{n.label}</span>
+                <span className="text-gray-500"> ({meta})</span>
+                {n.source && <span className="text-gray-400 text-xs"> · {n.source}</span>}
+              </span>
+            );
+          })}
+        </span>
+      ),
+    });
+  }
 
   if (person.gender) {
     rows.push({

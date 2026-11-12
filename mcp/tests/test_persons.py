@@ -414,3 +414,14 @@ def test_detail_naitab_eristavat_taiendit():
     }})
     out = persons.detail(client, BASE, "vutt:Pa", include_relations=False)
     assert "pastor" in out
+
+
+def test_detail_naitab_nimeajalugu():
+    """ADR 0083: agent peab nägema, et teine nimi on sama isiku hilisem nimi."""
+    client = FakeClient({"/prosopography/vutt%3APa": {
+        "id": "vutt:Pa", "works": [],
+        "name": {"label": "Johannes Erici Stregnensis",
+                 "names": [{"label": "Johan Stiernstråle", "type": "ennobled", "from": 1650, "to": None}]},
+    }})
+    out = persons.detail(client, BASE, "vutt:Pa", include_relations=False)
+    assert "Johan Stiernstråle (aadlinimi, 1650–)" in out

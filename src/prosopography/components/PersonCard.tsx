@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PersonSnippet from './PersonSnippet';
+import AlsoKnownAs from './AlsoKnownAs';
 import { MapPin, ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
 import type { VocabularySeisusItem } from '../../services/collectionService';
@@ -15,6 +16,8 @@ interface PersonCardProps {
   onSelect?: (id: string) => void;
   /** Seisuste sõnavara (id → {et,en}), laetakse PersonsPage'is; kasutatakse seisuse lokaliseerimiseks. */
   statusVocab?: VocabularySeisusItem[];
+  /** Otsingupäring — „ka: …”, kui tabati teist nime (ADR 0083). */
+  query?: string;
 }
 
 const ExternalBadge: React.FC<{ label: string }> = ({ label }) => (
@@ -44,8 +47,9 @@ const CardInner: React.FC<{
   onOriginClick?: () => void;
   onTagClick?: (value: string) => void;
   statusVocab?: VocabularySeisusItem[];
+  query?: string;
 }> = ({
-  person, lifespan, onOriginClick, onTagClick, statusVocab,
+  person, lifespan, onOriginClick, onTagClick, statusVocab, query,
 }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   return (
@@ -111,6 +115,7 @@ const CardInner: React.FC<{
         {person.label}
       </h3>
       {person.qualifier && <p className="text-sm text-gray-600 italic">{person.qualifier}</p>}
+      <AlsoKnownAs person={person} query={query} className="block text-xs text-gray-500" />
 
       <div className="mt-1 space-y-1.5 flex-1">
         {/* Eluaastad */}
@@ -172,7 +177,7 @@ const CardInner: React.FC<{
   );
 };
 
-const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect, statusVocab }) => {
+const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect, statusVocab, query }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -201,7 +206,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
             </svg>
           )}
         </div>
-        <CardInner person={person} lifespan={lifespanNode} statusVocab={statusVocab} />
+        <CardInner person={person} lifespan={lifespanNode} statusVocab={statusVocab} query={query} />
       </div>
     );
   }
@@ -233,7 +238,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
       onKeyDown={e => e.key === 'Enter' && openPerson()}
       className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden cursor-pointer"
     >
-      <CardInner person={person} lifespan={lifespanNode} onOriginClick={openOriginMap} onTagClick={openTagFilter} statusVocab={statusVocab} />
+      <CardInner person={person} lifespan={lifespanNode} onOriginClick={openOriginMap} onTagClick={openTagFilter} statusVocab={statusVocab} query={query} />
     </div>
   );
 };

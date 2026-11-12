@@ -14,6 +14,7 @@ import type { ProsopoIndexEntry } from '../prosopography/types';
 import PersonAddPanel from '../prosopography/components/PersonAddPanel';
 import { normalizeExtId } from '../prosopography/utils/externalIds';
 import { useUser } from '../contexts/UserContext';
+import AlsoKnownAs from '../prosopography/components/AlsoKnownAs';
 import { isAtLeast } from '../utils/roleUtils';
 
 export interface SuggestionItem {
@@ -591,6 +592,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         <span className="font-medium text-gray-900 text-sm block truncate">
           {entry.label}
           {entry.qualifier && <span className="ml-1.5 font-normal italic text-gray-500">{entry.qualifier}</span>}
+          <AlsoKnownAs person={entry} query={inputValue} className="ml-1.5 font-normal text-xs text-gray-500" />
         </span>
         <span className="text-[10px] text-indigo-500/80 italic flex items-center gap-1.5">
           <span>{entry.id}</span>

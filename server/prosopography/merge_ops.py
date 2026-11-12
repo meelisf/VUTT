@@ -145,6 +145,17 @@ def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
         target.setdefault("name", {})["maiden_name"] = src_maiden
         target_changed = True
 
+    # Nimeajalugu (ADR 0083): ühend nimekuju järgi, sihtkaardi kirjed ees.
+    src_names = (source.get("name") or {}).get("names") or []
+    if src_names:
+        tgt_name = target.setdefault("name", {})
+        tgt_names = tgt_name.get("names") or []
+        olemas = {(n.get("label") or "").strip().casefold() for n in tgt_names}
+        lisandub = [n for n in src_names if (n.get("label") or "").strip().casefold() not in olemas]
+        if lisandub:
+            tgt_name["names"] = tgt_names + lisandub
+            target_changed = True
+
     src_occs = source.get("occupations") or []
     tgt_occs = target.get("occupations") or []
     if src_occs:
