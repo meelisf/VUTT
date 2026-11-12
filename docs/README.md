@@ -14,6 +14,7 @@ Veel lahtiseks jäänud read tõsta enne `tegemata_tood.md`-sse, et need ei kaok
 |---|---|---|
 | [decisions/](decisions/) | **ADR-register** — invariandid, mille rikkumine on rikke põhjustanud | ENNE nende alade muutmist (kohustuslik) |
 | [tegemata_tood.md](tegemata_tood.md) | Teadaolev tehniline võlg, koodi vastu kontrollitud | Enne „lihtsa parandusena" ettepaneku tegemist |
+| [emil-esteri-kirjetega-sidumine.md](emil-esteri-kirjetega-sidumine.md) | EMILi sedelite ja ESTERi kirjete sidumine: plaan, Mscr-loendi võrdlus, märkuse kuju, ülevaatus | Sedelite seostamise jätkamisel ja ekspordi saabumisel |
 | [runbook-adr-0077-migratsioon.md](runbook-adr-0077-migratsioon.md) | Ühekordne käivitusjuhis: `<cs>` → `<f>` korpuse migratsioon (hetktõmmis, kontrollpunktid, tagasipööramine) | ADR 0077 migratsiooni käivitamisel; pärast täitmist arhiivi |
 | [DATA_ARCHITECTURE.md](DATA_ARCHITECTURE.md) | Kolm andmekihti: `_metadata.json` → Meili → frontend, väljade kaardistus | Meili päringute või väljade muutmisel |
 | [marginalia-editor-harness-ja-servajuhud.md](marginalia-editor-harness-ja-servajuhud.md) | Marginaalia-editori servajuhud + Playwright-harness | Enne `MarginaliaExtension.ts` puutumist |
