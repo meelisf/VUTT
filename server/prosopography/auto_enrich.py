@@ -209,7 +209,9 @@ def apply_to_card(card: dict, agg: dict) -> list:
         applied.append("aa_raw")
     if f.get("name.aliases"):
         name = card.setdefault("name", {})
-        uus = _ühenda_variandid(name.get("aliases") or [], f["name.aliases"])
+        # Kanooniline nimi kaasa: tema kordus ja paljas nimeosa ei ole alias.
+        uus = _ühenda_variandid(name.get("aliases") or [], f["name.aliases"],
+                                name.get("label") or "")
         if uus is not None:
             name["aliases"] = uus
             applied.append("name.aliases")

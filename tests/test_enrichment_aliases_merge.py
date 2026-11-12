@@ -80,3 +80,39 @@ def test_kuupaev_jaab_endiselt_konfliktiks(monkeypatch):
               _isik([], birth={"date": "1616-06-29"}))
     assert [c["field"] for c in d["conflicts"]] == ["birth.date"]
     assert "birth.date" not in d["auto_filled"]
+
+
+# ---- Allika müra (helilooja Fischer, 2026-11-12) ----
+# VIAF/Wikidata tõid kõigi kirjasüsteemide kujud ja GND eristav kuju muutus
+# aliaseks („Johann (1646-1716/17) Fischer”). Kasutaja ei teadnud, mida kümne
+# kujuga teha. Filter puudutab AINULT allikast tulevaid uusi kujusid.
+
+def _fischer(aliases=None):
+    return {"name": {"label": "Johann Fischer", "family_name": "Fischer", "aliases": aliases or []}}
+
+
+def test_mitteladina_kujud_jaetakse_valja(monkeypatch):
+    d = _diff(monkeypatch, {"name.aliases": ["Иоганн Фишер", "يوهان فيشر (ملحن)", "ヨハン・フィッシャー", "Johannes Fischer"]}, _fischer())
+    assert d["auto_filled"]["name.aliases"] == ["Johannes Fischer"]
+
+
+def test_gnd_sulukuju_puhastatakse_ja_kordus_jaab_valja(monkeypatch):
+    """„Johann (1646-1716/17) Fischer” → „Johann Fischer” = kanooniline nimi → välja."""
+    d = _diff(monkeypatch, {"name.aliases": ["Johann (1646-1716/17) Fischer", "Johann (III) Fischer", "Johannes (der Ältere) Fischerus"]}, _fischer())
+    assert d["auto_filled"]["name.aliases"] == ["Johannes Fischerus"]
+
+
+def test_kanooniline_nimi_ja_paljas_perekonnanimi_ei_tule_aliaseks(monkeypatch):
+    d = _diff(monkeypatch, {"name.aliases": ["Johann Fischer", "Fischer", "Piscator"]}, _fischer())
+    # „Piscator” on päris teine kuju (ladinastus), mitte nime osa
+    assert d["auto_filled"]["name.aliases"] == ["Piscator"]
+
+
+def test_kohalikke_aliasi_filter_ei_puuduta(monkeypatch):
+    d = _diff(monkeypatch, {"name.aliases": ["Johannes Fischer"]}, _fischer(["Иоганн Фишер"]))
+    assert d["auto_filled"]["name.aliases"] == ["Иоганн Фишер", "Johannes Fischer"]
+
+
+def test_ainult_mura_ei_paku_muudatust(monkeypatch):
+    d = _diff(monkeypatch, {"name.aliases": ["Иоганн Фишер", "Fischer"]}, _fischer())
+    assert "name.aliases" not in d["auto_filled"]
