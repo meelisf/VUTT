@@ -98,8 +98,9 @@ def test_mitteladina_kujud_jaetakse_valja(monkeypatch):
 
 def test_gnd_sulukuju_puhastatakse_ja_kordus_jaab_valja(monkeypatch):
     """„Johann (1646-1716/17) Fischer” → „Johann Fischer” = kanooniline nimi → välja."""
-    d = _diff(monkeypatch, {"name.aliases": ["Johann (1646-1716/17) Fischer", "Johann (III) Fischer", "Johannes (der Ältere) Fischerus"]}, _fischer())
-    assert d["auto_filled"]["name.aliases"] == ["Johannes Fischerus"]
+    d = _diff(monkeypatch, {"name.aliases": ["Johann (1646-1716/17) Fischer", "Johann (III) Fischer", "Johannes (Hans) Fischerus"]}, _fischer())
+    # muud sulud on nime osa ja jäävad (dry-run 2026-11-12: „Nicolaus (Niclas) Silfverskiöld”)
+    assert d["auto_filled"]["name.aliases"] == ["Johannes (Hans) Fischerus"]
 
 
 def test_kanooniline_nimi_ja_paljas_perekonnanimi_ei_tule_aliaseks(monkeypatch):

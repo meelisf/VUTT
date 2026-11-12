@@ -98,7 +98,9 @@ _WD_GENDER = {
 _HULGA_VÄLJAD = ("name.aliases",)
 
 
-_SULUD = re.compile(r"\s*\([^()]*\)")
+# Ainult GND eristus: sulgudes number või rooma number („(1646-1716/17)”, „(III)”).
+# Muud sulud on nime osa („Nicolaus (Niclas) Silfverskiöld”, „Pastelberg(er)”).
+_SULUD = re.compile(r"\s*\((?:[^()]*\d[^()]*|[IVXLC]+)\)")
 
 
 def _ladina_tahestikus(tekst: str) -> bool:
@@ -110,7 +112,8 @@ def _allika_variant(v, label: str) -> Optional[str]:
     """Allikast tulnud nimekuju aliaseks sobival kujul või None (müra).
 
     - mitteladina kirjasüsteem (VIAF/Wikidata kõigi keelte sildid) → välja;
-    - sulgudes eristus („Johann (1646-1716/17) Fischer”, GND) → eemaldatakse;
+    - GND eristus sulgudes („Johann (1646-1716/17) Fischer”, „(III)”) → eemaldatakse,
+      muud sulud jäävad („Nicolaus (Niclas) Silfverskiöld”);
     - paljas nimeosa („Fischer”) ei lisa otsingule midagi → välja.
     Kanoonilise nime kordus jääb välja `_ühenda_variandid`-is.
     """
