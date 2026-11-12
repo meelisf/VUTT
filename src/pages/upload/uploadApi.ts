@@ -2,6 +2,7 @@ import { FILE_API_URL } from '../../config';
 import { imageTokenQuery, type ImageToken } from '../../utils/imageTokenUrl';
 import { apiDelete, apiGet, apiPost, ApiError } from '../../services/apiClient';
 import { getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { invalidateWorkSetIds } from '../../services/workSetService';
 import type {
   PollResult,
   PageAdjust,
@@ -358,6 +359,10 @@ const maga = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  *    `imported` → import LÄKS läbi, tulemus on `work_id`,
  *    `importing` → käib veel, ootame,
  *    muu → server andis staatuse tagasi ehk import päriselt kukkus.
+ *
+ *  Õnnestunud import tühjendab töökollektsioonide ID-vahemälu: server lisab teose
+ *  upload'is valitud kogudesse (ADR 0042) ja SPA-sisene navigeerimine jätaks
+ *  muidu vana liikmeloendi kehtima — kogu vaade ei näidanud uut teost.
  */
 export async function importUploadWithRecovery(
   uploadId: string,
@@ -372,7 +377,9 @@ export async function importUploadWithRecovery(
   } = deps;
 
   try {
-    return await doImport(uploadId, token);
+    const tulemus = await doImport(uploadId, token);
+    invalidateWorkSetIds();
+    return tulemus;
   } catch (algne) {
     const tahtaeg = Date.now() + budgetMs;
     do {
@@ -384,6 +391,7 @@ export async function importUploadWithRecovery(
         throw algne;
       }
       if (olek.status === 'imported' && olek.work_id) {
+        invalidateWorkSetIds();
         return { work_id: olek.work_id, recovered: true };
       }
       if (olek.status !== 'importing') throw algne;
@@ -393,12 +401,14 @@ export async function importUploadWithRecovery(
   }
 }
 
-export function replaceWorkUpload(uploadId: string, workId: string, token: string | null): Promise<UploadImportResponse> {
-  return apiPost<UploadImportResponse>(
+export async function replaceWorkUpload(uploadId: string, workId: string, token: string | null): Promise<UploadImportResponse> {
+  const tulemus = await apiPost<UploadImportResponse>(
     `/admin/upload/${uploadId}/replace-work/${workId}`,
     { metadata_updates: {} },
     { token, timeout: IMPORT_TIMEOUT_MS },
   );
+  invalidateWorkSetIds();
+  return tulemus;
 }
 
 export function deleteUpload(uploadId: string, token: string | null): Promise<unknown> {

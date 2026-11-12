@@ -1,5 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
-import { importUploadWithRecovery } from '../uploadApi';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../services/workSetService', () => ({ invalidateWorkSetIds: vi.fn() }));
+vi.mock('../../../services/apiClient', async (orig) => ({
+  ...(await orig<typeof import('../../../services/apiClient')>()),
+  apiPost: vi.fn(async () => ({ work_id: 'asendatud' })),
+}));
+
+import { importUploadWithRecovery, replaceWorkUpload } from '../uploadApi';
+import { invalidateWorkSetIds } from '../../../services/workSetService';
 import type { PollResult, UploadImportResponse } from '../types';
 
 /** 524-leheline teos importis 75 s. nginx vaikimisi `proxy_read_timeout` on
@@ -73,5 +81,38 @@ describe('importUploadWithRecovery', () => {
 
     await expect(importUploadWithRecovery('u1', 't', { pollMs: 0, budgetMs: 0, doImport, checkStatus }))
       .rejects.toThrow('504');
+  });
+});
+
+
+/** Import lisab teose töökollektsioonidesse SERVERIS. Kliendi kogu-ID vahemälu
+ *  (`workSetService.idCache`) jäi vanaks ja kogu vaade ei näidanud uut teost
+ *  enne lehe uuesti laadimist (kaebus 2026-11-12, ADA import + töökollektsioon). */
+describe('töökollektsioonide vahemälu pärast importi', () => {
+  beforeEach(() => vi.mocked(invalidateWorkSetIds).mockClear());
+
+  it('õnnestunud import tühjendab kogu-ID vahemälu', async () => {
+    const doImport = vi.fn(async () => ({ work_id: 'abc123' }) as UploadImportResponse);
+    await importUploadWithRecovery('u1', 't', { ...kiire, doImport, checkStatus: vi.fn() });
+    expect(invalidateWorkSetIds).toHaveBeenCalledWith();
+  });
+
+  it('staatuse kaudu taastatud import tühjendab samuti', async () => {
+    const doImport = vi.fn(async () => { throw new Error('504'); });
+    const checkStatus = vi.fn(async () => olek('imported', 'wid9'));
+    await importUploadWithRecovery('u1', 't', { ...kiire, doImport, checkStatus });
+    expect(invalidateWorkSetIds).toHaveBeenCalledWith();
+  });
+
+  it('ebaõnnestunud import vahemälu ei puuduta', async () => {
+    const doImport = vi.fn(async () => { throw new Error('500'); });
+    const checkStatus = vi.fn(async () => olek('error'));
+    await expect(importUploadWithRecovery('u1', 't', { ...kiire, doImport, checkStatus })).rejects.toThrow();
+    expect(invalidateWorkSetIds).not.toHaveBeenCalled();
+  });
+
+  it('sisu asendus (replace-work) tühjendab samuti', async () => {
+    await replaceWorkUpload('u1', 'w1', 't');
+    expect(invalidateWorkSetIds).toHaveBeenCalledWith();
   });
 });
