@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { looksLikeOtherName, possibleNameChange, splitNames, joinNames } from '../personNames';
+import { looksLikeOtherName, possibleNameChange, splitNames, joinNames, matchedOtherName, sortNamesByTime, formatNameSpan } from '../personNames';
 
 // SAMAD juhtumid mis `tests/test_person_names.py::OTHER_NAME_CASES` — vormi vihje
 // (klient) ja loendi filter (server) peavad andma sama vastuse (ADR 0083).
@@ -72,5 +72,43 @@ describe('splitNames / joinNames', () => {
   it('kaardilt mustandiks ja tagasi', () => {
     const draft = splitNames([{ label: 'A B', type: 'married', from: 1700, to: null, source: 'X', notes: null }]);
     expect(draft).toEqual([{ label: 'A B', type: 'married', from: '1700', to: '', source: 'X', notes: '' }]);
+  });
+});
+
+describe('matchedOtherName — „ka: …”', () => {
+  const entry = {
+    label: 'Johannes Erici Stregnensis', sort_name: 'Stregnensis',
+    aliases: ['Strognensis', 'Johan Stiernstråle'],
+    names: [{ label: 'Johan Stiernstråle', type: 'ennobled' }],
+  };
+  it('kanooniline tabamus → null', () => {
+    expect(matchedOtherName(entry, 'Stregn')).toBeNull();
+    expect(matchedOtherName(entry, '')).toBeNull();
+  });
+  it('liigiga nimi enne varianti, diakriitikuta päring', () => {
+    expect(matchedOtherName(entry, 'stiernstrale')).toEqual({ label: 'Johan Stiernstråle', type: 'ennobled' });
+    expect(matchedOtherName(entry, 'joh stiern')).toEqual({ label: 'Johan Stiernstråle', type: 'ennobled' });
+  });
+  it('kirjaviisi variant ilma liigita', () => {
+    expect(matchedOtherName(entry, 'Strogn')).toEqual({ label: 'Strognensis', type: null });
+  });
+  it('tabamus väljaspool kirjet → null', () => {
+    expect(matchedOtherName(entry, 'Figrelius')).toBeNull();
+  });
+});
+
+describe('isikulehe nimeajalugu', () => {
+  it('järjestab aasta järgi, aastata lõppu, muidu sisestuse järjekorras', () => {
+    const r = sortNamesByTime([
+      { label: 'C', from: null }, { label: 'B', from: 1660 }, { label: 'A', to: 1650 }, { label: 'D' },
+    ]);
+    expect(r.map(n => n.label)).toEqual(['A', 'B', 'C', 'D']);
+  });
+  it('vahemiku kuju', () => {
+    const w = { from: 'alates', to: 'kuni' };
+    expect(formatNameSpan(1660, 1680, w)).toBe('1660–1680');
+    expect(formatNameSpan(1660, null, w)).toBe('alates 1660');
+    expect(formatNameSpan(null, 1680, w)).toBe('kuni 1680');
+    expect(formatNameSpan(null, null, w)).toBe('');
   });
 });

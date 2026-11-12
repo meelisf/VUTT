@@ -126,3 +126,50 @@ export function joinNames(aliases: string[], drafts: PersonNameDraft[]): { alias
   const typed = new Set(names.map(n => key(n.label)));
   return { aliases: aliases.filter(a => a.trim() && !typed.has(key(a))), names };
 }
+
+/** Otsinguvõrdluse kuju — serveri `fold_name`-i lihtsustus (diakriitikud, ß). */
+function foldQuery(s: string): string {
+  return s.replace(/ß/g, 'ss').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+/** Serveri `name_matches`: alamstring VÕI iga päringusõna on mõne nimesõna algus. */
+function queryMatches(query: string, name: string): boolean {
+  const fq = foldQuery(query).trim();
+  if (!fq) return false;
+  const fn = foldQuery(name);
+  if (fn.includes(fq)) return true;
+  const qw = fq.match(/[\p{L}\p{N}_]+/gu) ?? [];
+  const nw = fn.match(/[\p{L}\p{N}_]+/gu) ?? [];
+  return qw.length > 0 && qw.every(q => nw.some(w => w.startsWith(q)));
+}
+
+/**
+ * „ka: …” loendis ja valijas (ADR 0083 p 5): kui otsing tabas teist nime, mitte
+ * kanoonilist, tagasta see nimi (liigiga nimi enne kirjaviisi varianti).
+ * Väliste ID-de aliaste (`person_aliases.json`) tabamust klient ei näe — siis `null`.
+ */
+export function matchedOtherName(
+  entry: { label: string; sort_name?: string | null; aliases?: string[] | null; names?: { label: string; type: string }[] | null },
+  query: string | null | undefined,
+): { label: string; type: string | null } | null {
+  if (!query?.trim()) return null;
+  if (queryMatches(query, entry.label) || (entry.sort_name && queryMatches(query, entry.sort_name))) return null;
+  const typed = (entry.names ?? []).find(n => queryMatches(query, n.label));
+  if (typed) return { label: typed.label, type: typed.type };
+  const alias = (entry.aliases ?? []).find(a => queryMatches(query, a));
+  return alias ? { label: alias, type: null } : null;
+}
+
+/** Isikulehe järjestus: aasta järgi (aastata lõpus), muidu sisestuse järjekord. */
+export function sortNamesByTime<T extends { from?: number | null; to?: number | null }>(names: T[]): T[] {
+  const at = (n: T) => n.from ?? n.to ?? Infinity;
+  return names.map((n, i) => [n, i] as const).sort((a, b) => at(a[0]) - at(b[0]) || a[1] - b[1]).map(([n]) => n);
+}
+
+/** Ajavahemik: „1660–1680”, „alates 1660”, „kuni 1680” või tühi. */
+export function formatNameSpan(from: number | null | undefined, to: number | null | undefined, words: { from: string; to: string }): string {
+  if (from && to) return `${from}–${to}`;
+  if (from) return `${words.from} ${from}`;
+  if (to) return `${words.to} ${to}`;
+  return '';
+}

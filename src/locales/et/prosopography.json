@@ -479,10 +479,13 @@
     "source": "Allikas (nt SBL, Wikidata)",
     "promote": "Teine nimi?",
     "promoteTitle": "See kuju ei sarnane kanoonilise nimega — kas see on isiku teine nimi? Tõsta liigiga nimeks.",
+    "setType": "Määra nimekuju liik (nt ladinastatud kuju)",
     "demote": "Tagasi kirjaviisi variandiks",
     "demoteShort": "variandiks",
     "remove": "Eemalda",
     "also": "ka:",
+    "queueTitle": "Tööjärjekord",
+    "filterPossibleChange": "Võimalik nimemuutus",
     "history": "Nimed",
     "types": {
       "birth": "sünni-/patronüümiline nimi",

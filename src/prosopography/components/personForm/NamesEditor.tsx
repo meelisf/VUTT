@@ -5,6 +5,7 @@
  *
  * Variant, mis näib teise nimena (`looksLikeOtherName`), saab märgi „Teine nimi?”
  * ja ühe klikiga tõstetakse ta liigiga nimeks. Masin ei otsusta — toimetaja valib liigi.
+ * Tõsta saab iga kuju (nool), vihje ainult juhib tähelepanu.
  */
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -92,10 +93,17 @@ const NamesEditor: React.FC<Props> = ({ label, aliases, names, onChange }) => {
             <span key={i}
               className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${other ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-gray-100 border-gray-200 text-gray-700'}`}>
               {a}
-              {other && (
+              {/* Iga kuju saab liigi (ladinastatud kuju sarnaneb, aga on ikkagi liigiga nimi);
+                  vihje näitab ainult neid, mis kirjaviisi variandiks ei sobi. */}
+              {other ? (
                 <button type="button" onClick={() => promote(i)} title={t('names.promoteTitle')}
                   className="inline-flex items-center gap-0.5 font-medium text-amber-800 hover:text-amber-950">
                   <ArrowUp size={10} />{t('names.promote')}
+                </button>
+              ) : (
+                <button type="button" onClick={() => promote(i)} title={t('names.setType')}
+                  aria-label={t('names.setType')} className="text-gray-400 hover:text-gray-700">
+                  <ArrowUp size={10} />
                 </button>
               )}
               <button type="button" onClick={() => onChange({ name_aliases: aliases.filter((_, j) => j !== i) })}

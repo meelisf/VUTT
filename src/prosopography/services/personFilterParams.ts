@@ -22,6 +22,8 @@ export interface PersonFilterParams {
   imm_year_from?: number;
   imm_year_to?: number;
   tag?: string | string[];
+  /** Tööjärjekord „võimalik nimemuutus” (ADR 0083). */
+  name_change?: boolean;
 }
 
 // Record sunnib tüübikontrolli: uus väli liidesesse ilma siia lisamata on viga.
@@ -29,6 +31,7 @@ const KEYS: Record<keyof PersonFilterParams, true> = {
   q: true, gender: true, occupation: true, origin_group: true, origin_place: true,
   institution: true, status_id: true, source: true, verification_level: true,
   year_from: true, year_to: true, imm_year_from: true, imm_year_to: true, tag: true,
+  name_change: true,
 };
 export const PERSON_FILTER_KEYS = Object.keys(KEYS) as (keyof PersonFilterParams)[];
 
@@ -37,7 +40,7 @@ export function appendPersonFilterParams(params: URLSearchParams, filters?: Pers
   for (const key of PERSON_FILTER_KEYS) {
     if (key === 'tag') continue;
     const value = filters[key];
-    if (value == null || value === '') continue;
+    if (value == null || value === '' || value === false) continue;
     params.set(key, String(value));
   }
   appendTagParams(params, filters.tag);

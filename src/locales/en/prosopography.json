@@ -479,10 +479,13 @@
     "source": "Source (e.g. SBL, Wikidata)",
     "promote": "Other name?",
     "promoteTitle": "This form does not resemble the canonical name — is it another name of the person? Move it up as a typed name.",
+    "setType": "Set the name type (e.g. latinized form)",
     "demote": "Back to spelling variant",
     "demoteShort": "to variant",
     "remove": "Remove",
     "also": "also:",
+    "queueTitle": "Work queue",
+    "filterPossibleChange": "Possible name change",
     "history": "Names",
     "types": {
       "birth": "birth / patronymic name",
