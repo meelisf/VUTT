@@ -9,14 +9,15 @@ import BiographySection from '../components/personForm/BiographySection';
 import EntityPicker from '../../components/EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { apiGet } from '../../services/apiClient';
-import { getPerson, createPersonChecked, PersonConflictError, updatePerson, uploadPersonImage, deletePersonImage, deletePerson } from '../services/prosopographyService';
+import { fetchPlaces, getPerson, createPersonChecked, PersonConflictError, updatePerson, uploadPersonImage, deletePersonImage, deletePerson } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
-import type { ProsopoRecord } from '../types';
+import type { PlaceEntry, ProsopoRecord } from '../types';
 
 import { type FormDraft, type OccupationDraft, type EducationDraft, emptyDraft, emptyDateDraft } from '../components/personForm/types';
 import { recordToDraft, draftToPayload } from '../components/personForm/helpers';
 import DateField from '../components/personForm/DateField';
 import NamesEditor from '../components/personForm/NamesEditor';
+import { legacyBirthNote, personOriginKey } from '../utils/personOrigin';
 import { possibleNameChange } from '../utils/personNames';
 import ProsopoPersonPicker from '../components/personForm/ProsopoPersonPicker';
 import TagsList from '../components/personForm/TagsList';
@@ -60,6 +61,7 @@ const PersonEditPage: React.FC = () => {
 
   const prefillName = isNew ? (searchParams.get('name') ?? '') : '';
 
+  const [places, setPlaces] = useState<Record<string, PlaceEntry>>({});
   const [original, setOriginal] = useState<ProsopoRecord | null>(null);
   const [draft, setDraft] = useState<FormDraft>(() => {
     const d = emptyDraft();
@@ -178,6 +180,7 @@ const PersonEditPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    fetchPlaces().then(setPlaces).catch(() => {});
     getVocabularies().then(v => {
       if (v.seisused) setSeisused(v.seisused);
       if (v.konfessioonid) setKonfessioonid(v.konfessioonid);
@@ -187,10 +190,11 @@ const PersonEditPage: React.FC = () => {
   useEffect(() => {
     if (isNew) return;
     setLoading(true);
-    getPerson(id!, token)
-      .then(data => {
+    Promise.all([getPerson(id!, token), fetchPlaces()])
+      .then(([data, register]) => {
+        setPlaces(register);
         setOriginal(data);
-        setDraft(recordToDraft(data));
+        setDraft(recordToDraft(data, register));
         // ADR 0083: nimed ei tohi peituda kokkupandud ploki taha, kui seal on midagi otsustada
         if (data.name?.names?.length || possibleNameChange(data.name ?? {})) setNamesOpen(true);
         setImageUrl(data.image_url ?? null);
@@ -265,11 +269,11 @@ const PersonEditPage: React.FC = () => {
       if (isNew) {
         // Üks samm (spekk §4.2): kogu vormisisu salvestub ENNE taustarikastust —
         // create + update vahele sattunud rikastus andis varem versioonikonflikti.
-        const payload = draftToPayload(draft, undefined, seisused, konfessioonid);
+        const payload = draftToPayload(draft, undefined, seisused, konfessioonid, places);
         const created = await createPersonChecked({ card: payload, created_via: 'form' }, token);
         createdIdRef.current = created.id;
       } else {
-        const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid);
+        const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid, places);
         await updatePerson(id!, payload, token);
       }
       setIsDirty(false);
@@ -605,21 +609,33 @@ const PersonEditPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Eluaastad */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <DateField
-              label={t('born', 'Sündinud')}
-              value={draft.birth}
-              onChange={v => set({ birth: v })}
-              localSuggestions={entityLabels}
-            />
-            <DateField
-              label={t('died', 'Surnud')}
-              value={draft.death}
-              onChange={v => set({ death: v })}
-              localSuggestions={entityLabels}
-            />
-          </div>
+          <section aria-label={t('form.lifeData')} className="rounded-lg border border-gray-200 p-4 bg-gray-50/50">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">{t('form.lifeData')}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <DateField label={t('born')} value={draft.birth} onChange={v => set({ birth: v })} showPlace={false}
+                placeField={<div>
+                  <PlacePicker value={draft.origin_place || null} fallback={!draft.origin_place ? draft.birth.place : null}
+                    onChange={(key, entry) => {
+                      if (key && entry) setPlaces(prev => ({ ...prev, [key]: entry }));
+                      set({ origin_place: key ?? '', birth: { ...draft.birth, place: null } });
+                    }}
+                    token={token} canEdit={!!canEdit} lang={lang} label={t('origin')} />
+                  <p className="mt-1 text-xs text-gray-500">{t('form.originHint')}</p>
+                  {original && legacyBirthNote(original, draft.origin_place, places) &&
+                    <p className="mt-2 text-xs text-amber-800">{t('form.legacyBirthHint', { place: original.birth?.place?.label })}</p>}
+                </div>} />
+              <DateField label={t('died')} value={draft.death} onChange={v => set({ death: v })} showPlace={false}
+                placeField={<PlacePicker value={null} fallback={draft.death.place}
+                  onChange={(key, entry) => {
+                    if (key && entry) setPlaces(prev => ({ ...prev, [key]: entry }));
+                    set({ death: { ...draft.death, place: key && entry ? {
+                    label: entry.labels[lang] || entry.labels.et || entry.labels.en || key,
+                    id: entry.id, labels: entry.labels, source: 'wikidata',
+                  } : null } });
+                  }}
+                  token={token} canEdit={!!canEdit} lang={lang} label={t('form.deathPlace')} />} />
+            </div>
+          </section>
 
           {/* Seisus + konfessioon */}
           <div className="grid grid-cols-2 gap-3">
@@ -731,17 +747,6 @@ const PersonEditPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Päritolukoht ── */}
-        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
-          <PlacePicker
-            value={draft.origin_place || null}
-            onChange={key => set({ origin_place: key ?? '' })}
-            token={token}
-            canEdit={!!canEdit}
-            lang={lang}
-          />
-        </div>
-
         {/* ── Elulugu (ET | EN) ── */}
         <BiographySection
           draft={draft}
@@ -835,7 +840,9 @@ const PersonEditPage: React.FC = () => {
             viafId={draft.viaf_id}
             draft={draft}
             token={token}
-            onChange={newDraft => setDraft(newDraft)}
+            onChange={newDraft => setDraft({ ...newDraft, origin_place: personOriginKey({
+              origin: { place: newDraft.origin_place }, birth: { place: newDraft.birth.place },
+            } as ProsopoRecord, places) })}
             onApplied={fields => {
               if (fields.some(f => f === '_occupations' || f === '_occupation_label')) setOccupOpen(true);
             }}
@@ -853,7 +860,7 @@ const PersonEditPage: React.FC = () => {
             person={original} token={token} isDirty={isDirty}
             onApplied={person => {
               setOriginal(person);
-              setDraft(recordToDraft(person));
+              setDraft(recordToDraft(person, places));
               setIsDirty(false);
             }}
           />}

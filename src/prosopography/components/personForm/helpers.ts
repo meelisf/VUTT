@@ -1,9 +1,10 @@
 import { joinNames, splitNames } from '../../utils/personNames';
-import type { ProsopoRecord } from '../../types';
+import type { PlaceEntry, ProsopoRecord } from '../../types';
 import type { FormDraft, DateDraft, EducationDraft } from './types';
 import { emptyDateDraft } from './types';
 import { isQCode } from '../../../utils/qcodeUtils';
 import type { VocabularySeisusItem } from '../../../services/collectionService';
+import { personOriginKey, legacyBirthNote } from '../../utils/personOrigin';
 import { normalizeExtId } from '../../utils/externalIds';
 
 function isoStringToDraft(iso: string): DateDraft {
@@ -155,7 +156,7 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   return { ...draft, ...patch };
 }
 
-export function recordToDraft(p: ProsopoRecord): FormDraft {
+export function recordToDraft(p: ProsopoRecord, places: Record<string, PlaceEntry> = {}): FormDraft {
   const ident = (scheme: string) =>
     p.identifiers?.find(i => i.scheme === scheme)?.id ?? '';
   return {
@@ -226,7 +227,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     gnd_id: ident('gnd'),
     viaf_id: ident('viaf'),
     aa_id: ident('album_academicum'),
-    origin_place: p.origin?.place ?? '',
+    origin_place: personOriginKey(p, places),
   };
 }
 
@@ -255,7 +256,13 @@ export function draftToPayload(
   original?: ProsopoRecord,
   seisusedVocab: VocabularySeisusItem[] = [],
   konfessioonidVocab: VocabularySeisusItem[] = [],
+  places: Record<string, PlaceEntry> = {},
 ): Partial<ProsopoRecord> {
+  // Enrichment can add a birthplace after the form has loaded. Resolve it by
+  // identity and registered containment before saving the one origin link.
+  draft = { ...draft, origin_place: personOriginKey({
+    origin: { place: draft.origin_place }, birth: { place: draft.birth.place },
+  } as ProsopoRecord, places) };
   // Identifikaatorid — säilita olemasolevad, uuenda/lisa muudetud
   const existing = original?.identifiers ?? [];
   const schemes: { scheme: string; key: keyof FormDraft }[] = [
@@ -291,8 +298,20 @@ export function draftToPayload(
     // EI tohi langeda tagasi `original`-ile: tühi mustand ON kustutamise soov.
     // Varem taastas `?? original.birth` vana väärtuse, nii et ainus viis välja
     // tühjendada oli kirjutada sinna `0000` (#240).
-    birth: buildDatePayload(draft.birth),
-    death: buildDatePayload(draft.death),
+    birth: (() => {
+      const birth = buildDatePayload(draft.origin_place ? { ...draft.birth, place: null } : draft.birth);
+      const priorNote = original?.birth?.notes;
+      const notes = priorNote || null;
+      return birth || notes ? { ...birth,
+        original_text: original?.birth?.original_text ?? null,
+        date_to: original?.birth?.date_to ?? null, notes: notes || null } : null;
+    })(),
+    death: (() => {
+      const death = buildDatePayload(draft.death);
+      return death || original?.death?.notes ? { ...death,
+        original_text: original?.death?.original_text ?? null,
+        date_to: original?.death?.date_to ?? null, notes: original?.death?.notes ?? null } : null;
+    })(),
     // Salvesta mitmekeelne labels-objekt → useEntityLabel kuvab UI-keeles.
     // Sõnastikuväline väärtus kannab oma salvestatud kirje edasi — varem sai
     // tema sildiks Q-kood (Kristiina "Q9592", 2026-09-25).
@@ -308,8 +327,8 @@ export function draftToPayload(
     }),
     origin: {
       place: draft.origin_place || null,
-      geonames_id: original?.origin?.geonames_id ?? null,
-      coordinates: original?.origin?.coordinates ?? null,
+      geonames_id: draft.origin_place === original?.origin?.place ? original?.origin?.geonames_id ?? null : null,
+      coordinates: draft.origin_place === original?.origin?.place ? original?.origin?.coordinates ?? null : null,
     },
     floruit: (draft.floruit_from || draft.floruit_to) ? {
       year_from: draft.floruit_from ? parseInt(draft.floruit_from) : null,
@@ -380,7 +399,10 @@ export function draftToPayload(
       ];
       return confirmed.length ? { _confirm_translation: confirmed } : {};
     })(),
-    notes: draft.notes.trim() || null,
+    notes: (() => {
+      const archived = original && draft.origin_place ? legacyBirthNote(original, draft.origin_place, places) : '';
+      return [draft.notes.trim(), archived && !draft.notes.includes(archived) ? archived : ''].filter(Boolean).join('\n') || null;
+    })(),
     identifiers,
     ...(original ? { updated_at: original.updated_at } : {}),
   };

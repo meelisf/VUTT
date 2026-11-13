@@ -39,7 +39,7 @@ describe('lehe failinimi serveripäringutes on kettal olev kuju', () => {
 
 describe('/save vea teade', () => {
   const fail = (status: number, body: unknown) => fetchMock.mockResolvedValue({
-    ok: false, status, json: async () => body, text: async () => JSON.stringify(body),
+    ok: false, status, headers: new Headers(), json: async () => body, text: async () => JSON.stringify(body),
   });
   it('sõnemi detail (ADR 0077 409) jõuab teatesse', async () => {
     fail(409, { detail: 'Leht on vahepeal teisendatud — laadi leht uuesti.' });

@@ -356,26 +356,54 @@ export async function fetchPlacesMeta(): Promise<{
   return apiGet(`${BASE}/places/meta`, { timeout: 10000 });
 }
 
-export async function searchPlacesWikidata(q: string, lang = 'en'): Promise<{ q: string; label: string; description: string; aliases: string[] }[]> {
-  try {
-    return await apiGet(`${BASE}/places/wikidata-search?q=${encodeURIComponent(q)}&lang=${lang}`, { timeout: 10000 });
-  } catch (e) {
-    if (e instanceof ApiError) return [];
-    throw e;
-  }
-}
-
-export async function fetchPlaceWikidata(qid: string): Promise<{
+export interface PlaceSuggestion { q: string; label: string; description: string; aliases: string[] }
+export interface WikidataPlace {
   labels: Record<string, string>;
   type: string | null;
   coordinates: { lat: number; lon: number; source?: string; wikidata_property?: string; geonames_id?: string } | null;
   parents: { q: string; label_en: string; label_sv: string }[];
-}> {
-  return apiGet(`${BASE}/places/wikidata/${encodeURIComponent(qid)}`, { timeout: 15000 });
+}
+
+const placeLookupCache = new Map<string, { until: number; value: unknown }>();
+const placeLookups = new Map<string, Promise<unknown>>();
+let placeLookupCooldown = 0;
+
+async function placeLookup<T>(path: string, ttl: number): Promise<T> {
+  const cached = placeLookupCache.get(path);
+  if (cached && cached.until > Date.now()) return cached.value as T;
+  const pending = placeLookups.get(path);
+  if (pending) return pending as Promise<T>;
+  if (placeLookupCooldown > Date.now()) {
+    const seconds = Math.ceil((placeLookupCooldown - Date.now()) / 1000);
+    const error = new ApiError(`Wikidata: ${seconds}s`, 429);
+    error.retryAfter = seconds;
+    throw error;
+  }
+  const request = apiGet<T>(path, { timeout: 25000 }).then(value => {
+    if (placeLookupCache.size >= 200) placeLookupCache.delete(placeLookupCache.keys().next().value!);
+    placeLookupCache.set(path, { until: Date.now() + ttl, value });
+    return value;
+  }).catch(error => {
+    if (error instanceof ApiError && error.status === 429) {
+      placeLookupCooldown = Date.now() + (error.retryAfter || 60) * 1000;
+    }
+    throw error;
+  }).finally(() => placeLookups.delete(path));
+  placeLookups.set(path, request);
+  return request;
+}
+
+export function searchPlacesWikidata(q: string, lang = 'en'): Promise<PlaceSuggestion[]> {
+  if (q.trim().length < 2) return Promise.resolve([]);
+  return placeLookup(`${BASE}/places/wikidata-search?q=${encodeURIComponent(q.trim())}&lang=${encodeURIComponent(lang)}`, 120000);
+}
+
+export function fetchPlaceWikidata(qid: string): Promise<WikidataPlace> {
+  return placeLookup(`${BASE}/places/wikidata/${encodeURIComponent(qid)}`, 3600000);
 }
 
 export async function addPlace(key: string, data: Partial<PlaceEntry>, token: string): Promise<{ key: string; entry: PlaceEntry }> {
-  return apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, data, { token, timeout: 10000 });
+  return apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, { ...data, _create_only: true }, { token, timeout: 10000 });
 }
 
 export async function updatePlace(

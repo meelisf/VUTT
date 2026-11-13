@@ -102,7 +102,6 @@
   "levelReviewed": "Üle vaadatud",
   "levelVerified": "Kontrollitud",
   "origin": "Päritolu",
-  "bornAndOrigin": "Sünni- ja päritolukoht",
   "aliases": "Nimevariandid",
   "maidenName": "Neiupõlvenimi",
   "maidenNameShort": "sünd. {{name}}",
@@ -214,13 +213,17 @@
     "translateRateLimited": "Tõlkeid on tunnis liiga palju tehtud. Proovi hiljem.",
     "translateStaleResult": "Tekst muutus tõlkimise ajal — tõlget ei rakendatud automaatselt.",
     "translating": "Tõlgin…",
-    "viewSourceDiff": "Vaata, mis muutus"
+    "viewSourceDiff": "Vaata, mis muutus",
+    "lifeData": "Eluandmed",
+    "originHint": "Kõige täpsem teadaolev sünni- või päritolukoht.",
+    "deathPlace": "Surmakoht",
+    "legacyBirthHint": "Varasem sünnikoht „{{place}}” erineb valitud päritolust. Kontrolli valikut; salvestamisel säilib varasem sünnikoht märkustes."
   },
   "dateField": {
     "year": "aasta",
     "month": "kuu",
     "day": "päev",
-    "more": "täpsem",
+    "more": "Kuupäeva täpsustused",
     "circa": "ligikaudu",
     "exactDate": "täpne kuupäev",
     "before": "enne seda",
@@ -232,7 +235,9 @@
     "gregorian": "Gregoriuse kalender",
     "julianShort": "jul.",
     "gregorianShort": "greg.",
-    "place": "koht"
+    "place": "koht",
+    "bound": "Ajaline piir",
+    "calendar": "Kalender"
   },
   "aliasesList": {
     "label": "Nimevariandid",
@@ -427,7 +432,22 @@
   },
   "place": {
     "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",
-    "notFound": "Ei leitud. Paluge editoril lisada."
+    "notFound": "Sobivaid kohti ei leitud. Proovi teist nime või otsingu keelt.",
+    "wikidataSearch": "Wikidata kohaotsing",
+    "wikidataPlaceholder": "Kohanimi, ajalooline nimi või Q-kood",
+    "searchLanguage": "Otsingu keel",
+    "searchError": "Wikidata päring ebaõnnestus või päringupiirang on täis. Oota veidi ja proovi uuesti.",
+    "registryError": "Koharegistri laadimine ebaõnnestus. Laadi leht uuesti.",
+    "registry": "Koharegister",
+    "clear": "Eemalda koht",
+    "keyExists": "Selle nimega registrikoht on juba olemas. Vali olemasolev koht või täpsusta nime.",
+    "invalidCoordinates": "Sisesta mõlemad koordinaadid arvudena: laius −90…90, pikkus −180…180.",
+    "linkHint": "Otsi nime või Q-koodi järgi. Valimine täidab Wikidata seose ja koordinaadid; vaata andmed enne salvestamist üle.",
+    "alreadyLinked": "See Wikidata koht on juba seotud kirjega „{{name}}”. Kasuta olemasolevat kohta.",
+    "noCoordinates": "Sellel Wikidata kirjel puuduvad koordinaadid. Koha saab siiski salvestada.",
+    "unlink": "Eemalda Wikidata seos",
+    "rateLimit": "Päringupiirang on täis. Proovi uuesti {{seconds}} sekundi pärast.",
+    "retry": "Proovi uuesti"
   },
   "placeModal": {
     "searchWikidata": "Otsi Wikidatast",
