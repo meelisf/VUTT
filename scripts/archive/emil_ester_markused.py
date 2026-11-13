@@ -9,7 +9,8 @@ lehe lukk, kolmesuunaline liitmine (base = kettal olev seis), git-commit ja Meil
 käivad serveri tavateed (üks commit lehe kohta). Lehe teksti ei muudeta.
 
 Kordus on ohutu: leht, mille mõnes kommentaaris on juba „**ESTER” ja sama b-number,
-jäetakse vahele.
+jäetakse vahele. Kirjel võib olla `asenda_b` (varem kirjutatud vale b-number): siis
+asendatakse selle numbriga ESTERi märkuse tekst, uut kommentaari ei lisata.
 
     python3 emil_ester_markused.py             # kuivkäivitus
     python3 emil_ester_markused.py --kirjuta
@@ -81,6 +82,15 @@ def juba_olemas(meta, b_numbrid):
     return False
 
 
+def asendatav(meta, vanad):
+    """Indeks kommentaarile, mis on kirjutatud vale (vana) b-numbriga, või None."""
+    for i, c in enumerate(meta.get("comments") or []):
+        t = c.get("text", "") if isinstance(c, dict) else ""
+        if t.startswith("**ESTER") and any(b in t for b in vanad):
+            return i
+    return None
+
+
 def main():
     kirjed = json.load(open(ANDMED, encoding="utf-8"))
     tood, vahele = [], []
@@ -93,9 +103,12 @@ def main():
         if juba_olemas(meta, k["b"]):
             vahele.append((k["id"], "märkus juba olemas"))
             continue
+        if k.get("asenda_b") and asendatav(meta, k["asenda_b"]) is not None:
+            k = {**k, "_asenda": True}
         tood.append(k)
 
-    print(f"Kirjeid {len(kirjed)}, lisada {len(tood)}, vahele {len(vahele)}.")
+    asendusi = sum(1 for k in tood if k.get("_asenda"))
+    print(f"Kirjeid {len(kirjed)}, lisada {len(tood) - asendusi}, asendada {asendusi}, vahele {len(vahele)}.")
     for i, pohjus in vahele:
         print(f"  VAHELE {i}: {pohjus}")
     for k in tood[:3]:
@@ -126,6 +139,19 @@ def main():
             print(f"VAHELE {k['id']}: märkus juba olemas")
             continue
         uus_meta = copy.deepcopy(meta)
+        i = asendatav(meta, k["asenda_b"]) if k.get("asenda_b") else None
+        if i is not None:
+            # Sama kommentaar (id, autor, aeg) jääb, ainult tekst parandatakse.
+            uus_meta["comments"][i]["text"] = k["tekst"]
+            kood, vastus = paring("POST", "/save", {
+                "original_path": k["kaust"], "file_name": k["fail"],
+                "text_content": tekst, "meta_content": uus_meta, "base": base,
+            }, token=token)
+            ok = kood == 200 and vastus.get("changed") and vastus.get("git_committed")
+            vead += not ok
+            print(f"{'ASENDA' if ok else 'VIGA  '} {k['id']}  {kood} {'' if ok else vastus}")
+            time.sleep(0.3)
+            continue
         uus_meta["comments"] = list(meta.get("comments") or []) + [{
             "id": str(alus_id + n),
             "text": k["tekst"],

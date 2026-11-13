@@ -44,13 +44,13 @@ LISA = {
                      "read": ["Maht erineb: sedelil 136 lt., ESTERis 63 l."]},
     ("2li9jm", 95): {"koht": "F 93 (Leesment)"},
     ("2li9jm", 96): {"silt": "köited",
-                     "b": ["b25467542", "b25467414", "b25475058", "b25475757", "b25476245"],
+                     "b": ["b40491602", "b40491572", "b40493672", "b40493866", "b40494081"],
                      "pealkirjad": {
-                         "b25467542": "Leges, Statuta, Constitutiones, Privilegia Regni Poloniae … Vol. 2: 1550–1609. 496 l.",
-                         "b25467414": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 3: 1609–1640. 456 l.",
-                         "b25475058": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 4: 1641–1668. 600 l.",
-                         "b25475757": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 5: 1669–1697. 639 l.",
-                         "b25476245": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 6: 1697–1736. 321 l.",
+                         "b40491602": "Leges, Statuta, Constitutiones, Privilegia Regni Poloniae … Vol. 2: 1550–1609. 496 l.",
+                         "b40491572": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 3: 1609–1640. 456 l.",
+                         "b40493672": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 4: 1641–1668. 600 l.",
+                         "b40493866": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 5: 1669–1697. 639 l.",
+                         "b40494081": "Leges, Constitutiones et Privilegia Regni Poloniae … Vol. 6: 1697–1736. 321 l.",
                      },
                      "read": ["Sedel kirjeldab viieköitelist tervikut (Tomus II–VI, Ald 2961–2965); "
                               "ESTERis on igal köitel oma kirje (vol. 2–6). "
@@ -61,7 +61,7 @@ LISA = {
                       "b": ["b51618485", "b51618552"],
                       "read": ["Sedel katab 1. ja 2. kogu; ESTERis on need eraldi kirjetena."]},
     ("2li9jm", 123): {"silt": "köited",
-                      "b": ["b25692306", "b25695824", "b25695344", "b25699866", "b25700558"],
+                      "b": ["b40568325", "b40569986", "b40569731", "b40571592", "b40571907"],
                       "read": ["Sedel kirjeldab viit köidet (Ad 2925–2929); ESTERis on igal köitel "
                                "oma kirje. ESTERis kohaviit puudub."]},
     ("2li9jm", 124): {"autor": "",
@@ -117,6 +117,9 @@ def main():
     otsused = [json.loads(r) for r in open(os.path.join(SIIN, f"{jaotus}_otsused.jsonl"), encoding="utf-8")]
     kand = json.load(open(os.path.join(SIIN, f"{jaotus}_z_kandidaadid.json"), encoding="utf-8"))
     kirjed = {c["b"]: c for s in kand for c in s["kandidaadid"]}
+    # <jaotus>_b_kaart.json: vana 035 „(Tartu)” number → õige 907 number (2026-11-13 parandus).
+    kaart_tee = os.path.join(SIIN, f"{jaotus}_b_kaart.json")
+    vana_b = json.load(open(kaart_tee, encoding="utf-8")) if os.path.exists(kaart_tee) else {}
 
     seotud = [o for o in otsused if o["olek"] != "erinev"]
     puudu = [k for k in LISA if k not in {(o["work_id"], o["lk"]) for o in seotud}]
@@ -158,11 +161,16 @@ def main():
             ridu.append("Sama kirjega on seotud ka: " + ", ".join(
                 f"[{KAUSTAD[w][1]} lk {lk}](https://vutt.utlib.ut.ee/work/{w}/{lk})" for w, lk in teised) + ".")
         ridu.append(JALUS)
-        valja.append({
+        kirje = {
             "id": f"{o['work_id']}-{o['lk']}", "work_id": o["work_id"], "lk": o["lk"],
             "kaust": kaust, "fail": f"{kaust}-{o['lk']:03d}.txt", "b": bb,
             "tekst": "\n".join(ridu),
-        })
+        }
+        # Varem vale (vana Tartu) numbriga kirjutatud märkus asendatakse, mitte ei lisata uut.
+        vanad = [v for v, uus in vana_b.items() if uus in bb]
+        if vanad:
+            kirje["asenda_b"] = vanad
+        valja.append(kirje)
 
     tee = os.path.join(SIIN, f"{jaotus}_markused.json")
     with open(tee, "w", encoding="utf-8") as f:

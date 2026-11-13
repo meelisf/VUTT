@@ -65,7 +65,10 @@ def puhas(v):
 
 def kokkuvote(k):
     f = k["f"]
-    b = re.search(r"b\d{7}[\dx]", " ".join(f.get("035", []) + f.get("907", [])))
+    # ESTERi kirjenumber on 907-s (sama mis 035 „(ErESTER)…”). 035 „.b… (Tartu)” on vana
+    # kohaliku süsteemi number ja annab vale lingi — seda EI võeta.
+    b = re.search(r"b\d{7}[\dx]", " ".join(f.get("907", [])) or " ".join(
+        v for v in f.get("035", []) if "ErESTER" in v))
     g = lambda tag, kood="a": " ".join(alam(v, kood) for v in f.get(tag, []))
     return {
         "b": b.group(0) if b else None,
