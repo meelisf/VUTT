@@ -36,6 +36,7 @@ from .indices import rebuild_indices
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
 from . import enrichment_proposals, registry_candidates, registries
+from .place_wikidata_http import WikidataBusy
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo
 from ..rate_limit import get_client_ip, check_rate_limit
@@ -964,7 +965,13 @@ def prosopography_work_relations(
 def places_wikidata_search(request: Request, q: str = "", lang: str = "en"):
     """Otsib Wikidatast kohti nime järgi. Avalik (rate-limititud, et vältida proksi kuritarvitust)."""
     _check_wikidata_rate_limit(request)
-    return search_places_wikidata(q.strip(), lang=lang)
+    try:
+        return search_places_wikidata(q.strip(), lang=lang)
+    except WikidataBusy as e:
+        raise HTTPException(status_code=429, detail=str(e), headers={"Retry-After": str(e.retry_after)})
+    except Exception:
+        logger.warning("Wikidata kohaotsing ebaõnnestus", exc_info=True)
+        raise HTTPException(status_code=502, detail="Wikidata otsing ei ole praegu saadaval")
 
 
 @router.get("/places/wikidata/{qid}")
@@ -973,7 +980,10 @@ def places_wikidata_fetch(qid: str, request: Request):
     _check_wikidata_rate_limit(request)
     if not qid.startswith("Q") or not qid[1:].isdigit():
         raise HTTPException(status_code=400, detail=f"Vigane Q-kood: {qid}")
-    result = fetch_place_wikidata(qid)
+    try:
+        result = fetch_place_wikidata(qid)
+    except WikidataBusy as e:
+        raise HTTPException(status_code=429, detail=str(e), headers={"Retry-After": str(e.retry_after)})
     if result is None:
         raise HTTPException(status_code=502, detail=f"Wikidata päring ebaõnnestus: {qid}")
     return result

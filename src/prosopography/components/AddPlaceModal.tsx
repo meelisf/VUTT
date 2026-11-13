@@ -1,23 +1,15 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Search, Loader2, Plus } from 'lucide-react';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
-import { addPlace, fetchPlaceWikidata } from '../services/prosopographyService';
+import WikidataPlaceSearch from './WikidataPlaceSearch';
+import type { PlaceSuggestion, WikidataPlace } from '../services/prosopographyService';
+import { addPlace } from '../services/prosopographyService';
 import type { PlaceEntry } from '../types';
 
-export async function searchWikidataPlaces(q: string, lang: string): Promise<{ q: string; label: string; description: string; aliases: string[] }[]> {
-  if (!q.trim()) return [];
-  const params = new URLSearchParams({ action: 'wbsearchentities', search: q, language: lang, format: 'json', type: 'item', limit: '10', origin: '*' });
-  try {
-    const resp = await fetchWithTimeout(`https://www.wikidata.org/w/api.php?${params}`, { timeout: 10000 });
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    return (data.search ?? []).map((item: any) => ({ q: item.id, label: item.label ?? '', description: item.description ?? '', aliases: item.aliases ?? [] }));
-  } catch { return []; }
-}
 
 export interface AddPlaceModalProps {
   query: string;
+  initialSelection?: { item: PlaceSuggestion; details: WikidataPlace };
   meta: { groups: Record<string, any>; allowed_types: string[] } | null;
   places: Record<string, PlaceEntry>;
   onAdd: (key: string, entry: PlaceEntry) => void;
@@ -33,23 +25,17 @@ interface WdPreview {
   coordinates?: PlaceEntry['coordinates'];
 }
 
-const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: initialPlaces, onAdd, onClose, token }) => {
+const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, initialSelection, meta, places: initialPlaces, onAdd, onClose, token }) => {
   const { t, i18n } = useTranslation('prosopography');
   const lang = i18n.language?.slice(0, 2) ?? 'et';
-  const wdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const parentWdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Lokaalne places — kasvab kui lisatakse ülempiirkond
   const [places, setPlaces] = useState(initialPlaces);
 
   // Wikidata otsing (põhikoht)
-  const [wdQuery, setWdQuery] = useState(query);
-  const [wdResults, setWdResults] = useState<{ q: string; label: string; description: string; aliases: string[] }[]>([]);
-  const [wdSearching, setWdSearching] = useState(false);
-  const [wdSelected, setWdSelected] = useState<{ q: string; label: string } | null>(null);
-  const [wdParents, setWdParents] = useState<{ q: string; label_en: string; label_sv: string }[]>([]);
-  const [wdCoordinates, setWdCoordinates] = useState<PlaceEntry['coordinates'] | null>(null);
-  const [wdLoading, setWdLoading] = useState(false);
+  const [wdSelected, setWdSelected] = useState<{ q: string; label: string } | null>(initialSelection?.item ?? null);
+  const [wdParents, setWdParents] = useState<{ q: string; label_en: string; label_sv: string }[]>(initialSelection?.details.parents ?? []);
+  const [wdCoordinates, setWdCoordinates] = useState<PlaceEntry['coordinates'] | null>(initialSelection?.details.coordinates ?? null);
 
   // Parent — registriotsing
   const [parentQuery, setParentQuery] = useState('');
@@ -59,23 +45,19 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
   // Parent — Wikidata otsing + lisamine
   const [parentWdOpen, setParentWdOpen] = useState(false);
   const [parentWdQuery, setParentWdQuery] = useState('');
-  const [parentWdResults, setParentWdResults] = useState<{ q: string; label: string; description: string; aliases: string[] }[]>([]);
-  const [parentWdSearching, setParentWdSearching] = useState(false);
   const [parentWdPreview, setParentWdPreview] = useState<WdPreview | null>(null);
-  const [parentWdLoading, setParentWdLoading] = useState(false);
   const [parentWdAdding, setParentWdAdding] = useState(false);
   const [parentWdError, setParentWdError] = useState<string | null>(null);
 
   // Vorm
-  const [labels, setLabels] = useState<Record<string, string>>({});
-  const [name, setName] = useState(query);
-  const [placeType, setPlaceType] = useState('');
-  const [qCode, setQCode] = useState('');
+  const [labels, setLabels] = useState<Record<string, string>>(initialSelection?.details.labels ?? {});
+  const [name, setName] = useState(initialSelection ? (initialSelection.details.labels.et || initialSelection.details.labels.en || initialSelection.item.label) : query);
+  const [placeType, setPlaceType] = useState(initialSelection?.details.type ?? '');
+  const [qCode, setQCode] = useState(initialSelection?.item.q ?? '');
   const [group, setGroup] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const wdLang = lang === 'et' ? 'en' : lang;
 
   const resolveLabel = (lbls: Record<string, string> | undefined | null) => {
     if (!lbls) return '';
@@ -84,48 +66,18 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
 
   // ── Põhikoha Wikidata otsing ─────────────────────────────────────────────
 
-  const triggerWdSearch = (v: string) => {
-    clearTimeout(wdTimer.current);
-    if (!v.trim()) { setWdResults([]); return; }
-    setWdSearching(true);
-    wdTimer.current = setTimeout(async () => {
-      const results = await searchWikidataPlaces(v.trim(), wdLang);
-      setWdResults(results);
-      setWdSearching(false);
-    }, 350);
-  };
-
-  const handleWdQueryChange = (v: string) => {
-    setWdQuery(v);
-    setWdSelected(null);
-    triggerWdSearch(v);
-  };
-
-  const handleSelectWdResult = async (item: { q: string; label: string }) => {
+  const applySelection = (item: PlaceSuggestion, wd: WikidataPlace) => {
+    // A Q-code is an identity, not a reason to create a second register entry.
+    const existing = Object.entries(places).find(([, e]) => e.id === item.q);
+    if (existing) { onAdd(existing[0], existing[1]); return; }
     setWdSelected(item);
-    setWdResults([]);
-    setWdQuery(item.label);
     setQCode(item.q);
-    setWdCoordinates(null);
-    setWdLoading(true);
-    try {
-      const wd = await fetchPlaceWikidata(item.q);
-      if (wd.labels && Object.keys(wd.labels).length > 0) {
-        setLabels(wd.labels);
-        setName(wd.labels.et || wd.labels.en || wd.labels.sv || item.label);
-      } else {
-        setName(item.label);
-      }
-      if (wd.type) setPlaceType(wd.type);
-      setWdCoordinates(wd.coordinates ?? null);
-      setWdParents(wd.parents ?? []);
-    } catch {
-      setName(item.label);
-    } finally {
-      setWdLoading(false);
-    }
+    setLabels(wd.labels);
+    setName(wd.labels.et || wd.labels.en || wd.labels.sv || item.label);
+    setPlaceType(wd.type ?? '');
+    setWdCoordinates(wd.coordinates);
+    setWdParents(wd.parents);
   };
-
   // ── Ülempiirkonna registriotsing ─────────────────────────────────────────
 
   const filteredParents = useMemo(() => {
@@ -147,57 +99,26 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
     setParentWdPreview(null);
   };
 
-  const handleP131Click = (p: { label_en: string; label_sv: string }) => {
-    const label = p.label_sv || p.label_en;
-    setParentQuery(label);
-    setParentDropOpen(true);
-    setParentWdOpen(false);
-    const exact = Object.entries(places).find(([, e]) =>
-      Object.values(e.labels ?? {}).some(l => l.toLowerCase() === label.toLowerCase())
-    );
-    if (exact) { selectParent(exact[0]); return; }
-    // Ei leitud registrist — ava automaatselt Wikidata otsing
+  const handleP131Click = (p: { q: string; label_en: string; label_sv: string }) => {
+    const existing = Object.entries(places).find(([, e]) => e.id === p.q);
+    if (existing) { selectParent(existing[0]); return; }
+    setParentWdQuery(p.q);
+    setParentWdPreview(null);
     setParentWdOpen(true);
-    setParentWdQuery(label);
-    setParentWdResults([]);
-    setParentWdPreview(null);
-    setParentWdSearching(true);
-    searchWikidataPlaces(label, wdLang).then(r => { setParentWdResults(r); setParentWdSearching(false); });
   };
 
-  // ── Ülempiirkonna Wikidata otsing ─────────────────────────────────────────
-
-  const triggerParentWdSearch = (v: string) => {
-    clearTimeout(parentWdTimer.current);
-    setParentWdPreview(null);
-    if (!v.trim()) { setParentWdResults([]); return; }
-    setParentWdSearching(true);
-    parentWdTimer.current = setTimeout(async () => {
-      const results = await searchWikidataPlaces(v.trim(), wdLang);
-      setParentWdResults(results);
-      setParentWdSearching(false);
-    }, 350);
-  };
-
-  const handleSelectParentWd = async (item: { q: string; label: string }) => {
-    setParentWdResults([]);
-    setParentWdQuery(item.label);
-    setParentWdLoading(true);
+  const selectParentWikidata = (item: PlaceSuggestion, wd: WikidataPlace) => {
+    const existing = Object.entries(places).find(([, e]) => e.id === item.q);
+    if (existing) { selectParent(existing[0]); return; }
+    const lbls = Object.keys(wd.labels).length ? wd.labels : { en: item.label };
+    const proposedKey = (lbls.et || lbls.en || item.label).replace(/\s+/g, '_');
+    setParentWdPreview({ q: item.q, proposedKey, labels: lbls, type: wd.type ?? '', coordinates: wd.coordinates });
     setParentWdError(null);
-    try {
-      const wd = await fetchPlaceWikidata(item.q);
-      const lbls = Object.keys(wd.labels ?? {}).length > 0 ? wd.labels : { et: item.label, en: item.label };
-      const proposedKey = (lbls.et || lbls.en || item.label).replace(/\s+/g, '_');
-      setParentWdPreview({ q: item.q, proposedKey, labels: lbls, type: wd.type ?? '', coordinates: wd.coordinates ?? null });
-    } catch {
-      setParentWdError(t('placeModal.wikidataError'));
-    } finally {
-      setParentWdLoading(false);
-    }
   };
 
   const handleAddParentFromWd = async () => {
     if (!parentWdPreview) return;
+    if (places[parentWdPreview.proposedKey]) { setParentWdError(t('place.keyExists')); return; }
     setParentWdAdding(true);
     setParentWdError(null);
     try {
@@ -221,6 +142,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
   const handleSave = async () => {
     if (!name.trim()) { setError(t('form.nameRequired')); return; }
     const key = name.trim().replace(/\s+/g, '_');
+    if (places[key]) { setError(t('place.keyExists')); return; }
     const finalLabels = Object.keys(labels).length > 0 ? labels : { et: name.trim(), en: name.trim() };
     setSaving(true);
     setError(null);
@@ -253,46 +175,15 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
         {/* Põhikoha Wikidata otsing */}
         <div className="mb-4">
           <label className="block text-xs text-gray-500 mb-1">{t('placeModal.searchWikidata')}</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={wdQuery}
-              onChange={e => handleWdQueryChange(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); triggerWdSearch(wdQuery); } }}
-              placeholder={t('placeModal.wdSearchPlaceholder')}
-              autoFocus
-              className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
-            />
-            <button type="button" disabled={wdSearching || !wdQuery.trim()}
-              onClick={() => { clearTimeout(wdTimer.current); setWdSearching(true); searchWikidataPlaces(wdQuery.trim(), wdLang).then(r => { setWdResults(r); setWdSearching(false); }); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
-              {wdSearching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-            </button>
-          </div>
-          {wdResults.length > 0 && (
-            <div className="mt-1 border border-gray-200 rounded-lg shadow-sm max-h-48 overflow-y-auto bg-white">
-              {wdResults.map(r => (
-                <button key={r.q} type="button" onClick={() => handleSelectWdResult(r)}
-                  className="w-full text-left px-3 py-2 hover:bg-primary-50 border-b border-gray-50 last:border-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-medium text-gray-900">{r.label}</span>
-                    <span className="text-xs font-mono text-gray-400">{r.q}</span>
-                  </div>
-                  {r.description && <p className="text-xs text-gray-500 mt-0.5">{r.description}</p>}
-                  {r.aliases?.length > 0 && <p className="text-xs text-gray-400 mt-0.5 italic">{r.aliases.slice(0, 4).join(', ')}</p>}
-                </button>
-              ))}
-            </div>
-          )}
-          {wdSelected && wdLoading && (
-            <p className="mt-1 text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> {t('placeModal.loadingDetails')}</p>
-          )}
-          {wdSelected && !wdLoading && wdCoordinates && (
+          <WikidataPlaceSearch initialQuery={initialSelection ? '' : query} lang={lang} onSelect={applySelection} />
+          {wdSelected && <p className="mt-2 text-sm text-green-800">{wdSelected.label} · {wdSelected.q}</p>}
+          {wdSelected && !wdCoordinates && <p className="mt-1 text-xs text-amber-700">{t('place.noCoordinates')}</p>}
+          {wdSelected && wdCoordinates && (
             <p className="mt-1 text-xs text-green-700">
               {t('placeModal.coordinates')} {wdCoordinates.lat.toFixed(5)}, {wdCoordinates.lon.toFixed(5)}
             </p>
           )}
-          {wdSelected && !wdLoading && wdParents.length > 0 && (
+          {wdSelected && wdParents.length > 0 && (
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-1">{t('placeModal.parentFromWikidata')}</p>
               {wdParents.map(p => (
@@ -329,7 +220,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             </div>
             <div className="w-32">
               <label className="block text-xs text-gray-500 mb-1">{t('placeModal.qCode')}</label>
-              <input type="text" value={qCode} onChange={e => setQCode(e.target.value)}
+              <input type="text" value={qCode} readOnly
                 placeholder="Q12345"
                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono" />
             </div>
@@ -381,7 +272,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             {/* Wikidata otsingulüliti */}
             {!parentKey && (
               <button type="button"
-                onClick={() => { setParentWdOpen(v => !v); setParentWdResults([]); setParentWdPreview(null); setParentWdError(null); }}
+                onClick={() => { setParentWdOpen(v => !v); setParentWdQuery(parentQuery); setParentWdPreview(null); setParentWdError(null); }}
                 className="mt-1.5 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
                 <Search size={11} />
                 {parentWdOpen ? t('placeModal.hideWikidata') : t('placeModal.searchWikidata')}
@@ -391,35 +282,8 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             {/* Ülempiirkonna Wikidata otsing */}
             {parentWdOpen && !parentKey && (
               <div className="mt-2 bg-blue-50 border border-blue-200 rounded p-2.5 space-y-2">
-                <div className="flex gap-2">
-                  <input type="text" value={parentWdQuery}
-                    onChange={e => { setParentWdQuery(e.target.value); triggerParentWdSearch(e.target.value); }}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); triggerParentWdSearch(parentWdQuery); } }}
-                    placeholder={t('placeModal.parentWdPlaceholder')}
-                    className="flex-1 px-2 py-1 text-sm border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-                  />
-                  <button type="button" disabled={parentWdSearching || !parentWdQuery.trim()}
-                    onClick={() => { clearTimeout(parentWdTimer.current); setParentWdSearching(true); searchWikidataPlaces(parentWdQuery.trim(), wdLang).then(r => { setParentWdResults(r); setParentWdSearching(false); }); }}
-                    className="flex items-center px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
-                    {parentWdSearching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-                  </button>
-                </div>
-                {parentWdResults.length > 0 && (
-                  <div className="border border-blue-200 rounded bg-white max-h-36 overflow-y-auto">
-                    {parentWdResults.map(r => (
-                      <button key={r.q} type="button" onClick={() => handleSelectParentWd(r)}
-                        className="w-full text-left px-2.5 py-1.5 hover:bg-blue-50 border-b border-gray-50 last:border-0">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-sm font-medium text-gray-900">{r.label}</span>
-                          <span className="text-xs font-mono text-gray-400">{r.q}</span>
-                        </div>
-                        {r.description && <p className="text-xs text-gray-500">{r.description}</p>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {parentWdLoading && <p className="text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> {t('placeModal.loading')}</p>}
-                {parentWdPreview && !parentWdLoading && (
+                <WikidataPlaceSearch key={parentWdQuery} initialQuery={parentWdQuery} lang={lang} onSelect={selectParentWikidata} />
+                {parentWdPreview && (
                   <div className="bg-white border border-blue-300 rounded p-2 space-y-1">
                     <div className="text-xs text-gray-600 space-y-0.5">
                       {Object.entries(parentWdPreview.labels).map(([l, lbl]) => (

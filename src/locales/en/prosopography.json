@@ -102,7 +102,6 @@
   "levelReviewed": "Reviewed",
   "levelVerified": "Verified",
   "origin": "Origin",
-  "bornAndOrigin": "Place of birth and origin",
   "aliases": "Name variants",
   "maidenName": "Maiden name",
   "maidenNameShort": "née {{name}}",
@@ -214,13 +213,17 @@
     "translateRateLimited": "Too many translations this hour. Please try later.",
     "translateStaleResult": "The text changed while translating — the result was not applied automatically.",
     "translating": "Translating…",
-    "viewSourceDiff": "See what changed"
+    "viewSourceDiff": "See what changed",
+    "lifeData": "Life details",
+    "originHint": "The most specific known place of birth or origin.",
+    "deathPlace": "Place of death",
+    "legacyBirthHint": "The previous birthplace “{{place}}” differs from the selected origin. Review the selection; saving preserves the previous birthplace in the notes."
   },
   "dateField": {
     "year": "year",
     "month": "month",
     "day": "day",
-    "more": "more",
+    "more": "Date details",
     "circa": "circa",
     "exactDate": "exact date",
     "before": "before this",
@@ -232,7 +235,9 @@
     "gregorian": "Gregorian calendar",
     "julianShort": "jul.",
     "gregorianShort": "greg.",
-    "place": "place"
+    "place": "place",
+    "bound": "Date bound",
+    "calendar": "Calendar"
   },
   "aliasesList": {
     "label": "Name variants",
@@ -427,7 +432,22 @@
   },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",
-    "notFound": "Not found. Ask an editor to add."
+    "notFound": "No matching places found. Try another name or search language.",
+    "wikidataSearch": "Search Wikidata places",
+    "wikidataPlaceholder": "Place name, historical name or Q-code",
+    "searchLanguage": "Search language",
+    "searchError": "Wikidata lookup failed or its request limit was reached. Wait a little and try again.",
+    "registryError": "Could not load the place register. Reload the page.",
+    "registry": "Place register",
+    "clear": "Remove place",
+    "keyExists": "A register entry with this name already exists. Select it or use a more specific name.",
+    "invalidCoordinates": "Enter both coordinates as numbers: latitude −90…90, longitude −180…180.",
+    "linkHint": "Search by name or Q-code. Selecting a result fills the Wikidata link and coordinates; review before saving.",
+    "alreadyLinked": "This Wikidata place is already linked to “{{name}}”. Use the existing place.",
+    "noCoordinates": "This Wikidata item has no coordinates. You can still save the place.",
+    "unlink": "Remove Wikidata link",
+    "rateLimit": "Request limit reached. Try again in {{seconds}} seconds.",
+    "retry": "Try again"
   },
   "placeModal": {
     "searchWikidata": "Search Wikidata",

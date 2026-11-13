@@ -8,7 +8,6 @@ import os
 import re
 import time
 import threading
-import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 from typing import Optional
@@ -18,7 +17,8 @@ from ..utils import atomic_write_json
 from ..git_ops import save_config_with_git
 from ..git_ops import save_with_git
 from .locks import merge_operation_lock, person_lock
-from .enrichment import _wd_best_values, _wd_entity, _wd_item_ids, _wd_labels
+from .enrichment import _wd_best_values, _wd_item_ids
+from .place_wikidata_http import get_json, WikidataBusy
 
 logger = get_logger(__name__)
 
@@ -447,6 +447,15 @@ def put_place(key: str, data: dict, username: str = "Automaatne") -> dict:
 
     with places_write_lock:
         places = _load_places_cache(force_reload=True)
+        if data.get("_create_only") and key in places:
+            raise ValueError(f"Koht on juba registris: {key}")
+        qid = data.get("id")
+        if qid and (not isinstance(qid, str) or not re.fullmatch(r"Q[1-9][0-9]*", qid)):
+            raise ValueError("Vigane Wikidata Q-kood")
+        if qid and (data.get("_create_only") or places.get(key, {}).get("id") != qid):
+            duplicate = next((k for k, e in places.items() if k != key and e.get("id") == qid), None)
+            if duplicate:
+                raise ValueError(f"Wikidata koht on juba registris: {duplicate} ({qid})")
         entry = places.get(key, {})
         for field in ("id", "labels", "parent_key", "group", "type", "historical_names", "notes", "coordinates"):
             if field in data:
@@ -459,10 +468,6 @@ def put_place(key: str, data: dict, username: str = "Automaatne") -> dict:
 
 
 # ── Wikidata rikastamine ───────────────────────────────────────────────────
-
-_WD_HEADERS = {
-    "User-Agent": "VUTT-Historical-Archive/1.0 (https://vutt.utlib.ut.ee; vutt@utlib.ut.ee)"
-}
 
 # Wikidata P31 (instance of) Q-koodid → meie tüübid
 _WD_TYPE_MAP = {
@@ -497,37 +502,65 @@ def _parse_wikidata_point(value: str) -> Optional[dict]:
     }
 
 
+def _wd_api(**params):
+    return get_json("https://www.wikidata.org/w/api.php?" + urllib.parse.urlencode({
+        "format": "json", "maxlag": 5, **params,
+    }), ttl=120 if params.get("action") == "wbsearchentities" else 3600)
+
+
+def _wd_entity(qid):
+    data = get_json(f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json")
+    entities = data.get("entities") or {}
+    return entities.get(qid) or next(iter(entities.values()), None)
+
+
+def _wd_labels(ids, langs):
+    out = {}
+    for start in range(0, len(ids), 50):
+        entities = _wd_api(action="wbgetentities", ids="|".join(ids[start:start + 50]),
+                           props="labels", languages="|".join(langs)).get("entities", {})
+        out.update({qid: {lang: v["value"] for lang, v in (ent.get("labels") or {}).items()}
+                    for qid, ent in entities.items()})
+    return out
+
+
 def search_places_wikidata(query: str, lang: str = "en", limit: int = 10) -> list:
+    """Name/alias search, followed by ONE batch to discard non-geographic hits.
+
+    A direct Q-code is supported too. No SPARQL or request per suggestion.
     """
-    Otsib Wikidatast kohti nime järgi (wbsearchentities API).
-    Tagastab [{q, label, description, aliases}].
-    """
-    if not query.strip():
+    query = query.strip()[:200]
+    if len(query) < 2:
         return []
-    url = "https://www.wikidata.org/w/api.php?" + urllib.parse.urlencode({
-        "action": "wbsearchentities",
-        "search": query,
-        "language": lang,
-        "type": "item",
-        "format": "json",
-        "limit": limit,
-        "props": "url",
-    })
-    try:
-        req = urllib.request.Request(url, headers=_WD_HEADERS)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        results = []
-        for item in data.get("search", []):
-            results.append({
-                "q": item.get("id", ""),
-                "label": item.get("label", ""),
-                "description": item.get("description", ""),
-                "aliases": item.get("aliases", []),
-            })
-        return results
-    except Exception:
+    lang = lang if lang in ("et", "en", "de", "la", "sv", "da", "fi", "lv") else "en"
+    direct = bool(re.fullmatch(r"Q[1-9][0-9]*", query, re.I))
+    hits = [{"id": query.upper()}] if direct else _wd_api(
+        action="wbsearchentities", search=query, language=lang, uselang=lang,
+        type="item", limit=min(limit, 10)).get("search", [])
+    if not hits and lang != "en":
+        hits = _wd_api(action="wbsearchentities", search=query, language="en",
+                       uselang=lang, type="item", limit=min(limit, 10)).get("search", [])
+    ids = [h["id"] for h in hits if re.fullmatch(r"Q[1-9][0-9]*", h.get("id", ""))]
+    if not ids:
         return []
+    entities = _wd_api(action="wbgetentities", ids="|".join(ids),
+                       props="labels|descriptions|aliases|claims",
+                       languages="|".join(dict.fromkeys((lang, "en", "de", "sv", "mul"))))["entities"]
+    results = []
+    for hit in hits:
+        qid = hit.get("id")
+        ent = entities.get(qid) or {}
+        types = _wd_item_ids(ent, "P31")
+        if "Q5" in types or not (_entity_coordinates(ent) or _wd_item_ids(ent, "P131")
+                                   or any(t in _WD_TYPE_MAP for t in types)):
+            continue
+        labels = ent.get("labels") or {}
+        descriptions = ent.get("descriptions") or {}
+        label = next((labels[l]["value"] for l in (lang, "en", "mul", "de", "sv") if l in labels), hit.get("label", qid))
+        description = next((descriptions[l]["value"] for l in (lang, "en", "de") if l in descriptions), hit.get("description", ""))
+        aliases = list(dict.fromkeys(a["value"] for values in (ent.get("aliases") or {}).values() for a in values))
+        results.append({"q": qid, "label": label, "description": description, "aliases": aliases})
+    return results
 
 
 _PLACE_LABEL_LANGS = ("et", "en", "de", "la", "sv")
@@ -564,7 +597,13 @@ def fetch_place_wikidata(qid: str) -> Optional[dict]:
     if not qid.startswith("Q") or not qid[1:].isdigit():
         return None
 
-    entity = _wd_entity(qid)
+    try:
+        entity = _wd_entity(qid)
+    except WikidataBusy:
+        raise
+    except Exception:
+        logger.warning("Koha Wikidata päring ebaõnnestus: %s", qid, exc_info=True)
+        return None
     if entity is None:
         return None
 
@@ -580,7 +619,12 @@ def fetch_place_wikidata(qid: str) -> Optional[dict]:
     parents = []
     if parent_ids:
         # Tõrge → None, mitte sildita ülemüksused: UI pakuks Q-koodi kohanimeks.
-        sildid = _wd_labels(parent_ids, langs=("en", "sv", "mul"))
+        try:
+            sildid = _wd_labels(parent_ids, langs=("en", "sv", "mul"))
+        except WikidataBusy:
+            raise
+        except Exception:
+            sildid = None
         if sildid is None:
             return None
         for pq in parent_ids:

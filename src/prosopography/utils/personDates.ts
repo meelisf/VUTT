@@ -42,7 +42,7 @@ export function formatLifeDate(
   lang: string = 'et',
 ): string {
   const raw = (d?.date ?? '').trim();
-  if (!raw) return '';
+  if (!raw) return d?.place?.label ? placeSuffix(d, lang).replace(/^,\s*/, '') : '';
 
   const prefix =
     (d!.bound === 'before' ? `${boundLabels.before} ` : d!.bound === 'after' ? `${boundLabels.after} ` : '') +
@@ -52,7 +52,7 @@ export function formatLifeDate(
   if (!/^\d{4}/.test(raw)) return `${prefix}${raw}${placeSuffix(d!, lang)}`;
 
   const year = parseInt(raw.slice(0, 4), 10);
-  if (!year) return '';          // "0000" = teadmata, mitte aasta null
+  if (!year) return placeSuffix(d!, lang).replace(/^,\s*/, ''); // "0000" = teadmata
 
   const month = parseInt(raw.slice(5, 7), 10);
   const day = parseInt(raw.slice(8, 10), 10);
@@ -72,17 +72,4 @@ export function formatFloruit(
 ): string {
   if (!from && !to) return '';
   return `${from ?? ''}–${to ?? ''}`;
-}
-
-/**
- * Kas sünnikoht ja päritolu on sama koht (sama Q-kood)? Siis näidatakse ühte
- * rida („Sünni- ja päritolukoht"), mitte sama kohta kahes kohas (#427).
- * Eri täpsus (Tallinn / Estland) = eri Q-kood → mõlemad jäävad nähtavale.
- */
-export function birthPlaceIsOrigin(
-  birth: HistoricalDate | null | undefined,
-  origin: { place?: string | null; place_id?: string | null } | null | undefined,
-): boolean {
-  const q = birth?.place?.id;
-  return !!q && !!origin?.place && origin.place_id === q;
 }

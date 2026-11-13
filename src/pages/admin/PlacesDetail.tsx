@@ -10,6 +10,7 @@ import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { updatePlace, deletePlace } from '../../prosopography/services/prosopographyService';
 import type { PlaceEntry } from '../../prosopography/types';
 import PlacesMergeModal from './PlacesMergeModal';
+import WikidataPlaceSearch from '../../prosopography/components/WikidataPlaceSearch';
 
 const PLACE_TYPES = ['city', 'village', 'parish', 'county', 'province', 'territory', 'historical_region'];
 const LANGS = ['et', 'en', 'de', 'la', 'sv'];
@@ -128,6 +129,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
   const [newHistName, setNewHistName] = useState('');
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
+  const [coordinateMeta, setCoordinateMeta] = useState<PlaceEntry['coordinates']>(null);
 
   const parseDMS = (raw: string): { lat?: number; lon?: number } | null => {
     const re = /(\d+)°\s*(\d+)[''']\s*(\d+(?:[.,]\d+)?)["""]\s*([NSEWnsew])/g;
@@ -190,6 +192,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
       setLat(entry.coordinates?.lat != null ? String(entry.coordinates.lat) : '');
       setLon(entry.coordinates?.lon != null ? String(entry.coordinates.lon) : '');
       setNotes(entry.notes ?? '');
+      setCoordinateMeta(entry.coordinates);
       setBaseline(normalizeDraft(draftFromEntry(entry)));
       setSaveError(null);
     }
@@ -215,11 +218,17 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
     setSaving(true);
     setSaveError(null);
     try {
-      const latNum = lat.trim() ? parseFloat(lat) : undefined;
-      const lonNum = lon.trim() ? parseFloat(lon) : undefined;
+      const latNum = lat.trim() ? Number(lat.replace(',', '.')) : undefined;
+      const lonNum = lon.trim() ? Number(lon.replace(',', '.')) : undefined;
+      if ((latNum == null) !== (lonNum == null) ||
+          (latNum != null && (!Number.isFinite(latNum) || Math.abs(latNum) > 90)) ||
+          (lonNum != null && (!Number.isFinite(lonNum) || Math.abs(lonNum) > 180))) {
+        setSaveError(t('prosopography:place.invalidCoordinates'));
+        return false;
+      }
       const coordinates =
         latNum != null && lonNum != null && !isNaN(latNum) && !isNaN(lonNum)
-          ? { lat: latNum, lon: lonNum }
+          ? { ...(coordinateMeta?.lat === latNum && coordinateMeta?.lon === lonNum ? coordinateMeta : {}), lat: latNum, lon: lonNum }
           : null;
 
       const data: any = {
@@ -269,6 +278,21 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
         </div>
         {saveError && <p className="mb-3 text-xs text-red-600">{saveError}</p>}
 
+        <div className="mb-4 p-3 rounded border border-blue-200 bg-blue-50">
+          <p className="mb-2 text-xs text-gray-600">{t('prosopography:place.linkHint')}</p>
+          <WikidataPlaceSearch key={placeKey} initialQuery={qCode || name} lang={lang}
+            onSelect={(item, details) => {
+              const duplicate = Object.entries(places).find(([key, e]) => key !== placeKey && e.id === item.q);
+              if (duplicate) { setSaveError(t('prosopography:place.alreadyLinked', { name: duplicate[0] })); return; }
+              setSaveError(null);
+              setQCode(item.q);
+              setLabels(prev => ({ ...details.labels, ...Object.fromEntries(Object.entries(prev).filter(([, v]) => v.trim())) }));
+              if (details.type) setPlaceType(details.type);
+              setLat(details.coordinates ? String(details.coordinates.lat) : '');
+              setLon(details.coordinates ? String(details.coordinates.lon) : '');
+              setCoordinateMeta(details.coordinates);
+            }} />
+        </div>
         {/* Labelid */}
         <div className="mb-3">
           <label className="block text-xs text-gray-500 mb-1">{t('places.labels')}</label>
@@ -303,12 +327,15 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
           <div className="w-32">
             <label className="block text-xs text-gray-500 mb-1">{t('places.qcode')}</label>
             <input
+              aria-label="Wikidata Q-code"
               type="text"
               value={qCode}
-              onChange={e => setQCode(e.target.value)}
+              readOnly
               placeholder="Q12345"
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono"
             />
+            {qCode && <button type="button" className="mt-1 text-xs text-gray-600 underline"
+              onClick={() => { setQCode(''); setCoordinateMeta(null); }}>{t('prosopography:place.unlink')}</button>}
           </div>
         </div>
 

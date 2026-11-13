@@ -110,5 +110,6 @@ ei seota: „Kadrina kirikumõis" ≠ „Kadrina", „Kambja kihelkond" ≠ „K
   (`{field, qid, kind, key?}`) — järjekorra UI tuleb #426 PR 4-ga.
   Kinnitatud ülevaatust ei avata; ülevaateta vanale kaardile tekib `pending`
   (`created_via: "place_backfill"`).
-- UI: sama Q-koodiga sünnikoht ja päritolu → üks rida
-  („Sünni- ja päritolukoht", `birthPlaceIsOrigin`).
+- UI (asendatud 2026-11-13: [ADR 0084](0084-isiku-paritolu-ja-kohaotsing.md)):
+  vormis ja avalikul kaardil üks „Päritolu” koht; surmakoht eraldi.
+  Varasem sama Q-koodi järgi sünni- ja päritolurea kokkuliitmine on eemaldatud.

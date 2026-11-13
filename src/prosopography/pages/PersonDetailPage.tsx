@@ -3,7 +3,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { formatLifeDate, formatFloruit, birthPlaceIsOrigin } from '../utils/personDates';
+import { formatLifeDate, formatFloruit } from '../utils/personDates';
 import MarkdownView from '../../components/MarkdownView';
 import BiographyBlocks from '../components/BiographyBlocks';
 import {
@@ -162,16 +162,15 @@ export const StructuredInfoCard: React.FC<{ person: ProsopoRecord; workTitles: R
         : t('filterFemale', 'Naissoost'),
     });
   }
-  if (person.origin?.place) {
-    const sama = birthPlaceIsOrigin(person.birth, person.origin);
-    const modernOrigin = person.origin.place_labels
+  if (person.origin?.place || person.birth?.place?.label) {
+    const modernOrigin = person.origin?.place_labels
       ? (person.origin.place_labels[lang] ?? person.origin.place_labels['et'] ?? person.origin.place_labels['en'] ?? Object.values(person.origin.place_labels)[0] ?? '')
       : '';
     rows.push({
-      label: sama ? t('bornAndOrigin') : t('origin', 'Päritolu'),
+      label: t('origin', 'Päritolu'),
       value: modernOrigin && modernOrigin !== person.origin.place
         ? `${person.origin.place} (${modernOrigin})`
-        : person.origin.place,
+        : person.origin?.place || person.birth?.place?.label,
     });
   }
   if ((person.confessions?.length ?? 0) > 0) {
@@ -514,7 +513,7 @@ const PersonDetailPage: React.FC = () => {
   const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
   // Sama koht on päritolureal („Sünni- ja päritolukoht") — sünniaja järel ei korrata.
   const birth = formatLifeDate(
-    birthPlaceIsOrigin(person.birth, person.origin) ? { ...person.birth, place: null } : person.birth,
+    person.birth ? { ...person.birth, place: null } : person.birth,
     boundLabels, lang);
   const death = formatLifeDate(person.death, boundLabels, lang);
   // Sünni-/surmaaasta puudumisel jääks plokk tühjaks — näita tegutsemisperioodi

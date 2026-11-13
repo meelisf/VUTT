@@ -4,6 +4,7 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 export class ApiError extends Error {
   status: number;
   data: unknown;
+  retryAfter?: number;
 
   constructor(message: string, status: number, data: unknown = null) {
     super(message);
@@ -126,7 +127,10 @@ async function apiRequest<T>(
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw new ApiError(getErrorMessage(data, `HTTP ${response.status}`), response.status, data);
+    const error = new ApiError(getErrorMessage(data, `HTTP ${response.status}`), response.status, data);
+    const retry = response.headers.get('Retry-After');
+    if (retry) error.retryAfter = /^\d+$/.test(retry) ? Number(retry) : Math.max(1, (Date.parse(retry) - Date.now()) / 1000);
+    throw error;
   }
 
   return data as T;
