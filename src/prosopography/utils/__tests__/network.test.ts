@@ -1,6 +1,6 @@
 // src/prosopography/utils/__tests__/network.test.ts
 import { describe, it, expect } from 'vitest';
-import { applyFilters, coEdges, evidenceTarget, familyRelation, personKinds, otherEnd, radialLayout, timelineRows, DEFAULT_FILTER } from '../network';
+import { applyFilters, evidenceTarget, familyRelation, personKinds, otherEnd, timelineRows, DEFAULT_FILTER } from '../network';
 import type { PersonNetwork, NetworkEdge } from '../../services/networkService';
 
 const F = 'vutt:Pfocus';
@@ -97,16 +97,6 @@ describe('applyFilters', () => {
   });
 });
 
-describe('coEdges', () => {
-  it('seob isikud, kes esinevad samas teoses, kaaluga = ühiste teoste arv', () => {
-    const v = applyFilters(NET, DEFAULT_FILTER);
-    const byPair = Object.fromEntries(coEdges(v).map(c => [`${c.a}|${c.b}`, c.weight]));
-    expect(byPair['a|b']).toBe(2);        // w1 ja w2
-    expect(byPair['a|c']).toBe(1);
-    expect(byPair['b|c']).toBe(1);
-  });
-});
-
 describe('osad (#464)', () => {
   const partEdge = (other: string, part: string | undefined, pages: number[] = []): NetworkEdge => ({
     ...E('dedicated', other, 'w9', 1684), evidence: { work_id: 'w9', pages, ...(part ? { part_id: part } : {}) },
@@ -117,11 +107,6 @@ describe('osad (#464)', () => {
             { work_id: 'w9', part_id: 'k2', kind: 'letter', title: '', year: null, first_page: 12 }],
     edges: [partEdge('a', 'k1'), partEdge('b', 'k2'), partEdge('c', 'k1', [8])],
   };
-
-  it('kaaslaste serv ainult sama osa isikute vahel, mitte kogu kirjakogu peale', () => {
-    const pairs = coEdges(applyFilters(net, DEFAULT_FILTER)).map(c => `${c.a}|${c.b}`);
-    expect(pairs).toEqual(['a|c']);
-  });
 
   it('evidenceTarget: tõendi leht, osa puhul osa esimene leht, muidu 1', () => {
     const v = applyFilters(net, DEFAULT_FILTER);
@@ -152,12 +137,12 @@ describe('familyRelation', () => {
   const labelOf = (id: string) => ({ a: 'Hackspan', [F]: 'Fischer' } as Record<string, string>)[id] ?? id;
 
   it('eelistab fookuse kaardi kirjet: sihtisik on omaniku <tüüp>', () => {
-    expect(familyRelation(edge, F, labelOf)).toEqual({ subject: 'Hackspan', owner: 'Fischer', type: 'isa' });
+    expect(familyRelation(edge, F, labelOf)).toEqual({ subject: 'Hackspan', subjectId: 'a', owner: 'Fischer', type: 'isa' });
   });
 
   it('teise kaardi kirje: suunda ei pöörata', () => {
     const e2 = { ...edge, records: [edge.records![1]] };
-    expect(familyRelation(e2, F, labelOf)).toEqual({ subject: 'Fischer', owner: 'Hackspan', type: 'poeg' });
+    expect(familyRelation(e2, F, labelOf)).toEqual({ subject: 'Fischer', subjectId: F, owner: 'Hackspan', type: 'poeg' });
   });
 
   it('Wikidata tüüp UI keeles, varuks en ja toorväärtus', () => {
@@ -172,37 +157,6 @@ describe('familyRelation', () => {
   it('tüübita kirje → null', () => {
     const e3 = { ...edge, records: [{ source_id: F, target_id: 'a', type: null }] };
     expect(familyRelation(e3, F, labelOf)).toBeNull();
-  });
-});
-
-describe('radialLayout', () => {
-  it('rühmitab liigi järgi, siis esimese aasta järgi, ringil', () => {
-    const v = applyFilters(NET, DEFAULT_FILTER);
-    const { nodes, cx, cy, radius } = radialLayout(v, { w: 600, h: 600 });
-    expect(nodes.map(n => n.person.id)).toEqual(['a', 'b', 'c']);   // academic, siis cotext (b 1658 enne c 1660)
-    for (const n of nodes) {
-      expect(Math.hypot(n.x - cx, n.y - cy)).toBeCloseTo(radius, 5);
-    }
-  });
-
-  it('üle 40 isiku: sildid ainult suurima seosega isikutel', () => {
-    const many: PersonNetwork = {
-      ...NET,
-      persons: Array.from({ length: 60 }, (_, i) => P(`p${i}`)),
-      edges: Array.from({ length: 60 }, (_, i) => E('cotext', `p${i}`, i < 5 ? 'w1' : `x${i}`)),
-      works: [W('w1'), ...Array.from({ length: 60 }, (_, i) => W(`x${i}`))],
-    };
-    // p0..p4 saavad lisaks teise teose → workCount 2
-    many.edges.push(...Array.from({ length: 5 }, (_, i) => E('cotext', `p${i}`, 'w2')));
-    many.works.push(W('w2'));
-    const { nodes } = radialLayout(applyFilters(many, DEFAULT_FILTER), { w: 800, h: 800 });
-    const labelled = nodes.filter(n => n.labelled).map(n => n.person.id).sort();
-    expect(labelled).toEqual(['p0', 'p1', 'p2', 'p3', 'p4']);
-  });
-
-  it('kuni 40 isikut: kõik sildiga', () => {
-    const { nodes } = radialLayout(applyFilters(NET, DEFAULT_FILTER), { w: 600, h: 600 });
-    expect(nodes.every(n => n.labelled)).toBe(true);
   });
 });
 
@@ -237,28 +191,5 @@ describe('timelineRows', () => {
     const ids = timelineRows(applyFilters(net, DEFAULT_FILTER)).rows.map(r => r.person.id);
     expect(ids[ids.length - 1]).toBe('d');
     expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('c'));
-  });
-});
-
-describe('radialLayout sildid (arvustuse M1)', () => {
-  const mk = (counts: number[]) => {
-    const persons = counts.map((_, i) => P(`p${i}`));
-    const edges: NetworkEdge[] = [];
-    const works = [] as ReturnType<typeof W>[];
-    counts.forEach((c, i) => {
-      for (let k = 0; k < c; k++) { edges.push(E('cotext', `p${i}`, `w${i}_${k}`)); works.push(W(`w${i}_${k}`)); }
-    });
-    return applyFilters({ ...NET, persons, edges, works }, DEFAULT_FILTER);
-  };
-
-  it('väikeste täisarvude korral ei silta pooli ringist (järjestus, mitte väärtuslävi)', () => {
-    const v = mk([...Array(60).fill(1), ...Array(90).fill(2), ...Array(9).fill(3)]);
-    const n = radialLayout(v, { w: 900, h: 900 }).nodes.filter(x => x.labelled).length;
-    expect(n).toBe(Math.ceil(0.07 * 159));
-  });
-
-  it('kõigil üks teos: sildid ikkagi olemas', () => {
-    const v = mk(Array(60).fill(1));
-    expect(radialLayout(v, { w: 900, h: 900 }).nodes.filter(x => x.labelled).length).toBe(5);
   });
 });

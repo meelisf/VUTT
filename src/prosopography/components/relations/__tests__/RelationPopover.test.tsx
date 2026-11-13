@@ -2,7 +2,7 @@
 /** @vitest-environment jsdom */
 import { render, screen, fireEvent, act, renderHook } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import './testI18n';
 import RelationPopover, { usePopover } from '../RelationPopover';
 import { applyFilters, DEFAULT_FILTER } from '../../../utils/network';
@@ -153,5 +153,76 @@ describe('liitmärgi hüpik: ainult selle aasta teosed', () => {
     );
     expect(screen.getByText(/Frankfurt/)).toBeTruthy();
     expect(screen.getAllByText(/trükikoht teadmata/)).toHaveLength(1);   // ainult trükis
+  });
+});
+
+// jsdom-is ei pruugi PointerEvent koordinaate kanda → MouseEvent pointer-tüübiga
+const ptr = (el: Element | Window, type: string, x: number, y: number) =>
+  act(() => { el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 })); });
+const box = () => document.querySelector('[data-relation-popover]') as HTMLElement;
+const at = () => ({ left: parseFloat(box().style.left), top: parseFloat(box().style.top) });
+
+describe('RelationPopover lohistamine', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 300, height: 200, left: 0, top: 0, right: 300, bottom: 200, x: 0, y: 0, toJSON: () => ({}) });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('käepidemest lohistamine nihutab kaarti', () => {
+    renderPopover(true);
+    const before = at();
+    ptr(screen.getByTestId('popover-drag'), 'pointerdown', 100, 100);
+    ptr(window, 'pointermove', 160, 140);
+    ptr(window, 'pointerup', 160, 140);
+    expect(at()).toEqual({ left: before.left + 60, top: before.top + 40 });
+  });
+  it('Review Focus 5: jääb vaateaknasse 8 px varuga', () => {
+    renderPopover(true);
+    ptr(screen.getByTestId('popover-drag'), 'pointerdown', 100, 100);
+    ptr(window, 'pointermove', 5000, 5000);
+    expect(at()).toEqual({ left: 1000 - 300 - 8, top: 800 - 200 - 8 });
+    ptr(window, 'pointermove', -5000, -5000);
+    expect(at()).toEqual({ left: 8, top: 8 });
+    ptr(window, 'pointerup', -5000, -5000);
+  });
+  it('pärast pointerup-i liikumine ei mõju', () => {
+    renderPopover(true);
+    ptr(screen.getByTestId('popover-drag'), 'pointerdown', 100, 100);
+    ptr(window, 'pointerup', 100, 100);
+    const a = at(); ptr(window, 'pointermove', 400, 400);
+    expect(at()).toEqual(a);
+  });
+  it('hõljukvihjel käepidet ei ole', () => {
+    renderPopover(false);
+    expect(screen.queryByTestId('popover-drag')).toBeNull();
+  });
+  it('uus kinnitus lähtestab nihke; lohistus ei sulge kaarti', () => {
+    const net = applyFilters(NET, DEFAULT_FILTER);
+    const onClose = vi.fn();
+    const ui = (x: number) => <MemoryRouter><RelationPopover state={{ personId: 'vutt:Ps', x, y: 10, pinned: true }} net={net} onClose={onClose} /></MemoryRouter>;
+    const { rerender } = render(ui(10));
+    ptr(screen.getByTestId('popover-drag'), 'pointerdown', 100, 100);
+    ptr(window, 'pointermove', 300, 300); ptr(window, 'pointerup', 300, 300);
+    fireEvent.click(screen.getByTestId('popover-drag'));
+    expect(onClose).not.toHaveBeenCalled();
+    rerender(ui(50));
+    expect(at()).toEqual({ left: 50 + 14, top: 10 + 14 });
+  });
+  it('Review Focus 5: piiril lõppenud lohistus (pointerup kaardist väljas) ei sulge kaarti', () => {
+    const net = applyFilters(NET, DEFAULT_FILTER);
+    const { result } = renderHook(() => usePopover());
+    act(() => { result.current.pin('vutt:Ps', { stopPropagation: () => {}, clientX: 10, clientY: 10 } as unknown as React.MouseEvent); });
+    const { rerender } = render(<MemoryRouter><RelationPopover state={result.current.state} net={net} onClose={result.current.close} /></MemoryRouter>);
+    ptr(screen.getByTestId('popover-drag'), 'pointerdown', 100, 100);
+    ptr(window, 'pointermove', -5000, -5000);
+    ptr(document.body, 'pointerup', -5000, -5000);
+    act(() => { document.body.click(); });           // brauser saadab click-i ühisele eellasele
+    expect(result.current.state).not.toBeNull();
+    // järgmine päris klõps mujale sulgeb nagu enne
+    act(() => { document.body.click(); });
+    rerender(<MemoryRouter><RelationPopover state={result.current.state} net={net} onClose={result.current.close} /></MemoryRouter>);
+    expect(result.current.state).toBeNull();
   });
 });
