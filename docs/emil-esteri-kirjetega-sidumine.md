@@ -215,7 +215,8 @@ olnud.
 - Pildilt kontrolliti kaks juhtumit ja mõlemad olid õiged:
   - lk 71: läbi kriipsutatud „136” = ESTERis endine Mscr 136;
   - lk 202: OCR luges 1465, pildil Mscr 1165.
-- Kasutaja vaatas „erinevate” näidised üle ja pidas otsuseid õigeks. Enamik on
+- Kasutaja vaatas 88 „erineva” hulgast näidised üle. Tema hinnangul oli otsus
+  „erinev” õige, st kandidaat ei ole sama säilik. Enamik kandidaate on
   ühesõnalise päringu müra.
 - Vasteta 139 sedelit on enamasti Samson von Himmelstierni käsikirjad ja
   numbrita sedelid (Acc. 1922). Need on tõenäoliselt kataloogimata, aga
