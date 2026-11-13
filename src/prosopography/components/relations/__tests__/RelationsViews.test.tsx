@@ -1,5 +1,6 @@
 // src/prosopography/components/relations/__tests__/RelationsViews.test.tsx
 /** @vitest-environment jsdom */
+import React from 'react';
 import { render, screen, fireEvent, renderHook } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
@@ -90,6 +91,18 @@ describe('RelationsGraph', () => {
     const { rerender } = graph(fakePopover(pinnedAt('p0')));
     rerender(<MemoryRouter><RelationsGraph net={big} popover={fakePopover(null)} highlight={null} onHighlight={() => {}} /></MemoryRouter>);
     expect(screen.queryByTestId('selected-ring')).toBeNull();
+    expect(screen.getByTestId('node-p9').getAttribute('data-lit')).toBe('true');
+  });
+  it('klõps → hiir ära → kaardi sulgemine: esiletõst ei jää kinni', () => {
+    const Host: React.FC<{ pop: ReturnType<typeof usePopover> }> = ({ pop }) => {
+      const [hl, setHl] = React.useState<string | null>(null);
+      return <MemoryRouter><RelationsGraph net={big} popover={pop} highlight={hl} onHighlight={setHl} /></MemoryRouter>;
+    };
+    const { rerender } = render(<Host pop={fakePopover(null)} />);
+    fireEvent.mouseEnter(screen.getByTestId('node-p0'));
+    rerender(<Host pop={fakePopover(pinnedAt('p0'))} />);
+    fireEvent.mouseLeave(screen.getByTestId('node-p0'));
+    rerender(<Host pop={fakePopover(null)} />);
     expect(screen.getByTestId('node-p9').getAttribute('data-lit')).toBe('true');
   });
   it('Review Focus 1: valitud isik ei ole enam võrgustikus → ei kuku, valikut ei ole', () => {

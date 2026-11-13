@@ -126,7 +126,9 @@ const RelationsGraph: React.FC<Props> = ({ net, popover, highlight, onHighlight 
     },
     onMouseMove: (e: React.MouseEvent) => popover.hover(id, e),
     onMouseLeave: () => {
-      if (!selected) onHighlight(null);
+      // Alati: klõpsule eelnenud hõljutus jättis esiletõstu, mis muidu jääks pärast
+      // kaardi sulgemist kinni (valiku ajal varjab seda niikuinii `selected`)
+      onHighlight(null);
       popover.leave();
       setHoverId(null);
     },
