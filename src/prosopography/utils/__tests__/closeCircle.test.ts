@@ -85,6 +85,12 @@ describe('closeCircleLayout', () => {
     const d = (n: { x: number; y: number }) => Math.hypot((n.x - 450) / 405, (n.y - 300) / 266);
     expect(d(l.rim[0])).toBeCloseTo(1); expect(d(l.rim[1])).toBeCloseTo(0.94);
   });
+  it('alla 5 isiku: keegi ei ole fookuse kohal ega all (|cos| ≥ 0,25)', () => {
+    for (let n = 1; n <= 4; n++) {
+      const l = closeCircleLayout(net(n, () => ['a']));
+      for (const c of l.close) expect(Math.abs(Math.cos(c.angle))).toBeGreaterThanOrEqual(0.25);
+    }
+  });
   it('Review Focus 2: ainult teoseta sugulased → lõplikud arvud', () => {
     const l = closeCircleLayout(net(3, () => [], [0, 1, 2].map(i => E('family', `p${i}`, null))));
     expect(l.close).toHaveLength(3); expect(l.maxWorks).toBe(0); expect(finite(l)).toBe(true);

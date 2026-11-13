@@ -84,6 +84,22 @@ function distanceFactor(p: VisiblePerson, maxWorks: number): number {
   return 1 - 0.5 * (p.workCount - CLOSE_MIN_WORKS) / (maxWorks - CLOSE_MIN_WORKS);
 }
 
+/** Pööre (5° sammuga ühe nurgavahe piires), mis viib lähima isiku püsttelgedest
+ *  kõige kaugemale; viigi korral väikseim pööre. */
+function turnAwayFromVertical(n: number): number {
+  const step = Math.PI / 36;
+  let best = 0;
+  let bestScore = -1;
+  for (let turn = 0; turn < (2 * Math.PI) / n - 1e-9; turn += step) {
+    let score = Infinity;
+    for (let i = 0; i < n; i++) {
+      score = Math.min(score, Math.abs(Math.cos(-Math.PI / 2 + ((i + 0.5) / n) * 2 * Math.PI + turn)));
+    }
+    if (score > bestScore + 1e-9) { bestScore = score; best = turn; }
+  }
+  return best;
+}
+
 export function closeCircleLayout(v: VisibleNetwork): CloseLayout {
   const split = splitCloseCircle(v);
 
@@ -92,8 +108,9 @@ export function closeCircleLayout(v: VisibleNetwork): CloseLayout {
     rank(a) - rank(b) || (a.firstYear ?? 9999) - (b.firstYear ?? 9999) || a.label.localeCompare(b.label));
   const n = closeSorted.length;
   const maxWorks = closeSorted.reduce((m, p) => Math.max(m, p.workCount), 0);
-  // Alla 5 isiku: algnurk 45° pööratud, et nimed ei satuks fookuse nime kohale/alla
-  const turn = n < 5 ? Math.PI / 4 : 0;
+  // Alla 5 isiku: pööra algnurka nii, et keegi ei satuks fookuse nime kohale/alla.
+  // Kindel 45° ei sobi: koos poolsammuga viis see 4 isikut täpselt telgedele.
+  const turn = n > 0 && n < 5 ? turnAwayFromVertical(n) : 0;
   const close: CloseNode[] = closeSorted.map((person, i) => {
     const angle = -Math.PI / 2 + ((i + 0.5) / n) * 2 * Math.PI + turn;
     const f = distanceFactor(person, maxWorks);
