@@ -79,34 +79,6 @@ export function evidenceTarget(e: NetworkEdge, v: VisibleNetwork): { page: numbe
   return { page: e.evidence?.pages[0] ?? part?.first_page ?? 1, part };
 }
 
-/** Kaaslaste servad: seotud isikud, kes esinevad OMAVAHEL samas teoses — osadega
- *  teosel samas osas (#464), muidu seoks kirjakogu kõik kirjutajad omavahel. */
-export function coEdges(v: VisibleNetwork): Array<{ a: string; b: string; weight: number }> {
-  const byWork = new Map<string, Set<string>>();
-  for (const p of v.persons) {
-    for (const e of p.edges) {
-      if (!e.evidence?.work_id) continue;
-      const w = `${e.evidence.work_id}#${e.evidence.part_id ?? ''}`;
-      if (!byWork.has(w)) byWork.set(w, new Set());
-      byWork.get(w)!.add(p.id);
-    }
-  }
-  const pairs = new Map<string, number>();
-  for (const ids of byWork.values()) {
-    const list = [...ids].sort();
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const key = `${list[i]}|${list[j]}`;
-        pairs.set(key, (pairs.get(key) ?? 0) + 1);
-      }
-    }
-  }
-  return [...pairs].map(([key, weight]) => {
-    const [a, b] = key.split('|');
-    return { a, b, weight };
-  });
-}
-
 /**
  * Pereserva seos lausena kuvamiseks: `subject` on `owner`-i `type` (kirje kannab tüüpi
  * sihtisiku kohta: source = kaardi omanik, target = see, kes on „isa" jne).
@@ -126,48 +98,6 @@ export function familyRelation(
     type: formatRelationTypeLabel(rec.type!, rec.type_labels, lang),
   };
 }
-export interface RadialNode { person: VisiblePerson; x: number; y: number; angle: number; r: number; labelled: boolean; }
-
-const LABEL_ALL_MAX = 40;
-// Üle 40 isiku: sildid ~7%-le suurima seosega isikutest, vähemalt 5-le. Järjestuse,
-// mitte väärtuslävendi järgi — väikeste täisarvude (1–3 teost) juures sildistas
-// lävi pool ringist või mitte kedagi.
-const LABEL_SHARE = 0.07;
-const LABEL_MIN = 5;
-
-export function radialLayout(v: VisibleNetwork, size: { w: number; h: number }) {
-  const cx = size.w / 2;
-  const cy = size.h / 2;
-  const many = v.persons.length > LABEL_ALL_MAX;
-  const radius = Math.min(size.w, size.h) / 2 - (many ? 110 : 130);
-  const sorted = [...v.persons].sort((a, b) =>
-    rank(a.kind) - rank(b.kind)
-    || (a.firstYear ?? 9999) - (b.firstYear ?? 9999)
-    || a.label.localeCompare(b.label));
-  const kinds = new Set(sorted.map(p => p.kind));
-  const gap = 0.1;
-  const span = 2 * Math.PI - gap * kinds.size;
-  const step = span / Math.max(1, sorted.length);
-  const maxCount = Math.max(1, ...sorted.map(p => p.workCount));
-  const top = new Set(
-    [...sorted].sort((a, b) => b.workCount - a.workCount || a.label.localeCompare(b.label))
-      .slice(0, Math.max(LABEL_MIN, Math.ceil(LABEL_SHARE * sorted.length)))
-      .map(p => p.id),
-  );
-  let angle = -Math.PI / 2 + gap / 2;
-  let prev: RelationKind | null = null;
-  const nodes: RadialNode[] = sorted.map(person => {
-    if (prev && person.kind !== prev) angle += gap;
-    const a = angle + step / 2;
-    angle += step;
-    prev = person.kind;
-    const r = 3.5 + Math.sqrt(person.workCount / maxCount) * (many ? 5.5 : 9.5);
-    return { person, angle: a, r, x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a),
-             labelled: !many || top.has(person.id) };
-  });
-  return { cx, cy, radius, nodes };
-}
-
 export interface TimelineMark { year: number | null; works: string[]; kind: RelationKind; }
 export interface TimelineRow { person: VisiblePerson; marks: TimelineMark[]; }
 
