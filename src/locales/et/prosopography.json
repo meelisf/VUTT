@@ -217,7 +217,9 @@
     "lifeData": "Eluandmed",
     "originHint": "Kõige täpsem teadaolev sünni- või päritolukoht.",
     "deathPlace": "Surmakoht",
-    "legacyBirthHint": "Varasem sünnikoht „{{place}}” erineb valitud päritolust. Kontrolli valikut; salvestamisel säilib varasem sünnikoht märkustes."
+    "legacyBirthHint": "Varasem sünnikoht „{{place}}” erineb valitud päritolust. Kontrolli valikut; salvestamisel säilib varasem sünnikoht märkustes.",
+    "basicData": "Põhiandmed",
+    "statusAndConfession": "Seisus ja konfessioon"
   },
   "dateField": {
     "year": "aasta",

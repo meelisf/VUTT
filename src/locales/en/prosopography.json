@@ -217,7 +217,9 @@
     "lifeData": "Life details",
     "originHint": "The most specific known place of birth or origin.",
     "deathPlace": "Place of death",
-    "legacyBirthHint": "The previous birthplace “{{place}}” differs from the selected origin. Review the selection; saving preserves the previous birthplace in the notes."
+    "legacyBirthHint": "The previous birthplace “{{place}}” differs from the selected origin. Review the selection; saving preserves the previous birthplace in the notes.",
+    "basicData": "Basic details",
+    "statusAndConfession": "Status and confession"
   },
   "dateField": {
     "year": "year",

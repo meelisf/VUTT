@@ -508,8 +508,9 @@ const PersonEditPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Identiteedi kaart ── */}
-        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5 space-y-5">
+        {/* ── Põhiandmed ── */}
+        <section aria-labelledby="person-basic-data-title" className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5 space-y-5">
+          <h2 id="person-basic-data-title" className="text-sm font-semibold text-gray-900">{t('form.basicData')}</h2>
 
           {/* Uue isiku puhul on nimeväli juba vormi alguses — siin teda ei korrata. */}
           {!isNew && (
@@ -609,8 +610,74 @@ const PersonEditPage: React.FC = () => {
             </div>
           </div>
 
-          <section aria-label={t('form.lifeData')} className="rounded-lg border border-gray-200 p-4 bg-gray-50/50">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">{t('form.lifeData')}</h2>
+        </section>
+
+        {/* ── Nimevariandid ja identifikaatorid (klapitav) ── */}
+        <CollapsibleSection
+          title={t('form.namesAndIdentifiers')}
+          open={namesOpen}
+          onToggle={() => setNamesOpen(v => !v)}
+        >
+          <NamesEditor
+            label={draft.name_label}
+            aliases={draft.name_aliases}
+            names={draft.name_names}
+            onChange={set}
+          />
+          <div>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">{t('form.identifiers')}</label>
+            <div className="space-y-2">
+              {[
+                { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345', url: (v: string) => `https://www.wikidata.org/wiki/${encodeURIComponent(v)}` },
+                { key: 'gnd_id', label: 'GND', placeholder: '123456789', url: (v: string) => `https://d-nb.info/gnd/${encodeURIComponent(v)}` },
+                { key: 'viaf_id', label: 'VIAF', placeholder: '12345678', url: (v: string) => `https://viaf.org/viaf/${encodeURIComponent(v)}` },
+                { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA:123', url: null },
+              ].map(({ key, label, placeholder, url }) => {
+                const val = draft[key as keyof FormDraft] as string;
+                const href = url && val.trim() ? url(val.trim()) : null;
+                return (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-36 shrink-0">{label}</span>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={e => set({ [key]: e.target.value } as Partial<FormDraft>)}
+                      placeholder={placeholder}
+                      className={`flex-1 ${inputCls} font-mono`}
+                    />
+                    {href ? (
+                      <a href={href} target="_blank" rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-blue-600 transition-colors shrink-0"
+                        title={`Ava ${label}-s`}>
+                        <ExternalLink size={14} />
+                      </a>
+                    ) : (
+                      <span className="w-[14px] shrink-0" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <EnrichExistingSection
+            personId={isNew ? undefined : id}
+            wikidataId={draft.wikidata_id}
+            gndId={draft.gnd_id}
+            aaId={draft.aa_id}
+            viafId={draft.viaf_id}
+            draft={draft}
+            token={token}
+            onChange={newDraft => setDraft({ ...newDraft, origin_place: personOriginKey({
+              origin: { place: newDraft.origin_place }, birth: { place: newDraft.birth.place },
+            } as ProsopoRecord, places) })}
+            onApplied={fields => {
+              if (fields.some(f => f === '_occupations' || f === '_occupation_label')) setOccupOpen(true);
+            }}
+          />
+        </CollapsibleSection>
+
+        <section aria-labelledby="person-life-data-title" className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
+            <h2 id="person-life-data-title" className="text-sm font-semibold text-gray-900 mb-4">{t('form.lifeData')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <DateField label={t('born')} value={draft.birth} onChange={v => set({ birth: v })} showPlace={false}
                 placeField={<div>
@@ -635,10 +702,30 @@ const PersonEditPage: React.FC = () => {
                   }}
                   token={token} canEdit={!!canEdit} lang={lang} label={t('form.deathPlace')} />} />
             </div>
-          </section>
+            <div className="mt-5 border-t border-gray-200 pt-4">
+            <fieldset>
+              <legend className="text-xs text-gray-600 uppercase tracking-wide mb-2">
+                {t('form.floruit')}
+                <span className="ml-1 normal-case font-normal text-gray-500">({t('form.floruitHint')})</span>
+              </legend>
+              <div className="flex items-center gap-2">
+                <input type="number" min={1000} max={1900}
+                  aria-label={`${t('form.floruit')}: ${t('form.from')}`} placeholder={t('form.from')}
+                  value={draft.floruit_from} onChange={e => set({ floruit_from: e.target.value })}
+                  className={`w-24 ${inputCls}`} />
+                <span className="text-gray-400">–</span>
+                <input type="number" min={1000} max={1900}
+                  aria-label={`${t('form.floruit')}: ${t('form.to')}`} placeholder={t('form.to')}
+                  value={draft.floruit_to} onChange={e => set({ floruit_to: e.target.value })}
+                  className={`w-24 ${inputCls}`} />
+              </div>
+            </fieldset>
+            </div>
+        </section>
 
-          {/* Seisus + konfessioon */}
-          <div className="grid grid-cols-2 gap-3">
+        <section aria-labelledby="person-status-confession-title" className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
+          <h2 id="person-status-confession-title" className="text-sm font-semibold text-gray-900 mb-4">{t('form.statusAndConfession')}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {t('statuses', 'Seisus')}
@@ -720,32 +807,7 @@ const PersonEditPage: React.FC = () => {
               </div>
             </div>
           </div>
-
-
-          {/* Floruit */}
-          <div>
-            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-              {t('form.floruit')} <span className="normal-case font-normal text-gray-400">({t('form.floruitHint')})</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number" min={1000} max={1900}
-                placeholder={t('form.from')}
-                value={draft.floruit_from}
-                onChange={e => set({ floruit_from: e.target.value })}
-                className={`w-20 ${inputCls}`}
-              />
-              <span className="text-gray-400">–</span>
-              <input
-                type="number" min={1000} max={1900}
-                placeholder={t('form.to')}
-                value={draft.floruit_to}
-                onChange={e => set({ floruit_to: e.target.value })}
-                className={`w-20 ${inputCls}`}
-              />
-            </div>
-          </div>
-        </div>
+        </section>
 
         {/* ── Elulugu (ET | EN) ── */}
         <BiographySection
@@ -784,70 +846,6 @@ const PersonEditPage: React.FC = () => {
             />
           </div>
         )}
-
-        {/* ── Nimevariandid ja identifikaatorid (klapitav) ── */}
-        <CollapsibleSection
-          title={t('form.namesAndIdentifiers')}
-          open={namesOpen}
-          onToggle={() => setNamesOpen(v => !v)}
-        >
-          <NamesEditor
-            label={draft.name_label}
-            aliases={draft.name_aliases}
-            names={draft.name_names}
-            onChange={set}
-          />
-          <div>
-            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">{t('form.identifiers')}</label>
-            <div className="space-y-2">
-              {[
-                { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345', url: (v: string) => `https://www.wikidata.org/wiki/${encodeURIComponent(v)}` },
-                { key: 'gnd_id', label: 'GND', placeholder: '123456789', url: (v: string) => `https://d-nb.info/gnd/${encodeURIComponent(v)}` },
-                { key: 'viaf_id', label: 'VIAF', placeholder: '12345678', url: (v: string) => `https://viaf.org/viaf/${encodeURIComponent(v)}` },
-                { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA:123', url: null },
-              ].map(({ key, label, placeholder, url }) => {
-                const val = draft[key as keyof FormDraft] as string;
-                const href = url && val.trim() ? url(val.trim()) : null;
-                return (
-                  <div key={key} className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 w-36 shrink-0">{label}</span>
-                    <input
-                      type="text"
-                      value={val}
-                      onChange={e => set({ [key]: e.target.value } as Partial<FormDraft>)}
-                      placeholder={placeholder}
-                      className={`flex-1 ${inputCls} font-mono`}
-                    />
-                    {href ? (
-                      <a href={href} target="_blank" rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-blue-600 transition-colors shrink-0"
-                        title={`Ava ${label}-s`}>
-                        <ExternalLink size={14} />
-                      </a>
-                    ) : (
-                      <span className="w-[14px] shrink-0" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <EnrichExistingSection
-            personId={isNew ? undefined : id}
-            wikidataId={draft.wikidata_id}
-            gndId={draft.gnd_id}
-            aaId={draft.aa_id}
-            viafId={draft.viaf_id}
-            draft={draft}
-            token={token}
-            onChange={newDraft => setDraft({ ...newDraft, origin_place: personOriginKey({
-              origin: { place: newDraft.origin_place }, birth: { place: newDraft.birth.place },
-            } as ProsopoRecord, places) })}
-            onApplied={fields => {
-              if (fields.some(f => f === '_occupations' || f === '_occupation_label')) setOccupOpen(true);
-            }}
-          />
-        </CollapsibleSection>
 
         {/* ── Ametid ja haridus (klapitav) ── */}
         <CollapsibleSection
