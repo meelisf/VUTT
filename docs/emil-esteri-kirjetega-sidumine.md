@@ -305,7 +305,21 @@ Vahetulemused repos: `scripts/archive/emil_ester_z3950/`
    `500` selle märgib. Olek `kandidaat` saab põhjenduse rea „Ebakindel vaste:
    …”. Kirjutaja on sama `emil_ester_markused.py`. Dubleerimise kaitse töötab
    b-numbri järgi, nii et esimese vooru lehti see ei puuduta.
-3. Õigusteaduse 19 seost on hinnatud, aga **märkusi pole veel kirjutatud**.
+3. **Õigusteaduse 19 märkust on andmefailis** `scripts/archive/emil_ester_z3950/oigusteadus_markused.json`
+   (2026-11-13). Selle koostab `koosta_markused.py oigusteadus` otsustest ja
+   kandidaatidest (`oigusteadus_z_kandidaadid.json`). Kohaviite read, vastuolud ja mitme
+   kirje selgitused on käsitsi skripti tabelis `LISA`. Mitme ESTERi kirjega sedel
+   (köited, isikuarhiivi osad) saab sildi „köited” või „mitu kirjet” ja kirjete loendi.
+   Lehe 96 Poola seaduste viis köidet leiti kõik kandidaatide seast. Jalus ütleb
+   „ESTERi otsingu põhjal”, „pisteliselt üle vaadatud” jääb ära.
+
+   ```bash
+   ssh vutt && cd ~/VUTT && git pull
+   python3 scripts/archive/emil_ester_markused.py --andmed scripts/archive/emil_ester_z3950/oigusteadus_markused.json            # kuivkäivitus
+   python3 scripts/archive/emil_ester_markused.py --andmed scripts/archive/emil_ester_z3950/oigusteadus_markused.json --kirjuta
+   ```
+
+   Järgmistel jaotustel tuleb `KAUSTAD`-isse lisada jaotuse kaust ja `LISA`-sse read.
 
 ## Oodatav eksport
 

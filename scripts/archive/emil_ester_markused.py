@@ -13,6 +13,7 @@ jäetakse vahele.
 
     python3 emil_ester_markused.py             # kuivkäivitus
     python3 emil_ester_markused.py --kirjuta
+    python3 emil_ester_markused.py --andmed emil_ester_z3950/oigusteadus_markused.json [--kirjuta]
 """
 import copy
 import getpass
@@ -27,6 +28,9 @@ from datetime import datetime, timezone
 DATA = os.path.expanduser("~/VUTT/data")
 API = "http://127.0.0.1:8002"
 ANDMED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "emil_ester_seosed.json")
+# Teise vooru andmefail: --andmed emil_ester_z3950/<jaotus>_markused.json
+if "--andmed" in sys.argv:
+    ANDMED = os.path.abspath(sys.argv[sys.argv.index("--andmed") + 1])
 
 
 def paring(meetod, tee, keha=None, token=None):
