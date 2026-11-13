@@ -279,7 +279,12 @@ Filter: `040 ErTUR` ja käsikirja tunnus (leader/6 `t`/`d`/`f`, `773`,
    käsikirja. Väljund on `z_kandidaadid.json`. 246 sedelit võttis umbes 15 min.
 3. **Hindamine (Sonnet-agendid, ~50 sedelit agendi kohta).** Olekud nagu
    esimeses voorus. Juhend: endise kohaviite kattumine on tugev tõend; eri
-   kirjutaja või aastaga konspekt on eri säilik.
+   kirjutaja või aastaga konspekt on eri säilik. Lisaks peab olema **iga
+   sedeli kohta oma põhjendus, ka „erinev” puhul**: parim kandidaat (b-number)
+   ja üks lause, miks see ei sobi (näiteks „ühine ainult sõna Mitausche” või
+   „sama teos, teine eksemplar: 4° vs 34 cm”). Kui kandidaate polnud, siis
+   „kandidaate ei olnud”. Õigusteaduse jaotuses said kõik 88 „erinevat” ühe
+   kahest üldisest lausest ja agendi kaalutlust ei saanud hiljem kontrollida.
 4. **Märkused.** Vt allpool.
 
 Õigusteaduse (Balti) tulemus, 246 seostamata sedelit: kandidaate leiti 107-le,
