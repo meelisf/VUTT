@@ -337,7 +337,16 @@ eksemplar (hoidja riiulil olemas asi), aga tema tekst pärineb originaalist.
 - Kogu loendi reegel (`validate_exemplars`): `of` on sama teose teine eksemplar, ahel on
   lubatud (mikrofilm → paberkoopia), ring mitte.
 - Originaali kustutus eemaldab koopialt `of`-i ja paneb `needs_review` (koopia jääb).
-- Tekstitunnistaja on originaal, ka siis, kui skaneering tehti koopiast.
+- ~~Tekstitunnistaja on originaal, ka siis, kui skaneering tehti koopiast.~~ **Parandus
+  2026-11-13:** tekstitunnistaja (`text_witness`, „Transkriptsiooni alus") on objekt, millest
+  skaneering ja transkriptsioon **tegelikult tehti** — koopia, kui skaneeriti koopiat. Lõplik
+  allikas tuleb `of`-ahelast. Põhjus: transkriptsioon kannab koopia lünki — kopeerimata leht,
+  kopeerimisel paberiga kaetud koht, kärbitud äär, kaduma läinud pliiatsimärge või värv.
+  Kui alus oleks originaal, peaks uurija lünka trükise omaks, kuigi originaalis see koht on.
+  Mujalt (nt originaali digikoopiast) lisatud leht on selle eksemplari erandleht (`pages`).
+  Infopaneel näitab koopia real originaali („Paberkoopia: Uppsala UB", link eksemplari
+  lehele). Tootmises on mõlemat kuju (nt `1v4oj3` alus koopial, `occgcn` originaalil);
+  kas skaneering tehti koopiast, automaatselt ei järeldata — vanad kirjed vaadatakse üle.
 - Kust koopia tehti, on enamasti pliiatsiga skaneeringul, mõnikord on see välja kärbitud;
   ESTERis on see TÜR-i eksemplari märkuses. `of` täidab inimene või agendi ettepanek
   (väli on ettepaneku `fields`-is; `of` peab esitusel viitama olemasolevale eksemplarile).

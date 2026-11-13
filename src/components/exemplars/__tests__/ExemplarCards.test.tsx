@@ -31,8 +31,34 @@ describe('ExemplarCards', () => {
     expect(cards[0].textContent).toContain('exemplars.witness');
     expect(cards[1].textContent).toContain('info.exemplarPages:7');
     expect(cards[1].querySelector('a')?.getAttribute('href')).toBe('https://www.ester.ee/record=b1510692');
-    expect(cards[2].textContent).toContain('exemplars.reproduction.kinds.paberkoopia');
+    expect(cards[2].textContent).toContain('exemplars.reproduction.kinds.paberkoopia: Uppsala UB');
     expect(screen.getAllByText('exemplars.witness')).toHaveLength(1);
+  });
+
+  it('koopia märge: originaal on link selle eksemplari lehele, märkerida hoidja all', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <ExemplarCards exemplars={exemplars} pageNumbers={{}} archiveRefs={[]} archives={archives} workId="w1" />
+      </MemoryRouter>,
+    );
+    const notes = container.querySelectorAll('[data-testid="exemplar-notes"]');
+    const copy = [...notes].find(n => n.textContent?.includes('paberkoopia'))!;
+    expect(copy.querySelector('a')?.getAttribute('href')).toBe('/work/w1/exemplar/ecb2kb');
+  });
+
+  it('koopia ilma allikata → ainult liik; sama hoidja mitu eksemplari → kohaviit juurde', () => {
+    const list: Exemplar[] = [
+      { id: 'o1', holder: 'Uppsala UB', shelfmark: 'Rar 10:252' },
+      { id: 'o2', holder: 'Uppsala UB', shelfmark: 'Rar 10:253' },
+      { id: 'c1', holder: 'Tartu TÜR', shelfmark: 'R Acad. Dorp. 1', reproduction: { kind: 'paberkoopia', of: 'o2' } },
+      { id: 'c2', holder: 'Tartu TÜR', shelfmark: 'R Acad. Dorp. 2', reproduction: { kind: 'mikrofilm' } },
+    ];
+    const { container } = render(
+      <ExemplarCards exemplars={list} pageNumbers={{}} archiveRefs={[]} archives={{}} />,
+    );
+    const notes = [...container.querySelectorAll('[data-testid="exemplar-notes"]')].map(n => n.textContent);
+    expect(notes).toContain('exemplars.reproduction.kinds.paberkoopia: Uppsala UB Rar 10:253');
+    expect(notes).toContain('exemplars.reproduction.kinds.mikrofilm');
   });
 
   it('laadimata: tuletatud viited ilma esiletõstuta', () => {
@@ -50,7 +76,7 @@ describe('ExemplarCards', () => {
         <ExemplarCards exemplars={exemplars} pageNumbers={{}} archiveRefs={[]} archives={archives} workId="w1" />
       </MemoryRouter>,
     );
-    const witness = screen.getByText('Uppsala UB').closest('a');
+    const witness = screen.getAllByText('Uppsala UB')[0].closest('a');
     expect(witness?.getAttribute('href')).toBe('/work/w1/exemplar/ecb2kb');
     const ext = container.querySelector('a[href="https://www.ester.ee/record=b1510692"]');
     expect(ext?.textContent).toContain('ESTER');
@@ -66,7 +92,7 @@ describe('ExemplarCards', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Uppsala UB').closest('a')?.getAttribute('href')).toBe('/work/w1/exemplar/ecb2kb?page=7');
+    expect(screen.getAllByText('Uppsala UB')[0].closest('a')?.getAttribute('href')).toBe('/work/w1/exemplar/ecb2kb?page=7');
   });
 
   it('ADA link → silt ADA; pildiriba pole, piltide arv tekstina', () => {
