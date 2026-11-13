@@ -87,12 +87,13 @@ export function evidenceTarget(e: NetworkEdge, v: VisibleNetwork): { page: numbe
  */
 export function familyRelation(
   edge: NetworkEdge, focusId: string, labelOf: (id: string) => string, lang = 'et',
-): { subject: string; owner: string; type: string } | null {
+): { subject: string; subjectId: string; owner: string; type: string } | null {
   const recs = edge.records ?? [];
   const rec = recs.find(r => r.source_id === focusId && r.type) ?? recs.find(r => r.type);
   if (!rec) return null;
   return {
     subject: labelOf(rec.target_id),
+    subjectId: rec.target_id,
     owner: labelOf(rec.source_id),
     // Tüüp UI keeles: keelesilt → en → toorväärtus (sama ahel nagu isikulehe seostes)
     type: formatRelationTypeLabel(rec.type!, rec.type_labels, lang),

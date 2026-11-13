@@ -114,6 +114,20 @@ describe('RelationsGraph', () => {
     graph(fakePopover(null), null, vi.fn(), applyFilters(G(16, i => [`w${i}`]), DEFAULT_FILTER));
     expect(screen.getByText(/Lähikond ei eristu/)).toBeTruthy();
   });
+  it('suguluse liik ainult siis, kui kirje kirjeldab SEDA isikut (mitte fookust tema suhtes)', () => {
+    const fam = (other: string, rec: { source_id: string; target_id: string; type: string }) =>
+      ({ kind: 'family' as const, from: other, to: F, directed: false, year: null, place: null, evidence: null, records: [rec] });
+    const famNet = applyFilters({ ...NET, persons: [...NET.persons,
+      { id: 'tytar', label: 'Tütar Isik', birth_year: null, death_year: null, origin: null },
+      { id: 'naine', label: 'Naine Isik', birth_year: null, death_year: null, origin: null }],
+      edges: [...NET.edges,
+        fam('tytar', { source_id: 'tytar', target_id: F, type: 'isa' }),      // fookus on tütre isa
+        fam('naine', { source_id: F, target_id: 'naine', type: 'abikaasa' })] }, DEFAULT_FILTER);
+    graph(fakePopover(null), null, vi.fn(), famNet);
+    expect(screen.getByTestId('node-naine').textContent).toContain('abikaasa');
+    expect(screen.getByTestId('node-tytar').textContent).not.toContain('isa');
+    expect(screen.getByTestId('node-tytar').textContent).toContain('Perekond');
+  });
   it('väike võrgustik: kõik nimedega (olemasolev fikstuur)', () => {
     graph(fakePopover(null), null, vi.fn(), v);
     expect(screen.getByText('Anna Praeses')).toBeTruthy(); expect(screen.getByText('Undated Isik')).toBeTruthy();

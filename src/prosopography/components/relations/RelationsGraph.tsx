@@ -70,7 +70,12 @@ const RelationsGraph: React.FC<Props> = ({ net, popover, highlight, onHighlight 
     const sin = Math.sin(n.angle);
     const anchor = anchorOf(cos, false);
     const fam = n.person.edges.find(e => e.kind === 'family');
-    const famType = fam ? familyRelation(fam, net.focus.id, labelOf, lang)?.type : undefined;
+    // Kirje tüüp kirjeldab SIHTISIKUT. Kui siht on fookus („Fischer on tema isa"), ei saa
+    // tüüpi selle isiku juurde panna ega pöörata (sõltub soost) → üldine liigi nimi.
+    const rel = fam ? familyRelation(fam, net.focus.id, labelOf, lang) : null;
+    const famType = rel
+      ? (rel.subjectId === n.person.id ? rel.type : t('network.kinds.family'))
+      : fam ? t('network.kinds.family') : undefined;
     const sub = [famType, n.person.workCount > 0 ? t('network.sharedWorks', { count: n.person.workCount }) : null]
       .filter(Boolean).join(' · ');
     const x = anchor === 'start' ? n.x + n.r + 6 : anchor === 'end' ? n.x - n.r - 6 : n.x;

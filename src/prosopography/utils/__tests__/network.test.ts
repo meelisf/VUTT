@@ -137,12 +137,12 @@ describe('familyRelation', () => {
   const labelOf = (id: string) => ({ a: 'Hackspan', [F]: 'Fischer' } as Record<string, string>)[id] ?? id;
 
   it('eelistab fookuse kaardi kirjet: sihtisik on omaniku <tüüp>', () => {
-    expect(familyRelation(edge, F, labelOf)).toEqual({ subject: 'Hackspan', owner: 'Fischer', type: 'isa' });
+    expect(familyRelation(edge, F, labelOf)).toEqual({ subject: 'Hackspan', subjectId: 'a', owner: 'Fischer', type: 'isa' });
   });
 
   it('teise kaardi kirje: suunda ei pöörata', () => {
     const e2 = { ...edge, records: [edge.records![1]] };
-    expect(familyRelation(e2, F, labelOf)).toEqual({ subject: 'Fischer', owner: 'Hackspan', type: 'poeg' });
+    expect(familyRelation(e2, F, labelOf)).toEqual({ subject: 'Fischer', subjectId: F, owner: 'Hackspan', type: 'poeg' });
   });
 
   it('Wikidata tüüp UI keeles, varuks en ja toorväärtus', () => {
