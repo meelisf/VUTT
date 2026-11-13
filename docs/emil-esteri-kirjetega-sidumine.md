@@ -260,6 +260,12 @@ Mõõdetud omadused (2026-11-12). Ilma nendeta jääb enamik päringuid tühjaks
 | kärpimine | `@attr 5=1` / `*` ei toiminud usaldusväärselt. |
 | lagi | Lai päring annab kuni 500 tulemust. Kogu (`773`) järgi otsida ei saa. |
 
+**Kirjenumber tuleb väljast `907`** (sama, mis `035 (ErESTER)b…`). Vanematel kirjetel on
+`035`-s lisaks vana Tartu kohaliku süsteemi number (`.b25711295 (Tartu)`), mis annab
+vale lingi. Esimene `z_otsi.py` võttis selle ja õigusteaduse märkustest kirjutati
+10 vale lingiga (2026-11-13, parandatud). Vastendus on failis `oigusteadus_b_kaart.json`.
+`oigusteadus_z_kandidaadid.json`-is on parandatud ainult seotud kirjete numbrid.
+
 Leitakse ka teiste raamatukogude kirjeid (näiteks TLÜ käsikiri „[Kochbuch]”).
 Filter: `040 ErTUR` ja käsikirja tunnus (leader/6 `t`/`d`/`f`, `773`,
 `351 Säilik` või `500 Käsikiri`).
