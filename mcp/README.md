@@ -28,6 +28,22 @@ erand, sest `vutt-mcp` paigaldatakse pipx-iga globaalselt ega loe repo
 `.env`-i, ja prefiks väldib kollisiooni kasutaja shellis oleva võõra
 `MEILI_SEARCH_KEY`-ga. Väärtus on sama.
 
+### Teine kasutaja (ilma repota)
+
+Repo on avalik, kloonida pole vaja. Võti annab ligipääsu ka piiratud kogudele —
+anna see ainult adminile ja turvalise kanali kaudu.
+
+```bash
+pipx install "git+https://github.com/meelisf/VUTT#subdirectory=mcp"
+claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY='<võti>' -- vutt-mcp
+claude mcp list                  # vutt: ✓ Connected
+```
+
+Uuendus: `pipx reinstall vutt-mcp` (mitte-editable install ei järgi `git pull`-i),
+seejärel uus agendiseanss. Codex/Gemini: sama võtmega järgmise jaotise käsud.
+Ettepanekute tööriistad vajavad superadmini loodud agendikoodi; kirjanduskogu
+tööriistu ilma oma Zotero indeksita ei teki.
+
 ## Kliendi seadistus
 
 Serverit **ei anta agendile kaustana** — see registreeritakse kliendile üks
