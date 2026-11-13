@@ -2,6 +2,8 @@
 /**
  * Ühine hüpikaken seoste vaadetele (#461): hõljutus näitab lühivaadet, klikk kinnitab
  * (lingid isiku- ja teoselehele). Sulgub nupuga, klikiga mujale või Esc-iga.
+ * Kinnitatud kaarti saab nimereast lohistada (#812); nihet ei mäletata — uus avamine
+ * tuleb jälle kursori kõrvale. Kaart jääb vaateakna sisse 8 px varuga.
  * z-[1300]: päis on z-[1200] (CLAUDE.md).
  */
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -61,16 +63,59 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
   const { t, i18n } = useTranslation(['prosopography', 'workspace']);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: 0, top: 0 });
+  // Lohistamise nihe praegusest kohast; lähtestub iga uue oleku (kinnitus/hõljutus) peale
+  const [drag, setDrag] = useState({ dx: 0, dy: 0 });
+  const posRef = useRef(pos);
+  const stopDragRef = useRef<(() => void) | null>(null);
 
   useLayoutEffect(() => {
+    stopDragRef.current?.();
+    setDrag({ dx: 0, dy: 0 });
     if (!state || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
     let left = state.x + 14;
     let top = state.y + 14;
     if (left + r.width > window.innerWidth - 8) left = state.x - r.width - 14;
     if (top + r.height > window.innerHeight - 8) top = state.y - r.height - 14;
-    setPos({ left: Math.max(8, left), top: Math.max(8, top) });
+    const next = { left: Math.max(8, left), top: Math.max(8, top) };
+    posRef.current = next;
+    setPos(next);
   }, [state]);
+
+  useEffect(() => () => stopDragRef.current?.(), []);
+
+  const startDrag = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();   // teksti valik ei alga
+    stopDragRef.current?.();
+    const start = { x: e.clientX, y: e.clientY, dx: drag.dx, dy: drag.dy };
+    // Kui kaart on vaateaknast suurem, võidab alumine piir (8)
+    const clamp = (v: number, max: number) => Math.max(8, Math.min(v, max));
+    const onMove = (ev: PointerEvent) => {
+      const r = ref.current?.getBoundingClientRect();
+      if (!r) return;
+      const base = posRef.current;
+      const left = clamp(base.left + start.dx + ev.clientX - start.x, window.innerWidth - r.width - 8);
+      const top = clamp(base.top + start.dy + ev.clientY - start.y, window.innerHeight - r.height - 8);
+      setDrag({ dx: left - base.left, dy: top - base.top });
+    };
+    const stop = (ev?: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', stop);
+      stopDragRef.current = null;
+      // Piiril kinni jäänud lohistuse lõpp võib olla kaardist väljas → brauseri click läheks
+      // „klõps mujale sulgeb" kuularini. Neelame selle ühe click-i (capture enne document'i).
+      if (ev && (ev.clientX !== start.x || ev.clientY !== start.y)) {
+        const swallow = (c: MouseEvent) => { c.stopPropagation(); release(); };
+        const release = () => window.removeEventListener('click', swallow, true);
+        window.addEventListener('click', swallow, true);
+        setTimeout(release, 0);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', stop);
+    stopDragRef.current = stop;
+  };
 
   if (!state) return null;
   const p = net.persons.find(x => x.id === state.personId);
@@ -97,11 +142,18 @@ const RelationPopover: React.FC<{ state: PopoverState | null; net: VisibleNetwor
       data-relation-popover
       role={state.pinned ? 'dialog' : 'tooltip'}
       className={`fixed z-[1300] max-w-sm rounded-lg border border-gray-200 bg-white text-xs shadow-lg ${state.pinned ? 'flex max-h-[70vh] flex-col' : 'pointer-events-none'}`}
-      style={pos}
+      style={{ left: pos.left + drag.dx, top: pos.top + drag.dy }}
     >
       {/* Kinnitatud aknas kerib ainult sisu; tegevusjalus (ava/sulge) jääb alati nähtavale */}
       <div className={`p-3 ${state.pinned ? 'min-h-0 flex-1 overflow-auto' : ''}`}>
-        <div className="text-sm font-semibold text-gray-900">{p.label}</div>
+        {state.pinned ? (
+          <div data-testid="popover-drag" title={t('network.dragHint')} onPointerDown={startDrag}
+            className="cursor-move select-none text-sm font-semibold text-gray-900" style={{ touchAction: 'none' }}>
+            {p.label}
+          </div>
+        ) : (
+          <div className="text-sm font-semibold text-gray-900">{p.label}</div>
+        )}
         <div className="text-gray-500">
           {years}{years ? ' · ' : ''}
           {p.origin?.place ? t('network.origin', { place: p.origin.place }) : t('network.originUnknown')}

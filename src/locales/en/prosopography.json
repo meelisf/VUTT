@@ -382,6 +382,7 @@
     "originUnknown": "origin unknown",
     "origin": "origin {{place}}",
     "undated": "Date unknown",
+    "dragHint": "Drag to move",
     "focus": "Focus",
     "moreWorks_one": "… {{count}} more work",
     "moreWorks_other": "… {{count}} more works",

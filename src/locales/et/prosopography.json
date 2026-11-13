@@ -382,6 +382,7 @@
     "originUnknown": "päritolu teadmata",
     "origin": "päritolu {{place}}",
     "undated": "Aeg teadmata",
+    "dragHint": "Lohista, et liigutada",
     "focus": "Fookus",
     "moreWorks_one": "… veel {{count}} teos",
     "moreWorks_other": "… veel {{count}} teost",
