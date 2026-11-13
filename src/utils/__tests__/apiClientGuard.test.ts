@@ -21,7 +21,6 @@ const EXCEPTIONS = new Set([
   'src/services/wikidataService.ts',          // väline API
   'src/services/gndService.ts',               // väline API
   'src/services/viafService.ts',              // väline API
-  'src/prosopography/components/AddPlaceModal.tsx', // väline API (Wikidata)
   'src/pages/Dashboard.tsx',                  // staatiline about.html
   'src/components/editor/useTranscriptionGuide.ts', // staatiline juhend
   'src/components/ImageViewer.tsx',           // pildi blob

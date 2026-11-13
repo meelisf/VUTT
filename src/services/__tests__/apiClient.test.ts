@@ -98,4 +98,12 @@ describe('apiClient', () => {
       data: { status: 'error', message: 'Ligipääs puudub' },
     } satisfies Partial<ApiError>);
   });
+  it('säilitab päringupiirangu Retry-After päise', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(
+      { detail: 'Liiga palju päringuid' }, { status: 429, headers: { 'Retry-After': '12' } },
+    ));
+    await expect(apiGet('/prosopography/places/wikidata-search?q=Tonder'))
+      .rejects.toMatchObject({ status: 429, retryAfter: 12 });
+  });
+
 });
