@@ -232,25 +232,43 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-## 6. Turvalisus ja Tulemüür (UFW)
+## 6. Turvalisus ja Tulemüür (nftables)
 
-Enne avalikustamist piira ligipääs.
+**ufw on tootmises `inactive`** ja seda ei kasutata. Välismaailma eest kaitseb TÜ väline
+tulemüür; backend-pordid (7700, 8001, 8002) kuulavad ainult `localhost`-il. Hostis on üks
+kitsas nftables-tabel `inet vutt_filter`: zabbix-agent2 port 10050 ainult Zabbixi serverile.
+
+Repos on koopia `vutt-firewall.host.nft`, aktiivne fail on `/etc/vutt-firewall.nft`.
+Muutmisel uuenda MÕLEMAT.
+
+**EI kasuta `flush ruleset`-i ega Ubuntu `nftables.service`-it** — Dockeri reeglid elavad
+samas nftables-is ja `/etc/nftables.conf` flushiks need (konteinerite võrk kaoks).
 
 ```bash
-# Luba SSH
-sudo ufw allow ssh
-
-# Luba Zabbix Agent (kui monitooring on peal)
-sudo ufw allow 10050/tcp comment 'Zabbix Agent'
-
-# Luba veeb (80/443) - ligipääs on nüüd avatud kõigile, kes serverini jõuavad
-# (TÜ väline tulemüür kaitseb veel välismaailma eest)
-sudo ufw allow 'Nginx Full'
-
-# Keela muu
-sudo ufw default deny incoming
-sudo ufw enable
+scp vutt-firewall.host.nft vutt:/tmp/vutt-firewall.nft
+ssh vutt 'sudo cp /tmp/vutt-firewall.nft /etc/vutt-firewall.nft && sudo nft -c -f /etc/vutt-firewall.nft && sudo systemctl restart vutt-firewall'
 ```
+
+Teenus `/etc/systemd/system/vutt-firewall.service` (enabled):
+
+```ini
+[Unit]
+Description=VUTT hosti filter (/etc/vutt-firewall.nft)
+After=network-pre.target
+Before=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/vutt-firewall.nft
+ExecStop=-/usr/sbin/nft delete table inet vutt_filter
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Lisaks `/etc/sysctl.d/90-no-mptcp.conf` → `net.mptcp.enabled=0` (MPTCP-d ei kasutata;
+lisatud CVE-2026-98432 leevendusena 2026-10-31, jäetud alles).
 
 ## 7. Statistika ja Monitooring
 

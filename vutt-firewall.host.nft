@@ -1,0 +1,19 @@
+#!/usr/sbin/nft -f
+# NB! Aktiivne koopia asub serveris: /etc/vutt-firewall.nft (laeb vutt-firewall.service,
+# vt docs/deployment_guide.md jaotis 6). Muutmisel uuenda MÕLEMAT.
+#
+# VUTT hosti filter. EI kasuta "flush ruleset"-i: Dockeri reeglid elavad samas nftables-is.
+# Seepärast on Ubuntu nftables.service keelatud — tema /etc/nftables.conf flushiks Dockeri reeglid.
+# 10050 (zabbix-agent2) ainult Zabbixi serverile (vt /etc/zabbix/zabbix_agent2.conf Server=).
+# Lisatud 2026-10-31 CVE-2026-98432 leevendusena, jäetud alles püsivaks.
+table inet vutt_filter
+delete table inet vutt_filter
+table inet vutt_filter {
+	chain input {
+		type filter hook input priority filter; policy accept;
+		iif "lo" accept
+		tcp dport 10050 ip saddr 193.40.5.150 accept
+		tcp dport 10050 ip6 saddr 2001:bb8:2002:500::150 accept
+		tcp dport 10050 drop
+	}
+}
