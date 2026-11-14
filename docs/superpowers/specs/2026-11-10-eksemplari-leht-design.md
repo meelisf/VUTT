@@ -377,5 +377,5 @@ repo arutelu `2026-10-19-eksemplari-kiht-ja-paber-arutelu.md`.
 - Mockupid 2026-11-09: `.superpowers/brainstorm/1845782-1794239506/content/`
   (`eksemplari-leht-v3-grupid.html`, `korvutus-v3.html`) — paberi osa visandid on seal
   (PABER-vahekaart, vaatluse kaart, vesimärkide kõrvutus) ja kuluvad ära paberi töös.
-- Spike: `spike/eksemplari-leht-proto`, `src/pages/ExemplarsProtoPage.tsx`.
+- Spike: `spike/eksemplari-leht-proto` (`82bb2b37`, `src/pages/ExemplarsProtoPage.tsx`) — ainult lokaalne, kustutatud 2026-11-14; eksemplari leht on tootmises.
 - Mockupid 2026-11-10: `.superpowers/brainstorm/2115728-1794336221/content/`.
