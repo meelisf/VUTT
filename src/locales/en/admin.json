@@ -478,6 +478,7 @@
     "clear": "Clear",
     "empty": "No errors recorded.",
     "loadError": "Failed to load errors.",
+    "translated": "page translated ({{lang}})",
     "title": "Error log (client and server)"
   },
   "traffic": {
