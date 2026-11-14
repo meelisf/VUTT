@@ -245,6 +245,70 @@ Etappide 2–4 maht hindamata.
 - **Impordi korduskäivitus** ei tohi tekitada duplikaate: allika nimeruumiga ID (nt
   `paber:7/5`) ja allikast imporditud väärtused eristatavad uurija hilisematest parandustest (jk.).
 
+## Eksemplari lehe arutelust (2026-11-09): paber
+
+Allikas: eksemplari lehe arutelu 09.11 (haru `docs/eksemplarid-vahekaart-arutelu`, commit
+`e0890b31`, haru kustutatud 2026-11-14). Eksemplari lehe enda osa on üle läinud
+[eksemplari lehe disaini](2026-11-10-eksemplari-leht-design.md) (10.11); siia on tõstetud ainult
+paberi osa, mida mujal ei ole. Need on **töö käigus uuesti vaadatavad** — mitte lõplikud otsused.
+
+### Kasutaja 09.11 otsused (paberit puudutavad)
+
+- **Paberiinfo toimetamine on eksemplari kirje „Muuda"-st eraldi.** „Muuda" muudab ainult
+  eksemplari kirjet (`_metadata.json` `exemplars[]`). Paberiinfot toimetatakse PABER-vahekaardil
+  kaardi kaupa: „Paberi üldandmed" oma „Muuda", igal vesimärgikaardil oma „Muuda", „＋ Lisa
+  vaatlus". Põhjused: eri hoidla (vaatlused oma failis, poolik salvestus ei käivita Meili sünki),
+  eri töövoog (raamatukogus/arhiivis järk-järgult vs ESTERist agendi täidetud kirje), lahtised
+  õigused/nähtavus, paber.ut.ee import kirjutab ainult paberiandmeid.
+- **PABER-vahekaardi sisu:** kaart „Paberi üldandmed" (veržee, sõel, äär, poogna mõõt) + kaart
+  „Vesimärgid", kus iga vaatlus on rida nagu paber.ut.ee-s (nr · fotod · asukoht + lehelingid,
+  IPH sildid, kirjeldus, tekst, paigutus, ahel/ribi, kvaliteet, seos „vrd 502/1").
+- **Kõrvutus arvestab alati paberiga:**
+  - kõrvutatakse **eksemplari eksemplariga** — teose lehed on ühe eksemplari (transkriptsiooni
+    alus) skaneering ja sel on oma paber;
+  - **teose-lehe poole eksemplar tuleb lehest**, mitte vaikimisi teosest: erandleht („lk 7 =
+    eksemplar B", reegel 5) näitab eksemplari B nime ja paberit; ka `replace-image` võib lehe
+    taga eksemplari vahetada (`7zot7j` Uppsala → Tartu);
+  - mõlemal poolel paberipaneel; lehega seotud vaatlus (kui seos on) tõstetakse esile,
+    ülejäänud on eksemplari omad.
+- **Vesimärgid on teose lehtedest ja piltide paaridest täiesti eraldi.** Vesimärk on poognal, mitte
+  igal lehel: asukoht on `locus` (signatuur: a2, a3), seos teose lehega on **valikuline**. Fotod
+  kuuluvad vaatlusele, mitte eksemplari piltide hulka (`images.json`) ega paaridesse;
+  PILDID-võrgus vesimärgimärki ei ole. Paar = eksemplari pilt ↔ teose leht, ainult
+  reproduktsioonidele.
+
+Mockupid (git-ignored, ainult arendusmasinas):
+`.superpowers/brainstorm/1845782-1794239506/content/eksemplari-leht-v3-grupid.html` (PABER-vahekaart,
+vaatluse kaart) ja `korvutus-v3.html` (paberipaneel kõrvutuses).
+
+### Vastuolud — arutada enne paberi tööd
+
+1. **Kus elavad vesimärgifotod?**
+   - 09.11: fotod kuuluvad **vaatlusele**, eksemplari pildikogust (`images.json`) eraldi.
+   - [ADR 0079](../../decisions/0079-eksemplari-pildid.md) (rida 111): vaatlused viitavad
+     järgmises etapis eksemplari piltide **`image_id`-dele**; eksemplari lehe disain (10.11, „Koht
+     paberile"): „vaatlus viitab eksemplari piltidele, pildile saab hiljem lisada liigi ilma
+     migratsioonita".
+   - Siin (Andmemudel): pildid `_watermarks/…` alamkaustas — kolmas variant, eraldi kaust, aga
+     viitamisviis lahtine.
+   - Mõju: kas vesimärgifoto ilmub eksemplari PILDID-võrku, kas ta saab olla paar, kuidas
+     paber.ut.ee import fotod paigutab, kas pildiserver vajab uut alamkausta.
+2. **Kõrvutuse paberipaneel: kohustuslik või hilisem?**
+   - 09.11: „kõrvutus arvestab **alati** paberiinfoga", paneel mõlemal poolel.
+   - Eksemplari lehe disain (10.11, Mitte-eesmärgid): „paberipaneel kõrvutuses" on mitte-eesmärk.
+     See kehtib eksemplari lehe tööle; küsimus on, kas paberi töö PEAB selle tooma ja kas
+     kõrvutuse teose-lehe poole eksemplar tuleb lehest (erandleht, `replace-image`).
+3. **Paberi üldandmete koht.**
+   - Siin (Andmemudel): „eksemplari tasemel, vaatlusel ainult erinevuse korral".
+   - 09.11 ettepanek (kasutaja ei kinnitanud): tase on eksemplar, aga **fail** on paberifail
+     (`_watermarks.json` või sarnane), mitte `exemplars[]` väljad — kogu paberiinfo elab koos,
+     eksemplari kirje jääb puhtaks ja eraldi toimetamine (vt ülal) vastab eraldi hoidlale.
+4. **Nähtavus kui eraldi toimetamise põhjus.**
+   - 09.11: üks põhjus paberi eraldi toimetamiseks on „lahtised õigused/nähtavus (doktoritöö)".
+   - Uurija vastus (eksemplari lehe disain, „Uurija vastustest"): vesimärgid on **kohe avalikud**,
+     nähtavus = teose nähtavus, peidetud olekut ei ole. Siis langeb see põhjus ära (ülejäänud
+     kolm jäävad) ja Lahtiste küsimuste „Nähtavus ja õigused" punkt on suures osas vastatud.
+
 ## Viited
 
 - [paber.ut.ee — Eesti varajased trükised, vesimärgid][paber]; [eksemplar 7][eks7]
