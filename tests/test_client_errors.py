@@ -373,3 +373,16 @@ def test_kordusvotmete_tabel_ei_kasva_piiramatult(logi, monkeypatch):
     for i in range(100):
         client_errors.record_error({"message": f"juhuslik {i}"}, ip="1")
     assert len(client_errors._klient_viimati) <= 10
+
+
+def test_tolke_lipp_salvestub_ja_loigatakse(logi):
+    """Brauseri tõlge on `removeChild`-vigade tavaline põhjus — kirje peab seda näitama."""
+    client_errors.record_error({"message": "Failed to execute 'removeChild'",
+                                "translated": "en" + "x" * 100}, ip="10.0.0.1")
+    kirje = client_errors.list_errors()[0]
+    assert kirje["translated"] == ("en" + "x" * 100)[:client_errors.MAX_TRANSLATED_LEN]
+
+
+def test_tolketa_kirjel_lipp_puudub(logi):
+    client_errors.record_error({"message": "viga", "translated": ""}, ip="10.0.0.1")
+    assert client_errors.list_errors()[0]["translated"] is None

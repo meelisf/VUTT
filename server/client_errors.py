@@ -39,6 +39,8 @@ MAX_MESSAGE_LEN = 500
 MAX_STACK_LEN = 4000
 MAX_URL_LEN = 500
 MAX_UA_LEN = 300
+# Brauseri tõlke sihtkeel (nt "en") — keelekood, mitte vabatekst.
+MAX_TRANSLATED_LEN = 20
 
 # --- Volituste eemaldamine --------------------------------------------------
 #
@@ -222,7 +224,7 @@ def _puhasta_ja_lyhenda(vaartus, piir: int) -> Optional[str]:
 _RECORD_LIMITS = {
     "received_at": 80, "message": MAX_MESSAGE_LEN, "stack": MAX_STACK_LEN,
     "url": MAX_URL_LEN, "user_agent": MAX_UA_LEN, "source": 40,
-    "username": 200, "ip": 80,
+    "translated": MAX_TRANSLATED_LEN, "username": 200, "ip": 80,
 }
 
 
@@ -257,6 +259,10 @@ def record_error(payload: dict, *, ip: str = "", username: Optional[str] = None)
         # Kust viga tuli: "boundary" (React), "window" (onerror),
         # "promise" (unhandledrejection). Kliendi enda silt, ainult vihjeks.
         "source": _puhasta_ja_lyhenda(payload.get("source"), 40),
+        # Brauseri tõlge oli lehel sees (sihtkeel või "?"). Tõlge mähib
+        # tekstisõlmed ümber ja Reacti `removeChild`/`insertBefore` vead
+        # tulevad sealt, mitte meie koodist. Puudumine = tõlget ei tuvastatud.
+        "translated": _puhasta_ja_lyhenda(payload.get("translated") or None, MAX_TRANSLATED_LEN),
         "username": username,
         "ip": ip or None,
     }

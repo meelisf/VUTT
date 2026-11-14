@@ -12,6 +12,8 @@ interface ClientError {
   url: string | null;
   user_agent: string | null;
   source: string | null;
+  /** Brauseri tõlke sihtkeel, kui leht oli tõlgitud (DOM-vead tulevad siis tõlkest). */
+  translated?: string | null;
   username: string | null;
   ip: string | null;
 }
@@ -123,6 +125,9 @@ const ClientErrorsPanel: React.FC<{ token?: string }> = ({ token }) => {
                     {formatTime(e.received_at)}
                     {e.url && <> · <span className="font-mono">{e.url}</span></>}
                     {e.source && <> · {e.source}</>}
+                    {e.translated && (
+                      <> · <span className="text-amber-700">{t('admin:clientErrors.translated', { lang: e.translated })}</span></>
+                    )}
                     {e.username && <> · {e.username}</>}
                   </span>
                 </span>

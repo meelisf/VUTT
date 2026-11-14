@@ -31,6 +31,23 @@ export interface ClientErrorPayload {
   source: ErrorSource;
 }
 
+/**
+ * Kas brauseri tõlge on lehe DOM-i ümber kirjutanud. Tõlge mähib tekstisõlmed
+ * `<font>`-i ja React ei leia neid enam üles → `removeChild`/`insertBefore`
+ * NotFoundError, mis ei ole meie koodi viga. Google Translate (ka Chrome'i
+ * sisseehitatud) lisab `<html>`-ile klassi `translated-ltr`/`-rtl` ja vahetab
+ * `lang`-i sihtkeeleks. Tagastab sihtkeele või `null`.
+ */
+export function detectPageTranslation(): string | null {
+  try {
+    const html = document.documentElement;
+    if (!html.classList.contains('translated-ltr') && !html.classList.contains('translated-rtl')) return null;
+    return (html.getAttribute('lang') || '?').slice(0, 20);
+  } catch {
+    return null;
+  }
+}
+
 function shouldSend(key: string): boolean {
   if (sent >= MAX_PER_SESSION) return false;
   const now = Date.now();
@@ -68,6 +85,7 @@ export function reportClientError({ message, stack, source }: ClientErrorPayload
       url: scrubUrl(window.location.pathname + window.location.search),
       user_agent: navigator.userAgent,
       source,
+      translated: detectPageTranslation(),
     });
 
     // `keepalive`: viga võib tabada vahetult enne lehelt lahkumist ja tavaline

@@ -52,6 +52,28 @@ describe('clientErrorReporter', () => {
     expect(init!.keepalive).toBe(true);
   });
 
+  it('märgib brauseri tõlke (removeChild-vigade tavaline põhjus)', async () => {
+    const fetchMock = mockFetch();
+    const html = document.documentElement;
+    html.classList.add('translated-ltr');
+    html.setAttribute('lang', 'en');
+    try {
+      const { reportClientError } = await freshReporter();
+      reportClientError({ message: 'removeChild', source: 'boundary' });
+      expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string).translated).toBe('en');
+    } finally {
+      html.classList.remove('translated-ltr');
+      html.setAttribute('lang', 'et');
+    }
+  });
+
+  it('tõlketa lehel tõlke lippu ei ole', async () => {
+    const fetchMock = mockFetch();
+    const { reportClientError } = await freshReporter();
+    reportClientError({ message: 'muu', source: 'window' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string).translated).toBeNull();
+  });
+
   it('ei saada sama viga korduvalt aknas', async () => {
     const fetchMock = mockFetch();
     const { reportClientError } = await freshReporter();
