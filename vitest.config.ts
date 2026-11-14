@@ -10,5 +10,9 @@ export default defineConfig({
     environment: 'node',
     // `.tsx` on nimekirjas, et komponenditestid üldse leitaks.
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Vaikimisi võtaks vitest töölise peaaegu iga tuuma kohta (arendusmasinas
+    // 16), igaüks eraldi Node'i protsess. 13 GB RAM-iga masinas viis see koos
+    // brauseriga mälusurveni ja OOM tappis Firefoxi (2026-11-13/14).
+    maxWorkers: 4,
   },
 });
