@@ -35,6 +35,7 @@ from .routers.public_registries import router as public_registries_router
 from .routers.public import router as public_router
 from .routers.editing import router as editing_router
 from .routers.work_sets import router as work_sets_router
+from .routers.mcp_read import router as mcp_read_router
 from .routers.work_parts import router as work_parts_router
 from .routers.work_relations import router as work_relations_router
 from .routers.work_exemplars import router as work_exemplars_router
@@ -157,6 +158,7 @@ app.include_router(public_router)
 app.include_router(editing_router)
 app.include_router(collections_router)
 app.include_router(work_sets_router)
+app.include_router(mcp_read_router)
 app.include_router(work_parts_router)
 app.include_router(work_relations_router)
 app.include_router(work_exemplars_router)
