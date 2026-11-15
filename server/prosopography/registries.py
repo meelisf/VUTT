@@ -54,10 +54,14 @@ def load(kind: str) -> dict:
     return value
 
 
-def _text(value, field: str, *, required: bool = False) -> Optional[str]:
+# Märkus on vabatekst (allikaviited, eristus); nimed ja võtmed jäävad lühikeseks.
+NOTES_MAX_LEN = 2000
+
+
+def _text(value, field: str, *, required: bool = False, max_len: int = 300) -> Optional[str]:
     if value is None and not required:
         return None
-    if not isinstance(value, str) or len(value) > 300 or (required and not value.strip()):
+    if not isinstance(value, str) or len(value) > max_len or (required and not value.strip()):
         raise RegistryError(f"invalid_{field}")
     return value.strip() or None
 
@@ -96,7 +100,7 @@ def validate_entry(kind: str, key: str, data: dict, *, places: Optional[dict] = 
             clean_variants.append(value)
             seen.add(folded)
     result = {"id": qid, "labels": clean_labels, "variants": clean_variants}
-    notes = _text(data.get("notes"), "notes")
+    notes = _text(data.get("notes"), "notes", max_len=NOTES_MAX_LEN)
     if notes:
         result["notes"] = notes
     if kind == "institution":
