@@ -30,8 +30,10 @@ erand, sest `vutt-mcp` paigaldatakse pipx-iga globaalselt ega loe repo
 
 ### Teine kasutaja (ilma repota)
 
-Repo on avalik, kloonida pole vaja. Võti annab ligipääsu ka piiratud kogudele —
-anna see ainult adminile ja turvalise kanali kaudu.
+Repo on avalik, kloonida pole vaja. Võti annab ligipääsu ka piiratud kogudele
+ja kõigile töökollektsioonidele (server käsitleb võtme esitajat admini
+lugemisõigustes, `/mcp/work-sets`) — anna see ainult adminile ja turvalise
+kanali kaudu.
 
 ```bash
 pipx install "git+https://github.com/meelisf/VUTT#subdirectory=mcp"
@@ -97,6 +99,7 @@ Kolm asja, mis üllatavad:
 |---|---|
 | `search_pages` | Täistekstiotsing, lehekülje-katked |
 | `search_works` | Sama teosetasandil + esindav lehekülg |
+| `list_work_sets` | Töökollektsioonid (id, nimi, liikmete arv, arhiveeritud); `search_pages`/`search_works` parameeter `work_set` piirab otsingu kogu liikmetega |
 | `get_work` | Teose metaandmed + lehekülgede loend; ESTERi kirje number (`ester_id`) ja arhiiviviited (hoidja · kohaviit · digikoopia) — agendi eksemplariettepanekute lähtepunkt (#703) |
 | `get_pages` | Lehekülgede vahemiku täistekst (kuni 20 lk) |
 | `get_page_image` | Ühe skaneeringu täisresolutsiooniga pilt OCR-i kontrolliks |
