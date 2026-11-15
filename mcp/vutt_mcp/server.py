@@ -147,7 +147,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         """
         search_fields = _scope_fields(scope)
         work_ids = None
-        if work_set:
+        if work_set is not None:
             work_ids = work_sets_mod.member_ids(client, work_set)
             if not work_ids:
                 return work_sets_mod.empty_set_message(work_set)
@@ -223,7 +223,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         work_set = töökollektsiooni id (list_work_sets) — ainult selle liikmed.
         """
         work_ids = None
-        if work_set:
+        if work_set is not None:
             work_ids = work_sets_mod.member_ids(client, work_set)
             if not work_ids:
                 return work_sets_mod.empty_set_message(work_set)

@@ -97,3 +97,15 @@ async def test_tundmatu_kogu_soovitab_list_work_sets(tool):
         await _call(server, tool, {"query": "x", "work_set": "eiole"})
     assert "list_work_sets" in str(exc.value)
     assert client.bodies == []
+
+
+@pytest.mark.parametrize("value", ["", "  "])
+@pytest.mark.parametrize("tool", ["search_pages", "search_works"])
+async def test_tyhi_work_set_string_ei_otsi_kogu_korpusest(tool, value):
+    """`work_set=""` ei tohi vaikselt filtrit ära jätta — agent peaks tulemust
+    kogu liikmeteks."""
+    server, client = _server({})
+    with pytest.raises(ToolError) as exc:
+        await _call(server, tool, {"query": "x", "work_set": value})
+    assert "list_work_sets" in str(exc.value)
+    assert client.bodies == []

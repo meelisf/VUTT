@@ -11,7 +11,13 @@ from .errors import VuttError, VuttNotFound
 
 
 def member_ids(client, work_set: str) -> list[str]:
-    """Kogu liikmed; tundmatu id → juhis, kust õige leida."""
+    """Kogu liikmed; tundmatu id → juhis, kust õige leida.
+
+    Tühi id on viga, mitte „filtrit pole": agent, kes täidab kõik valikulised
+    parameetrid tühjaga, peaks muidu kogu korpuse tulemust kogu liikmeteks.
+    """
+    if not work_set.strip():
+        raise VuttError("work_set on tühi. Jäta parameeter ära või võta id list_work_sets'ist.")
     try:
         data = client.mcp_get(f"/mcp/work-sets/{quote(work_set, safe='')}/works")
     except VuttNotFound:
