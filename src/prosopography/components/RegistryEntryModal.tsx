@@ -15,6 +15,7 @@ import { createRegistryEntry, fetchPlaces, RegistryDuplicateError,
 import { entityToRegistryDraft, formatYears, parseYears, previewKey, sameIdEntry, similarEntries,
   type RegistryDraft, type RegistryKind } from '../utils/registryCreate';
 import { registryLabel, type RegistryEntryLike } from '../utils/registryMatch';
+import { registryErrorMessage } from '../utils/registryErrors';
 import PlacePicker from './personForm/PlacePicker';
 
 const DEFAULT_TYPES = ['university', 'gymnasium', 'school', 'parish'];
@@ -135,7 +136,7 @@ const RegistryEntryModal: React.FC<Props> = ({ kind, initialQuery, registry, tok
       onCreated(created.key, created.entry as RegistryEntryLike);
     } catch (e) {
       if (e instanceof RegistryDuplicateError) setError(tr('duplicateId', { key: e.key }));
-      else setError((e as Error).message);
+      else setError(registryErrorMessage(e, t, current.notes));
     } finally {
       setSaving(false);
     }

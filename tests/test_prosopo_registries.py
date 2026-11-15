@@ -59,6 +59,18 @@ def test_tundmatud_valjad_ei_joua_autoriteetsesse_faili(files):
         }, "admin")
 
 
+def test_markus_kuni_2000_marki_nimi_endiselt_300(files):
+    pikk = "a" * registries.NOTES_MAX_LEN
+    kirje = registries.put("institution", "agc", {
+        "labels": {"et": "AGC"}, "type": "university", "notes": pikk}, "admin")
+    assert kirje["notes"] == pikk
+    with pytest.raises(registries.RegistryError, match="invalid_notes"):
+        registries.put("institution", "agc", {
+            "labels": {"et": "AGC"}, "type": "university", "notes": pikk + "a"}, "admin")
+    with pytest.raises(registries.RegistryError, match="invalid_label"):
+        registries.put("occupation", "pastor", {"labels": {"et": "a" * 301}}, "admin")
+
+
 def test_isikufakt_sailitab_toorsildi_ja_kooskolastab_q_koodi(files):
     registries.put("occupation", "pastor", {
         "id": "Q152002", "labels": {"et": "pastor"}, "variants": ["Pfarrer"]}, "admin")

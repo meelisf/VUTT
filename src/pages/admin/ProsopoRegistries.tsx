@@ -9,6 +9,7 @@ import PlacePicker from '../../prosopography/components/personForm/PlacePicker';
 import RegistryEntryModal from '../../prosopography/components/RegistryEntryModal';
 import { formatYears, parseYears } from '../../prosopography/utils/registryCreate';
 import type { RegistryEntryLike } from '../../prosopography/utils/registryMatch';
+import { registryErrorMessage } from '../../prosopography/utils/registryErrors';
 import { fetchPlaces, fetchRegistry, saveRegistryEntry,
   type InstitutionRegistryEntry, type OccupationRegistryEntry } from '../../prosopography/services/prosopographyService';
 
@@ -18,7 +19,7 @@ const empty = (kind: Kind): Entry => ({ id: null, labels: { et: '', en: '' }, va
   ...(kind === 'institution' ? { type: '', place_key: null } : {}) });
 
 export default function ProsopoRegistries() {
-  const { t, i18n } = useTranslation('admin');
+  const { t, i18n } = useTranslation(['admin', 'prosopography']);
   const tr = (key: string) => t(`prosopoRegistries.${key}`);
   const lang = i18n.language.slice(0, 2);
   const { user, authToken, isLoading: userLoading } = useUser();
@@ -88,7 +89,7 @@ export default function ProsopoRegistries() {
       setPeriods(formatPlacePeriods((stored as InstitutionRegistryEntry).place_periods));
       setYearsText(formatYears((stored as InstitutionRegistryEntry).active_from, (stored as InstitutionRegistryEntry).active_to));
       setSaved(true);
-    } catch (e) { setError((e as Error).message); }
+    } catch (e) { setError(registryErrorMessage(e, t, draft.notes)); }
     finally { setBusy(false); }
   };
   const institution = kind === 'institution' ? draft as InstitutionRegistryEntry : null;
