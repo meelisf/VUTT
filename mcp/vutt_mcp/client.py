@@ -35,6 +35,16 @@ class VuttClient:
         url = f"{self._settings.base_url}/api/files{path}"
         return self._request("GET", url, params=params)
 
+    def mcp_get(self, path: str) -> dict | list:
+        """MCP read-only teed (töökollektsioonid): otsinguvõti OMA päises.
+
+        `Authorization` on serveris sessioonitokeni koht — võti seal tähendaks
+        surnud tokenit ja 401-t.
+        """
+        url = f"{self._settings.base_url}/api/files{path}"
+        headers = {"X-Vutt-Search-Key": self._settings.meili_key}
+        return self._request("GET", url, headers=headers)
+
     def api_post(self, path: str, json_body: dict) -> dict | list:
         url = f"{self._settings.base_url}/api/files{path}"
         return self._request("POST", url, json=json_body)

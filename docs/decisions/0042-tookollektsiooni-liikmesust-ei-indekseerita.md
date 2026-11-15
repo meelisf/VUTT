@@ -93,3 +93,18 @@ ligipääsu segunemine: `collections_hierarchy` KANNAB lugemisõigust
 tenant-tokeni kaudu, seega kogusse lisamine oleks vaikselt andnud lugemisõiguse
 teosele. Töökollektsioon ei tohi ligipääsu laiendada, ainult piiritleda hulka
 teostest, mida kasutaja niikuinii näeb.
+
+## Täiendus 2026-11-15: MCP
+
+MCP-serveril sessiooni ei ole — ta käib VUTT-i vastu Meili otsinguvõtmega, mis
+näeb niikuinii kõiki teoseid ja antakse ainult adminile. Seepärast annab server
+otsinguvõtmega (päis `X-Vutt-Search-Key`, MITTE `Authorization`) kaitstud
+read-only teed `GET /mcp/work-sets` ja `GET /mcp/work-sets/{id}/works`
+(`server/routers/mcp_read.py`), mis kasutavad SAMA `search_visible_work_ids`-i
+sünteetilise admini-kasutajaga. Uut õigusloogikat ei tule; vastus ei kanna
+`access`-i ega auditivälju.
+
+MCP lisab liikmed filtrisse `work_id IN [...]` teiste filtrite kõrvale —
+indeksit ei muudeta. Tühi loend = null tulemust, Meili-päringut ei tehta.
+Kasutajapõhine MCP (kogu `viewer`/`manager` õigused) on mõttekas alles siis, kui
+ka võti muutub kasutajapõhiseks; siis on see eraldi projekt.

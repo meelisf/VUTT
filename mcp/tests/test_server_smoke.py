@@ -8,6 +8,7 @@ EXPECTED_TOOLS = {
     "get_work_parts", "submit_work_parts_proposal",
     "get_page_source", "submit_page_text_proposal",
     "get_work_exemplars", "get_works_exemplars", "submit_exemplar_proposal",
+    "list_work_sets",
 }
 
 
