@@ -157,3 +157,20 @@ def test_load_settings_vaikimisi_base_url(monkeypatch):
     monkeypatch.setenv("VUTT_MEILI_SEARCH_KEY", "abc")
     monkeypatch.delenv("VUTT_BASE_URL", raising=False)
     assert load_settings().base_url == DEFAULT_BASE_URL
+
+
+def test_mcp_get_saadab_votme_paises():
+    """Töökollektsioonide tee: võti oma päises, MITTE Authorization-is
+    (see on serveris sessioonitokeni koht)."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["key"] = request.headers.get("x-vutt-search-key")
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json={"work_sets": []})
+
+    _client(handler).mcp_get("/mcp/work-sets")
+    assert seen["url"] == "https://example.test/api/files/mcp/work-sets"
+    assert seen["key"] == "k"
+    assert seen["auth"] is None

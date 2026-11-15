@@ -17,6 +17,7 @@ from . import parts as work_parts_mod
 from . import exemplars as exemplars_mod
 from . import persons
 from . import queries
+from . import work_sets as work_sets_mod
 from .client import VuttClient
 from .config import load_settings
 from .errors import VuttError, VuttNotFound
@@ -89,6 +90,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         type_id: str | None = None,
         tag_id: str | None = None,
         work_id: str | None = None,
+        work_set: str | None = None,
         relax_matching: bool = False,
         compact: bool = False,
         scope: str = "text",
@@ -122,6 +124,9 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         work_id on teose püsiv lühikood (nanoid, nt "v7Kq2mXp") — kasuta seda
         otsingu piiramiseks ühe teosega. Filtriväärtusi saad list_filter_values'ist.
 
+        work_set piirab töökollektsiooni (kureeritud teoste valiku) liikmetega;
+        id saad list_work_sets'ist. Kombineerub teiste filtritega AND-iga.
+
         type_id piirab teose tüübiga: "Q87167" = käsikiri, "Q1261026" = trükis.
         tag_id piirab teose märksõnaga (Wikidata Q-kood, loend:
         list_filter_values("tags")). Filtrid kombineeruvad AND-iga.
@@ -141,6 +146,11 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         get_pages näitab tähistust lehe päises.
         """
         search_fields = _scope_fields(scope)
+        work_ids = None
+        if work_set:
+            work_ids = work_sets_mod.member_ids(client, work_set)
+            if not work_ids:
+                return work_sets_mod.empty_set_message(work_set)
         offset = max(0, int(offset))
         limit = max(1, min(int(limit), queries.MAX_LIMIT))
         # Teoseülene otsing laotatakse teoste peale: tõmbame üle ja kärbime
@@ -157,6 +167,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             type_id=type_id,
             tag_id=tag_id,
             work_id=work_id,
+            work_ids=work_ids,
             relax_matching=relax_matching,
             search_fields=search_fields,
             limit=limit,
@@ -190,6 +201,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         genre_id: str | None = None,
         type_id: str | None = None,
         tag_id: str | None = None,
+        work_set: str | None = None,
         relax_matching: bool = False,
         compact: bool = False,
         limit: int = 10,
@@ -208,10 +220,17 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         Filtrid (collection, language, genre_id, type_id, tag_id, aastad) on
         samad mis search_pages'il: type_id "Q87167" = käsikiri, "Q1261026" =
         trükis; tag_id = teose märksõna Q-kood (list_filter_values("tags")).
+        work_set = töökollektsiooni id (list_work_sets) — ainult selle liikmed.
         """
+        work_ids = None
+        if work_set:
+            work_ids = work_sets_mod.member_ids(client, work_set)
+            if not work_ids:
+                return work_sets_mod.empty_set_message(work_set)
         body = queries.build_search_body(
             query,
             distinct_works=True,
+            work_ids=work_ids,
             collection=collection,
             year_from=year_from,
             year_to=year_to,
@@ -232,6 +251,17 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
             hits, total, base_url=base_url, compact=compact, unit="works",
             next_offset=edasi if len(hits) == limit and total > edasi else None,
         )
+
+    @mcp.tool(structured_output=False)
+    async def list_work_sets() -> str:
+        """Loetleb töökollektsioonid — kureeritud teoste valikud (nt ühe
+        konverentsi või projekti teosed), mis EI OLE kollektsioonid.
+
+        Kui kasutaja nimetab töökollektsiooni või projekti, leia siit id ja
+        anna see search_works / search_pages parameetrina work_set. Arv on
+        otsingus nähtavate liikmete arv. Arhiveeritud kogud on loendi lõpus.
+        """
+        return work_sets_mod.format_work_sets(client.mcp_get("/mcp/work-sets"))
 
     @mcp.tool(structured_output=False)
     async def get_work(work_id: str) -> str:

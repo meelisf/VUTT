@@ -19,6 +19,9 @@ class FakeClient:
         return {"results": [], "total": 0, "id": "vutt:x", "name": {"label": "T"},
                 "works": []}
 
+    def mcp_get(self, path):
+        return {"work_sets": [], "work_ids": [], "count": 0}
+
     def api_post(self, path, json_body):
         return {"titles": {}}
 
@@ -33,6 +36,7 @@ def _minimal_args(name: str) -> dict:
         "search_persons": {"q": "x"},
         "get_person": {"person_id": "vutt:abc"},
         "list_filter_values": {"field": "collections"},
+        "list_work_sets": {},
     }[name]
 
 

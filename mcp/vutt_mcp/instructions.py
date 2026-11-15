@@ -19,7 +19,7 @@ Tuum on 17. sajandi Tartu trükised, aga kogu ulatub sellest mõlemas suunas
 välja ja sisaldab ka sekundaarkirjandust - ÄRA eelda kitsast ajapiiri,
 piira ulatust kollektsiooniga. MCP esitab ootel ettepaneku.
 
-KEELED - arvesta neid, muidu otsid tühja:
+KEELED (muidu otsid tühja):
 - Alliktekstid on valdavalt ladina- ja saksakeelsed, kõrval rootsi ja kreeka;
   eestikeelset teksti on väga vähe. Otsi seega ladina- või saksakeelse sõnaga,
   MITTE eestikeelse terminiga ("disputatio", mitte "väitluskiri").
@@ -33,21 +33,20 @@ KEELED - arvesta neid, muidu otsid tühja:
 
 TÖÖKÄIK:
 1. list_filter_values (collections, languages, genres, types, tags) - suletud
-   loend, ära oleta väärtusi.
+   loend, ära oleta väärtusi. Töökollektsioon: list_work_sets → work_set.
 2. search_works = MILLISED teosed teemat käsitlevad; search_pages = KUS midagi
    mainitakse.
 3. get_pages = täistekst; get_page_image = pilt OCR-i kontrolliks.
 4. Isikud: search_persons / get_person (prosopograafia).
 5. Sekundaarkirjandus on ERALDI kogu, mitte korpuse osa: list_literature
-   näitab, mis seal on; get_literature_pages nõuab page_ref="printed" (trükise
+   näitab sisu; get_literature_pages nõuab page_ref="printed" (trükise
    number) või "pdf" (faili leht).
 
 REEGLID:
-- work_id on nanoid ("v7Kq2mXp"), mitte pealkiri; tuleb iga tulemusega kaasa.
+- work_id on nanoid ("v7Kq2mXp"), mitte pealkiri.
 - Otsing on vaikimisi range (kõik sõnad peavad leheküljel esinema). Tühja
   tulemuse järel proovi lühemat päringut ja relax_matching=true.
 - Tekst on masinlugemine. Lehe seisund kasvavas usaldusväärsuses: Toores
-  (kontrollimata OCR) < Töös < Parandatud < Annoteeritud < Valmis (inimese
-  kinnitatud).
+  (OCR) < Töös < Parandatud < Annoteeritud < Valmis (inimese kinnitatud).
 - Tühi tulemus EI tõesta, et teemat pole - kontrolli enne list_filter_values'i
   ja list_literature'iga, kas õige allikas on kogus üldse olemas."""

@@ -258,12 +258,16 @@ def build_search_body(
     type_id: str | None = None,
     tag_id: str | None = None,
     work_id: str | None = None,
+    work_ids: list[str] | None = None,
     relax_matching: bool = False,
     search_fields: list[str] | None = None,
     limit: int = 10,
     offset: int = 0,
 ) -> dict:
     """Koostab otsingupäringu keha.
+
+    `work_ids` = töökollektsiooni liikmed (ADR 0042). Tühja loendi peab kutsuja
+    ise null tulemuseks muutma — siin jääks tühi loend lihtsalt filtrist välja.
 
     `distinct_works=True` → teosetasandi tulemus. Meili valib sama work_id
     lehekülgedest kõrgeima rankinguga tabamuse; kasutame seda esindava
@@ -272,6 +276,8 @@ def build_search_body(
     clauses: list[str] = []
     if work_id:
         clauses.append(f"work_id = {_quote(work_id)}")
+    if work_ids:
+        clauses.append("work_id IN [" + ", ".join(_quote(w) for w in work_ids) + "]")
     if collection:
         clauses.append(f"collections_hierarchy = {_quote(collection)}")
     if year_from is not None:

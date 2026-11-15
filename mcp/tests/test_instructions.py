@@ -68,3 +68,9 @@ def test_juhend_ei_sisalda_arve():
     import re
     kahtlased = re.findall(r"~\s*\d[\d\s]*", SERVER_INSTRUCTIONS)
     assert not kahtlased, f"juhendis on vananevad arvud: {kahtlased}"
+
+
+def test_juhend_nimetab_tookollektsiooni():
+    """Kasutaja tahab sageli tegutseda ühe töökollektsiooni piires."""
+    assert "list_work_sets" in SERVER_INSTRUCTIONS
+    assert "work_set" in SERVER_INSTRUCTIONS

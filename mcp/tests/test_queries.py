@@ -203,3 +203,11 @@ def test_spread_search_tommete_lagi():
     hits, _, more = queries.spread_search(fetch, queries.build_search_body("x", limit=10),
                                           offset=0, limit=10, cap=3)
     assert len(calls) == queries.MAX_SPREAD_ROUNDS and len(hits) == 3
+
+
+def test_work_ids_filter():
+    """Töökollektsiooni liikmed (ADR 0042) — teiste filtrite KÕRVAL, AND-iga."""
+    body = queries.build_search_body("x", work_ids=["a", "b"], collection="c")
+    assert 'work_id IN ["a", "b"]' in body["filter"]
+    assert 'collections_hierarchy = "c"' in body["filter"]
+    assert " AND " in body["filter"]
