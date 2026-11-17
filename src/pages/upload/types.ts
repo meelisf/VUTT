@@ -73,6 +73,8 @@ export interface SavedUpload {
   files: FileEntry[];
   stalled?: boolean;
   partial_upload?: PartialUpload;
+  /** Asendatav teos („Asenda leheküljed"); server hoiab seda kogu upload'i eluaja. */
+  replace_work_id?: string | null;
 }
 
 export interface WorkMetadataForReplace {

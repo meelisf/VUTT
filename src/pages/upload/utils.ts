@@ -1,5 +1,5 @@
 import { OCR_PAGES_PER_MIN, OCR_MS_PER_PAGE, OCR_TIMEOUT_MS_FALLBACK } from './constants';
-import type { FileEntry, PollResult } from './types';
+import type { FileEntry, PollResult, SavedUpload } from './types';
 
 const SLUG_MAX_LEN = 80;
 
@@ -186,4 +186,18 @@ export function impordiEdenemine(
     ? Math.round((done / total) * 100)
     : null;
   return { label, pct };
+}
+
+/**
+ * Jätkatava upload'i asendusrežiim serveri olekust. Ilma selleta kaotas viisard
+ * jätkamisel asendusrežiimi ja „Impordi" tegi asendamise asemel duubli
+ * (bgxmdx ← jpmek8, 2026-11-17). Pealkirjaks sobib upload'i meta pealkiri —
+ * asendusvoog loob upload'i asendatava teose metaandmetest.
+ */
+export function replaceStateFromSaved(
+  saved: Pick<SavedUpload, 'replace_work_id' | 'meta'>,
+): { replaceWorkId: string | null; replaceWorkTitle: string | null } {
+  const rid = saved.replace_work_id || null;
+  if (!rid) return { replaceWorkId: null, replaceWorkTitle: null };
+  return { replaceWorkId: rid, replaceWorkTitle: saved.meta?.title || rid };
 }
