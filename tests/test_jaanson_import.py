@@ -155,3 +155,48 @@ def test_rakendus_olemasolevad_ja_kasikiri():
     assert "exemplars" not in out and "teise kohaviidaga" in report[0]
     out, report = ja.apply_to_meta({"id": "w", "type": {"id": "Q87167"}}, item, "d")
     assert out == {} and "käsikiri" in report[0]
+
+
+def test_tur_kohaviit_lahendab_sarja_naabri():
+    """Sarja disputatsioonid on pealkirjalt peaaegu samad (opuygz/mbrpig, 2026-11-17).
+    VUTT-i kaustanimi kannab TÜR-i kohaviita (`1644-16-…` = `R Acad. Dorp. 1644:16`) —
+    kui see osutab ühele teosele, on vaste kindel ka siis, kui OCR rikkus järgarvu."""
+    t = "In octo libros Physic. Aristot. sive de naturali auscultatione disputatio {} continens notas"
+    entries = [{"nr": 434, "year": 1644, "title": t.format("decimaguinta"), "shelfmark": "R Acad. Dorp. 1644:17"},
+               {"nr": 436, "year": 1644, "title": t.format("decima quarta"), "shelfmark": "R Acad. Dorp. 1644:16"}]
+    works = [{"id": "opuygz", "year": 1644, "title": t.format("decima quinta"), "_dir": "1644-17-In_octo"},
+             {"id": "mbrpig", "year": 1644, "title": t.format("decima quarta"), "_dir": "1644-16-In_octo"}]
+    m = jp.match(entries, works)
+    assert (m[434]["work_id"], m[434]["status"]) == ("opuygz", "kindel")
+    assert (m[436]["work_id"], m[436]["status"]) == ("mbrpig", "kindel")
+
+
+def test_tur_kohaviit_parandab_ahne_vahetuse():
+    """Identsed pealkirjad (Catalogus lectionum): ahne jaotus võib paari vahetada — kohaviit ei."""
+    t = "Catalogus lectionum publicarum quas professores Academiae Gustavo Carolinae habebunt"
+    entries = [{"nr": 1003, "year": 1694, "title": t, "shelfmark": "R Acad. Dorp. 1694:20"},
+               {"nr": 1035, "year": 1695, "title": t, "shelfmark": "R Acad. Dorp. 1695:18"}]
+    works = [{"id": "gx6qyi", "year": 1695, "title": t, "_dir": "1695-18-Catalogus"},
+             {"id": "be8b8q", "year": 1694, "title": t, "_dir": "1694-20-Catalogus"}]
+    m = jp.match(entries, works)
+    assert m[1003]["work_id"] == "be8b8q" and m[1035]["work_id"] == "gx6qyi"
+
+
+def test_kohaviide_ilma_pealkirja_sarnasuseta_ei_kehti():
+    """Kohaviit üksi ei piisa: teos peab olema pealkirja järgi kandidaat (vale kaustanimi)."""
+    entries = [{"nr": 1, "year": 1644, "title": "Oratio de pace", "shelfmark": "R Acad. Dorp. 1644:16"}]
+    works = [{"id": "w", "year": 1644, "title": "Disputatio physica de motu corporum caelestium", "_dir": "1644-16-x"}]
+    assert jp.match(entries, works)[1]["status"] != "kindel"
+
+
+def test_rakendus_tur_koopia_ilma_eesliiteta_on_olemas():
+    """Käsitsi sisestatud TÜR-i kohaviit „1644:17" = Jaansoni „R Acad. Dorp. 1644:17"."""
+    item = {"nr": 434, "exemplars": [
+        {"holder": "Helsinki KK"},
+        {"holder": "Tartu TÜR", "shelfmark": "R Acad. Dorp. 1644:17", "reproduction": {"kind": "paberkoopia"}}]}
+    meta = {"id": "opuygz", "exemplars": [
+        {"id": "29zhsa", "holder": "Tartu TÜR", "shelfmark": "1644:17", "reproduction": {"kind": "paberkoopia", "of": "3lgllc"}},
+        {"id": "3lgllc", "holder": "Helsinki KK"}]}
+    out, report = ja.apply_to_meta(meta, item, "2026-11-17")
+    assert "exemplars" not in out
+    assert out == {"notes": "Jaanson 434"}

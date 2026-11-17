@@ -32,6 +32,15 @@ TUR = "Tartu TÜR"
 COPY_PREFIX = "R Acad. Dorp."
 
 
+def _bare(shelf) -> str:
+    """„R Acad. Dorp. 1644:17" / „R Acad.Dorp. 1644:17" → „1644:17"."""
+    s = (shelf or "").strip()
+    for prefix in (COPY_PREFIX, "R Acad.Dorp.", "Acad. Dorp."):
+        if s.startswith(prefix):
+            return s[len(prefix):].strip()
+    return s
+
+
 def note_line(nr: int) -> str:
     return f"Jaanson {nr}"
 
@@ -54,6 +63,12 @@ def apply_to_meta(meta: dict, item: dict, today: str) -> tuple[dict, list[str]]:
             continue
         if shelf and we.duplicate_of({"holder": holder, "shelfmark": shelf}, current):
             skipped.append(f"{holder} {shelf}: olemas")
+            continue
+        # Käsitsi sisestatud paberkoopia kohaviit on sageli ilma eesliiteta („1644:17").
+        if holder == TUR and shelf and shelf.startswith(COPY_PREFIX) and any(
+                we.shelfmark_key(TUR, _bare(x.get("shelfmark"))) == we.shelfmark_key(TUR, _bare(shelf))
+                for x in same_holder):
+            skipped.append(f"{holder} {shelf}: olemas (kohaviit ilma eesliiteta)")
             continue
         if holder == TUR and shelf and not shelf.startswith(COPY_PREFIX) and any(
                 not (x.get("shelfmark") or "").startswith(COPY_PREFIX) for x in same_holder):
