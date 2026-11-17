@@ -123,6 +123,13 @@ def _alusta_importi(upload_id, get_upload_lock_func, read_state_func, write_stat
             raise ValueError(
                 f"Upload peab olema 'done' või 'reviewing' olekus, praegu: '{praegune}'"
             )
+        # Asendus-upload ei tohi saada uueks teoseks: jätkamisel kaotas viisard
+        # asendusrežiimi ja „Impordi" tegi duubli (bgxmdx ← jpmek8, 2026-11-17).
+        if state.get('replace_work_id'):
+            raise ValueError(
+                f"See upload asendab teose {state['replace_work_id']} lehekülgi — "
+                "kasuta asendamist, mitte uue teose importi"
+            )
         state['status'] = 'importing'
         # Eelmine staatus PEAB elama state'is, mitte ainult mälus: konteineri
         # restart tapab lõime enne except-haru ja käivitustaaste peab teadma,

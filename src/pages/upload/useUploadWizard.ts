@@ -26,6 +26,7 @@ import {
   computeReviewDerived,
   estimateRemainingSeconds,
   formatEta,
+  replaceStateFromSaved,
 } from './utils';
 import {
   ApiError,
@@ -608,6 +609,9 @@ export function useUploadWizard() {
   // ---------------------------------------------------------------------------
   function handleResume(saved: SavedUpload) {
     setUploadId(saved.id);
+    const asendus = replaceStateFromSaved(saved);
+    setReplaceWorkId(asendus.replaceWorkId);
+    setReplaceWorkTitle(asendus.replaceWorkTitle);
     setResumePartial(saved.partial_upload ?? null);
     setTitle(saved.meta.title);
     // saved.meta.year võib backendist tulla numbrina, kuigi tüüp ütleb string

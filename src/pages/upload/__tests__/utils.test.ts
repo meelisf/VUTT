@@ -7,6 +7,7 @@ import {
   isImageFile,
   ocrEstimate,
   prepareMultiImages,
+  replaceStateFromSaved,
   sanitizeSlug,
 } from '../utils';
 import { OCR_MS_PER_PAGE, OCR_TIMEOUT_MS_FALLBACK } from '../constants';
@@ -352,5 +353,29 @@ describe('impordiEdenemine', () => {
 
   it('nullist koguarv ei anna jagamist nulliga', () => {
     expect(impordiEdenemine({ phase: 'downloading', done: 0, total: 0 }, t)?.pct).toBeNull();
+  });
+});
+
+describe('replaceStateFromSaved', () => {
+  const meta = { title: 'Oratio metrica', year: '1641', slug: '1641-21' };
+
+  it('taastab asendusrežiimi serveri olekust (jätkamisel ei tohi kaduda)', () => {
+    expect(replaceStateFromSaved({ replace_work_id: 'jpmek8', meta })).toEqual({
+      replaceWorkId: 'jpmek8',
+      replaceWorkTitle: 'Oratio metrica',
+    });
+  });
+
+  it('tavaline upload jääb asendusrežiimist välja', () => {
+    expect(replaceStateFromSaved({ replace_work_id: null, meta })).toEqual({
+      replaceWorkId: null,
+      replaceWorkTitle: null,
+    });
+    expect(replaceStateFromSaved({ meta })).toEqual({ replaceWorkId: null, replaceWorkTitle: null });
+  });
+
+  it('tühja pealkirja korral näitab nupp teose id-d', () => {
+    expect(replaceStateFromSaved({ replace_work_id: 'jpmek8', meta: { ...meta, title: '' } }).replaceWorkTitle)
+      .toBe('jpmek8');
   });
 });
