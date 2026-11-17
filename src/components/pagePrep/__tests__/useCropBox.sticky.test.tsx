@@ -39,3 +39,41 @@ describe('useCropBox kleepuv kast', () => {
     expect(h.result.current.hasEdit).toBe(true);
   });
 });
+
+// 2026-11-17: „Rakenda kõik" võttis järgmise lehe puutumata kleepuva kasti märkimata
+// muudatusena plaani ja kärpis lehe, mida kasutaja ei tahtnud kärpida.
+// Kaudsed salvestused (Rakenda kõik, vahekaardi vahetus) vaatavad `userEdited`-it.
+describe('useCropBox userEdited', () => {
+  it('puutumata kleepuv kast ei ole kasutaja muudatus', () => {
+    const h = hookWithDrawnBox();
+    expect(h.result.current.userEdited).toBe(true);
+    act(() => { h.result.current.reset(); });
+    expect(h.result.current.hasEdit).toBe(true);      // kast on näha
+    expect(h.result.current.userEdited).toBe(false);  // aga keegi pole seda puudutanud
+  });
+
+  it('kleepuva kasti liigutamine teeb sellest kasutaja muudatuse', () => {
+    const h = hookWithDrawnBox();
+    act(() => { h.result.current.reset(); });
+    const r = h.result.current.cropRect!;
+    const overlay = h.result.current.overlayRef.current!;
+    // Haara kasti seest (liigutus) ja nihuta.
+    const cx = (r.x + r.w / 2) * 400, cy = (r.y + r.h / 2) * 600;
+    act(() => { h.result.current.onMouseDown({ clientX: cx, clientY: cy, target: overlay, preventDefault() {} } as never); });
+    act(() => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: cx + 20, clientY: cy + 10 })); });
+    act(() => { window.dispatchEvent(new MouseEvent('mouseup', { clientX: cx + 20, clientY: cy + 10 })); });
+    expect(h.result.current.userEdited).toBe(true);
+  });
+
+  it('perspektiiv kleepuva kasti peal on kasutaja muudatus', () => {
+    const h = hookWithDrawnBox();
+    act(() => { h.result.current.reset(); });
+    act(() => { h.result.current.togglePerspective(); });
+    expect(h.result.current.userEdited).toBe(true);
+  });
+
+  it('kastita leht: userEdited on false', () => {
+    const h = renderHook(() => useCropBox(400, 600, true));
+    expect(h.result.current.userEdited).toBe(false);
+  });
+});
