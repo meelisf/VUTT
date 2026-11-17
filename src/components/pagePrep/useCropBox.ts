@@ -44,6 +44,9 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
   // avamisel ilmub sama suur tühi kast keskele (asukohta/kallet ei taastata). Ref, mitte
   // state → ei tekita re-render'it ega püsi üle komponendi elu. clearCrop nullib selle.
   const lastCropSizeRef = useRef<{ w: number; h: number } | null>(null);
+  // reset()-i pandud kleepuv kast (objekti identsus). Iga kasutaja muudatus loob uue
+  // objekti, nii et `cropRect === stickyRectRef.current` = puutumata pakkumine.
+  const stickyRectRef = useRef<CropRect | null>(null);
   const interaction = useRef<Interaction>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -65,8 +68,11 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
     if (withSticky && lastCropSizeRef.current) {
       const w = Math.min(Math.max(lastCropSizeRef.current.w, 0.01), 0.98);
       const h = Math.min(Math.max(lastCropSizeRef.current.h, 0.01), 0.98);
-      setCropRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });
+      const sticky = { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+      stickyRectRef.current = sticky;
+      setCropRect(sticky);
     } else {
+      stickyRectRef.current = null;
       setCropRect(null);
     }
   }, []);
@@ -244,6 +250,15 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
 
   /** Kas kasutajal on midagi rakendada (kast või perspektiiv). */
   const hasEdit = cropRect !== null || (perspective && quad !== null);
+  /**
+   * Kas kast on kasutaja tehtud või muudetud — MITTE puutumata kleepuv pakkumine.
+   * Kaudsed salvestused (Rakenda kõik, vahekaardi vahetus) PEAVAD vaatama seda,
+   * mitte `hasEdit`-i: muidu kärbitakse leht, mida kasutaja ei puudutanud (2026-11-17).
+   * Selgesõnaline „Märgi" tohib võtta ka pakkumise — kast on ekraanil.
+   */
+  const untouchedSticky = cropRect !== null && cropRect === stickyRectRef.current
+    && boxAngle === 0 && !perspective;
+  const userEdited = hasEdit && !untouchedSticky;
 
   /**
    * Serveri parameetrid. `grossAngle` = pildile rakendatud jäme pööre (upload'is 0,
@@ -268,7 +283,7 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
   };
 
   return {
-    overlayRef, cropRect, boxAngle, quad, perspective, cropDraft, overlayBox, hasEdit,
+    overlayRef, cropRect, boxAngle, quad, perspective, cropDraft, overlayBox, hasEdit, userEdited,
     displayW, displayH,
     onMouseDown, reset, clearCrop, togglePerspective, resetQuad, onGrossRotate, toServerParams,
   };

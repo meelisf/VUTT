@@ -241,6 +241,10 @@ const PageImageEditorModal: React.FC<Props> = ({
   // Üks nupp: muudatus läheb plaani JA redaktor liigub edasi; muutmata leht = „Järgmine".
   // Tagasi saab nooleklahvide / navigatsiooninuppudega.
   const noEditChange = grossAngle === pendingRotate && !crop.hasEdit;
+  // Kaudsetele salvestustele (vahekaart, „Rakenda kõik"): puutumata kleepuv kast EI ole
+  // muudatus — muidu kärpis „Rakenda kõik" lehe, kuhu kast ise ilmus (2026-11-17).
+  const noUserChange = grossAngle === pendingRotate && !crop.userEdited;
+  const implicitAdjust = () => (crop.userEdited ? adjustFromParams(crop.toServerParams(0)) : null);
   const isLast = safeIndex >= pages.length - 1;
   const markPending = () => {
     if (!current) return;
@@ -265,8 +269,8 @@ const PageImageEditorModal: React.FC<Props> = ({
   // Vahekaardi vahetus: Poolita eelvaade ehitatakse ootel plaanist, seega märkimata
   // pööre/kärbe läheb enne plaani — muidu näitaks poolitus pilti, kus kärpet ei ole.
   const switchTab = (next: 'edit' | 'split') => {
-    if (next === 'split' && tab === 'edit' && current && !noEditChange) {
-      onEditChange(current.filename, grossAngle, crop.hasEdit ? adjustFromParams(crop.toServerParams(0)) : null);
+    if (next === 'split' && tab === 'edit' && current && !noUserChange) {
+      onEditChange(current.filename, grossAngle, implicitAdjust());
     }
     setTab(next);
     setError(null);
@@ -321,8 +325,8 @@ const PageImageEditorModal: React.FC<Props> = ({
   // kaoks see redaktori sulgemisel vaikselt.
   const applyAll = () => {
     if (!onApplyAll) return;
-    if (current && !noEditChange) {
-      onEditChange(current.filename, grossAngle, crop.hasEdit ? adjustFromParams(crop.toServerParams(0)) : null);
+    if (current && !noUserChange) {
+      onEditChange(current.filename, grossAngle, implicitAdjust());
     }
     onApplyAll();
   };

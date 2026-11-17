@@ -107,7 +107,8 @@ const SplitPageDetail: React.FC<Props> = ({
   // Vahekaardi vahetus: märkimata kast läheb enne plaani (muidu näitaks poolitusvaade
   // pilti, kus kärpet ei ole) — sama käitumine nagu halduse redaktoris.
   const switchTab = (next: EditorTab) => {
-    if (tab === 'edit' && next === 'split' && crop.hasEdit) {
+    // `userEdited`, mitte `hasEdit`: puutumata kleepuv kast ei ole muudatus (2026-11-17).
+    if (tab === 'edit' && next === 'split' && crop.userEdited) {
       onPageChange(pageNum, { adjust: adjustFromParams(crop.toServerParams(0)) });
     }
     setTab(next);
