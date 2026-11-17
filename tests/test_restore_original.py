@@ -63,3 +63,22 @@ def test_restore_path_traversal_rejected(ro_work):
     from server.admin_page_ops import restore_original_page_image
     with pytest.raises(ValueError):
         restore_original_page_image(ro_work["work_id"], "../secret.jpg")
+
+
+def test_restore_annab_uue_muutmisaja(ro_work):
+    """Taastatud pildi mtime peab olema kärbitust uuem.
+
+    Pildiserver vastab If-Modified-Since'ile 304, kui faili mtime <= vahemälu oma.
+    `copy2` kandis kaasa originaali VANA mtime — brauser, kellel oli kärbitud pilt
+    vahemälus, sai 304 ja nägi kärbitud pilti ka pärast värskendust.
+    """
+    import os
+    import time
+    from server.admin_page_ops import transform_page_image, restore_original_page_image
+    img = ro_work["folder"] / ro_work["filename"]
+    os.utime(img, (1_000_000_000, 1_000_000_000))  # originaal on vana (2001)
+    transform_page_image(ro_work["work_id"], ro_work["filename"], angle=90.0, username="admin")
+    karbitud = int(time.time()) - 60
+    os.utime(img, (karbitud, karbitud))  # = brauseri vahemälu Last-Modified
+    restore_original_page_image(ro_work["work_id"], ro_work["filename"], username="admin")
+    assert int(img.stat().st_mtime) > karbitud
