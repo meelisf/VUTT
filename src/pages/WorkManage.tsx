@@ -77,6 +77,7 @@ import ExemplarOriginSelect from './manage/ExemplarOriginSelect';
 import type { Exemplar } from '../types';
 import ExemplarProposalsTab from './manage/exemplars/ExemplarProposalsTab';
 import { listExemplarProposals } from '../services/exemplarProposalsApi';
+import { bumpWorkImageEpoch } from '../utils/workImageEpoch';
 
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
@@ -117,6 +118,12 @@ const WorkManage: React.FC = () => {
   const [replaceError, setReplaceError] = useState<string | null>(null);
   const [replaceSuccess, setReplaceSuccess] = useState<string | null>(null);
   const [thumbCacheBust, setThumbCacheBust] = useState<number>(Date.now());
+  // Pildimuutus: halduse pisipildid JA töölaud (sama failinimi, uus sisu — workImageEpoch.ts).
+  const markImagesChanged = () => {
+    const now = Date.now();
+    setThumbCacheBust(now);
+    bumpWorkImageEpoch(workId, now);
+  };
 
   // Lehekülje lisamine
   const [showAddForm, setShowAddForm] = useState(false);
@@ -683,7 +690,7 @@ const WorkManage: React.FC = () => {
           setPendingOps((ops) => (k ? dropApplied(ops, k.applied ?? [], k.transformed ?? []) : {}));
           handleClearSelection();
           await loadPages();
-          setThumbCacheBust(Date.now());
+          markImagesChanged();
           setPageOpsProgress(null);
           setPageOpsSaving(false);
         }
@@ -776,16 +783,10 @@ const WorkManage: React.FC = () => {
     const data = await replaceWorkPageImage(workId, authToken, pageNum, file, origin);
     if (data.status !== 'success') throw new Error(t('manage.replaceError'));
 
-    // Õnnestus: cache-bust + sessionStorage (Workspace tühistab cache'i) + lehtede uuesti laadimine
-    setThumbCacheBust(Date.now());
+    // Õnnestus: cache-bust (ka töölauale) + lehtede uuesti laadimine
+    markImagesChanged();
     setReplaceSuccess(t('manage.replaceSuccess', { num: pageNum }));
     setTimeout(() => setReplaceSuccess(null), 4000);
-    try {
-      const key = `${workId}/${pageNum}`;
-      const existing = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
-      existing[key] = Date.now();
-      sessionStorage.setItem('vutt_replaced_images', JSON.stringify(existing));
-    } catch { /* ignore storage errors */ }
 
     await loadPages();
   };
@@ -920,7 +921,7 @@ const WorkManage: React.FC = () => {
       // ja tõsta thumbCacheBust, sest lehekülgede loend ja pildiredaktor saavad
       // pildid pildiserverist ega tea sellest muudatusest midagi.
       await loadTrashPages();
-      setThumbCacheBust(Date.now());
+      markImagesChanged();
     } catch {
       // Erinevalt `handleRestorePage`-ist viskab `restoreOriginalPageImage`
       // (pageService.ts) alati lihtsa `Error`-i, mitte `ApiError`-i — serveri
@@ -1625,7 +1626,7 @@ const WorkManage: React.FC = () => {
           onClose={() => setEditorTarget(null)}
           onPagesChanged={async () => {
             const fresh = await loadPages();
-            setThumbCacheBust(Date.now());
+            markImagesChanged();
             return fresh;
           }}
           onReplaceImage={handleReplaceImage}

@@ -17,6 +17,7 @@ import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useImageToken, withImageToken } from '../contexts/ImageTokenContext';
+import { getWorkImageEpoch, withWorkImageEpoch } from '../utils/workImageEpoch';
 import { getViewerToken, type ViewerTokenResponse } from '../services/workApi';
 import { ApiError, apiPost } from '../services/apiClient';
 import { useCollection } from '../contexts/CollectionContext';
@@ -359,21 +360,19 @@ const Workspace: React.FC = () => {
     }
   };
 
+  // Halduses muudetud pildid (kärbe/pööre/poolitus/asendus) saavad uue URL-i —
+  // muidu annab brauser sama dokumendi piires vana pildi mälust (workImageEpoch.ts).
+  // Workspace monteerub halduselt naastes uuesti, seega piisab lugemisest teose kaupa.
+  const imageEpoch = useMemo(() => getWorkImageEpoch(workId), [workId]);
+
   const appendImageToken = useCallback((url: string): string => {
-    return withImageToken(url, imageToken);
-  }, [imageToken]);
+    return withImageToken(withWorkImageEpoch(url, imageEpoch), imageToken);
+  }, [imageToken, imageEpoch]);
 
   const currentImageSrc = useMemo(() => {
     if (!page?.image_url) return '';
-    try {
-      const replaced = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
-      const key = `${workId}/${page.page_number}`;
-      if (replaced[key]) {
-        return appendImageToken(`${page.image_url}?v=${replaced[key]}`);
-      }
-    } catch { /* ignore */ }
     return appendImageToken(page.image_url);
-  }, [appendImageToken, page?.image_url, page?.page_number, workId]);
+  }, [appendImageToken, page?.image_url]);
 
   // Kõrvallehtede skaneeringute eellaadimine (#186) — peab olema pärast
   // appendImageToken'i definitsiooni.
