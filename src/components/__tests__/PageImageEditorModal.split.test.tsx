@@ -112,3 +112,27 @@ describe('PageImageEditorModal tagasi ülevaatesse', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+// „Rakenda kõik" rakendab AINULT plaani: märkimata muudatus sellel lehel (pööre, kärbe,
+// ka puutumata kleepuv kast) ei lähe kaudselt plaani (2026-11-17, kogemata kärbitud lehed).
+describe('PageImageEditorModal „Rakenda kõik" ainult plaanist', () => {
+  it('märkimata pööre ei lähe plaani; rakendatakse olemasolev plaan', () => {
+    const onEditChange = vi.fn();
+    const onApplyAll = vi.fn();
+    render(
+      <PageImageEditorModal
+        workId="w1" pages={[{ filename: 'a.jpg', page_num: 1 }, { filename: 'b.jpg', page_num: 2 }]}
+        initialIndex={1} initialTab="edit"
+        imageToken={null} onClose={vi.fn()} onPagesChanged={vi.fn(async () => ['a.jpg', 'b.jpg'])}
+        onReplaceImage={vi.fn()} cacheBust={0}
+        pendingOps={{ 'a.jpg': { rotate: 0, split: false, adjust: ADJ } }} globalSplitX={0.5}
+        onSplitChange={vi.fn()} onEditChange={onEditChange} onAdjustClear={vi.fn()}
+        onApplyAll={onApplyAll}
+      />,
+    );
+    fireEvent.click(screen.getByTitle('pagePrep.rotateRight'));
+    fireEvent.click(screen.getByTestId('editor-apply-all'));
+    expect(onEditChange).not.toHaveBeenCalled();
+    expect(onApplyAll).toHaveBeenCalledTimes(1);
+  });
+});
