@@ -867,7 +867,10 @@ def restore_original_page_image(work_id, filename, username="admin"):
         # Praegust (tuletatud) pilti ei varundata (#325): ._originals on tema
         # allikas ja jääb alles, seega taastus on korduvalt korratav.
         tmp_path = img_path + '.tmp'
-        shutil.copy2(orig_backup, tmp_path)
+        # `copyfile`, MITTE `copy2`: taastatud fail peab saama UUE mtime'i. Pildiserver
+        # vastab If-Modified-Since'ile 304, kui mtime <= vahemälu oma — originaali vana
+        # mtime jättis kärbitud pildi brauseri vahemällu ka pärast värskendust.
+        shutil.copyfile(orig_backup, tmp_path)
         os.replace(tmp_path, img_path)
         os.chmod(img_path, 0o644)
 
