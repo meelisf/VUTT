@@ -261,9 +261,33 @@ def _year(meta: dict):
     return int(y) if y.isdigit() else None
 
 
+def shelf_key(shelfmark) -> str | None:
+    """TÜR-i paberkoopia kohaviit „R Acad. Dorp. 1644:16" → „1644-16"; muu → None."""
+    s = (shelfmark or "").split(";")[0].strip()
+    if not s.startswith(COPY_PREFIX):
+        return None
+    m = re.fullmatch(r"(1[67]\d\d)\s*:\s*0*(\d+)", s[len(COPY_PREFIX):].strip())
+    return f"{m.group(1)}-{m.group(2)}" if m else None
+
+
+def work_key(w: dict) -> str | None:
+    """VUTT-i kaustanimi kannab TÜR-i kohaviita: „1644-16-In_octo…" → „1644-16".
+    Kindlate vastete seas klappis see Jaansoni kohaviidaga 1012/1013 (2026-11-17)."""
+    for s in (w.get("_dir") or "", w.get("slug") or ""):
+        m = re.match(r"(1[67]\d\d)-0*(\d+)(?:-|$)", s)
+        if m:
+            return f"{m.group(1)}-{m.group(2)}"
+    return None
+
+
 def match(entries: list[dict], works: list[dict]) -> dict:
-    # NB: kindel ainult siis, kui sarja tunnused kattuvad (vt series_markers).
+    # NB: kindel ainult siis, kui sarja tunnused kattuvad (vt series_markers) VÕI kui
+    # TÜR-i kohaviit osutab ühele kaustale (vt shelf_key/work_key).
     """Pealkirja sarnasus sama aasta (±1) piires, siis ahne üks-ühele jaotus.
+
+    Enne ahnet jaotust seotakse kirjed, mille TÜR-i kohaviit osutab täpselt ühele
+    teosele, kes on ka pealkirja järgi kandidaat: sarja disputatsioonid on pealkirjalt
+    peaaegu samad ja OCR rikub järgarvu („decimaguinta"), kohaviit mitte.
 
     Tagastab {nr: {"work_id", "score", "second", "status"}}; status ∈ kindel |
     mitmetähenduslik | vasteta.
@@ -284,9 +308,25 @@ def match(entries: list[dict], works: list[dict]) -> dict:
                     continue
                 row.append((sm.ratio(), wid))
         cands[e["nr"]] = sorted(row, reverse=True)
+    taken_nr, taken_w, out = set(), set(), {}
+    by_key = collections.defaultdict(list)
+    for w in works:
+        if work_key(w):
+            by_key[work_key(w)].append(w["id"])
+    for e in entries:
+        hits = by_key.get(shelf_key(e.get("shelfmark")) or "", [])
+        if len(hits) != 1 or hits[0] in taken_w:
+            continue
+        s = next((s for s, w2 in cands[e["nr"]] if w2 == hits[0] and s >= MIN_SCORE), None)
+        if s is None:
+            continue                       # kohaviit üksi ei piisa — pealkiri peab sobima
+        taken_nr.add(e["nr"])
+        taken_w.add(hits[0])
+        second = max((s2 for s2, w2 in cands[e["nr"]] if w2 != hits[0]), default=0.0)
+        out[e["nr"]] = {"work_id": hits[0], "score": round(s, 3), "second": round(second, 3),
+                        "status": "kindel"}
     pairs = sorted(((s, nr, wid) for nr, row in cands.items() for s, wid in row if s >= MIN_SCORE),
                    reverse=True)
-    taken_nr, taken_w, out = set(), set(), {}
     for s, nr, wid in pairs:
         if nr in taken_nr or wid in taken_w:
             continue
@@ -354,7 +394,7 @@ def main() -> int:
         p = os.path.join(d.path, "_metadata.json")
         if d.is_dir() and os.path.exists(p):
             with open(p, encoding="utf-8") as f:
-                works.append(json.load(f))
+                works.append({**json.load(f), "_dir": d.name})   # kaustanimi = TÜR-i kohaviit
     plan = build_plan(entries, works, load_registry(args.data_dir))
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(plan, f, ensure_ascii=False, indent=1)
