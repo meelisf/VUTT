@@ -21,6 +21,22 @@ interface ArchiveSelectProps {
   className?: string;
 }
 
+/**
+ * Kas hoidja sobib filtriga. `viaAlias` = sobis AINULT teise nimekuju järgi —
+ * siis näitab rida seda kuju, muidu jääks arusaamatuks, miks „Helsingi ÜR"
+ * otsing tõi „Helsinki KK — Kansalliskirjasto".
+ */
+export function archiveFilterMatch(
+  id: string, info: ArchiveInfo, filter: string,
+): { match: boolean; viaAlias?: string } {
+  const f = filter.trim().toLowerCase();
+  if (!f) return { match: true };
+  if (id.toLowerCase().includes(f) || info.name.toLowerCase().includes(f)) return { match: true };
+  // Ajalooline kuju („Tallinn ERR") leiab praeguse hoidja
+  const alias = (info.aliases || []).find(a => a.toLowerCase().includes(f));
+  return alias ? { match: true, viaAlias: alias } : { match: false };
+}
+
 const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
   archives, value, onChange, onArchiveAdded, userRole, authToken, className = '',
 }) => {
@@ -40,14 +56,9 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
 
   const entries = Object.entries(archives);
   const showFilter = entries.length > 8;
-  const filtered = filter
-    ? entries.filter(([id, info]) =>
-        id.toLowerCase().includes(filter.toLowerCase()) ||
-        info.name.toLowerCase().includes(filter.toLowerCase()) ||
-        // Ajalooline kuju („Tallinn ERR") leiab praeguse hoidja
-        (info.aliases || []).some(a => a.toLowerCase().includes(filter.toLowerCase()))
-      )
-    : entries;
+  const filtered = entries
+    .map(([id, info]) => ({ id, info, ...archiveFilterMatch(id, info, filter) }))
+    .filter(e => e.match);
 
   const selectedLabel = value && archives[value]
     ? `${value} — ${archives[value].name}`
@@ -169,14 +180,19 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
                 — {t('admin:archives.selectPlaceholder')} —
               </button>
             </li>
-            {filtered.map(([id, info]) => (
+            {filtered.map(({ id, info, viaAlias }) => (
               <li key={id}>
                 <button
                   type="button"
                   className={`w-full text-left px-3 py-1.5 text-sm flex items-center justify-between hover:bg-gray-50 ${value === id ? 'font-medium text-primary-700' : 'text-gray-700'}`}
                   onClick={() => { onChange(id); setOpen(false); setFilter(''); }}
                 >
-                  <span><span className="font-medium">{id}</span> — {info.name}</span>
+                  <span>
+                    <span className="font-medium">{id}</span> — {info.name}
+                    {viaAlias && (
+                      <span className="ml-1 text-xs text-gray-500">({t('admin:archives.matchedAlias', { alias: viaAlias })})</span>
+                    )}
+                  </span>
                   {value === id && <Check size={12} />}
                 </button>
               </li>
