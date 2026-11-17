@@ -460,6 +460,7 @@
     "nameRequired": "Name is required",
     "deleteFailed": "Delete failed",
     "noResults": "No results found",
+    "matchedAlias": "also known as: {{alias}}",
     "duplicateId": "ID '{{id}}' is already in use",
     "deleteConfirm": "Delete archive '{{id}}'?",
     "deleteInUseWarning": "This archive is in use in a work. Deleting will not remove references from works.",

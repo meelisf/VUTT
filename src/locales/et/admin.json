@@ -460,6 +460,7 @@
     "nameRequired": "Nimi on kohustuslik",
     "deleteFailed": "Kustutamine ebaõnnestus",
     "noResults": "Tulemusi ei leitud",
+    "matchedAlias": "teine nimekuju: {{alias}}",
     "duplicateId": "Lühend '{{id}}' on juba kasutusel",
     "deleteConfirm": "Kustuta arhiiv '{{id}}'?",
     "deleteInUseWarning": "See arhiiv on kasutusel teoses. Kustutamine ei eemalda viiteid teostest.",
