@@ -51,6 +51,12 @@ export interface EnrichmentItem {
   text?: string;
   base_hash?: string;
   sources_add?: EnrichmentSourceAdd[];
+  // #834 2. osa
+  label?: string; type?: string; type_id?: string; target_id?: string; name?: string;
+  scheme?: string; id?: string; from?: number | null; to?: number | null;
+  year_from?: number | null; year_to?: number | null;
+  /** Staatuse/konfessiooni silt sõnastikust (server). */
+  display_label?: string;
 }
 export interface EnrichmentProposal {
   proposal_id: string; person_id: string; base_updated_at: string;

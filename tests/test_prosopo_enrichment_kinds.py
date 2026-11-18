@@ -405,7 +405,7 @@ def test_id_teisel_isikul_blocked(client, login, osa2):
     osa2.write("zzz", identifiers=[{"scheme": "gnd", "id": "118500", "checked_at": None}])
     item = {"kind": "identifier", "scheme": "gnd", "id": "118500", "evidence": OK_EVIDENCE}
     rows, kinnita = _ylevaatus(client, login, osa2, [item])
-    assert rows[0]["review_state"] == {"state": "blocked", "reason": "duplicate_id: vutt:Pzzz"}
+    assert rows[0]["review_state"] == {"state": "blocked", "reason": "duplicate_person_id: vutt:Pzzz"}
 
 
 def test_sama_skeem_teine_id_on_conflict(client, login, osa2):

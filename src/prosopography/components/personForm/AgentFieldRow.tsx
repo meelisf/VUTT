@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import type { EnrichmentDate, EnrichmentItem } from '../../services/prosopographyService';
 import { diffWords } from '../../../utils/textDiff';
 import EvidenceList from '../EvidenceList';
@@ -8,6 +9,9 @@ interface Props {
   item: EnrichmentItem;
   titleOf: (workId: string) => string | undefined;
 }
+
+const SCHEME_LABELS: Record<string, string> = { wikidata: 'Wikidata', gnd: 'GND', viaf: 'VIAF', album_academicum: 'AA' };
+const yearsText = (from?: number | null, to?: number | null) => from || to ? `${from ?? ''}–${to ?? ''}` : '';
 
 const dateText = (value?: Partial<EnrichmentDate> | null) => {
   if (!value?.date) return '';
@@ -31,6 +35,11 @@ export default function AgentFieldRow({ item, titleOf }: Props) {
       case 'death': return [dateText(item.date), item.registry_labels?.place_key].filter(Boolean).join(', ');
       case 'origin': return item.registry_labels?.place_key || item.place_key || '';
       case 'gender': return item.value ? tr(`gender.${item.value}`) : '';
+      case 'floruit': return yearsText(item.year_from, item.year_to);
+      case 'alias': return item.value ?? '';
+      case 'name': return [item.label, yearsText(item.from, item.to)].filter(Boolean).join(' ');
+      case 'status': case 'confession': return item.display_label || item.id || '';
+      case 'identifier': return `${SCHEME_LABELS[item.scheme ?? ''] ?? item.scheme} ${item.id}`;
       default: return '';
     }
   };
@@ -41,6 +50,10 @@ export default function AgentFieldRow({ item, titleOf }: Props) {
       return [dateText(c), c.place?.label].filter(Boolean).join(', ');
     }
     if (item.kind === 'gender') return tr(`gender.${current as string}`);
+    if (item.kind === 'floruit') {
+      const c = current as { year_from?: number | null; year_to?: number | null };
+      return yearsText(c.year_from, c.year_to);
+    }
     return String(current);
   };
 
@@ -53,7 +66,12 @@ export default function AgentFieldRow({ item, titleOf }: Props) {
   return <div className="space-y-1">
     <p>
       <span className="text-gray-500 mr-1">{label}</span>
-      {item.kind !== 'biography' && <strong>{valueText()}</strong>}
+      {item.kind === 'name' && item.type && <span className="text-gray-500 mr-1">({tr(`nameType.${item.type}`)})</span>}
+      {item.kind === 'relation'
+        ? <><span className="mr-1">{item.type} →</span>{item.target_id
+          ? <Link to={`/persons/${item.target_id}`} className="font-semibold text-blue-800 underline">{item.name}</Link>
+          : <strong>{item.name}</strong>}</>
+        : item.kind !== 'biography' && <strong>{valueText()}</strong>}
       <span className={`ml-2 inline-block rounded-full px-2 text-xs ${badgeCls}`}>{badge}</span>
     </p>
     {state === 'conflict' && <p className="text-xs text-gray-700">{tr('currentValue')}: {currentText()}</p>}

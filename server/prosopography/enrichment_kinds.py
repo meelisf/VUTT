@@ -439,7 +439,7 @@ def _apply_identifier(item: dict, person: dict, patch: dict) -> tuple:
     scheme, ext_id = item["scheme"], normalize_ext_id(item["scheme"], item["id"])
     owner = ext_id_index.find_person_id(scheme, ext_id)
     if owner and owner != person.get("id"):
-        raise _error(f"duplicate_id: {owner}")
+        raise _error(f"duplicate_person_id: {owner}")
     current = [dict(i) for i in (_current(person, patch, "identifiers") or []) if isinstance(i, dict)]
     same_scheme = [i for i in current if i.get("scheme") == scheme]
     if any(i.get("id") == ext_id for i in same_scheme):

@@ -23,7 +23,8 @@ interface Props {
 // Põhjuse kood on serveri vea algus („registry_conflict: valipreester"); tundmatu → „other".
 const KNOWN_REASONS = new Set(['duplicate_entry', 'unresolved_existing_entry', 'registry_key_missing',
   'ambiguous_match', 'registry_conflict', 'duplicate_id', 'unknown_occupation_key',
-  'unknown_institution_key', 'unknown_place_key', 'person_not_found', 'stale_biography']);
+  'unknown_institution_key', 'unknown_place_key', 'person_not_found', 'stale_biography',
+  'duplicate_person_id', 'unknown_person']);
 
 const isFieldRow = (item: EnrichmentItem) => (FIELD_KINDS as readonly string[]).includes(item.kind);
 
