@@ -4,6 +4,7 @@ Sünd, surm, päritolu, sugu ja elulugu. Iga liik: `validate` (esitusel), hiljem
 olek ülevaatusel ja kaardile kandmine. Amet ja haridus jäävad `enrichment_proposals`-i.
 """
 import re
+from typing import Optional
 
 SCALAR_KINDS = ("birth", "death", "origin", "gender")
 NEW_KINDS = SCALAR_KINDS + ("biography",)
@@ -134,7 +135,7 @@ def _current(person: dict, patch: dict, field: str):
     return patch[field] if field in patch else person.get(field)
 
 
-def _precision(date: dict) -> str | None:
+def _precision(date: dict) -> Optional[str]:
     return date.get("precision") or _PRECISION_BY_LENGTH.get(len(date.get("date") or ""))
 
 
@@ -153,7 +154,7 @@ def _registry_place(key: str) -> dict:
     return {"id": entry.get("id"), "label": label, "labels": labels}
 
 
-def _same_place(a: dict | None, b: dict | None) -> bool:
+def _same_place(a: Optional[dict], b: Optional[dict]) -> bool:
     if not a or not b:
         return False
     if a.get("id") and b.get("id"):

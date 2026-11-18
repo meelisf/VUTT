@@ -230,3 +230,36 @@ Kavand: `docs/superpowers/specs/2026-11-01-eksemplari-ettepanekud-design.md`; mu
 - Otsustatud ridadega ettepanekut aegumine ei kustuta: hilisem süstemaatiline läbikäik
   toetub „töödeldud" märkele. Ootel read aegunud ettepanekus on `expired`.
 
+
+## Täiendus 2026-11-18 (#834): isikukaardi kõik sisuväljad, 1. osa
+
+Disain: `docs/superpowers/specs/2026-11-18-isikuettepanek-koik-valjad-design.md`.
+Agent tuvastas isiku allikast (Johannes Horn, Levitski I lk 106), aga sai esitada ainult
+ameti ja hariduse; sünd, surm ja elulugu jäid käsitsi tööks. Muudetud:
+
+- **Uued realiigid** samas isikuettepanekus (sama kood, hoidla, paneel, `/review`):
+  `birth` (kuupäev), `death` (kuupäev + valikuline `place_key`), `origin` (`place_key`),
+  `gender` (`M`/`F`), `biography` (`lang` et/en, terve uus tekst, `base_hash`,
+  valikuline `sources_add`). Liigiloogika `server/prosopography/enrichment_kinds.py`.
+  Igat skalaarliiki ja eluloo keelt kuni üks rida ettepanekus (`duplicate_kind`).
+  Sünnikoht ei ole `birth` osa: kanooniline koht on `origin.place` (ADR 0084).
+- **Olekud** (server arvutab): `applicable` (väli tühi), `already_present` (sama väärtus —
+  lisandub ainult tõend; kuupäeval = sama `date` ja täpsus), `conflict` (kaardil teine
+  väärtus — kinnitus ASENDAB, vana tõend kaob; vaikset ülekirjutust ei ole, otsus on
+  toimetaja nupuvajutus), elulool `replace` (olemasolev tekst, räsi klapib).
+  `blocked`: `stale_biography` (tekst muutus pärast esitust), `unknown_place_key`.
+- **Tõendi koht (segamudel):** skalaarväljal oma `evidence` (`birth.evidence`,
+  `death.evidence`, `origin.evidence`) → isikulehel joonealune viide. Isikuvorm kannab
+  selle läbi (`birth_evidence` jne mustandis) ja jätab maha, kui toimetaja väärtust
+  muudab. `gender`-i tõend on esitusel kohustuslik, kaardile ei salvestata.
+  Elulool viited tekstis (VUTT-i lehe link või lühiviide), täiskirjed `sources_add` →
+  `sources[]` (ADR 0078) duplikaatideta; VUTT-i lingid ja `sources_add` teosed
+  kontrollitakse esitusel nagu `vutt_page`.
+- **Elulugu:** asendus `base_hash` = `text_hash` (ADR 0039) vastu; tõlkeankrut kinnitus ei
+  kirjuta (teise keele ankur vananeb ise). Markdown ilma HTML-ita, kuni 40 000 märki.
+- **Vene keel** (#833): kirillitsa keelatud eluloos ja kaardiväljadel; lubatud ainult
+  viites (`citation`, `locator`, `sources_add[].text`). MCP teeb `sources_add`
+  kirjanduskogu viitest loetava teksti.
+- Mahud: ettepanek ≤ 128 000 baiti, MCP kontekst ≤ 150 000 märki (pikad elulood).
+- 2. osa (nimevariandid, staatused, konfessioon, matmine, `floruit`, seosed,
+  identifikaatorid) on eraldi töö.
