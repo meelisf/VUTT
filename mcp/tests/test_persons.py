@@ -215,7 +215,9 @@ def test_rikastuse_kontekst_sailitab_ametid_ja_hariduse_tapse_kuju():
     assert result["occupations"] == [occupation]
     assert result["education"] == [education]
     assert result["sources"] == [{"text": "AA 123"}]
-    assert "biography_et" not in result and "works" not in result
+    # #834: elulugu kuulub konteksti (agent võib selle asendada räsi vastu)
+    assert result["biography_et"] == "ei kuulu sellesse vastusesse"
+    assert "works" not in result
     assert client.gets == [("/prosopography/vutt%3APabc", None)]
 
 
@@ -425,3 +427,47 @@ def test_detail_naitab_nimeajalugu():
     }})
     out = persons.detail(client, BASE, "vutt:Pa", include_relations=False)
     assert "Johan Stiernstråle (aadlinimi, 1650–)" in out
+
+
+def test_rikastuse_kontekst_annab_eluloo_rasi_nagu_server():
+    """#834: biography_<lang>_hash = serveri text_hash (MCP ei impordi serverit runtime'is)."""
+    from server.prosopo_biography_fields import text_hash
+    client = FakeClient({"/prosopography/vutt%3APabc": {
+        "id": "vutt:Pabc", "updated_at": "t", "gender": "M",
+        "origin": {"place": "tartu", "evidence": []},
+        "biography_et": "  Tekst\n", "biography_en": None,
+    }})
+    result = json.loads(persons.enrichment_context(client, "vutt:Pabc"))
+    assert result["biography_et_hash"] == text_hash("  Tekst\n")
+    assert result["biography_en_hash"] == text_hash("")
+    assert result["gender"] == "M" and result["origin"]["place"] == "tartu"
+
+
+async def test_allikate_kirjanduse_viide_asendatakse_tekstiga(tmp_path, monkeypatch):
+    """#834: sources_add kirjanduskogu viide → loetav `text` (citation + locator)."""
+    from vutt_mcp.library.schema import connect, create_schema
+
+    db = tmp_path / "kogu.db"
+    conn = connect(db)
+    create_schema(conn)
+    conn.execute("INSERT INTO documents (doc_id, parent_key, title, year, creators_json) "
+                 "VALUES ('DOC1', 'P1', 'An Itinerant Sheep', '2012', ?)",
+                 (json.dumps([["Stefan Donecker", "author"]]),))
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("VUTT_LIBRARY_DB", str(db))
+
+    class ProposalClient(FakeClient):
+        def api_post_once(self, path, json_body):
+            self.posts.append((path, json_body))
+            return {"proposal_id": "prop1", "status": "pending"}
+
+    client = ProposalClient()
+    server = build_server(client=client, base_url=BASE)
+    item = {"kind": "biography", "lang": "et", "base_hash": "0" * 12, "text": "x (Donecker 2012: 5)",
+            "sources_add": [{"source_kind": "literature", "source_id": "DOC1", "locator": "lk 5"},
+                            {"text": "Muu allikas"}]}
+    await server.call_tool("submit_person_enrichment_proposal", {
+        "handoff_code": "c", "person_id": "vutt:Pabc", "base_updated_at": "t", "items": [item]})
+    sent = client.posts[0][1]["items"][0]["sources_add"]
+    assert sent == [{"text": "Donecker 2012, An Itinerant Sheep, lk 5"}, {"text": "Muu allikas"}]

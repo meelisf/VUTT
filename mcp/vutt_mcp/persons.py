@@ -7,6 +7,7 @@ oleks sama suur probleem kui piiramata get_pages.
 Vastuste kujud on kontrollitud päris API vastu — vt mcp/tests/test_persons.py
 mooduli docstring.
 """
+import hashlib
 import json
 import re
 from urllib.parse import quote
@@ -18,7 +19,7 @@ MAX_RELATED_WORKS = 50
 MAX_RELATIONS = 50
 LIST_PATH = "/prosopography"
 MAX_ENRICHMENT_ENTRIES = 100
-MAX_ENRICHMENT_CHARS = 60000
+MAX_ENRICHMENT_CHARS = 150000  # kaks pikka elulugu (#834)
 MAX_REGISTRY_RESULT_CHARS = 30000
 _PERSON_ID = re.compile(r"^vutt:P[A-Za-z0-9_-]+$")
 
@@ -162,6 +163,12 @@ def detail(client, base_url: str, person_id: str, include_relations: bool) -> st
     return "\n\n".join(s for s in sections if s)
 
 
+def text_hash(text: str | None) -> str:
+    """Sama algoritm mis serveri `prosopo_biography_fields.text_hash` (ADR 0039).
+    Kopeeritud, sest MCP ei tohi `server`-it runtime'is importida; leping-test võrdleb."""
+    return hashlib.sha256((text or "").strip().encode("utf-8")).hexdigest()[:12]
+
+
 def enrichment_context(client, person_id: str) -> str:
     """Ameti ja hariduse täpsed kirjed koos kaardiversiooniga.
 
@@ -199,13 +206,20 @@ def enrichment_context(client, person_id: str) -> str:
         "identifiers": person.get("identifiers") or [],
         "birth": person.get("birth"),
         "death": person.get("death"),
+        "gender": person.get("gender"),
+        "origin": person.get("origin"),
         "occupations": occupations,
         "education": education,
         "sources": person.get("sources") or [],
+        # Elulugu asendatakse räsi vastu (#834): base_hash = biography_<lang>_hash
+        "biography_et": person.get("biography_et"),
+        "biography_en": person.get("biography_en"),
+        "biography_et_hash": text_hash(person.get("biography_et")),
+        "biography_en_hash": text_hash(person.get("biography_en")),
     }
     result = json.dumps(context, ensure_ascii=False, indent=2)
     if len(result) > MAX_ENRICHMENT_CHARS:
-        raise VuttError("Isiku ameti- ja haridusandmed ületavad MCP vastuse mahupiiri; ava kaart VUTT-i vormis.")
+        raise VuttError("Isikukaardi andmed ületavad MCP vastuse mahupiiri; ava kaart VUTT-i vormis.")
     return result
 
 

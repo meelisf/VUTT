@@ -433,6 +433,11 @@ def _check_literature_evidence(items: list) -> None:
     sources = [source for item in items if isinstance(item, dict)
                for source in (item.get("evidence") or []) if isinstance(source, dict)
                and source.get("source_kind") == "literature"]
+    # #834: eluloo „Allikad" kirjanduskogu viide asendatakse loetava tekstiga
+    added = [(item, index) for item in items if isinstance(item, dict)
+             for index, source in enumerate(item.get("sources_add") or [])
+             if isinstance(source, dict) and source.get("source_kind") == "literature"]
+    sources += [item["sources_add"][index] for item, index in added]
     if not sources:
         return
     doc_ids = {source.get("source_id") for source in sources}
@@ -452,6 +457,11 @@ def _check_literature_evidence(items: list) -> None:
             "(autor, pealkiri, aasta, URL), ta lisab selle kirjanduskogusse.")
     for source in sources:
         source["citation"] = citations[source["source_id"]][:500]
+    for item, index in added:
+        source = item["sources_add"][index]
+        locator = (source.get("locator") or "").strip()
+        item["sources_add"][index] = {
+            "text": (source["citation"] + (f", {locator}" if locator else ""))[:1000]}
 
 
 def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
@@ -730,7 +740,8 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         handoff_code: str, person_id: str, base_updated_at: str,
         items: list[dict],
     ) -> str:
-        """Esitab ootel ameti-/haridusettepaneku VUTT-i isikuvormis ülevaatuseks.
+        """Esitab ootel isikukaardi ettepaneku VUTT-i isikuvormis ülevaatuseks:
+        amet, haridus, sünd, surm, päritolu, sugu, elulugu (vt LIIGID allpool).
 
         handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review); sama kood
         kehtib ka lehe teksti ja teose osade ettepanekutele. Kood kehtib tööpäeva (8 h)
@@ -801,6 +812,30 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         väärt lisamist (autor, pealkiri, aasta, URL, mida see kinnitab). See talletab AINULT ettepaneku: isikukaart ja registrid jäävad
         muutmata. Toimetaja ainult kinnitab või lükkab rea tagasi; parandused teeb ta
         hiljem kaardil — esita seega kohe õige võti ja aeg.
+
+        LIIGID PEALE AMETI JA HARIDUSE (#834) — match_status'it neil ei ole, server
+        arvutab oleku (uus / juba kaardil / konflikt = toimetaja otsustab asendada).
+        Igat liiki (elulool iga keelt) kuni üks rida ettepanekus. Võtmed rangelt:
+        - {"kind": "birth", "date": {...}, "evidence": [...]} — kuupäev nagu date_from.
+          Sünnikoht EI käi siia: see on päritolu (origin).
+        - {"kind": "death", "date": {...}, "place_key"?, "evidence": [...]}
+        - {"kind": "origin", "place_key", "evidence": [...]} — kõige täpsem teadaolev
+          sünni- või päritolukoht. place_key peab olema VUTT-i koharegistris; kui pole,
+          ütle kasutajale, et koht tuleb lisada (ettepanek kohta ei loo).
+        - {"kind": "gender", "value": "M"|"F", "evidence": [...]}
+        - {"kind": "biography", "lang": "et"|"en", "text", "base_hash", "sources_add"?}
+          — TERVE uus tekst (asendab olemasoleva; toimetaja näeb erinevust).
+          base_hash = get_person_enrichment_context'i biography_<lang>_hash; kui
+          tekst on vahepeal muutunud, on rida vananenud — loe kontekst uuesti.
+          Markdown, ilma HTML-ita. Kirjuta välja keeles, ka lingitekst
+          („dedication", mitte „pühendus" ingliskeelses). Viited TEKSTIS nagu
+          olemasolevates elulugudes: VUTT-i leht ([VUTT, *pealkiri*, lk](https://vutt.utlib.ut.ee/work/<id>/<lk>))
+          või lühiviide (Autor aasta: lk), mille täiskirje lisa sources_add-i:
+          {"text"} | {"work_id", "page"?, "printed_page"?} | {"source_kind":
+          "literature", "source_id", "locator"} (MCP teeb viimasest loetava teksti).
+          Tõlkevastavust (ankrut) ei kinnita agent — seda teeb toimetaja.
+        Vene keelt ei kirjutata ühtegi neist (server lükkab kirillitsa tagasi);
+        vene allikas on ainult viide (sources_add / literature locator).
 
         Pärast võrguviga ära saada sama ettepanekut pimesi uuesti: server võis
         selle juba vastu võtta ja tekiks topelt ettepanek. Vaata tulemust vormis.
