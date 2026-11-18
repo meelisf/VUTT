@@ -258,18 +258,21 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
           )}
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 flex flex-wrap justify-end gap-3 shrink-0 border-t border-gray-200">
+        {/* Sama hierarhia mis UnsavedChangesDialog'is: hävitav „Võta tema versioon"
+            on täiteta punane tekst vasakul, ainus täidetud nupp on oranž. */}
+        <div className="px-6 py-4 bg-gray-50 flex flex-wrap items-center gap-3 shrink-0 border-t border-gray-200">
           {/* Tükkide dialoogis ei ole: viskaks ära ka minu põrkumata parandused —
               „Kõikjal tema" + Rakenda teeb sama ohutumalt. */}
           {!chunks && (
             <button
               type="button"
               onClick={onTakeTheirs}
-              className="px-4 py-2 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-700"
+              className="px-4 py-2 rounded-lg font-medium text-red-700 hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-700"
             >
               {t('conflict.takeTheirs')}
             </button>
           )}
+          <div className="ml-auto flex flex-wrap gap-3">
           <button
             ref={cancelRef}
             type="button"
@@ -296,6 +299,7 @@ const PageConflictDialog: React.FC<PageConflictDialogProps> = ({
               {t('conflict.keepMine')}
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>
