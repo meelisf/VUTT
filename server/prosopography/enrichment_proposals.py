@@ -107,6 +107,34 @@ def _short_string(value, limit: int = 500) -> bool:
     return isinstance(value, str) and len(value) <= limit
 
 
+# Vene teatmeteos (nt Levitski) on VUTT-is AINULT viide: kaardile ja registrisse
+# minev tekst ei tohi olla vene keeles. Viite enda (citation, locator) see ei puuduta.
+_KIRILLITSA = re.compile(r"[\u0400-\u04ff]")
+
+
+def _strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from _strings(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _strings(v)
+
+
+def _check_no_cyrillic(item: dict) -> None:
+    fields = [(k, item.get(k)) for k in ("raw_occupation", "raw_institution", "occupation_variant",
+                                         "institution_variant", "occupation_entry", "institution_entry")]
+    fields += [("evidence.quote", s.get("quote")) for s in item.get("evidence") or [] if isinstance(s, dict)]
+    for key, value in fields:
+        if any(_KIRILLITSA.search(t) for t in _strings(value)):
+            raise ProposalError(
+                f"cyrillic_not_allowed: {key} on vene keeles. Venekeelne allikas on VUTT-is ainult viide "
+                "(source_kind=literature + locator, ilma quote'ita); raw_occupation/raw_institution kirjuta "
+                "registri nimena või saksa/ladina allika sõnastuses, mitte vene keeles")
+
+
 def _validate_item(item: dict) -> None:
     # Veateade on agendile juhis: kood ees (masinloetav), selgitus järel. Paljas
     # „invalid_item" jättis agendi pimesi variante proovima.
@@ -188,6 +216,7 @@ def _validate_item(item: dict) -> None:
                     raise ProposalError("invalid_page: page peab olema täisarv ≥ 1")
             elif value is not None and not _short_string(value, 1000 if key == "quote" else 500):
                 raise ProposalError(f"invalid_evidence_text: {key} peab olema string (quote ≤1000, muu ≤500 märki)")
+    _check_no_cyrillic(item)
     for _, field, key_field in _ENTRY_FIELDS:
         entry = item.get(field)
         if entry is None:
