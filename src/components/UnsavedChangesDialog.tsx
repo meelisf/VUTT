@@ -104,15 +104,19 @@ const UnsavedChangesDialog: React.FC<UnsavedChangesDialogProps> = ({
           )}
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+        {/* Hierarhia: ainus täidetud nupp on soovitatud tegevus (salvesta). Hävitav
+            „Loobu" on täiteta punane tekst ja eraldi vasakul — täidetud punane oleks
+            dialoogi kõige kaalukam element ja sulaks oranžiga üheks „ohu" astmestikuks. */}
+        <div className="px-6 py-4 bg-gray-50 flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={onDiscard}
             disabled={saving}
-            className="px-4 py-2 rounded-lg font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-700"
+            className="px-4 py-2 rounded-lg font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-700"
           >
             {t('unsavedChanges.discard')}
           </button>
+          <div className="ml-auto flex flex-wrap gap-3">
           <button
             ref={stayButtonRef}
             type="button"
@@ -131,6 +135,7 @@ const UnsavedChangesDialog: React.FC<UnsavedChangesDialogProps> = ({
             {saving && <Loader2 className="animate-spin" size={16} />}
             {saving ? t('unsavedChanges.saving') : t('unsavedChanges.saveAndContinue')}
           </button>
+          </div>
         </div>
       </div>
     </div>
