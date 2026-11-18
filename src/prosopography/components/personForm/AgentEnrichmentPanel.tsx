@@ -6,6 +6,8 @@ import {
   rejectEnrichmentProposal, type EnrichmentDate, type EnrichmentItem, type EnrichmentProposal,
 } from '../../services/prosopographyService';
 import EvidenceList from '../EvidenceList';
+import AgentFieldRow from './AgentFieldRow';
+import { FIELD_KINDS } from '../../utils/enrichmentKinds';
 import BusyNote from '../../../components/BusyNote';
 import { Link } from 'react-router-dom';
 import { useWorkTitles } from '../../hooks/useWorkTitles';
@@ -21,7 +23,9 @@ interface Props {
 // Põhjuse kood on serveri vea algus („registry_conflict: valipreester"); tundmatu → „other".
 const KNOWN_REASONS = new Set(['duplicate_entry', 'unresolved_existing_entry', 'registry_key_missing',
   'ambiguous_match', 'registry_conflict', 'duplicate_id', 'unknown_occupation_key',
-  'unknown_institution_key', 'unknown_place_key', 'person_not_found']);
+  'unknown_institution_key', 'unknown_place_key', 'person_not_found', 'stale_biography']);
+
+const isFieldRow = (item: EnrichmentItem) => (FIELD_KINDS as readonly string[]).includes(item.kind);
 
 const yearOf = (value?: EnrichmentDate | null) => value?.date?.slice(0, 4) ?? '';
 const period = (item: EnrichmentItem) => {
@@ -135,8 +139,13 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
             const qid = item.registry_ids?.[keyField] ?? entry?.id;
             const institution = item.kind === 'occupation'
               ? item.registry_labels?.institution_key || item.raw_institution : '';
+            const field = isFieldRow(item);
             return <div key={index} className="flex gap-3 items-start rounded border border-gray-200 p-3 text-sm">
-              <div className="flex-1 min-w-0 space-y-1">
+              {field ? <div className="flex-1 min-w-0 space-y-1">
+                <AgentFieldRow item={item} titleOf={titleOf} />
+                {blocked && <p className="text-xs text-amber-800">{reasonText(item.review_state?.reason)}</p>}
+                {rowError && !blocked && <p className="text-xs text-red-700">{reasonText(rowError)}</p>}
+              </div> : <div className="flex-1 min-w-0 space-y-1">
                 <p>
                   <span className="text-gray-500 mr-1">{item.kind === 'occupation' ? tr('occupation') : tr('education')}</span>
                   <strong>{name}</strong>
@@ -152,15 +161,16 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
                   ＋ {tr('newEntry')} <span className="font-mono">{entry.key}</span>: {Object.values(entry.labels).join(' / ')}
                   {entry.variants?.length ? ` · ${tr('variants')}: ${entry.variants.join(', ')}` : ''}
                 </p>}
-                <EvidenceList evidence={item.evidence} titleOf={titleOf} />
+                <EvidenceList evidence={item.evidence ?? []} titleOf={titleOf} />
                 {blocked && <p className="text-xs text-amber-800">{reasonText(item.review_state?.reason)}</p>}
                 {rowError && !blocked && <p className="text-xs text-red-700">{reasonText(rowError)}</p>}
-              </div>
+              </div>}
               <div className="flex gap-2 shrink-0">
                 <button type="button" disabled={busy || isDirty || blocked}
                   onClick={() => void decide(proposal, [index], true)}
                   className="px-2.5 py-1 rounded bg-green-700 text-white text-xs disabled:bg-gray-400">
-                  {state === 'already_present' ? tr('addEvidenceShort') : tr('confirm')}
+                  {state === 'already_present' ? tr('addEvidenceShort')
+                    : state === 'conflict' || state === 'replace' ? tr('replace') : tr('confirm')}
                 </button>
                 <button type="button" disabled={busy || isDirty}
                   onClick={() => void decide(proposal, [index], false)}

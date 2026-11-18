@@ -1,7 +1,7 @@
 {
   "pageTitle": "Persons",
   "agentEnrichment": {
-    "title": "Agent occupation and education proposals",
+    "title": "Agent proposals for the person card",
     "intro": "Agent proposals for this person. Review each entry, link, and source here before approval.",
     "codeOnReview": "Agent code and all pending proposals: review page →",
     "refresh": "Refresh proposals",
@@ -31,7 +31,12 @@
     "working_one": "Saving {{count}} entry… this may take a few dozen seconds.",
     "working_other": "Saving {{count}} entries… this may take a few dozen seconds.",
     "rejecting": "Rejecting…",
-    "reason": {"duplicate_entry": "The same fact is already on the card.", "unresolved_existing_entry": "No single matching card entry to add the evidence to.", "registry_key_missing": "No registry key; ask the agent to choose a registry entry.", "ambiguous_match": "The agent did not choose a registry entry; ask it to resolve the match.", "registry_conflict": "The registry has a different entry under the same key.", "duplicate_id": "This Q-code belongs to another registry entry.", "unknown_occupation_key": "No such entry in the occupation registry.", "unknown_institution_key": "No such entry in the institution registry.", "unknown_place_key": "No such entry in the place registry.", "person_not_found": "Person not found.", "other": "This row cannot be confirmed."}
+    "kind": {"birth": "Birth", "death": "Death", "origin": "Origin", "gender": "Gender", "biography": "Biography ({{lang}})"},
+    "gender": {"M": "male", "F": "female"},
+    "badgeConflict": "differs from card", "badgeReplace": "replaces text", "badgeField": "new",
+    "currentValue": "Currently on card", "replace": "Replace", "showDiff": "Show changes", "hideDiff": "Hide changes",
+    "sourcesAdd": "Sources to add",
+    "reason": {"stale_biography": "The biography has changed since — ask the agent to resubmit the proposal.", "duplicate_entry": "The same fact is already on the card.", "unresolved_existing_entry": "No single matching card entry to add the evidence to.", "registry_key_missing": "No registry key; ask the agent to choose a registry entry.", "ambiguous_match": "The agent did not choose a registry entry; ask it to resolve the match.", "registry_conflict": "The registry has a different entry under the same key.", "duplicate_id": "This Q-code belongs to another registry entry.", "unknown_occupation_key": "No such entry in the occupation registry.", "unknown_institution_key": "No such entry in the institution registry.", "unknown_place_key": "No such entry in the place registry.", "person_not_found": "Person not found.", "other": "This row cannot be confirmed."}
   },
   "bibliography": "Sources and bibliography",
   "bibliographyLiterature": "Literature",

@@ -1,7 +1,7 @@
 {
   "pageTitle": "Isikud",
   "agentEnrichment": {
-    "title": "Agendi ameti- ja haridusettepanekud",
+    "title": "Agendi ettepanekud isikukaardile",
     "intro": "Agendi ettepanekud sellele isikule. Vaata iga kirje, seos ja tõend siin üle enne kinnitamist.",
     "codeOnReview": "Agendikood ja kõik ootel ettepanekud: ülevaatuse leht →",
     "refresh": "Värskenda ettepanekuid",
@@ -31,7 +31,12 @@
     "working_one": "Salvestan {{count}} kirje… see võib võtta mõnikümmend sekundit.",
     "working_other": "Salvestan {{count}} kirjet… see võib võtta mõnikümmend sekundit.",
     "rejecting": "Lükkan tagasi…",
-    "reason": {"duplicate_entry": "Sama fakt on kaardil juba olemas.", "unresolved_existing_entry": "Kaardilt ei leitud üheselt kirjet, millele tõend lisada.", "registry_key_missing": "Registrivõti puudub; palu agendil valida registrikirje.", "ambiguous_match": "Agent ei valinud registrikirjet; palu tal vaste lahendada.", "registry_conflict": "Registris on sama võtmega teine kirje.", "duplicate_id": "See Q-kood on registris teisel kirjel.", "unknown_occupation_key": "Ametiregistris sellist kirjet pole.", "unknown_institution_key": "Asutuste registris sellist kirjet pole.", "unknown_place_key": "Kohtade registris sellist kirjet pole.", "person_not_found": "Isikut ei leitud.", "other": "Rida ei saa kinnitada."}
+    "kind": {"birth": "Sünd", "death": "Surm", "origin": "Päritolu", "gender": "Sugu", "biography": "Elulugu ({{lang}})"},
+    "gender": {"M": "mees", "F": "naine"},
+    "badgeConflict": "erineb kaardist", "badgeReplace": "asendab teksti", "badgeField": "uus",
+    "currentValue": "Praegu kaardil", "replace": "Asenda", "showDiff": "Näita erinevust", "hideDiff": "Peida erinevus",
+    "sourcesAdd": "Lisatavad allikad",
+    "reason": {"stale_biography": "Elulugu on vahepeal muutunud — palu agendil ettepanek uuesti esitada.", "duplicate_entry": "Sama fakt on kaardil juba olemas.", "unresolved_existing_entry": "Kaardilt ei leitud üheselt kirjet, millele tõend lisada.", "registry_key_missing": "Registrivõti puudub; palu agendil valida registrikirje.", "ambiguous_match": "Agent ei valinud registrikirjet; palu tal vaste lahendada.", "registry_conflict": "Registris on sama võtmega teine kirje.", "duplicate_id": "See Q-kood on registris teisel kirjel.", "unknown_occupation_key": "Ametiregistris sellist kirjet pole.", "unknown_institution_key": "Asutuste registris sellist kirjet pole.", "unknown_place_key": "Kohtade registris sellist kirjet pole.", "person_not_found": "Isikut ei leitud.", "other": "Rida ei saa kinnitada."}
   },
   "bibliography": "Allikad ja bibliograafia",
   "bibliographyLiterature": "Kirjandus",
