@@ -83,6 +83,11 @@ export interface FormDraft {
   viaf_id: string;
   aa_id: string;
   origin_place: string;
+  /** Agendi ettepanekust kinnitatud tõend (#834). Vorm ehitab birth/death/origin
+   *  salvestamisel uuesti — mustandist välja jäänud tõend kaoks vaikselt. */
+  birth_evidence?: Record<string, unknown>[];
+  death_evidence?: Record<string, unknown>[];
+  origin_evidence?: Record<string, unknown>[];
 }
 
 export const emptyDraft = (): FormDraft => ({

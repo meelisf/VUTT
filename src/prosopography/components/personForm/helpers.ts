@@ -228,8 +228,20 @@ export function recordToDraft(p: ProsopoRecord, places: Record<string, PlaceEntr
     viaf_id: ident('viaf'),
     aa_id: ident('album_academicum'),
     origin_place: personOriginKey(p, places),
+    birth_evidence: evidenceOf(p.birth),
+    death_evidence: evidenceOf(p.death),
+    origin_evidence: evidenceOf(p.origin),
   };
 }
+
+const evidenceOf = (value: unknown): Record<string, unknown>[] => {
+  const evidence = (value as { evidence?: unknown } | null | undefined)?.evidence;
+  return Array.isArray(evidence) ? evidence : [];
+};
+
+/** Tõend käib salvestatud väärtuse kohta: muudetud väärtusel see kaob (#834). */
+const keptEvidence = (evidence: Record<string, unknown>[] | undefined, unchanged: boolean) =>
+  unchanged && evidence?.length ? { evidence } : {};
 
 export function buildDatePayload(d: DateDraft): any {
   const hasData = !!(d.year || d.place || d.circa || d.bound || d.calendar);
@@ -302,15 +314,23 @@ export function draftToPayload(
       const birth = buildDatePayload(draft.origin_place ? { ...draft.birth, place: null } : draft.birth);
       const priorNote = original?.birth?.notes;
       const notes = priorNote || null;
+      const sameBirth = !!birth && birth.date === original?.birth?.date
+        && birth.precision === original?.birth?.precision;
       return birth || notes ? { ...birth,
         original_text: original?.birth?.original_text ?? null,
-        date_to: original?.birth?.date_to ?? null, notes: notes || null } : null;
+        date_to: original?.birth?.date_to ?? null, notes: notes || null,
+        ...keptEvidence(draft.birth_evidence, sameBirth) } : null;
     })(),
     death: (() => {
       const death = buildDatePayload(draft.death);
+      const sameDeath = !!death && death.date === original?.death?.date
+        && death.precision === original?.death?.precision
+        && (death.place?.id ?? death.place?.label ?? null)
+          === (original?.death?.place?.id ?? original?.death?.place?.label ?? null);
       return death || original?.death?.notes ? { ...death,
         original_text: original?.death?.original_text ?? null,
-        date_to: original?.death?.date_to ?? null, notes: original?.death?.notes ?? null } : null;
+        date_to: original?.death?.date_to ?? null, notes: original?.death?.notes ?? null,
+        ...keptEvidence(draft.death_evidence, sameDeath) } : null;
     })(),
     // Salvesta mitmekeelne labels-objekt → useEntityLabel kuvab UI-keeles.
     // Sõnastikuväline väärtus kannab oma salvestatud kirje edasi — varem sai
@@ -329,6 +349,7 @@ export function draftToPayload(
       place: draft.origin_place || null,
       geonames_id: draft.origin_place === original?.origin?.place ? original?.origin?.geonames_id ?? null : null,
       coordinates: draft.origin_place === original?.origin?.place ? original?.origin?.coordinates ?? null : null,
+      ...keptEvidence(draft.origin_evidence, !!draft.origin_place && draft.origin_place === original?.origin?.place),
     },
     floruit: (draft.floruit_from || draft.floruit_to) ? {
       year_from: draft.floruit_from ? parseInt(draft.floruit_from) : null,
