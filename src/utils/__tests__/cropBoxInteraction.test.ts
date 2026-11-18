@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resizeBox, moveBox, resizeRotatedBox } from '../cropBoxInteraction';
+import { resizeBox, moveBox, resizeRotatedBox, clampRotatedCenter } from '../cropBoxInteraction';
 
 const bounds = { w: 200, h: 100 };
 
@@ -87,5 +87,36 @@ describe('resizeRotatedBox', () => {
   it('hoiab min-mõõtu', () => {
     const r = resizeRotatedBox(start, 0, 'w', 999, 100, 8);
     expect(r.w).toBeCloseTo(8, 6);
+  });
+});
+
+describe('clampRotatedCenter', () => {
+  const frame = { w: 400, h: 600 };
+
+  it('telgjoondatud kast peatub servas, mitte keskpunktiga servas', () => {
+    // Kast 100×200, lohistatud kaugele vasakule-üles.
+    expect(clampRotatedCenter({ cx: -50, cy: -50, w: 100, h: 200 }, 0, frame)).toEqual({ cx: 50, cy: 100 });
+    expect(clampRotatedCenter({ cx: 999, cy: 999, w: 100, h: 200 }, 0, frame)).toEqual({ cx: 350, cy: 500 });
+  });
+
+  it('raami sees olev kast jääb paigale', () => {
+    expect(clampRotatedCenter({ cx: 200, cy: 300, w: 100, h: 200 }, 0, frame)).toEqual({ cx: 200, cy: 300 });
+  });
+
+  it('kallutatud kast peatub ümbriskasti nurgaga servas', () => {
+    // 90° kraadi: ümbriskast on 200×100.
+    const r = clampRotatedCenter({ cx: 0, cy: 0, w: 100, h: 200 }, 90, frame);
+    expect(r.cx).toBeCloseTo(100);
+    expect(r.cy).toBeCloseTo(50);
+  });
+
+  it('raamist laiem kallutatud kast liigub ainult seni, kuni katab kogu laiuse', () => {
+    // Ümbriskasti laius > 400 → lubatud keskpunkt [400 - hx, hx].
+    const b = { w: 392, h: 588, cy: 300 };
+    const hx = (392 * Math.cos(Math.PI / 90) + 588 * Math.sin(Math.PI / 90)) / 2;
+    expect(hx).toBeGreaterThan(200);
+    expect(clampRotatedCenter({ ...b, cx: 0 }, 2, frame).cx).toBeCloseTo(400 - hx);
+    expect(clampRotatedCenter({ ...b, cx: 400 }, 2, frame).cx).toBeCloseTo(hx);
+    expect(clampRotatedCenter({ ...b, cx: 200 }, 2, frame).cx).toBeCloseTo(200);
   });
 });
