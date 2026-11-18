@@ -329,12 +329,12 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
     _check_registry_entries(items)
     # Skalaarliiki ja eluloo keelt kuni üks rida: kaks ettepanekut samale väljale ei
     # ole ülevaatajale otsustatavad (kumb kehtib?) — agent valib ise.
-    from .enrichment_kinds import NEW_KINDS
+    from .enrichment_kinds import NEW_KINDS, row_key
     seen_kinds = set()
     for index, item in enumerate(items):
         if item["kind"] not in NEW_KINDS:
             continue
-        kind = (item["kind"], item.get("lang"))
+        kind = row_key(item)
         if kind in seen_kinds:
             raise ProposalError(f"items[{index}]: duplicate_kind: {item['kind']} on ettepanekus juba olemas")
         seen_kinds.add(kind)

@@ -283,3 +283,63 @@ def test_paritolu_kinnitus_ei_loo_birth_place_seost(client, login, prosopo_env, 
     saved = prosopo_env.read("abc")
     assert saved["origin"]["place"] == "tartu"
     assert saved["birth"]["place"] == old_place
+
+
+# ── 2. osa: nimevariant, nimi, staatus, konfessioon, tegutsemisaeg, seos, ID ──
+
+@pytest.fixture
+def sonastik(tmp_path, monkeypatch):
+    import json as _json
+    from server.prosopography import enrichment_kinds
+    path = tmp_path / "vocabularies.json"
+    path.write_text(_json.dumps({
+        "seisused": [{"id": "Q134737", "label": {"et": "aadlik", "en": "noble"}}],
+        "konfessioonid": [{"id": "Q75809", "label": {"et": "luterlane", "en": "Lutheran"}}],
+    }))
+    monkeypatch.setattr(enrichment_kinds, "VOCABULARIES_FILE", str(path))
+    return path
+
+
+@pytest.mark.parametrize("item", [
+    {"kind": "alias", "value": "Joh. Hornius", "evidence": OK_EVIDENCE},
+    {"kind": "name", "label": "Gripenhielm", "type": "ennobled", "from": 1650, "evidence": OK_EVIDENCE},
+    {"kind": "status", "id": "Q134737", "evidence": OK_EVIDENCE},
+    {"kind": "confession", "id": "Q75809", "evidence": OK_EVIDENCE},
+    {"kind": "floruit", "year_from": 1640, "year_to": 1660, "evidence": OK_EVIDENCE},
+    {"kind": "floruit", "year_to": 1660, "evidence": OK_EVIDENCE},
+    {"kind": "relation", "name": "Isik B", "type": "õpetaja", "type_id": "Q1", "target_id": "vutt:Pbbb",
+     "evidence": OK_EVIDENCE},
+    {"kind": "relation", "name": "Tundmatu", "type": "vend", "evidence": OK_EVIDENCE},
+    {"kind": "identifier", "scheme": "wikidata", "id": "q123", "evidence": OK_EVIDENCE},
+])
+def test_osa2_kehtiv_rida(item, registrid, sonastik):
+    proposals._validate_item(item)
+
+
+@pytest.mark.parametrize("item,kood", [
+    ({"kind": "status", "id": "Q999", "evidence": OK_EVIDENCE}, "unknown_vocabulary_id"),
+    ({"kind": "name", "label": "X", "type": "nickname", "evidence": OK_EVIDENCE}, "invalid_name_type"),
+    ({"kind": "floruit", "evidence": OK_EVIDENCE}, "invalid_floruit"),
+    ({"kind": "floruit", "year_from": 1700, "year_to": 1600, "evidence": OK_EVIDENCE}, "invalid_floruit"),
+    ({"kind": "identifier", "scheme": "orcid", "id": "1", "evidence": OK_EVIDENCE}, "invalid_scheme"),
+    ({"kind": "relation", "name": "B", "type": "vend", "target_id": "x", "evidence": OK_EVIDENCE},
+     "invalid_person_id"),
+    ({"kind": "alias", "value": "Хорн", "evidence": OK_EVIDENCE}, "cyrillic_not_allowed"),
+    ({"kind": "alias", "value": "", "evidence": OK_EVIDENCE}, "invalid_text"),
+    ({"kind": "alias", "value": "X", "evidence": []}, "evidence_required"),
+])
+def test_osa2_vigane_rida(item, kood, registrid, sonastik):
+    with pytest.raises(proposals.ProposalError, match=kood):
+        proposals._validate_item(item)
+
+
+def test_sonastikuvaline_kood_loetleb_lubatud(registrid, sonastik):
+    with pytest.raises(proposals.ProposalError, match="Q134737: aadlik"):
+        proposals._validate_item({"kind": "status", "id": "Q1", "evidence": OK_EVIDENCE})
+
+
+def test_sama_alias_kaks_korda_eri_aliased_lubatud(esita, sonastik):
+    a = {"kind": "alias", "value": "Hornius", "evidence": OK_EVIDENCE}
+    r = esita([a, {**a, "value": "hornius"}])
+    assert r.status_code == 400 and "duplicate_kind" in r.text
+    assert esita([a, {**a, "value": "Hornus"}]).status_code == 200
