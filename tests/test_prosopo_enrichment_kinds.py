@@ -255,3 +255,31 @@ def test_kadunud_koht_blocked(client, login, prosopo_env, kohad):
     rows = client.get(f"/prosopography/enrichment-proposals/{card['id']}",
                       headers=_headers(token)).json()[0]["items"]
     assert rows[0]["review_state"] == {"state": "blocked", "reason": "unknown_place_key"}
+
+
+# ── Ülesanne 3: kaart säilitab skalaarvälja tõendi ───────────────────────
+
+def test_update_person_sailitab_skalaartoendi(prosopo_env, kohad):
+    from server.prosopography.person_crud import get_person, update_person
+    card = prosopo_env.write("abc")
+    update_person("vutt:Pabc", {
+        "updated_at": card["updated_at"],
+        "birth": {"date": "1755", "precision": "year", "evidence": OK_EVIDENCE},
+        "death": {"date": "1807", "precision": "year", "evidence": [EV_B]},
+        "origin": {"place": "tartu", "evidence": OK_EVIDENCE},
+    }, "t")
+    saved = get_person("vutt:Pabc")
+    assert saved["birth"]["evidence"] == OK_EVIDENCE
+    assert saved["death"]["evidence"] == [EV_B]
+    assert saved["origin"]["evidence"] == OK_EVIDENCE and saved["origin"]["place_id"] == "Q13972"
+
+
+def test_paritolu_kinnitus_ei_loo_birth_place_seost(client, login, prosopo_env, kohad):
+    old_place = {"id": "Q1", "label": "Riga"}
+    item = {"kind": "origin", "place_key": "tartu", "evidence": OK_EVIDENCE}
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, [item],
+                               birth={"date": "1755", "precision": "year", "place": old_place})
+    assert kinnita([0]).status_code == 200
+    saved = prosopo_env.read("abc")
+    assert saved["origin"]["place"] == "tartu"
+    assert saved["birth"]["place"] == old_place
