@@ -80,7 +80,8 @@ const PersonEditPage: React.FC = () => {
   const [occupOpen, setOccupOpen] = useState(agentFocus);
   // Tõendiviidete teoste pealkirjad (ametite ja hariduse tõendite loend).
   const evidenceTitles = useWorkTitles([
-    ...evidenceWorkIds([...draft.occupations, ...draft.education]),
+    ...evidenceWorkIds([...draft.occupations, ...draft.education,
+      { evidence: draft.birth_evidence }, { evidence: draft.death_evidence }, { evidence: draft.origin_evidence }]),
     ...draft.sources.flatMap(source => source.work_id ? [source.work_id] : [])], token);
   const [relOpen, setRelOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -702,6 +703,17 @@ const PersonEditPage: React.FC = () => {
                   }}
                   token={token} canEdit={!!canEdit} lang={lang} label={t('form.deathPlace')} />} />
             </div>
+            {/* Agendi ettepanekust kinnitatud tõend (#834): nähtav ja eemaldatav, muutmist ei ole */}
+            {([['birth_evidence', t('born')], ['death_evidence', t('died')], ['origin_evidence', t('origin')]] as const)
+              .filter(([field]) => (draft[field]?.length ?? 0) > 0).map(([field, label]) => (
+                <details key={field} className="mt-3 text-xs">
+                  <summary className="cursor-pointer text-gray-500">{label}: {draft[field]!.length} {t('agentEnrichment.evidenceCount')}</summary>
+                  <div className="mt-1">
+                    <EvidenceList evidence={draft[field] as unknown as EnrichmentEvidence[]} titleOf={id => evidenceTitles[id]}
+                      onRemove={canEdit ? index => set({ [field]: draft[field]!.filter((_, i) => i !== index) }) : undefined} />
+                  </div>
+                </details>
+              ))}
             <div className="mt-5 border-t border-gray-200 pt-4">
             <fieldset>
               <legend className="text-xs text-gray-600 uppercase tracking-wide mb-2">

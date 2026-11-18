@@ -31,3 +31,34 @@ describe('isikulehe joonealused viited', () => {
     expect(screen.getByText('Notarius publicus')).toBeTruthy();
   });
 });
+
+// #834: sünni, surma ja päritolu tõend
+import { LifeDates } from '../PersonDetailPage';
+
+describe('eluandmete joonealused viited', () => {
+  const ev = [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }];
+  it('päritolu real on viide kaardi viidete hulgas', () => {
+    const p = { id: 'vutt:P2', name: { aliases: [] }, occupations: [], education: [],
+      origin: { place: 'Tartu', evidence: ev } } as unknown as ProsopoRecord;
+    const { container } = render(<MemoryRouter><StructuredInfoCard person={p} workTitles={{ w1: 'Oratio' }} /></MemoryRouter>);
+    expect([...container.querySelectorAll('sup')].map(s => s.textContent)).toEqual(['1']);
+    expect(screen.getByRole('link', { name: 'Oratio' })).toBeTruthy();
+  });
+
+  it('sünni ja surma kuupäeva järel on viide ja viited ploki all', () => {
+    const p = { birth: { date: '1755', evidence: ev },
+      death: { date: '1807', evidence: [{ source_kind: 'literature', source_id: 'D', citation: 'Levitski 1902', locator: 'lk 106' }] },
+    } as unknown as ProsopoRecord;
+    const { container } = render(<MemoryRouter>
+      <LifeDates person={p} birth="1755" death="1807" workTitles={{ w1: 'Oratio' }} /></MemoryRouter>);
+    expect([...container.querySelectorAll('sup')].map(s => s.textContent)).toEqual(['1', '2']);
+    expect(screen.getByRole('link', { name: 'Oratio' })).toBeTruthy();
+    expect(screen.getByText(/Levitski 1902/)).toBeTruthy();
+  });
+
+  it('tõendita eluandmetel viiteid ei ole', () => {
+    const { container } = render(<MemoryRouter>
+      <LifeDates person={{ birth: { date: '1755' } } as unknown as ProsopoRecord} birth="1755" death="" workTitles={{}} /></MemoryRouter>);
+    expect(container.querySelectorAll('sup')).toHaveLength(0);
+  });
+});

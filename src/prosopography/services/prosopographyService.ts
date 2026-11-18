@@ -1,6 +1,7 @@
 import { FILE_API_URL } from '../../config';
 import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '../../services/apiClient';
 import { appendPersonFilterParams, type PersonFilterParams } from './personFilterParams';
+import type { EnrichmentFieldKind } from '../utils/enrichmentKinds';
 import type { HistoricalRegionsResponse, ProsopoIndexEntry, ProsopoMapResponse, ProsopoRecord, PlaceEntry } from '../types';
 
 const BASE = `${FILE_API_URL}/prosopography`;
@@ -17,13 +18,19 @@ export interface EnrichmentRegistryEntry {
   type?: string; place_key?: string | null;
 }
 export interface EnrichmentReviewState {
-  state: 'applicable' | 'already_present' | 'blocked'; reason?: string;
+  /** `conflict` ja `replace` (#834): kaardil on teine väärtus; kinnitus asendab. */
+  state: 'applicable' | 'already_present' | 'conflict' | 'replace' | 'blocked'; reason?: string;
+  /** Praegune kaardiväärtus konflikti/asenduse kuvamiseks (kuupäev, koha võti, sugu, tekst). */
+  current?: unknown;
+}
+export interface EnrichmentSourceAdd {
+  text?: string; work_id?: string; part_id?: string; page?: number; printed_page?: string; note?: string;
 }
 export interface EnrichmentDate {
   date: string; precision?: string; bound?: string; calendar?: string; is_circa?: boolean;
 }
 export interface EnrichmentItem {
-  kind: 'occupation' | 'education'; match_status: string; existing_index?: number;
+  kind: 'occupation' | 'education' | EnrichmentFieldKind; match_status?: string; existing_index?: number;
   review_state: EnrichmentReviewState;
   registry_labels?: Record<string, string>;
   registry_ids?: Record<string, string>;
@@ -35,7 +42,15 @@ export interface EnrichmentItem {
   occupation_variant?: string | null; institution_variant?: string | null;
   date_from?: EnrichmentDate | null;
   date_to?: EnrichmentDate | null;
-  evidence: EnrichmentEvidence[];
+  /** Elulool tõend puudub (viited on tekstis). */
+  evidence?: EnrichmentEvidence[];
+  // #834 väljad
+  date?: EnrichmentDate;
+  value?: 'M' | 'F';
+  lang?: 'et' | 'en';
+  text?: string;
+  base_hash?: string;
+  sources_add?: EnrichmentSourceAdd[];
 }
 export interface EnrichmentProposal {
   proposal_id: string; person_id: string; base_updated_at: string;

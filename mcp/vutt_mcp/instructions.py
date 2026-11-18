@@ -23,9 +23,8 @@ KEELED (muidu otsid tühja):
 - Alliktekstid on valdavalt ladina- ja saksakeelsed, kõrval rootsi ja kreeka;
   eestikeelset teksti on väga vähe. Otsi seega ladina- või saksakeelse sõnaga,
   MITTE eestikeelse terminiga ("disputatio", mitte "väitluskiri").
-  Ortograafia kõigub (u/v, i/j, ß/ss, ae/æ) - otsi lühikest tüve.
-- Ühesõnaline päring toimib sõnaosa otsinguna: "orati" leiab "orationem",
-  "orationes" jne. Mitmesõnalises päringus tohib ainult VIIMANE sõna olla
+  Ortograafia kõigub (u/v, i/j, ß/ss) - otsi lühikest tüve.
+- Ühesõnaline päring on sõnaosa otsing: "orati" leiab "orationem". Mitmesõnalises päringus tohib ainult VIIMANE sõna olla
   poolik: "oratio panegyr" ei leia "orationem panegyricam".
 - Sekundaarkirjandus on peamiselt saksa- ja eestikeelne. Sama mõiste on kahes
   kihis eri keeles: allikast otsi "typographus", sekundaarist "trükkal" /
@@ -37,16 +36,17 @@ TÖÖKÄIK:
 2. search_works = MILLISED teosed teemat käsitlevad; search_pages = KUS midagi
    mainitakse.
 3. get_pages = täistekst; get_page_image = pilt OCR-i kontrolliks.
-4. Isikud: search_persons / get_person (prosopograafia).
+4. Isikud: search_persons / get_person; kaardi täiendus (ka elulugu)
+   = submit_person_enrichment_proposal.
 5. Sekundaarkirjandus on ERALDI kogu, mitte korpuse osa: list_literature
    näitab sisu; get_literature_pages nõuab page_ref="printed" (trükise
    number) või "pdf" (faili leht).
 
 REEGLID:
-- work_id on nanoid ("v7Kq2mXp"), mitte pealkiri.
+- work_id on nanoid, mitte pealkiri.
 - Otsing on vaikimisi range (kõik sõnad peavad leheküljel esinema). Tühja
   tulemuse järel proovi lühemat päringut ja relax_matching=true.
-- Tekst on masinlugemine; lehe seisund: Toores (OCR) < Töös < Parandatud
+- Tekst on masinlugemine; seisund: Toores (OCR) < Töös < Parandatud
   < Annoteeritud < Valmis (inimese kinnitatud).
 - Tühi tulemus EI tõesta, et teemat pole - kontrolli list_filter_values'i
   ja list_literature'iga, kas allikas on kogus.
