@@ -1,11 +1,12 @@
 /** @vitest-environment jsdom */
 /**
- * Kärbe/kalle/perspektiiv upload'i detailvaates (#431, etapp 2).
+ * Kärbe/kalle/perspektiiv ja poolitus upload'i detailvaates (#431, ADR 0085).
  *
  * Leping, mida test hoiab:
- *  - tavavaade näitab KOHANDATUD eelvaadet (URL kannab `adj`), et poolitusjoon
- *    asetuks nagu apply lõikab (pööre → adjust → poolitus);
- *  - kärpimisrežiim näitab kohandamata eelvaadet ja ühist kärpekasti;
+ *  - üks vaade: kohandamata (pööratud) eelvaade, kärpekast ja poolitusjoon koos;
+ *    joon kärpe raamis (pööre → adjust → poolitus);
+ *  - „Näita tulemust" näitab KOHANDATUD eelvaadet (URL kannab `adj`);
+ *  - kõik on kohe ootel: kasti muudatus ja joon lähevad plaani eraldi, kohe;
  *  - pööre eemaldab kärpe (eelmise raami koordinaadid), eemaldamine = null.
  */
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -45,71 +46,83 @@ function renderDetail(p: PrepressPlan) {
   return { ...utils, onPageChange, img };
 }
 
-const toEditTab = () => fireEvent.click(screen.getByTestId('editor-tab-edit'));
+/** Klõps pildil (ilma liikumiseta) kuvapikslites. */
+const clickImage = (x: number, y: number) => {
+  fireEvent.mouseDown(document.querySelector('.cursor-crosshair')!, { clientX: x, clientY: y });
+  fireEvent.mouseUp(window, { clientX: x, clientY: y });
+};
 
-describe('SplitPageDetail vahekaardid ja kärpimine', () => {
-  it('avaneb „Poolita" vahekaardil: kärbitud leht kannab adj-i ja ootel-kapslit', () => {
+describe('SplitPageDetail üks vaade', () => {
+  it('vahekaarte ei ole: kohandamata eelvaade, kärpekast ja tööriistad korraga', () => {
     const { img } = renderDetail(plan({ adjust: KÄRBE }));
-    expect(img().src).toContain('adj=');
-    expect(screen.getByTestId('detail-edit-pending')).toBeTruthy();
-    expect(screen.queryByTestId('detail-toolbar')).toBeNull();
-    // Kärbitud eelvaade on märgitud kollase raamiga (ei näe välja rakendatud).
-    expect(screen.getByTestId('cropped-preview-mark')).toBeTruthy();
-  });
-
-  it('raami ei ole kärbeta lehel ega „Pööra ja kärbi" vahekaardil', () => {
-    const first = renderDetail(plan());
-    expect(screen.queryByTestId('cropped-preview-mark')).toBeNull();
-    first.unmount();
-    renderDetail(plan({ adjust: KÄRBE }));
-    toEditTab();
-    expect(screen.queryByTestId('cropped-preview-mark')).toBeNull();
-  });
-
-  it('„Pööra ja kärbi" näitab kohandamata eelvaadet, kärpekasti ja ühist riba', () => {
-    const { img } = renderDetail(plan({ adjust: KÄRBE }));
-    toEditTab();
+    expect(screen.queryByTestId('editor-tab-split')).toBeNull();
     expect(img().src).not.toContain('adj=');
     expect(screen.getByTestId('detail-crop-area')).toBeTruthy();
     expect(screen.getByTestId('detail-toolbar')).toBeTruthy();
-    // Kasti veel pole ja see on ainus leht → märkida pole midagi.
-    expect((screen.getByTestId('detail-mark') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('detail-edit-pending')).toBeTruthy();
+    // Pakkumist pole → „Kärbi ja järgmine" puudub; liikumine noolte kaudu.
+    expect(screen.queryByTestId('detail-mark')).toBeNull();
+    expect(screen.getByTestId('page-nav-position').textContent).toBe('1 / 1');
+  });
+
+  it('„Näita tulemust": kohandatud eelvaade, raam ja lukus tööriistad', () => {
+    const { img } = renderDetail(plan({ adjust: KÄRBE }));
+    expect(screen.queryByTestId('cropped-preview-mark')).toBeNull();
+    fireEvent.click(screen.getByTestId('detail-result-toggle'));
+    expect(img().src).toContain('adj=');
+    expect(screen.getByTestId('cropped-preview-mark')).toBeTruthy();
+    expect(screen.queryByTestId('detail-toolbar')).toBeNull();
+    expect(screen.queryByTestId('detail-crop-area')).toBeNull();
+  });
+
+  it('kärbeta lehe tulemusel raami ei ole', () => {
+    renderDetail(plan());
+    fireEvent.click(screen.getByTestId('detail-result-toggle'));
+    expect(screen.queryByTestId('cropped-preview-mark')).toBeNull();
   });
 
   it('ootel kärbe kontuur on nähtav; kärbeta lehel ei ole', () => {
-    renderDetail(plan({ adjust: KÄRBE }));
-    toEditTab();
+    const first = renderDetail(plan({ adjust: KÄRBE }));
     expect(screen.getByTestId('detail-pending-outline')).toBeTruthy();
-  });
-
-  it('kärbeta lehel kontuuri ei ole', () => {
+    first.unmount();
     renderDetail(plan());
-    toEditTab();
     expect(screen.queryByTestId('detail-pending-outline')).toBeNull();
   });
 
-  it('perspektiiv + „Märgi" kirjutab plaani quad-i serveri kujul', () => {
+  it('poolitataval lehel on joon kärpe raamis', () => {
+    // Raam 400 px; kärbe x 0…0.5 → üldjoon 50 % = 100 px.
+    renderDetail(plan({ mode: 'default', adjust: KÄRBE }));
+    expect(Number(screen.getByTestId('detail-line').getAttribute('x1'))).toBeCloseTo(100);
+  });
+
+  it('poolitamata lehel joont ei ole ja klõps poolitust ei tekita', () => {
     const { onPageChange } = renderDetail(plan());
-    toEditTab();
+    expect(screen.queryByTestId('detail-line')).toBeNull();
+    clickImage(200, 300);
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('klõps paneb joone kärpe raamis', () => {
+    const { onPageChange } = renderDetail(plan({ mode: 'default', adjust: KÄRBE }));
+    clickImage(150, 300);   // 150 / 400 = 0.375 → kärpe raamis 0.375 / 0.5 = 0.75
+    expect(onPageChange).toHaveBeenCalledWith(1, { mode: 'custom', split_x: 0.75 });
+  });
+
+  it('perspektiivi lüliti läheb KOHE plaani quad-i serveri kujul; klõps paneb ainult joone', () => {
+    const { onPageChange } = renderDetail(plan({ mode: 'default' }));
     fireEvent.click(screen.getByTestId('detail-tool-perspective'));
-    fireEvent.click(screen.getByTestId('detail-mark'));
+    expect(onPageChange).toHaveBeenCalledTimes(1);
     const patch = onPageChange.mock.calls[0][1];
     expect(patch.adjust.crop).toBeNull();
     expect(patch.adjust.quad).toHaveLength(4);
     expect(Array.isArray(patch.adjust.quad[0])).toBe(true);
-  });
-
-  it('vahekaardi vahetus kirjutab märkimata kasti plaani (nagu halduses)', () => {
-    const { onPageChange } = renderDetail(plan());
-    toEditTab();
-    fireEvent.click(screen.getByTestId('detail-tool-perspective'));
-    fireEvent.click(screen.getByTestId('editor-tab-split'));
-    expect(onPageChange.mock.calls[0][1].adjust.quad).toHaveLength(4);
+    clickImage(200, 300);
+    expect(onPageChange).toHaveBeenCalledTimes(2);
+    expect(Object.keys(onPageChange.mock.calls[1][1]).sort()).toEqual(['mode', 'split_x']);
   });
 
   it('pööre (ribal) eemaldab kärpe', () => {
     const { onPageChange } = renderDetail(plan({ adjust: KÄRBE }));
-    toEditTab();
     fireEvent.click(screen.getByTestId('detail-rotate-right'));
     expect(onPageChange).toHaveBeenCalledWith(1, { rotate: 90, adjust: null });
   });
@@ -120,12 +133,18 @@ describe('SplitPageDetail vahekaardid ja kärpimine', () => {
     expect(onPageChange).toHaveBeenCalledWith(1, { adjust: null });
   });
 
-  it('„Välista leht" on päises mõlemal vahekaardil', () => {
+  it('pöörde ✕ eemaldab pöörde ja kärpe; poolituse ✕ ainult poolituse', () => {
+    const { onPageChange } = renderDetail(plan({ rotate: 90, mode: 'custom', split_x: 0.4, adjust: KÄRBE }));
+    fireEvent.click(screen.getByTestId('detail-rotate-remove'));
+    expect(onPageChange).toHaveBeenLastCalledWith(1, { rotate: 0, adjust: null });
+    fireEvent.click(screen.getByTestId('detail-split-remove'));
+    expect(onPageChange).toHaveBeenLastCalledWith(1, { mode: 'nosplit', split_x: null });
+  });
+
+  it('„Välista leht" on päises', () => {
     const { onPageChange } = renderDetail(plan());
     fireEvent.click(screen.getByTestId('detail-exclude'));
     expect(onPageChange).toHaveBeenCalledWith(1, { excluded: true });
-    toEditTab();
-    expect(screen.getByTestId('detail-exclude')).toBeTruthy();
   });
 
   it('jalus: Tagasi ülevaatesse ja lehenooled on ühised', () => {

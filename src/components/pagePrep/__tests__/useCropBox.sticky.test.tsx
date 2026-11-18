@@ -42,7 +42,7 @@ describe('useCropBox kleepuv kast', () => {
 
 // 2026-11-17: „Rakenda kõik" võttis järgmise lehe puutumata kleepuva kasti märkimata
 // muudatusena plaani ja kärpis lehe, mida kasutaja ei tahtnud kärpida.
-// Kaudsed salvestused (Rakenda kõik, vahekaardi vahetus) vaatavad `userEdited`-it.
+// Kaudsed salvestused (nt Rakenda kõik) vaatavad `userEdited`-it.
 describe('useCropBox userEdited', () => {
   it('puutumata kleepuv kast ei ole kasutaja muudatus', () => {
     const h = hookWithDrawnBox();
@@ -75,5 +75,23 @@ describe('useCropBox userEdited', () => {
   it('kastita leht: userEdited on false', () => {
     const h = renderHook(() => useCropBox(400, 600, true));
     expect(h.result.current.userEdited).toBe(false);
+  });
+});
+
+// 2026-11-18: liigutamisel piirati ainult keskpunkti — kast läks poolenisti pildist
+// välja ja tulemus oli näidatust väiksem (kärbe klambitakse pildi piiridesse).
+describe('useCropBox liigutamine', () => {
+  it('kast jääb liigutades pildi raami, nagu joonistamisel', () => {
+    const h = hookWithDrawnBox();   // kast 50..250 × 50..350 raamis 400×600
+    const box = document.createElement('div');
+    box.dataset.cropbox = '';
+    const at = (x: number, y: number) => ({ clientX: x, clientY: y });
+    act(() => { h.result.current.onMouseDown({ ...at(150, 200), target: box, preventDefault() {} } as never); });
+    act(() => { window.dispatchEvent(new MouseEvent('mousemove', at(-500, -500))); });
+    act(() => { window.dispatchEvent(new MouseEvent('mouseup', at(-500, -500))); });
+    const r = h.result.current.cropRect!;
+    expect(r.x).toBeCloseTo(0);
+    expect(r.y).toBeCloseTo(0);
+    expect(r.w).toBeCloseTo(0.5);    // suurus ei muutu
   });
 });

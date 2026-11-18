@@ -110,3 +110,28 @@ export function resizeRotatedBox(
     h,
   };
 }
+
+/**
+ * Pööratud kasti keskpunkt piiratuna nii, et kasti ÜMBRISKAST jääb raami
+ * `bounds` sisse (liigutamine). Telgjoondatud kast peatub servas nagu
+ * joonistamisel; kallutatud kast peatub nurgaga servas. Kui kast on mingis
+ * suunas raamist suurem (nt peaaegu lehesuurune kallutatud kast sirgestamisel),
+ * võib ta selles suunas liikuda seni, kuni katab raami kogu ulatuse — lukustus
+ * keskele teeks sellise kasti liigutamatuks.
+ *
+ * Varem piirati ainult keskpunkti → kast sai poolenisti pildist välja ja
+ * tulemus (kärbe klambitakse pildi piiridesse) oli väiksem kui näidatud kast.
+ */
+export function clampRotatedCenter(
+  b: CenterBox, angleDeg: number, bounds: { w: number; h: number },
+): { cx: number; cy: number } {
+  const a = (angleDeg * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(a));
+  const sin = Math.abs(Math.sin(a));
+  const hx = (b.w * cos + b.h * sin) / 2;
+  const hy = (b.w * sin + b.h * cos) / 2;
+  // Väike kast: [half, size - half]. Suur kast: [size - half, half] (katab raami).
+  const axis = (v: number, half: number, size: number) =>
+    clamp(v, Math.min(half, size - half), Math.max(half, size - half));
+  return { cx: axis(b.cx, hx, bounds.w), cy: axis(b.cy, hy, bounds.h) };
+}

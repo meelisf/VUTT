@@ -464,19 +464,22 @@ selle omanik (`_reset_status_if_prepping`), muidu lubaks ta teise apply CAS-i si
 **Kaks pildiredaktorit — muudatus tuleb teha MÕLEMAS (ADR 0049)** — teose halduse
 `PageImageEditorModal` ja upload'i `SplitPageDetail` on kaks vaadet ühe tööriistakomplekti
 peal ja peavad kasutajale tunduma ühesugused. Ühine on `src/components/pagePrep/`
-(`useCropBox`, `CropOverlay`, `EditToolbar`, `PendingOutline`, `EditorTabs`, `PendingGroup`,
-`PageNavFooter`, `SplitLine`, `RotateButtons`, `useSplitDrag`, `geometry`): sinna käib KÕIK, mis on mõlemal sama (tööriistaribad, kontuurid,
+(`useCropBox`, `CropOverlay`, `EditToolbar`, `PendingOutline`, `PendingGroup`,
+`PageNavFooter`, `PageFilmstrip`, `SplitGuide`, `splitGeometry`, `RotateButtons`, `geometry`): sinna käib KÕIK, mis on mõlemal sama (tööriistaribad, kontuurid,
 kasti loogika) — ära kopeeri oma versiooni. Muudad ühist osa → ava ja kontrolli MÕLEMAT vaadet
 (`/work/<id>/manage` → lehe redaktor ja `/upload` → poolitusvaade); muudad ühes vaates midagi, mis
 võiks olla mõlemas → tee mõlemasse või kirjuta, miks mitte. Päris ühte moodulisse neid ei panda:
 andmeallikas (upload: plaan + 100 DPI eelvaade; haldus: ootel plaan + serveri eelvaade pileti
 kaudu) ja haldusele omased toimingud (asenda pilt, taasta originaal, eksemplari päritolu) erinevad.
-Päis (vahekaardid + ootel-kapsel), tööriistaveerg ja jalus on ühised; sõnastus elab `common:pagePrep`-is, mitte kummagi vaate nimeruumis. Vaatele omane: halduses „Rakenda kõik", asenda pilt, taasta originaal; upload'is „Välista leht" (päises) ja „Edasi" (apply).
+Päis (ootel-kapsel), tööriistaveerg, pisipiltide riba ja jalus on ühised; sõnastus elab `common:pagePrep`-is, mitte kummagi vaate nimeruumis. Vaatele omane: halduses „Rakenda kõik", asenda pilt, taasta originaal; upload'is „Välista leht" (päises) ja „Edasi" (apply).
 
 **Lehe teisendus (ADR 0049)** — kalle/kärbe/perspektiiv käib AINULT
 `server/image_transform.py` kaudu (teose haldus JA upload'i prepress); UI osad
 `src/components/pagePrep/`. Upload'i apply järjekord: **pööre → `adjust` → poolitus**;
-pööre eemaldab `adjust`-i (`withRotation`). Plaani salvestuses puuduv `adjust` võti =
+pööre eemaldab `adjust`-i (`withRotation`). Redaktor on ÜKS vaade (ADR 0085): kärpekast ja
+poolitusjoon samal pildil, joon kärpe väljundi nelinurgas (`splitGeometry`); klõps ilma
+liikumiseta = joon, lohistus = kast. Kõik on KOHE ootel (`usePendingCrop`): ekraanil olev
+kast = ootel kärbe (taastatakse lehele tulles), kleepuv kast on pakkumine kuni puudutamiseni. Plaani salvestuses puuduv `adjust` võti =
 ära puutu, ainult `null` eemaldab. Eelvaade saab `adjust`-i URL-ist (`?adj=`), mitte plaanist.
 Teose halduse pööre/kärbe/poolitus (ADR 0050, 0061) on **ootel plaan** (`manage/pageOpsPlan.ts`,
 võti = failinimi; kärbe = `adjust` pööratud raamis, pöörde muutus eemaldab selle) ja rakendub **taustatööna** (`POST /admin/work/{id}/page-ops` +

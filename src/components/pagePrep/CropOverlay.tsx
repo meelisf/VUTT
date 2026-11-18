@@ -26,8 +26,17 @@ interface Props {
  * `absolute inset-0` pildikasti peale, mille mõõdud on `crop.displayW/H`.
  * Ühine teose haldusele ja upload'i ülevaatusele (#431).
  */
+/** Pöördesanga kaugus kasti ülaservast (px). */
+const ROTATE_HANDLE_OFFSET = 22;
+
 const CropOverlay: React.FC<Props> = ({ crop, deskewTitle }) => {
   const { overlayRef, perspective, quad, overlayBox, cropDraft, displayW, displayH } = crop;
+  // Pöördesang on kasti kohal; kui seal ruumi pole (kast pildi ülaservas), läheks
+  // ta lava `overflow-hidden` taha ja oleks raske kätte saada → siis kasti SISSE,
+  // ülaserva alla. Pöörde arvutus käib kasti keskpunkti järgi, sanga koht ei loe.
+  const handleInside = overlayBox != null
+    && overlayBox.cy - overlayBox.h / 2 < ROTATE_HANDLE_OFFSET + 6;
+  const handleTop = handleInside ? ROTATE_HANDLE_OFFSET : -ROTATE_HANDLE_OFFSET;
   return (
     <div
       ref={overlayRef}
@@ -62,7 +71,9 @@ const CropOverlay: React.FC<Props> = ({ crop, deskewTitle }) => {
       ) : overlayBox && (
         <div
           data-cropbox=""
-          className="absolute border-2 border-indigo-500"
+          data-proposal={crop.proposal ? 'true' : 'false'}
+          // Kleepuv kast on PAKKUMINE (ADR 0085): punktiir, kuni kasutaja ta vastu võtab.
+          className={`absolute border-2 border-indigo-500 ${crop.proposal ? 'border-dashed' : ''}`}
           style={{
             left: overlayBox.cx - overlayBox.w / 2,
             top: overlayBox.cy - overlayBox.h / 2,
@@ -88,13 +99,14 @@ const CropOverlay: React.FC<Props> = ({ crop, deskewTitle }) => {
               {/* Pöördesang ülal keskel */}
               <div
                 className="absolute w-px bg-indigo-500 pointer-events-none"
-                style={{ left: '50%', top: -22, height: 22 }}
+                style={{ left: '50%', top: handleInside ? 0 : -ROTATE_HANDLE_OFFSET, height: ROTATE_HANDLE_OFFSET }}
               />
               <div
                 data-rotate=""
+                data-inside={handleInside ? 'true' : 'false'}
                 title={deskewTitle}
                 className="absolute w-3 h-3 bg-white border border-indigo-600 rounded-full"
-                style={{ left: '50%', top: -22, transform: 'translate(-50%, -50%)', cursor: 'grab' }}
+                style={{ left: '50%', top: handleTop, transform: 'translate(-50%, -50%)', cursor: 'grab' }}
               />
             </>
           )}

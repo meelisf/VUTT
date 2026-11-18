@@ -2,12 +2,11 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Kollane punktiirraam + silt Poolita-vahekaardi KÄRBITUD eelvaate peal.
+ * Kollane punktiirraam + silt tulemuse eelvaate („Näita tulemust", ADR 0085) peal.
  *
- * Poolitusjoon on murdosa juba kärbitud pildi laiusest, seega näitab Poolita
- * vahekaart serveri eelvaadet, kus kärbe on sees — see näeb välja nagu rakendatud.
- * Raam ütleb, et see on ootel kärbe (sama kollane kui kontuur „Pööra ja kärbi"
- * vahekaardil). ÜHINE halduse ja upload'i redaktorile. Paigutatakse `absolute inset-0`
+ * Eelvaade on serveri renderdus, kus kärbe on sees — see näeb välja nagu rakendatud.
+ * Raam ütleb, et see on ootel kärbe (sama kollane kui ootel kärpe kontuur
+ * töövaates). ÜHINE halduse ja upload'i redaktorile. Paigutatakse `absolute inset-0`
  * eelvaate kasti peale.
  */
 const CroppedPreviewMark: React.FC<{ className?: string; style?: React.CSSProperties }> = ({

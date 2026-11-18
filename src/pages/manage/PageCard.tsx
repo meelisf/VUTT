@@ -1,14 +1,13 @@
 import React from 'react';
 import { useAdminImageTicket } from '../../hooks/useAdminImageTicket';
 import { useTranslation } from 'react-i18next';
-import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
+import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw, SquarePen } from 'lucide-react';
 import PageThumbnail from '../../components/PageThumbnail';
-import { IMAGE_BASE_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
 import { ReocrState } from '../../utils/reocrStatus';
 import { cardLineLeftPercent } from '../../components/pagePrep/geometry';
-import { workPagePreviewUrl } from '../../services/workApi';
-import { PendingPageOp, effectiveSplitX, needsServerPreview, showsCardLine } from './pageOpsPlan';
+import { PendingPageOp, effectiveSplitX, showsCardLine } from './pageOpsPlan';
+import { manageThumb } from './pageThumb';
 
 interface PageCardProps {
   workId: string;
@@ -23,8 +22,8 @@ interface PageCardProps {
   thumbCacheBust: number;
   imageToken?: { exp: number; sig: string } | null;
   onToggle: (filename: string, shiftKey: boolean) => void;
-  /** Avab pildiredaktori: 'edit' = kärbe/kalle/pööre, 'split' = poolitusjoon. */
-  onEdit: (tab: 'edit' | 'split') => void;
+  /** Avab pildiredaktori (pööre, kärbe, poolitus ühes vaates — ADR 0085). */
+  onEdit: () => void;
   isFocused?: boolean;
   /** Ootel pööre/kärbe/poolitus (#431, ADR 0061) — kaart näitab eelvaadet, fail ei ole veel muutunud. */
   pendingOp?: PendingPageOp;
@@ -33,14 +32,6 @@ interface PageCardProps {
   /** Äsja PDF-ist lisatud leht (ADR 0074) — vaate olek, ei salvestata. */
   isHighlighted?: boolean;
 }
-
-/** Ootel pöörde eelvaade CSS-iga. 90°/270° juures skaleeritakse 3:4 kasti
- *  sisse (pööratud kast oleks 4:3 ja lõikuks servadest). */
-const rotateStyle = (deg: number): React.CSSProperties | undefined => {
-  if (!deg) return undefined;
-  const scale = deg === 90 || deg === 270 ? ' scale(0.75)' : '';
-  return { transform: `rotate(${deg}deg)${scale}` };
-};
 
 const statusColor = (status: string) => {
   switch (status) {
@@ -54,17 +45,15 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
   const ticket = useAdminImageTicket(`work:${p.workId}`, authToken);
-  const imageTokenQuery = p.imageToken ? `&exp=${p.imageToken.exp}&sig=${p.imageToken.sig}` : '';
   const [aspect, setAspect] = React.useState<number | undefined>(undefined);
   const op = p.pendingOp;
   // 180° ei muuda kuvatud pildi mõõte → joon käib sama valemi järgi.
   const lineLeft = showsCardLine(op) ? cardLineLeftPercent(aspect, effectiveSplitX(op, p.splitX)) : null;
-  // Kärbet/kallet CSS ei näita → server renderdab pisipildist eelvaate (pööre sees).
-  const serverPreview = needsServerPreview(op);
-  // Pilet veel teel → tavaline pisipilt, kuni eelvaate URL-i saab allkirjastada.
-  const thumbSrc = serverPreview && ticket
-    ? workPagePreviewUrl(p.workId, p.filename, ticket, op!.rotate, op!.adjust ?? null, 'thumb', p.thumbCacheBust)
-    : `${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}${imageTokenQuery}`;
+  // Pisipilt + ootel pööre/kärbe: sama allikas mis redaktori pisipiltide ribal.
+  const thumb = manageThumb({
+    workId: p.workId, imageName: p.imageName, filename: p.filename, op,
+    ticket, imageToken: p.imageToken ?? null, cacheBust: p.thumbCacheBust,
+  });
   return (
     <div
       ref={ref}
@@ -125,14 +114,14 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         <PageThumbnail
           retry
           workId={p.workId}
-          src={thumbSrc}
+          src={thumb.src}
           /* `object-contain`, MITTE `cover` (sama kuju nagu upload'i kontaktlehel
              ja UploadStepReview'l): rõhtne leht ON lapiti ja peab ka ruudustikus
              lapiti välja nägema. `cover` lõikas küljed 3/4 portreeks ja peitis
              just selle — lehe tegelikku formaati polnud kaardilt näha. */
           className="w-full h-full object-contain"
           onAspect={setAspect}
-          imgStyle={serverPreview ? undefined : rotateStyle(op?.rotate ?? 0)}
+          imgStyle={thumb.imgStyle}
         />
         {/* Äsja lisatud lehe märk — all vasakul (ülemised nurgad on valikul ja OCR-il). */}
         {p.isHighlighted && (
@@ -166,26 +155,17 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         <span className={`absolute bottom-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(p.status)}`}>
           {p.visiblePageNum}
         </span>
-        {/* Redaktor — all paremal: kaks eraldi nuppu, et kärpimine oleks leitav
-            (varem üks käärid-ikoon, mida loeti poolitamiseks, ADR 0061). */}
+        {/* Redaktor — all paremal: üks nupp (ADR 0085). Pööre, kärbe ja poolitus on
+            redaktoris ühes vaates; varem kaks nuppu, kumbki oma vahekaardile (ADR 0061). */}
         <div className="absolute bottom-1 right-1 flex gap-1">
           <button
-            data-testid="card-open-crop"
-            onClick={(e) => { e.stopPropagation(); p.onEdit('edit'); }}
+            data-testid="card-open-editor"
+            onClick={(e) => { e.stopPropagation(); p.onEdit(); }}
             className="p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
-            title={t('manage.editor.openCrop')}
-            aria-label={t('manage.editor.openCrop')}
+            title={t('manage.editor.openEditor')}
+            aria-label={t('manage.editor.openEditor')}
           >
-            <Crop size={14} />
-          </button>
-          <button
-            data-testid="card-open-split"
-            onClick={(e) => { e.stopPropagation(); p.onEdit('split'); }}
-            className="p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
-            title={t('manage.editor.openSplit')}
-            aria-label={t('manage.editor.openSplit')}
-          >
-            <Columns2 size={14} />
+            <SquarePen size={14} />
           </button>
         </div>
       </div>

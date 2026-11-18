@@ -52,3 +52,34 @@ export function rotatedCropToServerParams(
     },
   };
 }
+
+/**
+ * Pöördteisendus: serveri (angle, telg-joondatud crop) → pööratud kast display-pikslites.
+ * Ootel kärbe taastatakse lehele tagasi tulles MUUDETAVA kastina (ADR 0085: ekraanil
+ * olev kast = ootel kärbe). `angle` on serveri nurk (CSS-kraadid, võib olla [0, 360)).
+ */
+export function serverParamsToRotatedCrop(
+  params: ServerCropParams,
+  displayW: number,
+  displayH: number,
+): RotatedCropBox {
+  // Kasti kalle on serveri nurga vastand; normaliseeri vahemikku (-180, 180].
+  const norm = ((params.angle % 360) + 360) % 360;
+  const sendAngle = norm > 180 ? norm - 360 : norm;
+  const exp = expandedBoundingBox(displayW, displayH, sendAngle);
+  const w = params.crop.w * exp.width;
+  const h = params.crop.h * exp.height;
+  const dx = params.crop.x * exp.width + w / 2 - exp.width / 2;
+  const dy = params.crop.y * exp.height + h / 2 - exp.height / 2;
+  // Pöördpööre R_cw(sendAngle)^-1 = R_cw(-sendAngle).
+  const r = degToRad(sendAngle);
+  const cos = Math.cos(r);
+  const sin = Math.sin(r);
+  return {
+    cx: displayW / 2 + (cos * dx + sin * dy),
+    cy: displayH / 2 + (-sin * dx + cos * dy),
+    w,
+    h,
+    angleDeg: sendAngle === 0 ? 0 : -sendAngle,
+  };
+}
