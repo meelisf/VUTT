@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAdminImageTicket } from '../../hooks/useAdminImageTicket';
 import { useTranslation } from 'react-i18next';
-import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
+import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw, SquarePen } from 'lucide-react';
 import PageThumbnail from '../../components/PageThumbnail';
 import { useUser } from '../../contexts/UserContext';
 import { ReocrState } from '../../utils/reocrStatus';
@@ -22,8 +22,8 @@ interface PageCardProps {
   thumbCacheBust: number;
   imageToken?: { exp: number; sig: string } | null;
   onToggle: (filename: string, shiftKey: boolean) => void;
-  /** Avab pildiredaktori: 'edit' = kärbe/kalle/pööre, 'split' = poolitusjoon. */
-  onEdit: (tab: 'edit' | 'split') => void;
+  /** Avab pildiredaktori (pööre, kärbe, poolitus ühes vaates — ADR 0085). */
+  onEdit: () => void;
   isFocused?: boolean;
   /** Ootel pööre/kärbe/poolitus (#431, ADR 0061) — kaart näitab eelvaadet, fail ei ole veel muutunud. */
   pendingOp?: PendingPageOp;
@@ -155,26 +155,17 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         <span className={`absolute bottom-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(p.status)}`}>
           {p.visiblePageNum}
         </span>
-        {/* Redaktor — all paremal: kaks eraldi nuppu, et kärpimine oleks leitav
-            (varem üks käärid-ikoon, mida loeti poolitamiseks, ADR 0061). */}
+        {/* Redaktor — all paremal: üks nupp (ADR 0085). Pööre, kärbe ja poolitus on
+            redaktoris ühes vaates; varem kaks nuppu, kumbki oma vahekaardile (ADR 0061). */}
         <div className="absolute bottom-1 right-1 flex gap-1">
           <button
-            data-testid="card-open-crop"
-            onClick={(e) => { e.stopPropagation(); p.onEdit('edit'); }}
+            data-testid="card-open-editor"
+            onClick={(e) => { e.stopPropagation(); p.onEdit(); }}
             className="p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
-            title={t('manage.editor.openCrop')}
-            aria-label={t('manage.editor.openCrop')}
+            title={t('manage.editor.openEditor')}
+            aria-label={t('manage.editor.openEditor')}
           >
-            <Crop size={14} />
-          </button>
-          <button
-            data-testid="card-open-split"
-            onClick={(e) => { e.stopPropagation(); p.onEdit('split'); }}
-            className="p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
-            title={t('manage.editor.openSplit')}
-            aria-label={t('manage.editor.openSplit')}
-          >
-            <Columns2 size={14} />
+            <SquarePen size={14} />
           </button>
         </div>
       </div>

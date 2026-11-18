@@ -71,7 +71,9 @@ const CropOverlay: React.FC<Props> = ({ crop, deskewTitle }) => {
       ) : overlayBox && (
         <div
           data-cropbox=""
-          className="absolute border-2 border-indigo-500"
+          data-proposal={crop.proposal ? 'true' : 'false'}
+          // Kleepuv kast on PAKKUMINE (ADR 0085): punktiir, kuni kasutaja ta vastu võtab.
+          className={`absolute border-2 border-indigo-500 ${crop.proposal ? 'border-dashed' : ''}`}
           style={{
             left: overlayBox.cx - overlayBox.w / 2,
             top: overlayBox.cy - overlayBox.h / 2,

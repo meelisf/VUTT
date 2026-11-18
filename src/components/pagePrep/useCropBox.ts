@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CropRect } from '../../services/pageService';
 import { clampRotatedCenter, resizeRotatedBox, CropHandle, CenterBox } from '../../utils/cropBoxInteraction';
-import { rotatedCropToServerParams } from '../../utils/rotatedCropParams';
+import { rotatedCropToServerParams, serverParamsToRotatedCrop } from '../../utils/rotatedCropParams';
+import type { PageAdjust } from '../../pages/upload/types';
 import { defaultQuad, quadFromCropRect, quadPtFromDisplayPx, Quad4 } from '../../utils/perspectiveQuad';
 import { addRotation } from './geometry';
 
 const MIN_DRAG_PX = 8;   // alla selle ei registreeri kärbet
+/** Alla selle liikumise on vajutus KLÕPS (poolitusjoon, ADR 0085), mitte lohistus. */
+export const CLICK_PX = 4;
 
 /** Serveri teisendusparameetrid — sama leping teose halduses ja upload'i plaanis. */
 export interface CropServerParams {
@@ -15,8 +18,10 @@ export interface CropServerParams {
 }
 
 type Interaction =
-  | { mode: 'draw' }
-  | { mode: 'move'; startX: number; startY: number; startCenter: { cx: number; cy: number } }
+  // Vajutus tühjal alal: kas klõps (joon) või kasti joonistuse algus — selgub liikumisest.
+  | { mode: 'press'; x0: number; y0: number }
+  | { mode: 'draw'; prevAngle: number }
+  | { mode: 'move'; startX: number; startY: number; startCenter: { cx: number; cy: number }; moved: boolean }
   | { mode: 'resize'; handle: CropHandle; startBox: CenterBox }
   | { mode: 'rotate' }
   | { mode: 'corner'; idx: number }
@@ -32,7 +37,14 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
  * joonistatakse (teose halduses jämeda pöörde laiendatud kast, upload'is
  * juba pööratud eelvaade). `active` = pildi mõõdud on teada.
  */
-export function useCropBox(displayW: number, displayH: number, active: boolean) {
+export interface CropBoxOptions {
+  /** Klõps ilma liikumiseta (kuvapikslites) — poolitusjoone panek (ADR 0085). Kast ei muutu. */
+  onClick?: (p: { x: number; y: number }) => void;
+}
+
+export function useCropBox(displayW: number, displayH: number, active: boolean, opts: CropBoxOptions = {}) {
+  const onClickRef = useRef(opts.onClick);
+  onClickRef.current = opts.onClick;
   const [boxAngle, setBoxAngle] = useState(0);        // crop-kasti kalle (deskew)
   const [cropRect, setCropRect] = useState<CropRect | null>(null);  // telg-joondatud kasti-lokaal
   const [perspective, setPerspective] = useState(false);   // perspektiivirežiim
@@ -49,9 +61,14 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
   const stickyRectRef = useRef<CropRect | null>(null);
   const interaction = useRef<Interaction>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  // Kasutaja muudatuste loendur (ADR 0085: kõik on kohe ootel). Kasvab AINULT kasutaja
+  // lõpetatud toimingu peale (lohistuse lõpp, tööriistariba) — mitte reset/restore peale.
+  // Redaktor kirjutab plaani, kui loendur muutub.
+  const [editSeq, setEditSeq] = useState(0);
+  const bumpEdit = () => setEditSeq((n) => n + 1);
 
-  // Jäta meelde viimati kasutatud kärpe-suurus. onCropUp viskab MIN_DRAG_PX-st väiksemad
-  // kastid ära (cropRect=null) → liiga väikest kogemata kasti ei salvestata.
+  // Jäta meelde viimati kasutatud kärpe-suurus. onCropUp ei võta MIN_DRAG_PX-st väiksemat
+  // kasti vastu → liiga väikest kogemata kasti ei salvestata.
   useEffect(() => {
     if (cropRect) lastCropSizeRef.current = { w: cropRect.w, h: cropRect.h };
   }, [cropRect]);
@@ -77,11 +94,12 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
     }
   }, []);
 
-  /** Eemalda kast JA unusta kleepuv suurus. */
+  /** Eemalda kast JA unusta kleepuv suurus (kasutaja toiming → läheb plaani). */
   const clearCrop = useCallback(() => {
     setCropRect(null);
     setBoxAngle(0);
     lastCropSizeRef.current = null;
+    setEditSeq((n) => n + 1);
   }, []);
 
   // --- Kärpe-lohistus ---
@@ -122,7 +140,9 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
         setDragging(true);
         return;
       }
-      // Perspektiivirežiimis ei joonista uut kasti — ainult nurki lohistab.
+      // Perspektiivirežiimis ei joonista uut kasti — ainult nurki lohistab; klõps = joon.
+      interaction.current = { mode: 'press', x0: p.x, y0: p.y };
+      setDragging(true);
       return;
     }
 
@@ -134,20 +154,28 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
       interaction.current = { mode: 'rotate' };
     } else if (target.dataset.cropbox !== undefined && cropRect) {
       const b = rectToCenterPx(cropRect);
-      interaction.current = { mode: 'move', startX: p.x, startY: p.y, startCenter: { cx: b.cx, cy: b.cy } };
+      interaction.current = { mode: 'move', startX: p.x, startY: p.y, startCenter: { cx: b.cx, cy: b.cy }, moved: false };
     } else {
-      // Uue kasti joonistus on alati telg-joondatud → nulli kalle
-      setBoxAngle(0);
-      interaction.current = { mode: 'draw' };
-      setCropDraft({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+      // Joonistus algab alles liikumisega (onCropMove): klõps ei tohi kasti ega kallet puutuda.
+      interaction.current = { mode: 'press', x0: p.x, y0: p.y };
     }
     setDragging(true);
   };
 
   const onCropMove = (e: { clientX: number; clientY: number }) => {
     const it = interaction.current;
-    if (!it || (it.mode !== 'draw' && it.mode !== 'corner' && !cropRect)) return;
+    if (!it) return;
     const p = localPoint(e);
+    if (it.mode === 'press') {
+      if (Math.hypot(p.x - it.x0, p.y - it.y0) < CLICK_PX || perspective) return;
+      // Lohistus: uue kasti joonistus on alati telg-joondatud → nulli kalle (taastatakse,
+      // kui kast jääb liiga väikeseks).
+      interaction.current = { mode: 'draw', prevAngle: boxAngle };
+      setBoxAngle(0);
+      setCropDraft({ x0: it.x0, y0: it.y0, x1: p.x, y1: p.y });
+      return;
+    }
+    if (it.mode !== 'draw' && it.mode !== 'corner' && !cropRect) return;
     if (it.mode === 'corner' && quad) {
       const np = quadPtFromDisplayPx(p.x, p.y, displayW, displayH);
       setQuad(quad.map((q, i) => (i === it.idx ? np : q)) as Quad4);
@@ -156,6 +184,9 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
     if (it.mode === 'draw') {
       setCropDraft((d) => (d ? { ...d, x1: p.x, y1: p.y } : d));
     } else if (it.mode === 'move' && cropRect) {
+      // Alla klõpsuläve kast ei liigu — muidu nihutaks iga klõps kasti paar pikslit.
+      if (!it.moved && Math.hypot(p.x - it.startX, p.y - it.startY) < CLICK_PX) return;
+      it.moved = true;
       const b = rectToCenterPx(cropRect);
       // Kast (tema pööratud ümbriskast) jääb pildi raami — nagu joonistamisel ja
       // suuruse muutmisel. Ainult keskpunkti piiramine laskis kasti poolenisti välja.
@@ -180,6 +211,10 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
     setDragging(false);
     const it = interaction.current;
     interaction.current = null;
+    if (it?.mode === 'press') { onClickRef.current?.({ x: it.x0, y: it.y0 }); return; }
+    if (it?.mode === 'move' && !it.moved) { onClickRef.current?.({ x: it.startX, y: it.startY }); return; }
+    // Liigutus, suurus, kalle, perspektiivinurk: lõpetatud muudatus.
+    if (it && it.mode !== 'draw') { bumpEdit(); return; }
     if (it?.mode === 'draw' && cropDraft) {
       const left = Math.min(cropDraft.x0, cropDraft.x1);
       const top = Math.min(cropDraft.y0, cropDraft.y1);
@@ -187,10 +222,12 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
       const h = Math.abs(cropDraft.y1 - cropDraft.y0);
       setCropDraft(null);
       if (w < MIN_DRAG_PX || h < MIN_DRAG_PX) {
-        setCropRect(null);
+        // Liiga väike → kogemata lohistus; eelmine kast (ja kalle) jääb alles.
+        setBoxAngle(it.prevAngle);
         return;
       }
       setCropRect({ x: left / displayW, y: top / displayH, w: w / displayW, h: h / displayH });
+      bumpEdit();
     }
   };
 
@@ -220,9 +257,38 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
       setQuad(cropRect ? quadFromCropRect(cropRect) : defaultQuad(0.05));
       return true;
     });
+    bumpEdit();
   };
 
-  const resetQuad = () => setQuad(defaultQuad(0.05));
+  const resetQuad = () => { setQuad(defaultQuad(0.05)); bumpEdit(); };
+
+  /**
+   * Taasta ootel kärbe MUUDETAVA kastina (ADR 0085: ekraanil olev kast = ootel kärbe).
+   * Ei ole kasutaja toiming (loendur ei kasva) ega kleepuv pakkumine. `adjust` on
+   * `toServerParams(0)` kujul (pööratud lehe raamis). Tagastab false, kui kuju ei
+   * oska kastiks teisendada (nt perspektiiv koos kaldega) — siis jääb kontuur.
+   */
+  const restore = useCallback((adjust: PageAdjust): boolean => {
+    if (displayW <= 0 || displayH <= 0) return false;
+    interaction.current = null;
+    setCropDraft(null);
+    stickyRectRef.current = null;
+    if (adjust.quad && adjust.quad.length === 4) {
+      if (Math.abs(adjust.angle) > 1e-4 && Math.abs(adjust.angle - 360) > 1e-4) return false;
+      setCropRect(null);
+      setBoxAngle(0);
+      setPerspective(true);
+      setQuad(adjust.quad.map(([x, y]) => ({ x, y })) as Quad4);
+      return true;
+    }
+    if (!adjust.crop) return false;
+    const b = serverParamsToRotatedCrop({ angle: adjust.angle, crop: adjust.crop }, displayW, displayH);
+    setPerspective(false);
+    setQuad(null);
+    setBoxAngle(b.angleDeg);
+    setCropRect({ x: (b.cx - b.w / 2) / displayW, y: (b.cy - b.h / 2) / displayH, w: b.w / displayW, h: b.h / displayH });
+    return true;
+  }, [displayW, displayH]);
 
   /** Jäme pööre muudab kuvaraami → kärbe/kalle lähtestatakse; perspektiivis
    *  lähtestatakse quad vaikenelinurgaks (nurki me ei teisenda). */
@@ -256,13 +322,19 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
   const hasEdit = cropRect !== null || (perspective && quad !== null);
   /**
    * Kas kast on kasutaja tehtud või muudetud — MITTE puutumata kleepuv pakkumine.
-   * Kaudsed salvestused (Rakenda kõik, vahekaardi vahetus) PEAVAD vaatama seda,
+   * Kaudsed salvestused (nt Rakenda kõik) PEAVAD vaatama seda,
    * mitte `hasEdit`-i: muidu kärbitakse leht, mida kasutaja ei puudutanud (2026-11-17).
    * Selgesõnaline „Märgi" tohib võtta ka pakkumise — kast on ekraanil.
    */
   const untouchedSticky = cropRect !== null && cropRect === stickyRectRef.current
     && boxAngle === 0 && !perspective;
   const userEdited = hasEdit && !untouchedSticky;
+  /** Kleepuv kast on PAKKUMINE (ADR 0085): ekraanil, aga mitte plaanis, kuni kasutaja
+   *  teda puudutab või põhinupuga („Kärbi ja järgmine") vastu võtab. */
+  const proposal = hasEdit && untouchedSticky;
+  /** Pakkumine vastu võetud (redaktor kirjutas selle plaani): uus objekt → enam mitte
+   *  puutumata kleepuv kast. Loendur ei kasva — kirjutus tehti juba selgesõnaliselt. */
+  const acceptProposal = () => setCropRect((r) => (r ? { ...r } : r));
 
   /**
    * Serveri parameetrid. `grossAngle` = pildile rakendatud jäme pööre (upload'is 0,
@@ -288,8 +360,8 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
 
   return {
     overlayRef, cropRect, boxAngle, quad, perspective, cropDraft, overlayBox, hasEdit, userEdited,
-    displayW, displayH,
-    onMouseDown, reset, clearCrop, togglePerspective, resetQuad, onGrossRotate, toServerParams,
+    proposal, editSeq, dragging, displayW, displayH,
+    onMouseDown, reset, restore, acceptProposal, clearCrop, togglePerspective, resetQuad, onGrossRotate, toServerParams,
   };
 }
 

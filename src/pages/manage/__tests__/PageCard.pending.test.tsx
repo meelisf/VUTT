@@ -46,12 +46,12 @@ describe('PageCard ootel toimingud', () => {
 });
 
 describe('PageCard kärbe (ADR 0061)', () => {
-  it('kärpimine ja poolitamine on eraldi nähtavad nupud', () => {
+  it('üks redaktorinupp (ADR 0085)', () => {
     const onEdit = vi.fn();
     render(<PageCard {...base} onEdit={onEdit} />);
-    screen.getByTestId('card-open-crop').click();
-    screen.getByTestId('card-open-split').click();
-    expect(onEdit.mock.calls).toEqual([['edit'], ['split']]);
+    screen.getByTestId('card-open-editor').click();
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('card-open-split')).toBeNull();
   });
 
   it('ootel kärbe: märk ja serveri eelvaade (CSS-pööret pole)', () => {

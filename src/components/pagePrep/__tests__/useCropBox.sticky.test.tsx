@@ -42,7 +42,7 @@ describe('useCropBox kleepuv kast', () => {
 
 // 2026-11-17: „Rakenda kõik" võttis järgmise lehe puutumata kleepuva kasti märkimata
 // muudatusena plaani ja kärpis lehe, mida kasutaja ei tahtnud kärpida.
-// Kaudsed salvestused (Rakenda kõik, vahekaardi vahetus) vaatavad `userEdited`-it.
+// Kaudsed salvestused (nt Rakenda kõik) vaatavad `userEdited`-it.
 describe('useCropBox userEdited', () => {
   it('puutumata kleepuv kast ei ole kasutaja muudatus', () => {
     const h = hookWithDrawnBox();

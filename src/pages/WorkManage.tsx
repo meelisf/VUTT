@@ -208,7 +208,7 @@ const WorkManage: React.FC = () => {
   const [deleteWorkError, setDeleteWorkError] = useState<string | null>(null);
 
   // Pildi HMAC token piiratud teoste allalaadimiseks
-  const [editorTarget, setEditorTarget] = useState<{ index: number; tab: 'edit' | 'split' } | null>(null);
+  const [editorTarget, setEditorTarget] = useState<{ index: number } | null>(null);
 
   const MIN_COLS = 3;
   const MAX_COLS = 10;
@@ -352,7 +352,7 @@ const WorkManage: React.FC = () => {
 
   const pageOpsCount = pendingCount(pendingOps);
 
-  // Pildiredaktori poolitusvahekaart kirjutab samasse ootel plaani (joon püsib
+  // Pildiredaktori poolitusjoon kirjutab samasse ootel plaani (joon püsib
   // üle modaali sulgemise, kaardil on sama joon). Stabiilne identiteet —
   // redaktori lohistuse kuulaja sõltub sellest.
   const handleEditorSplitChange = useCallback(
@@ -1296,7 +1296,7 @@ const WorkManage: React.FC = () => {
                         thumbCacheBust={thumbCacheBust}
                         imageToken={imageToken}
                         onToggle={handleToggle}
-                        onEdit={(tab) => setEditorTarget({ index: page.page_num - 1, tab })}
+                        onEdit={() => setEditorTarget({ index: page.page_num - 1 })}
                         pendingOp={pendingOps[page.filename]}
                         splitX={splitX}
                         isHighlighted={highlightedFiles.has(page.filename)}
@@ -1621,7 +1621,6 @@ const WorkManage: React.FC = () => {
           workId={workId!}
           pages={pages.map(p => ({ filename: p.lehekylje_pilt.split('/').pop() ?? '', page_num: p.page_num }))}
           initialIndex={editorTarget.index}
-          initialTab={editorTarget.tab}
           imageToken={imageToken}
           onClose={() => setEditorTarget(null)}
           onPagesChanged={async () => {

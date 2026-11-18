@@ -100,7 +100,6 @@
     "globalLine": "Poolitusjoon (% laiusest)",
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
-    "willNotSplit": "Seda lehte ei poolitata",
     "isExcluded": "See leht jäetakse OCR-ist välja",
     "backToOverview": "Tagasi ülevaatesse",
     "card": {
@@ -139,8 +138,7 @@
     "gridColumns": "Pisipiltide suurus",
     "detail": {
       "resetToGlobal": "Lähtesta üldjoonele",
-      "splitHint": "Lohista joont või klõpsa pildil. Poolitus jääb ootele: leht lõigatakse alles siis, kui vajutad „Edasi”.",
-      "editHint": "Pööre ja kärbe jäävad ootele: pilt muutub alles siis, kui vajutad „Edasi”. Uus kärbe asendab praeguse, pööramine eemaldab kärpe."
+      "editHint": "Pööre, kärbe ja poolitus jäävad ootele: pilt muutub alles siis, kui vajutad „Edasi”. Uus kärbe asendab praeguse, pööramine eemaldab kärpe."
     },
     "excludedExplain": "Ei OCR-ita ega poolitata — seda lehte teosesse ei teki",
     "waitingRender": "Eelvaade lõpetab — nupp avaneb kohe ({{done}} / {{total}})"

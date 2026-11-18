@@ -100,7 +100,6 @@
     "globalLine": "Split line (% of width)",
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
-    "willNotSplit": "This page will not be split",
     "isExcluded": "This page is excluded from OCR",
     "backToOverview": "Back to overview",
     "card": {
@@ -139,8 +138,7 @@
     "gridColumns": "Thumbnail size",
     "detail": {
       "resetToGlobal": "Reset to global line",
-      "splitHint": "Drag the line or click on the image. The split stays pending: the page is cut only when you press “Continue”.",
-      "editHint": "Rotation and crop stay pending: the image changes only when you press “Continue”. A new crop replaces the current one; rotating removes it."
+      "editHint": "Rotation, crop and split stay pending: the image changes only when you press “Continue”. A new crop replaces the current one; rotating removes it."
     },
     "excludedExplain": "Not OCR’d and not split — this page will not appear in the work",
     "waitingRender": "Preview is finishing — the button unlocks shortly ({{done}} / {{total}})"

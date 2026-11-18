@@ -3,7 +3,7 @@
 // (vt CLAUDE.md „Kaks pildiredaktorit“).
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
-import { X, Columns2, Loader2, AlertTriangle, ChevronRight, Check, Upload, Undo2, MoreHorizontal } from 'lucide-react';
+import { X, Columns2, Loader2, AlertTriangle, ChevronRight, Check, Upload, Undo2, MoreHorizontal, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -12,17 +12,17 @@ import { workPagePreviewUrl } from '../services/workApi';
 import { adjustFromParams } from '../pages/upload/prepressPlan';
 import type { PageAdjust } from '../pages/upload/types';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
-import { addRotation, clampSplitX } from './pagePrep/geometry';
-import { useSplitDrag } from './pagePrep/useSplitDrag';
-import SplitLine from './pagePrep/SplitLine';
+import { addRotation } from './pagePrep/geometry';
+import SplitGuide, { useSplitGuideDrag } from './pagePrep/SplitGuide';
+import { outputQuad, splitSegment, splitXFromPoint, type Pt } from './pagePrep/splitGeometry';
 import EditToolbar from './pagePrep/EditToolbar';
 import CroppedPreviewMark from './pagePrep/CroppedPreviewMark';
-import EditorTabs from './pagePrep/EditorTabs';
-import PageNavFooter from './pagePrep/PageNavFooter';
+import { BackToOverview, PageNav } from './pagePrep/PageNavFooter';
 import PendingGroup from './pagePrep/PendingGroup';
 import PendingOutline from './pagePrep/PendingOutline';
 import PageFilmstrip, { type FilmstripItem } from './pagePrep/PageFilmstrip';
 import { useCropBox } from './pagePrep/useCropBox';
+import { usePendingCrop } from './pagePrep/usePendingCrop';
 import CropOverlay from './pagePrep/CropOverlay';
 import { effectiveSplitX, pendingCount, showsCardLine, type PendingPageOp } from '../pages/manage/pageOpsPlan';
 import { manageThumb } from '../pages/manage/pageThumb';
@@ -38,7 +38,6 @@ interface Props {
   workId: string;
   pages: PageInfo[];                // järjestatud
   initialIndex: number;
-  initialTab: 'edit' | 'split';
   imageToken: { exp: number; sig: string } | null;
   onClose: () => void;
   onPagesChanged: () => Promise<string[]>;  // laeb pages uuesti, tagastab uue failinimede massiivi
@@ -78,7 +77,7 @@ const DEFAULT_STAGE_W = 680;
 const DEFAULT_STAGE_H = 540;
 
 const PageImageEditorModal: React.FC<Props> = ({
-  workId, pages, initialIndex, initialTab, imageToken, onClose, onPagesChanged, onReplaceImage, cacheBust,
+  workId, pages, initialIndex, imageToken, onClose, onPagesChanged, onReplaceImage, cacheBust,
   pendingOps, globalSplitX, onSplitChange, onEditChange, onAdjustClear, onApplyAll, exemplars = [],
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
@@ -86,11 +85,13 @@ const PageImageEditorModal: React.FC<Props> = ({
   const ticket = useAdminImageTicket(`work:${workId}`, authToken);
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [tab, setTab] = useState<'edit' | 'split'>(initialTab);
-  const [grossAngle, setGrossAngle] = useState(0);   // jäme orientatsioon (90/180 nupud)
+  // „Näita tulemust" (ADR 0085): serveri eelvaade nähtava pöörde ja kärpega, ainult vaatamiseks.
+  const [showResult, setShowResult] = useState(false);
 
-  const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
-  // Poolitusvahekaardi kärbitud eelvaate mõõdud (serveri renderdus, ADR 0061).
+  // Pildi naturaalmõõdud koos võtmega (leht + versioon): lehe vahetuse renderdusel on
+  // vanad mõõdud veel olekus — `imgReady` ei tohi neid uue lehe omaks pidada.
+  const [imgNatural, setImgNatural] = useState<{ w: number; h: number; key: string } | null>(null);
+  // Tulemuse eelvaate mõõdud (serveri renderdus, ADR 0061).
   const [previewNatural, setPreviewNatural] = useState<{ w: number; h: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
@@ -105,7 +106,8 @@ const PageImageEditorModal: React.FC<Props> = ({
   const originMissing = exemplars.length > 0 && !replaceOrigin;
   const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
 
-  const splitContainerRef = useRef<HTMLDivElement>(null);
+  // Pildi raam (kuvatav, jämeda pöörde laiendatud kast) — joone ja klõpsu koordinaadid.
+  const frameRef = useRef<HTMLDivElement>(null);
   // "Lava" = paindlik ala, kuhu pilt mahutatakse. Mõõdame selle tegeliku suuruse,
   // et pilt mahuks alati ekraanile (ei jää modaali serva taha kitsal vertikaalruumil).
   const stageRef = useRef<HTMLDivElement>(null);
@@ -113,25 +115,22 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   const safeIndex = Math.max(0, Math.min(currentIndex, pages.length - 1));
   const current = pages[safeIndex];
+  const hasCurrent = Boolean(current);
 
   // Poolituse olek tuleb ootel plaanist (vt Props.pendingOps).
   const pendingOp = current ? pendingOps[current.filename] : undefined;
   const willSplit = Boolean(pendingOp?.split);
   const splitX = pendingOp?.split_x ?? globalSplitX;
-  // Ootel pööre rakendub ENNE poolitust → joon kehtib pööratud lehele, seega
-  // näitab poolitusvahekaart pilti juba pööratuna.
+  // Ootel pööre rakendub ENNE poolitust → joon kehtib pööratud (ja kärbitud) lehele.
   const pendingRotate = pendingOp?.rotate ?? 0;
+  // Pööre on kohe ootel (ADR 0085) → kuvatav jäme pööre ON ootel pööre.
+  const grossAngle = pendingRotate;
   const pendingAdjust = pendingOp?.adjust ?? null;
-  // Lehe vahetusel algab jäme pööre ootel pöördest (ref: lähtestus-effect ei tohi
-  // pöörde muutusel uuesti joosta — see pühiks pildi mõõdud ja kärpekasti).
-  const pendingRotateRef = useRef(pendingRotate);
-  pendingRotateRef.current = pendingRotate;
-  // Sama lehe-vahetuse effectile: ootel kärbega lehele ei panda kleepuvat kasti.
+  // Lehe-vahetuse effectile: ootel kärbega lehele ei panda kleepuvat kasti.
   const hasPendingAdjustRef = useRef(false);
   hasPendingAdjustRef.current = !!pendingAdjust;
 
-  // Mõõda lava tegelik suurus (uueneb akna/modaali muutudes ja tabi vahetusel).
-  // Korraga on mountitud ainult ühe tabi lava → re-attach [tab] muutudes.
+  // Mõõda lava tegelik suurus (uueneb akna/modaali muutudes).
   // Väike varu (-4 px), et piir/vari ei tekitaks ülevoolu.
   useEffect(() => {
     const el = stageRef.current;
@@ -144,7 +143,7 @@ const PageImageEditorModal: React.FC<Props> = ({
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [tab]);
+  }, [hasCurrent]);
 
   const imageUrl = (() => {
     if (!current) return '';
@@ -165,53 +164,31 @@ const PageImageEditorModal: React.FC<Props> = ({
   const displayH = expanded.height * fit;
   const imgDispW = natural.w * fit;
   const imgDispH = natural.h * fit;
-  // Ühtne pildi kuva-suurus mõlemal tabil (sõltumatu jämedast pöördest) — split kasutab seda,
-  // et edit-tabiga kokku langeda. grossAngle=0 korral identne imgDispW/H-ga.
-  // Poolitusvahekaart: kast on OOTEL pöörde järgi pööratud lehe mõõtu (90°/270°
-  // vahetavad laiuse ja kõrguse), pilt pööratakse CSS-iga selle sisse.
-  // Ootel kärpe korral näitab poolitusvahekaart serveri eelvaadet, milles pööre
-  // ja kärbe on juba sees — joon asetub täpselt nagu apply lõikab.
-  const splitPreviewUrl = current && pendingAdjust && ticket
-    ? workPagePreviewUrl(workId, current.filename, ticket, pendingRotate, pendingAdjust, 'view', cacheBust)
-    : null;
-  useEffect(() => { setPreviewNatural(null); }, [splitPreviewUrl]);
-  const splitRot90 = !splitPreviewUrl && (pendingRotate === 90 || pendingRotate === 270);
-  const splitNat = splitPreviewUrl
-    ? (previewNatural ?? natural)
-    : splitRot90 ? { w: natural.h, h: natural.w } : natural;
-  const splitFit = Math.min(stage.w / splitNat.w, stage.h / splitNat.h, 1);
-  const splitBoxW = splitNat.w * splitFit;
-  const splitBoxH = splitNat.h * splitFit;
-
-  // --- Kärpe/kalle/perspektiiv (edit-tab) --- ühine upload'i ülevaatusega (#431)
-  const crop = useCropBox(displayW, displayH, !!imgNatural);
+  // --- Kärpe/kalle/perspektiiv --- ühine upload'i ülevaatusega (#431).
+  // Klõps ilma liikumiseta = poolitusjoon (ADR 0085); käsitleja on allpool (vajab joone raami).
+  const clickRef = useRef<(p: Pt) => void>(() => {});
+  const imgKey = `${current?.filename}:${cacheBust}`;
+  const imgReady = imgNatural?.key === imgKey;
+  const crop = useCropBox(displayW, displayH, imgReady, { onClick: (p) => clickRef.current(p) });
   const resetCrop = crop.reset;
 
-  // Lähtesta teisendused + mõõda uuesti, kui leht vahetub VÕI pildi sisu muutub
-  // (cacheBust uueneb iga mutatsiooni järel — nt kärbe muudab kuvasuhet).
-  // crop.reset taastab "kleepuva" kärpe-suuruse tsentreeritud kastina (kui mõni
-  // varem oli) — samas efektis, et kasti kalle jääks garanteeritult 0.
+  // Lähtesta + mõõda uuesti, kui leht vahetub VÕI pildi sisu muutub (cacheBust uueneb
+  // iga mutatsiooni järel — nt kärbe muudab kuvasuhet). crop.reset paneb kleepuva
+  // pakkumise (ootel kärbega lehel mitte — see taastatakse kastina, usePendingCrop).
   useEffect(() => {
-    setGrossAngle(pendingRotateRef.current);
     setImgNatural(null);
     setError(null);
+    setShowResult(false);
     resetCrop(!hasPendingAdjustRef.current);
   }, [current?.filename, cacheBust, resetCrop]);
 
-  // Jäme 90°/180° pööre rakendub PILDILE; kärbe/kalle lähtestatakse (display-raam muutub).
+  // Jäme 90°/180° pööre läheb KOHE ootel plaani (ADR 0085). Kärbe kaob: see kuulus
+  // eelmisse raami (sama reegel mis upload'is, `withRotation`).
   const rotateBy = (delta: number) => {
-    setGrossAngle((a) => addRotation(a, delta));
+    if (!current) return;
+    onEditChange(current.filename, addRotation(pendingRotate, delta), null);
     crop.onGrossRotate();
   };
-
-  // --- Split-lohistus (split-tab) --- ühine upload'i ülevaatusega (#431)
-  const currentFilename = current?.filename;
-  const { startDrag: startSplitDrag, updateFromClientX: splitAtClientX } = useSplitDrag(
-    splitContainerRef,
-    useCallback((x: number) => {
-      if (currentFilename) onSplitChange(currentFilename, { split: true, split_x: clampSplitX(Number(x.toFixed(4))) });
-    }, [currentFilename, onSplitChange]),
-  );
 
   // --- Navigeerimine ---
   // Teade kaob ise (lisategevusega teade jääb, kuni kasutaja otsustab).
@@ -256,44 +233,52 @@ const PageImageEditorModal: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [currentIndex, goTo, onClose, menuOpen]);
 
-  // --- Märgi ja järgmine (ootel plaan, ADR 0061) ---
-  // Üks nupp: muudatus läheb plaani JA redaktor liigub edasi; muutmata leht = „Järgmine".
-  // Tagasi saab nooleklahvide / navigatsiooninuppudega.
-  const noEditChange = grossAngle === pendingRotate && !crop.hasEdit;
-  // Vahekaardi vahetusele (Poolita eelvaade ehitatakse plaanist): puutumata kleepuv
-  // kast EI ole muudatus — muidu läheks automaatne pakkumine plaani (2026-11-17).
-  const noUserChange = grossAngle === pendingRotate && !crop.userEdited;
-  const implicitAdjust = () => (crop.userEdited ? adjustFromParams(crop.toServerParams(0)) : null);
+  // --- Kõik on kohe ootel (ADR 0085) ---
+  // Ekraanil olev kast = ootel kärbe: taastatakse lehele tulles ja iga muudatus läheb kohe
+  // plaani. Kleepuv kast on pakkumine — plaani alles puudutamisel või põhinupu peale.
+  usePendingCrop({
+    crop, pendingAdjust, pageKey: `${imgKey}:${pendingRotate}`, ready: imgReady,
+    onCommit: (adjust) => { if (current) onEditChange(current.filename, pendingRotate, adjust); },
+  });
+  // Joone raam = plaani kärbe. Lohistuse ajal järgib joon kasti juba enne kirjutust.
+  const visibleAdjust: PageAdjust | null = crop.userEdited
+    ? adjustFromParams(crop.toServerParams(0))
+    : pendingAdjust;
+  const splitQuad = outputQuad(visibleAdjust, displayW, displayH);
   const isLast = safeIndex >= pages.length - 1;
-  const markPending = () => {
+  // Põhinupp: pakkumise korral „Kärbi ja järgmine" (võtab kasti vastu), muidu „Järgmine".
+  const advance = () => {
     if (!current) return;
-    // Lehel pole midagi muudetud → lihtsalt edasi; ootel plaan (ka varasem kärbe) jääb puutumata.
-    if (noEditChange) { if (!isLast) goTo(safeIndex + 1); return; }
-    // Kärpekast joonistati jämeda pöörde raamis → adjust käib selle pöörde juurde.
-    // Ainult pööre (kasti pole) → kärbe kaob, see kuulus eelmisse raami.
-    const adjust = crop.hasEdit ? adjustFromParams(crop.toServerParams(0)) : null;
-    onEditChange(current.filename, grossAngle, adjust);
-    setError(null);
-    // Järgmisele lehele, nagu varem kohese rakenduse järel — kärpimine käib lehthaaval.
-    if (!isLast) goTo(safeIndex + 1);
-    else {
-      // Viimane leht: kasti ei jäeta ette — tsentreeritud „kleepuv" kast paistaks
-      // nagu kehtiv kärbe, kuigi märgitud kärbe on juba plaanis (rida „Ootel kärbe").
-      resetCrop();
-      crop.clearCrop();
-      setToast({ text: t('manage.editor.allDone') });
+    if (crop.proposal) {
+      onEditChange(current.filename, pendingRotate, adjustFromParams(crop.toServerParams(0)));
+      crop.acceptProposal();
+      setError(null);
+      if (isLast) setToast({ text: t('manage.editor.allDone') });
     }
+    if (!isLast) goTo(safeIndex + 1);
   };
 
-  // Vahekaardi vahetus: Poolita eelvaade ehitatakse ootel plaanist, seega märkimata
-  // pööre/kärbe läheb enne plaani — muidu näitaks poolitus pilti, kus kärpet ei ole.
-  const switchTab = (next: 'edit' | 'split') => {
-    if (next === 'split' && tab === 'edit' && current && !noUserChange) {
-      onEditChange(current.filename, grossAngle, implicitAdjust());
-    }
-    setTab(next);
-    setError(null);
+  // --- Poolitusjoon kärpe raamis (ADR 0085) ---
+  const setSplitAt = (x: number) => {
+    if (current) onSplitChange(current.filename, { split: true, split_x: x });
   };
+  // Klõps paneb joone ainult poolitataval lehel — poolituse lülitab sisse nupp.
+  clickRef.current = (p: Pt) => {
+    if (willSplit) setSplitAt(splitXFromPoint(splitQuad, p));
+  };
+  const { startDrag: startSplitDrag } = useSplitGuideDrag(
+    frameRef, (p) => splitXFromPoint(splitQuad, p), setSplitAt,
+  );
+
+  // Tulemuse eelvaade: serveri renderdus nähtava pöörde ja kärpega (CSS ei kattu lõikega).
+  const resultUrl = showResult && current && ticket
+    ? workPagePreviewUrl(workId, current.filename, ticket, grossAngle, visibleAdjust, 'view', cacheBust)
+    : null;
+  useEffect(() => { setPreviewNatural(null); }, [resultUrl]);
+  const resultNat = previewNatural ?? { w: displayW, h: displayH };
+  const resultFit = Math.min(stage.w / resultNat.w, stage.h / resultNat.h, 1);
+  const resultW = resultNat.w * resultFit;
+  const resultH = resultNat.h * resultFit;
 
   // Taasta lehe ._originals pristine pilt (destruktiivne: kõik pildimuudatused kaovad).
   // Restore puudutab AINULT pilti; tekst/JSON jäävad. Poolitatud poolel → topeltlehekülg.
@@ -368,7 +353,7 @@ const PageImageEditorModal: React.FC<Props> = ({
   return (
     // Raam, kõrgus ja jaluse nupurühm järgivad upload'i detailvaadet
     // (`SplitPageDetail`): sama töö („vaata → otsusta → järgmine"), sama kuju.
-    // Ühine moodul nad ei ole — vajadused erinevad (vahekaardid, asendus, taaste).
+    // Ühine moodul nad ei ole — vajadused erinevad (asendus, taaste, andmeallikas).
     <div className="fixed inset-0 z-[1300] flex items-center justify-center overflow-hidden bg-black/70 p-2 sm:p-4">
       <div
         role="dialog"
@@ -376,36 +361,38 @@ const PageImageEditorModal: React.FC<Props> = ({
         className="flex h-[calc(100vh-1rem)] w-full max-w-6xl flex-col rounded bg-white sm:h-[calc(100vh-2rem)]"
       >
         {/* Päis: mis leht, mis vaade, mis selle lehega juhtub. */}
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-t border-b border-gray-200 bg-white px-4 py-2.5">
+        <div className="flex flex-shrink-0 flex-nowrap items-center gap-x-3 rounded-t border-b border-gray-200 bg-white px-4 py-2.5">
           <h2 className="whitespace-nowrap font-semibold text-gray-900">
             {t('common:pagePrep.page', { cur: safeIndex + 1, total: pages.length })}
           </h2>
-          <EditorTabs tab={tab} onChange={switchTab} />
 
-          {/* Ootel olek ühes rühmas: vasakul selle lehe muudatused (mõlemal vahekaardil),
-              paremal „Rakenda kõik" kogu teose kohta. Üks kollane kujund, mitte kaks
-              pilli, ja kogu info on ühes kohas. Rühm asub päises, et jalus ei kasvaks
-              ja pilt ei hüppaks. */}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          {/* Selle lehe ootel muudatused: kiibid, igaühel oma ✕. Ühel real (flex-nowrap +
+              overflow-hidden): päise kõrgus ei tohi sõltuda lehe olekust, muidu hüppab
+              pilt (ADR 0085). */}
+          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden">
             <PendingGroup
               rotate={pendingRotate} adjust={pendingAdjust}
               splitPercent={willSplit ? Math.round(splitX * 1000) / 10 : null}
-              onAdjustClear={() => onAdjustClear(current.filename)} testIdPrefix="editor">
-              {totalPending > 0 && onApplyAll && (
-                <button data-testid="editor-apply-all" onClick={applyAll}
-                  title={t('manage.editor.pendingChipTitle')}
-                  className="flex items-center gap-1.5 bg-amber-600 px-3 py-1 text-white hover:bg-amber-700">
-                  <Check size={12} />{t('manage.editor.applyAll', { count: totalPending })}
-                </button>
-              )}
-            </PendingGroup>
-            {tab === 'split' && !willSplit && (
+              // Pööre eemaldab ka kärpe (see kuulus pööratud raami), nagu pööramisnupud.
+              onRotateClear={() => { onEditChange(current.filename, 0, null); crop.onGrossRotate(); }}
+              // Ekraanil olev kast = ootel kärbe (ADR 0085) → eemaldus võtab ka kasti maha.
+              onAdjustClear={() => { crop.clearCrop(); onAdjustClear(current.filename); }}
+              onSplitClear={() => onSplitChange(current.filename, { split: false, split_x: pendingOp?.split_x ?? null })}
+              testIdPrefix="editor" />
+            {!willSplit && (
               <span data-testid="editor-split-state" className="text-xs text-gray-500">{t('common:pagePrep.notSplit')}</span>
             )}
-            {tab === 'split' && pendingRotate !== 0 && (
-              <span className="text-xs text-amber-700">{t('manage.editor.splitAfterRotate', { deg: pendingRotate })}</span>
-            )}
           </div>
+
+          {/* Kogu teose „Rakenda kõik" — eraldi nupp, mitte lehe kiipide seas: kehtib
+              KÕIGILE ootel lehtedele. Oranž = ootel muudatuste toiming (salvestusnupu kokkulepe). */}
+          {totalPending > 0 && onApplyAll && (
+            <button data-testid="editor-apply-all" onClick={applyAll}
+              title={t('manage.editor.pendingChipTitle')}
+              className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700">
+              <Check size={15} />{t('manage.editor.applyAll', { count: totalPending })}
+            </button>
+          )}
 
           {/* Harvad toimingud */}
           <div className="relative flex flex-shrink-0 items-center gap-1">
@@ -471,104 +458,78 @@ const PageImageEditorModal: React.FC<Props> = ({
                 className="-mr-1 rounded p-0.5 text-emerald-600 hover:bg-emerald-100"><X size={14} /></button>
             </div>
           )}
-          {/* Poolita-vahekaardil hoiab tühi koht riba laiust, et lava mõõt ja pilt
-              vahekaarti vahetades ei nihkuks ega muudaks suurust. */}
-          {tab === 'split' && <div aria-hidden="true" className="w-14 flex-shrink-0" />}
-          {tab === 'edit' && <EditToolbar crop={crop} onRotate={rotateBy} testIdPrefix="editor" />}
+          {/* Tulemuse eelvaates on muutmine lukus → tööriistariba asemel tühi koht sama laiusega,
+              et pilt ei nihkuks. */}
+          {showResult
+            ? <div aria-hidden="true" className="w-14 flex-shrink-0" />
+            : <EditToolbar crop={crop} onRotate={rotateBy} testIdPrefix="editor" />}
           {/* Peidetud laadija: mõõdab pildi naturaalmõõdud enne kuvamist (väldib aspect-venitust) */}
-          {!imgNatural && (
+          {!imgReady && (
             <img
               src={imageUrl}
               alt=""
               draggable={false}
               className="hidden"
-              onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+              onLoad={(e) => setImgNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight, key: imgKey })}
             />
           )}
-          {tab === 'edit' ? (
-            <div ref={stageRef} className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
-              {/* Eelvaade: pilt seisab (jäme pööre), kärpe-kasti saab kallutada */}
-              {!imgNatural ? loadingBox : (
-                <div
-                  className="relative border border-gray-200 bg-white shadow-inner"
-                  style={{ width: displayW, height: displayH }}
-                >
+          <div ref={stageRef} className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
+            {!imgReady ? loadingBox : showResult ? (
+              // Tulemus: serveri renderdus, joon sirge (kärbitud pildi laiuse osa). Ainult vaatamiseks.
+              <div data-testid="editor-result" className="relative select-none overflow-hidden rounded border border-gray-200"
+                style={{ width: resultW, height: resultH }}>
+                {resultUrl ? (
                   <img
-                    src={imageUrl}
+                    data-testid="editor-result-image"
+                    src={resultUrl}
                     alt={current.filename}
+                    className="pointer-events-none absolute inset-0 max-w-none"
                     draggable={false}
-                    // max-w-none: Tailwindi preflight seab img-le max-width:100%, mis 90°/270°
-                    // pöördel kärbiks RÕHTSA pildi laiuse konteineri (expand'itud kasti) laiuseks
-                    // — element muutuks ruuduks ja eelvaade paistaks kokkusurutud.
-                    className="pointer-events-none absolute max-w-none select-none"
-                    style={{
-                      width: imgDispW,
-                      height: imgDispH,
-                      left: '50%', top: '50%',
-                      transform: `translate(-50%, -50%) rotate(${grossAngle}deg)`,
-                    }}
+                    style={{ width: resultW, height: resultH }}
+                    onLoad={(e) => setPreviewNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
                   />
-                  {!crop.hasEdit && (
-                    <PendingOutline adjust={pendingAdjust} width={displayW} height={displayH} />
-                  )}
-                  {/* Kärpe-overlay (püüab hiire) */}
-                  <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />
-                </div>
-              )}
-            </div>
-          ) : (
-            <div ref={stageRef} className="flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
-              {!imgNatural ? loadingBox : (
-                <div
-                  ref={splitContainerRef}
-                  className={`relative select-none overflow-hidden rounded border border-gray-200 ${willSplit ? 'cursor-col-resize' : ''}`}
-                  style={{ width: splitBoxW, height: splitBoxH }}
-                  onPointerDown={(e) => { if (willSplit) splitAtClientX(e.clientX); }}
-                >
-                  {splitPreviewUrl ? (
-                    <img
-                      data-testid="editor-split-preview"
-                      src={splitPreviewUrl}
-                      alt={current.filename}
-                      className="pointer-events-none absolute inset-0 max-w-none"
-                      draggable={false}
-                      style={{ width: splitBoxW, height: splitBoxH }}
-                      onLoad={(e) => setPreviewNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-                    />
-                  ) : (
-                    <img
-                      src={imageUrl}
-                      alt={current.filename}
-                      className="pointer-events-none absolute max-w-none"
-                      draggable={false}
-                      style={{
-                        width: natural.w * splitFit,
-                        height: natural.h * splitFit,
-                        left: '50%', top: '50%',
-                        transform: `translate(-50%, -50%) rotate(${pendingRotate}deg)`,
-                      }}
-                    />
-                  )}
-                  {/* Ootel kärbega leht: eelvaade on kärbitud — raam ütleb, et pilt pole veel lõigatud. */}
-                  {splitPreviewUrl && <CroppedPreviewMark />}
-                  {willSplit ? (
-                    <SplitLine
-                      x={splitX}
-                      box={{ left: 0, top: 0, width: splitBoxW, height: splitBoxH }}
-                      onHandleDown={startSplitDrag}
-                    />
-                  ) : (
-                    // Sama märk nagu upload'i detailvaates: vaade ei näita joont, mida ei lõigata.
-                    <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-6">
-                      <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
-                        <Columns2 size={15} />{t('common:pagePrep.notSplit')}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                ) : loadingBox}
+                {visibleAdjust && <CroppedPreviewMark />}
+                {willSplit && (
+                  <div data-testid="editor-result-line" className="pointer-events-none absolute bottom-0 top-0 w-0.5 bg-red-500 opacity-90"
+                    style={{ left: splitX * resultW }} />
+                )}
+              </div>
+            ) : (
+              <div
+                ref={frameRef}
+                className="relative border border-gray-200 bg-white shadow-inner"
+                style={{ width: displayW, height: displayH }}
+              >
+                {/* Pilt seisab (jäme pööre), kärpe-kasti saab kallutada */}
+                <img
+                  src={imageUrl}
+                  alt={current.filename}
+                  draggable={false}
+                  // max-w-none: Tailwindi preflight seab img-le max-width:100%, mis 90°/270°
+                  // pöördel kärbiks RÕHTSA pildi laiuse konteineri (expand'itud kasti) laiuseks
+                  // — element muutuks ruuduks ja eelvaade paistaks kokkusurutud.
+                  className="pointer-events-none absolute max-w-none select-none"
+                  style={{
+                    width: imgDispW,
+                    height: imgDispH,
+                    left: '50%', top: '50%',
+                    transform: `translate(-50%, -50%) rotate(${grossAngle}deg)`,
+                  }}
+                />
+                {!crop.hasEdit && (
+                  <PendingOutline adjust={pendingAdjust} width={displayW} height={displayH} />
+                )}
+                {/* Kärpe-overlay (püüab hiire: lohistus = kast, klõps = joon) */}
+                <CropOverlay crop={crop} deskewTitle={t('common:pagePrep.deskew')} />
+                {/* Joon kärpe raamis, overlay kohal — käepide peab olema haaratav. */}
+                {willSplit && (
+                  <SplitGuide segment={splitSegment(splitQuad, splitX)} onHandleDown={startSplitDrag}
+                    lineTestId="editor-split-line" handleTestId="editor-split-handle" />
+                )}
+              </div>
+            )}
+          </div>
           <PageFilmstrip items={filmstripItems} currentIndex={safeIndex} onSelect={goTo} testIdPrefix="editor" />
         </div>
 
@@ -620,60 +581,70 @@ const PageImageEditorModal: React.FC<Props> = ({
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1">
-              <PageNavFooter onBack={onClose} onPrev={() => goTo(currentIndex - 1)}
-                onNext={() => goTo(currentIndex + 1)} hasPrev={safeIndex > 0} hasNext={safeIndex < pages.length - 1} />
-
-              {tab === 'split' && (
-              <div className="ml-2 flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3">
-                {(
-                  <>
-                    <button
-                      data-testid="editor-split-toggle"
-                      aria-pressed={!willSplit}
-                      onClick={() => onSplitChange(current.filename, { split: !willSplit, split_x: pendingOp?.split_x ?? null })}
-                      className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm ${
-                        willSplit ? 'border-gray-300 hover:bg-gray-100' : 'border-gray-900 bg-gray-900 font-medium text-white'
-                      }`}
-                    >
-                      <Columns2 size={15} />
-                      {willSplit ? t('manage.pageOps.noSplit') : t('manage.pageOps.split')}
-                    </button>
-                    {willSplit && pendingOp?.split_x != null && (
-                      <button
-                        onClick={() => onSplitChange(current.filename, { split: true, split_x: null })}
-                        className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100"
-                      >
-                        {t('common:pagePrep.resetToGlobal')}
-                      </button>
-                    )}
-                  </>
+            <div className="flex flex-wrap items-center gap-2">
+              <BackToOverview onBack={onClose} />
+              <div className="ml-1 flex flex-wrap items-center gap-2 border-l border-gray-200 pl-3">
+                <button
+                  data-testid="editor-split-toggle"
+                  aria-pressed={!willSplit}
+                  onClick={() => onSplitChange(current.filename, { split: !willSplit, split_x: pendingOp?.split_x ?? null })}
+                  className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm ${
+                    willSplit ? 'border-gray-300 hover:bg-gray-100' : 'border-gray-900 bg-gray-900 font-medium text-white'
+                  }`}
+                >
+                  <Columns2 size={15} />
+                  {willSplit ? t('manage.pageOps.noSplit') : t('manage.pageOps.split')}
+                </button>
+                {willSplit && pendingOp?.split_x != null && (
+                  <button
+                    onClick={() => onSplitChange(current.filename, { split: true, split_x: null })}
+                    className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100"
+                  >
+                    {t('common:pagePrep.resetToGlobal')}
+                  </button>
                 )}
+                <button
+                  data-testid="editor-result-toggle"
+                  aria-pressed={showResult}
+                  onClick={() => setShowResult((v) => !v)}
+                  className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm ${
+                    showResult ? 'border-indigo-600 bg-indigo-50 font-medium text-indigo-700' : 'border-gray-300 hover:bg-gray-100'
+                  }`}
+                >
+                  {showResult ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showResult ? t('common:pagePrep.hideResult') : t('common:pagePrep.showResult')}
+                </button>
               </div>
-              )}
             </div>
 
-            {tab === 'edit' && (
-              <button
-                data-testid="editor-mark"
-                onClick={markPending}
-                disabled={noEditChange && isLast}
-                className="flex items-center gap-2 rounded bg-indigo-600 px-5 py-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {noEditChange
-                  ? t('common:pagePrep.next')
-                  : isLast ? <><Check size={14} />{t('common:pagePrep.markPending')}</> : t('common:pagePrep.markAndNext')}
-                {!isLast && <ChevronRight size={14} />}
-              </button>
-            )}
+            {/* Liikumine paremas servas (ADR 0085). Kõik on kohe ootel → eraldi „Järgmine"
+                nuppu pole. „Kärbi ja järgmine" ilmub ainult pakkumise korral ja noolte
+                VASAKULE, et nooled ei nihkuks. */}
+            <div className="flex flex-shrink-0 items-center gap-3">
+              {crop.proposal && (
+                <button
+                  type="button"
+                  data-testid="editor-mark"
+                  onClick={advance}
+                  className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm text-white transition-colors hover:bg-indigo-700"
+                >
+                  {isLast
+                    ? <><Check size={14} />{t('common:pagePrep.acceptCrop')}</>
+                    : <>{t('common:pagePrep.acceptAndNext')}<ChevronRight size={14} /></>}
+                </button>
+              )}
+              <PageNav onPrev={() => goTo(currentIndex - 1)} onNext={() => goTo(currentIndex + 1)} hasPrev={safeIndex > 0} hasNext={safeIndex < pages.length - 1}
+                current={safeIndex + 1} total={pages.length} />
+            </div>
           </div>
-          <p className="text-xs text-gray-500">
-            {tab === 'split'
-              ? t('manage.editor.splitPendingHint')
-              : <>
-                {crop.perspective ? t('common:pagePrep.perspectiveHint') : t('common:pagePrep.cropHint')}
-                {' '}{t('manage.editor.editPendingHint')}
-              </>}
+          {/* Fikseeritud kõrgus (2 rida): vihje sisu muutub (perspektiiv, tulemus), aga jaluse
+              kõrgus ei tohi — muidu hüppab pilt (ADR 0085). */}
+          <p data-testid="prep-hint" className="line-clamp-2 h-8 overflow-hidden text-xs leading-4 text-gray-500">
+            {showResult ? t('common:pagePrep.resultHint') : <>
+              {crop.perspective ? t('common:pagePrep.perspectiveHint') : t('common:pagePrep.cropHint')}
+              {' '}{t('common:pagePrep.splitClickHint')}
+            </>}
+            {' '}{t('manage.editor.editPendingHint')}
           </p>
         </div>
       </div>
