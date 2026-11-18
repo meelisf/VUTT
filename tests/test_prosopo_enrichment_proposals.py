@@ -133,6 +133,13 @@ def test_ettepanek_on_kasutaja_oma_mitte_seansi(client, login, prosopo_env):
     {"items": [_item(date_from={"date": "sometime", "precision": "year"})]},
     {"items": [_item(date_from={"date": "1640-13-01", "precision": "day"})]},
     {"items": [_item(evidence=[{"source_kind": "vutt_page", "work_id": "w1"}])]},
+    # Vene teatmeteos on ainult viide (Levitski): kaardile minev tekst ei tohi olla vene keeles
+    {"items": [_item(raw_occupation="профессор церковной истории")]},
+    {"items": [_item(evidence=[{"source_kind": "vutt_page", "work_id": "w1", "page": 12,
+                                "quote": "Іоганнъ Горнъ, профессоръ"}])]},
+    {"items": [_item(match_status="new_registry_candidate", occupation_key=None,
+                     occupation_entry={"key": "kirikuloo-prof", "labels": {"et": "kirikuloo professor",
+                                                                            "en": "профессор"}})]},
 ])
 def test_vigane_ettepanek_ei_kuluta_koodi(client, login, prosopo_env, change):
     prosopo_env.write("abc")
@@ -145,6 +152,15 @@ def test_vigane_ettepanek_ei_kuluta_koodi(client, login, prosopo_env, change):
     body = {"code": code, "person_id": "vutt:Pabc",
             "base_updated_at": "2026-01-01T00:00:00+00:00", "items": [_item()]}
     assert client.post("/prosopography/enrichment-proposals/submit", json=body).status_code == 200
+
+
+def test_vene_allikas_viitena_on_lubatud():
+    """Kirillitsa viite pealkirjas/asukohas on viide ise, mitte kaardi sisu."""
+    proposals._validate_item(_item(evidence=[{
+        "source_kind": "literature", "source_id": "SKHZ9LQR", "locator": "lk 106",
+        "citation": "Левицкий, Биографический словарь I (1902)"}]))
+    with pytest.raises(proposals.ProposalError, match="cyrillic_not_allowed"):
+        proposals._validate_item(_item(raw_occupation="профессор"))
 
 
 def test_aegunud_kood_keeldub(client, login, prosopo_env, monkeypatch):

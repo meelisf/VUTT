@@ -754,7 +754,11 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           ajaloolist terminit, kui allikas seda tsiteerib
           ("poeta laureatus caesareus"), muidu lühikest nimetust allika
           keeles ("inspector", mitte "inspector at a copper mine in
-          Småland"); koht, asutus ja aeg lähevad oma väljadele
+          Småland"); koht, asutus ja aeg lähevad oma väljadele.
+          ERAND: vene keelt VUTT-i ei kirjutata (server lükkab kirillitsa
+          tagasi: cyrillic_not_allowed). Venekeelne allikas (Levitski jt) on
+          ainult viide: literature + locator, ilma quote'ita; raw_* on siis
+          registri nimi või saksa/ladina allika sõnastus
         - occupation_key, institution_key, place_key: registrivõtmed
           search_enrichment_registry'st; occupation_variant /
           institution_variant ainult koos vastava võtmega. Ametil on KAS

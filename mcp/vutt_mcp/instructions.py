@@ -46,7 +46,8 @@ REEGLID:
 - work_id on nanoid ("v7Kq2mXp"), mitte pealkiri.
 - Otsing on vaikimisi range (kõik sõnad peavad leheküljel esinema). Tühja
   tulemuse järel proovi lühemat päringut ja relax_matching=true.
-- Tekst on masinlugemine. Lehe seisund kasvavas usaldusväärsuses: Toores
-  (OCR) < Töös < Parandatud < Annoteeritud < Valmis (inimese kinnitatud).
-- Tühi tulemus EI tõesta, et teemat pole - kontrolli enne list_filter_values'i
-  ja list_literature'iga, kas õige allikas on kogus üldse olemas."""
+- Tekst on masinlugemine; lehe seisund: Toores (OCR) < Töös < Parandatud
+  < Annoteeritud < Valmis (inimese kinnitatud).
+- Tühi tulemus EI tõesta, et teemat pole - kontrolli list_filter_values'i
+  ja list_literature'iga, kas allikas on kogus.
+- Vene keelt VUTT-i ei kirjuta: vene allikas (Levitski) on vaid viide."""
