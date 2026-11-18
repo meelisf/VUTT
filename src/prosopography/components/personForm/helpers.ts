@@ -231,6 +231,7 @@ export function recordToDraft(p: ProsopoRecord, places: Record<string, PlaceEntr
     birth_evidence: evidenceOf(p.birth),
     death_evidence: evidenceOf(p.death),
     origin_evidence: evidenceOf(p.origin),
+    floruit_evidence: evidenceOf(p.floruit),
   };
 }
 
@@ -351,10 +352,12 @@ export function draftToPayload(
       coordinates: draft.origin_place === original?.origin?.place ? original?.origin?.coordinates ?? null : null,
       ...keptEvidence(draft.origin_evidence, !!draft.origin_place && draft.origin_place === original?.origin?.place),
     },
-    floruit: (draft.floruit_from || draft.floruit_to) ? {
-      year_from: draft.floruit_from ? parseInt(draft.floruit_from) : null,
-      year_to: draft.floruit_to ? parseInt(draft.floruit_to) : null,
-    } : null,
+    floruit: (draft.floruit_from || draft.floruit_to) ? (() => {
+      const year_from = draft.floruit_from ? parseInt(draft.floruit_from) : null;
+      const year_to = draft.floruit_to ? parseInt(draft.floruit_to) : null;
+      const same = year_from === (original?.floruit?.year_from ?? null) && year_to === (original?.floruit?.year_to ?? null);
+      return { year_from, year_to, ...keptEvidence(draft.floruit_evidence, same) };
+    })() : null,
     occupations: draft.occupations.filter(o => o.label.trim()).map(o => ({
       label: o.label.trim(),
       ...(o.id ? { id: o.id } : {}),

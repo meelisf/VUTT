@@ -88,6 +88,7 @@ export interface FormDraft {
   birth_evidence?: Record<string, unknown>[];
   death_evidence?: Record<string, unknown>[];
   origin_evidence?: Record<string, unknown>[];
+  floruit_evidence?: Record<string, unknown>[];
 }
 
 export const emptyDraft = (): FormDraft => ({
