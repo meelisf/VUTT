@@ -368,7 +368,9 @@
     "notSplit": "Not split",
     "page": "Page {{cur}} / {{total}}",
     "resetToGlobal": "Reset to global line",
-    "croppedPreview": "Preview with crop, the image is not cut yet"
+    "croppedPreview": "Preview with crop, the image is not cut yet",
+    "filmstrip": "Pages",
+    "filmstripPending": "pending change"
   },
   "filterPanel": {
     "title": "Filters",

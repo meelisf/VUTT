@@ -1,12 +1,12 @@
 // ⚠ KAKS PILDIREDAKTORIT: see ja components/PageImageEditorModal.tsx peavad välja nägema ja käituma ühtmoodi.
 // Ühine osa on `components/pagePrep/`; muudatus ühes vaates tähendab, et kontrolli ka teist
 // (vt CLAUDE.md „Kaks pildiredaktorit“).
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronRight, Check, Columns2, Eye, EyeOff } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
-import { adjustFromParams, willSplit, withRotation } from '../prepressPlan';
+import { adjustFromParams, isPreviewReady, willSplit, withRotation } from '../prepressPlan';
 import { addRotation, clampSplitX } from '../../../components/pagePrep/geometry';
 import { useSplitDrag } from '../../../components/pagePrep/useSplitDrag';
 import SplitLine from '../../../components/pagePrep/SplitLine';
@@ -18,6 +18,7 @@ import EditorTabs, { type EditorTab } from '../../../components/pagePrep/EditorT
 import PageNavFooter from '../../../components/pagePrep/PageNavFooter';
 import PendingGroup from '../../../components/pagePrep/PendingGroup';
 import PendingOutline from '../../../components/pagePrep/PendingOutline';
+import PageFilmstrip, { type FilmstripItem } from '../../../components/pagePrep/PageFilmstrip';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 interface Props {
@@ -103,6 +104,25 @@ const SplitPageDetail: React.FC<Props> = ({
     const target = plan.pages[i];
     if (target) onNavigate(target.n);
   }, [plan.pages, onNavigate]);
+
+  // Pisipiltide riba: sama eelvaade (pööre + kärbe sees) ja sama joon mis kontaktlehel.
+  // Ootel = kasutaja on lehele midagi märkinud (vaikimisi ei poolitata midagi).
+  const filmstripItems = useMemo<FilmstripItem[]>(() => plan.pages.map((p) => {
+    const split = willSplit(plan, p.n);
+    const rotate = Boolean(p.rotate);
+    const crop = Boolean(p.adjust);
+    return {
+      key: String(p.n),
+      src: isPreviewReady(plan, p.n)
+        ? prepressPreviewUrl(uploadId, p.n, ticket, p.rotate ?? 0, p.adjust ?? null)
+        : '',
+      splitX: split
+        ? (p.mode === 'custom' && p.split_x != null ? p.split_x : plan.default_split_x)
+        : null,
+      pending: rotate || crop || split ? { rotate, crop, split } : null,
+      dimmed: Boolean(p.excluded),
+    };
+  }), [plan, uploadId, ticket]);
 
   // Vahekaardi vahetus: märkimata kast läheb enne plaani (muidu näitaks poolitusvaade
   // pilti, kus kärpet ei ole) — sama käitumine nagu halduse redaktoris.
@@ -324,6 +344,7 @@ const SplitPageDetail: React.FC<Props> = ({
               </div>
             )}
           </div>
+          <PageFilmstrip items={filmstripItems} currentIndex={index} onSelect={goTo} testIdPrefix="detail" />
         </div>
 
         <div className="flex-shrink-0 space-y-2 rounded-b border-t border-gray-200 bg-white px-4 py-3">

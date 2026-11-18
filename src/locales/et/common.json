@@ -368,7 +368,9 @@
     "notSplit": "Ei poolitata",
     "page": "Leht {{cur}} / {{total}}",
     "resetToGlobal": "Lähtesta üldjoonele",
-    "croppedPreview": "Eelvaade kärpega, pilt pole veel lõigatud"
+    "croppedPreview": "Eelvaade kärpega, pilt pole veel lõigatud",
+    "filmstrip": "Lehed",
+    "filmstripPending": "ootel muudatus"
   },
   "filterPanel": {
     "title": "Filtrid",

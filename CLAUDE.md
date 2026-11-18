@@ -465,7 +465,7 @@ selle omanik (`_reset_status_if_prepping`), muidu lubaks ta teise apply CAS-i si
 `PageImageEditorModal` ja upload'i `SplitPageDetail` on kaks vaadet ühe tööriistakomplekti
 peal ja peavad kasutajale tunduma ühesugused. Ühine on `src/components/pagePrep/`
 (`useCropBox`, `CropOverlay`, `EditToolbar`, `PendingOutline`, `EditorTabs`, `PendingGroup`,
-`PageNavFooter`, `SplitLine`, `RotateButtons`, `useSplitDrag`, `geometry`): sinna käib KÕIK, mis on mõlemal sama (tööriistaribad, kontuurid,
+`PageNavFooter`, `PageFilmstrip`, `SplitLine`, `RotateButtons`, `useSplitDrag`, `geometry`): sinna käib KÕIK, mis on mõlemal sama (tööriistaribad, kontuurid,
 kasti loogika) — ära kopeeri oma versiooni. Muudad ühist osa → ava ja kontrolli MÕLEMAT vaadet
 (`/work/<id>/manage` → lehe redaktor ja `/upload` → poolitusvaade); muudad ühes vaates midagi, mis
 võiks olla mõlemas → tee mõlemasse või kirjuta, miks mitte. Päris ühte moodulisse neid ei panda:

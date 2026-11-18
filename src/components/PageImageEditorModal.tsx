@@ -1,7 +1,7 @@
 // ⚠ KAKS PILDIREDAKTORIT: see ja upload/components/SplitPageDetail.tsx peavad välja nägema ja käituma ühtmoodi.
 // Ühine osa on `components/pagePrep/`; muudatus ühes vaates tähendab, et kontrolli ka teist
 // (vt CLAUDE.md „Kaks pildiredaktorit“).
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
 import { X, Columns2, Loader2, AlertTriangle, ChevronRight, Check, Upload, Undo2, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -21,9 +21,11 @@ import EditorTabs from './pagePrep/EditorTabs';
 import PageNavFooter from './pagePrep/PageNavFooter';
 import PendingGroup from './pagePrep/PendingGroup';
 import PendingOutline from './pagePrep/PendingOutline';
+import PageFilmstrip, { type FilmstripItem } from './pagePrep/PageFilmstrip';
 import { useCropBox } from './pagePrep/useCropBox';
 import CropOverlay from './pagePrep/CropOverlay';
-import { pendingCount, type PendingPageOp } from '../pages/manage/pageOpsPlan';
+import { effectiveSplitX, pendingCount, showsCardLine, type PendingPageOp } from '../pages/manage/pageOpsPlan';
+import { manageThumb } from '../pages/manage/pageThumb';
 import ExemplarOriginSelect from '../pages/manage/ExemplarOriginSelect';
 import type { Exemplar } from '../types';
 
@@ -223,6 +225,23 @@ const PageImageEditorModal: React.FC<Props> = ({
     setCurrentIndex(Math.max(0, Math.min(pages.length - 1, idx)));
     setToast(null);
   }, [pages.length]);
+
+  // Pisipiltide riba: sama pisipilt ja joon mis ruudustiku kaardil (`manageThumb`,
+  // `showsCardLine`) — 90°/270° CSS-pöördega pisipildil joont ei näidata.
+  const filmstripItems = useMemo<FilmstripItem[]>(() => pages.map((p) => {
+    const op = pendingOps[p.filename];
+    const thumb = manageThumb({
+      workId, imageName: p.filename, filename: p.filename, op,
+      ticket, imageToken, cacheBust,
+    });
+    return {
+      key: p.filename,
+      src: thumb.src,
+      imgStyle: thumb.imgStyle,
+      splitX: showsCardLine(op) ? effectiveSplitX(op, globalSplitX) : null,
+      pending: op ? { rotate: op.rotate !== 0, crop: Boolean(op.adjust), split: op.split } : null,
+    };
+  }), [pages, pendingOps, workId, ticket, imageToken, cacheBust, globalSplitX]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -550,6 +569,7 @@ const PageImageEditorModal: React.FC<Props> = ({
               )}
             </div>
           )}
+          <PageFilmstrip items={filmstripItems} currentIndex={safeIndex} onSelect={goTo} testIdPrefix="editor" />
         </div>
 
         {/* Jalus */}

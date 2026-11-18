@@ -3,12 +3,11 @@ import { useAdminImageTicket } from '../../hooks/useAdminImageTicket';
 import { useTranslation } from 'react-i18next';
 import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw } from 'lucide-react';
 import PageThumbnail from '../../components/PageThumbnail';
-import { IMAGE_BASE_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
 import { ReocrState } from '../../utils/reocrStatus';
 import { cardLineLeftPercent } from '../../components/pagePrep/geometry';
-import { workPagePreviewUrl } from '../../services/workApi';
-import { PendingPageOp, effectiveSplitX, needsServerPreview, showsCardLine } from './pageOpsPlan';
+import { PendingPageOp, effectiveSplitX, showsCardLine } from './pageOpsPlan';
+import { manageThumb } from './pageThumb';
 
 interface PageCardProps {
   workId: string;
@@ -34,14 +33,6 @@ interface PageCardProps {
   isHighlighted?: boolean;
 }
 
-/** Ootel pöörde eelvaade CSS-iga. 90°/270° juures skaleeritakse 3:4 kasti
- *  sisse (pööratud kast oleks 4:3 ja lõikuks servadest). */
-const rotateStyle = (deg: number): React.CSSProperties | undefined => {
-  if (!deg) return undefined;
-  const scale = deg === 90 || deg === 270 ? ' scale(0.75)' : '';
-  return { transform: `rotate(${deg}deg)${scale}` };
-};
-
 const statusColor = (status: string) => {
   switch (status) {
     case 'Valmis': return 'bg-green-100 text-green-700';
@@ -54,17 +45,15 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { authToken } = useUser();
   const ticket = useAdminImageTicket(`work:${p.workId}`, authToken);
-  const imageTokenQuery = p.imageToken ? `&exp=${p.imageToken.exp}&sig=${p.imageToken.sig}` : '';
   const [aspect, setAspect] = React.useState<number | undefined>(undefined);
   const op = p.pendingOp;
   // 180° ei muuda kuvatud pildi mõõte → joon käib sama valemi järgi.
   const lineLeft = showsCardLine(op) ? cardLineLeftPercent(aspect, effectiveSplitX(op, p.splitX)) : null;
-  // Kärbet/kallet CSS ei näita → server renderdab pisipildist eelvaate (pööre sees).
-  const serverPreview = needsServerPreview(op);
-  // Pilet veel teel → tavaline pisipilt, kuni eelvaate URL-i saab allkirjastada.
-  const thumbSrc = serverPreview && ticket
-    ? workPagePreviewUrl(p.workId, p.filename, ticket, op!.rotate, op!.adjust ?? null, 'thumb', p.thumbCacheBust)
-    : `${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}${imageTokenQuery}`;
+  // Pisipilt + ootel pööre/kärbe: sama allikas mis redaktori pisipiltide ribal.
+  const thumb = manageThumb({
+    workId: p.workId, imageName: p.imageName, filename: p.filename, op,
+    ticket, imageToken: p.imageToken ?? null, cacheBust: p.thumbCacheBust,
+  });
   return (
     <div
       ref={ref}
@@ -125,14 +114,14 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         <PageThumbnail
           retry
           workId={p.workId}
-          src={thumbSrc}
+          src={thumb.src}
           /* `object-contain`, MITTE `cover` (sama kuju nagu upload'i kontaktlehel
              ja UploadStepReview'l): rõhtne leht ON lapiti ja peab ka ruudustikus
              lapiti välja nägema. `cover` lõikas küljed 3/4 portreeks ja peitis
              just selle — lehe tegelikku formaati polnud kaardilt näha. */
           className="w-full h-full object-contain"
           onAspect={setAspect}
-          imgStyle={serverPreview ? undefined : rotateStyle(op?.rotate ?? 0)}
+          imgStyle={thumb.imgStyle}
         />
         {/* Äsja lisatud lehe märk — all vasakul (ülemised nurgad on valikul ja OCR-il). */}
         {p.isHighlighted && (
