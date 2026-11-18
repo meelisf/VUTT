@@ -100,23 +100,26 @@
     "globalLine": "Poolitusjoon (% laiusest)",
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
-    "isExcluded": "See leht jäetakse OCR-ist välja",
+    "isExcluded": "See leht jäetakse teosest välja",
     "backToOverview": "Tagasi ülevaatesse",
     "card": {
       "select": "Vali leht",
-      "exclude": "Jäta OCR-ist välja",
-      "include": "Lisa OCR-i",
+      "exclude": "Jäta teosest välja",
+      "include": "Võta teosesse tagasi",
       "split": "Poolita",
       "noSplit": "Ära poolita",
-      "open": "Ava täisvaade",
-      "splitKeptWhileExcluded": "Poolitusolek säilib, aga hakkab kehtima alles siis, kui leht OCR-i tagasi lisada"
+      "open": "Pööra, kärbi või poolita",
+      "splitKeptWhileExcluded": "Poolitusolek säilib, aga hakkab kehtima alles siis, kui leht teosesse tagasi võtta",
+      "badgeCrop": "kärbe",
+      "badgeSplit": "poolitus",
+      "pendingTitle": "Ootel muudatus — rakendub „Edasi” peale"
     },
     "bar": {
       "count": "Valitud: {{count}}",
       "split": "Poolita",
       "noSplit": "Ära poolita",
-      "exclude": "Ära OCR-i",
-      "include": "Lisa OCR-i",
+      "exclude": "Jäta välja",
+      "include": "Võta tagasi",
       "clear": "Tühista valik",
       "shiftHint": "Shift+klõps valib vahemiku",
       "splitResult": "{{applied}} lehte sai üldjoone, {{kept}} käsitsi seatut jäi puutumata"

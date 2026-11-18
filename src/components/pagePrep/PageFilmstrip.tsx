@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Columns2, Crop, Loader2, RotateCw } from 'lucide-react';
+import { Columns2, Crop, Loader2, RotateCw, X } from 'lucide-react';
 import { cardLineLeftPercent } from './geometry';
 
 /** Ühe lehe ootel toimingud ribal; `null` = puutumata. */
@@ -18,8 +18,8 @@ export interface FilmstripItem {
   /** Poolitusjoon kuvatud pildi laiuse osana; `null` = joont ei näidata. */
   splitX: number | null;
   pending: FilmstripPending | null;
-  /** Tuhm pilt (upload'is väljajäetud leht) — sama tähendus mis kontaktlehel. */
-  dimmed?: boolean;
+  /** Upload'is teosest välja jäetud leht: tuhm pilt + punane rist (sama mis kontaktlehel). */
+  excluded?: boolean;
 }
 
 interface Props {
@@ -74,6 +74,7 @@ const PageFilmstrip: React.FC<Props> = ({ items, currentIndex, onSelect, testIdP
             onClick={() => onSelect(i)}
             className={`relative aspect-[3/4] w-full flex-shrink-0 overflow-hidden rounded border bg-gray-100 ${
               current ? 'border-indigo-600 ring-2 ring-indigo-500'
+                : item.excluded ? 'border-red-400 ring-1 ring-red-300'
                 : p ? 'border-amber-400 ring-1 ring-amber-300 hover:border-amber-500'
                 : 'border-gray-200 hover:border-gray-400'
             }`}
@@ -91,7 +92,7 @@ const PageFilmstrip: React.FC<Props> = ({ items, currentIndex, onSelect, testIdP
                   const ratio = img.naturalWidth / img.naturalHeight;
                   setAspects((prev) => (prev[item.key] === ratio ? prev : { ...prev, [item.key]: ratio }));
                 }}
-                className={`h-full w-full object-contain ${item.dimmed ? 'opacity-35' : ''}`}
+                className={`h-full w-full object-contain ${item.excluded ? 'opacity-35' : ''}`}
               />
             ) : (
               <span className="flex h-full w-full items-center justify-center">
@@ -108,7 +109,12 @@ const PageFilmstrip: React.FC<Props> = ({ items, currentIndex, onSelect, testIdP
             <span className="absolute bottom-0.5 left-0.5 rounded bg-white/90 px-1 text-[10px] leading-tight text-gray-700 shadow-sm">
               {i + 1}
             </span>
-            {p && (
+            {item.excluded ? (
+              <span data-testid={`${testIdPrefix}-filmstrip-excluded-${i}`}
+                className="absolute right-0.5 top-0.5 rounded bg-red-600 p-0.5 text-white shadow-sm">
+                <X size={10} />
+              </span>
+            ) : p && (
               <span
                 data-testid={`${testIdPrefix}-filmstrip-pending-${i}`}
                 className="absolute right-0.5 top-0.5 flex items-center gap-0.5 rounded border border-amber-300 bg-amber-100 px-0.5 py-0.5 text-amber-800 shadow-sm"

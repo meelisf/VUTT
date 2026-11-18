@@ -41,7 +41,9 @@ describe('useCropBox klõps', () => {
   it('klõps kasti sees ei nihuta kasti ega tee sellest kasutaja muudatust', () => {
     const { h, onClick, overlay, box, press } = setup();
     press(overlay, [50, 50], [250, 350]);
+    act(() => { h.result.current.toggleCarry(); });
     act(() => { h.result.current.reset(); });       // kleepuv pakkumine, puutumata
+    expect(h.result.current.proposal).toBe(true);
     const r = h.result.current.cropRect;
     expect(h.result.current.userEdited).toBe(false);
     press(box, [200, 300], [202, 301]);             // alla klõpsuläve

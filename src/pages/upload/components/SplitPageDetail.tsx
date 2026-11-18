@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronRight, Check, Columns2, Eye, EyeOff } from 'lucide-react';
+import { X, ChevronRight, Check, Columns2, Eye, EyeOff, Undo2 } from 'lucide-react';
 import type { PageAdjust } from '../types';
 import { prepressPreviewUrl } from '../uploadApi';
 import { adjustFromParams, isPreviewReady, willSplit, withRotation } from '../prepressPlan';
@@ -127,7 +127,7 @@ const SplitPageDetail: React.FC<Props> = ({
         ? (p.mode === 'custom' && p.split_x != null ? p.split_x : plan.default_split_x)
         : null,
       pending: rotate || crop || split ? { rotate, crop, split } : null,
-      dimmed: Boolean(p.excluded),
+      excluded: Boolean(p.excluded),
     };
   }), [plan, uploadId, ticket]);
 
@@ -250,23 +250,25 @@ const SplitPageDetail: React.FC<Props> = ({
               <span data-testid="detail-split-state" className="text-xs text-gray-500">{t('common:pagePrep.notSplit')}</span>
             )}
             {excluded && (
-              <span data-testid="detail-excluded-state" className="text-xs font-medium text-gray-700">
+              <span data-testid="detail-excluded-state" className="whitespace-nowrap text-xs font-medium text-red-700">
                 {t('step3split.isExcluded')}
               </span>
             )}
           </div>
           {/* Väljajätmine on upload'i oma toiming (halduses seda pole) ja käib ka tulemuse
-              eelvaates: otsus „see leht ei tule teosesse" ei sõltu vaatest. */}
+              eelvaates: otsus „see leht ei tule teosesse" ei sõltu vaatest. Punane rist:
+              leht jääb TEOSEST välja (mitte ainult OCR-ist). Välja jäetud lehel on nupp
+              tagasivõtmine (neutraalne), sest punane olek on juba päises näha. */}
           <button
             type="button"
             data-testid="detail-exclude"
             aria-pressed={excluded}
-            className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-sm ${
-              excluded ? 'border-gray-900 bg-gray-900 font-medium text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+            className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded border px-2.5 py-1.5 text-sm ${
+              excluded ? 'border-gray-300 text-gray-700 hover:bg-gray-100' : 'border-red-300 text-red-700 hover:bg-red-50'
             }`}
             onClick={() => onPageChange(pageNum, { excluded: !excluded })}
           >
-            {excluded ? <EyeOff size={15} /> : <Eye size={15} />}
+            {excluded ? <Undo2 size={15} /> : <X size={15} />}
             {excluded ? t('step3split.card.include') : t('step3split.card.exclude')}
           </button>
           <button
@@ -347,8 +349,8 @@ const SplitPageDetail: React.FC<Props> = ({
                   width: imgBox.width, height: imgBox.height,
                 }}
               >
-                <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
-                  <EyeOff size={15} />
+                <span className="flex items-center gap-2 rounded-full bg-red-600/90 px-4 py-2 text-sm font-medium text-white shadow-lg">
+                  <X size={15} />
                   {t('step3split.isExcluded')}
                 </span>
                 {/* Ilma tagajärjeta jäi õhku, MIS väljajäetud lehest saab:

@@ -100,23 +100,26 @@
     "globalLine": "Split line (% of width)",
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
-    "isExcluded": "This page is excluded from OCR",
+    "isExcluded": "This page is left out of the work",
     "backToOverview": "Back to overview",
     "card": {
       "select": "Select page",
-      "exclude": "Exclude from OCR",
-      "include": "Include in OCR",
+      "exclude": "Leave out of the work",
+      "include": "Take back into the work",
       "split": "Split",
       "noSplit": "Don't split",
-      "open": "Open full view",
-      "splitKeptWhileExcluded": "The split setting is kept, but only takes effect once the page is added back to OCR"
+      "open": "Rotate, crop or split",
+      "splitKeptWhileExcluded": "The split setting is kept, but only takes effect once the page is taken back into the work",
+      "badgeCrop": "crop",
+      "badgeSplit": "split",
+      "pendingTitle": "Pending change — applied when you press “Continue”"
     },
     "bar": {
       "count": "Selected: {{count}}",
       "split": "Split",
       "noSplit": "Don't split",
-      "exclude": "Skip OCR",
-      "include": "Include in OCR",
+      "exclude": "Leave out",
+      "include": "Take back",
       "clear": "Clear selection",
       "shiftHint": "Shift+click selects a range",
       "splitResult": "{{applied}} pages got the global line, {{kept}} manual lines left untouched"
