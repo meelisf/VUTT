@@ -378,7 +378,7 @@ registrikirje `place_periods`-is, mitte isikufaktis. Registrikirje on admini era
 toiming (`save_config_with_git`); isikufakti kinnitamine EI loo kirjet, v.a agendi
 ettepaneku kinnitus `registries.ensure` kaudu (luku all, sama Q → seotakse).
 
-**MCP ettepanekud (ADR 0058)** — MCP kirjutab AINULT ootel ettepaneku (isik — amet, haridus, sünd, surm, päritolu, sugu, elulugu (#834, `enrichment_kinds.py`); teose osad, lehe tekst, eksemplarid);
+**MCP ettepanekud (ADR 0058)** — MCP kirjutab AINULT ootel ettepaneku (isik — amet, haridus, sünd, surm, päritolu, sugu, elulugu, nimed, staatus, konfessioon, tegutsemisaeg, seos, ID (#834, `enrichment_kinds.py`; ID = ainult salvestus, seos sünkroonib vastastikuse `router._after_person_save` kaudu); teose osad, lehe tekst, eksemplarid);
 kinnitus käib olemasolevate valideeritud kirjutusteede kaudu (`create_part`,
 isikukaardi salvestus). Skalaarvälja tõend (`birth/death/origin.evidence`) PEAB isikuvormi
 mustandis läbi käima (`birth_evidence` jne, `helpers.ts`) — vorm ehitab need objektid salvestusel uuesti. Agendikood on ÜKS (`/review`, `POST /agent-handoff`): üks hoidla

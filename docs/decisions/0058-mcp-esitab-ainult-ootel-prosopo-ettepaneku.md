@@ -263,3 +263,22 @@ ameti ja hariduse; sünd, surm ja elulugu jäid käsitsi tööks. Muudetud:
 - Mahud: ettepanek ≤ 128 000 baiti, MCP kontekst ≤ 150 000 märki (pikad elulood).
 - 2. osa (nimevariandid, staatused, konfessioon, matmine, `floruit`, seosed,
   identifikaatorid) on eraldi töö.
+
+## Täiendus 2026-11-18 (#834): 2. osa — loendiväljad, tegutsemisaeg, identifikaator
+
+Disain: sama fail, jaotis „2. osa".
+
+- **Uued realiigid:** `alias`, `name` (ADR 0083 liik), `status`/`confession` (Q-kood
+  `vocabularies.json` suletud sõnastikust; vale koodi viga loetleb lubatud), `floruit`
+  (skalaar, tõend kaardil nagu sünnil — vorm `floruit_evidence`), `relation`
+  (`target_id` = elav VUTT-i isik või nimepõhine), `identifier` (`wikidata|gnd|viaf|album_academicum`).
+- **Loendiväljad on lisavad:** agent ei eemalda ega muuda olemasolevat rida. „Juba kaardil":
+  alias ka kanoonilise nime/nimeajaloo kujuna; seos sama `target_id` (selleta nimi).
+  Loendirea tõend on esitusel kohustuslik, kaardile ei salvestata.
+- **Identifikaator salvestatakse AINULT ID-na** (kasutaja otsus): Wikidata/GND päringut ega
+  automaatrikastust kinnitus ei tee. ID teisel kaardil → `blocked: duplicate_person_id`;
+  sama skeem teise ID-ga → `conflict` (asendab).
+- **Vastastikune seos:** PUT-i järelsammud (`sync_reciprocals`, siltide rikastus) on
+  `router._after_person_save`-is ja kinnituse otspunkt kutsub sama — B kaart saab
+  `reciprocal_auto` rea nagu käsitsi salvestusel.
+- **Matmine (`burial`) jääb välja**, kuni isikuvormis on väli.
