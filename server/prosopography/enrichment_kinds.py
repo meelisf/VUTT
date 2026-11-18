@@ -119,3 +119,142 @@ def validate(item: dict) -> None:
         raise _error("invalid_gender: value on 'M' või 'F'")
     _validate_evidence(item["evidence"])
     _check_no_cyrillic(item)
+
+
+# ── Olek ülevaatusel ja kaardile kandmine ────────────────────────────────
+#
+# `patch` = sama ettepaneku eelmiste ridade poolt muudetud kaardiväljad (koopia).
+# Read hinnatakse järjest, nagu amet ja haridus `_merge_row`-is.
+
+_PRECISION_BY_LENGTH = {4: "year", 7: "month", 10: "day"}
+_DATE_FIELDS = ("date", "precision", "bound", "calendar", "is_circa")
+
+
+def _current(person: dict, patch: dict, field: str):
+    return patch[field] if field in patch else person.get(field)
+
+
+def _precision(date: dict) -> str | None:
+    return date.get("precision") or _PRECISION_BY_LENGTH.get(len(date.get("date") or ""))
+
+
+def _merge_evidence(old: list, new: list) -> list:
+    return list(old) + [source for source in new if source not in old]
+
+
+def _registry_place(key: str) -> dict:
+    """Koharegistri kirje kuupäevaobjekti `place` kujul (nagu vormi kohaotsing)."""
+    from . import registries
+    entry = registries._places().get(key)
+    if not isinstance(entry, dict):
+        raise _error("unknown_place_key")
+    labels = entry.get("labels") if isinstance(entry.get("labels"), dict) else None
+    label = (labels or {}).get("et") or (labels or {}).get("en") or entry.get("label") or key
+    return {"id": entry.get("id"), "label": label, "labels": labels}
+
+
+def _same_place(a: dict | None, b: dict | None) -> bool:
+    if not a or not b:
+        return False
+    if a.get("id") and b.get("id"):
+        return a["id"] == b["id"]
+    return (a.get("label") or "").strip().lower() == (b.get("label") or "").strip().lower()
+
+
+def _apply_date(item: dict, person: dict, patch: dict) -> tuple[str, object]:
+    field = item["kind"]
+    current = dict(_current(person, patch, field) or {})
+    proposed = item["date"]
+    place = _registry_place(item["place_key"]) if item.get("place_key") else None
+    snapshot = {k: current.get(k) for k in (*_DATE_FIELDS, "place")}
+    same_date = (current.get("date") == proposed["date"]
+                 and _precision(current) == _precision(proposed))
+    if current.get("date") and same_date and (not place or not current.get("place")
+                                               or _same_place(current["place"], place)):
+        # Juba kaardil: tõend lisandub, täpsustused ainult tühja kohta
+        for key in ("bound", "calendar", "is_circa"):
+            if not current.get(key) and proposed.get(key):
+                current[key] = proposed[key]
+        if place and not current.get("place"):
+            current["place"] = place
+        current["evidence"] = _merge_evidence(current.get("evidence") or [], item["evidence"])
+        patch[field] = current
+        return "already_present", None
+    state = "conflict" if current.get("date") or (place and current.get("place")) else "applicable"
+    current.update({"date": proposed["date"], "precision": _precision(proposed),
+                    "bound": proposed.get("bound"), "calendar": proposed.get("calendar"),
+                    "is_circa": bool(proposed.get("is_circa")),
+                    # Vana tõend käis vana väärtuse kohta
+                    "evidence": list(item["evidence"])})
+    if place:
+        current["place"] = place
+    patch[field] = current
+    return state, snapshot if state == "conflict" else None
+
+
+def _apply_origin(item: dict, person: dict, patch: dict) -> tuple[str, object]:
+    _registry_place(item["place_key"])  # registris olemas
+    current = dict(_current(person, patch, "origin") or {})
+    if current.get("place") == item["place_key"]:
+        current["evidence"] = _merge_evidence(current.get("evidence") or [], item["evidence"])
+        patch["origin"] = current
+        return "already_present", None
+    state = "conflict" if current.get("place") else "applicable"
+    previous = current.get("place")
+    # ADR 0084: kanooniline koht on origin.place; birth.place-i ei puudutata.
+    # place_id/place_labels täidab salvestusel `_enrich_origin_from_places`.
+    current.update({"place": item["place_key"], "place_id": None, "place_labels": None,
+                    "evidence": list(item["evidence"])})
+    patch["origin"] = current
+    return state, previous if state == "conflict" else None
+
+
+def _apply_gender(item: dict, person: dict, patch: dict) -> tuple[str, object]:
+    current = _current(person, patch, "gender")
+    if current == item["value"]:
+        return "already_present", None
+    patch["gender"] = item["value"]
+    return ("conflict", current) if current else ("applicable", None)
+
+
+def _same_source(a: dict, b: dict) -> bool:
+    if a.get("work_id") or b.get("work_id"):
+        return (a.get("work_id"), a.get("page")) == (b.get("work_id"), b.get("page"))
+    return (a.get("text") or "").strip() == (b.get("text") or "").strip()
+
+
+def _apply_biography(item: dict, person: dict, patch: dict) -> tuple[str, object]:
+    from ..prosopo_biography_fields import text_hash
+    field = f"biography_{item['lang']}"
+    current = _current(person, patch, field) or ""
+    if text_hash(current) != item["base_hash"]:
+        raise _error("stale_biography")
+    patch[field] = item["text"]
+    sources = list(_current(person, patch, "sources") or [])
+    for source in item.get("sources_add") or []:
+        if not any(isinstance(s, dict) and _same_source(s, source) for s in sources):
+            sources.append(dict(source))
+    patch["sources"] = sources
+    return ("replace", current) if current.strip() else ("applicable", None)
+
+
+_APPLY = {"birth": _apply_date, "death": _apply_date, "origin": _apply_origin,
+          "gender": _apply_gender, "biography": _apply_biography}
+
+
+def apply(item: dict, person: dict, patch: dict) -> str:
+    """Kannab rea `patch`-i; tagastab oleku. Blokeeritud rida viskab ProposalError."""
+    return _APPLY[item["kind"]](item, person, patch)[0]
+
+
+def review_state(item: dict, person: dict, patch: dict) -> dict:
+    """Serveri otsus paneelile; `current` = praegune väärtus konflikti/asenduse kuvamiseks."""
+    from .enrichment_proposals import ProposalError
+    try:
+        state, current = _APPLY[item["kind"]](item, person, patch)
+    except ProposalError as error:
+        return {"state": "blocked", "reason": str(error)}
+    result = {"state": state}
+    if current is not None:
+        result["current"] = current
+    return result

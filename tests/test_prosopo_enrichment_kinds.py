@@ -7,6 +7,13 @@ from server.prosopography import enrichment_proposals as proposals
 from tests.test_prosopo_enrichment_proposals import (  # noqa: F401
     _headers, _kood, korpuse_teos, proposal_db, registrid)
 
+@pytest.fixture(autouse=True)
+def allika_teos(monkeypatch):
+    """„Allikad" kirje teose kontroll (person_sources) näeb sama korpust: ainult w1."""
+    from server.prosopography import person_sources
+    monkeypatch.setattr(person_sources, "_load_meta", lambda work_id: {} if work_id == "w1" else None)
+
+
 OK_EVIDENCE = [{"source_kind": "vutt_page", "work_id": "w1", "page": 3}]
 LINK = "([VUTT, *Oratio*, 3](https://vutt.utlib.ut.ee/work/w1/3))"
 
@@ -93,6 +100,158 @@ def test_eluloo_link_vale_lehele(esita):
     assert r.status_code == 400 and "page_out_of_range" in r.text
 
 
+def test_allika_teos_kontrollitakse_esitusel(esita):
+    r = esita([_bio(sources_add=[{"work_id": "w2", "page": 1}])])
+    assert r.status_code == 400 and "unknown_work" in r.text
+
+
 def test_pikk_elulugu_mahub(esita):
     pikk = ("Lõik pikast eluloost. " * 2800)[:39_000] + f" {LINK}"
     assert esita([_bio(text=pikk), _bio(lang="en", text=pikk)]).status_code == 200
+
+
+# ── Ülesanne 2: olek ülevaatusel ja kinnitus ─────────────────────────────
+
+from tests.test_prosopo_enrichment_proposals import _submit_for_review  # noqa: E402
+
+EV_B = {"source_kind": "vutt_page", "work_id": "w1", "page": 9}
+BIRTH = {"kind": "birth", "date": {"date": "1755", "precision": "year"}, "evidence": OK_EVIDENCE}
+
+
+@pytest.fixture
+def kohad(registrid, monkeypatch):
+    """Koharegister ka päritolu rikastajale (places_ops loeb oma vahemälust)."""
+    import json as _json
+    from server.prosopography import places_ops
+    config, _ = registrid
+    (config / "places.json").write_text(_json.dumps({
+        "tartu": {"id": "Q13972", "labels": {"et": "Tartu", "en": "Tartu"}},
+        "riia": {"id": "Q1773", "labels": {"et": "Riia", "en": "Riga"}}}))
+    monkeypatch.setattr(places_ops, "PLACES_FILE", str(config / "places.json"))
+    places_ops._load_places_cache(force_reload=True)
+    yield config
+    places_ops._load_places_cache(force_reload=True)
+
+
+def _ylevaatus(client, login, prosopo_env, items, **card):
+    card = prosopo_env.write("abc", occupations=[], education=[], **card)
+    token = login("superadmin", "superpass")
+    proposal_id = _submit_for_review(client, token, card, items)
+    rows = client.get(f"/prosopography/enrichment-proposals/{card['id']}",
+                      headers=_headers(token)).json()[0]["items"]
+
+    def kinnita(selected):
+        return client.post(f"/prosopography/enrichment-proposals/{card['id']}/apply",
+                           headers=_headers(token),
+                           json={"proposal_id": proposal_id, "selected": selected})
+    return rows, kinnita
+
+
+def test_sund_tuhjale_kaardile_applicable_ja_kinnitus_kirjutab_toendi(client, login, prosopo_env, kohad):
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, [BIRTH])
+    assert rows[0]["review_state"]["state"] == "applicable"
+    assert kinnita([0]).status_code == 200
+    birth = prosopo_env.read("abc")["birth"]
+    assert birth["date"] == "1755" and birth["precision"] == "year"
+    assert birth["evidence"] == OK_EVIDENCE
+
+
+def test_sama_sund_already_present_lisab_ainult_toendi(client, login, prosopo_env, kohad):
+    item = {**BIRTH, "evidence": OK_EVIDENCE + [EV_B], "date": {"date": "1755", "is_circa": True}}
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, [item], birth={
+        "date": "1755", "precision": "year", "is_circa": False, "evidence": OK_EVIDENCE})
+    assert rows[0]["review_state"]["state"] == "already_present"
+    assert kinnita([0]).status_code == 200
+    birth = prosopo_env.read("abc")["birth"]
+    assert birth["evidence"] == OK_EVIDENCE + [EV_B]
+    assert birth["is_circa"] is True  # tühja (false) koha täitmine
+
+
+def test_erinev_sund_on_conflict_ja_kinnitus_asendab(client, login, prosopo_env, kohad):
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, [BIRTH], birth={
+        "date": "1754", "precision": "year", "evidence": [EV_B], "notes": "märkus"})
+    state = rows[0]["review_state"]
+    assert state["state"] == "conflict" and state["current"]["date"] == "1754"
+    assert kinnita([0]).status_code == 200
+    birth = prosopo_env.read("abc")["birth"]
+    assert birth["date"] == "1755" and birth["evidence"] == OK_EVIDENCE
+    assert birth["notes"] == "märkus"  # muu väli jääb
+
+
+def test_surm_kohaga_ja_paritolu(client, login, prosopo_env, kohad):
+    items = [{"kind": "death", "date": {"date": "1807-03-02", "precision": "day"},
+              "place_key": "tartu", "evidence": OK_EVIDENCE},
+             {"kind": "origin", "place_key": "riia", "evidence": OK_EVIDENCE},
+             {"kind": "gender", "value": "M", "evidence": OK_EVIDENCE}]
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, items)
+    assert [r["review_state"]["state"] for r in rows] == ["applicable"] * 3
+    assert kinnita([0, 1, 2]).status_code == 200
+    saved = prosopo_env.read("abc")
+    assert saved["death"]["place"]["id"] == "Q13972" and saved["death"]["evidence"] == OK_EVIDENCE
+    assert saved["origin"]["place"] == "riia" and saved["origin"]["place_id"] == "Q1773"
+    assert saved["origin"]["evidence"] == OK_EVIDENCE
+    assert saved["gender"] == "M"
+
+
+def test_paritolu_conflict_ja_sama(client, login, prosopo_env, kohad):
+    item = {"kind": "origin", "place_key": "riia", "evidence": OK_EVIDENCE}
+    rows, _ = _ylevaatus(client, login, prosopo_env, [item], origin={"place": "tartu"})
+    assert rows[0]["review_state"]["state"] == "conflict"
+    assert rows[0]["review_state"]["current"] == "tartu"
+    rows, _ = _ylevaatus(client, login, prosopo_env, [item], origin={"place": "riia"})
+    assert rows[0]["review_state"]["state"] == "already_present"
+
+
+def test_elulugu_replace_ja_stale(client, login, prosopo_env, kohad):
+    item = _bio(text=f"Uus elulugu {LINK}.", base_hash=text_hash("Vana."))
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, [item], biography_et="Vana.")
+    assert rows[0]["review_state"]["state"] == "replace"
+    assert rows[0]["review_state"]["current"] == "Vana."
+    # Toimetaja muudab vahepeal teksti käsitsi → rida vananeb
+    card = prosopo_env.read("abc")
+    prosopo_env.write("abc", **{**{k: v for k, v in card.items() if k != "id"},
+                                "biography_et": "Vahepeal parandatud."})
+    response = kinnita([0])
+    assert response.status_code == 400 and "stale_biography" in response.text
+    assert prosopo_env.read("abc")["biography_et"] == "Vahepeal parandatud."
+
+
+def test_eluloo_kinnitus_ei_kirjuta_ankrut_ja_lisab_allikad_duplikaatideta(client, login, prosopo_env, kohad):
+    anchor = {"hash": "abcdefabcdef", "at": "2026-01-01T00:00:00+00:00"}
+    item = _bio(sources_add=[{"text": "A"}, {"text": "B"}, {"work_id": "w1", "page": 3}])
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, [item], biography_en="English.",
+                               biography_en_src=anchor,
+                               sources=[{"text": "A"}, {"work_id": "w1", "page": 3}])
+    assert rows[0]["review_state"]["state"] == "applicable"
+    response = kinnita([0])
+    assert response.status_code == 200, response.text
+    saved = prosopo_env.read("abc")
+    assert saved["biography_et"] == item["text"]
+    assert saved["biography_en_src"] == anchor
+    assert saved["sources"] == [{"text": "A"}, {"work_id": "w1", "page": 3}, {"text": "B"}]
+
+
+def test_mitu_liiki_uks_kinnitus_uks_commit(client, login, prosopo_env, kohad, monkeypatch):
+    from server.prosopography import state
+    calls = []
+    real = state.save_with_git
+    monkeypatch.setattr(state, "save_with_git", lambda *a, **k: calls.append(a) or real(*a, **k))
+    items = [BIRTH, {"kind": "origin", "place_key": "tartu", "evidence": OK_EVIDENCE}, _bio()]
+    rows, kinnita = _ylevaatus(client, login, prosopo_env, items)
+    calls.clear()
+    assert kinnita([0, 1, 2]).status_code == 200
+    assert len(calls) == 1
+
+
+def test_kadunud_koht_blocked(client, login, prosopo_env, kohad):
+    import json as _json
+    from server.prosopography import places_ops
+    item = {"kind": "origin", "place_key": "riia", "evidence": OK_EVIDENCE}
+    card = prosopo_env.write("abc", occupations=[], education=[])
+    token = login("superadmin", "superpass")
+    _submit_for_review(client, token, card, [item])
+    (kohad / "places.json").write_text(_json.dumps({"tartu": {"id": "Q13972"}}))
+    places_ops._load_places_cache(force_reload=True)
+    rows = client.get(f"/prosopography/enrichment-proposals/{card['id']}",
+                      headers=_headers(token)).json()[0]["items"]
+    assert rows[0]["review_state"] == {"state": "blocked", "reason": "unknown_place_key"}

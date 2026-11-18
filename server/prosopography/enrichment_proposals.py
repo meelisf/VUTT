@@ -257,7 +257,10 @@ def _check_vutt_pages(items: list) -> None:
         from .enrichment_kinds import biography_links
         sources = item.get("evidence") or []
         if item["kind"] == "biography":
-            sources = biography_links(item["text"])
+            # Eluloo lingid ja „Allikad" teoseviited peavad korpuses olemas olema
+            sources = biography_links(item["text"]) + [
+                {"source_kind": "vutt_page", "work_id": s["work_id"], "page": s.get("page") or 1}
+                for s in item.get("sources_add") or [] if s.get("work_id")]
         for source in sources:
             if source["source_kind"] != "vutt_page":
                 continue
@@ -398,8 +401,9 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
         # duplikaat juba loetelus, mitte alles „Kinnita kõik" eelkontrollis.
         occupations = list(person.get("occupations") or []) if person else []
         education = list(person.get("education") or []) if person else []
+        patch: dict = {}
         for item in items:
-            item["review_state"] = _review_state(item, person, occupations, education)
+            item["review_state"] = _review_state(item, person, occupations, education, patch)
             labels, ids = {}, {}
             for key, filename in (
                 ("occupation_key", os.path.join(DATA_CONFIG_DIR, "occupations.json")),
@@ -614,11 +618,15 @@ def _merge_row(item: dict, occupations: list, education: list) -> str:
     return "already_present"
 
 
-def _review_state(item: dict, person: Optional[dict], occupations: list, education: list) -> dict:
-    """Serveri otsus paneelile — klient olekut ise ei arvuta. Loendid on kaardi koopiad,
-    kuhu eelmised read on juba kantud."""
+def _review_state(item: dict, person: Optional[dict], occupations: list, education: list,
+                  patch: Optional[dict] = None) -> dict:
+    """Serveri otsus paneelile — klient olekut ise ei arvuta. Loendid (ja `patch` uutel
+    liikidel, #834) on kaardi koopiad, kuhu eelmised read on juba kantud."""
     if person is None:
         return {"state": "blocked", "reason": "person_not_found"}
+    from . import enrichment_kinds
+    if item.get("kind") in enrichment_kinds.NEW_KINDS:
+        return enrichment_kinds.review_state(item, person, {} if patch is None else patch)
     try:
         state = _merge_row(item, occupations, education)
     except ProposalError as error:
@@ -703,9 +711,14 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
             raise ProposalError("person_not_found")
         occupations = list(person.get("occupations") or [])
         education = list(person.get("education") or [])
+        from . import enrichment_kinds
+        patch: dict = {}  # uute liikide (#834) kaardiväljad
         # 1. Eelkontroll elava kaardi ja registri vastu; kaardi loendid ehitatakse koopiasse.
         for index in selected:
             try:
+                if items[index]["kind"] in enrichment_kinds.NEW_KINDS:
+                    enrichment_kinds.apply(items[index], person, patch)
+                    continue
                 _merge_row(items[index], occupations, education)
             except ProposalError as error:
                 raise ProposalError(f"items[{index}]: {error}") from None
@@ -727,7 +740,7 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
             try:
                 updated = update_person(person_id, {
                     "updated_at": person["updated_at"],
-                    "occupations": occupations, "education": education,
+                    "occupations": occupations, "education": education, **patch,
                 }, username)
             except ValueError as error:
                 if str(error).startswith("conflict:"):
