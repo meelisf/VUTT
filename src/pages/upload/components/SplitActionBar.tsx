@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Columns2, Eye, EyeOff, X } from 'lucide-react';
+import { Columns2, Undo2, X } from 'lucide-react';
 import FloatingActionBar from '../../../components/pagePrep/FloatingActionBar';
 import RotateButtons from '../../../components/pagePrep/RotateButtons';
 
@@ -53,13 +53,14 @@ const SplitActionBar: React.FC<SplitActionBarProps> = (props) => {
             </button>
           </div>
 
-          {/* OCR-rühm — mõlemasuunaline (§6) */}
+          {/* Teosest välja / tagasi — mõlemasuunaline (§6). Punane rist nagu kaardil. */}
           <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
-            <button type="button" onClick={props.onExclude} className={btn}>
-              <EyeOff size={14} />{t('step3split.bar.exclude')}
+            <button type="button" onClick={props.onExclude}
+              className="flex items-center gap-1.5 rounded border border-red-300 px-2.5 py-1 text-sm text-red-700 hover:bg-red-50">
+              <X size={14} />{t('step3split.bar.exclude')}
             </button>
             <button type="button" onClick={props.onInclude} className={btn}>
-              <Eye size={14} />{t('step3split.bar.include')}
+              <Undo2 size={14} />{t('step3split.bar.include')}
             </button>
           </div>
 

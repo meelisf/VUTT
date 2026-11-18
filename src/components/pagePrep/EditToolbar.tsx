@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Crop, Frame, CircleX } from 'lucide-react';
+import { Crop, Frame, CircleX, CopyPlus } from 'lucide-react';
 import RotateButtons from './RotateButtons';
 import type { CropBoxState } from './useCropBox';
 
@@ -49,6 +49,20 @@ const EditToolbar: React.FC<Props> = ({ crop, onRotate, testIdPrefix }) => {
           {tool.icon}
         </button>
       ))}
+      {/* „Kanna kärbe edasi" (ADR 0085): sees → igale uuele lehele pakutakse viimane kast
+          samasse kohta (punktiir); „Kärbi ja järgmine" võtab vastu, noolega edasi = ei kärbi.
+          Väljas (vaikimisi) → uuele lehele kasti ise ei teki. */}
+      <button
+        type="button"
+        data-testid={`${testIdPrefix}-tool-carry`}
+        onClick={crop.toggleCarry}
+        aria-pressed={crop.carry}
+        aria-label={t('pagePrep.carryCrop')}
+        title={t('pagePrep.carryCrop')}
+        className={`flex w-full justify-center rounded border p-2 ${crop.carry ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
+      >
+        <CopyPlus size={16} />
+      </button>
       {crop.perspective && crop.quad && (
         <button type="button" onClick={crop.resetQuad} title={t('pagePrep.perspectiveReset')}
           className={`${toolBtn} text-gray-500 hover:text-gray-700`}>

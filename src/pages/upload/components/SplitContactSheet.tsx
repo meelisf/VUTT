@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
-import { Check, Columns2, Eye, EyeOff, Loader2, Maximize2 } from 'lucide-react';
+import { Check, Columns2, Crop, Loader2, RotateCw, SquarePen, X } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
 import { isPreviewReady, willSplit } from '../prepressPlan';
 import { cardLineLeftPercent } from '../../../components/pagePrep/geometry';
@@ -19,15 +19,23 @@ interface Props {
 }
 
 /** Nurgaikooni kest — sama geomeetria kui PageCard tegevusnupul.
- *  must = VÄLJAJÄTMINE: seda lehte ei OCR-ita / ei poolitata; hall = tehakse.
- *  Mõlemad nurgaikoonid ja täisvaate nupud kannavad SAMA signaali — segased
- *  suunad (must = „poolitatakse" ühes, „ei poolitata" teises) olid varem
- *  peamine arusaamatuse allikas. */
+ *  must = seda lehte EI poolitata; hall = poolitatakse / tavaolek. Nurgaikoon ja
+ *  täisvaate nupud kannavad SAMA signaali — segased suunad olid varem peamine
+ *  arusaamatuse allikas. */
 const cornerBtn = (active: boolean) =>
   `p-1 rounded shadow-sm border transition-colors ${
     active
       ? 'bg-gray-900 border-gray-900 text-white'
       : 'bg-white/90 border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+  }`;
+
+/** Väljajätmise nupp: PUNANE rist, sest leht jääb TEOSEST välja (mitte ainult OCR-ist).
+ *  Välja jäetud = täidetud punane; muidu tavaline, punane alles hõljudes. */
+const excludeBtn = (excluded: boolean) =>
+  `p-1 rounded shadow-sm border transition-colors ${
+    excluded
+      ? 'bg-red-600 border-red-600 text-white hover:bg-red-700'
+      : 'bg-white/90 border-gray-600 text-gray-600 hover:border-red-600 hover:bg-red-50 hover:text-red-700'
   }`;
 
 /**
@@ -57,13 +65,23 @@ const SplitContactSheet: React.FC<Props> = ({
           : plan.default_split_x;
         // Joon pildi, mitte kasti järgi (vt cardLineLeftPercent).
         const lineLeft = cardLineLeftPercent(aspects[page.n], x);
+        // Ootel muudatus (sama tähendus mis redaktori pisipiltide ribal): kasutaja on
+        // lehele midagi määranud. Vaikimisi ei poolitata midagi.
+        const pRotate = Boolean(page.rotate);
+        const pCrop = Boolean(page.adjust);
+        const pending = pRotate || pCrop || splits;
         return (
           <div
             key={page.n}
             data-testid={`page-${page.n}`}
             data-excluded={page.excluded ? 'true' : 'false'}
+            data-pending={pending ? 'true' : 'false'}
+            // Raam: valik > välja jäetud (punane) > ootel muudatus (oranž, nagu teose halduse kaardil).
             className={`relative flex flex-col rounded-lg border overflow-hidden bg-white ${
-              isSelected ? 'border-primary-500 ring-2 ring-primary-400' : 'border-gray-200'
+              isSelected ? 'border-primary-500 ring-2 ring-primary-400'
+                : page.excluded ? 'border-red-400 ring-1 ring-red-300'
+                : pending ? 'border-amber-400 ring-1 ring-amber-300'
+                : 'border-gray-200'
             }`}
           >
             {/* Kogu pisipildi-ala on valiku-sihtmärk; select-none väldib
@@ -133,7 +151,23 @@ const SplitContactSheet: React.FC<Props> = ({
                 {page.n}
               </span>
 
-              {/* Kolm nurgaikooni: [silm] [|] [suurenda] — OCR, poolitus, ava (§4) */}
+              {/* Ootel muudatuste märk — üleval paremal (samad ikoonid mis pisipiltide ribal).
+                  Väljajäetud lehel näitab märgi asemel punast risti: tema muudatused ei rakendu. */}
+              {page.excluded ? (
+                <span data-testid={`excluded-mark-${page.n}`}
+                  className="pointer-events-none absolute right-1 top-1 z-10 rounded bg-red-600 p-0.5 text-white shadow-sm">
+                  <X size={12} />
+                </span>
+              ) : pending && (
+                <span data-testid={`pending-${page.n}`} title={t('step3split.card.pendingTitle')}
+                  className="absolute right-1 top-1 z-10 flex items-center gap-1 rounded border border-amber-300 bg-amber-100 px-1 py-0.5 text-[10px] leading-none text-amber-800 shadow-sm">
+                  {pRotate && (<><RotateCw size={11} />{page.rotate}°</>)}
+                  {pCrop && (<><Crop size={11} />{t('step3split.card.badgeCrop')}</>)}
+                  {splits && (<><Columns2 size={11} />{t('step3split.card.badgeSplit')}</>)}
+                </span>
+              )}
+
+              {/* Kolm nurgaikooni: [✕] [|] [redaktor] — teosest välja, poolitus, ava redaktor (§4) */}
               <div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">
                 <button
                   type="button"
@@ -141,9 +175,9 @@ const SplitContactSheet: React.FC<Props> = ({
                   onClick={(e) => { e.stopPropagation(); onPageChange(page.n, { excluded: !page.excluded }); }}
                   aria-pressed={page.excluded}
                   title={page.excluded ? t('step3split.card.include') : t('step3split.card.exclude')}
-                  className={cornerBtn(page.excluded)}
+                  className={excludeBtn(page.excluded)}
                 >
-                  {page.excluded ? <EyeOff size={14} /> : <Eye size={14} />}
+                  <X size={14} />
                 </button>
                 <button
                   type="button"
@@ -169,7 +203,8 @@ const SplitContactSheet: React.FC<Props> = ({
                   title={t('step3split.card.open')}
                   className={`${cornerBtn(false)} disabled:opacity-40`}
                 >
-                  <Maximize2 size={14} />
+                  {/* Sama ikoon ja tekst mis teose halduse kaardil (ADR 0085): üks redaktor. */}
+                  <SquarePen size={14} />
                 </button>
               </div>
             </div>

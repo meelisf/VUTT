@@ -41,9 +41,13 @@ Põhjus oli see, et `split_x` on **kärbitud** pildi laiuse osa (pööre → `ad
      Taastamine ei ole kasutaja muudatus ega kirjuta plaani. Taastamine ootab, kuni
      kuvamõõdud kuuluvad selle lehe pildile (`imgReady`/`loadedKey`): lehe vahetuse
      renderdusel on olekus veel eelmise pildi mõõdud.
-   - **Kleepuv kast on pakkumine** (punktiir). Plaani läheb ta alles siis, kui kasutaja
-     teda puudutab või põhinupuga vastu võtab. Muidu kärbiks iga läbi lehitsetud lehte
-     (2026-11-17).
+   - **Kärpe edasikandmine on eraldi lüliti** „Kanna kärbe edasi" (tööriistaribal,
+     VAIKIMISI VÄLJAS). Väljas: uuele lehele kasti ise ei teki. Sees: kastita lehele
+     pakutakse viimast kasti SAMASSE kohta (suurus, asukoht, kalle), mitte keskele.
+     Pakkumine on punktiiriga ja plaani läheb alles siis, kui kasutaja seda puudutab või
+     „Kärbi ja järgmine" vastu võtab. Noolega edasi minnes lehte ei kärbita. Muidu kärbiks
+     iga läbi lehitsetud lehte (2026-11-17). Varem tekkis pakkumine alati ja lehe keskele,
+     mis oli segadusttekitav.
    - Joone raam on plaani kärbe; lohistuse ajal järgib joon kasti juba enne kirjutust.
    - Päise ja jaluse kõrgus ei sõltu lehe olekust (päis ühel real, vihje fikseeritud
      kõrgusega), muidu hüppab pilt.

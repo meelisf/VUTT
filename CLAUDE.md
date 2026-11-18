@@ -479,7 +479,8 @@ Päis (ootel-kapsel), tööriistaveerg, pisipiltide riba ja jalus on ühised; s�
 pööre eemaldab `adjust`-i (`withRotation`). Redaktor on ÜKS vaade (ADR 0085): kärpekast ja
 poolitusjoon samal pildil, joon kärpe väljundi nelinurgas (`splitGeometry`); klõps ilma
 liikumiseta = joon, lohistus = kast. Kõik on KOHE ootel (`usePendingCrop`): ekraanil olev
-kast = ootel kärbe (taastatakse lehele tulles), kleepuv kast on pakkumine kuni puudutamiseni. Plaani salvestuses puuduv `adjust` võti =
+kast = ootel kärbe (taastatakse lehele tulles); „Kanna kärbe edasi" lüliti (vaikimisi väljas)
+pakub viimast kasti samasse kohta, pakkumine läheb plaani alles puudutamisel. Plaani salvestuses puuduv `adjust` võti =
 ära puutu, ainult `null` eemaldab. Eelvaade saab `adjust`-i URL-ist (`?adj=`), mitte plaanist.
 Teose halduse pööre/kärbe/poolitus (ADR 0050, 0061) on **ootel plaan** (`manage/pageOpsPlan.ts`,
 võti = failinimi; kärbe = `adjust` pööratud raamis, pöörde muutus eemaldab selle) ja rakendub **taustatööna** (`POST /admin/work/{id}/page-ops` +

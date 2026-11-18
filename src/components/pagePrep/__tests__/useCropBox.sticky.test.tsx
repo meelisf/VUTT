@@ -14,6 +14,8 @@ function hookWithDrawnBox() {
   act(() => { h.result.current.onMouseDown({ ...at(50, 50), target: overlay, preventDefault() {} } as never); });
   act(() => { window.dispatchEvent(new MouseEvent('mousemove', at(250, 350))); });
   act(() => { window.dispatchEvent(new MouseEvent('mouseup', at(250, 350))); });
+  // „Kanna kärbe edasi" sisse (ADR 0085) — vaikimisi pakkumist ei teki.
+  act(() => { h.result.current.toggleCarry(); });
   return h;
 }
 
@@ -32,7 +34,7 @@ describe('useCropBox kleepuv kast', () => {
     expect(h.result.current.hasEdit).toBe(false);
   });
 
-  it('kleepuv suurus jääb reset(false) järel meelde', () => {
+  it('viimane kast jääb reset(false) järel meelde', () => {
     const h = hookWithDrawnBox();
     act(() => { h.result.current.reset(false); });
     act(() => { h.result.current.reset(); });
@@ -93,5 +95,49 @@ describe('useCropBox liigutamine', () => {
     expect(r.x).toBeCloseTo(0);
     expect(r.y).toBeCloseTo(0);
     expect(r.w).toBeCloseTo(0.5);    // suurus ei muutu
+  });
+});
+
+// ADR 0085: „Kanna kärbe edasi" — vaikimisi väljas; sees → sama kast samasse kohta.
+describe('useCropBox „Kanna kärbe edasi"', () => {
+  function drawn() {
+    const h = renderHook(() => useCropBox(400, 600, true));
+    const overlay = document.createElement('div');
+    overlay.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 600, right: 400, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
+    (h.result.current.overlayRef as { current: HTMLDivElement | null }).current = overlay;
+    const at = (x: number, y: number) => ({ clientX: x, clientY: y });
+    act(() => { h.result.current.onMouseDown({ ...at(40, 60), target: overlay, preventDefault() {} } as never); });
+    act(() => { window.dispatchEvent(new MouseEvent('mousemove', at(240, 360))); });
+    act(() => { window.dispatchEvent(new MouseEvent('mouseup', at(240, 360))); });
+    return h;
+  }
+
+  it('vaikimisi väljas: uuele lehele kasti ei teki', () => {
+    const h = drawn();
+    expect(h.result.current.carry).toBe(false);
+    act(() => { h.result.current.reset(); });
+    expect(h.result.current.cropRect).toBeNull();
+    expect(h.result.current.proposal).toBe(false);
+  });
+
+  it('sees: pakutakse SAMA asukoht ja suurus (mitte keskele)', () => {
+    const h = drawn();
+    const r = h.result.current.cropRect!;
+    act(() => { h.result.current.toggleCarry(); });
+    act(() => { h.result.current.reset(); });
+    const p = h.result.current.cropRect!;
+    expect(h.result.current.proposal).toBe(true);
+    expect(p.x).toBeCloseTo(r.x);
+    expect(p.y).toBeCloseTo(r.y);
+    expect(p.w).toBeCloseTo(r.w);
+  });
+
+  it('kastita lehel sisselülitus paneb pakkumise kohe; väljalülitus võtab pakkumise ära', () => {
+    const h = drawn();
+    act(() => { h.result.current.reset(); });            // lüliti väljas → kasti pole
+    act(() => { h.result.current.toggleCarry(); });
+    expect(h.result.current.proposal).toBe(true);
+    act(() => { h.result.current.toggleCarry(); });
+    expect(h.result.current.cropRect).toBeNull();
   });
 });

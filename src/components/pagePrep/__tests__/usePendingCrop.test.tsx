@@ -47,6 +47,7 @@ describe('usePendingCrop', () => {
     const { h, onCommit, overlay, drag } = setup(null);
     drag(overlay, [50, 50], [250, 350]);
     onCommit.mockClear();
+    act(() => { h.result.current.toggleCarry(); });     // „Kanna kärbe edasi" sisse
     act(() => { h.result.current.reset(); });           // järgmine leht: pakkumine
     expect(h.result.current.proposal).toBe(true);
     expect(onCommit).not.toHaveBeenCalled();

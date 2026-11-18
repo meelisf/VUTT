@@ -52,13 +52,17 @@ export function useCropBox(displayW: number, displayH: number, active: boolean, 
   const [dragging, setDragging] = useState(false);          // kärbe-interaktsioon aktiivne
   // Kärpe-lohistuse ajutine olek (display-pikslites)
   const [cropDraft, setCropDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  // "Kleepuv" kärpe-suurus: viimati kasutatud kasti normaliseeritud mõõt. Iga uue lehe
-  // avamisel ilmub sama suur tühi kast keskele (asukohta/kallet ei taastata). Ref, mitte
-  // state → ei tekita re-render'it ega püsi üle komponendi elu. clearCrop nullib selle.
-  const lastCropSizeRef = useRef<{ w: number; h: number } | null>(null);
-  // reset()-i pandud kleepuv kast (objekti identsus). Iga kasutaja muudatus loob uue
-  // objekti, nii et `cropRect === stickyRectRef.current` = puutumata pakkumine.
-  const stickyRectRef = useRef<CropRect | null>(null);
+  // Viimati kasutatud kast (asukoht, suurus, kalle — normaliseeritud). „Kanna kärbe edasi"
+  // lüliti sees: iga uue lehe avamisel pakutakse SAMA kast samasse kohta (ADR 0085). Ref,
+  // mitte state → ei tekita re-render'it. clearCrop nullib selle.
+  const lastBoxRef = useRef<{ rect: CropRect; angle: number } | null>(null);
+  // Pakutud kast (objekti identsus + kalle). Iga kasutaja muudatus loob uue objekti,
+  // nii et sama objekt ja sama kalle = puutumata pakkumine.
+  const stickyRef = useRef<{ rect: CropRect; angle: number } | null>(null);
+  // „Kanna kärbe edasi" (ADR 0085): VAIKIMISI VÄLJAS — uuele lehele ei teki kasti ise.
+  // Lüliti püsib lehtede vahel (hook elab üle lehevahetuse); ref reset()-i jaoks.
+  const [carry, setCarry] = useState(false);
+  const carryRef = useRef(false);
   const interaction = useRef<Interaction>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   // Kasutaja muudatuste loendur (ADR 0085: kõik on kohe ootel). Kasvab AINULT kasutaja
@@ -67,38 +71,45 @@ export function useCropBox(displayW: number, displayH: number, active: boolean, 
   const [editSeq, setEditSeq] = useState(0);
   const bumpEdit = () => setEditSeq((n) => n + 1);
 
-  // Jäta meelde viimati kasutatud kärpe-suurus. onCropUp ei võta MIN_DRAG_PX-st väiksemat
+  // Jäta meelde viimati kasutatud kast. onCropUp ei võta MIN_DRAG_PX-st väiksemat
   // kasti vastu → liiga väikest kogemata kasti ei salvestata.
   useEffect(() => {
-    if (cropRect) lastCropSizeRef.current = { w: cropRect.w, h: cropRect.h };
-  }, [cropRect]);
+    if (cropRect) lastBoxRef.current = { rect: cropRect, angle: boxAngle };
+  }, [cropRect, boxAngle]);
 
-  /** Lähtesta leheks: kõik tühjaks, siis "kleepuv" suurus tsentreeritud kastina. */
-  // `withSticky=false`: kleepuvat kasti ei panda (suurus jääb meelde) — nt lehel, kus on
-  // juba ootel kärbe: tühi kast peidaks ootel kärbe kontuuri.
+  /** Pane viimane kast pakkumisena (sama koht, suurus, kalle; piiratud raami). */
+  const placeProposal = useCallback((): boolean => {
+    const last = lastBoxRef.current;
+    if (!last) return false;
+    const w = Math.min(Math.max(last.rect.w, 0.01), 1);
+    const h = Math.min(Math.max(last.rect.h, 0.01), 1);
+    const rect = {
+      x: Math.min(Math.max(last.rect.x, 0), 1 - w), y: Math.min(Math.max(last.rect.y, 0), 1 - h), w, h,
+    };
+    stickyRef.current = { rect, angle: last.angle };
+    setBoxAngle(last.angle);
+    setCropRect(rect);
+    return true;
+  }, []);
+
+  /** Lähtesta leheks: kõik tühjaks; lüliti „Kanna kärbe edasi" sees → viimane kast pakkumisena. */
+  // `withSticky=false`: pakkumist ei panda — lehel, kus on juba ootel kärbe (see taastatakse).
   const reset = useCallback((withSticky = true) => {
     setBoxAngle(0);
     setCropDraft(null);
     setPerspective(false);
     setQuad(null);
     interaction.current = null;
-    if (withSticky && lastCropSizeRef.current) {
-      const w = Math.min(Math.max(lastCropSizeRef.current.w, 0.01), 0.98);
-      const h = Math.min(Math.max(lastCropSizeRef.current.h, 0.01), 0.98);
-      const sticky = { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
-      stickyRectRef.current = sticky;
-      setCropRect(sticky);
-    } else {
-      stickyRectRef.current = null;
-      setCropRect(null);
-    }
-  }, []);
+    stickyRef.current = null;
+    if (withSticky && carryRef.current && placeProposal()) return;
+    setCropRect(null);
+  }, [placeProposal]);
 
-  /** Eemalda kast JA unusta kleepuv suurus (kasutaja toiming → läheb plaani). */
+  /** Eemalda kast JA unusta viimane kast (kasutaja toiming → läheb plaani). */
   const clearCrop = useCallback(() => {
     setCropRect(null);
     setBoxAngle(0);
-    lastCropSizeRef.current = null;
+    lastBoxRef.current = null;
     setEditSeq((n) => n + 1);
   }, []);
 
@@ -272,7 +283,7 @@ export function useCropBox(displayW: number, displayH: number, active: boolean, 
     if (displayW <= 0 || displayH <= 0) return false;
     interaction.current = null;
     setCropDraft(null);
-    stickyRectRef.current = null;
+    stickyRef.current = null;
     if (adjust.quad && adjust.quad.length === 4) {
       if (Math.abs(adjust.angle) > 1e-4 && Math.abs(adjust.angle - 360) > 1e-4) return false;
       setCropRect(null);
@@ -326,8 +337,8 @@ export function useCropBox(displayW: number, displayH: number, active: boolean, 
    * mitte `hasEdit`-i: muidu kärbitakse leht, mida kasutaja ei puudutanud (2026-11-17).
    * Selgesõnaline „Märgi" tohib võtta ka pakkumise — kast on ekraanil.
    */
-  const untouchedSticky = cropRect !== null && cropRect === stickyRectRef.current
-    && boxAngle === 0 && !perspective;
+  const untouchedSticky = cropRect !== null && cropRect === stickyRef.current?.rect
+    && boxAngle === stickyRef.current.angle && !perspective;
   const userEdited = hasEdit && !untouchedSticky;
   /** Kleepuv kast on PAKKUMINE (ADR 0085): ekraanil, aga mitte plaanis, kuni kasutaja
    *  teda puudutab või põhinupuga („Kärbi ja järgmine") vastu võtab. */
@@ -335,6 +346,22 @@ export function useCropBox(displayW: number, displayH: number, active: boolean, 
   /** Pakkumine vastu võetud (redaktor kirjutas selle plaani): uus objekt → enam mitte
    *  puutumata kleepuv kast. Loendur ei kasva — kirjutus tehti juba selgesõnaliselt. */
   const acceptProposal = () => setCropRect((r) => (r ? { ...r } : r));
+
+  /**
+   * „Kanna kärbe edasi" lüliti. Sisse: kastita lehel tekib kohe pakkumine. Välja:
+   * puutumata pakkumine kaob (päris kast ehk ootel kärbe jääb alles).
+   */
+  const toggleCarry = () => {
+    const next = !carryRef.current;
+    carryRef.current = next;
+    setCarry(next);
+    if (next && !cropRect && !perspective) placeProposal();
+    if (!next && proposal) {
+      stickyRef.current = null;
+      setCropRect(null);
+      setBoxAngle(0);
+    }
+  };
 
   /**
    * Serveri parameetrid. `grossAngle` = pildile rakendatud jäme pööre (upload'is 0,
@@ -360,8 +387,8 @@ export function useCropBox(displayW: number, displayH: number, active: boolean, 
 
   return {
     overlayRef, cropRect, boxAngle, quad, perspective, cropDraft, overlayBox, hasEdit, userEdited,
-    proposal, editSeq, dragging, displayW, displayH,
-    onMouseDown, reset, restore, acceptProposal, clearCrop, togglePerspective, resetQuad, onGrossRotate, toServerParams,
+    proposal, carry, editSeq, dragging, displayW, displayH,
+    onMouseDown, reset, restore, acceptProposal, toggleCarry, clearCrop, togglePerspective, resetQuad, onGrossRotate, toServerParams,
   };
 }
 
