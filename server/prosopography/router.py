@@ -453,6 +453,25 @@ _APPLY_CONFLICTS = ("stale_proposal", "stale_person", "duplicate_entry", "unreso
                     "registry_conflict", "duplicate_id")
 
 
+async def _after_person_save(person_id: str, old_relations: list, person: dict, username: str) -> None:
+    """Kaardi salvestuse järelsammud: vastastikused seosed ja Q-koodide sildid.
+    Kutsuvad PUT ja agendi ettepaneku kinnitus (#834) — sama tulemus mõlemal teel."""
+    # Sünkroniseeri vastastikused seosed (best-effort — viga ei blokeeri 200 vastust)
+    try:
+        a_label = (person.get("name") or {}).get("label", "")
+        await run_in_threadpool(
+            sync_reciprocals,
+            person_id,
+            old_relations,
+            person.get("relations", []),
+            a_label,
+            username=username,
+        )
+    except Exception:
+        logger.exception("sync_reciprocals ebaõnnestus isiku %s jaoks", person_id)
+    enrich_entity_labels_from_person_async(person)
+
+
 @router.post("/enrichment-proposals/{person_id}/apply")
 async def prosopography_apply_enrichment_proposal(
     person_id: str, request: Request, user=Depends(require_role("superadmin")),
@@ -461,12 +480,16 @@ async def prosopography_apply_enrichment_proposal(
     if not enrichment_proposals.valid_person_id(person_id):
         raise HTTPException(status_code=400, detail="invalid_person_id")
     data = await _decision_body(request)
+    old_person = await run_in_threadpool(get_person, person_id)
+    old_relations = (old_person or {}).get("relations", [])
     try:
-        return await run_in_threadpool(
+        updated = await run_in_threadpool(
             enrichment_proposals.apply_selected, data["proposal_id"], person_id,
             user["username"], request.state.session_fingerprint, data["selected"],
             data.get("revision"),
         )
+        await _after_person_save(person_id, old_relations, updated, user["username"])
+        return updated
     except enrichment_proposals.ApplyError as e:
         raise HTTPException(status_code=409, detail={
             "error": str(e), "created_registry_entries": e.created})
@@ -1148,20 +1171,7 @@ async def prosopography_update(
                 status_code=400,
                 detail="Tühja lähteteksti vastu ei saa tõlget kinnitada.")
         raise HTTPException(status_code=400, detail=msg)
-    # Sünkroniseeri vastastikused seosed (best-effort — viga ei blokeeri 200 vastust)
-    try:
-        a_label = (person.get("name") or {}).get("label", "")
-        await run_in_threadpool(
-            sync_reciprocals,
-            person_id,
-            old_relations,
-            person.get("relations", []),
-            a_label,
-            username=user["username"],
-        )
-    except Exception:
-        logger.exception("sync_reciprocals ebaõnnestus isiku %s jaoks", person_id)
-    enrich_entity_labels_from_person_async(person)
+    await _after_person_save(person_id, old_relations, person, user["username"])
     return person
 
 

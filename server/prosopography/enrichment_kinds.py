@@ -348,8 +348,122 @@ def _apply_biography(item: dict, person: dict, patch: dict) -> tuple[str, object
     return ("replace", current) if current.strip() else ("applicable", None)
 
 
+def _apply_floruit(item: dict, person: dict, patch: dict) -> tuple:
+    current = dict(_current(person, patch, "floruit") or {})
+    proposed = (item.get("year_from"), item.get("year_to"))
+    if (current.get("year_from"), current.get("year_to")) == proposed:
+        current["evidence"] = _merge_evidence(current.get("evidence") or [], item["evidence"])
+        patch["floruit"] = current
+        return "already_present", None
+    had = current.get("year_from") or current.get("year_to")
+    snapshot = {"year_from": current.get("year_from"), "year_to": current.get("year_to")}
+    current.update({"year_from": proposed[0], "year_to": proposed[1], "evidence": list(item["evidence"])})
+    patch["floruit"] = current
+    return ("conflict", snapshot) if had else ("applicable", None)
+
+
+def _name_copy(person: dict, patch: dict) -> dict:
+    name = dict(_current(person, patch, "name") or {})
+    name["aliases"] = list(name.get("aliases") or [])
+    name["names"] = list(name.get("names") or [])
+    return name
+
+
+def _apply_alias(item: dict, person: dict, patch: dict) -> tuple:
+    name = _name_copy(person, patch)
+    value = item["value"].strip()
+    known = [a for a in name["aliases"] if isinstance(a, str)] + [name.get("label") or ""] + [
+        n.get("label") or "" for n in name["names"] if isinstance(n, dict)]
+    if any(value.casefold() == k.strip().casefold() for k in known):
+        return "already_present", None
+    name["aliases"].append(value)
+    patch["name"] = name
+    return "applicable", None
+
+
+def _apply_name(item: dict, person: dict, patch: dict) -> tuple:
+    name = _name_copy(person, patch)
+    label = item["label"].strip()
+    if any(isinstance(n, dict) and (n.get("label") or "").strip().casefold() == label.casefold()
+           and n.get("type") == item["type"] for n in name["names"]):
+        return "already_present", None
+    # Liigiga nime tõstab normalize_name_obj salvestusel aliastest välja (ADR 0083)
+    name["names"].append({"label": label, "type": item["type"],
+                          "from": item.get("from"), "to": item.get("to")})
+    patch["name"] = name
+    return "applicable", None
+
+
+def _apply_vocab(item: dict, person: dict, patch: dict) -> tuple:
+    field = {"status": "statuses", "confession": "confessions"}[item["kind"]]
+    entry = vocabulary(item["kind"]).get(item["id"])
+    if entry is None:
+        raise _error("unknown_vocabulary_id")
+    current = list(_current(person, patch, field) or [])
+    if any(isinstance(c, dict) and c.get("id") == item["id"] for c in current):
+        return "already_present", None
+    labels = entry.get("label") if isinstance(entry.get("label"), dict) else {}
+    current.append({"id": item["id"], "label": labels.get("et") or item["id"], "labels": labels})
+    patch[field] = current
+    return "applicable", None
+
+
+def _apply_relation(item: dict, person: dict, patch: dict) -> tuple:
+    target = item.get("target_id")
+    if target:
+        from .person_crud import get_person
+        other = get_person(target)
+        if other is None or other.get("record_status") == "tombstone" or other.get("merged_into"):
+            raise _error("unknown_person")
+    current = list(_current(person, patch, "relations") or [])
+    for r in current:
+        if not isinstance(r, dict):
+            continue
+        if (target and r.get("target_id") == target) or (
+                not target and not r.get("target_id")
+                and (r.get("name") or "").strip().casefold() == item["name"].strip().casefold()):
+            return "already_present", None
+    row = {"name": item["name"].strip(), "type": item["type"].strip()}
+    if item.get("type_id"):
+        row["type_id"] = item["type_id"]
+    if target:
+        row["target_id"] = target
+    current.append(row)
+    patch["relations"] = current
+    return "applicable", None
+
+
+def _apply_identifier(item: dict, person: dict, patch: dict) -> tuple:
+    from . import ext_id_index
+    from .ext_ids import normalize_ext_id
+    scheme, ext_id = item["scheme"], normalize_ext_id(item["scheme"], item["id"])
+    owner = ext_id_index.find_person_id(scheme, ext_id)
+    if owner and owner != person.get("id"):
+        raise _error(f"duplicate_id: {owner}")
+    current = [dict(i) for i in (_current(person, patch, "identifiers") or []) if isinstance(i, dict)]
+    same_scheme = [i for i in current if i.get("scheme") == scheme]
+    if any(i.get("id") == ext_id for i in same_scheme):
+        return "already_present", None
+    # Ainult ID salvestus (kasutaja 2026-11-18): Wikidata/GND päringut ei tehta
+    previous = same_scheme[0].get("id") if same_scheme else None
+    current = [i for i in current if i.get("scheme") != scheme] + [
+        {"scheme": scheme, "id": ext_id, "checked_at": None}]
+    patch["identifiers"] = current
+    return ("conflict", previous) if previous else ("applicable", None)
+
+
+def display_label(item: dict) -> Optional[str]:
+    """Paneelile: staatuse/konfessiooni silt sõnastikust (agent annab ainult Q-koodi)."""
+    if item.get("kind") not in _VOCAB_OF:
+        return None
+    labels = (vocabulary(item["kind"]).get(item.get("id")) or {}).get("label") or {}
+    return labels.get("et") or labels.get("en") if isinstance(labels, dict) else None
+
+
 _APPLY = {"birth": _apply_date, "death": _apply_date, "origin": _apply_origin,
-          "gender": _apply_gender, "biography": _apply_biography}
+          "gender": _apply_gender, "biography": _apply_biography, "floruit": _apply_floruit,
+          "alias": _apply_alias, "name": _apply_name, "status": _apply_vocab,
+          "confession": _apply_vocab, "relation": _apply_relation, "identifier": _apply_identifier}
 
 
 def apply(item: dict, person: dict, patch: dict) -> str:

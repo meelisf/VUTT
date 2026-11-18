@@ -343,3 +343,103 @@ def test_sama_alias_kaks_korda_eri_aliased_lubatud(esita, sonastik):
     r = esita([a, {**a, "value": "hornius"}])
     assert r.status_code == 400 and "duplicate_kind" in r.text
     assert esita([a, {**a, "value": "Hornus"}]).status_code == 200
+
+
+# ── 2. osa: olek ja kinnitus ─────────────────────────────────────────────
+
+@pytest.fixture
+def osa2(prosopo_env, kohad, sonastik, monkeypatch):
+    """Vastastikune seos kirjutab B kaarti otse (reciprocal_ops): suuna testikausta."""
+    from server.prosopography import reciprocal_ops, router
+    monkeypatch.setattr(reciprocal_ops, "PROSOPOGRAPHY_DIR", str(prosopo_env.dir))
+
+    def fake_save(path, content, username, message=None, **_):
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        return {"success": True}
+    monkeypatch.setattr(reciprocal_ops, "save_with_git", fake_save)
+    monkeypatch.setattr(router, "enrich_entity_labels_from_person_async", lambda person: None)
+    return prosopo_env
+
+
+def _rida(state, rows, i=0):
+    return rows[i]["review_state"]["state"]
+
+
+def test_osa2_loendiread_kinnituvad(client, login, osa2):
+    items = [{"kind": "alias", "value": "Hornius", "evidence": OK_EVIDENCE},
+             {"kind": "name", "label": "Hornensis", "type": "latinized", "from": 1780, "evidence": OK_EVIDENCE},
+             {"kind": "status", "id": "Q134737", "evidence": OK_EVIDENCE},
+             {"kind": "confession", "id": "Q75809", "evidence": OK_EVIDENCE},
+             {"kind": "floruit", "year_from": 1780, "year_to": 1807, "evidence": OK_EVIDENCE},
+             {"kind": "identifier", "scheme": "wikidata", "id": "q123", "evidence": OK_EVIDENCE}]
+    rows, kinnita = _ylevaatus(client, login, osa2, items)
+    assert [r["review_state"]["state"] for r in rows] == ["applicable"] * 6
+    assert rows[2]["display_label"] == "aadlik"
+    response = kinnita(list(range(6)))
+    assert response.status_code == 200, response.text
+    saved = osa2.read("abc")
+    assert "Hornius" in saved["name"]["aliases"]
+    assert {"label": "Hornensis", "type": "latinized"}.items() <= saved["name"]["names"][0].items()
+    assert saved["statuses"] == [{"id": "Q134737", "label": "aadlik", "labels": {"et": "aadlik", "en": "noble"}}]
+    assert saved["confessions"][0]["id"] == "Q75809"
+    assert saved["floruit"]["year_from"] == 1780 and saved["floruit"]["evidence"] == OK_EVIDENCE
+    assert {"scheme": "wikidata", "id": "Q123"}.items() <= saved["identifiers"][0].items()
+
+
+def test_osa2_juba_kaardil(client, login, osa2):
+    items = [{"kind": "alias", "value": "hornius", "evidence": OK_EVIDENCE},
+             {"kind": "status", "id": "Q134737", "evidence": OK_EVIDENCE},
+             {"kind": "identifier", "scheme": "wikidata", "id": "Q123", "evidence": OK_EVIDENCE},
+             {"kind": "floruit", "year_from": 1780, "evidence": OK_EVIDENCE}]
+    rows, _ = _ylevaatus(client, login, osa2, items,
+                         name={"label": "Isik abc", "aliases": ["Hornius"]},
+                         statuses=[{"id": "Q134737", "label": "aadlik"}],
+                         identifiers=[{"scheme": "wikidata", "id": "Q123", "checked_at": None}],
+                         floruit={"year_from": 1781, "year_to": None})
+    assert [r["review_state"]["state"] for r in rows] == ["already_present", "already_present",
+                                                          "already_present", "conflict"]
+
+
+def test_id_teisel_isikul_blocked(client, login, osa2):
+    osa2.write("zzz", identifiers=[{"scheme": "gnd", "id": "118500", "checked_at": None}])
+    item = {"kind": "identifier", "scheme": "gnd", "id": "118500", "evidence": OK_EVIDENCE}
+    rows, kinnita = _ylevaatus(client, login, osa2, [item])
+    assert rows[0]["review_state"] == {"state": "blocked", "reason": "duplicate_id: vutt:Pzzz"}
+
+
+def test_sama_skeem_teine_id_on_conflict(client, login, osa2):
+    item = {"kind": "identifier", "scheme": "wikidata", "id": "Q2", "evidence": OK_EVIDENCE}
+    rows, kinnita = _ylevaatus(client, login, osa2, [item],
+                               identifiers=[{"scheme": "wikidata", "id": "Q1", "checked_at": None}])
+    assert rows[0]["review_state"]["state"] == "conflict"
+    assert kinnita([0]).status_code == 200
+    assert [i["id"] for i in osa2.read("abc")["identifiers"]] == ["Q2"]
+
+
+def test_nimi_aliasena_ei_dubleeri(client, login, osa2):
+    items = [{"kind": "name", "label": "Gripenhielm", "type": "ennobled", "evidence": OK_EVIDENCE}]
+    rows, kinnita = _ylevaatus(client, login, osa2, items,
+                               name={"label": "Isik abc", "aliases": ["Gripenhielm"]})
+    assert kinnita([0]).status_code == 200
+    name = osa2.read("abc")["name"]
+    assert "Gripenhielm" not in name["aliases"]
+    assert name["names"][0]["label"] == "Gripenhielm"
+
+
+def test_seose_kinnitus_lisab_vastastikuse_rea(client, login, osa2):
+    osa2.write("bbb", relations=[])
+    item = {"kind": "relation", "name": "Isik bbb", "type": "õpetaja", "target_id": "vutt:Pbbb",
+            "evidence": OK_EVIDENCE}
+    rows, kinnita = _ylevaatus(client, login, osa2, [item])
+    assert rows[0]["review_state"]["state"] == "applicable"
+    assert kinnita([0]).status_code == 200
+    assert osa2.read("abc")["relations"][0]["target_id"] == "vutt:Pbbb"
+    back = osa2.read("bbb")["relations"]
+    assert back and back[0]["target_id"] == "vutt:Pabc" and back[0]["reciprocal_auto"] is True
+
+
+def test_seos_puuduvale_isikule_blocked(client, login, osa2):
+    item = {"kind": "relation", "name": "X", "type": "vend", "target_id": "vutt:Pnone", "evidence": OK_EVIDENCE}
+    rows, _ = _ylevaatus(client, login, osa2, [item])
+    assert rows[0]["review_state"] == {"state": "blocked", "reason": "unknown_person"}

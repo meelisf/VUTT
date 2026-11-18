@@ -425,6 +425,10 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
                         ids[key] = entry["id"]
             item["registry_labels"] = labels
             item["registry_ids"] = ids
+            from .enrichment_kinds import display_label
+            shown = display_label(item)
+            if shown:
+                item["display_label"] = shown
             if item.get("institution_key"):
                 institution = item.get("institution_entry") or _registry_entry(
                     os.path.join(DATA_CONFIG_DIR, "institutions.json"), item["institution_key"])
