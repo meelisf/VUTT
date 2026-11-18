@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CropRect } from '../../services/pageService';
-import { resizeRotatedBox, CropHandle, CenterBox } from '../../utils/cropBoxInteraction';
+import { clampRotatedCenter, resizeRotatedBox, CropHandle, CenterBox } from '../../utils/cropBoxInteraction';
 import { rotatedCropToServerParams } from '../../utils/rotatedCropParams';
 import { defaultQuad, quadFromCropRect, quadPtFromDisplayPx, Quad4 } from '../../utils/perspectiveQuad';
 import { addRotation } from './geometry';
@@ -157,8 +157,12 @@ export function useCropBox(displayW: number, displayH: number, active: boolean) 
       setCropDraft((d) => (d ? { ...d, x1: p.x, y1: p.y } : d));
     } else if (it.mode === 'move' && cropRect) {
       const b = rectToCenterPx(cropRect);
-      const cx = clamp(it.startCenter.cx + (p.x - it.startX), 0, displayW);
-      const cy = clamp(it.startCenter.cy + (p.y - it.startY), 0, displayH);
+      // Kast (tema pööratud ümbriskast) jääb pildi raami — nagu joonistamisel ja
+      // suuruse muutmisel. Ainult keskpunkti piiramine laskis kasti poolenisti välja.
+      const { cx, cy } = clampRotatedCenter(
+        { ...b, cx: it.startCenter.cx + (p.x - it.startX), cy: it.startCenter.cy + (p.y - it.startY) },
+        boxAngle, { w: displayW, h: displayH },
+      );
       setCropRect(centerPxToRect({ ...b, cx, cy }));
     } else if (it.mode === 'resize') {
       setCropRect(centerPxToRect(resizeRotatedBox(it.startBox, boxAngle, it.handle, p.x, p.y, MIN_DRAG_PX)));
