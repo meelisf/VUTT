@@ -834,6 +834,21 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
           {"text"} | {"work_id", "page"?, "printed_page"?} | {"source_kind":
           "literature", "source_id", "locator"} (MCP teeb viimasest loetava teksti).
           Tõlkevastavust (ankrut) ei kinnita agent — seda teeb toimetaja.
+        LOENDIVÄLJAD (2. osa) — lisavad: agent ei eemalda ega muuda olemasolevat rida.
+        Sama väärtusega kaks rida ettepanekus on viga. Igal real evidence 1–5.
+        - {"kind": "alias", "value"} — kirjaviisi variant (name.aliases).
+        - {"kind": "name", "label", "type", "from"?, "to"?} — liigiga nimi (ADR 0083):
+          type ∈ birth, latinized, ennobled, married, pseudonym, religious, other.
+        - {"kind": "status"|"confession", "id"} — Q-kood VUTT-i suletud sõnastikust;
+          vale koodi korral loetleb serveri veateade lubatud koodid.
+        - {"kind": "floruit", "year_from"?, "year_to"?} — tegutsemisaeg (kui sünd/surm
+          pole teada); erinev olemasolev = konflikt.
+        - {"kind": "relation", "name", "type", "type_id"?, "target_id"?} — seos teise
+          isikuga; target_id = VUTT-i isik (search_persons), siis lisab VUTT ka
+          vastastikuse seose tema kaardile. type on seose liik vabatekstina (õpetaja).
+        - {"kind": "identifier", "scheme": "wikidata"|"gnd"|"viaf"|"album_academicum",
+          "id"} — salvestatakse AINULT ID (VUTT ei päri Wikidatat ega täida välju —
+          esita leitud faktid ise eraldi ridadena). ID teisel kaardil = blokeeritud.
         Vene keelt ei kirjutata ühtegi neist (server lükkab kirillitsa tagasi);
         vene allikas on ainult viide (sources_add / literature locator).
 

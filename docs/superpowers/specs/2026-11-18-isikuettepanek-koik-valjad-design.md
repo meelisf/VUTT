@@ -159,3 +159,40 @@ vene keele keeld, `sources_add`.
   pole, on erinev koht `conflict`.
 - 2. osa (identifikaatorid jt) saab eraldi disaini lõigu ja plaani pärast 1. osa
   kasutuselevõttu.
+
+---
+
+## 2. osa (2026-11-18)
+
+Sama mudel (lähenemine A, `enrichment_kinds.py`): uued realiigid, server arvutab oleku,
+kinnitus = üks `update_person`. Loendiväljad on **lisavad** — agent ei eemalda ega muuda
+olemasolevat rida (kustutamine/parandus jääb vormi).
+
+| kind | Väljad (+ `evidence` 1–5 kõigil) | Kaardile | „Juba kaardil" |
+|---|---|---|---|
+| `alias` | `value` (kirjaviisi variant) | `name.aliases` | sama tekst (tõstutundetu) |
+| `name` | `label`, `type` ∈ `person_names.NAME_TYPES`, `from?`, `to?` (aasta) | `name.names` (ADR 0083, `normalize_name_obj`) | sama `label`+`type` |
+| `status` | `id` (Q-kood `vocabularies.json` `seisused`-ist) | `statuses` (+ `labels` sõnastikust) | sama `id` |
+| `confession` | `id` (Q-kood `konfessioonid`-ist) | `confessions` | sama `id` |
+| `floruit` | `year_from?`, `year_to?` (vähemalt üks) | `floruit` + `floruit.evidence` | samad aastad; erinev = `conflict` |
+| `relation` | `name`, `type` (vabatekst), `type_id?` (Q), `target_id?` (VUTT-i isik) | `relations` | sama `target_id` (selleta sama `name`) |
+| `identifier` | `scheme` (mida `normalize_ext_id` tunneb), `id` | `identifiers` | sama skeem+ID; sama skeem teine ID = `conflict` |
+
+Otsused:
+- **Identifikaator (kasutaja):** kinnitus salvestab AINULT ID — Wikidata/GND päringut ega
+  automaatrikastust ei tehta (agent kasutab Wikidatat niikuinii ise). ID teisel kaardil →
+  `blocked: duplicate_id` (ADR 0048 `ext_id_index`; `update_person` võtab
+  `ext_id_claim_lock`-i, kui `identifiers` on andmetes).
+- **Seos:** `target_id` peab olema elav isik (mitte tombstone/liidetud); ilma selleta on
+  seos nimepõhine. Kinnitus käivitab **sama vastastikuse sünkrooni** mis käsitsi
+  salvestus (`sync_reciprocals` + `enrich_entity_labels_from_person_async` — praegu ainult
+  marsruuteris; tõsta ühisesse abifunktsiooni, mida kutsuvad PUT ja `apply_selected`).
+- **Tõend:** `floruit` kannab tõendit nagu sünd (vorm `floruit_evidence` läbi, muudetud
+  väärtusel kaob). Loendiridade (alias, nimi, staatus, konfessioon, seos, ID) tõend on
+  esitusel kohustuslik ja ülevaatusel nähtav, kaardile ei salvestata (loendikirjel pole
+  tõendi kohta; laiendus hiljem, kui vaja).
+- **Matmine (`burial`) jääb välja** — isikuvormis välja ei ole, toimetaja ei näeks ega
+  saaks parandada.
+- Kirillitsa keeld kõigil uutel tekstiväljadel (#833).
+- Paneel: rida liigi järgi („Nimevariant: …", „Seos: õpetaja → Isik", „Wikidata Q123");
+  `relation` `target_id`-ga on link isikule.

@@ -123,8 +123,8 @@ const useEntityLabel = () => {
 
 /** Sünni- ja surmaaeg päises koos agendi ettepanekust kinnitatud tõendiga (#834):
  *  viide kuupäeva järel, viited ploki all (sama kuju mis StructuredInfoCard-is). */
-export function LifeDates({ person, birth, death, workTitles }: {
-  person: ProsopoRecord; birth: string; death: string; workTitles: Record<string, string>;
+export function LifeDates({ person, birth, death, floruit = '', workTitles }: {
+  person: ProsopoRecord; birth: string; death: string; floruit?: string; workTitles: Record<string, string>;
 }) {
   const { t } = useTranslation('prosopography');
   const notes: EvidenceRef[] = [];
@@ -140,6 +140,7 @@ export function LifeDates({ person, birth, death, workTitles }: {
   const cells = [
     birth && { label: t('born', 'Sündinud'), value: birth, mark: marks(person.birth) },
     death && { label: t('died', 'Surnud'), value: death, mark: marks(person.death) },
+    floruit && { label: t('form.floruit'), value: floruit, mark: marks(person.floruit) },
   ].filter(Boolean) as { label: string; value: string; mark: React.ReactNode }[];
   return <div>
     <div className="grid grid-cols-2 gap-4">
@@ -397,7 +398,7 @@ const PersonDetailPage: React.FC = () => {
   // Tõendiviidete ja allikakirjete teoste pealkirjad (ADR 0078: pealkiri tuleb teoselt).
   const evidenceTitles = useWorkTitles([
     ...evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? []),
-      person?.birth ?? {}, person?.death ?? {}, person?.origin ?? {}]),
+      person?.birth ?? {}, person?.death ?? {}, person?.origin ?? {}, person?.floruit ?? {}]),
     ...sourceWorkIds(person?.sources)], token);
   const sourceParts = useSourceParts(sourcePartWorkIds(person?.sources), token);
   const sourceWorks = useWorkInfo(sourceWorkIds(person?.sources), token);
@@ -649,17 +650,8 @@ const PersonDetailPage: React.FC = () => {
 
             <div className="flex-1 space-y-3 text-sm">
             {/* Eluaastad */}
-            {(birth || death) && (
-              <LifeDates person={person} birth={birth} death={death} workTitles={evidenceTitles} />
-            )}
-
-            {floruit && (
-              <div>
-                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                  {t('form.floruit')}
-                </span>
-                <p className="text-gray-900">{floruit}</p>
-              </div>
+            {(birth || death || floruit) && (
+              <LifeDates person={person} birth={birth} death={death} floruit={floruit} workTitles={evidenceTitles} />
             )}
 
             {/* Immatrikuleerumine (AG) */}

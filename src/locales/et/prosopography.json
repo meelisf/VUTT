@@ -31,12 +31,13 @@
     "working_one": "Salvestan {{count}} kirje… see võib võtta mõnikümmend sekundit.",
     "working_other": "Salvestan {{count}} kirjet… see võib võtta mõnikümmend sekundit.",
     "rejecting": "Lükkan tagasi…",
-    "kind": {"birth": "Sünd", "death": "Surm", "origin": "Päritolu", "gender": "Sugu", "biography": "Elulugu ({{lang}})"},
+    "kind": {"birth": "Sünd", "death": "Surm", "origin": "Päritolu", "gender": "Sugu", "biography": "Elulugu ({{lang}})", "floruit": "Tegutses", "alias": "Nimevariant", "name": "Nimi", "status": "Staatus", "confession": "Konfessioon", "relation": "Seos", "identifier": "Identifikaator"},
     "gender": {"M": "mees", "F": "naine"},
     "badgeConflict": "erineb kaardist", "badgeReplace": "asendab teksti", "badgeField": "uus",
     "currentValue": "Praegu kaardil", "replace": "Asenda", "showDiff": "Näita erinevust", "hideDiff": "Peida erinevus",
     "sourcesAdd": "Lisatavad allikad",
-    "reason": {"stale_biography": "Elulugu on vahepeal muutunud — palu agendil ettepanek uuesti esitada.", "duplicate_entry": "Sama fakt on kaardil juba olemas.", "unresolved_existing_entry": "Kaardilt ei leitud üheselt kirjet, millele tõend lisada.", "registry_key_missing": "Registrivõti puudub; palu agendil valida registrikirje.", "ambiguous_match": "Agent ei valinud registrikirjet; palu tal vaste lahendada.", "registry_conflict": "Registris on sama võtmega teine kirje.", "duplicate_id": "See Q-kood on registris teisel kirjel.", "unknown_occupation_key": "Ametiregistris sellist kirjet pole.", "unknown_institution_key": "Asutuste registris sellist kirjet pole.", "unknown_place_key": "Kohtade registris sellist kirjet pole.", "person_not_found": "Isikut ei leitud.", "other": "Rida ei saa kinnitada."}
+    "nameType": {"birth": "sünninimi", "latinized": "ladinastatud", "ennobled": "aadeldamine", "married": "abielunimi", "pseudonym": "pseudonüüm", "religious": "ordunimi", "other": "muu"},
+    "reason": {"duplicate_person_id": "See ID on juba teisel isikukaardil.", "unknown_person": "Seotud isikut ei leitud VUTT-ist.", "stale_biography": "Elulugu on vahepeal muutunud — palu agendil ettepanek uuesti esitada.", "duplicate_entry": "Sama fakt on kaardil juba olemas.", "unresolved_existing_entry": "Kaardilt ei leitud üheselt kirjet, millele tõend lisada.", "registry_key_missing": "Registrivõti puudub; palu agendil valida registrikirje.", "ambiguous_match": "Agent ei valinud registrikirjet; palu tal vaste lahendada.", "registry_conflict": "Registris on sama võtmega teine kirje.", "duplicate_id": "See Q-kood on registris teisel kirjel.", "unknown_occupation_key": "Ametiregistris sellist kirjet pole.", "unknown_institution_key": "Asutuste registris sellist kirjet pole.", "unknown_place_key": "Kohtade registris sellist kirjet pole.", "person_not_found": "Isikut ei leitud.", "other": "Rida ei saa kinnitada."}
   },
   "bibliography": "Allikad ja bibliograafia",
   "bibliographyLiterature": "Kirjandus",

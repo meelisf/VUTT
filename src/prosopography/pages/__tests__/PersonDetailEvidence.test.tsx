@@ -62,3 +62,13 @@ describe('eluandmete joonealused viited', () => {
     expect(container.querySelectorAll('sup')).toHaveLength(0);
   });
 });
+
+describe('tegutsemisaja joonealune viide (#834 2. osa)', () => {
+  it('tegutsemisaja järel on viide', () => {
+    const p = { floruit: { year_from: 1780, evidence: [{ source_kind: 'vutt_page', work_id: 'w1', page: 3 }] } } as unknown as ProsopoRecord;
+    const { container } = render(<MemoryRouter>
+      <LifeDates person={p} birth="" death="" floruit="fl. 1780" workTitles={{ w1: 'Oratio' }} /></MemoryRouter>);
+    expect([...container.querySelectorAll('sup')].map(s => s.textContent)).toEqual(['1']);
+    expect(screen.getByText(/fl\. 1780/)).toBeTruthy();
+  });
+});

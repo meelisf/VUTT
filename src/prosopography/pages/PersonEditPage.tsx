@@ -81,7 +81,8 @@ const PersonEditPage: React.FC = () => {
   // Tõendiviidete teoste pealkirjad (ametite ja hariduse tõendite loend).
   const evidenceTitles = useWorkTitles([
     ...evidenceWorkIds([...draft.occupations, ...draft.education,
-      { evidence: draft.birth_evidence }, { evidence: draft.death_evidence }, { evidence: draft.origin_evidence }]),
+      { evidence: draft.birth_evidence }, { evidence: draft.death_evidence }, { evidence: draft.origin_evidence },
+      { evidence: draft.floruit_evidence }]),
     ...draft.sources.flatMap(source => source.work_id ? [source.work_id] : [])], token);
   const [relOpen, setRelOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -704,7 +705,8 @@ const PersonEditPage: React.FC = () => {
                   token={token} canEdit={!!canEdit} lang={lang} label={t('form.deathPlace')} />} />
             </div>
             {/* Agendi ettepanekust kinnitatud tõend (#834): nähtav ja eemaldatav, muutmist ei ole */}
-            {([['birth_evidence', t('born')], ['death_evidence', t('died')], ['origin_evidence', t('origin')]] as const)
+            {([['birth_evidence', t('born')], ['death_evidence', t('died')], ['origin_evidence', t('origin')],
+              ['floruit_evidence', t('form.floruit')]] as const)
               .filter(([field]) => (draft[field]?.length ?? 0) > 0).map(([field, label]) => (
                 <details key={field} className="mt-3 text-xs">
                   <summary className="cursor-pointer text-gray-500">{label}: {draft[field]!.length} {t('agentEnrichment.evidenceCount')}</summary>

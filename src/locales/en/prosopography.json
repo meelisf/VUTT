@@ -31,12 +31,13 @@
     "working_one": "Saving {{count}} entry… this may take a few dozen seconds.",
     "working_other": "Saving {{count}} entries… this may take a few dozen seconds.",
     "rejecting": "Rejecting…",
-    "kind": {"birth": "Birth", "death": "Death", "origin": "Origin", "gender": "Gender", "biography": "Biography ({{lang}})"},
+    "kind": {"birth": "Birth", "death": "Death", "origin": "Origin", "gender": "Gender", "biography": "Biography ({{lang}})", "floruit": "Active", "alias": "Name variant", "name": "Name", "status": "Status", "confession": "Confession", "relation": "Relation", "identifier": "Identifier"},
     "gender": {"M": "male", "F": "female"},
     "badgeConflict": "differs from card", "badgeReplace": "replaces text", "badgeField": "new",
     "currentValue": "Currently on card", "replace": "Replace", "showDiff": "Show changes", "hideDiff": "Hide changes",
     "sourcesAdd": "Sources to add",
-    "reason": {"stale_biography": "The biography has changed since — ask the agent to resubmit the proposal.", "duplicate_entry": "The same fact is already on the card.", "unresolved_existing_entry": "No single matching card entry to add the evidence to.", "registry_key_missing": "No registry key; ask the agent to choose a registry entry.", "ambiguous_match": "The agent did not choose a registry entry; ask it to resolve the match.", "registry_conflict": "The registry has a different entry under the same key.", "duplicate_id": "This Q-code belongs to another registry entry.", "unknown_occupation_key": "No such entry in the occupation registry.", "unknown_institution_key": "No such entry in the institution registry.", "unknown_place_key": "No such entry in the place registry.", "person_not_found": "Person not found.", "other": "This row cannot be confirmed."}
+    "nameType": {"birth": "birth name", "latinized": "latinized", "ennobled": "ennobled", "married": "married name", "pseudonym": "pseudonym", "religious": "religious name", "other": "other"},
+    "reason": {"duplicate_person_id": "This ID is already on another person card.", "unknown_person": "The related person was not found in VUTT.", "stale_biography": "The biography has changed since — ask the agent to resubmit the proposal.", "duplicate_entry": "The same fact is already on the card.", "unresolved_existing_entry": "No single matching card entry to add the evidence to.", "registry_key_missing": "No registry key; ask the agent to choose a registry entry.", "ambiguous_match": "The agent did not choose a registry entry; ask it to resolve the match.", "registry_conflict": "The registry has a different entry under the same key.", "duplicate_id": "This Q-code belongs to another registry entry.", "unknown_occupation_key": "No such entry in the occupation registry.", "unknown_institution_key": "No such entry in the institution registry.", "unknown_place_key": "No such entry in the place registry.", "person_not_found": "Person not found.", "other": "This row cannot be confirmed."}
   },
   "bibliography": "Sources and bibliography",
   "bibliographyLiterature": "Literature",

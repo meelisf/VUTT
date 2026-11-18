@@ -43,3 +43,15 @@ describe('skalaarvälja tõend vormis', () => {
     expect(saved.death.evidence).toEqual([B]);
   });
 });
+
+describe('tegutsemisaja tõend vormis (#834 2. osa)', () => {
+  const rec = { name: { label: 'X' }, floruit: { year_from: 1780, year_to: 1807, evidence: [A] } } as unknown as ProsopoRecord;
+  it('säilib ringsõidul', () => {
+    const saved = draftToPayload(recordToDraft(rec, places), rec, [], [], places) as any;
+    expect(saved.floruit.evidence).toEqual([A]);
+  });
+  it('muudetud aastal kaob', () => {
+    const saved = draftToPayload({ ...recordToDraft(rec, places), floruit_from: '1781' }, rec, [], [], places) as any;
+    expect(saved.floruit.evidence ?? []).toEqual([]);
+  });
+});

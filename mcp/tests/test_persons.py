@@ -471,3 +471,17 @@ async def test_allikate_kirjanduse_viide_asendatakse_tekstiga(tmp_path, monkeypa
         "handoff_code": "c", "person_id": "vutt:Pabc", "base_updated_at": "t", "items": [item]})
     sent = client.posts[0][1]["items"][0]["sources_add"]
     assert sent == [{"text": "Donecker 2012, An Itinerant Sheep, lk 5"}, {"text": "Muu allikas"}]
+
+
+def test_rikastuse_kontekst_annab_osa2_valjad():
+    """#834 2. osa: staatused, konfessioonid, tegutsemisaeg, seosed kontekstis."""
+    client = FakeClient({"/prosopography/vutt%3APabc": {
+        "id": "vutt:Pabc", "updated_at": "t",
+        "statuses": [{"id": "Q134737"}], "confessions": [{"id": "Q75809"}],
+        "floruit": {"year_from": 1780}, "relations": [{"name": "B", "target_id": "vutt:Pb"}],
+    }})
+    result = json.loads(persons.enrichment_context(client, "vutt:Pabc"))
+    assert result["statuses"] == [{"id": "Q134737"}]
+    assert result["confessions"] == [{"id": "Q75809"}]
+    assert result["floruit"] == {"year_from": 1780}
+    assert result["relations"] == [{"name": "B", "target_id": "vutt:Pb"}]

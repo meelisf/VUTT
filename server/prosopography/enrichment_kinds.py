@@ -3,11 +3,18 @@
 Sünd, surm, päritolu, sugu ja elulugu. Iga liik: `validate` (esitusel), hiljem
 olek ülevaatusel ja kaardile kandmine. Amet ja haridus jäävad `enrichment_proposals`-i.
 """
+import json
 import re
 from typing import Optional
 
-SCALAR_KINDS = ("birth", "death", "origin", "gender")
-NEW_KINDS = SCALAR_KINDS + ("biography",)
+from ..config import VOCABULARIES_FILE
+
+SCALAR_KINDS = ("birth", "death", "origin", "gender", "floruit")
+# 2. osa: loendiväljad on lisavad — agent ei eemalda ega muuda olemasolevat rida
+LIST_KINDS = ("alias", "name", "status", "confession", "relation", "identifier")
+NEW_KINDS = SCALAR_KINDS + ("biography",) + LIST_KINDS
+ID_SCHEMES = ("wikidata", "gnd", "viaf", "album_academicum")
+MAX_TEXT = 300
 
 MAX_BIOGRAPHY_CHARS = 40_000
 MAX_SOURCES_ADD = 10
@@ -18,7 +25,17 @@ _KEYS = {
     "origin": ({"kind", "place_key", "evidence"}, {"kind", "place_key", "evidence"}),
     "gender": ({"kind", "value", "evidence"}, {"kind", "value", "evidence"}),
     "biography": ({"kind", "lang", "text", "base_hash"}, {"kind", "lang", "text", "base_hash", "sources_add"}),
+    "floruit": ({"kind", "evidence"}, {"kind", "year_from", "year_to", "evidence"}),
+    "alias": ({"kind", "value", "evidence"}, {"kind", "value", "evidence"}),
+    "name": ({"kind", "label", "type", "evidence"}, {"kind", "label", "type", "from", "to", "evidence"}),
+    "status": ({"kind", "id", "evidence"}, {"kind", "id", "evidence"}),
+    "confession": ({"kind", "id", "evidence"}, {"kind", "id", "evidence"}),
+    "relation": ({"kind", "name", "type", "evidence"},
+                 {"kind", "name", "type", "type_id", "target_id", "evidence"}),
+    "identifier": ({"kind", "scheme", "id", "evidence"}, {"kind", "scheme", "id", "evidence"}),
 }
+_VOCAB_OF = {"status": "seisused", "confession": "konfessioonid"}
+_QID = re.compile(r"Q[1-9]\d*")
 _SOURCE_ADD_KEYS = ({"work_id", "part_id", "page", "printed_page", "note"}, {"text", "note"})
 
 # VUTT-i lehe link eluloos: absoluutne või suhteline /work/<id>/<lk> (Markdown-lingi sihtmärk)
@@ -104,6 +121,93 @@ def _validate_biography(item: dict) -> None:
         _check_sources_add(item["sources_add"])
 
 
+def vocabulary(kind: str) -> dict:
+    """Staatuse/konfessiooni suletud sõnastik: Q-kood → kirje (`vocabularies.json`)."""
+    try:
+        with open(VOCABULARIES_FILE, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    items = data.get(_VOCAB_OF[kind]) if isinstance(data, dict) else None
+    return {i["id"]: i for i in items or [] if isinstance(i, dict) and i.get("id")}
+
+
+def _text(item: dict, key: str, required: bool = True) -> None:
+    from .enrichment_proposals import _KIRILLITSA
+    value = item.get(key)
+    if value is None and not required:
+        return
+    if not isinstance(value, str) or not value.strip() or len(value) > MAX_TEXT:
+        raise _error(f"invalid_text: {key} peab olema mittetühi string (≤{MAX_TEXT} märki)")
+    if _KIRILLITSA.search(value):
+        raise _error(f"cyrillic_not_allowed: {key} on vene keeles. Venekeelne allikas on VUTT-is "
+                     "ainult viide (evidence), mitte kaardi tekst")
+
+
+def _year(value, key: str) -> None:
+    if value is not None and (not isinstance(value, int) or isinstance(value, bool)
+                              or not 1000 <= value <= 2100):
+        raise _error(f"invalid_year: {key} peab olema aasta 1000–2100")
+
+
+def _validate_list_or_floruit(item: dict) -> None:
+    from .enrichment_proposals import valid_person_id
+    kind = item["kind"]
+    if kind == "floruit":
+        _year(item.get("year_from"), "year_from")
+        _year(item.get("year_to"), "year_to")
+        start, end = item.get("year_from"), item.get("year_to")
+        if start is None and end is None or (start and end and start > end):
+            raise _error("invalid_floruit: anna year_from ja/või year_to (year_from ≤ year_to)")
+    elif kind == "alias":
+        _text(item, "value")
+    elif kind == "name":
+        from .person_names import NAME_TYPES
+        _text(item, "label")
+        if item["type"] not in NAME_TYPES:
+            raise _error(f"invalid_name_type: type on üks {list(NAME_TYPES)} (ADR 0083)")
+        _year(item.get("from"), "from")
+        _year(item.get("to"), "to")
+    elif kind in _VOCAB_OF:
+        allowed = vocabulary(kind)
+        if item["id"] not in allowed:
+            listing = ", ".join(f"{k}: {(v.get('label') or {}).get('et', k)}" for k, v in allowed.items())
+            raise _error(f"unknown_vocabulary_id: {item['id']!r} ei ole sõnastikus; lubatud {listing}")
+    elif kind == "relation":
+        _text(item, "name")
+        _text(item, "type")
+        if item.get("type_id") is not None and not (isinstance(item["type_id"], str)
+                                                    and _QID.fullmatch(item["type_id"])):
+            raise _error("invalid_type_id: type_id on Wikidata Q-kood")
+        if item.get("target_id") is not None and not valid_person_id(str(item["target_id"])):
+            raise _error("invalid_person_id: target_id on VUTT-i isiku ID (vutt:P…)")
+    elif kind == "identifier":
+        from .ext_ids import normalize_ext_id
+        if item["scheme"] not in ID_SCHEMES:
+            raise _error(f"invalid_scheme: scheme on üks {list(ID_SCHEMES)}")
+        if not isinstance(item["id"], str) or not normalize_ext_id(item["scheme"], item["id"]) \
+                or len(item["id"]) > 100:
+            raise _error("invalid_identifier: id peab olema mittetühi string")
+
+
+def row_key(item: dict) -> tuple:
+    """Duplikaadikontroll ühes ettepanekus: skalaar liigi (ja eluloo keele) kaupa,
+    loendirida liigi ja normaliseeritud väärtuse kaupa."""
+    kind = item["kind"]
+    if kind == "alias":
+        return kind, item["value"].strip().casefold()
+    if kind == "name":
+        return kind, item["label"].strip().casefold(), item["type"]
+    if kind in _VOCAB_OF:
+        return kind, item["id"]
+    if kind == "relation":
+        return kind, item.get("target_id") or item["name"].strip().casefold()
+    if kind == "identifier":
+        from .ext_ids import normalize_ext_id
+        return kind, item["scheme"], normalize_ext_id(item["scheme"], item["id"])
+    return kind, item.get("lang")
+
+
 def validate(item: dict) -> None:
     """Esituse kujukontroll; korpuse lehed kontrollib `submit` (`_check_vutt_pages`)."""
     from .enrichment_proposals import _check_no_cyrillic, _validate_date, _validate_evidence
@@ -111,6 +215,11 @@ def validate(item: dict) -> None:
     kind = item["kind"]
     if kind == "biography":
         _validate_biography(item)
+        return
+    if kind == "floruit" or kind in LIST_KINDS:
+        _validate_list_or_floruit(item)
+        _validate_evidence(item["evidence"])
+        _check_no_cyrillic(item)
         return
     if kind in ("birth", "death"):
         _validate_date("date", item["date"])
@@ -239,8 +348,122 @@ def _apply_biography(item: dict, person: dict, patch: dict) -> tuple[str, object
     return ("replace", current) if current.strip() else ("applicable", None)
 
 
+def _apply_floruit(item: dict, person: dict, patch: dict) -> tuple:
+    current = dict(_current(person, patch, "floruit") or {})
+    proposed = (item.get("year_from"), item.get("year_to"))
+    if (current.get("year_from"), current.get("year_to")) == proposed:
+        current["evidence"] = _merge_evidence(current.get("evidence") or [], item["evidence"])
+        patch["floruit"] = current
+        return "already_present", None
+    had = current.get("year_from") or current.get("year_to")
+    snapshot = {"year_from": current.get("year_from"), "year_to": current.get("year_to")}
+    current.update({"year_from": proposed[0], "year_to": proposed[1], "evidence": list(item["evidence"])})
+    patch["floruit"] = current
+    return ("conflict", snapshot) if had else ("applicable", None)
+
+
+def _name_copy(person: dict, patch: dict) -> dict:
+    name = dict(_current(person, patch, "name") or {})
+    name["aliases"] = list(name.get("aliases") or [])
+    name["names"] = list(name.get("names") or [])
+    return name
+
+
+def _apply_alias(item: dict, person: dict, patch: dict) -> tuple:
+    name = _name_copy(person, patch)
+    value = item["value"].strip()
+    known = [a for a in name["aliases"] if isinstance(a, str)] + [name.get("label") or ""] + [
+        n.get("label") or "" for n in name["names"] if isinstance(n, dict)]
+    if any(value.casefold() == k.strip().casefold() for k in known):
+        return "already_present", None
+    name["aliases"].append(value)
+    patch["name"] = name
+    return "applicable", None
+
+
+def _apply_name(item: dict, person: dict, patch: dict) -> tuple:
+    name = _name_copy(person, patch)
+    label = item["label"].strip()
+    if any(isinstance(n, dict) and (n.get("label") or "").strip().casefold() == label.casefold()
+           and n.get("type") == item["type"] for n in name["names"]):
+        return "already_present", None
+    # Liigiga nime tõstab normalize_name_obj salvestusel aliastest välja (ADR 0083)
+    name["names"].append({"label": label, "type": item["type"],
+                          "from": item.get("from"), "to": item.get("to")})
+    patch["name"] = name
+    return "applicable", None
+
+
+def _apply_vocab(item: dict, person: dict, patch: dict) -> tuple:
+    field = {"status": "statuses", "confession": "confessions"}[item["kind"]]
+    entry = vocabulary(item["kind"]).get(item["id"])
+    if entry is None:
+        raise _error("unknown_vocabulary_id")
+    current = list(_current(person, patch, field) or [])
+    if any(isinstance(c, dict) and c.get("id") == item["id"] for c in current):
+        return "already_present", None
+    labels = entry.get("label") if isinstance(entry.get("label"), dict) else {}
+    current.append({"id": item["id"], "label": labels.get("et") or item["id"], "labels": labels})
+    patch[field] = current
+    return "applicable", None
+
+
+def _apply_relation(item: dict, person: dict, patch: dict) -> tuple:
+    target = item.get("target_id")
+    if target:
+        from .person_crud import get_person
+        other = get_person(target)
+        if other is None or other.get("record_status") == "tombstone" or other.get("merged_into"):
+            raise _error("unknown_person")
+    current = list(_current(person, patch, "relations") or [])
+    for r in current:
+        if not isinstance(r, dict):
+            continue
+        if (target and r.get("target_id") == target) or (
+                not target and not r.get("target_id")
+                and (r.get("name") or "").strip().casefold() == item["name"].strip().casefold()):
+            return "already_present", None
+    row = {"name": item["name"].strip(), "type": item["type"].strip()}
+    if item.get("type_id"):
+        row["type_id"] = item["type_id"]
+    if target:
+        row["target_id"] = target
+    current.append(row)
+    patch["relations"] = current
+    return "applicable", None
+
+
+def _apply_identifier(item: dict, person: dict, patch: dict) -> tuple:
+    from . import ext_id_index
+    from .ext_ids import normalize_ext_id
+    scheme, ext_id = item["scheme"], normalize_ext_id(item["scheme"], item["id"])
+    owner = ext_id_index.find_person_id(scheme, ext_id)
+    if owner and owner != person.get("id"):
+        raise _error(f"duplicate_person_id: {owner}")
+    current = [dict(i) for i in (_current(person, patch, "identifiers") or []) if isinstance(i, dict)]
+    same_scheme = [i for i in current if i.get("scheme") == scheme]
+    if any(i.get("id") == ext_id for i in same_scheme):
+        return "already_present", None
+    # Ainult ID salvestus (kasutaja 2026-11-18): Wikidata/GND päringut ei tehta
+    previous = same_scheme[0].get("id") if same_scheme else None
+    current = [i for i in current if i.get("scheme") != scheme] + [
+        {"scheme": scheme, "id": ext_id, "checked_at": None}]
+    patch["identifiers"] = current
+    return ("conflict", previous) if previous else ("applicable", None)
+
+
+def display_label(item: dict) -> Optional[str]:
+    """Paneelile: staatuse/konfessiooni silt sõnastikust (agent annab ainult Q-koodi)."""
+    if item.get("kind") not in _VOCAB_OF:
+        return None
+    labels = (vocabulary(item["kind"]).get(item.get("id")) or {}).get("label") or {}
+    return labels.get("et") or labels.get("en") if isinstance(labels, dict) else None
+
+
 _APPLY = {"birth": _apply_date, "death": _apply_date, "origin": _apply_origin,
-          "gender": _apply_gender, "biography": _apply_biography}
+          "gender": _apply_gender, "biography": _apply_biography, "floruit": _apply_floruit,
+          "alias": _apply_alias, "name": _apply_name, "status": _apply_vocab,
+          "confession": _apply_vocab, "relation": _apply_relation, "identifier": _apply_identifier}
 
 
 def apply(item: dict, person: dict, patch: dict) -> str:

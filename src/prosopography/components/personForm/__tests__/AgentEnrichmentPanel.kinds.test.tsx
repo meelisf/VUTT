@@ -72,3 +72,28 @@ describe('isikukaardi väljade read', () => {
     await waitFor(() => expect(apply).toHaveBeenCalledWith(person.id, 'p1', [0, 1, 2], 'tok', 'rev1'));
   });
 });
+
+describe('2. osa read', () => {
+  const p2 = { ...proposal, proposal_id: 'p2', items: [
+    { kind: 'alias', value: 'Hornius', evidence: ev, review_state: { state: 'applicable' } },
+    { kind: 'name', label: 'Gripenhielm', type: 'ennobled', from: 1650, evidence: ev, review_state: { state: 'applicable' } },
+    { kind: 'status', id: 'Q134737', display_label: 'aadlik', evidence: ev, review_state: { state: 'applicable' } },
+    { kind: 'floruit', year_from: 1780, year_to: 1807, evidence: ev, review_state: { state: 'conflict', current: { year_from: 1781, year_to: null } } },
+    { kind: 'relation', name: 'Isik B', type: 'õpetaja', target_id: 'vutt:Pbbb', evidence: ev, review_state: { state: 'applicable' } },
+    { kind: 'identifier', scheme: 'wikidata', id: 'Q123', evidence: ev, review_state: { state: 'blocked', reason: 'duplicate_person_id: vutt:Pzzz' } },
+    { kind: 'relation', name: 'X', type: 'vend', target_id: 'vutt:Pnone', evidence: ev, review_state: { state: 'blocked', reason: 'unknown_person' } },
+  ] };
+  it('kuvab liigid, sildid, seose lingi ja põhjused', async () => {
+    list.mockResolvedValue([p2]);
+    renderPanel();
+    expect(await screen.findByText('Hornius')).toBeTruthy();
+    expect(screen.getByText(/Gripenhielm/)).toBeTruthy();
+    expect(screen.getByText(/aadeldamine/)).toBeTruthy();
+    expect(screen.getByText('aadlik')).toBeTruthy();
+    expect(screen.getByText(/1781/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Isik B' }).getAttribute('href')).toBe('/persons/vutt:Pbbb');
+    expect(screen.getByText(/Wikidata Q123/)).toBeTruthy();
+    expect(screen.getByText(/teisel isikukaardil/)).toBeTruthy();
+    expect(screen.getByText(/Seotud isikut ei leitud/)).toBeTruthy();
+  });
+});
