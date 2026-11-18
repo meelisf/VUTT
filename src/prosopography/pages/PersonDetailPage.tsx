@@ -121,6 +121,48 @@ const useEntityLabel = () => {
   };
 };
 
+/** Sünni- ja surmaaeg päises koos agendi ettepanekust kinnitatud tõendiga (#834):
+ *  viide kuupäeva järel, viited ploki all (sama kuju mis StructuredInfoCard-is). */
+export function LifeDates({ person, birth, death, workTitles }: {
+  person: ProsopoRecord; birth: string; death: string; workTitles: Record<string, string>;
+}) {
+  const { t } = useTranslation('prosopography');
+  const notes: EvidenceRef[] = [];
+  const marks = (entry: unknown): React.ReactNode => {
+    const evidence = (entry as { evidence?: unknown } | null)?.evidence;
+    if (!Array.isArray(evidence) || !evidence.length) return null;
+    const numbers = (evidence as EnrichmentEvidence[]).map(source => {
+      notes.push(evidenceRef(source, id => workTitles[id], t('agentEnrichment.page')));
+      return notes.length;
+    });
+    return <sup className="ml-0.5 text-blue-700">{numbers.join(',')}</sup>;
+  };
+  const cells = [
+    birth && { label: t('born', 'Sündinud'), value: birth, mark: marks(person.birth) },
+    death && { label: t('died', 'Surnud'), value: death, mark: marks(person.death) },
+  ].filter(Boolean) as { label: string; value: string; mark: React.ReactNode }[];
+  return <div>
+    <div className="grid grid-cols-2 gap-4">
+      {cells.map(cell => <div key={cell.label}>
+        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{cell.label}</span>
+        <p className="text-gray-900">{cell.value}{cell.mark}</p>
+      </div>)}
+    </div>
+    {notes.length > 0 && <div className="mt-1 space-y-0.5 text-xs text-gray-600">
+      {notes.map((ref, i) => <span key={i} className="block">
+        <span className="text-blue-700 mr-1">{i + 1}</span>
+        {ref.href && !ref.external
+          ? <Link to={ref.href} className="underline hover:text-gray-800">{ref.title}</Link>
+          : ref.href
+            ? <a href={ref.href} target="_blank" rel="noopener noreferrer" className="underline">{ref.title}</a>
+            : ref.title}
+        {ref.locator && `, ${ref.locator}`}
+        {ref.quote && <> — <q className="italic">{ref.quote}</q></>}
+      </span>)}
+    </div>}
+  </div>;
+}
+
 export const StructuredInfoCard: React.FC<{ person: ProsopoRecord; workTitles: Record<string, string> }> = ({ person, workTitles }) => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
@@ -162,25 +204,8 @@ export const StructuredInfoCard: React.FC<{ person: ProsopoRecord; workTitles: R
         : t('filterFemale', 'Naissoost'),
     });
   }
-  if (person.origin?.place || person.birth?.place?.label) {
-    const modernOrigin = person.origin?.place_labels
-      ? (person.origin.place_labels[lang] ?? person.origin.place_labels['et'] ?? person.origin.place_labels['en'] ?? Object.values(person.origin.place_labels)[0] ?? '')
-      : '';
-    rows.push({
-      label: t('origin', 'Päritolu'),
-      value: modernOrigin && modernOrigin !== person.origin.place
-        ? `${person.origin.place} (${modernOrigin})`
-        : person.origin?.place || person.birth?.place?.label,
-    });
-  }
-  if ((person.confessions?.length ?? 0) > 0) {
-    rows.push({
-      label: t('confession', 'Konfessioon'),
-      value: (person.confessions ?? []).map(c => getLabel(c) || c.label).filter(Boolean).join(', '),
-    });
-  }
   // Joonealused viited (spekk 2026-09-28, variant B): iga tõend saab läbiva numbri
-  // üle ametite JA hariduse; viited on ploki all.
+  // üle päritolu (#834), ametite JA hariduse; viited on ploki all.
   const notes: EvidenceRef[] = [];
   const marks = (entry: any): React.ReactNode => {
     const evidence: EnrichmentEvidence[] = Array.isArray(entry?.evidence) ? entry.evidence : [];
@@ -191,6 +216,23 @@ export const StructuredInfoCard: React.FC<{ person: ProsopoRecord; workTitles: R
     });
     return <sup className="ml-0.5 text-blue-700">{numbers.join(',')}</sup>;
   };
+  if (person.origin?.place || person.birth?.place?.label) {
+    const modernOrigin = person.origin?.place_labels
+      ? (person.origin.place_labels[lang] ?? person.origin.place_labels['et'] ?? person.origin.place_labels['en'] ?? Object.values(person.origin.place_labels)[0] ?? '')
+      : '';
+    rows.push({
+      label: t('origin', 'Päritolu'),
+      value: <>{modernOrigin && modernOrigin !== person.origin.place
+        ? `${person.origin.place} (${modernOrigin})`
+        : person.origin?.place || person.birth?.place?.label}{marks(person.origin)}</>,
+    });
+  }
+  if ((person.confessions?.length ?? 0) > 0) {
+    rows.push({
+      label: t('confession', 'Konfessioon'),
+      value: (person.confessions ?? []).map(c => getLabel(c) || c.label).filter(Boolean).join(', '),
+    });
+  }
   // Amet ja haridus: iga kirje omal real koos asutuse ja ajavahemikuga —
   // „millal keegi Tartus professor oli" on sisuline info, mitte lisadetail.
   if (person.occupations?.length > 0) {
@@ -354,7 +396,8 @@ const PersonDetailPage: React.FC = () => {
   const token = authToken ?? '';
   // Tõendiviidete ja allikakirjete teoste pealkirjad (ADR 0078: pealkiri tuleb teoselt).
   const evidenceTitles = useWorkTitles([
-    ...evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? [])]),
+    ...evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? []),
+      person?.birth ?? {}, person?.death ?? {}, person?.origin ?? {}]),
     ...sourceWorkIds(person?.sources)], token);
   const sourceParts = useSourceParts(sourcePartWorkIds(person?.sources), token);
   const sourceWorks = useWorkInfo(sourceWorkIds(person?.sources), token);
@@ -607,24 +650,7 @@ const PersonDetailPage: React.FC = () => {
             <div className="flex-1 space-y-3 text-sm">
             {/* Eluaastad */}
             {(birth || death) && (
-              <div className="grid grid-cols-2 gap-4">
-                {birth && (
-                  <div>
-                    <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                      {t('born', 'Sündinud')}
-                    </span>
-                    <p className="text-gray-900">{birth}</p>
-                  </div>
-                )}
-                {death && (
-                  <div>
-                    <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                      {t('died', 'Surnud')}
-                    </span>
-                    <p className="text-gray-900">{death}</p>
-                  </div>
-                )}
-              </div>
+              <LifeDates person={person} birth={birth} death={death} workTitles={evidenceTitles} />
             )}
 
             {floruit && (
