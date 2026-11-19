@@ -132,10 +132,26 @@ def test_loetamatu_teose_lisamine_lukatakse_tervikuna_tagasi(client, work_sets,
         "osalist lisamist ei tohi olla"
 
 
-def test_tundmatu_teose_lisamine_annab_400(client, work_sets, manager_token, ws_id):
+def test_tundmatu_teos_mitteadminile_sama_mis_privaatne(client, work_sets, manager_token, ws_id):
+    """Olematu ja loetamatu teos annavad haldurile SAMA vastuse (N19-14) — muidu oraakel."""
+    vastused = [client.post(f"/work-sets/{ws_id}/works",
+                            json={"work_ids": [wid], "revision": 3},
+                            headers=auth(manager_token)) for wid in ("pole-olemas", "piiratud-teos")]
+    assert [r.status_code for r in vastused] == [403, 403]
+    assert vastused[0].json() == vastused[1].json()
+
+
+def test_tundmatu_teose_lisamine_adminile_400(client, work_sets, admin_token, ws_id):
     r = client.post(f"/work-sets/{ws_id}/works",
                     json={"work_ids": ["pole-olemas"], "revision": 3},
-                    headers=auth(manager_token))
+                    headers=auth(admin_token))
+    assert r.status_code == 400
+
+
+@pytest.mark.parametrize("bad", [[{}], [1], [""], [None]])
+def test_work_ids_elemendid_peavad_olema_stringid(client, work_sets, manager_token, ws_id, bad):
+    r = client.post(f"/work-sets/{ws_id}/works",
+                    json={"work_ids": bad, "revision": 3}, headers=auth(manager_token))
     assert r.status_code == 400
 
 
