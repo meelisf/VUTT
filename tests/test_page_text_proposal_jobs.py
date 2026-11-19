@@ -98,6 +98,16 @@ def test_pakk_jatab_otsustatud_vahele(work):
     assert res["skipped"] == ["t-001"] and _txt(work, 1) == "leht 1 vana\nteine rida\n"
 
 
+def test_varem_aegunud_leht_on_stale_mitte_skipped(work):
+    """Ainult aegunud lehega pakk: teade ütleb „vajab käsitsi ülevaatust", mitte „vahele jäetud"."""
+    pid = _esita(work, pages=(1, 2))
+    _write(work, 2, "leht 2 muu\nteine rida\n")
+    ptp.apply_pack(pid, work["dir"], "super")              # t-001 kinnitatud, t-002 aegub
+    res = ptp.apply_pack(pid, work["dir"], "super")
+    assert res == {"accepted": [], "stale": ["t-002"], "skipped": ["t-001"]}
+    assert _states(pid)["t-002"] == "stale"
+
+
 def test_pakk_git_viga_taastab_ketta(work, monkeypatch):
     pid = _esita(work)
     orig = git_ops.save_with_git
