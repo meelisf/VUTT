@@ -1,5 +1,5 @@
 import type { WorkDating } from '../../utils/workDating';
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +30,7 @@ import PersonWorkParts from '../components/PersonWorkParts';
 import PersonSourcesCard from '../components/PersonSourcesCard';
 import { evidenceRef, evidenceWorkIds, type EvidenceRef } from '../utils/evidenceRef';
 import type { EnrichmentEvidence } from '../services/prosopographyService';
-import { useWorkInfo, useWorkTitles } from '../hooks/useWorkTitles';
+import { titlesOf, useWorkInfo } from '../hooks/useWorkTitles';
 import { useSourceParts } from '../hooks/useSourceParts';
 import { sourcePartWorkIds, sourceWorkIds } from '../utils/personSources';
 import { quoteFilterValue } from '../../utils/filterUtils';
@@ -396,12 +396,13 @@ const PersonDetailPage: React.FC = () => {
 
   const token = authToken ?? '';
   // Tõendiviidete ja allikakirjete teoste pealkirjad (ADR 0078: pealkiri tuleb teoselt).
-  const evidenceTitles = useWorkTitles([
+  // Üks päring mõlemale: allikakirjete ID-d on tõendiviidete hulga alamhulk (N19-11).
+  const citedWorks = useWorkInfo([
     ...evidenceWorkIds([...(person?.occupations ?? []), ...(person?.education ?? []),
       person?.birth ?? {}, person?.death ?? {}, person?.origin ?? {}, person?.floruit ?? {}]),
     ...sourceWorkIds(person?.sources)], token);
+  const evidenceTitles = useMemo(() => titlesOf(citedWorks), [citedWorks]);
   const sourceParts = useSourceParts(sourcePartWorkIds(person?.sources), token);
-  const sourceWorks = useWorkInfo(sourceWorkIds(person?.sources), token);
   const canEdit = isAtLeast(user?.role, 'editor');
   const sameName = useSameNamePersons(person?.name?.label ?? '', person?.id, authToken ?? undefined);
   const isAdmin = isAtLeast(user?.role, 'admin');
@@ -460,9 +461,12 @@ const PersonDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!id) return;
+    // Kiirel isikuvahetusel ei tohi eelmise isiku hilinenud vastus uut kaarti üle kirjutada.
+    let cancelled = false;
     setLoading(true);
     getPerson(id, token)
       .then(data => {
+        if (cancelled) return;
         // Liidendatud kaart: backend suunas järglasele, paranda ka marsruut,
         // muidu jääb aadressiribale surnud ID (#240)
         const merged = mergedRedirectTarget(id, data?.id);
@@ -472,43 +476,53 @@ const PersonDetailPage: React.FC = () => {
         }
         setPerson(data);
         setError(null);
-        const uniqueWorkIds = [...new Set((data.works ?? []).map((w: { work_id: string }) => w.work_id).filter(Boolean))];
-        if (uniqueWorkIds.length > 0 && index) {
-          // Teoste pealkirjad: päri partiidena (max 50 korraga), et vältida Meilisearch IN-filtri piiranguid
-          const BATCH = 50;
-          const allHits: any[] = [];
-          const batches: string[][] = [];
-          for (let i = 0; i < uniqueWorkIds.length; i += BATCH) batches.push(uniqueWorkIds.slice(i, i + BATCH));
-          Promise.all(batches.map(batch => {
-            const ids = batch.map((wid: string) => quoteFilterValue(wid)).join(', ');
-            return index.search('', {
-              filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
-              attributesToRetrieve: ['work_id', 'title', 'year', 'year_display', 'dating', 'collections_hierarchy'],
-              limit: BATCH,
-            }).then(res => allHits.push(...res.hits)).catch(() => {});
-          })).then(async () => {
-            const map: Record<string, { title: string; year: number | null; year_display: string | null; dating?: WorkDating | null; collections: string[]; restricted?: boolean }> = {};
-            for (const hit of allHits) {
-              if (hit.work_id && !map[hit.work_id]) {
-                map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, year_display: hit.year_display ?? null, dating: hit.dating, collections: hit.collections_hierarchy ?? [] };
-              }
-            }
-            // Kaitstud kollektsiooni teoseid Meilisearch ei tagasta (anon/õiguseta) —
-            // küsi pealkirjad serverist, et neidki kuvada (lingita, märkega "kaitstud").
-            const missing = uniqueWorkIds.filter((wid: string) => !map[wid]);
-            if (missing.length > 0) {
-              const fallback = await getWorkTitles(missing, token);
-              for (const [wid, info] of Object.entries(fallback)) {
-                map[wid] = { title: info.title || wid, year: info.year, year_display: null, collections: [], restricted: info.restricted };
-              }
-            }
-            setWorkTitles(map);
-          });
-        }
       })
-      .catch(() => setError(t('loadError', 'Isiku laadimine ebaõnnestus.')))
-      .finally(() => setLoading(false));
-  }, [id, token, index, reloadNonce]);
+      .catch(() => { if (!cancelled) setError(t('loadError', 'Isiku laadimine ebaõnnestus.')); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [id, token, reloadNonce]);
+
+  // Teoste pealkirjad eraldi effectis: Meili indeks vahetub auth'i taastumisel ja tokeni
+  // uuendusel — see ei tohi kaarti uuesti laadida, ainult pealkirjad (N19-11, vrd ADR 0060).
+  const personWorkKey = [...new Set((person?.works ?? []).map(w => w.work_id).filter(Boolean))].sort().join('|');
+  useEffect(() => {
+    if (!personWorkKey || !index) { setWorkTitles({}); return; }
+    let cancelled = false;
+    const uniqueWorkIds = personWorkKey.split('|');
+    // Teoste pealkirjad: päri partiidena (max 50 korraga), et vältida Meilisearch IN-filtri piiranguid
+    const BATCH = 50;
+    const allHits: any[] = [];
+    const batches: string[][] = [];
+    for (let i = 0; i < uniqueWorkIds.length; i += BATCH) batches.push(uniqueWorkIds.slice(i, i + BATCH));
+    Promise.all(batches.map(batch => {
+      const ids = batch.map((wid: string) => quoteFilterValue(wid)).join(', ');
+      return index.search('', {
+        filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
+        attributesToRetrieve: ['work_id', 'title', 'year', 'year_display', 'dating', 'collections_hierarchy'],
+        limit: BATCH,
+      }).then(res => allHits.push(...res.hits)).catch(() => {});
+    })).then(async () => {
+      if (cancelled) return;
+      const map: Record<string, { title: string; year: number | null; year_display: string | null; dating?: WorkDating | null; collections: string[]; restricted?: boolean }> = {};
+      for (const hit of allHits) {
+        if (hit.work_id && !map[hit.work_id]) {
+          map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, year_display: hit.year_display ?? null, dating: hit.dating, collections: hit.collections_hierarchy ?? [] };
+        }
+      }
+      // Kaitstud kollektsiooni teoseid Meilisearch ei tagasta (anon/õiguseta) —
+      // küsi pealkirjad serverist, et neidki kuvada (lingita, märkega "kaitstud").
+      const missing = uniqueWorkIds.filter((wid: string) => !map[wid]);
+      if (missing.length > 0) {
+        const fallback = await getWorkTitles(missing, token);
+        if (cancelled) return;
+        for (const [wid, info] of Object.entries(fallback)) {
+          map[wid] = { title: info.title || wid, year: info.year, year_display: null, collections: [], restricted: info.restricted };
+        }
+      }
+      setWorkTitles(map);
+    });
+    return () => { cancelled = true; };
+  }, [personWorkKey, index, token]);
 
   // ── Loading ──────────────────────────────────────────────
   if (loading) {
@@ -938,7 +952,7 @@ const PersonDetailPage: React.FC = () => {
         )}
 
         {/* ── Allikad ja bibliograafia: käsitsi loend + tõendites kasutatud ── */}
-        <PersonSourcesCard person={person} workTitles={evidenceTitles} works={sourceWorks} parts={sourceParts} />
+        <PersonSourcesCard person={person} workTitles={evidenceTitles} works={citedWorks} parts={sourceParts} />
 
         {/* ── Ajalugu (ainult admin) ── */}
         {isAdmin && id && (

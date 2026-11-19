@@ -182,7 +182,11 @@ const PersonEditPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchPlaces().then(setPlaces).catch(() => {});
+    // Uuel kaardil laeb registri see effect; olemasoleval laeb ta koos kaardiga (allpool).
+    if (isNew) fetchPlaces().then(setPlaces).catch(() => {});
+  }, [isNew]);
+
+  useEffect(() => {
     getVocabularies().then(v => {
       if (v.seisused) setSeisused(v.seisused);
       if (v.konfessioonid) setKonfessioonid(v.konfessioonid);
@@ -191,9 +195,12 @@ const PersonEditPage: React.FC = () => {
 
   useEffect(() => {
     if (isNew) return;
+    // Kiirel kaardivahetusel ei tohi eelmise kaardi hilinenud vastus mustandit üle kirjutada.
+    let cancelled = false;
     setLoading(true);
     Promise.all([getPerson(id!, token), fetchPlaces()])
       .then(([data, register]) => {
+        if (cancelled) return;
         setPlaces(register);
         setOriginal(data);
         setDraft(recordToDraft(data, register));
@@ -201,8 +208,9 @@ const PersonEditPage: React.FC = () => {
         if (data.name?.names?.length || possibleNameChange(data.name ?? {})) setNamesOpen(true);
         setImageUrl(data.image_url ?? null);
       })
-      .catch(() => setError(t('loadErrorSingle')))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!cancelled) setError(t('loadErrorSingle')); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [id, token]);
 
   const handleImageFile = async (file: File) => {

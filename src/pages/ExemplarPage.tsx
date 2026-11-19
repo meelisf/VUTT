@@ -107,12 +107,20 @@ const ExemplarPage: React.FC = () => {
   const backPage = pageParam && /^\d+$/.test(pageParam) ? Number(pageParam) : null;
   const pageQuery = backPage ? `?page=${backPage}` : '';
 
+  // Päringute järjekorranumbrid (N19-11): kirjutab ainult viimane päring — teose või
+  // eksemplari kiirel vahetusel ei tohi hilinenud vana vastus uut üle kirjutada.
+  const dataSeq = useRef(0);
+  const manifestSeq = useRef(0);
+
   const loadData = useCallback(async () => {
+    const seq = ++dataSeq.current;
     try {
-      setData(await getWorkExemplars(workId, authToken));
+      const next = await getWorkExemplars(workId, authToken);
+      if (seq !== dataSeq.current) return;
+      setData(next);
       setLoadError(false);
     } catch {
-      setLoadError(true);
+      if (seq === dataSeq.current) setLoadError(true);
     }
   }, [workId, authToken]);
 
@@ -148,12 +156,14 @@ const ExemplarPage: React.FC = () => {
   const imageCount = selectedExemplar ? data?.images?.[selectedExemplar.id]?.count ?? 0 : 0;
 
   const loadManifest = useCallback(async (eid: string) => {
+    const seq = ++manifestSeq.current;
+    let m: ExemplarManifest;
     try {
-      const m = await fetchExemplarImages(workId, eid, authToken);
-      setManifestState({ eid, m });
+      m = await fetchExemplarImages(workId, eid, authToken);
     } catch {
-      setManifestState({ eid, m: EMPTY_MANIFEST });
+      m = EMPTY_MANIFEST;
     }
+    if (seq === manifestSeq.current) setManifestState({ eid, m });
   }, [workId, authToken]);
 
   useEffect(() => {
@@ -161,7 +171,7 @@ const ExemplarPage: React.FC = () => {
     if (!eid) return;
     // Pildita eksemplari manifesti vajab ainult toimetaja (üleslaadimine).
     if (imageCount > 0 || canEdit) void loadManifest(eid);
-    else setManifestState({ eid, m: EMPTY_MANIFEST });
+    else { manifestSeq.current++; setManifestState({ eid, m: EMPTY_MANIFEST }); }
   }, [selectedExemplar?.id, imageCount, canEdit, loadManifest]);
 
   const manifest = manifestState && manifestState.eid === selectedExemplar?.id ? manifestState.m : null;
@@ -375,7 +385,7 @@ const ExemplarPage: React.FC = () => {
                 canEdit={canEdit} canCompare={canCompare} imageToken={imageToken} authToken={authToken}
                 onOpen={openItem}
                 onCompare={(seqKey, i) => openCompare(seqKey, seqs.find(q => q.key === seqKey)?.items[i])}
-                onManifest={m => { if (selectedExemplar) setManifestState({ eid: selectedExemplar.id, m }); void loadData(); }}
+                onManifest={m => { if (selectedExemplar) { manifestSeq.current++; setManifestState({ eid: selectedExemplar.id, m }); } void loadData(); }}
                 onImported={() => { if (selectedExemplar) void loadManifest(selectedExemplar.id); void loadData(); }} />
             )}
           </div>
