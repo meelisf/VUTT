@@ -398,8 +398,6 @@ def check_production_secrets(exit_on_fail=True):
     """Tootmises (VUTT_ENV=production) keeldu käivitumast teadaolevate arendussaladustega.
 
     Kontrollib backend-i kontrolli all olevaid saladusi (Meilisearch master key, pildi-HMAC).
-    Umami saladused (UMAMI_DB_PASSWORD, UMAMI_APP_SECRET) on eraldi konteinerites — backend
-    neid ei näe — ja tuleb hallata deploy-tasandil (.env / docker-compose).
 
     Tagastab probleemide nimekirja. exit_on_fail=True korral kutsub sys.exit, kui leidub.
     """

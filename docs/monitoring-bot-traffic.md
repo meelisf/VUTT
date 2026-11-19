@@ -2,7 +2,8 @@
 
 Eesmärk: teha "luba esialgu, jälgi, klassifitseeri ümber" poliitika reaalseks.
 Praegu logib nginx HTML-lehed UA-ga (`vutt_access.log`), AGA `/api/images/` on
-`access_log off` → pildikraapimine on nähtamatu. Umami näeb ainult brausereid.
+`access_log off` → pildikraapimine on nähtamatu. (Umami eemaldati 2026-11-19 — brauseri-
+analüütikat enam ei ole.)
 Zabbix teeb uptime-kontrolli ja on tuleviku push-alertingu koht (D4, sügis 2026).
 
 ## D1 — Logi pildipäringud (eraldi fail)
