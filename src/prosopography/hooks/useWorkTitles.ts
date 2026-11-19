@@ -20,9 +20,14 @@ export function useWorkInfo(workIds: string[], token?: string): Record<string, W
   return info;
 }
 
+/** Ainult pealkirjad — kui `useWorkInfo` vastus on juba käes (üks päring mõlemale). */
+export function titlesOf(info: Record<string, WorkInfo>): Record<string, string> {
+  return Object.fromEntries(Object.entries(info).map(([id, w]) => [id, w.title]));
+}
+
 /** Teoste pealkirjad tõendiviidetele. */
 export function useWorkTitles(workIds: string[], token?: string): Record<string, string> {
   const info = useWorkInfo(workIds, token);
   // Stabiilne viide: kutsujad võivad tulemust effecti sõltuvusena kasutada.
-  return useMemo(() => Object.fromEntries(Object.entries(info).map(([id, w]) => [id, w.title])), [info]);
+  return useMemo(() => titlesOf(info), [info]);
 }

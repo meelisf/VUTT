@@ -366,8 +366,30 @@ export async function mergePersons(
   return apiPost(`${BASE}/${encodeURIComponent(sourceId)}/merge`, { target_id: targetId }, { token, timeout: 30000 });
 }
 
-export async function fetchPlaces(): Promise<Record<string, PlaceEntry>> {
-  return apiGet(`${BASE}/places`, { timeout: 10000 });
+// Koharegistri vahemälu (N19-11): isikuvormil laeb registrit nii leht kui iga PlacePicker
+// (kuni 6 tükki), ilma selleta tuli avamisel sama vastus mitu korda. Lühike TTL katab teiste
+// toimetajate muudatused, oma kirjutus (lisa/muuda/kustuta/liida) tühjendab vahemälu kohe.
+// Viga ei jää vahemällu. Vastust EI TOHI muuta — kutsujad uuendavad oma koopiat (`{...prev}`).
+const PLACES_TTL_MS = 60_000;
+let placesCache: { until: number; promise: Promise<Record<string, PlaceEntry>> } | null = null;
+
+export function fetchPlaces(): Promise<Record<string, PlaceEntry>> {
+  if (placesCache && placesCache.until > Date.now()) return placesCache.promise;
+  const promise = apiGet<Record<string, PlaceEntry>>(`${BASE}/places`, { timeout: 10000 }).catch(err => {
+    if (placesCache?.promise === promise) placesCache = null;
+    throw err;
+  });
+  placesCache = { until: Date.now() + PLACES_TTL_MS, promise };
+  return promise;
+}
+
+export function invalidatePlacesCache(): void {
+  placesCache = null;
+}
+
+/** Kohakirjutus: tühjendab registri vahemälu ka tõrke korral (osaline muudatus serveris). */
+function placeWrite<T>(request: Promise<T>): Promise<T> {
+  return request.finally(invalidatePlacesCache);
 }
 
 export async function fetchPlacesMeta(): Promise<{
@@ -424,7 +446,7 @@ export function fetchPlaceWikidata(qid: string): Promise<WikidataPlace> {
 }
 
 export async function addPlace(key: string, data: Partial<PlaceEntry>, token: string): Promise<{ key: string; entry: PlaceEntry }> {
-  return apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, { ...data, _create_only: true }, { token, timeout: 10000 });
+  return placeWrite(apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, { ...data, _create_only: true }, { token, timeout: 10000 }));
 }
 
 export async function updatePlace(
@@ -432,11 +454,11 @@ export async function updatePlace(
   data: Partial<PlaceEntry> & { historical_names?: string[]; notes?: string },
   token: string,
 ): Promise<{ key: string; entry: PlaceEntry }> {
-  return apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, data, { token, timeout: 10000 });
+  return placeWrite(apiPut(`${BASE}/admin/places/${encodeURIComponent(key)}`, data, { token, timeout: 10000 }));
 }
 
 export async function deletePlace(key: string, token: string): Promise<void> {
-  await apiDelete(`${BASE}/admin/places/${encodeURIComponent(key)}`, { token, timeout: 10000 });
+  await placeWrite(apiDelete(`${BASE}/admin/places/${encodeURIComponent(key)}`, { token, timeout: 10000 }));
 }
 
 export async function putGroup(
@@ -460,7 +482,7 @@ export async function mergePlaces(
   targetKey: string,
   token: string,
 ): Promise<{ redirected: number; target_key: string }> {
-  return apiPost(`${BASE}/admin/places/${encodeURIComponent(sourceKey)}/merge`, { target_key: targetKey }, { token, timeout: 15000 });
+  return placeWrite(apiPost(`${BASE}/admin/places/${encodeURIComponent(sourceKey)}/merge`, { target_key: targetKey }, { token, timeout: 15000 }));
 }
 
 export async function fetchPersonHistory(

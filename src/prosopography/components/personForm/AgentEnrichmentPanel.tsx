@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProsopoRecord } from '../../types';
 import {
@@ -50,9 +50,17 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
   const titles = useWorkTitles(evidenceWorkIds(proposals.flatMap(p => p.items)), token);
   const titleOf = (id: string) => titles[id];
 
+  // Kirjutab ainult viimane päring (N19-11): isiku vahetusel või otsusejärgsel värskendusel
+  // ei tohi hilinenud vana loend uuemat üle kirjutada.
+  const refreshSeq = useRef(0);
   const refresh = useCallback(async () => {
-    try { setProposals(await listEnrichmentProposals(person.id, token)); }
-    catch (err) { setError((err as Error).message); }
+    const seq = ++refreshSeq.current;
+    try {
+      const next = await listEnrichmentProposals(person.id, token);
+      if (seq === refreshSeq.current) setProposals(next);
+    } catch (err) {
+      if (seq === refreshSeq.current) setError((err as Error).message);
+    }
   }, [person.id, token]);
 
   useEffect(() => { setError(''); void refresh(); }, [refresh]);
