@@ -2,8 +2,6 @@ import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useTranslation } from 'react-i18next';
 import App from './App';
-import 'leaflet/dist/leaflet.css';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import './index.css';
 import { i18nReady, preloadOtherLanguage } from './i18n';
 import { installGlobalErrorReporting } from './services/clientErrorReporter';

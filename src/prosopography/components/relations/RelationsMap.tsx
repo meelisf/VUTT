@@ -7,6 +7,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MapContainer, Marker, Polyline, Popup } from 'react-leaflet';
+// Kaardi-CSS laeb ainult kaardiga koos, mitte igal lehel (N19-08).
+import 'leaflet/dist/leaflet.css';
 import HistoricalMapLayer from '../HistoricalMapLayer';
 import { FitToPoints, spreadOverlapping, type LatLon } from '../map/mapBase';
 import { fetchInstitutions, fetchPlaces, fetchRegistry, type InstitutionRegistryEntry, type OccupationRegistryEntry } from '../../services/prosopographyService';

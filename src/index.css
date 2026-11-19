@@ -421,7 +421,9 @@ hr.page-break::before {
   box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.38), 0 8px 18px rgba(15, 23, 42, 0.28);
 }
 
-.vutt-region-tooltip {
+/* Topeltklass: leaflet.css laeb kaardi tükiga PÄRAST seda faili (N19-08) ja
+   sama spetsiifilisusega `.leaflet-tooltip` võidaks muidu. */
+.leaflet-tooltip.vutt-region-tooltip {
   border: 1px solid rgba(100, 116, 107, 0.35);
   border-radius: 0.5rem;
   box-shadow: 0 5px 16px rgba(15, 23, 42, 0.18);

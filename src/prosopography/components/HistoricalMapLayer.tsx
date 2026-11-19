@@ -9,6 +9,8 @@ import { fetchHistoricalRegions } from '../services/prosopographyService';
 import type { HistoricalRegionProperties } from '../types';
 import { REGION_SOURCE_ID, pickRegionFeature, regionLayerSpecs } from '../utils/regionLayers';
 import '@maplibre/maplibre-gl-leaflet';
+// Kaardi-CSS laeb ainult kaardiga koos, mitte igal lehel (N19-08).
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { supportsWebGL2 } from '../../utils/webgl';
 
 // MapLibre 6 on ESM-only: tööline ei ole enam bundle'i sees, vaid eraldi fail,
