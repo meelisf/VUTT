@@ -259,8 +259,12 @@ export function useUploadWizard() {
           // Ajatempel EI alga `applying` ajal: siis alles avaldatakse lehti ja
           // OCR jookseb nendega paralleelselt (ADR 0028). Timeout mõõdab
           // hetkest, mil sisendvoog on suletud ehk `processing`-ust.
-          if (d.status !== 'applying' && processingStartedAt === null) {
-            setProcessingStartedAt(Date.now());
+          // Funktsionaalne uuendus: `setInterval` hoiab kinni selle sulundi,
+          // millega poll käivitati — seal on `processingStartedAt` alati null
+          // ja otsene võrdlus lähtestas ajatempli igal tiksul (timeout ei
+          // käivitunud kunagi, N19-05).
+          if (d.status !== 'applying') {
+            setProcessingStartedAt(prev => prev ?? Date.now());
           }
         }
         // `done` peatab pollimise ainult siis, kui import EI käi: impordi ajal
@@ -274,7 +278,7 @@ export function useUploadWizard() {
         // Ignoreerime ajutisi võrgu vigu
       }
     },
-    [authToken, stopPolling, processingStartedAt]
+    [authToken, stopPolling]
   );
 
   const startPolling = useCallback(
