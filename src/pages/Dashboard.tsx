@@ -38,7 +38,6 @@ import FilterSidebar, { MobileFiltersButton } from '../components/filters/Filter
 import WorkFilterSections from '../components/workFilters/WorkFilterSections';
 import WorkFilterChips, { FilterChip, FilterHintChip } from '../components/workFilters/WorkFilterChips';
 import { useFilterHints, FilterHint } from '../services/filterHints/useFilterHints';
-import { trackEvent } from '../services/analytics';
 import { sortAfterQueryChange, createUrlEchoGuard, dashboardDefaultSort } from './dashboardQuerySync';
 import { useWorkFilterModel } from '../components/workFilters/useWorkFilterModel';
 import WorkListRow from '../components/WorkListRow';
@@ -398,7 +397,6 @@ const Dashboard: React.FC = () => {
     else filterModel.applyWorkFilter(h.kind, h.value);
     setInputValue(h.remainingQuery);
     setAcceptedHint(h);
-    trackEvent('filter-hint-accept', { kind: h.kind });
   };
 
   // Sähvatus ainult vastuvõtu hetkel: järgmine päringumuutus lõpetab selle

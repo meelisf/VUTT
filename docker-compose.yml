@@ -154,43 +154,6 @@ services:
     ports:
       - "127.0.0.1:7700:7700"
 
-  # Umami Analytics Database
-  db-umami:
-    image: postgres:15-alpine
-    container_name: vutt-umami-db
-    restart: always
-    logging: *default-logging
-    environment:
-      POSTGRES_DB: umami
-      POSTGRES_USER: umami
-      # S27-02: vaikesaladust EI OLE — puuduv väärtus peatab käivituse. Olemasoleva
-      # andmeköite korral muudab parooli ainult `ALTER USER`, mitte see muutuja.
-      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:?Sea UMAMI_DB_PASSWORD .env-is}
-    volumes:
-      - umami_db_data:/var/lib/postgresql/data
-    # Analüütika eraldi võrgus: backend, pildiserver ja Meilisearch ei näe Umamit (S27-02).
-    networks:
-      - analytics
-
-  # Umami Analytics App
-  umami:
-    # Täpne versioon, MITTE `postgresql-latest` (#764 N10-10). v3 avaldab ühe (Postgres)
-    # pildi ilma andmebaasi-eesliiteta; digest = tootmises 2026-11-11 jooksnu.
-    image: ghcr.io/umami-software/umami:3.0.3
-    container_name: vutt-umami
-    restart: always
-    logging: *default-logging
-    environment:
-      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?Sea UMAMI_DB_PASSWORD .env-is}@db-umami:5432/umami
-      DATABASE_TYPE: postgresql
-      APP_SECRET: ${UMAMI_APP_SECRET:?Sea UMAMI_APP_SECRET .env-is}
-    ports:
-      - "127.0.0.1:3000:3000"
-    depends_on:
-      - db-umami
-    networks:
-      - analytics
-
   # Frontend ja Reverse Proxy (Host Nginx tegeleb sellega nüüd)
   # nginx:
   #   image: nginx:alpine
@@ -207,11 +170,8 @@ services:
 
 volumes:
   meili_data:
-  umami_db_data:
 
 networks:
-  analytics:
-    driver: bridge
   default:
     driver: bridge
     ipam:

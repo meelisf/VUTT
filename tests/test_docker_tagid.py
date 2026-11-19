@@ -30,7 +30,6 @@ def test_valised_pildid_on_kinnitatud():
         assert tag and not UJUV.search(tag), f"ujuv tag: {image}"
 
 
-def test_meili_ja_umami_tootmise_versioonil():
+def test_meili_tootmise_versioonil():
     images = set(_images())
     assert "getmeili/meilisearch:v1.33.1" in images
-    assert "ghcr.io/umami-software/umami:3.0.3" in images
