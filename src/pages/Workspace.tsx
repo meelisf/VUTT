@@ -390,9 +390,11 @@ const Workspace: React.FC = () => {
     setIsGridView(true);
     setGridLoading(true);
     const pages = await getWorkPageImages(effectiveIndex, work.work_id, work.page_count);
-    setGridPages(imageToken ? pages.map(p => ({ ...p, imageUrl: appendImageToken(p.imageUrl) })) : pages);
+    // Alati läbi appendImageToken'i: ka allkirjata (avalik teos) vajab `?v=` epochi,
+    // muidu näitab ruudustik pärast halduses kärpimist vana pisipilti (N19-18).
+    setGridPages(pages.map(p => ({ ...p, imageUrl: appendImageToken(p.imageUrl) })));
     setGridLoading(false);
-  }, [work, effectiveIndex, imageToken, appendImageToken]);
+  }, [work, effectiveIndex, appendImageToken]);
 
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);
