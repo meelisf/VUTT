@@ -233,6 +233,26 @@ def test_cover_on_vaiksem_kui_vana_560px_variant(tmp_path):
     assert os.path.getsize(uus) < os.path.getsize(vana)
 
 
+def test_thumbnail_kirjutus_on_atomaarne(tmp_path, monkeypatch):
+    """Pooleliolev pisipilt ei tohi kunagi olla sihtnime all (N19-13)."""
+    from PIL import Image as PILImage
+    from server import image_server
+
+    work = _make_work(tmp_path)
+    siht = work / "_thumb_page_001.jpg"
+    nahtud = []
+    orig_save = PILImage.Image.save
+
+    def save(self, fp, *a, **kw):
+        nahtud.append((str(fp), siht.exists()))
+        return orig_save(self, fp, *a, **kw)
+
+    monkeypatch.setattr(PILImage.Image, "save", save)
+    assert image_server.generate_thumbnail(str(work / "page_001.jpg"), str(siht))
+    assert nahtud and nahtud[0][0] != str(siht) and nahtud[0][1] is False
+    assert siht.exists() and not list(work.glob("*.tmp.*"))
+
+
 # ---------------------------------------------------------------------------
 # HMAC tokeni valideerimine
 # ---------------------------------------------------------------------------
