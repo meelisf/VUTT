@@ -13,8 +13,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
-from .auth import (delete_user_sessions, hash_password, load_users, save_users,
-                   users_transaction)
+from .auth import (_revoke_agent_handoffs, delete_user_sessions, hash_password,
+                   load_users, save_users, users_transaction)
 from .config import RESET_TOKENS_FILE, get_logger
 from .registration import validate_password_strength  # taaskasuta paroolipoliitikat
 from .utils import atomic_write_json
@@ -240,6 +240,10 @@ def complete_password_reset(token: str, new_password: str) -> Tuple[Optional[Dic
         _unconsume_token(token)
         logger.error(f"Reset: sessioonide invalideerimine ebaõnnestus ({username}): {e}")
         return None, "Parooli lähtestamine ebaõnnestus, palun proovi uuesti"
+
+    # MCP agendikoodid on seotud kasutajaga nagu sessioonid (ADR 0058, N19-14).
+    # Mitte-fataalne: kood aegub niikuinii 8 h jooksul.
+    _revoke_agent_handoffs(username)
 
     logger.info(f"Parool lähtestatud kasutajale {username}")
     return {"username": username}, None

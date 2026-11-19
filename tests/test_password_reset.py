@@ -215,3 +215,13 @@ def test_looja_kustutamine_ei_tuhista_sihtmargi_tokenit(reset_env):
     auth.delete_user("admin2", admin)  # kustuta looja
     got, error = pr.validate_reset_token(token_data["token"])  # mari token kehtib
     assert error is None and got is not None
+
+
+def test_complete_reset_tuhistab_mcp_koodid(reset_env, monkeypatch):
+    """Parooli lähtestus tühistab agendikoodid nagu sessioonid (N19-14)."""
+    from server import agent_handoff
+    tuhistatud = []
+    monkeypatch.setattr(agent_handoff, "revoke_user", tuhistatud.append)
+    token_data, _ = pr.create_reset_token("mari", "admin")
+    result, error = pr.complete_password_reset(token_data["token"], "uusparool1234")
+    assert error is None and tuhistatud == ["mari"]
