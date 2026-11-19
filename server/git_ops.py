@@ -180,26 +180,11 @@ def _invalidate_work_info(relative_paths):
 _images_cache = {}
 
 
-def _get_page_sequence_for_img(folder_path, img_name):
-    """Loeb sequence välja lehekülje JSON-failist (sama loogika nagu meilisearch_ops-is)."""
-    json_path = os.path.join(folder_path, os.path.splitext(img_name)[0] + '.json')
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                d = json.load(f)
-                seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
-                if seq is not None:
-                    return int(seq)
-        except Exception:
-            pass
-    return float('inf')
-
-
 def _build_images_list(folder_path):
-    """Tagastab sorteeritud piltide nimekirja, kasutades sequence-põhist sortimist (nagu Meilisearch)."""
-    raw = [f for f in os.listdir(folder_path)
-           if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
-    return sorted(raw, key=lambda f: (_get_page_sequence_for_img(folder_path, f), f))
+    """Lehejärjekord — sama reegel mis indekseerijal (`meili_doc.enumerate_page_images`, N19-07)."""
+    # Laisk import: meili_doc → work_exemplars → … võib git_ops-i tagasi importida.
+    from .meili_doc import enumerate_page_images
+    return enumerate_page_images(folder_path)
 
 
 def get_page_number_from_txt(folder_name, txt_filename):

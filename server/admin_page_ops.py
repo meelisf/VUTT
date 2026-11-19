@@ -20,7 +20,8 @@ from PIL import Image
 from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, git_write_lock, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
 from .keyed_locks import KeyedLocks
-from .utils import find_directory_by_id, generate_nanoid
+from .meili_doc import enumerate_page_images, page_sequence
+from .utils import atomic_write_json, atomic_write_text, find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import refresh_work_mentions
 from .trash_reason import SPLIT_COMMIT_PREFIX, DELETE_COMMIT_PREFIX
@@ -151,39 +152,13 @@ def detect_and_convert_image(content: bytes, filename: str = "") -> tuple:
 
 def get_page_sequence(json_path: str) -> float:
     """Loeb sequence välja .json failist. Tagastab float('inf') kui puudub."""
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                d = json.load(f)
-                seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
-                if seq is not None:
-                    return int(seq)
-        except Exception:
-            pass
-    return float('inf')
+    s = page_sequence(json_path)
+    return float('inf') if s is None else s
 
 
 def get_sorted_images(dir_path: str) -> list[str]:
-    """Tagastab sequence järgi sorteeritud piltide nimekirja.
-    Fallback: tähestikuline positsioon × 100 kui sequence puudub.
-    NB: float('inf') fallback läheks katki kui mõni leht HAS sequence —
-    siis float('inf') lehed sorteeritaks uue lehe järele, mitte ette.
-    """
-    images = [
-        f for f in os.listdir(dir_path)
-        if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')
-    ]
-    # Esmane tähestikuline sort positsioonifallback'i jaoks
-    alpha_sorted = sorted(images)
-    alpha_pos = {f: i for i, f in enumerate(alpha_sorted)}
-
-    def effective_seq(f: str) -> int:
-        s = get_page_sequence(os.path.join(dir_path, os.path.splitext(f)[0] + '.json'))
-        if s == float('inf'):
-            return (alpha_pos[f] + 1) * 100  # positsioonipõhine fallback
-        return int(s)
-
-    return sorted(images, key=lambda f: (effective_seq(f), f))
+    """Lehejärjekord — sama reegel mis indekseerijal (`meili_doc.enumerate_page_images`, N19-07)."""
+    return enumerate_page_images(dir_path)
 
 
 def reorder_pages(dir_path: str, new_order: list, username: str) -> dict:
@@ -229,9 +204,7 @@ def _reorder_pages_unlocked(dir_path: str, new_order: list, username: str, folde
                     d['meta_content']['sequence'] = new_seq
                 else:
                     d['sequence'] = new_seq
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(d, f, indent=2, ensure_ascii=False)
-                os.chmod(json_path, 0o644)
+                atomic_write_json(json_path, d)
             except Exception as e:
                 return {"error": f"Viga faili {img_name} töötlemisel: {e}"}
         else:
@@ -274,9 +247,7 @@ def rebalance_sequences(dir_path: str):
                     d['meta_content']['sequence'] = new_seq
                 else:
                     d['sequence'] = new_seq
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(d, f, indent=2, ensure_ascii=False)
-                os.chmod(json_path, 0o644)
+                atomic_write_json(json_path, d)
             except Exception:
                 pass
         else:
@@ -398,9 +369,7 @@ def _split_page_locked(path: str, work_id: str, page_num: int, split_x: float,
         (right_txt_path, right_txt),
         (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
     ]:
-        with open(fpath, 'w', encoding='utf-8') as f:
-            f.write(content)
-        os.chmod(fpath, 0o644)
+        atomic_write_text(fpath, content)
 
     # Populeeri MÕLEMA poole ._originals poolituseelse topeltlehega, et
     # "Taasta originaal" tooks kummalt poolelt terve topeltlehe tagasi.
@@ -1161,8 +1130,7 @@ def insert_prepared_pages(work_id, jpeg_paths, after, username, origin=None):
                     else:
                         d['sequence'] = new_seq
                     new_content = json.dumps(d, indent=2, ensure_ascii=False)
-                    with open(jp, 'w', encoding='utf-8') as f:
-                        f.write(new_content)
+                    atomic_write_text(jp, new_content)
                     renumber_files.append((jp, new_content))
 
             # --- ÜKS git-commit ---
@@ -1239,8 +1207,7 @@ def _cleanup_bulk(staging, moved_final, json_backups):
             logger.critical(f"Bulk cleanup: uue faili eemaldamine ebaõnnestus: {dst}")
     for jp, orig in json_backups.items():
         try:
-            with open(jp, 'w', encoding='utf-8') as f:
-                f.write(orig)
+            atomic_write_text(jp, orig)
         except Exception:
             logger.critical(f"Bulk cleanup: json taastamine ebaõnnestus: {jp}")
 
