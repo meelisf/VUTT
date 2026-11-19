@@ -319,6 +319,8 @@ def test_osa2_kehtiv_rida(item, registrid, sonastik):
 @pytest.mark.parametrize("item,kood", [
     ({"kind": "status", "id": "Q999", "evidence": OK_EVIDENCE}, "unknown_vocabulary_id"),
     ({"kind": "name", "label": "X", "type": "nickname", "evidence": OK_EVIDENCE}, "invalid_name_type"),
+    ({"kind": "name", "label": "X", "type": "ennobled", "from": 1700, "to": 1650, "evidence": OK_EVIDENCE},
+     "invalid_name_period"),
     ({"kind": "floruit", "evidence": OK_EVIDENCE}, "invalid_floruit"),
     ({"kind": "floruit", "year_from": 1700, "year_to": 1600, "evidence": OK_EVIDENCE}, "invalid_floruit"),
     ({"kind": "identifier", "scheme": "orcid", "id": "1", "evidence": OK_EVIDENCE}, "invalid_scheme"),
@@ -443,3 +445,11 @@ def test_seos_puuduvale_isikule_blocked(client, login, osa2):
     item = {"kind": "relation", "name": "X", "type": "vend", "target_id": "vutt:Pnone", "evidence": OK_EVIDENCE}
     rows, _ = _ylevaatus(client, login, osa2, [item])
     assert rows[0]["review_state"] == {"state": "blocked", "reason": "unknown_person"}
+
+
+def test_seos_iseendaga_blocked(client, login, osa2):
+    """Agent ei saa pakkuda isikule seost iseendaga (N19-14)."""
+    item = {"kind": "relation", "name": "Isik abc", "type": "vend", "target_id": "vutt:Pabc",
+            "evidence": OK_EVIDENCE}
+    rows, _ = _ylevaatus(client, login, osa2, [item])
+    assert rows[0]["review_state"] == {"state": "blocked", "reason": "self_relation"}

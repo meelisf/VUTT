@@ -80,6 +80,13 @@ def get_viewer_token(work_id: str, request: Request):
     # kaustanime järgi, aga Meili `work_id` ja pildiserveri allkiri on `meta["id"]` (#617).
     canonical_id = meta.get("id") or work_id
     meili_token = generate_work_scoped_meili_token(canonical_id)
+    # Avalik/jagatud teos ei vaja pildiallkirja — pildiserver laseb ta niikuinii läbi
+    # (`image_server._check_image_access`, SAMA predikaat). Allkiri muutis pildi URL-i:
+    # töölaud laadis esimese lehe kaks korda (enne ja pärast allkirja) ja iga uus
+    # `exp` lõhkus brauseri vahemälu (N19-01). Nähtavuse muutuse järel võib
+    # pildiserveri kogude vahemälu (TTL 5 min, eraldi protsess) korraks maha jääda.
+    if is_work_public(meta) or meta.get("shareable", False):
+        return {"token": meili_token, "image_exp": None, "image_sig": None}
     image_exp = int(_time.time()) + 3600
     image_sig = _hmac.new(
         IMAGE_TOKEN_SECRET.encode(),

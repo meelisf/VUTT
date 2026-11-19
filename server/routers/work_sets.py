@@ -219,8 +219,8 @@ async def _mutate(set_id: str, request: Request, user, *, adding: bool):
         raise HTTPException(status_code=403, detail="Puudub haldusõigus")
     body = await get_json_data(request)
     work_ids = body.get("work_ids") or []
-    if not isinstance(work_ids, list):
-        raise HTTPException(status_code=400, detail="work_ids peab olema loend")
+    if not isinstance(work_ids, list) or not all(isinstance(w, str) and w for w in work_ids):
+        raise HTTPException(status_code=400, detail="work_ids peab olema teose-ID-de loend")
 
     if adding:
         # Lisamine ja eemaldamine EI ole sümmeetrilised: lisatav teos peab
@@ -229,11 +229,14 @@ async def _mutate(set_id: str, request: Request, user, *, adding: bool):
         # osaline lisamine jätaks kogusse teose, mille lisaja tagasi lükati.
         from ..access_ops import can_read_work
         from ..work_sets_access import load_work_metadata_by_id
+        is_admin = is_at_least(user.get("role") or "contributor", "admin")
         for work_id in work_ids:
             meta = await run_in_threadpool(load_work_metadata_by_id, work_id)
-            if meta is None:
+            # Mitte-admin haldur saab olematu ja privaatse teose kohta SAMA vastuse —
+            # muidu eristaks 400/403 privaatse teose olemasolu (N19-14).
+            if meta is None and is_admin:
                 raise HTTPException(status_code=400, detail=f"Tundmatu teos: {work_id}")
-            if not can_read_work(meta, user):
+            if meta is None or not can_read_work(meta, user):
                 raise HTTPException(status_code=403, detail="Teos ei ole kutsujale loetav")
 
     try:

@@ -414,6 +414,9 @@ def original_path(work_dir: str, eid: str, image_id: str) -> tuple[Optional[str]
         return None, f"https://hdl.handle.net/{src['ref']}"
     d = exemplar_dir(work_dir, eid)
     path = os.path.join(d, img.get("original") or f"{image_id}.jpg")
+    # Sügavuskaitse: manifesti `original` ei tohi viia kaustast välja (N19-14).
+    if os.path.commonpath([os.path.realpath(d), os.path.realpath(path)]) != os.path.realpath(d):
+        raise ExemplarImagesError("Lähtefail puudub", 404)
     if not os.path.isfile(path):
         raise ExemplarImagesError("Lähtefail puudub", 404)
     return path, None

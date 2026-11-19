@@ -103,15 +103,20 @@ def test_viewer_token_200_admin(env, monkeypatch):
     assert r.status_code == 200
 
 
+def _admin_headers(env):
+    token = env["client"].post("/login", json={"username": "admin", "password": "adminpass"}).json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_viewer_token_includes_image_credentials(env, monkeypatch):
-    """Viewer token peab sisaldama pildi HMAC andmeid."""
+    """Piiratud teose viewer token sisaldab pildi HMAC andmeid."""
     import hmac as hmac_mod
     import hashlib
     import server.config as cfg
     cfg.IMAGE_TOKEN_SECRET = "test-image-secret"
 
-    set_work(monkeypatch, SHAREABLE_META)
-    r = env["client"].get("/work/def456/viewer-token")
+    set_work(monkeypatch, {**RESTRICTED_META, "work_id": "def456"})
+    r = env["client"].get("/work/def456/viewer-token", headers=_admin_headers(env))
     assert r.status_code == 200
     data = r.json()
     assert "image_exp" in data
@@ -126,10 +131,10 @@ def test_viewer_token_kaustanimega_allkirjastab_kanoonilise_id(env, monkeypatch)
     import hashlib, hmac, jwt
     from server.config import IMAGE_TOKEN_SECRET
     from server.routers import public as public_router
-    meta = {**SHAREABLE_META, "id": "kanoon1"}
+    meta = {**RESTRICTED_META, "id": "kanoon1"}
     monkeypatch.setattr(public_router, "_load_work_metadata",
                         lambda work_id: meta if work_id == "1690-slug-kanoon1" else None)
-    r = env["client"].get("/work/1690-slug-kanoon1/viewer-token")
+    r = env["client"].get("/work/1690-slug-kanoon1/viewer-token", headers=_admin_headers(env))
     assert r.status_code == 200
     body = r.json()
     payload = jwt.decode(body["token"], "test-key-32-chars-long-padding-x", algorithms=["HS256"])
@@ -137,3 +142,11 @@ def test_viewer_token_kaustanimega_allkirjastab_kanoonilise_id(env, monkeypatch)
     oodatud = hmac.new(IMAGE_TOKEN_SECRET.encode(), f"image:kanoon1:{body['image_exp']}".encode(),
                        hashlib.sha256).hexdigest()
     assert body["image_sig"] == oodatud
+
+
+@pytest.mark.parametrize("meta,wid", [(PUBLIC_META, "ghi789"), (SHAREABLE_META, "def456")])
+def test_avalik_ja_jagatud_teos_ei_saa_pildiallkirja(env, monkeypatch, meta, wid):
+    """Pildiserver laseb need niikuinii läbi; allkiri ainult muudaks URL-i (N19-01)."""
+    set_work(monkeypatch, meta)
+    body = env["client"].get(f"/work/{wid}/viewer-token", headers=_admin_headers(env)).json()
+    assert body["token"] and body["image_exp"] is None and body["image_sig"] is None

@@ -177,6 +177,16 @@ def test_original_path(env):
     assert ei.original_path(env["work_dir"], env["eid"], "imp001") == (None, "https://hdl.handle.net/10062/14332")
 
 
+def test_original_path_ei_lahku_kaustast(env, monkeypatch):
+    """Manifesti `original` ei tohi viia eksemplari kaustast välja (N19-14)."""
+    m = _add(env, n=1)
+    img = {**m["images"][0], "original": "../../_metadata.json"}
+    monkeypatch.setattr(ei, "read_manifest", lambda *a: {**m, "images": [img]})
+    with pytest.raises(ei.ExemplarImagesError) as e:
+        ei.original_path(env["work_dir"], env["eid"], img["id"])
+    assert e.value.status == 404
+
+
 def test_uleslaadimine_ei_toota_pilti_metadata_lock_all(env, monkeypatch):
     """Pildi dekodeerimine ei tohi hoida globaalset metadata_lock-i (kõik teosed ootaks)."""
     import threading

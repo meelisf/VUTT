@@ -168,6 +168,8 @@ def _validate_list_or_floruit(item: dict) -> None:
             raise _error(f"invalid_name_type: type on üks {list(NAME_TYPES)} (ADR 0083)")
         _year(item.get("from"), "from")
         _year(item.get("to"), "to")
+        if item.get("from") is not None and item.get("to") is not None and item["from"] > item["to"]:
+            raise _error("invalid_name_period: from ≤ to")
     elif kind in _VOCAB_OF:
         allowed = vocabulary(kind)
         if item["id"] not in allowed:
@@ -410,6 +412,8 @@ def _apply_vocab(item: dict, person: dict, patch: dict) -> tuple:
 
 def _apply_relation(item: dict, person: dict, patch: dict) -> tuple:
     target = item.get("target_id")
+    if target and target == person.get("id"):
+        raise _error("self_relation")
     if target:
         from .person_crud import get_person
         other = get_person(target)

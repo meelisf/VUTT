@@ -12,6 +12,7 @@ import re
 import shutil
 import socketserver
 import sys
+import threading
 import urllib.parse
 
 # Lisame server/ kausta pathi
@@ -202,6 +203,12 @@ def get_first_image(work_path):
     return images[0]
 
 
+# Pillow dekodeerib täissuuruses skanni (~2 MB JPEG → kümneid MB RAM-i). Server on
+# lõimepõhine ja piiramatu, seega külm korpus (nt bot) käivitaks muidu sadu paralleelseid
+# dekodeerimisi (N19-13). Lagi kehtib ainult GENEREERIMISELE, valmis faili serveerimine ei oota.
+PILLOW_SEMAPHORE = threading.BoundedSemaphore(4)
+
+
 def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT, quality=THUMB_QUALITY):
     """Genereerib thumbnaili antud pildist.
 
@@ -224,8 +231,9 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT, quality=THU
         print(f"[THUMB] Pillow pole saadaval, ei saa genereerida: {thumb_path}")
         return False
 
+    tmp_path = None
     try:
-        with Image.open(source_path) as img:
+        with PILLOW_SEMAPHORE, Image.open(source_path) as img:
             # Rakenda EXIF orientatsioon enne skaleerimist (muidu thumb tuleb pööratud)
             img = ImageOps.exif_transpose(img)
 
@@ -240,16 +248,22 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT, quality=THU
             if thumb.mode in ('RGBA', 'P'):
                 thumb = thumb.convert('RGB')
 
-            # Salvesta JPEG formaadis
-            thumb.save(thumb_path, 'JPEG', quality=quality, optimize=True)
-
-            # Sea õigused loetavaks
-            os.chmod(thumb_path, 0o644)
+            # Atomaarne kirjutus (tmp + os.replace): samaaegne päring ei tohi
+            # serveerida poolikut JPEG-i (N19-13) — sama muster mis _generate_fitted_image.
+            tmp_path = f"{thumb_path}.tmp.{os.getpid()}.{time.time_ns()}"
+            thumb.save(tmp_path, 'JPEG', quality=quality, optimize=True)
+            os.chmod(tmp_path, 0o644)
+            os.replace(tmp_path, thumb_path)
 
             print(f"[THUMB] Genereeritud: {thumb_path}")
             return True
     except Exception as e:
         print(f"[THUMB] Viga genereerimisel {source_path}: {e}")
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
         return False
 
 
@@ -264,7 +278,7 @@ def _generate_fitted_image(source_path, output_path, size, quality, log_tag):
 
     tmp_path = None
     try:
-        with Image.open(source_path) as source:
+        with PILLOW_SEMAPHORE, Image.open(source_path) as source:
             source = ImageOps.exif_transpose(source).convert('RGB')
             fitted = ImageOps.fit(
                 source,
