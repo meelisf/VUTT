@@ -250,14 +250,25 @@ def enumerate_page_images(doc_path):
     `tests/test_meili_seed_live_parity.py`. Tootmises osalise `sequence`-iga
     teoseid 2026-11-19 seisuga ei ole (1514-st 0). Jätab välja `_thumb_` failid.
     """
+    return [f for _, f in page_order_keys(doc_path)]
+
+
+def page_order_key(doc_path, img_name) -> tuple:
+    """Ühe lehe sortimisvõti `(sequence, failinimi)`; `sequence`-ita leht → `inf` (lõppu)."""
+    s = page_sequence(os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json'))
+    return (s if s is not None else float('inf'), img_name)
+
+
+def page_order_keys(doc_path) -> list:
+    """`enumerate_page_images`-i sortimisvõtmed järjekorras: `[(sequence, failinimi), …]`.
+
+    Pakk-toiming, mis muudab lehti ükshaaval (teose halduse poolitus, N19-12), hoiab
+    seda loendit mälus ja sisestab uued lehed `bisect`-iga — sama reegel ilma iga
+    sammu järel kõiki lehe-JSON-e uuesti lugemata.
+    """
     all_imgs = [f for f in os.listdir(doc_path)
                 if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
-
-    def _seq(img_name):
-        s = page_sequence(os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json'))
-        return s if s is not None else float('inf')
-
-    return sorted(all_imgs, key=lambda f: (_seq(f), f))
+    return sorted(page_order_key(doc_path, f) for f in all_imgs)
 
 def build_text_annotations_text(text_annotations):
     """Koostab otsitava teksti text_annotations kommentaaridest.

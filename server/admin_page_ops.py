@@ -3,6 +3,7 @@
 Eraldatud main.py-st parema testitavuse ja hallatavuse jaoks.
 """
 
+import bisect
 import fcntl
 import os
 import json
@@ -20,7 +21,7 @@ from PIL import Image
 from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, git_write_lock, save_with_git, delete_page_from_git, delete_pages_from_git, commit_add_and_remove
 from .keyed_locks import KeyedLocks
-from .meili_doc import enumerate_page_images, page_sequence
+from .meili_doc import enumerate_page_images, page_order_key, page_order_keys, page_sequence
 from .utils import atomic_write_json, atomic_write_text, find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 from .prosopography.relations import refresh_work_mentions
@@ -696,7 +697,12 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
     folder_name = os.path.basename(path)
     rotated = adjusted = split = pairs_removed = 0
     with work_lock(folder_name, path):
-        images = get_sorted_images(path)
+        # Lehejärjekord mälus (N19-12): sama võti mis `get_sorted_images`-il. Poolitus
+        # vahetab ühe lehe kaheks — varem luges iga poolitus kõigi lehtede JSON-id uuesti
+        # (O(N²) pika teose „Poolita kõik" peal). Pooled sisestatakse oma jada järgi,
+        # mitte originaali kohale: vahe < 2 korral jääb parem pool järgmise lehe taha.
+        keys = page_order_keys(path)
+        images = [f for _, f in keys]
         missing = [op["filename"] for op in clean if op["filename"] not in images]
         if missing:
             raise ValueError("Lehti ei leitud (leht muutus vahepeal): " + ", ".join(missing))
@@ -724,11 +730,15 @@ def apply_page_ops(work_id: str, ops, username: str, progress=None) -> dict:
                     adjusted += 1 if adj else 0
                     transformed = fn
                 if op["split_x"] is not None:
-                    images = get_sorted_images(path)
-                    halves = _split_page_locked(path, work_id, images.index(fn) + 1,
+                    idx = images.index(fn)
+                    halves = _split_page_locked(path, work_id, idx + 1,
                                                 op["split_x"], username, images)
                     if halves:
                         renamed[os.path.splitext(fn)[0]] = [os.path.splitext(h)[0] for h in halves]
+                        del keys[idx]
+                        for half in halves:
+                            bisect.insort(keys, page_order_key(path, half))
+                        images = [f for _, f in keys]
                     split += 1
                 applied.append(fn)
                 transformed = None
