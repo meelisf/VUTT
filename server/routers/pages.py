@@ -511,7 +511,7 @@ def admin_restore_original_page_image(work_id: str, filename: str, user=Depends(
 @router.post("/admin/work/{work_id}/reorder-pages")
 async def admin_reorder_pages(work_id: str, request: Request, user=Depends(require_role("admin"))):
     """Muudab lehekülgede järjekorda. Body: {\"order\": [\"fail1.jpg\", \"fail2.jpg\", ...]}"""
-    path = find_directory_by_id(work_id)
+    path = await run_in_threadpool(find_directory_by_id, work_id)
     if not path:
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     data = await request.json()

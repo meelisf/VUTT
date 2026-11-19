@@ -35,13 +35,13 @@ async def toggle_shareable(work_id: str, request: Request, background_tasks: Bac
     body = await request.json()
     shareable = bool(body.get("shareable", False))
 
-    folder = find_directory_by_id(work_id)
+    folder = await run_in_threadpool(find_directory_by_id, work_id)
     if not folder:
         return {"status": "error", "message": "Teos ei leitud"}
 
     meta_path = os.path.join(folder, '_metadata.json')
     # Ligipääsukontroll on fail-closed: vigane või puuduv meta ei tähenda avalikku teost.
-    _cur_meta = _load_work_metadata(work_id)
+    _cur_meta = await run_in_threadpool(_load_work_metadata, work_id)
     if _cur_meta is None:
         raise HTTPException(status_code=503, detail="Teose metaandmeid ei saa praegu lugeda")
     if not can_write_work(_cur_meta, user):

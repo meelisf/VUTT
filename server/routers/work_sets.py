@@ -252,7 +252,7 @@ async def _mutate(set_id: str, request: Request, user, *, adding: bool):
             raise HTTPException(status_code=409, detail={
                 "error": "limit", "current": e.current, "adding": e.adding, "limit": e.limit})
         raise HTTPException(status_code=409, detail={"error": "limit"})
-    ids = search_visible_work_ids(ws, user)
+    ids = await run_in_threadpool(search_visible_work_ids, ws, user)
     return {"status": "success", "work_ids": ids, "count": len(ids),
             "revision": ws.get("revision")}
 

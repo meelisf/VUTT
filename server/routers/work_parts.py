@@ -167,7 +167,7 @@ async def parts_proposal_submit(request: Request):
             or not set(data) <= {"code", "work_id", "pages_version", "parts", "persons"} \
             or not isinstance(data["work_id"], str):
         raise HTTPException(status_code=400, detail="Vigane ettepaneku kuju")
-    path = find_directory_by_id(data["work_id"])
+    path = await run_in_threadpool(find_directory_by_id, data["work_id"])
     if not path:
         raise HTTPException(status_code=400, detail="invalid_or_expired_handoff")
     return await run_in_threadpool(_wpp, wpp.submit, data["code"], data["work_id"], path,

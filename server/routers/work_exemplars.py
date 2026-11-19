@@ -174,7 +174,7 @@ async def exemplar_proposal_submit(request: Request):
     if not isinstance(data, dict) or not {"code", "work_id", "rows"} <= set(data) <= _SUBMIT_KEYS \
             or not isinstance(data["work_id"], str):
         raise HTTPException(status_code=400, detail="Vigane ettepaneku kuju")
-    path = find_directory_by_id(data["work_id"])
+    path = await run_in_threadpool(find_directory_by_id, data["work_id"])
     if not path:
         # Sama vastus mis vigase koodi korral: autentimata küsija ei saa teoste olemasolu kaardistada.
         raise HTTPException(status_code=400, detail="invalid_or_expired_handoff")
