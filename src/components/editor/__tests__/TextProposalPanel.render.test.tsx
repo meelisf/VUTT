@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 // `/review` link pakile, mille lehed on teosest kadunud: riba ütleb seda ja pakki saab tagasi lükata.
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import TextProposalPanel from '../TextProposalPanel';
 
 vi.mock('react-i18next', () => ({
@@ -16,7 +16,7 @@ const noop = () => {};
 const props = {
   review: null, pack, pendingNotLoaded: false, loaded: false, job: null, error: null,
   onLoad: noop, onReject: noop, onRejectPack: noop, onAcceptPack: noop, onSaveAndNext: noop,
-  onPrev: null, onNext: null,
+  onPrev: null, onNext: null, onOpenStale: null,
 };
 
 describe('TextProposalPanel', () => {
@@ -28,5 +28,22 @@ describe('TextProposalPanel', () => {
   it('tavaolukorras teadet ei ole', () => {
     render(<TextProposalPanel {...props} packPagesGone={false} />);
     expect(screen.queryByText('proposal.packPagesGone')).toBeNull();
+  });
+
+  it('ainult aegunud lehed → paki kinnitust ei pakuta, viide käsitsi ülevaatusele', () => {
+    const onOpenStale = vi.fn();
+    const stalePack = { ...pack, counts: { pending: 0, stale: 1, accepted: 2, rejected: 0 } };
+    render(<TextProposalPanel {...props} pack={stalePack} packPagesGone={false} onOpenStale={onOpenStale} />);
+    expect(screen.queryByText('proposal.acceptPack')).toBeNull();
+    expect(screen.getByText('proposal.rejectPack')).toBeTruthy();
+    expect(screen.getByText('proposal.staleOnly')).toBeTruthy();
+    fireEvent.click(screen.getByText('proposal.openStale'));
+    expect(onOpenStale).toHaveBeenCalled();
+  });
+  it('ootel lehed → kinnitusnupp, aegunute viidet ei ole', () => {
+    const mixed = { ...pack, counts: { pending: 2, stale: 1, accepted: 0, rejected: 0 } };
+    render(<TextProposalPanel {...props} pack={mixed} packPagesGone={false} />);
+    expect(screen.getByText('proposal.acceptPack')).toBeTruthy();
+    expect(screen.queryByText('proposal.staleOnly')).toBeNull();
   });
 });

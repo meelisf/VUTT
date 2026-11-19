@@ -434,7 +434,10 @@ def apply_pack(proposal_id: str, work_dir: str, username: str, progress=None) ->
     """Kõik ootel lehed ÜHE commit'iga. Lehelukud hoitakse lugemisest commit'ini
     (vahepealne Ctrl+S ootab, mitte ei kao). Git-viga → kirjutatud failid
     taastatakse toimingueelsest seisust lukke vabastamata ja lehed jäävad ootele.
-    Commit'imata pooliku töö (protsess suri) leht taastatakse enne HEAD-ist."""
+    Commit'imata pooliku töö (protsess suri) leht taastatakse enne HEAD-ist.
+
+    Tulemus: `stale` = KÕIK aegunud lehed (ka varem aegunud — need vajavad käsitsi
+    ülevaatust, pakk neid ei kinnita), `skipped` = juba otsustatud (kinnitatud/tagasi lükatud)."""
     accepted, stale, skipped, writes, originals = [], [], [], [], []
     with proposal_lock(proposal_id):
         with _db() as db:
@@ -443,7 +446,8 @@ def apply_pack(proposal_id: str, work_dir: str, username: str, progress=None) ->
         if not rows:
             raise ProposalError("unknown_proposal")
         todo = [r for r in rows if r["state"] == "pending"]
-        skipped = [r["stem"] for r in rows if r["state"] != "pending"]
+        stale = [r["stem"] for r in rows if r["state"] == "stale"]
+        skipped = [r["stem"] for r in rows if r["state"] not in ("pending", "stale")]
         with ExitStack() as stack:
             for r in todo:
                 stack.enter_context(page_lock(_txt_path(work_dir, r["stem"])))
@@ -497,7 +501,7 @@ def apply_pack(proposal_id: str, work_dir: str, username: str, progress=None) ->
                 raise
             accepted += [s for _, _, s in writes]
             mark_accepted(proposal_id, accepted, username)
-            mark_stale(proposal_id, stale)
+            mark_stale(proposal_id, stale)    # varem aegunud: CAS pending-ilt, no-op
     if writes:
         _sync_meili(work_dir)
     return {"accepted": sorted(accepted), "stale": sorted(stale), "skipped": sorted(skipped)}

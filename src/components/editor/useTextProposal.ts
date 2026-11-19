@@ -213,6 +213,9 @@ export function useTextProposal({
   const prevPage = [...others].reverse().find(pg => pg.page_no < page.page_number);
   const next = nextPage ? () => navigateToPage(nextPage.page_no) : null;
   const prev = prevPage ? () => navigateToPage(prevPage.page_no) : null;
+  // Aegunud lehte pakk ei kinnita — viide esimesele, kui ainult need on alles.
+  const stalePage = others.find(pg => pg.state === 'stale');
+  const openStale = stalePage ? () => navigateToPage(stalePage.page_no) : null;
 
   const saveAndNext = useCallback(async () => {
     const target = nextPage?.page_no;
@@ -305,6 +308,6 @@ export function useTextProposal({
 
   return {
     pack, review, pendingNotLoaded, packPagesGone, loaded, activeRef, job, error,
-    loadIntoEditor, reject, rejectPack, acceptPack, saveAndNext, next, prev, afterSave, reload: load,
+    loadIntoEditor, reject, rejectPack, acceptPack, saveAndNext, next, prev, openStale, afterSave, reload: load,
   };
 }

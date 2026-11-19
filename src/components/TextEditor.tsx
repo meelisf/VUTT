@@ -354,6 +354,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             onSaveAndNext={() => { void proposal.saveAndNext(); }}
             onPrev={proposal.prev}
             onNext={proposal.next}
+            onOpenStale={proposal.openStale}
           />
         )}
 

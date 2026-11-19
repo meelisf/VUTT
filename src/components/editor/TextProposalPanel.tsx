@@ -20,6 +20,8 @@ interface TextProposalPanelProps {
   onSaveAndNext: () => void;
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
+  /** Esimene aegunud leht (mitte praegune) — pakk neid ei kinnita. */
+  onOpenStale: (() => void) | null;
 }
 
 /** Riba on nähtav ainult siis, kui teoses on päris ettepanek (või paki töö tulemus/viga) —
@@ -35,7 +37,9 @@ export function shouldShowProposalPanel({ review, pack, job, error }: {
 // Agendi tekstiettepaneku riba redaktori kohal (#641; ainult superadmin).
 export default function TextProposalPanel(p: TextProposalPanelProps) {
   const { t } = useTranslation(['workspace', 'common']);
-  const remaining = p.pack ? p.pack.counts.pending + p.pack.counts.stale : 0;
+  const pending = p.pack?.counts.pending ?? 0;
+  const staleCount = p.pack?.counts.stale ?? 0;
+  const remaining = pending + staleCount;
   const staleDiff = useMemo(
     () => (p.review?.state === 'stale' ? diffWords(p.review.base_text, p.review.proposed_text) : null),
     [p.review],
@@ -75,10 +79,13 @@ export default function TextProposalPanel(p: TextProposalPanelProps) {
           )}
           {p.pack && remaining > 0 && (
             <>
-              <button type="button" onClick={p.onAcceptPack} disabled={running}
-                className="px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
-                {t('proposal.acceptPack')}
-              </button>
+              {/* Pakk kinnitab ainult ootel lehti; aegunud vajavad käsitsi ülevaatust. */}
+              {pending > 0 && (
+                <button type="button" onClick={p.onAcceptPack} disabled={running}
+                  className="px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
+                  {t('proposal.acceptPack')}
+                </button>
+              )}
               <button type="button" onClick={p.onRejectPack} disabled={running}
                 className="px-2 py-0.5 rounded border border-violet-300 hover:bg-violet-100 disabled:opacity-50">
                 {t('proposal.rejectPack')}
@@ -88,6 +95,16 @@ export default function TextProposalPanel(p: TextProposalPanelProps) {
         </div>
       </div>
 
+      {p.pack && pending === 0 && staleCount > 0 && !running && (
+        <div className="flex items-center gap-2 text-amber-800">
+          <span>{t('proposal.staleOnly', { count: staleCount })}</span>
+          {p.onOpenStale && (
+            <button type="button" onClick={p.onOpenStale} className="px-2 py-0.5 rounded border border-violet-300 hover:bg-violet-100">
+              {t('proposal.openStale')}
+            </button>
+          )}
+        </div>
+      )}
       {p.packPagesGone && <div className="text-amber-800">{t('proposal.packPagesGone')}</div>}
       {p.pack?.note && <div>{t('proposal.packNote', { note: p.pack.note })}</div>}
       {p.review?.note && <div>{t('proposal.pageNote', { note: p.review.note })}</div>}
