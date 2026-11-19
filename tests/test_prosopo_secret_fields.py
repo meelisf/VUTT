@@ -86,7 +86,7 @@ def test_get_person_with_works_ei_tagasta_salajast_valja(tmp_path, monkeypatch):
                           {"auth_token": "11111111-2222-3333"})
     from server.prosopography import relations
 
-    monkeypatch.setattr(relations, "_load_person_to_works", lambda: {})
+    monkeypatch.setattr(relations, "_load_person_to_works_readonly", lambda: {})
 
     person = relations.get_person_with_works("vutt:Pabc123")
 

@@ -259,16 +259,28 @@ def _load_creators_index() -> dict:
     return {}
 
 
-def _load_person_name_map() -> dict:
-    """Tagastab { person_id: label } kaardi prosopography_index.json-st."""
-    if os.path.exists(PROSOPOGRAPHY_INDEX_FILE):
-        try:
-            with open(PROSOPOGRAPHY_INDEX_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return {e["id"]: e.get("label", e["id"]) for e in data.get("entries", [])}
-        except Exception:
-            pass
-    return {}
+# Lugejate vahemälu (N19-10): avalik /work-relations parsis igal päringul 3,6 MB isiku-
+# indeksi, 1 MB faktiindeksi ja person_to_works.json-i. `_cached_json` võti on faili allkiri,
+# nii et iga atomic_write annab järgmisel lugemisel värske sisu. Tulemust EI TOHI muuta —
+# kirjutajad kasutavad `_load_creators_index()`-i. Teed loetakse kutse ajal (testid seavad).
+def _load_creators_index_readonly() -> dict:
+    from .indices import _cached_json
+    return _cached_json(WORKS_CREATORS_INDEX_FILE, dict)
+
+
+def _load_person_to_works_readonly() -> dict:
+    from .indices import _cached_json
+    return _cached_json(PERSON_TO_WORKS_FILE, dict)
+
+
+def _person_names(person_ids) -> dict:
+    """{ person_id: label } antud isikutele, isikuindeksi vahemälust."""
+    from .indices import _cached_json
+    wanted = set(person_ids)
+    if not wanted:
+        return {}
+    data = _cached_json(PROSOPOGRAPHY_INDEX_FILE, lambda: {"entries": []})
+    return {e["id"]: e.get("label", e["id"]) for e in data.get("entries", []) if e.get("id") in wanted}
 
 
 def get_work_relations(person_id: str, limit: int = 10, offset: int = 0) -> list:
@@ -276,9 +288,8 @@ def get_work_relations(person_id: str, limit: int = 10, offset: int = 0) -> list
     Tagastab isikud, kellega person_id jagab teoseid creators[] kaudu.
     Sorteeritud shared_works_count järgi kahanevalt.
     """
-    ptw = _load_person_to_works()
-    creators_index = _load_creators_index()
-    name_map = _load_person_name_map()
+    ptw = _load_person_to_works_readonly()
+    creators_index = _load_creators_index_readonly()
 
     a_work_ids = {w["work_id"] for w in ptw.get(person_id, [])}
 
@@ -305,6 +316,7 @@ def get_work_relations(person_id: str, limit: int = 10, offset: int = 0) -> list
                 work_entry.get("year"),
             )
 
+    name_map = _person_names(shared)
     results = []
     for b_id, works in shared.items():
         work_list = [
