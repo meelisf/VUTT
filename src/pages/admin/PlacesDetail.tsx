@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Edit2, GitMerge, Trash2, Loader2, X, Plus } from 'lucide-react';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
+// Kaardi-CSS laeb ainult kaardiga koos, mitte igal lehel (N19-08).
+import 'leaflet/dist/leaflet.css';
 import { icon } from 'leaflet';
 import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
 import markerIconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';

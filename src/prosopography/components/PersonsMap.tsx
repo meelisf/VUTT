@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { divIcon } from 'leaflet';
 import { MapContainer, Marker, Popup } from 'react-leaflet';
+// Kaardi-CSS laeb ainult kaardiga koos, mitte igal lehel (N19-08).
+import 'leaflet/dist/leaflet.css';
 import { Loader2, MapPin, Users } from 'lucide-react';
 import { fetchPersonMapMarkers } from '../services/prosopographyService';
 import { useCollection } from '../../contexts/CollectionContext';

@@ -74,3 +74,16 @@ def test_endpointi_soltuvus_katab_koik_filtrid():
     params = set(inspect.signature(person_filters).parameters)
     fields = {f.name for f in dataclasses.fields(PersonFilters)}
     assert params == (fields - {"tags"}) | {"tag"}
+
+
+def test_tuhi_ametiloend_indeksis_ei_loe_kaarti(monkeypatch):
+    """Indeks on autoriteetne ka tühja loendiga; kaart loetakse ainult vana kirje korral (N19-04)."""
+    from server.prosopography import person_search
+
+    loetud = []
+    monkeypatch.setattr(person_search, "get_person",
+                        lambda pid: loetud.append(pid) or {"occupations": [{"label": "pastor"}]})
+    assert person_search._entry_occupations({"id": "p1", "occupations": []}) == []
+    assert loetud == []
+    vana = person_search._entry_occupations({"id": "p2"})
+    assert loetud == ["p2"] and [o["label"] for o in vana] == ["pastor"]

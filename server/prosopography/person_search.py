@@ -206,9 +206,12 @@ def _entry_occupations(entry: dict) -> list[dict]:
                     })
             elif isinstance(item, str) and item.strip():
                 normalized.append({"id": None, "label": item.strip(), "labels": None})
-        if normalized:
-            return normalized
+        # Väli olemas = indeks on autoriteetne, ka tühjana: indeks ehitatakse sama
+        # `_extract_occupation_entries`-iga. Varem langes tühi loend kaardi
+        # kettalugemisse iga ametita isiku kohta (N19-04).
+        return normalized
 
+    # Ainult vana indeksikirje (väli puudub) loeb kaardi.
     person_id = entry.get("id")
     if not person_id:
         return []
