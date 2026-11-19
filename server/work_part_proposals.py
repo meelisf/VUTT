@@ -342,13 +342,16 @@ def _with_resolved(part: dict, refs: dict, persons: list) -> dict:
 def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
            persons: Optional[list] = None) -> dict:
     """Talletab ainult ootel ettepaneku; teost ei muudeta."""
-    if not isinstance(code, str) or len(code) > 100 or not isinstance(version, str):
-        raise ProposalError("invalid_handoff")
+    if not isinstance(code, str) or len(code) > 100:
+        raise ProposalError("invalid_or_expired_handoff")
+    # Kood ENNE igat muud kontrolli: otspunkt on autentimata ja router jõuab siia
+    # ainult olemasoleva teosega — koodita küsijale erinev viga (`invalid_parts`,
+    # `stale_pages`) reedaks teose olemasolu. Ainult lugemine — kulub INSERT-iga.
+    agent_handoff.check(code, "parts", work_id, ProposalError, need_use=True)
+    if not isinstance(version, str):
+        raise ProposalError("invalid_pages_version")
     if not isinstance(parts, list) or not 1 <= len(parts) <= MAX_PARTS:
         raise ProposalError("invalid_parts")
-    # Kood ENNE teose lugemist: otspunkt on autentimata ja `stale_pages` vastaks
-    # muidu ka koodita küsijale. Ainult lugemine — kood kulub allpool INSERT-iga.
-    agent_handoff.check(code, "parts", work_id, ProposalError, need_use=True)
     stems = wp.page_stems(work_dir)
     if version != pages_version(work_dir):
         raise ProposalError("stale_pages")

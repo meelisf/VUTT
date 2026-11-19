@@ -455,3 +455,10 @@ def test_muudatus_allikata_kirjel_saab_ester_allika(work):
     pid = _submit(work, [UPD])["proposal_id"]
     epp.decide("w1", work, "ed", [(pid, 0)], "accept")
     assert _meta(work)["exemplars"][0]["source"]["ref"] == "b2648642"
+
+
+@pytest.mark.parametrize("rows,note", [([], None), ("x", None), ([NEW], "x" * 1001)])
+def test_vigane_kood_enne_sisu_kontrolli(work, rows, note):
+    """Koodita küsija ei tohi sisuveaga teose olemasolu teada saada (N19-06)."""
+    with pytest.raises(epp.ProposalError, match="invalid_or_expired_handoff"):
+        epp.submit("vale-kood", "w1", work, rows, note)

@@ -193,12 +193,14 @@ def submit(code: str, work_id: str, work_dir: str, rows: list, note: Optional[st
     """Talletab ainult ootel ettepaneku; teost ei muudeta."""
     if not isinstance(code, str) or len(code) > agent_handoff.MAX_CODE_LEN:
         raise ProposalError("invalid_or_expired_handoff")
+    # Kood ENNE igat muud kontrolli: otspunkt on autentimata ja router jõuab siia
+    # ainult olemasoleva teosega — koodita küsijale erinev viga (`invalid_rows`)
+    # reedaks teose olemasolu. Ainult lugemine — kulub INSERT-iga.
+    agent_handoff.check(code, KIND, work_id, ProposalError, need_use=True)
     if not isinstance(rows, list) or not 1 <= len(rows) <= MAX_ROWS:
         raise ProposalError("invalid_rows")
     if note is not None and (not isinstance(note, str) or len(note) > MAX_NOTE):
         raise ProposalError("invalid_note")
-    # Kood ENNE teose lugemist: otspunkt on autentimata. Ainult lugemine — kulub INSERT-iga.
-    agent_handoff.check(code, KIND, work_id, ProposalError, need_use=True)
     live = {x["id"]: x for x in _read_meta(work_dir).get("exemplars") or [] if isinstance(x, dict)}
     clean = [_clean_row(r, i, live) for i, r in enumerate(rows)]
     payload = json.dumps({"rows": clean}, ensure_ascii=False)

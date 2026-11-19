@@ -576,3 +576,10 @@ def test_kokkuvote_kasutaja_kaupa(work):
     assert wpp.list_pending_summary("ed")[0]["pending"] == 1
     wpp.decide(row["proposal_id"], "w1", work, "ed", 1, "reject")
     assert wpp.list_pending_summary("ed") == []
+
+
+@pytest.mark.parametrize("version,parts", [("v", []), (1, [LETTER]), ("vana", [LETTER])])
+def test_vigane_kood_enne_sisu_kontrolli(work, version, parts):
+    """Koodita küsija ei tohi sisuveaga teose olemasolu teada saada (N19-06)."""
+    with pytest.raises(wpp.ProposalError, match="invalid_or_expired_handoff"):
+        wpp.submit("vale-kood", "w1", work, version, parts)
