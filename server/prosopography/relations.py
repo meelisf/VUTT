@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from typing import Optional
 
 from . import state
 from .indices import _load_index_readonly, _load_person_to_works, mention_entries
+from .network import _cards_signature
 from ..config import get_logger
 from .person_crud import get_person
 
@@ -101,8 +103,23 @@ def get_person_relation_network_ids(person_id: str, collection: Optional[str] = 
     return [person_id, *sorted(others)]
 
 
+# Avalik otspunkt parsis igal päringul kõik ~2350 kaarti (N19-03). Ehitatakse
+# uuesti ainult kaardikausta allkirja muutusel — sama muster mis `network._reverse_relations`.
+_type_suggestions_lock = threading.Lock()
+_type_suggestions_cache: dict = {"sig": None, "value": []}
+
+
 def get_relation_type_suggestions() -> list:
-    """Kogub kõigist isikukaartidest unikaalsed seose tüübid."""
+    """Kogub kõigist isikukaartidest unikaalsed seose tüübid (vahemälust)."""
+    sig = _cards_signature(state.PROSOPOGRAPHY_DIR)
+    with _type_suggestions_lock:
+        if _type_suggestions_cache["sig"] != sig:
+            _type_suggestions_cache["value"] = _collect_relation_types()
+            _type_suggestions_cache["sig"] = sig
+        return list(_type_suggestions_cache["value"])
+
+
+def _collect_relation_types() -> list:
     seen: dict[str, dict] = {}
     pattern = os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")
     for path in state._glob.glob(pattern):
