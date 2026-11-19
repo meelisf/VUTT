@@ -397,3 +397,32 @@ def test_taustatoo_viga_kannab_tehtud_lehti(monkeypatch):
     page_ops_jobs.start("w1", [], "admin", 3)
     st = _oota("error")
     assert st["applied"] == [] and st["transformed"] == []
+
+
+def test_jarjekord_malus_vastab_kettale_ja_ei_skanni_iga_poolituse_jarel(work, monkeypatch):
+    """N19-12: lehejärjekord hoitakse mälus. Vahe < 2 korral jääb parem pool järgmise
+    lehe TAHA — mälus olev loend peab seda kordama, muidu saaks järgmine poolitus vale
+    lehenumbri ja vale naabri."""
+    aps = work["aps"]
+    n = work["names"]
+    for fn, seq in zip(n, (100, 101, 200)):
+        (work["folder"] / (fn[:-4] + ".json")).write_text(
+            json.dumps({"sequence": seq, "status": "Toores"}), encoding="utf-8")
+
+    scans = []
+    real_keys, real_sorted = aps.page_order_keys, aps.get_sorted_images
+    monkeypatch.setattr(aps, "page_order_keys", lambda p: scans.append("keys") or real_keys(p))
+    monkeypatch.setattr(aps, "get_sorted_images", lambda p: scans.append("sorted") or real_sorted(p))
+
+    r = aps.apply_page_ops("w1", [
+        {"filename": n[0], "split_x": 0.5},
+        {"filename": n[1], "split_x": 0.5},
+    ], "admin")
+    assert r["split"] == 2 and r["new_page_count"] == 5
+    # Üks skann alguses + üks lehtede arvu jaoks lõpus, poolituste arvust sõltumata.
+    assert scans == ["keys", "sorted"]
+
+    texts = [(work["folder"] / (fn[:-4] + ".txt")).read_text(encoding="utf-8")
+             for fn in real_sorted(str(work["folder"]))]
+    # L1(100) L2(101) P2(125) P1(150) 3(200): 1. lehe parem pool läks 2. lehe taha.
+    assert texts == ["V1", "V2", "P2", "P1", "V3<pb/>P3"]
