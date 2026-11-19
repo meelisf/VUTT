@@ -15,7 +15,7 @@ Väljumiskood: 0 = puhas, 1 = midagi on lennus (server_update.sh peatub).
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Upload'i staatused, mille ajal lõime tapmine kaotab kasutaja tööd.
 # `applying` — 300 DPI renderdus + SFTP käib; restart jätab upload'i rippu (#256).
@@ -37,19 +37,24 @@ UPLOAD_LENNUS = ("applying", "processing", "collecting_images", "prepping",
 REOCR_LENNUS = ("uploading", "processing", "cancelling")
 
 
-def _vanus(algus) -> str:
-    """Inimloetav kestus. „Kaua see kestnud on" otsustab, kas oodata tasub."""
+def _vanus(algus, praegu=None) -> str:
+    """Inimloetav kestus. „Kaua see kestnud on" otsustab, kas oodata tasub.
+
+    Ajavööndita aeg on UTC (sama reegel mis frontendi `parseServerDate`-il, #652):
+    selle kirjutab backend-konteiner (`datetime.now()`, konteineri kell on UTC), aga
+    skript jookseb hostis (EET). Kohaliku kellaga võrdlus näitas talvel 2 h liiga
+    palju — 9 minutit kestnud upload paistis „2 h 9 min" kinni olevat (2026-11-19).
+    """
     if not algus:
         return "aeg teadmata"
-    for vorming in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
-        try:
-            algusaeg = datetime.strptime(str(algus)[:26], vorming)
-            break
-        except ValueError:
-            continue
-    else:
+    try:
+        algusaeg = datetime.fromisoformat(str(algus).replace("Z", "+00:00"))
+    except ValueError:
         return "aeg teadmata"
-    minutid = int((datetime.now() - algusaeg).total_seconds() // 60)
+    if algusaeg.tzinfo is None:
+        algusaeg = algusaeg.replace(tzinfo=timezone.utc)
+    praegu = praegu or datetime.now(timezone.utc)
+    minutid = int((praegu - algusaeg).total_seconds() // 60)
     if minutid < 1:
         return "alla minuti"
     if minutid < 60:

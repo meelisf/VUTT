@@ -99,3 +99,20 @@ def test_puuduv_reocr_fail_on_normaalne(tmp_path):
     _uploads(tmp_path, a="done")
     (tmp_path / "state").mkdir()
     assert leia_lennus_olevad(str(tmp_path)) == []
+
+
+def test_ajavoondita_aeg_on_utc():
+    """Konteiner kirjutab ajavööndita UTC-aja, skript jookseb EET hostis (2026-11-19:
+    9 minutit kestnud upload paistis „2 h 9 min")."""
+    from datetime import datetime, timedelta, timezone
+    praegu = datetime(2026, 11, 19, 14, 40, 50, tzinfo=timezone.utc)
+    assert _MOD._vanus("2026-11-19T14:31:47.190977", praegu) == "9 min"
+    # Ajavööndiga aeg (Z või nihe) arvestab nihet.
+    assert _MOD._vanus("2026-11-19T14:31:47Z", praegu) == "9 min"
+    assert _MOD._vanus("2026-11-19T16:31:47+02:00", praegu) == "9 min"
+    assert _MOD._vanus((praegu - timedelta(hours=3, minutes=5)).replace(tzinfo=None).isoformat(),
+                       praegu) == "3 h 5 min"
+    assert _MOD._vanus("katki", praegu) == "aeg teadmata"
+    assert _MOD._vanus(None, praegu) == "aeg teadmata"
+    # Ilma `praegu`-ta võrdleb UTC kellaga: just loodud aeg ei ole tundide vanune.
+    assert _MOD._vanus(datetime.now(timezone.utc).replace(tzinfo=None).isoformat()) == "alla minuti"
