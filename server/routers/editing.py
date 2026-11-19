@@ -352,7 +352,7 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
             data['metadata']['page_numbering'] = clean_page_numbering(data['metadata']['page_numbering'])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
+    path = await run_in_threadpool(find_directory_by_id, data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
     meta_path = os.path.join(path, '_metadata.json')
     slug = os.path.basename(path)
 
@@ -384,7 +384,7 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
 @router.post("/get-work-metadata")
 async def get_work_meta_direct(request: Request, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
-    path = find_directory_by_id(data.get("work_id"))
+    path = await run_in_threadpool(find_directory_by_id, data.get("work_id"))
     if path is None:
         raw_path = data.get("original_path", "")
         catalog = os.path.basename(raw_path) if raw_path else ""
@@ -399,7 +399,9 @@ async def get_work_meta_direct(request: Request, user=Depends(require_role("cont
 @router.post("/get-metadata-suggestions")
 async def metadata_suggestions(request: Request, user=Depends(require_role("contributor"))):
     data = await get_json_data(request)
-    return {"status": "success", **get_cached_suggestions(data.get('lang', 'et'))}
+    # Cache-miss skannib kõik `_metadata.json`-id ja küsib Meilit (ADR 0002, N19-02).
+    suggestions = await run_in_threadpool(get_cached_suggestions, data.get('lang', 'et'))
+    return {"status": "success", **suggestions}
 
 # =========================================================
 # GIT AJALUGU JA BULK

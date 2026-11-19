@@ -25,6 +25,12 @@ CACHE_TTL_SECONDS = 300
 _suggestions_cache = {}
 _suggestions_cache_at = None
 SUGGESTIONS_CACHE_TTL = 300
+# Soovituste ehitus skannib kõik `_metadata.json`-id ja küsib Meilit (kuni 5 s) —
+# oma lukk, et `/collections` ja arhiivid ei ootaks seda ära (N19-02).
+# Põlvkond: `invalidate_cache` ei võta seda lukku (ei oota ehitust ära), aga
+# keset ehitust tehtud invalideerimise järel ei salvestata vana tulemust.
+_suggestions_lock = threading.Lock()
+_suggestions_gen = 0
 
 def _load_cache_internal():
     global _collections_cache, _vocabularies_cache, _cache_loaded_at
@@ -66,7 +72,7 @@ def get_cached_vocabularies():
 
 def invalidate_cache():
     global _collections_cache, _vocabularies_cache, _cache_loaded_at
-    global _suggestions_cache, _suggestions_cache_at
+    global _suggestions_cache, _suggestions_cache_at, _suggestions_gen
     global _people_aliases_cache, _people_aliases_cache_at
     global _people_register_cache, _people_register_cache_at
     global _archives_cache, _archives_cache_at
@@ -74,6 +80,7 @@ def invalidate_cache():
         _collections_cache = None
         _vocabularies_cache = None
         _cache_loaded_at = None
+        _suggestions_gen += 1
         _suggestions_cache = {}
         _suggestions_cache_at = None
         _people_aliases_cache = None
@@ -223,14 +230,16 @@ def _build_suggestions(preferred_lang):
 
 def get_cached_suggestions(lang):
     global _suggestions_cache, _suggestions_cache_at
-    with _cache_lock:
+    with _suggestions_lock:
         if _suggestions_cache_at is None or (datetime.now() - _suggestions_cache_at).total_seconds() > SUGGESTIONS_CACHE_TTL:
             _suggestions_cache = {}
             _suggestions_cache_at = None
         if lang in _suggestions_cache: return _suggestions_cache[lang]
+        gen = _suggestions_gen
         result = _build_suggestions(lang)
-        _suggestions_cache[lang] = result
-        if _suggestions_cache_at is None: _suggestions_cache_at = datetime.now()
+        if gen == _suggestions_gen:
+            _suggestions_cache[lang] = result
+            if _suggestions_cache_at is None: _suggestions_cache_at = datetime.now()
         return result
 
 # =========================================================

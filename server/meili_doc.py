@@ -222,28 +222,41 @@ def build_annotated_search_text(page_text, text_annotations):
 
 
 
+def page_sequence(json_path):
+    """Lehe `sequence` (juur või `meta_content`); `None`, kui puudub või fail on loetamatu."""
+    try:
+        with open(json_path, 'r', encoding='utf-8') as fj:
+            d = json.load(fj)
+    except (OSError, ValueError):
+        return None
+    s = d.get('sequence')
+    if s is None:
+        s = (d.get('meta_content') or {}).get('sequence')
+    try:
+        return int(s) if s is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def enumerate_page_images(doc_path):
-    """Loeb teose pildifailid järjekorras (sequence, siis failinimi).
+    """Teose pildifailid lehejärjekorras — ÜKS reegel kõigile (N19-07).
 
-    Jätab välja `_thumb_` failid. ÜHINE loogika indekseerijale (build_work_documents)
-    ja bot-prerenderi teksti-lugejale (text_reading.read_work_page_texts) —
-    nii ei saa lehe-järjekord kahe tee vahel lahku minna.
+    Kasutavad indekseerija, seed, `work_parts`, `work_exemplars`, bot-prerender,
+    teose haldus (`admin_page_ops.get_sorted_images`) ja git-ajalugu. Varem oli
+    haldusel ja ajalool oma varureegel (tähestikuline positsioon × 100) ning
+    osalise `sequence`-iga teosel lahknesid lehenumbrid.
+
+    `sequence`-ita leht läheb LÕPPU (failinime järgi) — seed/live pariteet,
+    `tests/test_meili_seed_live_parity.py`. Tootmises osalise `sequence`-iga
+    teoseid 2026-11-19 seisuga ei ole (1514-st 0). Jätab välja `_thumb_` failid.
     """
-    def _seq(img_name):
-        jp = os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json')
-        if os.path.exists(jp):
-            try:
-                with open(jp, 'r', encoding='utf-8') as fj:
-                    d = json.load(fj)
-                    s = d.get('sequence') or d.get('meta_content', {}).get('sequence')
-                    if s is not None:
-                        return int(s)
-            except Exception:
-                pass
-        return float('inf')
-
     all_imgs = [f for f in os.listdir(doc_path)
                 if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
+
+    def _seq(img_name):
+        s = page_sequence(os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json'))
+        return s if s is not None else float('inf')
+
     return sorted(all_imgs, key=lambda f: (_seq(f), f))
 
 def build_text_annotations_text(text_annotations):

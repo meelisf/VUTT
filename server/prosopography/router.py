@@ -161,7 +161,7 @@ async def prosopography_query(request: Request):
     Väldib liiga pikka query stringi, kui ids massiiv on suur.
     """
     data = await request.json()
-    work_set_ids = _resolve_work_set_ids(data.get("work_set"), request)
+    work_set_ids = await run_in_threadpool(_resolve_work_set_ids, data.get("work_set"), request)
     return await run_in_threadpool(
         list_persons,
         PersonFilters.from_body(data),
@@ -249,7 +249,7 @@ async def prosopography_facets_post(request: Request):
     """POST variant /facets — kasuta kui ids nimekiri on pikk (414 vältimiseks)."""
     data = await request.json()
     id_list = data.get("ids") or None
-    work_set_ids = _resolve_work_set_ids(data.get("work_set"), request)
+    work_set_ids = await run_in_threadpool(_resolve_work_set_ids, data.get("work_set"), request)
     return await run_in_threadpool(
         get_person_facets,
         q=data.get("q"),

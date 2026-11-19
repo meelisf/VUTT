@@ -166,6 +166,8 @@ Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json
 lukustatud `requirements.lock`-is — Dockerfile ja CI paigaldavad SEDA, `requirements.txt`
 on ainult vahemike allikas. Uuendus = uus freeze (juhis faili päises), mitte käsitsi pin.
 Blokeeriv I/O `async def` sees on keelatud (ADR 0002) — kas sync `def` route või `run_in_threadpool`.
+Valvur `tests/test_async_ei_blokeeri.py` kontrollib konkreetset nimekirja (`find_directory_by_id`,
+`_load_work_metadata`, `search_visible_work_ids`, `get_cached_suggestions` …) — uus raske abifunktsioon lisa sinna.
 Funktsiooni eemaldamisel kontrolli ka `server/__init__.py` re-eksporte.
 
 ### Frontend (`src/`)
@@ -385,6 +387,8 @@ mustandis läbi käima (`birth_evidence` jne, `helpers.ts`) — vorm ehitab need
 (`agent_handoff.py`, rida liigi kohta), kulutus + ettepanek üks tehing `ATTACH`-iga (WAL keelatud); loend `GET /agent-proposals`,
 `target_url` koostab server (täiendus 2026-10-20). Kood kehtib 8 h, piiratud esitused, seotud
 KASUTAJAGA, mitte sessiooniga. Kõik ettepanekuliigid on ainult superadmin.
+Autentimata submit kontrollib koodi ENNE igat sisuvaliidsust — router jõuab sinna ainult olemasoleva
+teosega ja muu veateade reedaks privaatse teose olemasolu (mall `page_text_proposals.submit`, N19-06).
 Lehe teksti ettepanek (#641): agent saab toorteksti AINULT koodiga, esitab asendused
 räsi vastu; ülevaatus liidab ketta vastu ühe `page_lock`-i all (`review_page`), pakk on
 ÜKS commit, lukud ettepanek → leht → git. Kinnitus ei muuda lehe seisundit.
@@ -509,6 +513,9 @@ Iga lehe JSON-i lugev-ja-tagasikirjutav tee hoiab `page_lock`-i (`server/page_lo
 lugemisest kirjutamiseni; kommentaaritoimingud kirjutavad ainult `.json`-i (ADR 0053).
 `/save` liidab kliendi `base`-i vastu kolmesuunaliselt (`server/page_merge.py`, ADR 0054):
 uus redaktori lehe-väli PEAB minema `PAGE_FIELDS`-i, `read_page_view` = `meili_doc` projektsioon.
+Olemasoleva lehe JSON-i ülekirjutus käib `atomic_write_*` kaudu (kommentaarid + ajalugu).
+Lehejärjekord on ÜKS reegel: `meili_doc.enumerate_page_images` (`sequence`-ita leht → lõppu,
+seed/live pariteet) — haldus (`get_sorted_images`) ja git-ajalugu kutsuvad seda; ära kirjuta oma sorteerijat.
 
 **OCR vea-märgend (ADR 0025)** — OCR-server kirjutab ebaõnnestunud lehe kõrvale
 `{tüvi}.err` (üks rida: `ErandiTüüp: sõnum`). Märgend on **lõplik**: `main_loop` ei võta
@@ -545,6 +552,9 @@ tühjendamine katki). Salvestamata muudatuste jaoks on ÜKS dialoog (`UnsavedCha
 (viga / `'warning'` nt `git_committed === false` / `'success'`); natiivset `alert`/`confirm`
 EI kasutata (valvur `noNativeDialogsGuard.test.ts`, #672). Kerib AKEN, mitte konteiner (v.a
 Workspace). `LoginModal` `isOpen` EI TOHI olla seotud `sessionExpired`-iga.
+Kaardi-CSS (`leaflet.css`, `maplibre-gl.css`) imporditakse KAARDIKOMPONENDIS, mitte `index.tsx`-is —
+laisk tükk laeb pärast `index.css`-i, seega `index.css` reegel, mis kirjutab üle `.leaflet-*` /
+`.maplibregl-*` klassi, vajab topeltklassi (`.leaflet-tooltip.vutt-region-tooltip`), muidu võidab Leaflet.
 
 ## Domeen
 

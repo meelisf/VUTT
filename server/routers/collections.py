@@ -32,11 +32,12 @@ def _read_json(path):
         return json.load(f)
 
 
+# `def`, mitte `async def`: vahemälu lukk ja TTL-järgne ketaslugemine (ADR 0002).
 @router.get("/collections")
-async def collections(): return {"status": "success", "collections": get_cached_collections()}
+def collections(): return {"status": "success", "collections": get_cached_collections()}
 
 @router.get("/config/archives")
-async def get_archives(): return {"status": "success", "archives": get_cached_archives()}
+def get_archives(): return {"status": "success", "archives": get_cached_archives()}
 
 @router.post("/config/archives")
 async def create_archive(request: Request, user=Depends(require_role("admin"))):
