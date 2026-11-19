@@ -27,12 +27,12 @@ jäetud algsel kujul, kehtiv seis ja prioriteet on selles jaotises.
 | N19-06 | P1 → P2 | **#838** | Sama oraakel oli ka **osaettepanekul** (`invalid_parts`), mitte ainult eksemplaridel. Risk on väike (nanoid-e ei saa ära arvata + rate-limit). |
 | N19-07 | P1 | **#839** (osaliselt) | Vt otsused allpool; leidus kolmas koopia `git_ops.py`-s. |
 | N19-08 | P1 | **#838** | Ülevaade mõõtis toorsuurust (97 KB, 51 %); CLAUDE.md nõuab gzip'i: ~14 KB 32,6 KB-st. Tulemus: peamine CSS gzip 32,6 → 16,2 KB. Kaardid brauseris üle vaadatud. |
-| N19-09–12 | P1 | issue'd | Rea-täpsusega väiteid EI kontrollitud — issue'des on esimene samm kontroll/mõõtmine. |
+| N19-09–12 | P1 | #841, #842, #843, #844 | Rea-täpsusega väiteid EI kontrollitud — issue'des on esimene samm kontroll/mõõtmine. |
 | N19-13 | P2 | **#840** | Kontrollitud: `thumb.save` kirjutas otse sihtfaili. |
 | N19-14 p2 | P2 | **#838** | Parooli lähtestus tühistab MCP agendikoodid. |
 | N19-14 p5 nginx | P2 | **#840** | Kontrollitud: `add_header` lisab teise päise, ei asenda olemasolevat; `no-store` võidab. |
 | N19-14 p1, p3, p5 `original_path` | P2 | **#840** | p4 (tulevane rollilangetus) ei vaja praegu muudatust. Docker `no-new-privileges` ja kommenteeritud `nginx.conf` jäid tegemata. |
-| N19-15–17 | P2 | issue'd | Hallatavus; liinid, mitte parandused. |
+| N19-15–17 | P2 | #845 | Hallatavus; liinid, mitte parandused. |
 | N19-18 | P3 | **#838**, **#840** | `react-zoom-pan-pinch` eemaldatud; `Workspace.tsx:393` parandatud. |
 
 ### Otsused ja põhjused
@@ -113,7 +113,7 @@ no-store lisatakse ainult siis, kui backend oma päist ei saada. Hostis rakendat
 
 ### Järgmised sammud
 
-Avatud töö on GitHub issue'des (N19-09, N19-10, N19-11, N19-12, N19-15/16/17). Väljaspool neid jäid
+Avatud töö on GitHub issue'des: #841 (N19-09), #842 (N19-10), #843 (N19-11), #844 (N19-12), #845 (N19-15/16/17). Väljaspool neid jäid
 tegemata Docker `no-new-privileges` ja kommenteeritud `nginx.conf` viide (`backend:8001`).
 
 ---
