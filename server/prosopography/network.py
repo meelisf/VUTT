@@ -15,16 +15,18 @@ import threading
 from typing import Optional
 
 from . import state
-from .indices import _collection_descendants, _load_index, _load_person_to_works, _load_work_collections
+from .indices import (_collection_descendants, _load_index_readonly, _load_person_to_works_readonly,
+                      _load_work_collections_readonly)
 from .network_rules import classify_pair
 from .person_crud import get_person
 from .places_ops import _get_place_coordinates, _load_places_cache
 from . import work_relations_ops as _wro
-from .work_relations_ops import _load_creators_index
 
 # Read-modelid mälus faili allkirja (mtime_ns, suurus) järgi. Iga /network päring luges
 # varem neli indeksifaili kettalt (~80 ms ka väikese isiku puhul); isikuleht küsib seda
 # igal avamisel. Tuletatud struktuur (nt rollid teose kaupa) hoitakse koos failiga.
+# Toorandmed tulevad `indices._cached_json`-ist (N19-10): sama objekt mis teistel
+# lugejatel, mitte teine parsitud koopia — seega EI TOHI neid ka siin muuta.
 _index_cache: dict = {}
 _index_lock = threading.Lock()
 
@@ -222,16 +224,16 @@ def build_person_network(person_id: str, collection: Optional[str] = None) -> Op
     card = get_person(person_id)
     if card is None:
         return None
-    index = _cached("index", state.PROSOPOGRAPHY_INDEX_FILE, _load_index,
+    index = _cached("index", state.PROSOPOGRAPHY_INDEX_FILE, _load_index_readonly,
                     lambda d: {e.get("id"): e for e in d.get("entries", [])})
-    facts = _cached("facts", _wro.WORKS_CREATORS_INDEX_FILE, _load_creators_index)
-    wc = _cached("wc", state.WORK_COLLECTIONS_INDEX_FILE, _load_work_collections)
+    facts = _cached("facts", _wro.WORKS_CREATORS_INDEX_FILE, _wro._load_creators_index_readonly)
+    wc = _cached("wc", state.WORK_COLLECTIONS_INDEX_FILE, _load_work_collections_readonly)
     allowed_cols = None
     if collection:
         from ..cache import get_cached_collections
         allowed_cols = _collection_descendants(collection, get_cached_collections() or {})
 
-    by_work = _cached("by_work", state.PERSON_TO_WORKS_FILE, _load_person_to_works, _roles_by_work)
+    by_work = _cached("by_work", state.PERSON_TO_WORKS_FILE, _load_person_to_works_readonly, _roles_by_work)
     edges: list = []
     works: dict = {}
     parts_out: dict = {}

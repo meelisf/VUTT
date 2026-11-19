@@ -45,7 +45,7 @@ def keskkond(tmp_path, monkeypatch, backend_env):
     monkeypatch.setattr(acc, "is_work_public",
                         lambda meta: "sample" in (meta.get("collections") or []))
 
-    monkeypatch.setattr(indices, "_load_person_to_works", lambda: PERSON_TO_WORKS)
+    monkeypatch.setattr(indices, "_load_person_to_works_readonly", lambda: PERSON_TO_WORKS)
     monkeypatch.setattr(indices, "_load_index", lambda: INDEX)
     monkeypatch.setattr(indices, "_load_index_readonly", lambda: INDEX)
     monkeypatch.setattr(person_search, "_load_index_readonly", lambda: INDEX)

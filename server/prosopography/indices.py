@@ -121,6 +121,11 @@ def _load_index() -> dict:
 # Vahemälu ei ole kasutajapõhine — indeks ei sõltu kutsujast (ADR 0042 reegel ei puutu).
 _readonly_cache: dict = {}
 _readonly_lock = threading.Lock()
+# Faili kaupa laadimislukk (N19-10): cache-missil parsib ainult üks lõim, teised ootavad
+# ja saavad sama objekti. Ilma selleta parsis iga samal hetkel saabunud päring 3,6 MB
+# indeksit eraldi. Kirjutused vahemällu käivad sama luku all, nii et hilinenud lõim ei
+# kirjuta värskema väärtuse üle.
+_load_locks: dict = {}
 
 
 def _file_sig(path: str) -> tuple:
@@ -137,9 +142,17 @@ def _cached_json(path: str, default_factory) -> Any:
         hit = _readonly_cache.get(path)
         if hit and hit[0] == sig:
             return hit[1]
-    value = _load_json_or_default(path, default_factory())
-    with _readonly_lock:
-        _readonly_cache[path] = (sig, value)
+        load_lock = _load_locks.setdefault(path, threading.Lock())
+    with load_lock:
+        # Teine lõim võis ootamise ajal sama versiooni juba laadida.
+        sig = _file_sig(path)
+        with _readonly_lock:
+            hit = _readonly_cache.get(path)
+            if hit and hit[0] == sig:
+                return hit[1]
+        value = _load_json_or_default(path, default_factory())
+        with _readonly_lock:
+            _readonly_cache[path] = (sig, value)
     return value
 
 
@@ -154,11 +167,23 @@ def _load_person_aliases_readonly() -> dict:
 
 
 def _load_person_to_works() -> dict:
+    """Värske, MUUDETAV koopia — kirjutajatele."""
     return _load_json_or_default(state.PERSON_TO_WORKS_FILE, {})
 
 
+def _load_person_to_works_readonly() -> dict:
+    """`person_to_works.json` lugejatele, vahemälust (N19-10). EI TOHI muuta."""
+    return _cached_json(state.PERSON_TO_WORKS_FILE, dict)
+
+
 def _load_work_collections() -> dict:
+    """Värske, MUUDETAV koopia — kirjutajatele."""
     return _load_json_or_default(state.WORK_COLLECTIONS_INDEX_FILE, {})
+
+
+def _load_work_collections_readonly() -> dict:
+    """`work_collections_index.json` lugejatele, vahemälust (N19-10). EI TOHI muuta."""
+    return _cached_json(state.WORK_COLLECTIONS_INDEX_FILE, dict)
 
 
 def update_work_collections(work_id: str, collections: list) -> None:
@@ -231,8 +256,8 @@ def _persons_in_collection(collection_id: str) -> set:
 
     collections = get_cached_collections() or {}
     target = _collection_descendants(collection_id, collections)
-    wc = _load_work_collections()
-    ptw = _load_person_to_works()
+    wc = _load_work_collections_readonly()
+    ptw = _load_person_to_works_readonly()
     result = {
         pid for pid, entries in ptw.items()
         if any(target & set(wc.get(e.get("work_id"), ())) for e in entries)
@@ -257,7 +282,7 @@ def _persons_in_work_set(work_ids) -> set:
     target = set(work_ids or ())
     if not target:
         return set()
-    ptw = _load_person_to_works()
+    ptw = _load_person_to_works_readonly()
     return {
         pid for pid, entries in ptw.items()
         if any(e.get("work_id") in target for e in entries)
@@ -266,8 +291,8 @@ def _persons_in_work_set(work_ids) -> set:
 
 def _person_collections(person_id: str) -> list:
     """Kollektsioonid, kuhu isiku teosed kuuluvad; dedup esmaesinemise järjekorras."""
-    wc = _load_work_collections()
-    ptw = _load_person_to_works()
+    wc = _load_work_collections_readonly()
+    ptw = _load_person_to_works_readonly()
     result: list = []
     for entry in ptw.get(person_id, ()):
         for cid in wc.get(entry.get("work_id"), ()):

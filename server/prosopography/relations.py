@@ -8,7 +8,7 @@ import time
 from typing import Optional
 
 from . import state
-from .indices import _load_index_readonly, _load_person_to_works, mention_entries
+from .indices import _load_index_readonly, _load_person_to_works, _load_person_to_works_readonly, mention_entries
 from .network import _cards_signature
 from ..config import get_logger
 from .person_crud import get_person
@@ -24,8 +24,9 @@ def get_person_with_works(person_id: str) -> Optional[dict]:
     person = get_person(person_id)
     if person is None:
         return None
-    works = _load_person_to_works()
-    person["works"] = _with_part_facts(works.get(person_id, []))
+    works = _load_person_to_works_readonly()
+    # Koopia: loend on jagatud vahemäluga (N19-10), vastus ei tohi seda muuta.
+    person["works"] = _with_part_facts(list(works.get(person_id, [])))
     return person
 
 
@@ -37,8 +38,8 @@ def _with_part_facts(entries: list) -> list:
     """
     if not any(e.get("part_id") for e in entries):
         return entries
-    from .work_relations_ops import _load_creators_index
-    facts = _load_creators_index()
+    from .work_relations_ops import _load_creators_index_readonly
+    facts = _load_creators_index_readonly()
     out = []
     for e in entries:
         part = ((facts.get(e.get("work_id")) or {}).get("parts") or {}).get(e.get("part_id") or "")
@@ -50,7 +51,7 @@ def _with_part_facts(entries: list) -> list:
 
 def _build_work_to_persons() -> dict:
     """Pöörab person_to_works → {work_id: [{id, label}]}, label isikuindeksist."""
-    ptw = _load_person_to_works()
+    ptw = _load_person_to_works_readonly()
     index = _load_index_readonly()
     labels = {e.get("id"): (e.get("label") or e.get("name") or e.get("id"))
               for e in index.get("entries", [])}
