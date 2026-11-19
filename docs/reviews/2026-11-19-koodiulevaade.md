@@ -19,7 +19,7 @@ jäetud algsel kujul, kehtiv seis ja prioriteet on selles jaotises.
 
 | ID | Algne → hinnang | Seis | Märkus |
 |---|---|---|---|
-| N19-01 | P0 → P1 | avatud | Topeltlaadimine juhtub ainult teose ESIMESEL lehel: allkiri jääb `ImageTokenContext`-i vahemällu teose kaupa. |
+| N19-01 | P0 → P1 | **#840** | Topeltlaadimine juhtub ainult teose ESIMESEL lehel: allkiri jääb `ImageTokenContext`-i vahemällu teose kaupa. |
 | N19-02 | P0 → P1 | **#839** | „Autentimata DoS" jättis mainimata rate-limiti (30 / 300 s IP kohta, `config.py`). |
 | N19-03 | P0 → P1 | **#839** | |
 | N19-04 | P0 → P1 | **#838** | Tulemus oli õige, ainult aeglane — ainult ametifiltri korral. |
@@ -27,13 +27,13 @@ jäetud algsel kujul, kehtiv seis ja prioriteet on selles jaotises.
 | N19-06 | P1 → P2 | **#838** | Sama oraakel oli ka **osaettepanekul** (`invalid_parts`), mitte ainult eksemplaridel. Risk on väike (nanoid-e ei saa ära arvata + rate-limit). |
 | N19-07 | P1 | **#839** (osaliselt) | Vt otsused allpool; leidus kolmas koopia `git_ops.py`-s. |
 | N19-08 | P1 | **#838** | Ülevaade mõõtis toorsuurust (97 KB, 51 %); CLAUDE.md nõuab gzip'i: ~14 KB 32,6 KB-st. Tulemus: peamine CSS gzip 32,6 → 16,2 KB. Kaardid brauseris üle vaadatud. |
-| N19-09–12 | P1 | avatud | Rea-täpsusega väiteid EI kontrollitud. |
-| N19-13 | P2 | avatud | Kontrollitud: `thumb.save` kirjutab otse sihtfaili. |
+| N19-09–12 | P1 | issue'd | Rea-täpsusega väiteid EI kontrollitud — issue'des on esimene samm kontroll/mõõtmine. |
+| N19-13 | P2 | **#840** | Kontrollitud: `thumb.save` kirjutas otse sihtfaili. |
 | N19-14 p2 | P2 | **#838** | Parooli lähtestus tühistab MCP agendikoodid. |
-| N19-14 p5 nginx | P2 | avatud | Kontrollitud: `add_header` lisab teise päise, ei asenda olemasolevat; `no-store` võidab. |
-| N19-14 muud | P2 | avatud | Kontrollimata. |
-| N19-15–17 | P2 | avatud | Hallatavus; sobivad pigem GitHub issue'ks kui parandusnimekirja. |
-| N19-18 | P3 | **#838** (osaliselt) | `react-zoom-pan-pinch` eemaldatud. `Workspace.tsx:393` (`?v=` puudub allkirjata ruudustikul) kontrollitud, avatud. |
+| N19-14 p5 nginx | P2 | **#840** | Kontrollitud: `add_header` lisab teise päise, ei asenda olemasolevat; `no-store` võidab. |
+| N19-14 p1, p3, p5 `original_path` | P2 | **#840** | p4 (tulevane rollilangetus) ei vaja praegu muudatust. Docker `no-new-privileges` ja kommenteeritud `nginx.conf` jäid tegemata. |
+| N19-15–17 | P2 | issue'd | Hallatavus; liinid, mitte parandused. |
+| N19-18 | P3 | **#838**, **#840** | `react-zoom-pan-pinch` eemaldatud; `Workspace.tsx:393` parandatud. |
 
 ### Otsused ja põhjused
 
@@ -95,11 +95,26 @@ veidi aeglasemaks.
 `work_relations.cleanup_for_deletion` püüab `OSError`/`ValueError` teadlikult ise kinni („katkine teos
 peab jääma kustutatavaks"); `None` tagastamine muudaks seal semantikat.
 
+**N19-01 — parandus serveris, mitte kliendis.** Ülevaade pakkus kahte asja: avalikule teosele allkirja
+mitte anda ja piiratud teosel töölaual allkirja ära oodata. Tehti ainult esimene: `viewer-token`
+tagastab avalikule ja jagatud teosele `image_exp/image_sig = null` (sama predikaat mis
+`image_server._check_image_access`). Ootamist ei lisatud: piiratud teose esimene allkirjata päring
+saab 403, mis on väike, mitte 2 MB skann. Teadlik piirang: pildiserver on eraldi protsess oma kogude
+vahemäluga (TTL 5 min), nii et kogu muutumise järel avalikuks võib sisselogitud vaataja pilt kuni
+5 min 403-ga tulla.
+
+**N19-14 work_sets — oraakel.** Mitte-admin haldur saab olematu ja loetamatu teose kohta sama 403;
+admin saab olematu kohta endiselt 400 (admin loeb kõike, oraaklit pole). Vana test
+`test_tundmatu_teose_lisamine_annab_400` kinnitas just oraaklit ja asendati.
+
+**N19-14 nginx.** `add_header Cache-Control $admin_cache_control` + `map $upstream_http_cache_control`:
+no-store lisatakse ainult siis, kui backend oma päist ei saada. Hostis rakendatakse deploy'l
+(`scp` + `nginx -t` + reload, CLAUDE.md „nginx").
+
 ### Järgmised sammud
 
-Järjekorras: N19-01 (`viewer-token` ei anna avalikule teosele allkirja / töölaud ootab allkirja ära),
-N19-13, N19-14 nginx, N19-10/11/12 pärast väidete kontrolli, N19-18 `Workspace.tsx:393`.
-N19-15/16 → GitHub issue'd.
+Avatud töö on GitHub issue'des (N19-09, N19-10, N19-11, N19-12, N19-15/16/17). Väljaspool neid jäid
+tegemata Docker `no-new-privileges` ja kommenteeritud `nginx.conf` viide (`backend:8001`).
 
 ---
 
