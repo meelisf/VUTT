@@ -27,7 +27,7 @@ export {
   StickyNote as NotesIcon,
 
   // Lehe pilt
-  Crop as PageEditorIcon, // ava redaktor (pööre, kärbe, poolitus)
+  Scan as PageEditorIcon, // ava redaktor (pööre, kärbe, poolitus); skaneeringu nurgad, mitte kärbe
   Crop as CropIcon, // kärpetööriist, ootel kärbe
   Frame as PerspectiveIcon,
   Columns2 as SplitIcon, // lehe poolitus — AINULT see

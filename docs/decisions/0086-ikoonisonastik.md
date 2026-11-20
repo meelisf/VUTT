@@ -47,7 +47,7 @@ Ikoonid imporditi igas komponendis otse `lucide-react`-ist, nii et ükski koht e
 | Ääremärkus (lisa `<m>`) | `MarginaliaIcon` | `PanelRightDashed` |
 | Marginaaliaveerg: klõps avab / sulgeb | `MarginaliaShowIcon` / `MarginaliaHideIcon` | `PanelRightOpen` / `PanelRightClose` |
 | Märkmed (toimetaja vabatekst teosel/isikul) | `NotesIcon` | `StickyNote` |
-| Ava lehe redaktor (pööre, kärbe, poolitus) | `PageEditorIcon` | `Crop` |
+| Ava lehe redaktor (pööre, kärbe, poolitus) | `PageEditorIcon` | `Scan` |
 | Kärpetööriist, ootel kärbe | `CropIcon` | `Crop` |
 | Perspektiiv | `PerspectiveIcon` | `Frame` |
 | Lehe poolitus | `SplitIcon` | `Columns2` |
@@ -57,8 +57,11 @@ Ikoonid imporditi igas komponendis otse `lucide-react`-ist, nii et ükski koht e
 | Lähtesta vaikeväärtustele | `ResetIcon` | `ListRestart` |
 | Võta tagasi (viimane toiming) | `UndoIcon` | `Undo2` |
 
-Lehe redaktor ja kärbe jagavad ikooni teadlikult: redaktor avaneb kärbitavana ja kaardi
-ootel-märgis kannab teksti, nii et nupp ja märgis ei lähe segi.
+Lehe redaktor ja kärbe jagasid algul ikooni (`Crop`), põhjendusega, et redaktor avaneb
+kärbitavana ja ootel-märgis kannab teksti. Täiendus 2026-11-20: see ei pidanud —
+teose halduse lehekaardil on redaktori nupp ja ootel-märgise kärpeikoon kõrvuti all
+servas ning loeti sama asjana. Redaktori nupp sai oma ikooni `Scan` (skaneeringu nurgad);
+`Crop` tähendab nüüd AINULT kärbet (tööriist, ootel kärbe), nagu põhimõte nõuab.
 
 ### Töölaua tööriistariba rühmad
 

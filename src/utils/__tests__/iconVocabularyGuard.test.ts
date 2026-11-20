@@ -14,7 +14,7 @@ const VOCABULARY = [
   'MessageSquare', 'MessageSquarePlus', 'MessageSquareQuote',
   'PanelRightDashed', 'PanelRightOpen', 'PanelRightClose',
   'StickyNote',
-  'Crop', 'Frame', 'Columns2', 'RotateCcw', 'RotateCw',
+  'Scan', 'Crop', 'Frame', 'Columns2', 'RotateCcw', 'RotateCw',
   'GalleryHorizontal', 'ArchiveRestore', 'ListRestart', 'Undo2',
 ];
 
