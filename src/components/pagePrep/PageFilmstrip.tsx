@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Columns2, Crop, Loader2, RotateCw, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
+import { CropIcon, RotateRightIcon, SplitIcon } from '../icons';
 import { cardLineLeftPercent } from './geometry';
 
 /** Ühe lehe ootel toimingud ribal; `null` = puutumata. */
@@ -119,9 +120,9 @@ const PageFilmstrip: React.FC<Props> = ({ items, currentIndex, onSelect, testIdP
                 data-testid={`${testIdPrefix}-filmstrip-pending-${i}`}
                 className="absolute right-0.5 top-0.5 flex items-center gap-0.5 rounded border border-amber-300 bg-amber-100 px-0.5 py-0.5 text-amber-800 shadow-sm"
               >
-                {p.rotate && <RotateCw size={10} />}
-                {p.crop && <Crop size={10} />}
-                {p.split && <Columns2 size={10} />}
+                {p.rotate && <RotateRightIcon size={10} />}
+                {p.crop && <CropIcon size={10} />}
+                {p.split && <SplitIcon size={10} />}
               </span>
             )}
           </button>

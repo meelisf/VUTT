@@ -7,7 +7,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, ListOrdered, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronRight, ListOrdered } from 'lucide-react';
+import { EditIcon } from '../icons';
 import { deletePart, getPartsToc, updatePart, type PartAddress, type WorkPart } from '../../services/workPartsApi';
 import { draftFromPart, PartDatingError, partFromDraft, sharedStems as sharedStemsOf, type PartDraft } from '../../pages/manage/partsModel';
 import PartForm from '../../pages/manage/parts/PartForm';
@@ -350,7 +351,7 @@ const PartDetails: React.FC<{ workId: string; part: WorkPart; attachments: WorkP
         {onEdit && (
           <button type="button" onClick={onEdit}
             className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-0.5 text-gray-700 hover:border-primary-400 hover:text-primary-700">
-            <Pencil size={12} /> {t('info.tocEdit')}
+            <EditIcon size={12} /> {t('info.tocEdit')}
           </button>
         )}
       </div>

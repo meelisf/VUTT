@@ -5,7 +5,8 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bot, Check, Pencil, RefreshCw, X } from 'lucide-react';
+import { Bot, Check, RefreshCw, X } from 'lucide-react';
+import { EditIcon } from '../../../components/icons';
 import { Link } from 'react-router-dom';
 import {
   acceptPartProposals, decidePartProposal, listPartProposals,
@@ -160,7 +161,7 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
                 )}
                 <button type="button" disabled={busy} onClick={() => onEdit(p.proposal_id, index, item)}
                   className="flex items-center gap-1 rounded border border-violet-300 px-2 py-1 text-xs text-violet-800 hover:bg-violet-50 disabled:opacity-50">
-                  <Pencil size={12} /> {tp('edit')}
+                  <EditIcon size={12} /> {tp('edit')}
                 </button>
                 <button type="button" disabled={busy} onClick={() => void decide(p.proposal_id, index, 'reject')}
                   className="flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50">

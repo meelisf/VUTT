@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Edit2, GitMerge, Trash2, Loader2, X, Plus } from 'lucide-react';
+import { GitMerge, Trash2, Loader2, X, Plus } from 'lucide-react';
+import { EditIcon } from '../../components/icons';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 // Kaardi-CSS laeb ainult kaardiga koos, mitte igal lehel (N19-08).
 import 'leaflet/dist/leaflet.css';
@@ -542,7 +543,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
             onClick={() => setEditing(true)}
             className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700"
           >
-            <Edit2 size={13} />
+            <EditIcon size={13} />
             {t('places.edit')}
           </button>
           <button

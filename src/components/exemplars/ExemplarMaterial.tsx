@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Columns2 } from 'lucide-react';
+import { CompareIcon } from '../icons';
 import ExemplarImageEditor from './ExemplarImageEditor';
 import AdaImportDialog from './AdaImportDialog';
 import type { ExemplarManifest } from '../../services/exemplarImagesService';
@@ -111,7 +111,7 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
           {canCompare && (
             <button type="button" onClick={() => onCompare(hasImages ? images!.key : pages.key, 0)}
               className={`ml-auto ${btn} inline-flex items-center gap-1`}>
-              <Columns2 size={13} />{t('exemplarPage.compare')}
+              <CompareIcon size={13} />{t('exemplarPage.compare')}
             </button>
           )}
         </div>

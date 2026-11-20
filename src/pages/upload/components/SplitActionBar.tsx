@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Columns2, Undo2, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { SplitIcon, UndoIcon } from '../../../components/icons';
 import FloatingActionBar from '../../../components/pagePrep/FloatingActionBar';
 import RotateButtons from '../../../components/pagePrep/RotateButtons';
 
@@ -46,7 +47,7 @@ const SplitActionBar: React.FC<SplitActionBarProps> = (props) => {
           {/* Poolitusrühm */}
           <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
             <button type="button" onClick={props.onSplit} className={btn}>
-              <Columns2 size={14} />{t('step3split.bar.split')}
+              <SplitIcon size={14} />{t('step3split.bar.split')}
             </button>
             <button type="button" onClick={props.onNoSplit} className={btn}>
               {t('step3split.bar.noSplit')}
@@ -60,7 +61,7 @@ const SplitActionBar: React.FC<SplitActionBarProps> = (props) => {
               <X size={14} />{t('step3split.bar.exclude')}
             </button>
             <button type="button" onClick={props.onInclude} className={btn}>
-              <Undo2 size={14} />{t('step3split.bar.include')}
+              <UndoIcon size={14} />{t('step3split.bar.include')}
             </button>
           </div>
 

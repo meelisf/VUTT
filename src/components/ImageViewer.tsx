@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid, Scissors } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid } from 'lucide-react';
+import { PageEditorIcon } from './icons';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { panOffsetForTop } from '../utils/imageViewerGeometry';
 import { imageFadeStyle, FADE_OUT_MS } from '../utils/imageFadeTransition';
@@ -370,7 +371,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
               className="p-2 text-white hover:bg-white/20 rounded transition-colors"
               title={t('imageViewer.managePage')}
             >
-              <Scissors size={20} />
+              <PageEditorIcon size={20} />
             </button>
           )}
           <div className="w-px bg-white/20 mx-1"></div>

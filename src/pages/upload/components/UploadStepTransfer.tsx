@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, FileUp, Info, Loader2, RotateCcw } from 'lucide-react';
+import { AlertTriangle, FileUp, Info, Loader2, RefreshCw } from 'lucide-react';
 import ProgressBar from '../../../components/ProgressBar';
 import type { PartialUpload } from '../types';
 
@@ -240,7 +240,7 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
         )}
         {resumePartial && resumePartial.total > 0 && (
           <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
-            <RotateCcw size={16} className="shrink-0 mt-0.5" />
+            <RefreshCw size={16} className="shrink-0 mt-0.5" />
             <span>
               {t('step2.resumePartial', {
                 name: resumePartial.name ?? '',

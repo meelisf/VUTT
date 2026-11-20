@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookDown, BookOpen, Bookmark, Download, ExternalLink, FileSliders, FolderOpen, IdCard, StickyNote, User } from 'lucide-react';
+import { BookDown, BookOpen, Bookmark, Download, ExternalLink, FolderOpen, IdCard, User } from 'lucide-react';
+import { EditIcon, NotesIcon } from '../icons';
 import DownloadModal from '../DownloadModal';
 import RelatedWorksBlock from '../relations/RelatedWorksBlock';
 import SameVolumeBlock from '../convolutes/SameVolumeBlock';
@@ -370,7 +371,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
             {work.notes && (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                  <StickyNote size={12} />
+                  <NotesIcon size={12} />
                   {t('metadata.notes', 'Märkused')}
                 </span>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{work.notes}</p>
@@ -411,7 +412,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                   className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-800 hover:underline"
                   title={t('info.editWorkMetadata')}
                 >
-                  <FileSliders size={16} />
+                  <EditIcon size={16} />
                   {t('metadata.editMetadata')}
                 </button>
               )}

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAdminImageTicket } from '../../hooks/useAdminImageTicket';
 import { useTranslation } from 'react-i18next';
-import { Crop, Check, Loader2, FileCheck2, AlertCircle, Columns2, RotateCw, SquarePen } from 'lucide-react';
+import { Check, Loader2, FileCheck2, AlertCircle } from 'lucide-react';
+import { CropIcon, PageEditorIcon, RotateRightIcon, SplitIcon } from '../../components/icons';
 import PageThumbnail from '../../components/PageThumbnail';
 import { useUser } from '../../contexts/UserContext';
 import { ReocrState } from '../../utils/reocrStatus';
@@ -146,9 +147,9 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
             data-testid="pending-op-badge"
             className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-1 py-0.5 rounded text-[10px] leading-none bg-amber-100 text-amber-800 border border-amber-300 shadow-sm"
           >
-            {op.rotate !== 0 && (<><RotateCw size={11} />{op.rotate}°</>)}
-            {op.adjust && (<><Crop size={11} />{t('manage.pageOps.badgeCrop')}</>)}
-            {op.split && (<><Columns2 size={11} />{t('manage.pageOps.badgeSplit')}</>)}
+            {op.rotate !== 0 && (<><RotateRightIcon size={11} />{op.rotate}°</>)}
+            {op.adjust && (<><CropIcon size={11} />{t('manage.pageOps.badgeCrop')}</>)}
+            {op.split && (<><SplitIcon size={11} />{t('manage.pageOps.badgeSplit')}</>)}
           </span>
         )}
         {/* Nähtav number — all vasakul */}
@@ -165,7 +166,7 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
             title={t('manage.editor.openEditor')}
             aria-label={t('manage.editor.openEditor')}
           >
-            <SquarePen size={14} />
+            <PageEditorIcon size={14} />
           </button>
         </div>
       </div>

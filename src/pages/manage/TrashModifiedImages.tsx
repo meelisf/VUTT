@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ImageToken } from '../../utils/imageTokenUrl';
-import { Loader2, RotateCcw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { RestoreIcon } from '../../components/icons';
 import type { ModifiedImage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
 import { parseServerDate } from '../../utils/formatDateTime';
@@ -95,7 +96,7 @@ const TrashModifiedImages: React.FC<Props> = ({
               {restoringOriginal === i.filename ? (
                 <><Loader2 size={13} className="animate-spin" />{t('manage.trash.restoring')}</>
               ) : (
-                <><RotateCcw size={13} />{t('manage.trash.restoreOriginal')}</>
+                <><RestoreIcon size={13} />{t('manage.trash.restoreOriginal')}</>
               )}
             </button>
           </div>

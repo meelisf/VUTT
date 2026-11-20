@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Crop, Frame, CircleX, CopyPlus } from 'lucide-react';
+import { CircleX, CopyPlus } from 'lucide-react';
+import { CropIcon, PerspectiveIcon } from '../icons';
 import RotateButtons from './RotateButtons';
 import type { CropBoxState } from './useCropBox';
 
@@ -25,8 +26,8 @@ const toolBtn = 'flex w-full justify-center rounded border border-gray-300 bg-wh
 const EditToolbar: React.FC<Props> = ({ crop, onRotate, testIdPrefix }) => {
   const { t } = useTranslation('common');
   const tools = [
-    { id: 'crop', active: !crop.perspective, label: t('pagePrep.cropTool'), icon: <Crop size={16} /> },
-    { id: 'perspective', active: crop.perspective, label: t('pagePrep.perspective'), icon: <Frame size={16} /> },
+    { id: 'crop', active: !crop.perspective, label: t('pagePrep.cropTool'), icon: <CropIcon size={16} /> },
+    { id: 'perspective', active: crop.perspective, label: t('pagePrep.perspective'), icon: <PerspectiveIcon size={16} /> },
   ];
   return (
     <div data-testid={`${testIdPrefix}-toolbar`} role="toolbar" aria-orientation="vertical"

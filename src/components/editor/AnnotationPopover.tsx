@@ -1,4 +1,5 @@
-import { Pencil, Trash2, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
+import { EditIcon } from '../icons';
 import { useTranslation } from 'react-i18next';
 import type { TextAnnotation } from '../../types';
 
@@ -127,7 +128,7 @@ export default function AnnotationPopover({
                   ) : (
                     <>
                       <button type="button" onClick={() => { onEditingChange(true); onEditTextChange(annotation.comment); }} className="text-gray-300 hover:text-primary-500 transition-colors" title={t('info.editComment')}>
-                        <Pencil size={13} />
+                        <EditIcon size={13} />
                       </button>
                       <button type="button" onClick={() => onPendingDeleteChange(true)} className="text-gray-300 hover:text-red-500 transition-colors" title={t('info.deleteComment')}>
                         <Trash2 size={13} />

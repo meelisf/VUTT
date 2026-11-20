@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Edit3, SquarePen, Trash2, X } from 'lucide-react';
+import { Check, Trash2, X } from 'lucide-react';
+import { EditIcon, TextAnnotationIcon } from '../icons';
 import type { TextAnnotation } from '../../types';
 import { extractHighlightedText } from '../../utils/annUtils';
 import { parseServerDate } from '../../utils/formatDateTime';
@@ -29,7 +30,7 @@ const TextAnnotationsPanel: React.FC<TextAnnotationsPanelProps> = ({
   return (
     <div className="bg-white p-5 rounded-lg border border-yellow-200 shadow-sm mb-6">
       <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-        <SquarePen size={16} className="text-yellow-500" />
+        <TextAnnotationIcon size={16} className="text-yellow-500" />
         <h4 className="font-bold">{t('annotations.textAnnotations', 'Tekst-annotatsioonid')}</h4>
       </div>
       <div className="space-y-3">
@@ -98,7 +99,7 @@ const TextAnnotationsPanel: React.FC<TextAnnotationsPanelProps> = ({
                         className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
                         title={t('info.editComment')}
                       >
-                        <Edit3 size={14} />
+                        <EditIcon size={14} />
                       </button>
                       <button
                         type="button"

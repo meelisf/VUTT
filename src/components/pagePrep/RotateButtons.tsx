@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlipVertical2, RotateCcw, RotateCw } from 'lucide-react';
+import { FlipVertical2 } from 'lucide-react';
+import { RotateLeftIcon, RotateRightIcon } from '../icons';
 
 interface Props {
   /** Pöörde muut kraadides, päripäeva: -90 | 90 | 180. */
@@ -23,11 +24,11 @@ const RotateButtons: React.FC<Props> = ({ onRotate, buttonClassName, iconSize, t
     <>
       <button type="button" data-testid={tid('left')} onClick={() => onRotate(-90)}
         title={t('pagePrep.rotateLeft')} className={buttonClassName}>
-        <RotateCcw size={iconSize} />
+        <RotateLeftIcon size={iconSize} />
       </button>
       <button type="button" data-testid={tid('right')} onClick={() => onRotate(90)}
         title={t('pagePrep.rotateRight')} className={buttonClassName}>
-        <RotateCw size={iconSize} />
+        <RotateRightIcon size={iconSize} />
       </button>
       <button type="button" data-testid={tid('180')} onClick={() => onRotate(180)}
         title={t('pagePrep.rotate180')} className={buttonClassName}>

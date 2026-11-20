@@ -5,20 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getWritableCollectionOptions } from '../../services/collectionService';
 import { resolveApproveScope } from './approveScope';
-import {
-  UserPlus,
-  Check,
-  X,
-  Loader2,
-  Copy,
-  CheckCircle,
-  Clock,
-  Building,
-  Mail,
-  MessageSquare,
-  FolderTree,
-  ChevronLeft
-} from 'lucide-react';
+import { UserPlus, Check, X, Loader2, Copy, CheckCircle, Clock, Building, Mail, FolderTree, ChevronLeft } from 'lucide-react';
+import { CommentIcon } from '../../components/icons';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { apiPost } from '../../services/apiClient';
@@ -386,7 +374,7 @@ const Registrations: React.FC = () => {
                         </div>
                         <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-start gap-2">
-                            <MessageSquare size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                            <CommentIcon size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
                             <p className="text-sm text-gray-700">{reg.motivation}</p>
                           </div>
                         </div>

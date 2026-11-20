@@ -540,6 +540,11 @@ päringuga korduv viga kliendivead ringist välja. Executor-tööde erindid siia
 Kliendivigadel sama server-poolne aken (teade + esimene stack-rida, 5 min): kliendi
 dedupe on lehesessioonipõhine ja hajutatud robot (2026-11-09: 233 IP-d) pühkis ringi tühjaks.
 
+**Ikoonid (ADR 0086)** — tähendusega ikoon (muuda, märkus, annotatsioon, marginaalia, redaktor,
+kärbe, poolitus, pööre, taaste …) tuleb `src/components/icons.ts`-ist semantilise nimega, MITTE otse
+`lucide-react`-ist; `SquarePen`/`Pen`/`PenLine` on keelatud. Uus mõiste → `icons.ts` + ADR tabel +
+valvuri `VOCABULARY` (`iconVocabularyGuard.test.ts`).
+
 **z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
 (nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob
 väikesel ekraanil ära. Tegevusribad (`PageActionBar`, `DashboardBulkActionBar`) on `z-[1100]`

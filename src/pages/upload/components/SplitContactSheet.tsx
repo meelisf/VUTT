@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
-import { Check, Columns2, Crop, Loader2, RotateCw, SquarePen, X } from 'lucide-react';
+import { Check, Loader2, X } from 'lucide-react';
+import { CropIcon, PageEditorIcon, RotateRightIcon, SplitIcon } from '../../../components/icons';
 import { prepressPreviewUrl } from '../uploadApi';
 import { isPreviewReady, willSplit } from '../prepressPlan';
 import { cardLineLeftPercent } from '../../../components/pagePrep/geometry';
@@ -161,9 +162,9 @@ const SplitContactSheet: React.FC<Props> = ({
               ) : pending && (
                 <span data-testid={`pending-${page.n}`} title={t('step3split.card.pendingTitle')}
                   className="absolute right-1 top-1 z-10 flex items-center gap-1 rounded border border-amber-300 bg-amber-100 px-1 py-0.5 text-[10px] leading-none text-amber-800 shadow-sm">
-                  {pRotate && (<><RotateCw size={11} />{page.rotate}°</>)}
-                  {pCrop && (<><Crop size={11} />{t('step3split.card.badgeCrop')}</>)}
-                  {splits && (<><Columns2 size={11} />{t('step3split.card.badgeSplit')}</>)}
+                  {pRotate && (<><RotateRightIcon size={11} />{page.rotate}°</>)}
+                  {pCrop && (<><CropIcon size={11} />{t('step3split.card.badgeCrop')}</>)}
+                  {splits && (<><SplitIcon size={11} />{t('step3split.card.badgeSplit')}</>)}
                 </span>
               )}
 
@@ -193,7 +194,7 @@ const SplitContactSheet: React.FC<Props> = ({
                   title={page.mode === 'nosplit' ? t('step3split.card.split') : t('step3split.card.noSplit')}
                   className={cornerBtn(page.mode === 'nosplit')}
                 >
-                  <Columns2 size={14} />
+                  <SplitIcon size={14} />
                 </button>
                 <button
                   type="button"
@@ -204,7 +205,7 @@ const SplitContactSheet: React.FC<Props> = ({
                   className={`${cornerBtn(false)} disabled:opacity-40`}
                 >
                   {/* Sama ikoon ja tekst mis teose halduse kaardil (ADR 0085): üks redaktor. */}
-                  <SquarePen size={14} />
+                  <PageEditorIcon size={14} />
                 </button>
               </div>
             </div>

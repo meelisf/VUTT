@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, RotateCcw, Loader2 } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
+import { ResetIcon } from '../icons';
 import { apiGet, apiPost } from '../../services/apiClient';
 import { FILE_API_URL } from '../../config';
 
@@ -146,7 +147,7 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
               disabled={isSaving}
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
             >
-              <RotateCcw size={11} />
+              <ResetIcon size={11} />
               {t('editor.resetChars', 'Lähtesta vaikimisi')}
             </button>
           )}

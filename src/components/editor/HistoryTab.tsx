@@ -2,24 +2,8 @@ import React, { useState } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import {
-  History,
-  RotateCcw,
-  Shield,
-  User,
-  Loader2,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  Minus,
-  Clock,
-  Wrench,
-  Wand2,
-  Copy,
-  Check,
-  Link,
-  Sparkles
-} from 'lucide-react';
+import { History, Shield, User, Loader2, ChevronDown, ChevronRight, Plus, Minus, Clock, Wrench, Wand2, Copy, Check, Link, Sparkles } from 'lucide-react';
+import { RestoreIcon } from '../icons';
 import { Annotation, Page, Work } from '../../types';
 import { isCollectionRestricted, type Collections } from '../../services/collectionService';
 import { FILE_API_URL } from '../../config';
@@ -467,7 +451,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                           {isRestoring ? (
                             <Loader2 size={12} className="animate-spin" />
                           ) : (
-                            <RotateCcw size={12} />
+                            <RestoreIcon size={12} />
                           )}
                         </button>
                       )}
