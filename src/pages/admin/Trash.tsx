@@ -2,14 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Loader2,
-  Trash2,
-  RefreshCw,
-  RotateCcw,
-  Image,
-  ChevronLeft
-} from 'lucide-react';
+import { Loader2, Trash2, RefreshCw, Image, ChevronLeft } from 'lucide-react';
+import { RestoreIcon } from '../../components/icons';
 import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
@@ -194,7 +188,7 @@ const Trash: React.FC = () => {
                         >
                           {restoringId === item.work_id
                             ? <><Loader2 size={12} className="animate-spin" />{t('trash.restoring')}</>
-                            : <><RotateCcw size={12} />{t('trash.restore')}</>
+                            : <><RestoreIcon size={12} />{t('trash.restore')}</>
                           }
                         </button>
                       </td>

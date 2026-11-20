@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Trash2, Edit2, X, ChevronRight } from 'lucide-react';
+import { Loader2, Trash2, X, ChevronRight } from 'lucide-react';
+import { EditIcon } from '../../components/icons';
 import { putGroup, deleteGroup, autoAssignGroupParents } from '../../prosopography/services/prosopographyService';
 
 interface GroupEntry {
@@ -244,7 +245,7 @@ const PlacesGroupPanel: React.FC<PlacesGroupPanelProps> = ({
                   onClick={() => isEditing ? setEditKey(null) : startEdit(key)}
                   className="text-gray-400 hover:text-primary-600"
                 >
-                  <Edit2 size={13} />
+                  <EditIcon size={13} />
                 </button>
                 <button
                   onClick={() => handleDelete(key)}

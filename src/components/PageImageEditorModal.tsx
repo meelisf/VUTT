@@ -3,7 +3,8 @@
 // (vt CLAUDE.md „Kaks pildiredaktorit“).
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
-import { X, Columns2, Loader2, AlertTriangle, ChevronRight, Check, Upload, Undo2, MoreHorizontal, Eye, EyeOff } from 'lucide-react';
+import { X, Loader2, AlertTriangle, ChevronRight, Check, Upload, MoreHorizontal, Eye, EyeOff } from 'lucide-react';
+import { SplitIcon, UndoIcon } from './icons';
 import { useTranslation } from 'react-i18next';
 import { IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -429,7 +430,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                   <button role="menuitem" data-testid="editor-restore"
                     onClick={() => { setMenuOpen(false); setShowReplace(false); setShowRestoreConfirm(true); }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">
-                    <Undo2 size={14} />{t('manage.editor.restoreOriginal')}
+                    <UndoIcon size={14} />{t('manage.editor.restoreOriginal')}
                   </button>
                 </div>
               </>
@@ -592,7 +593,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                     willSplit ? 'border-gray-300 hover:bg-gray-100' : 'border-gray-900 bg-gray-900 font-medium text-white'
                   }`}
                 >
-                  <Columns2 size={15} />
+                  <SplitIcon size={15} />
                   {willSplit ? t('manage.pageOps.noSplit') : t('manage.pageOps.split')}
                 </button>
                 {willSplit && pendingOp?.split_x != null && (

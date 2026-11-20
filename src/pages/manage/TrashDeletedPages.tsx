@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ImageToken } from '../../utils/imageTokenUrl';
-import { Loader2, RotateCcw, HelpCircle } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
+import { RestoreIcon } from '../../components/icons';
 import type { DeletedWorkPage } from '../../services/workApi';
 import { historyThumbUrl } from './trashGrouping';
 import { parseServerDate } from '../../utils/formatDateTime';
@@ -67,7 +68,7 @@ const TrashDeletedPages: React.FC<Props> = ({
                 {restoringPage === p.filename ? (
                   <><Loader2 size={13} className="animate-spin" />{t('manage.trash.restoring')}</>
                 ) : (
-                  <><RotateCcw size={13} />{t('manage.trash.restore')}</>
+                  <><RestoreIcon size={13} />{t('manage.trash.restore')}</>
                 )}
               </button>
             )}

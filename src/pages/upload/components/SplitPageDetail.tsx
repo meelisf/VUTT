@@ -4,7 +4,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ImageToken } from '../../../utils/imageTokenUrl';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronRight, Check, Columns2, Eye, EyeOff, Undo2 } from 'lucide-react';
+import { X, ChevronRight, Check, Eye, EyeOff } from 'lucide-react';
+import { SplitIcon, UndoIcon } from '../../../components/icons';
 import type { PageAdjust } from '../types';
 import { prepressPreviewUrl } from '../uploadApi';
 import { adjustFromParams, isPreviewReady, willSplit, withRotation } from '../prepressPlan';
@@ -268,7 +269,7 @@ const SplitPageDetail: React.FC<Props> = ({
             }`}
             onClick={() => onPageChange(pageNum, { excluded: !excluded })}
           >
-            {excluded ? <Undo2 size={15} /> : <X size={15} />}
+            {excluded ? <UndoIcon size={15} /> : <X size={15} />}
             {excluded ? t('step3split.card.include') : t('step3split.card.exclude')}
           </button>
           <button
@@ -386,7 +387,7 @@ const SplitPageDetail: React.FC<Props> = ({
                   } ${excluded ? 'opacity-50' : ''}`}
                   onClick={() => onPageChange(pageNum, { mode: noSplitMode ? 'default' : 'nosplit', split_x: null })}
                 >
-                  <Columns2 size={15} />
+                  <SplitIcon size={15} />
                   {noSplitMode ? t('step3split.card.split') : t('step3split.card.noSplit')}
                 </button>
                 {page.mode === 'custom' && (

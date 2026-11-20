@@ -6,10 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { formatLifeDate, formatFloruit } from '../utils/personDates';
 import MarkdownView from '../../components/MarkdownView';
 import BiographyBlocks from '../components/BiographyBlocks';
-import {
-  ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
-  BookOpen, User, Users, StickyNote, Map, History, RotateCcw, Lock,
-} from 'lucide-react';
+import { ArrowLeft, ExternalLink, ChevronDown, ChevronRight, BookOpen, User, Users, Map, History, Lock } from 'lucide-react';
+import { EditIcon, NotesIcon, RestoreIcon } from '../../components/icons';
 import { isQCode } from '../../utils/qcodeUtils';
 import { formatYearDisplay, parseYearDisplayRange } from '../../utils/yearDisplayUtils';
 import Header from '../../components/Header';
@@ -635,7 +633,7 @@ const PersonDetailPage: React.FC = () => {
                     state={{ from: backTo }}
                     className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
                   >
-                    <Edit3 size={12} />
+                    <EditIcon size={12} />
                     {t('edit', 'Muuda')}
                   </Link>
                 )}
@@ -946,7 +944,7 @@ const PersonDetailPage: React.FC = () => {
         {/* ── Märkmed ── */}
         {person.notes && (
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-            <CardHeader icon={<StickyNote size={18} />} title={t('notes', 'Märkmed')} />
+            <CardHeader icon={<NotesIcon size={18} />} title={t('notes', 'Märkmed')} />
             <MarkdownView content={person.notes} className="text-sm text-gray-700" />
           </div>
         )}
@@ -1009,7 +1007,7 @@ const PersonDetailPage: React.FC = () => {
                           className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
                           title={t('historyPanel.restoreTitle')}
                         >
-                          <RotateCcw size={12} />
+                          <RestoreIcon size={12} />
                           {t('common:buttons.restore')}
                         </button>
                       )}

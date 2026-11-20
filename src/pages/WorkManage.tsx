@@ -4,16 +4,7 @@ import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { parseFocusParam, buildBackToEditorPath } from '../utils/manageDeeplink';
-import {
-  ArrowLeft,
-  Plus,
-  Loader2,
-  Wrench,
-  AlertTriangle,
-  RotateCcw,
-  Upload,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Wrench, AlertTriangle, Upload, RefreshCw } from 'lucide-react';
 import Header from '../components/Header';
 import ConfirmModal from '../components/ConfirmModal';
 import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
@@ -1478,7 +1469,7 @@ const WorkManage: React.FC = () => {
                 disabled={trashLoading}
                 className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 rounded text-gray-600 flex items-center gap-1"
               >
-                {trashLoading ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                {trashLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                 {t('manage.trash.load')}
               </button>
             </div>

@@ -6,7 +6,8 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, Columns2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { CompareIcon } from '../icons';
 import ImageViewer from '../ImageViewer';
 import CopyLinkButton from './CopyLinkButton';
 import type { Sequence } from './exemplarSequences';
@@ -73,7 +74,7 @@ const ExemplarImageModal: React.FC<ExemplarImageModalProps> = ({
             {onCompare && (
               <button type="button" onClick={onCompare}
                 className="text-sm px-3 py-1.5 rounded border border-gray-300 bg-white hover:bg-gray-50 inline-flex items-center gap-1">
-                <Columns2 size={14} />{t('exemplarPage.compare')}
+                <CompareIcon size={14} />{t('exemplarPage.compare')}
               </button>
             )}
             <button type="button" onClick={onClose} aria-label={t('common:buttons.close')} title={t('common:buttons.close')}

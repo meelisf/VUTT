@@ -15,7 +15,8 @@
  */
 import React, { useEffect, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { EditIcon } from '../icons';
 import { REPRODUCTION_KINDS } from '../../types';
 import type { Exemplar } from '../../types';
 import {
@@ -359,7 +360,7 @@ const ExemplarList: React.FC<ExemplarListProps> = ({
           <div className="flex flex-wrap gap-4 mt-3">
             <button type="button" onClick={() => startEdit(x)} disabled={busy || editorOpen}
               className={`${actionLink} inline-flex items-center gap-1`}>
-              <Pencil size={12} />{t('exemplars.edit')}
+              <EditIcon size={12} />{t('exemplars.edit')}
             </button>
             <button type="button" onClick={() => void toggleWitness(x)} disabled={busy || editorOpen} className={actionLink}>
               {x.text_witness ? t('exemplars.unmarkWitness') : t('exemplars.markWitness')}

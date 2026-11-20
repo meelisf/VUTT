@@ -14,11 +14,8 @@ import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import PageThumbnail from '../../components/PageThumbnail';
 import { parseYearDisplayRange, formatYearDisplay } from '../../utils/yearDisplayUtils';
 import SafeHtml from '../../components/SafeHtml';
-import {
-    Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
-    ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
-    Bookmark, FolderOpen, SquarePen
-} from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, User, Calendar, Tag, Bookmark, FolderOpen } from 'lucide-react';
+import { CommentIcon, TextAnnotationIcon } from '../../components/icons';
 
 interface WorkInfo {
     title: string;
@@ -203,7 +200,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                 {(showRawComments ? hit.comments : highlightedComments)?.map((comment, idx) => (
                                     <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-gray-800">
                                         <div className="flex items-center gap-1 mb-1 font-bold text-yellow-800">
-                                            <MessageSquare size={12} />
+                                            <CommentIcon size={12} />
                                             <span>{t('results.comment', { author: comment.author })}</span>
                                         </div>
                                         {showRawComments
@@ -219,7 +216,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                 {(hasHighlightedAnnotations ? highlightedAnnotations : hit.text_annotations!).map((ann: any, idx: number) => (
                                     <div key={idx} className="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-gray-800">
                                         <div className="flex items-center gap-1 mb-1 font-bold text-amber-800">
-                                            <SquarePen size={12} />
+                                            <TextAnnotationIcon size={12} />
                                             <span>{t('results.textAnnotation', { author: ann.author })}</span>
                                         </div>
                                         {hasHighlightedAnnotations

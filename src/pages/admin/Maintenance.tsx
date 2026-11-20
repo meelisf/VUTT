@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, ChevronLeft, Wrench, Pencil, Trash2 } from 'lucide-react';
+import { RefreshCw, ChevronLeft, Wrench, Trash2 } from 'lucide-react';
+import { EditIcon } from '../../components/icons';
 import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
@@ -376,7 +377,7 @@ const Maintenance: React.FC = () => {
                                     className="text-gray-300 hover:text-gray-600 transition-colors"
                                     title={t('common:buttons.edit')}
                                   >
-                                    <Pencil size={13} />
+                                    <EditIcon size={13} />
                                   </button>
                                   <button
                                     onClick={() => setPendingDeleteId(id)}

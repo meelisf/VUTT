@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Edit3, MessageSquare, Reply, Send, Trash2, X } from 'lucide-react';
+import { Check, Reply, Send, Trash2, X } from 'lucide-react';
+import { CommentIcon, EditIcon } from '../icons';
 import type { Annotation } from '../../types';
 import { isAtLeast } from '../../utils/roleUtils';
 import MarkdownEditor from '../MarkdownEditor';
@@ -97,7 +98,7 @@ const EditablePost: React.FC<EditablePostProps> = ({
                 className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
                 title={labels.edit}
               >
-                <Edit3 size={14} />
+                <EditIcon size={14} />
               </button>
               <button
                 onClick={onDelete}
@@ -288,7 +289,7 @@ const PageCommentsPanel: React.FC<PageCommentsPanelProps> = ({
   return (
     <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex-1 flex flex-col">
       <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-        <MessageSquare size={18} className="text-primary-600" />
+        <CommentIcon size={18} className="text-primary-600" />
         <h4 className="font-bold">{t('workspace:info.pageAnnotations')}</h4>
       </div>
 

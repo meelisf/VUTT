@@ -3,7 +3,8 @@ import { datingError, WorkDating } from '../utils/workDating';
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Edit3, X, Save, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
+import { X, Save, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
+import { EditIcon } from './icons';
 import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { Creator, Page, Work, ArchiveRef, PageNumbering } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
@@ -509,7 +510,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           onMouseDown={drag.onHandleMouseDown}
         >
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Edit3 size={18} className="text-amber-600" />
+            <EditIcon size={18} className="text-amber-600" />
             {t('metadata.title')}
           </h3>
           <button onClick={requestClose} className="text-gray-400 hover:text-gray-600" aria-label={t('common:buttons.close')}>

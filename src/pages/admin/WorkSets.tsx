@@ -8,7 +8,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Loader2, Plus, Users, Archive, RotateCcw, Globe, Lock, Trash2, ChevronDown, ChevronRight, X, Pencil } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, Users, Archive, Globe, Lock, Trash2, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { EditIcon, RestoreIcon } from '../../components/icons';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -357,7 +358,7 @@ const WorkSets: React.FC = () => {
                             aria-label={t('workSets.rename')}
                             title={t('workSets.rename')}
                           >
-                            <Pencil size={13} />
+                            <EditIcon size={13} />
                           </button>
                         )}
                         {ws.visibility === 'public'
@@ -399,7 +400,7 @@ const WorkSets: React.FC = () => {
                           disabled={busyId === ws.id}
                           className="inline-flex items-center gap-1 text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                         >
-                          {arhiveeritud ? <RotateCcw size={13} /> : <Archive size={13} />}
+                          {arhiveeritud ? <RestoreIcon size={13} /> : <Archive size={13} />}
                           {arhiveeritud ? t('workSets.restore') : t('workSets.archive')}
                         </button>
                         {isAdmin && (

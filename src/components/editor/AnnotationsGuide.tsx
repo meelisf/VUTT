@@ -8,9 +8,8 @@
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Bookmark, ListOrdered, MessageSquare, MessageSquarePlus, SquarePen, Tag, Tags, type LucideIcon,
-} from 'lucide-react';
+import { Bookmark, ListOrdered, Tag, Tags, type LucideIcon } from 'lucide-react';
+import { AddCommentIcon, CommentIcon, TextAnnotationIcon } from '../icons';
 
 export type GuideKey = 'toc' | 'workSets' | 'workTags' | 'pageTags' | 'textAnnotations' | 'pageNotes' | 'addNote';
 export type GuideCounts = Partial<Record<Exclude<GuideKey, 'addNote'>, number>>;
@@ -27,9 +26,9 @@ const ITEMS: { key: Exclude<GuideKey, 'addNote'>; icon: LucideIcon; tone: string
   { key: 'toc', icon: ListOrdered, tone: 'text-primary-600' },
   { key: 'workSets', icon: Bookmark, tone: 'text-violet-600' },
   { key: 'workTags', icon: Tags, tone: 'text-green-600' },
-  { key: 'textAnnotations', icon: SquarePen, tone: 'text-yellow-600' },
+  { key: 'textAnnotations', icon: TextAnnotationIcon, tone: 'text-yellow-600' },
   { key: 'pageTags', icon: Tag, tone: 'text-primary-600' },
-  { key: 'pageNotes', icon: MessageSquare, tone: 'text-amber-700' },
+  { key: 'pageNotes', icon: CommentIcon, tone: 'text-amber-700' },
 ];
 
 const base = 'inline-flex items-center gap-1.5 text-xs rounded-full border px-2.5 py-0.5 transition-colors';
@@ -63,7 +62,7 @@ const AnnotationsGuide: React.FC<Props> = ({ counts, canAddNote, onJump }) => {
       {addNote && (
         <button type="button" data-guide="addNote" onClick={() => onJump('addNote')}
           className={`${calm} border-dashed text-gray-500`}>
-          <MessageSquarePlus size={12} aria-hidden />
+          <AddCommentIcon size={12} aria-hidden />
           {label.addNote}
         </button>
       )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpDown, Check, Columns2, RefreshCw, Trash2, X, Loader2, Sparkles } from 'lucide-react';
+import { ArrowUpDown, Check, RefreshCw, Trash2, X, Loader2, Sparkles } from 'lucide-react';
+import { SplitIcon } from '../../components/icons';
 import FloatingActionBar from '../../components/pagePrep/FloatingActionBar';
 import RotateButtons from '../../components/pagePrep/RotateButtons';
 import ProgressBar from '../../components/ProgressBar';
@@ -150,7 +151,7 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
           <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center gap-x-3 gap-y-2">
             {props.pageOpsCount > 0 && (<>
             <span className="flex items-center gap-1.5 text-sm font-medium text-amber-800">
-              <Columns2 size={15} />
+              <SplitIcon size={15} />
               {t('manage.pageOps.summary', { count: props.pageOpsCount })}
             </span>
             <label className="flex items-center gap-1 text-sm text-gray-700">
@@ -225,7 +226,7 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
               title={props.pageOpsDisabled ? t('manage.pageOps.blocked') : undefined}>
               <button onClick={props.onSplitSelected} disabled={props.pageOpsDisabled}
                 data-testid="page-ops-split" className={opBtn}>
-                <Columns2 size={14} />{t('manage.pageOps.split')}
+                <SplitIcon size={14} />{t('manage.pageOps.split')}
               </button>
               <button onClick={props.onNoSplitSelected} disabled={props.pageOpsDisabled}
                 className={opBtn}>

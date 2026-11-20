@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Columns2, Crop, RotateCw, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { CropIcon, RotateRightIcon, SplitIcon } from '../icons';
 import type { PageAdjust } from '../../pages/upload/types';
 
 interface Props {
@@ -56,17 +57,17 @@ const PendingGroup: React.FC<Props> = ({
     <div data-testid={`${testIdPrefix}-edit-pending`} className="flex min-w-0 flex-nowrap items-center gap-1.5">
       <span className="flex-shrink-0 whitespace-nowrap text-xs text-gray-500">{t('pagePrep.thisPage')}</span>
       {rotate !== 0 && (
-        <Chip icon={<RotateCw size={12} />} label={t('pagePrep.rotatePending', { deg: rotate })}
+        <Chip icon={<RotateRightIcon size={12} />} label={t('pagePrep.rotatePending', { deg: rotate })}
           removeLabel={t('pagePrep.rotateRemove')} onRemove={onRotateClear}
           removeTestId={`${testIdPrefix}-rotate-remove`} />
       )}
       {adjust && (
-        <Chip icon={<Crop size={12} />} label={adjustLabel(adjust, t as never)}
+        <Chip icon={<CropIcon size={12} />} label={adjustLabel(adjust, t as never)}
           removeLabel={t('pagePrep.cropRemove')} onRemove={onAdjustClear}
           removeTestId={`${testIdPrefix}-crop-remove`} />
       )}
       {splitPercent != null && (
-        <Chip icon={<Columns2 size={12} />} label={t('pagePrep.splitAt', { percent: splitPercent })}
+        <Chip icon={<SplitIcon size={12} />} label={t('pagePrep.splitAt', { percent: splitPercent })}
           removeLabel={t('pagePrep.splitRemove')} onRemove={onSplitClear}
           testId={`${testIdPrefix}-split-state`} removeTestId={`${testIdPrefix}-split-remove`} />
       )}
