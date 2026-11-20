@@ -60,6 +60,22 @@ Ikoonid imporditi igas komponendis otse `lucide-react`-ist, nii et ükski koht e
 Lehe redaktor ja kärbe jagavad ikooni teadlikult: redaktor avaneb kärbitavana ja kaardi
 ootel-märgis kannab teksti, nii et nupp ja märgis ei lähe segi.
 
+### Töölaua tööriistariba rühmad
+
+Rühmad järgivad küsimust „mida see märgendus allika kohta ütleb", vasakult paremale:
+
+| Rühm | Nupud | Miks koos |
+|---|---|---|
+| Kiri | paks, kursiiv, fraktuur | kuidas tekst põhireal välja näeb |
+| Reast väljas | lisandus (‸), ääremärkus, joonealune | tekst, mis asub mujal kui põhireal |
+| Leht | lehevahetus, lehe tähistus (#) | lehe ülesehitus |
+| Puhasta | eemaldab eelnevate rühmade märgenduse | annotatsiooni ei puuduta (`cleanMarkup: 'keep'`) |
+| Toimetaja kiht | Ann | toimetaja kommentaar, mitte allika kirjeldus |
+| Vaade (paremal, `ml-auto`) | marginaaliaveeru lüliti | vaate seadistus; ilmub ainult marginaaliaga lehel ega nihuta toimetamisnuppe |
+
+Lisandus oli varem kirja rühmas, kuigi ta on reast väljas olev tekst, ja vaate lüliti
+toimetamisnuppude järel. Uus nupp läheb rühma, mille küsimusele ta vastab.
+
 ## Tagajärjed
 
 - Uus tähendusega ikoon: lisa `icons.ts`-i, siia tabelisse ja valvuri `VOCABULARY`-sse.

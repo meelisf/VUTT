@@ -44,8 +44,9 @@ export default function EditorToolbar({
   if (readOnly) return <div className="flex items-center gap-4 overflow-x-auto no-scrollbar" />;
 
   return (
-    <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
-      <div className="flex items-center gap-1">
+    <div className="flex-1 min-w-0 flex items-center gap-4 overflow-x-auto no-scrollbar">
+      <div className="flex-1 flex items-center gap-1">
+        {/* Rühmad (ADR 0086): kiri │ reast väljas │ leht │ puhasta │ toimetaja kiht … vaade paremal. */}
         <button type="button" onClick={() => wrapWithTag('b')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={`${t('editor.tooltips.bold')} (Ctrl+B)`}>B</button>
         <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.italic')} (Ctrl+I)`}>I</button>
         {/* Lüliti pöörab alati valiku kirja; silt näitab, mida hall praegu tähendab (ADR 0077, 2a). */}
@@ -53,10 +54,11 @@ export default function EditorToolbar({
           title={`${scriptMode === 'fraktur' ? t('editor.tooltips.markAntiqua') : t('editor.tooltips.markFraktur')} · ${scriptMode === 'fraktur' ? t('editor.scriptMode.fraktur') : t('editor.scriptMode.antiqua')} (Ctrl+K)`}>
           <span className="vutt-script-minority px-0.5 rounded-sm">{scriptMode === 'fraktur' ? 'A' : '𝔉'}</span>
         </button>
-        <button type="button" onClick={() => wrapWithTag('add')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-emerald-50 font-serif border border-transparent hover:border-emerald-200 text-emerald-700" title={`${t('editor.tooltips.addition')} (Ctrl+Shift+L)`}>‸</button>
         <div className="w-px h-4 bg-gray-300 mx-1"></div>
+        <button type="button" onClick={() => wrapWithTag('add')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-emerald-50 font-serif border border-transparent hover:border-emerald-200 text-emerald-700" title={`${t('editor.tooltips.addition')} (Ctrl+Shift+L)`}>‸</button>
         <button type="button" onClick={insertMarginalia} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.marginalia')}><MarginaliaIcon size={14} />{!compactToolbar && <span>Marginalia</span>}</button>
         <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
+        <div className="w-px h-4 bg-gray-300 mx-1"></div>
         <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
         <button type="button" onClick={togglePageMarkPalette}
           className={`w-7 h-7 flex items-center justify-center rounded border ${pageMarkPaletteOpen ? 'bg-gray-100 border-gray-200 text-gray-700' : 'border-transparent hover:bg-gray-100 hover:border-gray-200 text-gray-500'}`}
@@ -76,7 +78,7 @@ export default function EditorToolbar({
           <button
             type="button"
             onClick={toggleMarginaliaMode}
-            className={`h-7 flex items-center justify-center gap-1 rounded text-[11px] border ${compactToolbar ? 'w-7' : 'px-2'} ${marginaliaUserMode === 'column' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'text-gray-600 border-transparent hover:border-gray-200 hover:bg-gray-100'}`}
+            className={`ml-auto h-7 flex items-center justify-center gap-1 rounded text-[11px] border ${compactToolbar ? 'w-7' : 'px-2'} ${marginaliaUserMode === 'column' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'text-gray-600 border-transparent hover:border-gray-200 hover:bg-gray-100'}`}
             title={marginaliaUserMode === 'column' ? t('editor.marginalia.collapse') : t('editor.marginalia.expand')}
           >
             {marginaliaUserMode === 'column' ? <MarginaliaHideIcon size={14} /> : <MarginaliaShowIcon size={14} />}{!compactToolbar && <span>{t('editor.marginalia.toggle')}</span>}
