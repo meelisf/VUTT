@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { setSessionExpiredHandler } from '../services/apiClient';
 import i18n from '../i18n';
 import { useMeilisearch } from './MeilisearchContext';
+import { useVisibleInterval } from '../hooks/useVisibleInterval';
 
 export type ResultsPage = 'works' | 'persons';
 export type ResultsView = 'cards' | 'list';
@@ -53,7 +54,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [userSettings, setUserSettings] = useState<UserSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
-  const tokenCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Tokeni verifitseerimine serverist
   const verifyToken = async (token: string): Promise<User | null | 'network-error'> => {
@@ -166,37 +166,23 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => setSessionExpiredHandler(null);
   }, [markSessionExpired]);
 
-  // Perioodiline tokeni kontroll (iga 5 min)
-  useEffect(() => {
-    // Puhasta eelmine intervall
-    if (tokenCheckRef.current) {
-      clearInterval(tokenCheckRef.current);
-      tokenCheckRef.current = null;
+  // Perioodiline tokeni kontroll (iga 5 min), ainult nähtaval vahekaardil (#854).
+  // Käivitusel kohest kutset ei tehta — `initAuth` just kontrollis; ettetoomisel
+  // kontrollitakse kohe. Taustal aegunud sessiooni püüab niikuinii iga 401
+  // (`setSessionExpiredHandler`), nii et ootamine kaotab ainult varajase teate.
+  useVisibleInterval(async () => {
+    if (!authToken) return;
+    const result = await verifyToken(authToken);
+    if (result === 'network-error') {
+      // Võrguviga — ära logi välja, proovi järgmisel korral uuesti
+      console.warn('Token check: võrguviga, jätkan sessiooni');
+      return;
     }
-
-    // Käivita ainult kui kasutaja on sisse logitud
-    if (!authToken || !user) return;
-
-    tokenCheckRef.current = setInterval(async () => {
-      const result = await verifyToken(authToken);
-      if (result === 'network-error') {
-        // Võrguviga — ära logi välja, proovi järgmisel korral uuesti
-        console.warn('Token check: võrguviga, jätkan sessiooni');
-        return;
-      }
-      if (!result) {
-        // Server kinnitas, et token on aegunud
-        markSessionExpired();
-      }
-    }, 5 * 60 * 1000); // 5 minutit
-
-    return () => {
-      if (tokenCheckRef.current) {
-        clearInterval(tokenCheckRef.current);
-        tokenCheckRef.current = null;
-      }
-    };
-  }, [authToken, user, markSessionExpired]);
+    if (!result) {
+      // Server kinnitas, et token on aegunud
+      markSessionExpired();
+    }
+  }, 5 * 60 * 1000, { enabled: !!authToken && !!user, immediate: false, restartKey: authToken });
 
   const clearSessionExpired = useCallback(() => {
     setSessionExpired(false);
