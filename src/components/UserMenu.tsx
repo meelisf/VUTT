@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { getNotifications } from '../services/notificationService';
 import { FILE_API_URL } from '../config';
 import { apiPost } from '../services/apiClient';
 import { isSentNotification } from '../utils/notificationText';
+import { useVisibleInterval } from '../hooks/useVisibleInterval';
 
 /** `tone="dark"`: tume päis (#587). */
 const UserMenu: React.FC<{ tone?: 'light' | 'dark' }> = ({ tone = 'light' }) => {
@@ -26,52 +27,42 @@ const UserMenu: React.FC<{ tone?: 'light' | 'dark' }> = ({ tone = 'light' }) => 
     return () => window.removeEventListener('vutt:notifications-changed', handler);
   }, []);
 
-  useEffect(() => {
-    if (!user || !authToken) return;
+  // Vastus, mis jõuab kohale pärast väljalogimist / kasutajavahetust / unmount'i,
+  // ei tohi olekut kirjutada: võrdleme kutse aegset tokenit hetke omaga.
+  const tokenRef = useRef(authToken);
+  tokenRef.current = authToken;
+  useEffect(() => () => { tokenRef.current = null; }, []);
 
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const items = await getNotifications(authToken);
-        if (!cancelled) setNotifications(items);
-      } catch {
-        if (!cancelled) setNotifications([]);
-      }
-    };
+  const isAdmin = !!user && isAtLeast(user.role, 'admin');
 
-    load();
-    const id = window.setInterval(load, 60000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [user, authToken, refreshTick]);
-
-  useEffect(() => {
-    if (!user || !isAtLeast(user.role, 'admin') || !authToken) {
-      setPendingRegistrationCount(0);
-      return;
+  // Küsitlus ainult nähtaval vahekaardil, ettetoomisel kohe (#854).
+  useVisibleInterval(async () => {
+    const token = authToken;
+    if (!token) return;
+    try {
+      const items = await getNotifications(token);
+      if (tokenRef.current === token) setNotifications(items);
+    } catch {
+      if (tokenRef.current === token) setNotifications([]);
     }
+  }, 60000, { enabled: !!user && !!authToken, restartKey: `${authToken}|${refreshTick}` });
 
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const data = await apiPost<any>(`${FILE_API_URL}/admin/registrations`, {}, { token: authToken, timeout: 5000 });
-        const registrations = Array.isArray(data?.registrations) ? data.registrations : [];
-        const pendingCount = registrations.filter((item: { status?: string }) => item.status === 'pending').length;
-        if (!cancelled) setPendingRegistrationCount(pendingCount);
-      } catch {
-        if (!cancelled) setPendingRegistrationCount(0);
-      }
-    };
+  useEffect(() => {
+    if (!isAdmin || !authToken) setPendingRegistrationCount(0);
+  }, [isAdmin, authToken]);
 
-    load();
-    const id = window.setInterval(load, 60000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [user, authToken]);
+  useVisibleInterval(async () => {
+    const token = authToken;
+    if (!token) return;
+    try {
+      const data = await apiPost<any>(`${FILE_API_URL}/admin/registrations`, {}, { token, timeout: 5000 });
+      const registrations = Array.isArray(data?.registrations) ? data.registrations : [];
+      const pendingCount = registrations.filter((item: { status?: string }) => item.status === 'pending').length;
+      if (tokenRef.current === token) setPendingRegistrationCount(pendingCount);
+    } catch {
+      if (tokenRef.current === token) setPendingRegistrationCount(0);
+    }
+  }, 60000, { enabled: isAdmin && !!authToken, restartKey: authToken });
 
   if (!user) return null;
 
