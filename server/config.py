@@ -144,6 +144,9 @@ BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 _STATE_DIR = os.getenv("VUTT_STATE_DIR") or os.path.join(_PROJECT_ROOT, "state")
 STATE_DIR = _STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
 USERS_FILE = os.path.join(_STATE_DIR, "users.json")
+# Kasutusstatistika päevakokkuvõtted (#855). Kirjutab HOSTI cron (`scripts/usage_stats.py`,
+# ei impordi server-it — tee arvutatakse seal sama reegliga), backend ainult loeb.
+USAGE_STATS_FILE = os.path.join(_STATE_DIR, "usage_stats.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
 RESET_TOKENS_FILE = os.path.join(_STATE_DIR, "reset_tokens.json")

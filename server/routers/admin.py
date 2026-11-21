@@ -73,6 +73,15 @@ def _render_and_send(template: str, language: str, to: str, **context) -> dict:
 
 
 
+@router.get("/admin/usage-stats")
+def admin_usage_stats(days: int = 30, user=Depends(require_role("admin"))):
+    """Kasutusstatistika (#855): nginxi logi päevakokkuvõtted, mille kirjutab
+    hosti cron (`scripts/usage_stats.py`). Sync route — loeb kettalt (ADR 0002).
+    """
+    from .. import usage_stats as us
+    return {"status": "success", **us.with_labels(us.aggregate(us.load_days(), days), user)}
+
+
 @router.get("/admin/traffic")
 def admin_traffic(user=Depends(require_role("superadmin"))):
     """Backendi liikluse minutigraafik (24 h, mälus) + häirete ajalugu (#786).

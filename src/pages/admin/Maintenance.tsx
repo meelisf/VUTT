@@ -10,6 +10,7 @@ import { useUser } from '../../contexts/UserContext';
 import { ApiError, apiDelete, apiErrorMessage, apiGet, apiPost, apiPut } from '../../services/apiClient';
 import ClientErrorsPanel from './ClientErrorsPanel';
 import TrafficPanel from './TrafficPanel';
+import UsageStatsPanel from './UsageStatsPanel';
 
 type ActionState = 'idle' | 'running' | 'done' | 'error';
 
@@ -214,6 +215,10 @@ const Maintenance: React.FC = () => {
         {/* Liiklus (#786) — ainult superadmin: häired lähevad ainult talle ja
             endpoint on `require_role("superadmin")`. */}
         {isAtLeast(user.role, 'superadmin') && <TrafficPanel token={authToken ?? undefined} />}
+
+        {/* Kasutusstatistika (#855) — nginxi logi päevakokkuvõtted; admin, sest
+            failis on ainult arvud, ja teose pealkiri tuleb ainult loetavale teosele. */}
+        <UsageStatsPanel token={authToken ?? undefined} />
 
         {/* Arhiivide register */}
         <div className="mb-6">
