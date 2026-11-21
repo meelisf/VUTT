@@ -506,5 +506,33 @@
     "alertErrors": "server errors: {{errors}} × 5xx ({{share}} %)",
     "alertSlow": "slow: {{slow}} requests over the limit ({{share}} %)",
     "notDelivered": "not delivered, retrying"
+  },
+  "usage": {
+    "title": "Usage (nginx log, daily)",
+    "loadFailed": "Failed to load usage statistics.",
+    "empty": "No data yet — daily summaries are written by the server's nightly cron (scripts/usage_stats.py).",
+    "periodDays_one": "{{count}} d",
+    "periodDays_other": "{{count}} d",
+    "visitorsPerDay": "Visitors per day",
+    "loggedInPerDay": "Logged in per day",
+    "max": "max {{n}}",
+    "pageLoads": "Page loads",
+    "meiliQueries": "{{n}} search queries",
+    "saves": "Saves",
+    "botRequests": "{{n}} bot requests",
+    "chartTitle": "Visitors per day (dark = logged in)",
+    "tipVisitors": "{{n}} visitors",
+    "tipLoggedIn": "{{n}} logged in",
+    "tipPageLoads": "{{n}} page loads",
+    "tipMeili": "{{n}} search queries",
+    "tipSaves": "{{n}} saves",
+    "tipBots": "bots: {{n}} requests, {{ips}} IPs",
+    "legend": "Visitor = distinct IP that used the application (API or search); scanners and search crawlers don't. Several people behind one IP (e.g. the university network) count as one visitor; a JavaScript-running bot shows up as a spike.",
+    "topWorks": "Works opened directly",
+    "topPersons": "Persons opened directly",
+    "referrers": "External referrers",
+    "bots": "Bots",
+    "scopeNote": "“Opened directly” = external link, bookmark or reload; works opened within the app are not visible in the log. Monitoring (Zabbix) and background polling are excluded. IP addresses are not stored.",
+    "since": "Data since {{date}}."
   }
 }

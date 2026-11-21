@@ -57,6 +57,7 @@ ssh vutt && cd ~/VUTT
 ./scripts/server_seed_data.sh           # Meilisearch reindeks (kui andmed/skeem muutusid)
 docker logs vutt-backend                # backend jookseb Dockeris (vutt-backend)
 docker logs vutt-images                 # pildiserver (8001): SAMA image, eraldi teenus (#388)
+# Hosti crontab (meelisf, adm grupis): 15 0 * * * cd ~/VUTT && python3 scripts/usage_stats.py 2>&1 | logger -t vutt-usage-stats
 
 # Frontend — lokaalses masinas
 npm run build && rsync -avz --delete dist/ vutt:~/VUTT/dist/
@@ -104,7 +105,7 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, `sessions.json` (püsisessioonid, ADR 0081), tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `user_settings/`, `notifications/`, MCP agendikood (`agent_handoff.sqlite3`) ja ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`, `page_text_proposals.sqlite3`, `exemplar_proposals.sqlite3`) | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, `sessions.json` (püsisessioonid, ADR 0081), tokenid, `reocr_log.json`, `ocr_run_reaps.json`, `client_errors.json`, `usage_stats.json` (kasutusstatistika, kirjutab HOSTI cron, ADR 0087), `user_settings/`, `notifications/`, MCP agendikood (`agent_handoff.sqlite3`) ja ettepanekud (`prosopo_enrichment_proposals.sqlite3`, `work_part_proposals.sqlite3`, `page_text_proposals.sqlite3`, `exemplar_proposals.sqlite3`) | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
 `labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`occupations.json`**, **`institutions.json`**

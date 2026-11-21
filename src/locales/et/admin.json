@@ -506,5 +506,33 @@
     "alertErrors": "serverivead: {{errors}} × 5xx ({{share}} %)",
     "alertSlow": "aeglane: {{slow}} päringut üle lävendi ({{share}} %)",
     "notDelivered": "kohale ei jõudnud, proovitakse uuesti"
+  },
+  "usage": {
+    "title": "Kasutus (nginxi logi, päevad)",
+    "loadFailed": "Kasutusstatistika laadimine ebaõnnestus.",
+    "empty": "Andmeid veel ei ole — päevakokkuvõtted kirjutab serveri öine cron (scripts/usage_stats.py).",
+    "periodDays_one": "{{count}} p",
+    "periodDays_other": "{{count}} p",
+    "visitorsPerDay": "Külastajaid päevas",
+    "loggedInPerDay": "Sisse logitud päevas",
+    "max": "max {{n}}",
+    "pageLoads": "Lehelaadimisi",
+    "meiliQueries": "{{n}} otsingupäringut",
+    "saves": "Salvestusi",
+    "botRequests": "{{n}} robotipäringut",
+    "chartTitle": "Külastajad päevas (tume = sisse logitud)",
+    "tipVisitors": "{{n}} külastajat",
+    "tipLoggedIn": "{{n}} sisse logitud",
+    "tipPageLoads": "{{n}} lehelaadimist",
+    "tipMeili": "{{n}} otsingupäringut",
+    "tipSaves": "{{n}} salvestust",
+    "tipBots": "robotid: {{n}} päringut, {{ips}} IP-d",
+    "legend": "Külastaja = eri IP, mis kasutas rakendust (API või otsing); skännerid ja otsingurobotid seda ei tee. Mitu inimest ühe IP taga (nt ülikooli võrk) on üks külastaja; JavaScripti käivitav robot paistab hüppena.",
+    "topWorks": "Otse avatud teosed",
+    "topPersons": "Otse avatud isikud",
+    "referrers": "Välised viitajad",
+    "bots": "Robotid",
+    "scopeNote": "„Otse avatud” = väline link, järjehoidja või värskendus; rakenduse sees avatud teoseid logist ei näe. Jälgimine (Zabbix) ja taustaküsitlus on välja jäetud. IP-aadresse ei salvestata.",
+    "since": "Andmed alates {{date}}."
   }
 }
