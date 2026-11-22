@@ -6,6 +6,10 @@ sõna (t9zd42-058 „Kollegienrath" kaks korda), korpora.org kaotatud „ß" taa
 (51 kohta, „da" pro „daß"), lõppkontroll (rida toorrea vastu: CER > 0,45, kordab eelmist rida,
 AA sulg, sõnatükk rea servas) → lipp.
 
+Kasutatud kahes voorus: (1) kordus/ß/lõppkontroll — 126 lehte, 36 Valmis → ülevaatus; (2) käsikirja
+ortograafia (mudelil ß ja editsioonil ss, märgiga lühend) — 126 lehte, ainult tekst. Sisend arhiveeritud:
+LOSS qwen3.5/data/vutt_sisendid_20261122/.
+
 Sisend ~/klapitus_uuendus.json: [{leht, kiri, eelmine, uus, valmis, oli_valmis, lipud, silt, allikas}].
 Leht muudetakse AINULT siis, kui kettal on täpselt meie eelmine tekst (inimese parandust ei puututa).
 - valmis: uus tekst, seisund „Valmis", silt maha, kommentaar „märgitud skriptiga".

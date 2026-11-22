@@ -12,6 +12,11 @@ silti ega kommentaari teist korda.
 
     python3 parrot_rieger_vutti.py             # kuivkäivitus
     python3 parrot_rieger_vutti.py --kirjuta
+
+NB (22.11 õhtul): selle skripti tulemust parandas klapitus_uuendus.py (sõna kahel real, korpora „ß",
+lõppkontroll, käsikirja ortograafia) — osa siin „Valmis"-iks märgitud lehti läks tagasi ülevaatusse.
+Sisendfailid (serveri ~/ alt koristatud): LOSS qwen3.5/data/vutt_sisendid_20261122/ ja ekspordid
+{aa_kant,parrot,morgenstern}/*.json. Töövoog: LOSS SPIKKER „Editsiooniga klapitus".
 """
 import datetime
 import getpass
