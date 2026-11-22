@@ -13,6 +13,11 @@ silti ega kommentaari teist korda.
     python3 klinger_morgenstern_vutti.py             # kuivkäivitus
     python3 klinger_morgenstern_vutti.py --kirjuta
     python3 klinger_morgenstern_vutti.py ~/morgenstern_v5.json [--kirjuta]   # vasteta lehed: ainult v5 lugem
+
+NB (22.11 õhtul): selle skripti tulemust parandas klapitus_uuendus.py (sõna kahel real, korpora „ß",
+lõppkontroll, käsikirja ortograafia) — osa siin „Valmis"-iks märgitud lehti läks tagasi ülevaatusse.
+Sisendfailid (serveri ~/ alt koristatud): LOSS qwen3.5/data/vutt_sisendid_20261122/ ja ekspordid
+{aa_kant,parrot,morgenstern}/*.json. Töövoog: LOSS SPIKKER „Editsiooniga klapitus".
 """
 import datetime
 import getpass
