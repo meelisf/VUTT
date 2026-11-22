@@ -12,6 +12,7 @@ silti ega kommentaari teist korda.
 
     python3 klinger_morgenstern_vutti.py             # kuivkäivitus
     python3 klinger_morgenstern_vutti.py --kirjuta
+    python3 klinger_morgenstern_vutti.py ~/morgenstern_v5.json [--kirjuta]   # vasteta lehed: ainult v5 lugem
 """
 import datetime
 import getpass
@@ -25,7 +26,7 @@ import urllib.request
 
 DATA = os.path.expanduser("~/VUTT/data")
 API = "http://127.0.0.1:8002"
-SISEND = os.path.expanduser("~/morgenstern_vutti.json")
+SISEND = os.path.expanduser(next((a for a in sys.argv[1:] if a.endswith(".json")), "~/morgenstern_vutti.json"))
 SILT = "Klingeri ülevaatus"
 
 
