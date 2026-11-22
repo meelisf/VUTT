@@ -37,6 +37,7 @@ interface AdminUser {
   created_at: string | null;
   allowed_collections?: string[];
   edit_collections?: string[];
+  agent_access?: boolean;
 }
 
 const klooni = (s: UserRightsState): UserRightsState =>
@@ -197,6 +198,20 @@ const UserDetail: React.FC = () => {
     }
   };
 
+  // Agendi ligipääs (#869): ainult superadmin, ainult adminile. Server katkestab
+  // sihtkasutaja sessiooni ja äravõtmisel tühistab tema agendikoodid.
+  const muudaAgendiOigust = async (enabled: boolean) => {
+    if (!target) return;
+    setViga(null);
+    try {
+      await apiPost('/admin/users/agent-access',
+        { username: target.username, enabled }, { token: authToken });
+      setTarget({ ...target, agent_access: enabled });
+    } catch (e) {
+      setViga((e as { message?: string }).message || t('users.detail.agentAccessFailed'));
+    }
+  };
+
   const taastaParool = async () => {
     if (!target) return;
     setViga(null);
@@ -250,6 +265,7 @@ const UserDetail: React.FC = () => {
   const onIse = target?.username === user.username;
   const voibKustutada = voibHallata && !onIse;
   const voibParooliTaastada = onIse || voibHallata;
+  const naitaAgendiOigust = target?.role === 'admin' && isAtLeast(user.role, 'superadmin');
   const wsMuudatusi = target ? accessChanges(workSets, target.username, wsMustand).length > 0 : false;
 
   // Sildid ütlevad TEGEVUSE, mitte välja nime: „lugemisõigus" ja
@@ -343,6 +359,22 @@ const UserDetail: React.FC = () => {
                     )}
                   </dd>
                 </div>
+                {naitaAgendiOigust && (
+                  <div className="flex items-start gap-2">
+                    <dt className="w-32 flex-shrink-0 text-gray-500">{t('users.detail.agentAccess')}</dt>
+                    <dd>
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={target.agent_access === true}
+                          onChange={(e) => muudaAgendiOigust(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <span className="text-xs text-gray-500">{t('users.detail.agentAccessHelp')}</span>
+                      </label>
+                    </dd>
+                  </div>
+                )}
               </dl>
 
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">

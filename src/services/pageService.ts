@@ -47,7 +47,7 @@ const saveToFileSystem = async (
       work_id: page.work_id,
       // Kolmesuunalise liitmise baas (#455, ADR 0054)
       ...(base ? { base } : {}),
-      // Agendi tekstiettepaneku kinnitus (#641) — ainult superadmin
+      // Agendi tekstiettepaneku kinnitus (#641) — agendi õigusega toimetaja (#869)
       ...(proposal ? { proposal } : {}),
     };
 

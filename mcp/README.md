@@ -43,7 +43,8 @@ claude mcp list                  # vutt: ✓ Connected
 
 Uuendus: `pipx reinstall vutt-mcp` (mitte-editable install ei järgi `git pull`-i),
 seejärel uus agendiseanss. Codex/Gemini: sama võtmega järgmise jaotise käsud.
-Ettepanekute tööriistad vajavad superadmini loodud agendikoodi; kirjanduskogu
+Ettepanekute tööriistad vajavad agendikoodi (superadmin või agendi õigusega admin,
+`/admin/agents`); kirjanduskogu
 tööriistu ilma oma Zotero indeksita ei teki.
 
 ## Kliendi seadistus
@@ -112,20 +113,22 @@ Kolm asja, mis üllatavad:
 | `submit_work_parts_proposal` | Teose osade (kirjad, istungid jm) ootel ettepanek toimetaja koodiga; teost ei muuda |
 | `get_work_exemplars` | Teose eksemplarid püsiva `id`-ga (hoidja, kohaviit, konvoluut jm) + hoidjate register; piiratud teose kohta viga (#703) |
 | `get_works_exemplars` | Sama mitme teose kohta ühe päringuga (kuni 50 `work_id`-d); piiratud/puuduv teos läheb `errors`-i. Kasuta tsükli asemel — server piirab sagedust (nginx `vutt_api`, ~10 päringut sekundis kogu ülikooli IP kohta) |
-| `submit_exemplar_proposal` | Eksemplaride ettepanek ESTERi põhjal (uus eksemplar / olemasoleva muudatus `base`-iga, igal real ESTERi allikas); superadmin kinnitab teose halduse „Eksemplarid" vahekaardil; teost ei muuda |
-| `get_page_source` | Lehe toortekst (märgendus, reavahetused) + `stem` + `text_hash` + lubatud tägid; nõuab superadmini koodi (#641) |
-| `submit_page_text_proposal` | Lehe teksti asendused (`old` → `new`) ootel ettepanekuna; superadmin vaatab Workspace'is pildi kõrval üle; lehti ei muuda |
+| `submit_exemplar_proposal` | Eksemplaride ettepanek ESTERi põhjal (uus eksemplar / olemasoleva muudatus `base`-iga, igal real ESTERi allikas); koodi andnud toimetaja kinnitab teose halduse „Eksemplarid" vahekaardil; teost ei muuda |
+| `get_page_source` | Lehe toortekst (märgendus, reavahetused) + `stem` + `text_hash` + lubatud tägid; nõuab agendikoodi (#641) |
+| `submit_page_text_proposal` | Lehe teksti asendused (`old` → `new`) ootel ettepanekuna; koodi andnud toimetaja vaatab Workspace'is pildi kõrval üle; lehti ei muuda |
 | `list_filter_values` | Legaalsed filtriväärtused |
 
 `get_person_enrichment_context` ei kärbi ameti- ega hariduskirjeid vaikselt:
 väga suure või vigase kaardi korral annab vea.
 
-**Agendikood on ÜKS** (ADR 0058 täiendus 2026-10-20): superadmin loob selle VUTT-i
-ülevaatuse lehel (`/review` → „Loo agendikood", `POST /api/files/agent-handoff`) ja
+**Agendikood on ÜKS** (ADR 0058 täiendus 2026-10-20): superadmin või agendi õigusega
+admin (#869) loob selle VUTT-i agentide lehel (`/admin/agents` → „Loo agendikood",
+`POST /api/files/agent-handoff`) ja
 sama kood kehtib `submit_person_enrichment_proposal`-ile, `submit_work_parts_proposal`-ile,
 `submit_exemplar_proposal`-ile ning `get_page_source` / `submit_page_text_proposal`-ile — kõigis teostes ja kõigil
 isikutel, 8 h, iga liigi esituste lae piires. Tööriistad talletavad ainult ajutise
-ettepaneku. Kõik ootel ettepanekud on samal lehel ühes loendis
+ettepaneku. Ootel ettepanekud on samal lehel ühes loendis (admin näeb oma koodiga tulnuid,
+superadmin kõiki)
 (`GET /api/files/agent-proposals`); rida viib sinna, kus otsustatakse: lehe tekst
 redaktorisse, osad teose halduse „Osad" vahekaardile, eksemplarid „Eksemplarid"
 vahekaardile, isiku kirjed isikuvormi.

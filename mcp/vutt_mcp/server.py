@@ -541,7 +541,7 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     ) -> str:
         """Esitab teose osade (sisukorra) ettepaneku toimetaja ülevaatuseks.
 
-        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review → „Loo
+        handoff_code tuleb toimetajalt VUTT-i agentide lehelt (/admin/agents → „Loo
         agendikood"); üks kood kehtib osade, lehe teksti ja isikukaartide
         ettepanekutele, kõigis teostes, 8 h. pages_version tuleb get_work_parts'ist;
         kui lehti on vahepeal muudetud, lükatakse ettepanek tagasi (stale_pages) —
@@ -622,9 +622,9 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
     @mcp.tool(structured_output=False)
     async def submit_exemplar_proposal(handoff_code: str, work_id: str, rows: list[dict],
                                        note: str | None = None) -> str:
-        """Esitab teose eksemplaride ettepaneku (ESTERi põhjal) superadmini ülevaatuseks.
+        """Esitab teose eksemplaride ettepaneku (ESTERi põhjal) toimetaja ülevaatuseks.
 
-        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review → „Loo
+        handoff_code tuleb toimetajalt VUTT-i agentide lehelt (/admin/agents → „Loo
         agendikood"); kehtib 8 h, kõigis teostes. Loe ENNE get_work_exemplars.
         ESTERi kirje (www.ester.ee/record=b…) loe OMA veebivahendiga — MCP ESTERit
         ei puuduta. Eksemplaride tabeli märkus on lehel kärbitud („… >>"); täistekst
@@ -673,7 +673,7 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         tühikuks, poolitused liidetud, märgendus eemaldatud, ß → ss). Parandus selle
         põhjal kustutaks lehe struktuuri.
 
-        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review); sama kood
+        handoff_code tuleb toimetajalt VUTT-i agentide lehelt (/admin/agents); sama kood
         kehtib ka osade ja isikukaartide ettepanekutele, 8 h, kõigis teostes. page = VUTT-i 1-põhine
         järjestusnumber nagu get_pages'is. Vastuses: stem (lehe püsiv tunnus), text_hash
         (räsi täpselt sellest tekstist), status, text ja tags — VUTT-i lubatud tägid
@@ -743,7 +743,7 @@ def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
         """Esitab ootel isikukaardi ettepaneku VUTT-i isikuvormis ülevaatuseks:
         amet, haridus, sünd, surm, päritolu, sugu, elulugu (vt LIIGID allpool).
 
-        handoff_code tuleb superadminilt VUTT-i ülevaatuse lehelt (/review); sama kood
+        handoff_code tuleb toimetajalt VUTT-i agentide lehelt (/admin/agents); sama kood
         kehtib ka lehe teksti ja teose osade ettepanekutele. Kood kehtib tööpäeva (8 h)
         ja lubab mitu esitust igale isikule, kuni esituste laeni. Ära kasuta selleks editori
         sessioonitokenit. `base_updated_at` tuleb iga isiku kohta värskest

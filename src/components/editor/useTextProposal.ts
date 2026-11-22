@@ -27,7 +27,7 @@ import type { EditorSavedState } from './useEditorSave';
 interface UseTextProposalParams {
   page: Page;
   viewRef: MutableRefObject<EditorView | null>;
-  /** Ainult superadmin (ADR 0058 täiendus 2026-10-19). */
+  /** Superadmin või agendi lipuga admin (ADR 0058 täiendused 2026-10-19, 2026-11-22). */
   enabled: boolean;
   token: string | null | undefined;
   hasUnsavedChanges: boolean;
@@ -45,7 +45,7 @@ interface UseTextProposalParams {
   /** `handlePageRestored` (useEditorSave luuakse hiljem, seega ref). */
   onPageRefreshedRef: MutableRefObject<((r: RestoreResult) => void) | null>;
   saveWithDraftsRef: MutableRefObject<(() => Promise<boolean>) | null>;
-  /** `?proposal=` (`/review` link): see pakk võidab, kui ta on teose ootel pakkide seas. */
+  /** `?proposal=` (`/admin/agents` link): see pakk võidab, kui ta on teose ootel pakkide seas. */
   preferredProposalId?: string | null;
   pollMs?: number;
 }

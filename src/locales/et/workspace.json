@@ -343,7 +343,7 @@
         "working": "Salvestan…",
         "accepting_one": "Lisan {{count}} osa…",
         "accepting_other": "Lisan {{count}} osa…",
-        "codeOnReview": "Agendikood ja kõik ootel ettepanekud: ülevaatuse leht →"
+        "codeOnAgents": "Agendikood ja kõik ootel ettepanekud: agentide leht →"
       },
       "kinds": {
         "letter": "Kiri",

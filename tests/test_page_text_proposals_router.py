@@ -1,4 +1,5 @@
-"""#641: tekstiettepanekute otspunktid — kood on agendi ainus õigus, ülejäänu superadmin."""
+"""#641: tekstiettepanekute otspunktid — kood on agendi ainus õigus, ülevaatus superadmin
+või agendi lipuga admin (ainult oma pakid, #869)."""
 import json
 
 import pytest
@@ -84,6 +85,35 @@ def test_stale_page_409(client, work):
         "code": code, "work_id": "w1", "note": "",
         "pages": [{"stem": "t-001", "text_hash": "vale", "edits": [{"old": "vana", "new": "uus"}]}]})
     assert r.status_code == 409 and r.json()["detail"] == "stale_page:t-001"
+
+
+def _pack(client, owner, page):
+    # Eri lehed: uus pakk sama lehe peal tõrjuks eelmise (superseded).
+    code = ptp.issue_handoff("w1", owner)["code"]
+    src = client.post("/works/text-proposals/source", json={"code": code, "work_id": "w1", "page": page}).json()
+    r = client.post("/works/text-proposals/submit", json={
+        "code": code, "work_id": "w1",
+        "pages": [{"stem": f"t-00{page}", "text_hash": src["text_hash"], "edits": [{"old": "vana", "new": "uus"}]}]})
+    assert r.status_code == 200, r.text
+    return r.json()["proposal_id"]
+
+
+def test_lipuga_admin_naeb_ainult_oma_pakke(client):
+    """#869: võõras pakk on adminile „tundmatu" (404) — olemasolu ei leki."""
+    voor = _pack(client, "su", 1)
+    oma = _pack(client, "ad", 2)
+    client.state["user"] = {"username": "ad", "role": "admin", "agent_access": True}
+    assert [p["proposal_id"] for p in client.get("/text-proposals").json()] == [oma]
+    assert [p["proposal_id"] for p in client.get("/works/w1/text-proposals").json()] == [oma]
+    assert client.get(f"/works/w1/text-proposals/{oma}/pages/t-002").status_code == 200
+    for method, path in [("get", f"/works/w1/text-proposals/{voor}/pages/t-001"),
+                         ("post", f"/works/w1/text-proposals/{voor}/pages/t-001/reject"),
+                         ("post", f"/works/w1/text-proposals/{voor}/reject"),
+                         ("post", f"/works/w1/text-proposals/{voor}/accept")]:
+        r = getattr(client, method)(path)
+        assert r.status_code == 404 and r.json()["detail"] == "unknown_proposal", path
+    client.state["user"] = {"username": "su", "role": "superadmin"}
+    assert {p["proposal_id"] for p in client.get("/text-proposals").json()} == {voor, oma}
 
 
 def test_superadmin_otspunktid_admin_403(client):

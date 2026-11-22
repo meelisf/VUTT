@@ -267,33 +267,35 @@ def _live(work_dir: str) -> dict:
     return {x["id"]: x for x in _read_meta(work_dir).get("exemplars") or [] if isinstance(x, dict)}
 
 
-def list_for_work(work_id: str, work_dir: str, username: str) -> list[dict]:
-    """Kasutaja ettepanekud teosele (uuemad ees), ootel ja otsustatud read koos olekuga."""
+def list_for_work(work_id: str, work_dir: str, username: str, see_all: bool = False) -> list[dict]:
+    """Kasutaja ettepanekud teosele (uuemad ees), ootel ja otsustatud read koos olekuga.
+    `see_all` (superadmin) = kõigi kasutajate ettepanekud (#869)."""
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
-        rows = db.execute("SELECT * FROM proposal WHERE work_id=? AND username=? ORDER BY created_at DESC",
-                          (work_id, username)).fetchall()
+        rows = db.execute("SELECT * FROM proposal WHERE work_id=? AND (? OR username=?) ORDER BY created_at DESC",
+                          (work_id, see_all, username)).fetchall()
     live, holders = _live(work_dir), _holders()
     out = []
     for p in rows:
         expired = p["expires_at"] <= now
         items = json.loads(p["payload"])["rows"]
-        out.append({"proposal_id": p["id"], "created_at": p["created_at"], "expires_at": p["expires_at"],
+        out.append({"proposal_id": p["id"], "username": p["username"], "created_at": p["created_at"],
+                    "expires_at": p["expires_at"],
                     "note": p["note"],
                     "rows": [_view(r, i, expired, live, holders) for i, r in enumerate(items)]})
     return out
 
 
-def list_pending_summary(username: str) -> list[dict]:
+def list_pending_summary(username: str, see_all: bool = False) -> list[dict]:
     """Kasutaja ettepanekud, kus on kinnitamata ridu (ülevaatuse loend `/review`).
     `stale` = ootel read, mida praegu kinnitada ei saa (aegunud alus, topelt, hoidja)."""
     from .utils import find_directory_by_id
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
-        rows = db.execute("SELECT * FROM proposal WHERE username=? AND expires_at>? ORDER BY created_at DESC",
-                          (username, now)).fetchall()
+        rows = db.execute("SELECT * FROM proposal WHERE (? OR username=?) AND expires_at>? ORDER BY created_at DESC",
+                          (see_all, username, now)).fetchall()
     holders, cache, out = _holders(), {}, []
     for p in rows:
         items = json.loads(p["payload"])["rows"]
@@ -305,7 +307,7 @@ def list_pending_summary(username: str) -> list[dict]:
             cache[p["work_id"]] = _live(work_dir) if work_dir else {}
         live = cache[p["work_id"]]
         stale = sum(1 for r in pending if _review_state(r, False, live, holders) != "pending")
-        out.append({"proposal_id": p["id"], "work_id": p["work_id"], "created_at": p["created_at"],
+        out.append({"proposal_id": p["id"], "work_id": p["work_id"], "username": p["username"], "created_at": p["created_at"],
                     "pending": len(pending), "stale": stale})
     return out
 
@@ -326,7 +328,7 @@ def _parse_picks(picks) -> list[tuple[str, int]]:
 
 @_serialized
 def decide(work_id: str, work_dir: str, username: str, picks: list, action: str,
-           background_tasks=None) -> dict:
+           background_tasks=None, see_all: bool = False) -> dict:
     """Valitud read (`[(proposal_id, index)]`) vastu ÜHE kirjutusega või tagasi.
 
     Klient saadab read, mida kasutaja nägi. Vastuvõtul peab iga rida olema praegu
@@ -342,8 +344,8 @@ def decide(work_id: str, work_dir: str, username: str, picks: list, action: str,
         loaded: dict = {}
         for pid, _ in keys:
             if pid not in loaded:
-                row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND username=?",
-                                 (pid, work_id, username)).fetchone()
+                row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND (? OR username=?)",
+                                 (pid, work_id, see_all, username)).fetchone()
                 if row is None:
                     raise ProposalError("proposal_not_found")
                 loaded[pid] = (json.loads(row["payload"])["rows"], row["expires_at"] <= now)

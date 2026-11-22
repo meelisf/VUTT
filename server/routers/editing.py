@@ -11,7 +11,7 @@ from ..access_ops import require_catalog_access
 from ..annotation_ops import (
     apply_restored_annotations, restore_annotation_as_comment, split_page_json,
 )
-from ..auth import is_at_least
+from ..auth import has_agent_access, is_at_least
 from ..cache import get_cached_suggestions
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
 from ..comment_history_ops import (
@@ -203,15 +203,16 @@ def _save_page_locked(txt_path, text, client_meta, username, base=None, message=
         ), merged_page, isikud_enne != isikud_parast
 
 
-def _proposal_ref(proposal, catalog, filename):
-    """`/save` `proposal`-viide (#641): ülevaatust vajav leht SELLE teose SELLEL lehel."""
+def _proposal_ref(proposal, catalog, filename, owner=None):
+    """`/save` `proposal`-viide (#641): ülevaatust vajav leht SELLE teose SELLEL lehel.
+    `owner` = admini puhul tema kasutajanimi: võõras pakk käitub nagu otsustatud (#869)."""
     if not isinstance(proposal, dict) or not isinstance(proposal.get("id"), str) \
             or not isinstance(proposal.get("stem"), str):
         raise HTTPException(status_code=400, detail="Vigane ettepaneku viide")
     if proposal["stem"] != os.path.splitext(filename)[0]:
         raise HTTPException(status_code=400, detail="Ettepanek on teise lehe kohta")
     try:
-        row = page_text_proposals.page_ref(proposal["id"], proposal["stem"])
+        row = page_text_proposals.page_ref(proposal["id"], proposal["stem"], owner)
     except page_text_proposals.ProposalError:
         # Ettepanek otsustati vahepeal mujal (agent esitas uuesti, teine superadmin,
         # aegumine): toimetaja salvestus EI tohi selle pärast kukkuda — muidu jääks
@@ -273,10 +274,12 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     proposal_ref = None
     proposal_state = None
     if data.get('proposal') is not None:
-        # Agendi tekstiettepaneku kinnitus (#641) — töövoog on ainult superadminil.
-        if not is_at_least(user.get('role'), 'superadmin'):
-            raise HTTPException(status_code=403, detail="Ettepanekuid kinnitab ainult superadmin")
-        proposal_ref = await run_in_threadpool(_proposal_ref, data['proposal'], catalog, filename)
+        # Agendi tekstiettepaneku kinnitus (#641): superadmin (kõik pakid) või agendi
+        # lipuga admin (ainult oma koodiga tulnud, #869).
+        if not has_agent_access(user):
+            raise HTTPException(status_code=403, detail="Ettepanekuid kinnitab ainult agendi õigusega toimetaja")
+        owner = None if is_at_least(user.get('role'), 'superadmin') else user['username']
+        proposal_ref = await run_in_threadpool(_proposal_ref, data['proposal'], catalog, filename, owner)
         if proposal_ref is None:
             proposal_state = "already_decided"
     try:

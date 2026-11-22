@@ -2,9 +2,11 @@
 """Agendi lehe teksti ettepanekud (#641, ADR 0058 täiendus 2026-10-19).
 
 Koodiga otspunktid (`source`, `submit`) on autentimata — kood on ainus õigus ja
-see annab ainult lugemise + ootel ettepaneku. Ülevaatus ja otsused: superadmin.
-`/api/files/` proksib kõik teed avalikult, seega toortekst (ka piiratud
-teosel) väljastatakse AINULT kehtiva koodiga.
+see annab ainult lugemise + ootel ettepaneku. `/api/files/` proksib kõik teed
+avalikult, seega toortekst (ka piiratud teosel) väljastatakse AINULT kehtiva koodiga.
+
+Ülevaatus: superadmin (kõik pakid) või agendi lipuga admin (ainult oma koodiga
+tulnud pakid; #869).
 """
 import json
 
@@ -13,7 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .. import page_text_proposal_jobs as jobs
 from .. import page_text_proposals as ptp
-from ..deps import require_role
+from ..deps import proposal_scope, require_agent_access
 from ..rate_limit import check_rate_limit, get_client_ip
 from ..utils import find_directory_by_id
 from ..vutt_tags import VUTT_TAG_REGISTRY
@@ -41,8 +43,13 @@ def _work_dir(work_id: str, *, status: int = 404) -> str:
     return path
 
 
-def _own_pack(proposal_id: str, work_id: str) -> str:
-    if _call(ptp.pack_work_id, proposal_id) != work_id:
+def _owner(user: dict):
+    """Admin näeb ainult oma koodiga tulnud pakke; superadmin kõiki (#869)."""
+    return None if proposal_scope(user) else user["username"]
+
+
+def _own_pack(proposal_id: str, work_id: str, user: dict) -> str:
+    if _call(ptp.pack_work_id, proposal_id, _owner(user)) != work_id:
         raise HTTPException(status_code=404, detail="unknown_proposal")
     return _work_dir(work_id)
 
@@ -92,45 +99,45 @@ async def text_proposal_submit(request: Request):
 
 
 @router.get("/text-proposals")
-def text_proposals_all(user=Depends(require_role("superadmin"))):
-    return ptp.list_pending()
+def text_proposals_all(user=Depends(require_agent_access())):
+    return ptp.list_pending(owner=_owner(user))
 
 
 @router.get("/works/{work_id}/text-proposals")
-def text_proposals_for_work(work_id: str, user=Depends(require_role("superadmin"))):
-    return ptp.list_pending(work_id)
+def text_proposals_for_work(work_id: str, user=Depends(require_agent_access())):
+    return ptp.list_pending(work_id, owner=_owner(user))
 
 
 @router.get("/works/{work_id}/text-proposals/job")
-def text_proposal_job(work_id: str, user=Depends(require_role("superadmin"))):
+def text_proposal_job(work_id: str, user=Depends(require_agent_access())):
     return jobs.get_status(work_id)
 
 
 @router.get("/works/{work_id}/text-proposals/{proposal_id}/pages/{stem}")
-def text_proposal_page(work_id: str, proposal_id: str, stem: str, user=Depends(require_role("superadmin"))):
+def text_proposal_page(work_id: str, proposal_id: str, stem: str, user=Depends(require_agent_access())):
     """Lehe ettepanek ülevaatuseks: lehe vaade + selle vastu liidetud kandidaat ÜHEST hetktõmmisest."""
-    path = _own_pack(proposal_id, work_id)
+    path = _own_pack(proposal_id, work_id, user)
     return _call(ptp.review_page, proposal_id, stem, path)
 
 
 @router.post("/works/{work_id}/text-proposals/{proposal_id}/pages/{stem}/reject")
 def text_proposal_page_reject(work_id: str, proposal_id: str, stem: str,
-                              user=Depends(require_role("superadmin"))):
-    _own_pack(proposal_id, work_id)
+                              user=Depends(require_agent_access())):
+    _own_pack(proposal_id, work_id, user)
     return {"rejected": ptp.reject_page(proposal_id, stem, user["username"])}
 
 
 @router.post("/works/{work_id}/text-proposals/{proposal_id}/reject")
-def text_proposal_reject(work_id: str, proposal_id: str, user=Depends(require_role("superadmin"))):
-    _own_pack(proposal_id, work_id)
+def text_proposal_reject(work_id: str, proposal_id: str, user=Depends(require_agent_access())):
+    _own_pack(proposal_id, work_id, user)
     return {"rejected": ptp.reject_pack(proposal_id, user["username"])}
 
 
 @router.post("/works/{work_id}/text-proposals/{proposal_id}/accept", status_code=202)
 def text_proposal_accept(work_id: str, proposal_id: str, response: Response,
-                         user=Depends(require_role("superadmin"))):
+                         user=Depends(require_agent_access())):
     """Paki kinnitus taustatööna; olekut pollitakse `…/text-proposals/job` kaudu."""
-    path = _own_pack(proposal_id, work_id)
+    path = _own_pack(proposal_id, work_id, user)
     if not jobs.start(proposal_id, work_id, path, user["username"]):
         raise HTTPException(status_code=409, detail="job_running")
     return {"state": "running"}

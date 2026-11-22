@@ -384,10 +384,13 @@ ettepaneku kinnitus `registries.ensure` kaudu (luku all, sama Q → seotakse).
 **MCP ettepanekud (ADR 0058)** — MCP kirjutab AINULT ootel ettepaneku (isik — amet, haridus, sünd, surm, päritolu, sugu, elulugu, nimed, staatus, konfessioon, tegutsemisaeg, seos, ID (#834, `enrichment_kinds.py`; ID = ainult salvestus, seos sünkroonib vastastikuse `router._after_person_save` kaudu); teose osad, lehe tekst, eksemplarid);
 kinnitus käib olemasolevate valideeritud kirjutusteede kaudu (`create_part`,
 isikukaardi salvestus). Skalaarvälja tõend (`birth/death/origin.evidence`) PEAB isikuvormi
-mustandis läbi käima (`birth_evidence` jne, `helpers.ts`) — vorm ehitab need objektid salvestusel uuesti. Agendikood on ÜKS (`/review`, `POST /agent-handoff`): üks hoidla
+mustandis läbi käima (`birth_evidence` jne, `helpers.ts`) — vorm ehitab need objektid salvestusel uuesti. Agendikood on ÜKS (`/admin/agents`, `POST /agent-handoff`): üks hoidla
 (`agent_handoff.py`, rida liigi kohta), kulutus + ettepanek üks tehing `ATTACH`-iga (WAL keelatud); loend `GET /agent-proposals`,
 `target_url` koostab server (täiendus 2026-10-20). Kood kehtib 8 h, piiratud esitused, seotud
-KASUTAJAGA, mitte sessiooniga. Kõik ettepanekuliigid on ainult superadmin.
+KASUTAJAGA, mitte sessiooniga. Ettepanekuteed: superadmin VÕI kasutajapõhise lipuga
+(`agent_access`) admin — üks sõltuvus `deps.require_agent_access`; admin näeb AINULT oma
+koodiga tulnud ettepanekuid, superadmin kõiki (`proposal_scope` → hoidlate `see_all`; #869).
+Lipp on õigusväli (kirjutus katkestab sessiooni). Kood ja loend elavad `/admin/agents`-is.
 Autentimata submit kontrollib koodi ENNE igat sisuvaliidsust — router jõuab sinna ainult olemasoleva
 teosega ja muu veateade reedaks privaatse teose olemasolu (mall `page_text_proposals.submit`, N19-06).
 Lehe teksti ettepanek (#641): agent saab toorteksti AINULT koodiga, esitab asendused

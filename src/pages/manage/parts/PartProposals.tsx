@@ -104,7 +104,7 @@ const PartProposals: React.FC<Props> = ({ workId, token, refreshKey, onPreview, 
 
       {/* Agendikood on ÜKS ja elab ülevaatuse lehel (ADR 0058, 2026-10-20). */}
       <p className="mt-1 text-xs">
-        <Link to="/review" className="text-violet-800 underline hover:text-violet-950">{tp('codeOnReview')}</Link>
+        <Link to="/admin/agents" className="text-violet-800 underline hover:text-violet-950">{tp('codeOnAgents')}</Link>
       </p>
 
       {busy && <BusyNote className="mt-2">

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { isAtLeast } from '../utils/roleUtils';
+import { hasAgentAccess, isAtLeast } from '../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { UserPlus, Users, Upload, Library, History, Trash2, Wrench, MapPin } from 'lucide-react';
+import { UserPlus, Users, Upload, Library, History, Trash2, Wrench, MapPin, Bot } from 'lucide-react';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { apiGet, apiPost } from '../services/apiClient';
@@ -17,6 +17,8 @@ interface AdminCard {
   count?: number;
   countColor?: string;
   superadminOnly?: boolean;
+  /** Superadmin või agendi lipuga admin (#869). */
+  agentOnly?: boolean;
 }
 
 const Admin: React.FC = () => {
@@ -95,6 +97,13 @@ const Admin: React.FC = () => {
       href: '/review',
     },
     {
+      key: 'agents',
+      icon: <Bot size={18} className="text-violet-600" />,
+      group: t('admin:groups.workflow'),
+      href: '/admin/agents',
+      agentOnly: true,
+    },
+    {
       key: 'trash',
       icon: <Trash2 size={18} className="text-rose-600" />,
       group: t('admin:groups.content'),
@@ -125,7 +134,8 @@ const Admin: React.FC = () => {
       <Header pageTitle="Admin" />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {cards.filter(card => !card.superadminOnly || isAtLeast(user.role, 'superadmin')).map(card => (
+          {cards.filter(card => (!card.superadminOnly || isAtLeast(user.role, 'superadmin'))
+            && (!card.agentOnly || hasAgentAccess(user))).map(card => (
             <Link
               key={card.key}
               to={card.href}

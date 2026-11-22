@@ -4,7 +4,7 @@ import { Page, PageStatus, Annotation, Work } from '../types';
 import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { useUser } from '../contexts/UserContext';
-import { isAtLeast } from '../utils/roleUtils';
+import { hasAgentAccess, isAtLeast } from '../utils/roleUtils';
 import EditorHeader from './editor/EditorHeader';
 import { initialEditorTab } from './editor/initialTab';
 import EditorEditTab from './editor/EditorEditTab';
@@ -132,12 +132,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     hasUnsavedChanges,
   } = useEditorState({ page, viewRef, onUnsavedChanges });
 
-  // Agendi tekstiettepanek (#641) — ainult superadmin. `useEditorSave` luuakse
+  // Agendi tekstiettepanek (#641) — superadmin või agendi lipuga admin (#869). `useEditorSave` luuakse
   // allpool ja vajab aktiivset viidet, seega vahetatakse callback'id ref'ide kaudu.
   const pageRefreshedRef = useRef<((r: RestoreResult) => void) | null>(null);
   const saveWithDraftsRef = useRef<(() => Promise<boolean>) | null>(null);
   const proposal = useTextProposal({
-    page, viewRef, enabled: isAtLeast(user?.role, 'superadmin') && !readOnly, token: authToken,
+    page, viewRef, enabled: hasAgentAccess(user) && !readOnly, token: authToken,
     hasUnsavedChanges, setSavedState, setComments, setTextAnnotations, setPageTags, setIsDirty,
     runGuarded, navigateToPage: onNavigateToPage, navigateAfterSave: onNavigateAfterSave,
     onPageRefreshedRef: pageRefreshedRef, saveWithDraftsRef,
@@ -338,7 +338,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
 
-        {activeTab === 'edit' && isAtLeast(user?.role, 'superadmin') && !readOnly && shouldShowProposalPanel(proposal) && (
+        {activeTab === 'edit' && hasAgentAccess(user) && !readOnly && shouldShowProposalPanel(proposal) && (
           <TextProposalPanel
             review={proposal.review}
             pack={proposal.pack}

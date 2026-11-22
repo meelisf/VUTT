@@ -373,8 +373,9 @@ def submit(code: str, work_id: str, work_dir: str, version: str, parts: list,
             "parts": len(items), "persons": len(people), "expires_at": now + PROPOSAL_TTL}
 
 
-def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
-    """Kasutaja otsustamata ettepanekud; leheküljenumbrid praeguse järjekorra järgi."""
+def list_pending(work_id: str, work_dir: str, username: str, see_all: bool = False) -> list[dict]:
+    """Kasutaja otsustamata ettepanekud; leheküljenumbrid praeguse järjekorra järgi.
+    `see_all` (superadmin) = kõigi kasutajate ettepanekud (#869)."""
     now = int(time.time())
     stems = wp.page_stems(work_dir)
     number = {s: i for i, s in enumerate(stems, start=1)}
@@ -382,8 +383,8 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
     out = []
     with _db() as db:
         _clean(db, now)
-        rows = db.execute("SELECT * FROM proposal WHERE work_id=? AND username=? ORDER BY created_at DESC",
-                          (work_id, username)).fetchall()
+        rows = db.execute("SELECT * FROM proposal WHERE work_id=? AND (? OR username=?) ORDER BY created_at DESC",
+                          (work_id, see_all, username)).fetchall()
     parts_now = _current_parts(work_dir)
     for row in rows:
         items, persons = _load(row["payload"])
@@ -400,26 +401,26 @@ def list_pending(work_id: str, work_dir: str, username: str) -> list[dict]:
                     it["text_changes"] = text_changes(existing, it["part"], it["merged"])
             it["page_numbers"] = [number[s] for s in it["part"]["pages"] if s in number]
             it["missing_pages"] = [s for s in it["part"]["pages"] if s not in number]
-        out.append({"proposal_id": row["id"], "created_at": row["created_at"],
+        out.append({"proposal_id": row["id"], "username": row["username"], "created_at": row["created_at"],
                     "expires_at": row["expires_at"], "pages_changed": row["pages_version"] != current,
                     "items": items, "persons": persons})
     return out
 
 
-def list_pending_summary(username: str) -> list[dict]:
+def list_pending_summary(username: str, see_all: bool = False) -> list[dict]:
     """Kasutaja otsustamata ettepanekud kõigis teostes (ülevaatuse loend). Teose
     kausta ei loe — vananemise arvutab kutsuja `pages_version` järgi."""
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
-        rows = db.execute("SELECT * FROM proposal WHERE username=? ORDER BY created_at DESC",
-                          (username,)).fetchall()
+        rows = db.execute("SELECT * FROM proposal WHERE (? OR username=?) ORDER BY created_at DESC",
+                          (see_all, username)).fetchall()
     out = []
     for row in rows:
         items, _ = _load(row["payload"])
         pending = sum(1 for it in items if it["status"] == "pending")
         if pending:
-            out.append({"proposal_id": row["id"], "work_id": row["work_id"],
+            out.append({"proposal_id": row["id"], "work_id": row["work_id"], "username": row["username"],
                         "created_at": row["created_at"], "pages_version": row["pages_version"],
                         "pending": pending})
     return out
@@ -428,7 +429,7 @@ def list_pending_summary(username: str) -> list[dict]:
 @_serialized
 def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: int,
            action: str, override: Optional[dict] = None, mode: Optional[str] = None,
-           background_tasks=None) -> Optional[dict]:
+           background_tasks=None, see_all: bool = False) -> Optional[dict]:
     """Toimetaja otsus ühe osa kohta. Vastuvõtt: kui ettepanek parandab olemasolevat osa
     (`part_id` või samad lehed), siis update_part liidetud kujuga; muidu create_part.
     `mode="create"` sunnib uue osa (toimetaja otsus: tegemist on eri tekstiga)."""
@@ -437,8 +438,8 @@ def decide(proposal_id: str, work_id: str, work_dir: str, username: str, index: 
     if action not in ("accept", "reject") or not isinstance(index, int) or isinstance(index, bool):
         raise ProposalError("invalid_decision")
     with _db() as db:
-        row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND username=? AND expires_at>?",
-                         (proposal_id, work_id, username, int(time.time()))).fetchone()
+        row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND (? OR username=?) AND expires_at>?",
+                         (proposal_id, work_id, see_all, username, int(time.time()))).fetchone()
         if row is None:
             raise ProposalError("proposal_not_found")
         items, persons = _load(row["payload"])
@@ -484,7 +485,7 @@ MAX_BATCH = 500
 
 @_serialized
 def decide_many(work_id: str, work_dir: str, username: str, picks: list,
-                background_tasks=None) -> list[dict]:
+                background_tasks=None, see_all: bool = False) -> list[dict]:
     """„Lisa kõik": valitud read (`[(proposal_id, index)]`) vastu ÜHE kirjutusega.
 
     Varem tegi klient iga rea kohta eraldi päringu: commit + kogu teose Meili sünk
@@ -507,8 +508,8 @@ def decide_many(work_id: str, work_dir: str, username: str, picks: list,
         rows: dict = {}
         for pid, index in keys:
             if pid not in rows:
-                row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND username=? AND expires_at>?",
-                                 (pid, work_id, username, int(time.time()))).fetchone()
+                row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND (? OR username=?) AND expires_at>?",
+                                 (pid, work_id, see_all, username, int(time.time()))).fetchone()
                 if row is None:
                     raise ProposalError("proposal_not_found")
                 rows[pid] = _load(row["payload"])
@@ -564,15 +565,15 @@ def decide_many(work_id: str, work_dir: str, username: str, picks: list,
 
 @_serialized
 def resolve_person(proposal_id: str, work_id: str, work_dir: str, username: str, ref: str,
-                   action: str, person_id: Optional[str] = None) -> dict:
+                   action: str, person_id: Optional[str] = None, see_all: bool = False) -> dict:
     """Pakutud isik: `create` (create_person_checked, ADR 0048), `link` olemasolevaga
     või `name` (jääb nimeks). Olemasolev väline ID → `person_exists:<id>`."""
     from .prosopography import person_crud
     if action not in ("create", "link", "name"):
         raise ProposalError("invalid_decision")
     with _db() as db:
-        row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND username=? AND expires_at>?",
-                         (proposal_id, work_id, username, int(time.time()))).fetchone()
+        row = db.execute("SELECT * FROM proposal WHERE id=? AND work_id=? AND (? OR username=?) AND expires_at>?",
+                         (proposal_id, work_id, see_all, username, int(time.time()))).fetchone()
         if row is None:
             raise ProposalError("proposal_not_found")
         items, persons = _load(row["payload"])

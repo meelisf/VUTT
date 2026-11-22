@@ -26,6 +26,6 @@ describe('PartProposals agendikood', () => {
     await screen.findByText('manage.parts.proposals.empty');
     expect(screen.queryByText('manage.parts.proposals.createCode')).toBeNull();
     expect(screen.queryByText('manage.parts.proposals.createCodeAll')).toBeNull();
-    expect(screen.getByRole('link', { name: 'manage.parts.proposals.codeOnReview' }).getAttribute('href')).toBe('/review');
+    expect(screen.getByRole('link', { name: 'manage.parts.proposals.codeOnAgents' }).getAttribute('href')).toBe('/admin/agents');
   });
 });

@@ -2,8 +2,8 @@
 
 Agent loeb teose olemasolevad eksemplarid (püsiva `id`-ga) ja hoidjate registri,
 võrdleb neid ESTERi kirjega (oma veebivahendiga — MCP ESTERit ei puuduta) ja
-esitab ettepaneku. VUTT talletab selle AINULT ootel ettepanekuna; superadmin
-otsustab teose halduse „Eksemplarid" vahekaardil rea kaupa.
+esitab ettepaneku. VUTT talletab selle AINULT ootel ettepanekuna; koodi andnud
+toimetaja otsustab teose halduse „Eksemplarid" vahekaardil rea kaupa.
 """
 from __future__ import annotations
 

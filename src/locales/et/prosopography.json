@@ -3,7 +3,7 @@
   "agentEnrichment": {
     "title": "Agendi ettepanekud isikukaardile",
     "intro": "Agendi ettepanekud sellele isikule. Vaata iga kirje, seos ja tõend siin üle enne kinnitamist.",
-    "codeOnReview": "Agendikood ja kõik ootel ettepanekud: ülevaatuse leht →",
+    "codeOnAgents": "Agendikood ja kõik ootel ettepanekud: agentide leht →",
     "refresh": "Värskenda ettepanekuid",
     "unsaved": "Salvesta või tühista esmalt vormi muudatused.",
     "empty": "Ootel ettepanekuid ei ole.",

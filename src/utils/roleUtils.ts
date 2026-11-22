@@ -27,6 +27,19 @@ export function isAtLeast(role: string | undefined | null, minRole: Role): boole
   return roleLevel(role) >= ROLE_LEVELS[minRole];
 }
 
+/**
+ * Kas kasutaja tohib agendikoodi anda ja ettepanekuid üle vaadata (#869, ADR 0058)?
+ * Superadmin alati; admin ainult superadmini antud lipuga. Peegeldab backendi
+ * `auth.has_agent_access`-i — MUGAVUS, server jõustab sama.
+ */
+export function hasAgentAccess(
+  user: { role?: string | null; agent_access?: boolean } | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (isAtLeast(user.role, 'superadmin')) return true;
+  return user.role === 'admin' && user.agent_access === true;
+}
+
 export function canManageUser(actorRole: string, targetRole: string): boolean {
   return roleLevel(targetRole) < roleLevel(actorRole);
 }

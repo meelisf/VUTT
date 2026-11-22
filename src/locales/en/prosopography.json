@@ -3,7 +3,7 @@
   "agentEnrichment": {
     "title": "Agent proposals for the person card",
     "intro": "Agent proposals for this person. Review each entry, link, and source here before approval.",
-    "codeOnReview": "Agent code and all pending proposals: review page →",
+    "codeOnAgents": "Agent code and all pending proposals: agents page →",
     "refresh": "Refresh proposals",
     "unsaved": "Save or discard form changes first.",
     "empty": "No pending proposals.",

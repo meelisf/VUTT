@@ -381,8 +381,10 @@ def submit(code: str, person_id: str, base_updated_at: str, items: list) -> dict
             "status": "pending", "expires_at": now + PROPOSAL_TTL}
 
 
-def list_pending(person_id: str, username: str, session_fingerprint: str = "") -> list[dict]:
-    """Toimetaja näeb ainult enda algatatud ettepanekuid — igas oma seansis (#492)."""
+def list_pending(person_id: str, username: str, session_fingerprint: str = "",
+                 see_all: bool = False) -> list[dict]:
+    """Toimetaja näeb ainult enda algatatud ettepanekuid — igas oma seansis (#492).
+    `see_all` (superadmin) = kõigi kasutajate ettepanekud (#869)."""
     from .person_crud import get_person
     person = get_person(person_id)
     if person is not None and (person.get("record_status") == "tombstone" or person.get("merged_into")):
@@ -391,8 +393,8 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
     with _db() as db:
         _clean(db, now)
         rows = db.execute(
-            "SELECT * FROM proposal WHERE person_id=? AND username=? AND applied_at IS NULL ORDER BY created_at DESC",
-            (person_id, username),
+            "SELECT * FROM proposal WHERE person_id=? AND (? OR username=?) AND applied_at IS NULL ORDER BY created_at DESC",
+            (person_id, see_all, username),
         ).fetchall()
     result = []
     for row in rows:
@@ -441,18 +443,18 @@ def list_pending(person_id: str, username: str, session_fingerprint: str = "") -
     return result
 
 
-def list_pending_summary(username: str) -> list[dict]:
+def list_pending_summary(username: str, see_all: bool = False) -> list[dict]:
     """Kasutaja otsustamata ettepanekud kõigil isikutel (ülevaatuse loend). Kaarti
     ei loe: read hinnatakse elava kaardi vastu alles isikuvormis."""
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
         rows = db.execute(
-            "SELECT id, person_id, created_at, payload FROM proposal"
-            " WHERE username=? AND applied_at IS NULL ORDER BY created_at DESC", (username,),
+            "SELECT id, person_id, username, created_at, payload FROM proposal"
+            " WHERE (? OR username=?) AND applied_at IS NULL ORDER BY created_at DESC", (see_all, username),
         ).fetchall()
     # Otsustatud read eemaldab `_close_rows` — alles jäänud on otsustamata.
-    return [{"proposal_id": r["id"], "person_id": r["person_id"], "created_at": r["created_at"],
+    return [{"proposal_id": r["id"], "person_id": r["person_id"], "username": r["username"], "created_at": r["created_at"],
              "pending": len(json.loads(r["payload"]))} for r in rows]
 
 
@@ -647,10 +649,10 @@ class ApplyError(ProposalError):
         self.created = created
 
 
-def _open_proposal(db, proposal_id: str, person_id: str, username: str):
+def _open_proposal(db, proposal_id: str, person_id: str, username: str, see_all: bool = False):
     row = db.execute(
-        "SELECT * FROM proposal WHERE id=? AND person_id=? AND username=? AND applied_at IS NULL AND expires_at>?",
-        (proposal_id, person_id, username, int(time.time())),
+        "SELECT * FROM proposal WHERE id=? AND person_id=? AND (? OR username=?) AND applied_at IS NULL AND expires_at>?",
+        (proposal_id, person_id, see_all, username, int(time.time())),
     ).fetchone()
     if row is None:
         raise ProposalError("proposal_not_found")
@@ -699,14 +701,14 @@ def _close_rows(db, proposal_id: str, decided: list[dict]) -> int:
 
 def apply_selected(proposal_id: str, person_id: str, username: str,
                    session_fingerprint: str, selected: list[int],
-                   revision: Optional[str] = None) -> dict:
+                   revision: Optional[str] = None, see_all: bool = False) -> dict:
     """Kinnitus kolmes sammus: eelkontroll (ei kirjuta) → registrikirjed → kaart üks kord.
     Kõik-või-mitte-midagi kaardi suhtes, mitte registri suhtes (vt `ApplyError`)."""
     from . import registries
     from .person_crud import get_person, update_person
 
     with _db() as db:
-        row = _open_proposal(db, proposal_id, person_id, username)
+        row = _open_proposal(db, proposal_id, person_id, username, see_all)
         _check_revision(row, revision)
         items = json.loads(row["payload"])
         _check_selection(selected, len(items))
@@ -759,10 +761,11 @@ def apply_selected(proposal_id: str, person_id: str, username: str,
 
 
 def reject_selected(proposal_id: str, person_id: str, username: str,
-                    selected: list[int], revision: Optional[str] = None) -> dict:
+                    selected: list[int], revision: Optional[str] = None,
+                    see_all: bool = False) -> dict:
     """Toimetaja lükkab read tagasi; kaarti ega registrit ei puudutata."""
     with _db() as db:
-        row = _open_proposal(db, proposal_id, person_id, username)
+        row = _open_proposal(db, proposal_id, person_id, username, see_all)
         _check_revision(row, revision)
         items = json.loads(row["payload"])
         _check_selection(selected, len(items))

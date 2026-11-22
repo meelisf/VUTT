@@ -282,3 +282,30 @@ Disain: sama fail, jaotis „2. osa".
   `router._after_person_save`-is ja kinnituse otspunkt kutsub sama — B kaart saab
   `reciprocal_auto` rea nagu käsitsi salvestusel.
 - **Matmine (`burial`) jääb välja**, kuni isikuvormis on väli.
+
+## Täiendus 2026-11-22 (#869): agendi ligipääs adminile
+
+Seni oli kogu töövoog (kood, loend, ülevaatus, kinnitus) ainult superadminil.
+Nüüd saab superadmin anda ligipääsu **üksikule adminile**.
+
+- **Õigus on kasutajapõhine lipp**, mitte grupp: `users.json` → `agent_access: true`.
+  Kehtib AINULT rollil `admin` (`auth.has_agent_access`; superadmin alati). Lippu
+  kirjutab ainult superadmin (`POST /admin/users/agent-access`, `set_agent_access`).
+  Kasutajate tabil (`UserDetail`) on lüliti ainult superadminile ja ainult admini kirjel.
+- **Lipp elab sessioonis** (ADR 0046): `verify_user` paneb ta hetktõmmisesse, kirjutus
+  katkestab sihtkasutaja sessioonid (valvur `test_oigusvalja_kirjutus_katkestab_sessiooni`
+  loeb `agent_access`-i õigusväljaks). Äravõtmine tühistab ka tema agendikoodid
+  (`agent_handoff.revoke_user`). Rollimuutus mitte-adminiks pühib lipu — hilisem
+  tagasiedutamine ei taasta unustatud õigust.
+- **Üks sõltuvus:** kõik ettepanekuteed (`/agent-handoff`, `/agent-proposals`, lehe tekst,
+  osad, eksemplarid, isiku rikastus) kasutavad `deps.require_agent_access`. Liputa admin
+  saab 403 (mitte 401 — klient loeb 401 sessiooni surmaks). `/save` `proposal`-viide
+  kontrollib sama `has_agent_access`-iga.
+- **Nähtavus:** admin näeb ja otsustab AINULT oma koodiga tulnud ettepanekuid, superadmin
+  kõiki (`deps.proposal_scope` → hoidlate `see_all`). See muudab kahte varasemat reeglit:
+  tekstipakid ei ole enam kõigile ülevaatajatele nähtavad, ja osi/eksemplare/isikuid näeb
+  superadmin ka teiste kasutajate omi. Võõras ettepanek on adminile „tundmatu" (sama viga
+  nagu puuduval, olemasolu ei leki); `/save` käsitleb võõrast pakki nagu otsustatut.
+  Loendi read kannavad `username`-i (superadmini filter).
+- **Üks koht:** kood ja ettepanekute loend kolisid `/review` lehelt uude „Agendid"
+  kaarti (`/admin/agents`). Otsus käib endiselt sihtvaates.

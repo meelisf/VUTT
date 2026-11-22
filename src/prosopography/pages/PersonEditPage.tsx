@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { isAtLeast } from '../../utils/roleUtils';
+import { hasAgentAccess, isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowLeftRight, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
@@ -74,7 +74,7 @@ const PersonEditPage: React.FC = () => {
   // Uue isiku voog algab isikupaneeliga (NewPersonStart); see lipp avab käsitsi tühja vormi.
   const [manualMode, setManualMode] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
-  // `?agent=1` tuleb `/review` agendi ettepanekute loendist (ADR 0058, 2026-10-20):
+  // `?agent=1` tuleb `/admin/agents` agendi ettepanekute loendist (ADR 0058, 2026-10-20):
   // ametite plokk lahti ja agendipaneel nähtavale.
   const agentFocus = searchParams.get('agent') === '1';
   const [occupOpen, setOccupOpen] = useState(agentFocus);
@@ -112,7 +112,7 @@ const PersonEditPage: React.FC = () => {
 
   const canEdit = isAtLeast(user?.role, 'editor');
   const isAdmin = isAtLeast(user?.role, 'admin');
-  const isSuperadmin = isAtLeast(user?.role, 'superadmin');
+  const agentAccess = hasAgentAccess(user);
 
   // Isikutel juba kasutusel olevad märksõnad — soovitused TagsList'ile.
   const tagSuggestions = usePersonTagSuggestions(lang, canEdit, authToken ?? undefined);
@@ -875,8 +875,8 @@ const PersonEditPage: React.FC = () => {
           open={occupOpen}
           onToggle={() => setOccupOpen(v => !v)}
         >
-          {/* Agendi rikastus on ainult superadminil, kuni töövoog on silutud (spekk 2026-09-28). */}
-          {!isNew && original && isSuperadmin && <AgentEnrichmentPanel
+          {/* Agendi rikastus: superadmin või agendi lipuga admin (#869). */}
+          {!isNew && original && agentAccess && <AgentEnrichmentPanel
             person={original} token={token} isDirty={isDirty}
             onApplied={person => {
               setOriginal(person);

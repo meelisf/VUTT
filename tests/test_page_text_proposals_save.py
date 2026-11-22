@@ -1,4 +1,5 @@
-"""#641: lehe ettepaneku kinnitus `/save` kaudu (`proposal`-viide, ainult superadmin)."""
+"""#641: lehe ettepaneku kinnitus `/save` kaudu (`proposal`-viide): superadmin või
+agendi lipuga admin oma pakil (#869)."""
 import json
 import subprocess
 
@@ -72,6 +73,45 @@ def test_save_viide_mitte_superadmin_403(client, login, leht, ettepanek):
               user=("editor", "editorpass"))
     assert r.status_code == 403
     assert leht["txt"].read_text(encoding="utf-8") == "vana tekst"
+
+
+def _anna_agendi_oigus(client, login):
+    token = login("superadmin", "superpass")
+    r = client.post("/admin/users/agent-access", json={"username": "admin", "enabled": True},
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200, r.text
+
+
+def test_save_viide_admin_ilma_liputa_403(client, login, leht, ettepanek):
+    r = _save(client, login, text="uus tekst", proposal={"id": ettepanek, "stem": "pg1"},
+              user=("admin", "adminpass"))
+    assert r.status_code == 403
+    assert leht["txt"].read_text(encoding="utf-8") == "vana tekst"
+
+
+def test_save_viide_lipuga_admin_voor_pakk_ei_otsusta(client, login, leht, ettepanek):
+    """#869: teise kasutaja pakk on adminile nagu otsustatud — salvestus käib, olek jääb."""
+    _anna_agendi_oigus(client, login)
+    r = _save(client, login, text="uus tekst", proposal={"id": ettepanek, "stem": "pg1"},
+              user=("admin", "adminpass"))
+    assert r.status_code == 200, r.text
+    assert r.json()["proposal_state"] == "already_decided"
+    assert _row_state(ettepanek) == "pending"
+
+
+def test_save_viide_lipuga_admin_oma_pakk(client, login, leht, tmp_path, monkeypatch):
+    monkeypatch.setattr(ptp, "DB_PATH", str(tmp_path / "ptp-oma.sqlite3"))
+    folder = leht["txt"].parent
+    (folder / "pg1.jpg").write_bytes(b"x")
+    code = ptp.issue_handoff("work1", "admin")["code"]
+    src = ptp.read_source(code, "work1", str(folder), 1)
+    pid = ptp.submit(code, "work1", str(folder), [{"stem": "pg1", "text_hash": src["text_hash"],
+                     "edits": [{"old": "vana", "new": "uus"}]}], "pakk")["proposal_id"]
+    _anna_agendi_oigus(client, login)
+    r = _save(client, login, text="uus tekst", proposal={"id": pid, "stem": "pg1"},
+              user=("admin", "adminpass"))
+    assert r.status_code == 200, r.text
+    assert r.json()["proposal_state"] == "accepted" and _row_state(pid) == "accepted"
 
 
 @pytest.mark.parametrize("proposal", [{"stem": "pg1"}, "pg1"])

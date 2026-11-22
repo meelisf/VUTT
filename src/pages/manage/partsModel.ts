@@ -137,7 +137,7 @@ export type ManageTab = 'parts' | 'pages' | 'trash' | 'replace' | 'exemplars';
 
 /** Vaikimisi „Leheküljed": osi läheb harvem vaja, ja töölaua sügavlink `?focus=N`
  *  (utils/manageDeeplink) vajab niikuinii lehtede vahekaarti. `?tab=parts` tuleb
- *  `/review` agendi ettepanekute loendist (ADR 0058, 2026-10-20), `?tab=exemplars`
+ *  `/admin/agents` agendi ettepanekute loendist (ADR 0058, 2026-10-20), `?tab=exemplars`
  *  sealt eksemplari-ettepanekute juurde (#703). */
 export function initialManageTab(focus: number | null, tab: string | null): ManageTab {
   if (focus !== null) return 'pages';

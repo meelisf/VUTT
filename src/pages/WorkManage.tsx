@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAdminImageTicket } from '../hooks/useAdminImageTicket';
-import { isAtLeast } from '../utils/roleUtils';
+import { hasAgentAccess, isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { parseFocusParam, buildBackToEditorPath } from '../utils/manageDeeplink';
@@ -209,6 +209,8 @@ const WorkManage: React.FC = () => {
   // Gemini pakkuja: nupp nähtav ainult siis, kui roll JA serveripoolne seadistus lubavad
   // (frontend-kontroll on mugavus, backend jõustab superadmin-nõude uuesti).
   const isSuperadmin = isAtLeast(user?.role, 'superadmin');
+  // Agendi ettepanekud: superadmin või agendi lipuga admin (#869).
+  const agentAccess = hasAgentAccess(user);
   const geminiEnabled = useGeminiEnabled(authToken, isSuperadmin);
 
   useEffect(() => {
@@ -282,12 +284,12 @@ const WorkManage: React.FC = () => {
     if (isAdmin) loadPages();
   }, [workId, authToken, isAdmin]);
 
-  // Agendi eksemplari-ettepanekud (#703, ainult superadmin): vahekaart on nähtav, kui
+  // Agendi eksemplari-ettepanekud (#703, agendi õigusega): vahekaart on nähtav, kui
   // teosel on ettepanekuid; nupul kinnitatavate ridade arv (olek tuleb serverist).
   const [exemplarProposalRows, setExemplarProposalRows] = useState<{ total: number; pending: number }>(
     { total: 0, pending: 0 });
   const loadExemplarProposalCount = useCallback(() => {
-    if (!workId || !authToken || !isSuperadmin) return;
+    if (!workId || !authToken || !agentAccess) return;
     listExemplarProposals(workId, authToken)
       .then(ps => {
         const rows = ps.flatMap(p => p.rows);
@@ -295,7 +297,7 @@ const WorkManage: React.FC = () => {
           pending: rows.filter(r => r.review_state === 'pending').length });
       })
       .catch(() => {});
-  }, [workId, authToken, isSuperadmin]);
+  }, [workId, authToken, agentAccess]);
   useEffect(() => { loadExemplarProposalCount(); }, [loadExemplarProposalCount]);
   const onExemplarProposalsChanged = () => {
     loadExemplarProposalCount();
@@ -1005,7 +1007,7 @@ const WorkManage: React.FC = () => {
           >
             {t('manage.tabParts')}
           </button>
-          {isSuperadmin && (exemplarProposalRows.total > 0 || activeTab === 'exemplars') && (
+          {agentAccess && (exemplarProposalRows.total > 0 || activeTab === 'exemplars') && (
             <button
               onClick={() => switchTab('exemplars')}
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -1067,7 +1069,7 @@ const WorkManage: React.FC = () => {
           />
         )}
 
-        {activeTab === 'exemplars' && workId && isSuperadmin && (
+        {activeTab === 'exemplars' && workId && agentAccess && (
           <ExemplarProposalsTab workId={workId} token={authToken} onChanged={onExemplarProposalsChanged} />
         )}
 

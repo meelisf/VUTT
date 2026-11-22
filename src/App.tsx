@@ -33,6 +33,7 @@ const AdminRegistrations = lazyRetry(() => import('./pages/admin/Registrations')
 const AdminUsers = lazyRetry(() => import('./pages/admin/Users'));
 const AdminUserDetail = lazyRetry(() => import('./pages/admin/UserDetail'));
 const AdminTrash = lazyRetry(() => import('./pages/admin/Trash'));
+const AdminAgents = lazyRetry(() => import('./pages/admin/Agents'));
 const AdminCollections = lazyRetry(() => import('./pages/admin/CollectionsHub'));
 const AdminCollectionDetail = lazyRetry(() => import('./pages/admin/CollectionDetail'));
 const AdminMaintenance = lazyRetry(() => import('./pages/admin/Maintenance'));
@@ -124,6 +125,11 @@ const router = createBrowserRouter([
   {
     path: "/admin/trash",
     element: <Lazy><AdminTrash /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/agents",
+    element: <Lazy><AdminAgents /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {
