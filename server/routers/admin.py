@@ -13,6 +13,7 @@ from ..auth import (
     can_manage_user,
     delete_user,
     get_all_users,
+    set_agent_access,
     update_user_role,
 )
 from ..config import BASE_DIR, PUBLIC_BASE_URL, get_logger
@@ -249,6 +250,17 @@ async def admin_collection_rights(request: Request, user=Depends(require_role("a
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success", "users": users_state}
+
+
+@router.post("/admin/users/agent-access")
+async def admin_agent_access(request: Request, user=Depends(require_role("superadmin"))):
+    """Superadmin annab adminile agendi ligipääsu või võtab selle (#869, ADR 0058)."""
+    data = await get_json_data(request)
+    success, message = await run_in_threadpool(
+        set_agent_access, data.get("username"), data.get("enabled"), user)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success"}
 
 
 @router.post("/admin/users/delete")

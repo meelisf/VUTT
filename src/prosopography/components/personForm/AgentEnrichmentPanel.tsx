@@ -108,7 +108,7 @@ export default function AgentEnrichmentPanel({ person, token, isDirty, onApplied
       <p className="text-xs text-gray-600">{tr('intro')}</p>
       {/* Agendikood on ÜKS ja elab ülevaatuse lehel (ADR 0058, 2026-10-20). */}
       <p className="text-xs">
-        <Link to="/review" className="text-blue-800 underline hover:text-blue-950">{tr('codeOnReview')}</Link>
+        <Link to="/admin/agents" className="text-blue-800 underline hover:text-blue-950">{tr('codeOnAgents')}</Link>
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => void refresh()} disabled={busy}

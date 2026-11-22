@@ -13,7 +13,7 @@ import ast
 from pathlib import Path
 
 SERVER = Path(__file__).resolve().parents[1] / "server"
-VALJAD = {"allowed_collections", "edit_collections"}
+VALJAD = {"allowed_collections", "edit_collections", "agent_access"}
 
 # funktsioon → põhjus, miks ta ise sessiooni ei katkesta
 ERANDID = {

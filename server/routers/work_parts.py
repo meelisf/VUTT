@@ -10,7 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Re
 from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import can_read_work, can_write_work
-from ..deps import optional_user, require_role
+from ..deps import optional_user, proposal_scope, require_agent_access, require_role
 from ..utils import find_directory_by_id
 from ..work_sets_access import load_work_metadata_by_id
 from .. import page_address
@@ -109,7 +109,7 @@ def change_pages(work_id: str, part_id: str, background_tasks: BackgroundTasks, 
 
 
 # ── Agendi ettepanekud (#492 samm 2) ─────────────────────────────────────────
-# Esialgu ainult superadmin (kasutaja otsus 2026-09-27): teised toimetajad seda ei kasuta.
+# Superadmin (kõik) või agendi lipuga admin (ainult oma koodiga tulnud; #869).
 
 def _wpp(fn, *args, **kwargs):
     try:
@@ -120,31 +120,32 @@ def _wpp(fn, *args, **kwargs):
 
 
 @router.get("/works/{work_id}/parts/proposals")
-def parts_proposals(work_id: str, user=Depends(require_role("superadmin"))):
-    return _wpp(wpp.list_pending, work_id, _writable(work_id, user), user["username"])
+def parts_proposals(work_id: str, user=Depends(require_agent_access())):
+    return _wpp(wpp.list_pending, work_id, _writable(work_id, user), user["username"],
+                see_all=proposal_scope(user))
 
 
 @router.post("/works/{work_id}/parts/proposals/{proposal_id}/items/{index}/{action}")
 def parts_proposal_decide(work_id: str, proposal_id: str, index: int, action: str,
                           background_tasks: BackgroundTasks,
-                          body: dict = Body(default={}), user=Depends(require_role("superadmin"))):
+                          body: dict = Body(default={}), user=Depends(require_agent_access())):
     """Toimetaja otsus ühe osa kohta: accept (soovi korral parandatud `part`) või reject."""
     path = _writable(work_id, user)
     created = _wpp(wpp.decide, proposal_id, work_id, path, user["username"], index, action,
                    override=(body or {}).get("part"), mode=(body or {}).get("mode"),
-                   background_tasks=background_tasks)
+                   background_tasks=background_tasks, see_all=proposal_scope(user))
     return {"status": "accepted" if created else "rejected", "part": created}
 
 
 @router.post("/works/{work_id}/parts/proposals/accept")
 def parts_proposals_accept(work_id: str, background_tasks: BackgroundTasks,
-                           body: dict = Body(...), user=Depends(require_role("superadmin"))):
+                           body: dict = Body(...), user=Depends(require_agent_access())):
     """„Lisa kõik": `items: [{proposal_id, index}]` ühe commiti ja ühe Meili sünk'iga."""
     path = _writable(work_id, user)
     picks = [(i.get("proposal_id"), i.get("index")) if isinstance(i, dict) else None
              for i in (body or {}).get("items") or []]
     parts = _wpp(wpp.decide_many, work_id, path, user["username"], picks,
-                 background_tasks=background_tasks)
+                 background_tasks=background_tasks, see_all=proposal_scope(user))
     return {"accepted": len(parts), "parts": parts}
 
 
@@ -176,8 +177,8 @@ async def parts_proposal_submit(request: Request):
 
 @router.post("/works/{work_id}/parts/proposals/{proposal_id}/persons/{ref}/{action}")
 def parts_proposal_person(work_id: str, proposal_id: str, ref: str, action: str,
-                          body: dict = Body(default={}), user=Depends(require_role("superadmin"))):
+                          body: dict = Body(default={}), user=Depends(require_agent_access())):
     """Pakutud isik: create (uus kaart), link (olemasolev, `person_id`) või name (jääb nimeks)."""
     path = _writable(work_id, user)
     return _wpp(wpp.resolve_person, proposal_id, work_id, path, user["username"], ref, action,
-                (body or {}).get("person_id"))
+                (body or {}).get("person_id"), see_all=proposal_scope(user))

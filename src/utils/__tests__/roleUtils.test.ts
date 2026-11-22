@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roleLevel, canManageUser, canAssignRole, assignableRoles, isAtLeast, canEditWork, describeWriteScope, ROLE_LEVELS } from '../roleUtils';
+import { roleLevel, canManageUser, canAssignRole, assignableRoles, isAtLeast, hasAgentAccess, canEditWork, describeWriteScope, ROLE_LEVELS } from '../roleUtils';
 
 describe('roleUtils', () => {
   it('hierarhia neli taset', () => {
@@ -90,5 +90,13 @@ describe('describeWriteScope', () => {
   it('fail-closed: tundmatu roll ei anna piiranguta ulatust', () => {
     expect(describeWriteScope('root', ['oma'])).toEqual({ kind: 'collections', ids: ['oma'] });
     expect(describeWriteScope('root', [])).toEqual({ kind: 'none' });
+  });
+
+  it('hasAgentAccess: superadmin alati, admin ainult lipuga (#869, peegeldab serverit)', () => {
+    expect(hasAgentAccess(null)).toBe(false);
+    expect(hasAgentAccess({ role: 'superadmin' })).toBe(true);
+    expect(hasAgentAccess({ role: 'admin' })).toBe(false);
+    expect(hasAgentAccess({ role: 'admin', agent_access: true })).toBe(true);
+    expect(hasAgentAccess({ role: 'editor', agent_access: true })).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Agendi lehe teksti ettepanekud (#641, ADR 0058 täiendus 2026-10-19).
- * Kõik otspunktid on ainult superadminile; kood antakse agendile kopeerimiseks.
+ * Otspunktid: superadmin või agendi lipuga admin (#869); kood antakse agendile kopeerimiseks.
  */
 import { FILE_API_URL } from '../config';
 import { apiGet, apiPost } from './apiClient';

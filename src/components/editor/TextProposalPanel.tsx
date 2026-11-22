@@ -25,7 +25,7 @@ interface TextProposalPanelProps {
 }
 
 /** Riba on nähtav ainult siis, kui teoses on päris ettepanek (või paki töö tulemus/viga) —
- *  muidu oleks superadminil igal lehel tühi „Agendi ettepanek" riba. */
+ *  muidu oleks ülevaatajal igal lehel tühi „Agendi ettepanek" riba. */
 export function shouldShowProposalPanel({ review, pack, job, error }: {
   review: ProposalPageReview | null; pack: TextProposalPack | null;
   job: ProposalJob | null; error: string | null;
@@ -34,7 +34,7 @@ export function shouldShowProposalPanel({ review, pack, job, error }: {
   return Boolean(review || job || error || remaining > 0);
 }
 
-// Agendi tekstiettepaneku riba redaktori kohal (#641; ainult superadmin).
+// Agendi tekstiettepaneku riba redaktori kohal (#641; agendi õigusega toimetaja, #869).
 export default function TextProposalPanel(p: TextProposalPanelProps) {
   const { t } = useTranslation(['workspace', 'common']);
   const pending = p.pack?.counts.pending ?? 0;

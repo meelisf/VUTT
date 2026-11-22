@@ -119,7 +119,10 @@
       "remnantRole": "this saved assignment has no effect, access comes from the role ({{role}})",
       "remnantPublic": "this saved assignment has no effect, the collection is public",
       "remnantDeleted": "this saved assignment has no effect, the collection has been deleted",
-      "roleCoversAll": "A {{role}} has access through their role: separate collection assignments are not needed."
+      "roleCoversAll": "A {{role}} has access through their role: separate collection assignments are not needed.",
+      "agentAccess": "Agent access",
+      "agentAccessHelp": "Allows creating agent codes and reviewing proposals made with them. The user must log in again after a change; removing it revokes active codes.",
+      "agentAccessFailed": "Changing agent access failed"
     },
     "list": {
       "searchPlaceholder": "Search by name, username or email",
@@ -324,6 +327,7 @@
     "maintenance": "Maintenance",
     "places": "Place Register",
     "prosopoRegistries": "Occupation and institution registries",
+    "agents": "Agents",
     "pending": "{{count}} pending"
   },
   "groups": {
@@ -429,6 +433,31 @@
     "historicalNamePlaceholder": "Add a name + Enter",
     "groupKeyPlaceholder": "e.g. gotaland",
     "treeEmpty": "No places"
+  },
+  "agents": {
+    "codeTitle": "Agent code",
+    "proposalsTitle": "Pending proposals",
+    "error": "Action failed: {{error}}",
+    "createCode": "Create agent code",
+    "codeHelp": "The code is valid for all works and persons: page text (up to {{text}} submissions), work parts (up to {{parts}}), copies (up to {{exemplars}}) and person records (up to {{persons}}). Give it to the agent.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "expires": "Expires",
+    "kind": {
+      "text": "Text",
+      "parts": "Parts",
+      "person": "Person",
+      "exemplars": "Copies"
+    },
+    "pending": "pending {{count}}",
+    "stale": "stale {{count}}",
+    "pagesChanged": "pages changed",
+    "blocked": "cannot be accepted {{count}}",
+    "intro": "An agent code lets an MCP agent submit pending proposals. Listed here are the proposals made with your codes; a row opens the view where you accept or reject them.",
+    "introSuperadmin": "An agent code lets an MCP agent submit pending proposals. As a superadmin you see every user's proposals; a row opens the view where you accept or reject them.",
+    "filterOwner": "Submitted by",
+    "allOwners": "All",
+    "empty": "No pending proposals."
   },
   "trash": {
     "tab": "Trash",

@@ -343,7 +343,7 @@
         "working": "Saving…",
         "accepting_one": "Adding {{count}} part…",
         "accepting_other": "Adding {{count}} parts…",
-        "codeOnReview": "Agent code and all pending proposals: review page →"
+        "codeOnAgents": "Agent code and all pending proposals: agents page →"
       },
       "kinds": {
         "letter": "Letter",

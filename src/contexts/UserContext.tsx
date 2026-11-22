@@ -27,6 +27,8 @@ interface User {
   role: string;
   allowed_collections?: string[];
   edit_collections?: string[];
+  /** Agendi ligipääs adminile (#869); kasuta `hasAgentAccess`-i, mitte välja otse. */
+  agent_access?: boolean;
 }
 
 interface UserContextType {

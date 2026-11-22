@@ -1,7 +1,7 @@
 """Lehe teksti ettepanek (#641, ADR 0058 täiendus 2026-10-19).
 
 Agent loeb lehe TOORTEKSTI (märgendus, reavahetused) koodiga ja esitab
-asendused. VUTT talletab need AINULT ootel ettepanekuna; superadmin vaatab need
+asendused. VUTT talletab need AINULT ootel ettepanekuna; koodi andnud toimetaja vaatab need
 pildi kõrval üle. `get_pages` ei kõlba aluseks — see on otsinguks puhastatud tekst.
 """
 from __future__ import annotations

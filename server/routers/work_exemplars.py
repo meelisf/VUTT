@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Re
 from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import can_read_work, can_write_work
-from ..deps import optional_user, require_role
+from ..deps import optional_user, proposal_scope, require_agent_access, require_role
 from ..utils import find_directory_by_id
 from ..work_sets_access import load_work_metadata_by_id
 from .. import work_exemplars as we
@@ -142,7 +142,7 @@ def delete(work_id: str, exemplar_id: str, background_tasks: BackgroundTasks,
 
 
 # ── Agendi ettepanekud (#703, ADR 0076 §7, ADR 0058) ────────────────────────
-# Ainult superadmin (nagu osade ja tekstide ettepanekud). Submit on autentimata:
+# Superadmin või agendi lipuga admin (#869; nagu osade ja tekstide ettepanekud). Submit on autentimata:
 # õigus on agendikood, mis ei anna teose kirjutusõigust.
 
 _SUBMIT_KEYS = {"code", "work_id", "rows", "note"}
@@ -183,13 +183,14 @@ async def exemplar_proposal_submit(request: Request):
 
 
 @router.get("/works/{work_id}/exemplar-proposals")
-def exemplar_proposals(work_id: str, user=Depends(require_role("superadmin"))):
-    return _epp(epp.list_for_work, work_id, _writable(work_id, user), user["username"])
+def exemplar_proposals(work_id: str, user=Depends(require_agent_access())):
+    return _epp(epp.list_for_work, work_id, _writable(work_id, user), user["username"],
+                see_all=proposal_scope(user))
 
 
 @router.post("/works/{work_id}/exemplar-proposals/decide")
 def exemplar_proposals_decide(work_id: str, background_tasks: BackgroundTasks,
-                              body: dict = Body(...), user=Depends(require_role("superadmin"))):
+                              body: dict = Body(...), user=Depends(require_agent_access())):
     """`{items: [{proposal_id, index}], action: "accept" | "reject"}` — partii = üks commit."""
     path = _writable(work_id, user)
     picks = [(i.get("proposal_id"), i.get("index")) if isinstance(i, dict) else None

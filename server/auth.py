@@ -156,6 +156,20 @@ def is_at_least(role: str, min_role: str) -> bool:
     return role_level(role) >= role_level(min_role)
 
 
+def has_agent_access(user: Optional[dict]) -> bool:
+    """Kas kasutaja tohib agendikoodi anda ja ettepanekuid üle vaadata (ADR 0058, #869)?
+
+    Superadmin alati; admin ainult siis, kui superadmin on talle lipu `agent_access`
+    andnud. Lipp ei kehti teistel rollidel ka siis, kui see on kirjesse jäänud. Väärtus
+    tuleb sessiooni hetktõmmisest (ADR 0046) — lipu kirjutus katkestab sessiooni."""
+    if not user:
+        return False
+    role = user.get("role") or "contributor"
+    if is_at_least(role, "superadmin"):
+        return True
+    return role == "admin" and user.get("agent_access") is True
+
+
 def can_manage_user(actor_role: str, target_role: str) -> bool:
     """Kas actor tohib target-kasutajat üldse puutuda (reset / kustutus / rollimuutus)?
     Sihtmärgi praegune tase peab olema RANGELT madalam actor tasemest."""
@@ -441,6 +455,7 @@ def verify_user(username, password):
         "role": users[username].get("role", "contributor"),
         "allowed_collections": users[username].get("allowed_collections", []),
         "edit_collections": users[username].get("edit_collections", []),
+        "agent_access": users[username].get("agent_access") is True,
     }
 
 
@@ -610,6 +625,7 @@ def get_all_users():
             "created_at": user_data.get("created_at"),
             "allowed_collections": user_data.get("allowed_collections", []),
             "edit_collections": user_data.get("edit_collections", []),
+            "agent_access": user_data.get("agent_access") is True,
         })
     # Sorteeri loomisaja järgi (uuemad ees), kui loomisaeg puudub, siis lõppu
     result.sort(key=lambda x: x.get("created_at") or "0000", reverse=True)
@@ -659,6 +675,10 @@ def update_user_role(username, new_role, admin_user):
 
         old_role = target_current
         users[username]["role"] = new_role
+        # Agendi lipp kehtib ainult adminil (#869): muu roll pühib selle, et
+        # hilisem tagasiedutamine ei taastaks unustatud õigust vaikselt.
+        if new_role != "admin":
+            users[username].pop("agent_access", None)
         save_users(users)
 
     # Sessioonide ja tokenite käsitlus on TEADLIKULT luku VÄLJAS: nad võtavad
@@ -675,6 +695,38 @@ def update_user_role(username, new_role, admin_user):
 
     print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' rolli: {old_role} -> {new_role}. Invalideeritud {invalidated} sessiooni.")
     return True, "Roll muudetud"
+
+
+def set_agent_access(username, enabled, actor):
+    """Superadmin annab või võtab adminilt agendi ligipääsu (#869, ADR 0058).
+
+    Lipp jõuab kutsujani sessiooni hetktõmmise kaudu, seega katkestab kirjutus
+    sihtkasutaja sessioonid (ADR 0046). Äravõtmine tühistab ka tema kehtivad
+    agendikoodid; juba esitatud ettepanekud jäävad (superadmin näeb neid).
+    Tagastab (ok, sõnum)."""
+    if not actor or not is_at_least(actor.get("role") or "contributor", "superadmin"):
+        return False, "Ainult superadmin"
+    if not isinstance(enabled, bool):
+        return False, "Vigane väärtus"
+    with users_transaction() as users:
+        if username not in users:
+            return False, "Kasutajat ei leitud"
+        if users[username].get("role") != "admin":
+            return False, "Agendi ligipääsu saab anda ainult adminile"
+        if (users[username].get("agent_access") is True) == enabled:
+            return True, "Muutust ei ole"
+        if enabled:
+            users[username]["agent_access"] = True
+        else:
+            users[username].pop("agent_access", None)
+        save_users(users)
+    # Luku VÄLJAS, nagu update_user_role: sessioonid ja koodid võtavad oma lukud.
+    delete_user_sessions(username)
+    if not enabled:
+        _revoke_agent_handoffs(username)
+    print(f"Superadmin '{actor['username']}' {'andis' if enabled else 'võttis'} "
+          f"kasutajalt '{username}' agendi ligipääsu")
+    return True, "Muudetud"
 
 
 def sanitize_edit_collections(collection_ids, collections_config):

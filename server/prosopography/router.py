@@ -10,7 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Request, De
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
-from ..deps import require_role
+from ..deps import proposal_scope, require_agent_access, require_role
 from ..config import get_logger
 from ..entity_labels_ops import enrich_entity_labels_from_person_async
 from .person_crud import (
@@ -369,19 +369,19 @@ def prosopography_candidates(data: dict = Body(...), user=Depends(require_role("
 _ALLOWED_CREATED_VIA = ("picker", "form")
 
 
-# Agendi rikastuse töövoog on ainult superadminil, kuni see on silutud (spekk
-# 2026-09-28). Rolli langetamine = need kolm otspunkti (loetelu, apply, reject),
-# ühtne kood (`/agent-handoff`, ADR 0058 2026-10-20) + paneeli nähtavus PersonEditPage'is.
+# Agendi rikastuse töövoog: superadmin (kõigi ettepanekud) või agendi lipuga admin
+# (ainult oma koodiga tulnud; #869). Õigus = `require_agent_access`; ühtne kood
+# (`/agent-handoff`, ADR 0058 2026-10-20) + paneeli nähtavus PersonEditPage'is.
 @router.get("/enrichment-proposals/{person_id}")
 async def prosopography_enrichment_proposals(
-    person_id: str, request: Request, user=Depends(require_role("superadmin")),
+    person_id: str, request: Request, user=Depends(require_agent_access()),
 ):
     """Tagastab ainult sama isiku ja sama kasutaja ootel ettepanekud (igas seansis)."""
     if not enrichment_proposals.valid_person_id(person_id):
         raise HTTPException(status_code=400, detail="Vigane person_id")
     return await run_in_threadpool(
         enrichment_proposals.list_pending, person_id, user["username"],
-        request.state.session_fingerprint,
+        request.state.session_fingerprint, see_all=proposal_scope(user),
     )
 
 
@@ -474,7 +474,7 @@ async def _after_person_save(person_id: str, old_relations: list, person: dict, 
 
 @router.post("/enrichment-proposals/{person_id}/apply")
 async def prosopography_apply_enrichment_proposal(
-    person_id: str, request: Request, user=Depends(require_role("superadmin")),
+    person_id: str, request: Request, user=Depends(require_agent_access()),
 ):
     """Toimetaja kinnitab valitud read oma sessioonis; MCP ei saa seda kutsuda."""
     if not enrichment_proposals.valid_person_id(person_id):
@@ -486,7 +486,7 @@ async def prosopography_apply_enrichment_proposal(
         updated = await run_in_threadpool(
             enrichment_proposals.apply_selected, data["proposal_id"], person_id,
             user["username"], request.state.session_fingerprint, data["selected"],
-            data.get("revision"),
+            data.get("revision"), see_all=proposal_scope(user),
         )
         await _after_person_save(person_id, old_relations, updated, user["username"])
         return updated
@@ -500,7 +500,7 @@ async def prosopography_apply_enrichment_proposal(
 
 @router.post("/enrichment-proposals/{person_id}/reject")
 async def prosopography_reject_enrichment_proposal(
-    person_id: str, request: Request, user=Depends(require_role("superadmin")),
+    person_id: str, request: Request, user=Depends(require_agent_access()),
 ):
     """Eemaldab read ettepanekust; kaart ja register jäävad puutumata."""
     if not enrichment_proposals.valid_person_id(person_id):
@@ -510,6 +510,7 @@ async def prosopography_reject_enrichment_proposal(
         return await run_in_threadpool(
             enrichment_proposals.reject_selected, data["proposal_id"], person_id,
             user["username"], data["selected"], data.get("revision"),
+            see_all=proposal_scope(user),
         )
     except enrichment_proposals.ProposalError as e:
         raise HTTPException(status_code=409 if str(e) == "stale_proposal" else 400, detail=str(e))

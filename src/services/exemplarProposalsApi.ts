@@ -1,6 +1,6 @@
 // src/services/exemplarProposalsApi.ts
 /**
- * Agendi eksemplari-ettepanekud (#703, ADR 0076 §7). Ainult superadmin.
+ * Agendi eksemplari-ettepanekud (#703, ADR 0076 §7). Agendi õigusega toimetaja (#869).
  * Ülevaatuse olek (`review_state`) arvutab server elava seisu vastu — klient ainult kuvab.
  */
 import { FILE_API_URL } from '../config';

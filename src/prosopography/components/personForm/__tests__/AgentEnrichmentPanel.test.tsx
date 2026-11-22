@@ -120,11 +120,11 @@ describe('agendi ettepanekute ülevaatus', () => {
     expect((screen.getByRole('button', { name: 'Kinnita kõik (3)' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('paneelis ei ole koodinuppe, on viide /review-le', async () => {
+  it('paneelis ei ole koodinuppe, on viide /admin/agents-ile', async () => {
     renderPanel();
     await screen.findAllByText('registris');
     expect(screen.queryByRole('button', { name: 'Kood kõigile isikutele' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Loo üleandmiskood' })).toBeNull();
-    expect(screen.getByRole('link', { name: /ülevaatuse leht/ }).getAttribute('href')).toBe('/review');
+    expect(screen.getByRole('link', { name: /agentide leht/ }).getAttribute('href')).toBe('/admin/agents');
   });
 });

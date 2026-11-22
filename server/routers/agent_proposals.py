@@ -1,20 +1,21 @@
 # server/routers/agent_proposals.py
 """Ühtne agendikood ja ootel ettepanekute loend `/review`-l (ADR 0058 täiendus 2026-10-20).
 
-Mõlemad otspunktid on superadminile (ADR 0058, 2026-09-29). Loogika elab
+Mõlemad otspunktid: superadmin või agendi lipuga admin (#869). Admin näeb
+ainult oma koodiga tulnud ettepanekuid, superadmin kõiki. Loogika elab
 `server/agent_proposals.py`-s; siin on ainult HTTP-kiht.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import agent_proposals as ap
-from ..deps import require_role
+from ..deps import proposal_scope, require_agent_access
 from ..rate_limit import check_rate_limit
 
 router = APIRouter()
 
 
 @router.post("/agent-handoff")
-def agent_handoff(request: Request, user=Depends(require_role("superadmin"))):
+def agent_handoff(request: Request, user=Depends(require_agent_access())):
     """ÜKS agendikood (8 h, mitu esitust): lehe tekst, teose osad ja isikukaardid."""
     allowed, retry = check_rate_limit(user["username"], "/agent-handoff")
     if not allowed:
@@ -27,5 +28,5 @@ def agent_handoff(request: Request, user=Depends(require_role("superadmin"))):
 
 
 @router.get("/agent-proposals")
-def agent_proposals(user=Depends(require_role("superadmin"))):
-    return ap.list_agent_proposals(user["username"])
+def agent_proposals(user=Depends(require_agent_access())):
+    return ap.list_agent_proposals(user["username"], see_all=proposal_scope(user))

@@ -164,8 +164,8 @@ def test_loend_kolm_liiki(client, work):
     rows = client.get("/agent-proposals").json()
     assert sorted(r["kind"] for r in rows) == ["parts", "person", "text"]
     for row in rows:
-        assert set(row) == {"kind", "proposal_id", "target_id", "target_label", "target_url",
-                            "pending", "stale", "created_at"}
+        assert set(row) == {"kind", "proposal_id", "username", "target_id", "target_label",
+                            "target_url", "pending", "stale", "created_at"}
     (text,) = _by_kind(rows, "text")
     assert text["target_id"] == "w1" and text["target_label"] == "Epistolae"
     assert text["pending"] == 1 and text["stale"] == 1
@@ -235,15 +235,49 @@ def test_tombstone_isik_saab_id_sildiks(client, work, monkeypatch):
     assert person["target_label"] == "vutt:Pabc"
 
 
-def test_nahtavus_kasutaja_kaupa(client, work):
-    client.state["user"] = {"username": "teine", "role": "superadmin"}
+ADMIN = {"username": "adm", "role": "admin", "agent_access": True}
+
+
+def _esita_koik(client, work, user):
+    client.state["user"] = user
     code = client.post("/agent-handoff").json()["code"]
-    pid = _text_pack(work, code, 2)
+    _text_pack(work, code, 2)
     wpp.submit(code, "w1", work, wpp.pages_version(work), [LETTER])
     ep.submit(code, "vutt:Pabc", "t", [dict(ITEM)])
+
+
+def test_superadmin_naeb_koigi_ettepanekuid(client, work):
+    """#869: superadmin näeb kõigi kasutajate ettepanekuid, rida kannab esitaja nime."""
+    _esita_koik(client, work, ADMIN)
     client.state["user"] = {"username": "ed", "role": "superadmin"}
     rows = client.get("/agent-proposals").json()
-    assert [(r["kind"], r["proposal_id"]) for r in rows] == [("text", pid)]
+    assert sorted((r["kind"], r["username"]) for r in rows) == [
+        ("parts", "adm"), ("person", "adm"), ("text", "adm")]
+
+
+def test_admin_naeb_ainult_oma_ettepanekuid(client, work):
+    """#869: lipuga admin näeb ainult oma koodiga tulnud ettepanekuid — ka tekstipakke,
+    mida varem nägid kõik superadminid."""
+    _esita_koik(client, work, {"username": "ed", "role": "superadmin"})
+    client.state["user"] = ADMIN
+    assert client.get("/agent-proposals").json() == []
+    _esita_koik(client, work, {**ADMIN, "username": "teine"})
+    client.state["user"] = ADMIN
+    assert client.get("/agent-proposals").json() == []
+    _esita_koik(client, work, ADMIN)
+    rows = client.get("/agent-proposals").json()
+    assert {r["username"] for r in rows} == {"adm"} and len(rows) == 3
+
+
+@pytest.mark.parametrize("user", [
+    {"username": "adm", "role": "admin"},
+    {"username": "adm", "role": "admin", "agent_access": False},
+    {"username": "red", "role": "editor", "agent_access": True},   # lipp kehtib ainult adminil
+])
+def test_ilma_agendi_oiguseta_ei_saa(client, user):
+    client.state["user"] = user
+    assert client.post("/agent-handoff").status_code == 403
+    assert client.get("/agent-proposals").status_code == 403
 
 
 EX_NEW = {"op": "create", "fields": {"holder": "TÜR", "shelfmark": "R 1"},
@@ -261,6 +295,39 @@ def test_loend_naitab_eksemplari_ettepanekut(client, work, monkeypatch):
     (row,) = _by_kind(client.get("/agent-proposals").json(), "exemplars")
     assert row == {"kind": "exemplars", "proposal_id": res["proposal_id"], "target_id": "w1",
                    "target_label": "Epistolae", "target_url": "/work/w1/manage?tab=exemplars",
-                   "pending": 2, "stale": 1, "created_at": row["created_at"]}
-    client.state["user"] = {"username": "teine", "role": "superadmin"}
+                   "pending": 2, "stale": 1, "created_at": row["created_at"], "username": "ed"}
+    client.state["user"] = {"username": "teine", "role": "admin", "agent_access": True}
     assert _by_kind(client.get("/agent-proposals").json(), "exemplars") == []
+    client.state["user"] = {"username": "teine", "role": "superadmin"}
+    assert len(_by_kind(client.get("/agent-proposals").json(), "exemplars")) == 1
+
+
+def test_otsus_voorale_ettepanekule_ainult_superadminil(client, work, monkeypatch):
+    """#869: admin ei leia teise kasutaja ettepanekut ka otsustusteel (sama viga nagu
+    puuduval), superadmin (`see_all`) leiab. Tagasilükkamine ei kirjuta teost."""
+    import importlib
+    config = importlib.import_module("server.config")
+    archives = os.path.join(os.path.dirname(work), "archives.json")
+    json.dump({"TÜR": {"name": "TÜR"}}, open(archives, "w"))
+    monkeypatch.setattr(config, "ARCHIVES_FILE", archives)
+    code = client.post("/agent-handoff").json()["code"]       # "ed" esitab
+    parts = wpp.submit(code, "w1", work, wpp.pages_version(work), [LETTER])["proposal_id"]
+    person = ep.submit(code, "vutt:Pabc", "t", [dict(ITEM)])["proposal_id"]
+    ex = epp.submit(code, "w1", work, [EX_NEW])["proposal_id"]
+
+    with pytest.raises(wpp.ProposalError, match="proposal_not_found"):
+        wpp.decide(parts, "w1", work, "adm", 0, "reject")
+    with pytest.raises(ep.ProposalError, match="proposal_not_found"):
+        ep.reject_selected(person, "vutt:Pabc", "adm", [0])
+    with pytest.raises(epp.ProposalError, match="proposal_not_found"):
+        epp.decide("w1", work, "adm", [(ex, 0)], "reject")
+    assert wpp.list_pending("w1", work, "adm") == []
+    assert ep.list_pending("vutt:Pabc", "adm") == []
+    assert epp.list_for_work("w1", work, "adm") == []
+
+    assert [p["username"] for p in wpp.list_pending("w1", work, "su", see_all=True)] == ["ed"]
+    assert len(ep.list_pending("vutt:Pabc", "su", see_all=True)) == 1
+    assert [p["username"] for p in epp.list_for_work("w1", work, "su", see_all=True)] == ["ed"]
+    assert wpp.decide(parts, "w1", work, "su", 0, "reject", see_all=True) is None
+    ep.reject_selected(person, "vutt:Pabc", "su", [0], see_all=True)
+    epp.decide("w1", work, "su", [(ex, 0)], "reject", see_all=True)

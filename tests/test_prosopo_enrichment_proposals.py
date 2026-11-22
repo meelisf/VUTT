@@ -580,13 +580,16 @@ def test_toend_lubab_citationi():
     ("get", "/prosopography/enrichment-proposals/vutt:Pabc"),
     ("post", "/prosopography/enrichment-proposals/vutt:Pabc/apply"),
 ])
-@pytest.mark.parametrize("user, password", [("editor", "editorpass"), ("admin", "adminpass")])
-def test_rikastuse_otspunktid_on_ainult_superadminile(client, login, prosopo_env, method, path, user, password):
+@pytest.mark.parametrize("user, password, status", [
+    ("editor", "editorpass", 401),   # alla admini: selle projekti rollikaitse (deps.get_user)
+    ("admin", "adminpass", 403),     # admin ilma agendi liputa (#869): sessioon elab, õigust pole
+])
+def test_rikastuse_otspunktid_vajavad_agendi_oigust(client, login, prosopo_env, method, path, user, password, status):
     prosopo_env.write("abc")
     token = login(user, password)
     response = getattr(client, method)(path, headers=_headers(token),
                                        **({"json": {"proposal_id": "x", "selected": [0]}} if method == "post" else {}))
-    assert response.status_code == 401   # selle projekti rollikaitse (deps.get_user)
+    assert response.status_code == status
 
 
 def _loetelu(client, token):

@@ -23,7 +23,7 @@ import PartProposals from './PartProposals';
 import { usePersonSources } from '../../../hooks/usePersonSources';
 import { getLangCode } from '../../../utils/getLangCode';
 import { useUser } from '../../../contexts/UserContext';
-import { isAtLeast } from '../../../utils/roleUtils';
+import { hasAgentAccess } from '../../../utils/roleUtils';
 
 const THUMB_KEY = 'vutt_parts_thumb';
 const THUMB_MIN = 100;
@@ -57,9 +57,9 @@ type Editing = { id: string | null; pages: string[]; proposal?: { id: string; in
 const PartsTab: React.FC<Props> = ({ workId, pages, token, imageToken, thumbCacheBust, onDirtyChange, runGuarded, saveRef }) => {
   const { t, i18n } = useTranslation(['workspace']);
   const { authors, peopleRegister } = usePersonSources(token, getLangCode(i18n.language));
-  // Agendi ettepanekud esialgu ainult superadminile (#492; server kontrollib sama).
+  // Agendi ettepanekud: superadmin või agendi lipuga admin (#492, #869; server kontrollib sama).
   const { user } = useUser();
-  const showProposals = isAtLeast(user?.role, 'superadmin');
+  const showProposals = hasAgentAccess(user);
   const [view, setView] = useState<'pages' | 'toc'>('pages');
   const [thumbSize, setThumbSize] = useState(readThumbSize);
   const [parts, setParts] = useState<WorkPart[]>([]);

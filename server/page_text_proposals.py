@@ -297,7 +297,7 @@ def _set_state(db, proposal_id: str, stems, state: str, username: Optional[str])
 
 def _page_row(db, proposal_id: str, stem: str):
     row = db.execute(
-        "SELECT pp.*, p.note AS pack_note, p.work_id FROM proposal_page pp "
+        "SELECT pp.*, p.note AS pack_note, p.work_id, p.username AS owner FROM proposal_page pp "
         "JOIN proposal p ON p.id = pp.proposal_id WHERE pp.proposal_id=? AND pp.stem=?",
         (proposal_id, stem)).fetchone()
     if row is None:
@@ -345,8 +345,9 @@ def review_page(proposal_id: str, stem: str, work_dir: str) -> dict:
             "note": row["note"], "pack_note": row["pack_note"], "work_id": row["work_id"]}
 
 
-def list_pending(work_id: Optional[str] = None) -> list:
-    """Pakid, milles on ülevaatust vajavaid (pending ∪ stale) lehti."""
+def list_pending(work_id: Optional[str] = None, owner: Optional[str] = None) -> list:
+    """Pakid, milles on ülevaatust vajavaid (pending ∪ stale) lehti.
+    `owner` = ainult selle kasutaja koodiga tulnud pakid (admin, #869); `None` = kõik."""
     now = int(time.time())
     with _db() as db:
         _clean(db, now)
@@ -355,7 +356,10 @@ def list_pending(work_id: Optional[str] = None) -> list:
         args: tuple = ()
         if work_id is not None:
             q += " AND p.work_id=?"
-            args = (work_id,)
+            args += (work_id,)
+        if owner is not None:
+            q += " AND p.username=?"
+            args += (owner,)
         packs = []
         for p in db.execute(q + " ORDER BY p.created_at", args).fetchall():
             pages = db.execute("SELECT stem, page_no, state FROM proposal_page WHERE proposal_id=? "
@@ -408,10 +412,13 @@ def mark_rejected(proposal_id: str, stems, username: str) -> int:
         return _set_state(db, proposal_id, stems, "rejected", username)
 
 
-def page_ref(proposal_id: str, stem: str):
-    """Ülevaatust vajav lehe ettepanek `/save` viite jaoks; muu → ProposalError."""
+def page_ref(proposal_id: str, stem: str, owner: Optional[str] = None):
+    """Ülevaatust vajav lehe ettepanek `/save` viite jaoks; muu → ProposalError.
+    `owner` antud → võõras pakk on tundmatu (admin, #869)."""
     with _db() as db:
         row = _page_row(db, proposal_id, stem)
+    if owner is not None and row["owner"] != owner:
+        raise ProposalError("unknown_proposal")
     if row["state"] not in REVIEW_STATES:
         raise ProposalError("proposal_decided")
     return row
@@ -507,9 +514,10 @@ def apply_pack(proposal_id: str, work_dir: str, username: str, progress=None) ->
     return {"accepted": sorted(accepted), "stale": sorted(stale), "skipped": sorted(skipped)}
 
 
-def pack_work_id(proposal_id: str) -> str:
+def pack_work_id(proposal_id: str, owner: Optional[str] = None) -> str:
+    """Paki teos. `owner` antud → võõras pakk on „tundmatu" (404, olemasolu ei leki; #869)."""
     with _db() as db:
-        row = db.execute("SELECT work_id FROM proposal WHERE id=?", (proposal_id,)).fetchone()
-    if row is None:
+        row = db.execute("SELECT work_id, username FROM proposal WHERE id=?", (proposal_id,)).fetchone()
+    if row is None or (owner is not None and row["username"] != owner):
         raise ProposalError("unknown_proposal")
     return row["work_id"]

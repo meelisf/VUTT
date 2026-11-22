@@ -1,7 +1,7 @@
 // src/pages/manage/exemplars/ExemplarProposalsTab.tsx
 /**
  * Teose halduse vahekaart „Eksemplarid" (#703, ADR 0076 §7): agendi
- * eksemplari-ettepanekud. Ainult superadmin.
+ * eksemplari-ettepanekud. Agendi õigusega toimetaja (#869).
  *
  * Ülevaatus = Kinnita või Lükka tagasi (ADR 0058 täiendus 2026-09-29: parandust
  * ettepanekus ei ole — toimetaja parandab pärast kinnitust eksemplari vormis).

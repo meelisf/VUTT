@@ -79,44 +79,49 @@ def _text_page(pack: dict, number: dict) -> int:
     return 1
 
 
-def list_agent_proposals(username: str) -> list[dict]:
-    """Kõik ootel ettepanekud ühes loendis. Nähtavus järgib sihtvaadet: tekstipakke
-    näevad kõik superadminid, osi, eksemplare ja isikuid ainult koodi loonud kasutaja."""
+def list_agent_proposals(username: str, see_all: bool = False) -> list[dict]:
+    """Ootel ettepanekud ühes loendis (#869): `see_all` (superadmin) = kõigi kasutajate
+    omad, muidu ainult selle kasutaja koodiga tulnud. Igal real on `username` —
+    superadmini loend filtreerib selle järgi."""
     works = _Works()
     rows = []
-    for pack in ptp.list_pending():
+    for pack in ptp.list_pending(owner=None if see_all else username):
         w = works.get(pack["work_id"])
         rows.append({
-            "kind": "text", "proposal_id": pack["proposal_id"], "target_id": pack["work_id"],
+            "kind": "text", "proposal_id": pack["proposal_id"], "username": pack["username"],
+            "target_id": pack["work_id"],
             "target_label": w["label"],
             "target_url": f"/work/{pack['work_id']}/{_text_page(pack, w['number'])}"
                           f"?proposal={pack['proposal_id']}",
             "pending": pack["counts"]["pending"], "stale": pack["counts"]["stale"],
             "created_at": pack["created_at"],
         })
-    for p in wpp.list_pending_summary(username):
+    for p in wpp.list_pending_summary(username, see_all=see_all):
         w = works.get(p["work_id"])
         changed = w["version"] is not None and p["pages_version"] != w["version"]
         rows.append({
-            "kind": "parts", "proposal_id": p["proposal_id"], "target_id": p["work_id"],
+            "kind": "parts", "proposal_id": p["proposal_id"], "username": p["username"],
+            "target_id": p["work_id"],
             "target_label": w["label"], "target_url": f"/work/{p['work_id']}/manage?tab=parts",
             "pending": p["pending"], "stale": p["pending"] if changed else 0,
             "created_at": p["created_at"],
         })
-    for p in epp.list_pending_summary(username):
+    for p in epp.list_pending_summary(username, see_all=see_all):
         w = works.get(p["work_id"])
         rows.append({
-            "kind": "exemplars", "proposal_id": p["proposal_id"], "target_id": p["work_id"],
+            "kind": "exemplars", "proposal_id": p["proposal_id"], "username": p["username"],
+            "target_id": p["work_id"],
             "target_label": w["label"], "target_url": f"/work/{p['work_id']}/manage?tab=exemplars",
             "pending": p["pending"], "stale": p["stale"], "created_at": p["created_at"],
         })
     people: dict = {}
-    for p in ep.list_pending_summary(username):
+    for p in ep.list_pending_summary(username, see_all=see_all):
         pid = p["person_id"]
         if pid not in people:
             people[pid] = _person_label(get_person(pid), pid)
         rows.append({
-            "kind": "person", "proposal_id": p["proposal_id"], "target_id": pid,
+            "kind": "person", "proposal_id": p["proposal_id"], "username": p["username"],
+            "target_id": pid,
             "target_label": people[pid], "target_url": f"/persons/{pid}/edit?agent=1",
             "pending": p["pending"], "stale": None, "created_at": p["created_at"],
         })

@@ -1,6 +1,7 @@
 /**
  * Ühtne agendikood ja ootel ettepanekute loend (ADR 0058 täiendus 2026-10-20).
- * Mõlemad otspunktid on ainult superadminile; `target_url` koostab server.
+ * Mõlemad otspunktid: superadmin või agendi lipuga admin (#869). Admin saab ainult
+ * oma koodiga tulnud read, superadmin kõik. `target_url` koostab server.
  */
 import { FILE_API_URL } from '../config';
 import { apiGet, apiPost } from './apiClient';
@@ -10,6 +11,8 @@ export type AgentProposalKind = 'text' | 'parts' | 'person' | 'exemplars';
 export interface AgentProposal {
   kind: AgentProposalKind;
   proposal_id: string;
+  /** Koodi andnud kasutaja (#869) — superadmini loendi filter. */
+  username: string;
   target_id: string;
   target_label: string;
   target_url: string;

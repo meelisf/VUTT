@@ -119,7 +119,10 @@
       "remnantRole": "salvestatud määrang ei mõjuta midagi, ligipääs tuleb rollist ({{role}})",
       "remnantPublic": "salvestatud määrang ei mõjuta midagi, kogu on avalik",
       "remnantDeleted": "salvestatud määrang ei mõjuta midagi, kollektsioon on kustutatud",
-      "roleCoversAll": "{{role}} ligipääs tuleb rollist: eraldi kollektsioonimääranguid ei ole vaja."
+      "roleCoversAll": "{{role}} ligipääs tuleb rollist: eraldi kollektsioonimääranguid ei ole vaja.",
+      "agentAccess": "Agendi ligipääs",
+      "agentAccessHelp": "Lubab anda agendikoodi ja vaadata üle oma koodiga tulnud ettepanekuid. Muutmisel peab kasutaja uuesti sisse logima; äravõtmine tühistab kehtivad koodid.",
+      "agentAccessFailed": "Agendi ligipääsu muutmine ebaõnnestus"
     },
     "list": {
       "searchPlaceholder": "Otsi nime, kasutajanime või e-posti järgi",
@@ -324,6 +327,7 @@
     "maintenance": "Hooldus",
     "places": "Kohtade register",
     "prosopoRegistries": "Ametite ja asutuste registrid",
+    "agents": "Agendid",
     "pending": "{{count}} ootel"
   },
   "groups": {
@@ -429,6 +433,31 @@
     "historicalNamePlaceholder": "Lisa nimi + Enter",
     "groupKeyPlaceholder": "nt gootaland",
     "treeEmpty": "Kohti pole"
+  },
+  "agents": {
+    "codeTitle": "Agendikood",
+    "proposalsTitle": "Ootel ettepanekud",
+    "error": "Toiming ebaõnnestus: {{error}}",
+    "createCode": "Loo agendikood",
+    "codeHelp": "Kood kehtib kõigile teostele ja isikutele: lehe tekst (kuni {{text}} esitust), teose osad (kuni {{parts}}), eksemplarid (kuni {{exemplars}}) ja isikukaardid (kuni {{persons}}). Anna see agendile.",
+    "copy": "Kopeeri",
+    "copied": "Kopeeritud",
+    "expires": "Aegub",
+    "kind": {
+      "text": "Tekst",
+      "parts": "Osad",
+      "person": "Isik",
+      "exemplars": "Eksemplarid"
+    },
+    "pending": "ootel {{count}}",
+    "stale": "aegunud {{count}}",
+    "pagesChanged": "lehed muutunud",
+    "blocked": "ei saa kinnitada {{count}}",
+    "intro": "Agendikood annab MCP-agendile õiguse esitada ootel ettepanekuid. Siin on sinu koodiga tulnud ettepanekud; rida avab vaate, kus need kinnitad või tagasi lükkad.",
+    "introSuperadmin": "Agendikood annab MCP-agendile õiguse esitada ootel ettepanekuid. Superadminina näed kõigi kasutajate ettepanekuid; rida avab vaate, kus need kinnitad või tagasi lükkad.",
+    "filterOwner": "Esitaja",
+    "allOwners": "Kõik",
+    "empty": "Ootel ettepanekuid ei ole."
   },
   "trash": {
     "tab": "Prügikast",

@@ -22,7 +22,7 @@ kustutatud. Valvur: ``tests/test_token_lugeja_uks_reegel.py``.
 from fastapi import HTTPException, Request
 
 from . import image_tickets
-from .auth import require_token, session_is_valid, token_key
+from .auth import has_agent_access, is_at_least, require_token, session_is_valid, token_key
 
 
 async def get_user(request: Request, min_role: str = "contributor"):
@@ -51,6 +51,23 @@ def require_role(role: str):
     async def role_dependency(request: Request):
         return await get_user(request, min_role=role)
     return role_dependency
+
+
+def require_agent_access():
+    """Agendikood ja ettepanekute ülevaatus (ADR 0058, #869): superadmin või
+    agendi lipuga admin (`auth.has_agent_access`). Liputa admin → 403."""
+    async def dependency(request: Request):
+        user = await get_user(request, min_role="admin")
+        if not has_agent_access(user):
+            raise HTTPException(status_code=403, detail="agent_access_required")
+        return user
+    return dependency
+
+
+def proposal_scope(user: dict) -> bool:
+    """`see_all` ettepanekuhoidlatele: superadmin näeb kõigi kasutajate ettepanekuid,
+    admin ainult enda koodiga tulnuid (#869)."""
+    return is_at_least(user.get("role") or "contributor", "superadmin")
 
 
 def admin_image_access(kind: str, param: str):
