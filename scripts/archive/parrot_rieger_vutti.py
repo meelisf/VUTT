@@ -50,7 +50,7 @@ def kommentaar(o):
         r = f["rieger"].replace("*", "").strip()
         rieger = f"Rieger: `{r}`" if r else "Riegeris vastet pole"
         # lipunimed tulevad Kantiana torustikust (AA = võrdlustekst, siin Rieger)
-        read.append(f"- rida {f['rida']}: {f['pohjus'].replace('AA', 'Rieger')} ({rieger})")
+        read.append(f"- rida {f['rida']}: {f['pohjus'].replace('AA-ga', 'Riegeriga').replace('AA-s', 'Riegeris').replace('AA', 'Rieger')} ({rieger})")
     return "\n".join(read)
 
 
