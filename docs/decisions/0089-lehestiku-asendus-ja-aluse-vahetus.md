@@ -110,6 +110,11 @@ Kolm parandusvooru näitasid, et vana seisu git'ist tuletamine ei kata kettal ol
   katab käivitusaegne taaste. Kui käivitusaegne taaste ei saa indeksit sünkroonida
   (`index_failed`), **server ei käivitu**. Teose kustutus võtab teose luku enne `metadata_lock`-i
   (pooleli asendus → 409).
+- (järelparandus) HEAD-i uuendus on avaldamise piir. Enne `update-ref`-i märgitakse teose indeksi sünk
+  ootele (`state/git_index_sync_pending.json`); `git_write_lock` proovib välimisel võtmisel ootel
+  sünki ja keeldub (`GitIndexSyncError`), kui see ei õnnestu — vananenud indeksit ei commiti keegi.
+  Käivitusaegne taaste teeb sama (tõrkel server ei käivitu). Ajutise indeksi eemalduse tõrge
+  pärast avaldamist on ainult hoiatus.
 
 ## Tagajärjed
 

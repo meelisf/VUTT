@@ -506,8 +506,9 @@ kettal, mitte gitis:** kõik vanad lehefailid (txt/json/jpg, mitte `_metadata.js
 prügikasti ja taastamine toob need tagasi (commitimata salvestatud tekst jääb alles). Lõplik
 commit käib ajutise indeksiga (`GIT_INDEX_FILE` → commit-tree → update-ref, treiler `Upload: <id>`) —
 ühine indeks ei näe asenduse ettevalmistust kunagi; tõrge = taastamine + 500. Teose kustutus võtab
-teose luku (pooleli asendus → 409). Kui käivitusaegne taaste ei saa indeksit sünkroonida, server
-ei käivitu. Käivitusaegne taaste (`replace_recovery.recover_all`) jookseb
+teose luku (pooleli asendus → 409). HEAD-i uuendus on avaldamise piir: enne seda
+märgitakse indeksi sünk ootele ja `git_write_lock` keeldub, kuni ootel sünk õnnestub. Kui
+käivitusaegne taaste ei saa indeksit sünkroonida, server ei käivitu. Käivitusaegne taaste (`replace_recovery.recover_all`) jookseb
 lifespan'is ENNE päringuid ja tegutseb ainult selle asenduse aktiivse märgi olemasolul; esimese
 sammuna viib ta teose kausta indeksi HEAD-ile. Ajaloo lugemisviga ≠ „commit'i pole". Igal katsel
 oma tühi prügikasti kaust. Uued lehed kannavad

@@ -198,6 +198,14 @@ def recover_all() -> None:
     ükski teine commit ei tohi seda kaasa võtta enne, kui taaste on indeksi puhastanud.
     Ei kuku — taastamata teos jääb märgi tõttu kirjutamiseks lukku.
     """
+    # Ootel indeksi sünkid (asendus jõudis HEAD-i uuendamiseni, sünk jäi tegemata): enne
+    # päringuid; ebaõnnestumisel server ei käivitu (vananenud indeks pööraks asenduse tagasi).
+    from ..git_ops import run_pending_index_syncs, GitIndexSyncError
+    try:
+        run_pending_index_syncs()
+    except GitIndexSyncError as e:
+        raise RuntimeError(f"Lehestiku asenduse ootel git-indeksi sünk ebaõnnestus: {e}. "
+                           "Server ei käivitu. Kontrolli /data git-repot.") from e
     indeks_katki = []
     for slug, m in replace_marker.list_markers():
         uid = m.get("upload_id")
