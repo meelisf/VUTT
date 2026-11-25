@@ -246,6 +246,153 @@ def test_recover_replaced_faasis_kordab_jarelsamme(tmp_path, monkeypatch):
     (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").write_text(json.dumps(s), encoding="utf-8")
     replace_marker.write_marker(slug, upload_id)
     kutsed = []
-    monkeypatch.setattr(upload_ops, "_after_replace_commit", lambda *a: kutsed.append(a) or None)
+    monkeypatch.setattr(upload_ops, "_after_replace_commit", lambda *a, **k: kutsed.append(a) or None)
     assert replace_recovery.recover(upload_id, slug) == "replaced"
     assert kutsed and replace_marker.read_marker(slug) is None
+
+
+# ── Ülevaatus PR #881 ─────────────────────────────────────────────────────────
+
+def test_commit_torge_taastab_ja_kukub(tmp_path, monkeypatch):
+    """(1) Commit'i erind ei ole edu: vana seis tagasi, 500, märk ja taasteinfo ära."""
+    from fastapi import HTTPException
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    monkeypatch.setattr(type(repo.index), "commit", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("lock")))
+    with pytest.raises(HTTPException) as exc:
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert exc.value.status_code == 500
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
+    assert (work_dir / "vana-teos_pg_001.jpg").read_bytes() == b"vana jpg"
+    assert replace_marker.read_marker(slug) is None
+    assert _state(upload_id).get("status") != "imported"
+
+
+def test_ebaonnestunud_taaste_jatab_margi_ja_taasteinfo(tmp_path, monkeypatch):
+    """(2) Taastamise tõrge ei tohi kirjutuskaitset ega taasteinfot eemaldada."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+
+    class Katkine(_KirjutavSftp):
+        def get(self, remote, local):
+            if local.endswith(".txt"):
+                raise FileNotFoundError(remote)
+            super().get(remote, local)
+
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Katkine(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    real_git = repo.git
+
+    class KatkineGit:
+        def __getattr__(self, name):
+            if name == "checkout":
+                return lambda *a, **k: (_ for _ in ()).throw(RuntimeError("checkout katki"))
+            return getattr(real_git, name)
+
+    monkeypatch.setattr(repo, "git", KatkineGit(), raising=False)
+    with pytest.raises(Exception):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert replace_marker.read_marker(slug) is not None
+    assert (replace_marker.read_marker(slug) or {}).get("progress", {}).get("phase") == "replacing"
+
+
+def test_recover_ebaonnestunud_taastega_jatab_margi(tmp_path, monkeypatch):
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    progress = {"phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(tmp_path / "t"),
+                "old_jpgs": [], "new_files": [], "old_tracked": ["vana-teos_pg_001.txt"]}
+    replace_marker.write_marker(slug, upload_id, progress)
+    monkeypatch.setattr(replace_recovery, "restore_replace",
+                        lambda *a, **k: (_ for _ in ()).throw(replace_recovery.RestoreError("katki")))
+    assert replace_recovery.recover(upload_id, slug) == "restore_failed"
+    assert replace_marker.read_marker(slug) is not None
+
+
+def test_taasteinfo_elab_margis_ka_ilma_state_ita(tmp_path, monkeypatch):
+    """(3) Taasteinfo koopia märgis: üleslaadimise kausta kadumine ei hävita taastet."""
+    import shutil
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    trash = tmp_path / "t"
+    trash.mkdir()
+    (work_dir / "vana-teos_pg_001.jpg").rename(trash / "vana-teos_pg_001.jpg")
+    (work_dir / "vana-teos_pg_001.txt").unlink()
+    progress = {"phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(trash),
+                "old_jpgs": ["vana-teos_pg_001.jpg"], "new_files": [],
+                "old_tracked": ["vana-teos_pg_001.txt", "vana-teos_pg_001.json"]}
+    replace_marker.write_marker(slug, upload_id, progress)
+    shutil.rmtree(Path(upload_ops.UPLOADS_DIR) / upload_id)
+    assert replace_recovery.recover(upload_id, slug) == "restored"
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
+    assert (work_dir / "vana-teos_pg_001.jpg").read_bytes() == b"vana jpg"
+    assert replace_marker.read_marker(slug) is None
+
+
+def test_tuhistamine_asenduse_ajal_409(client, login, tmp_path, monkeypatch):
+    upload_id, work_id, slug, *_ = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    replace_marker.write_marker(slug, upload_id, {"phase": "replacing"})
+    token = login("admin", "adminpass")
+    r = client.delete(f"/admin/upload/{upload_id}", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 409
+    assert (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").exists()
+
+
+def test_asendus_ei_jata_kustutusi_uhisesse_indeksisse(tmp_path, monkeypatch):
+    """(4) Allalaadimise ajal ei tohi indeksis olla asenduse kustutusi — teise teose
+    `repo.index.commit` commitiks need kaasa."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    staged = []
+
+    class Vaatlev(_KirjutavSftp):
+        def get(self, remote, local):
+            staged.append(repo.git.diff("--cached", "--name-only"))
+            super().get(remote, local)
+
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Vaatlev(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert staged and all(s.strip() == "" for s in staged), staged
+
+
+def test_taastepunkt_on_lehelukkude_jarel(tmp_path, monkeypatch):
+    """(5) Salvestus, mis hoidis lehelukku asenduse alguses, jääb pärast rollback'i alles."""
+    import threading
+    import time
+    from server.page_locks import page_lock
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    txt = work_dir / "vana-teos_pg_001.txt"
+    hoiab, valmis = threading.Event(), threading.Event()
+
+    def salvestaja():
+        with page_lock(str(txt)):
+            hoiab.set()
+            time.sleep(0.3)
+            txt.write_text("salvestatud vahepeal", encoding="utf-8")
+            repo.index.add([f"{slug}/vana-teos_pg_001.txt"])
+            repo.index.commit("Salvestus")
+        valmis.set()
+
+    class Katkine(_KirjutavSftp):
+        def get(self, remote, local):
+            raise FileNotFoundError(remote)
+
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Katkine(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    t = threading.Thread(target=salvestaja)
+    t.start()
+    hoiab.wait(5)
+    with pytest.raises(Exception):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    t.join(5)
+    assert txt.read_text(encoding="utf-8") == "salvestatud vahepeal"
+
+
+def test_taaste_ei_puutu_vahepeal_salvestatud_metaandmeid(tmp_path, monkeypatch):
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    meta = work_dir / "_metadata.json"
+
+    class Katkine(_KirjutavSftp):
+        def get(self, remote, local):
+            meta.write_text(json.dumps({"id": work_id, "title": "Uus pealkiri"}), encoding="utf-8")
+            repo.index.add([f"{slug}/_metadata.json"])
+            repo.index.commit("Metaandmed")
+            raise FileNotFoundError(remote)
+
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Katkine(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    with pytest.raises(Exception):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert json.loads(meta.read_text(encoding="utf-8"))["title"] == "Uus pealkiri"
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"

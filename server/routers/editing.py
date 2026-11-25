@@ -196,10 +196,12 @@ def _save_page_locked(txt_path, text, client_meta, username, base=None, message=
         work_dir = os.path.dirname(txt_path)
         require_existing_page(os.path.dirname(work_dir), os.path.basename(work_dir),
                               os.path.basename(txt_path))
-        if client_generation is not _POLVKOND_PUUDUB:
-            disk_gen = _disk_generation(os.path.splitext(txt_path)[0] + ".json")
-            if (client_generation or None) != (disk_gen or None):
-                raise HTTPException(status_code=409, detail=LEHESTIK_ASENDATI)
+        disk_gen = _disk_generation(os.path.splitext(txt_path)[0] + ".json")
+        # Vana kimp (võtit pole) tohib salvestada ainult lehte, mida pole asendatud:
+        # enne juurutust avatud redaktor ei tohi asendatud lehte üle kirjutada (PR #881).
+        klient = None if client_generation is _POLVKOND_PUUDUB else client_generation
+        if (klient or None) != (disk_gen or None):
+            raise HTTPException(status_code=409, detail=LEHESTIK_ASENDATI)
         if client_meta:
             json_path = os.path.splitext(txt_path)[0] + ".json"
             meta_content = client_meta

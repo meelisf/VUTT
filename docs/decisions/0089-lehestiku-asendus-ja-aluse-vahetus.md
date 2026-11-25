@@ -66,6 +66,18 @@ Eksemplari pildid → asendusrežiimis üleslaadimine (`promote`), lõpetamine i
 täielikult commit'itud lähtepiltide eemaldus). Täpsus: disainifail. Teostatakse eraldi PR-ina
 p 1–5 peale.
 
+### Täiendus 2026-11-25 (PR #881 ülevaatus)
+
+- Järjekord: märk → vanade lehtede lukud → paarid → `old_head`. Salvestus, mis hoidis lehelukku,
+  jõuab commit'ini enne taastepunkti.
+- Vanad lehed eemaldatakse ainult töökaustast; indeks muutub alles lõpliku commit'iga (teised
+  kirjutajad commitivad ühist indeksit `repo.index.commit`-iga).
+- Commit'i tõrge = taastamine + 500. Asenduse metaandmete uuendus pärast lehestiku commit'i.
+- Taastamine puudutab ainult vanu lehefaile (`old_tracked`), mitte `_metadata.json`-i; tõrkel
+  `RestoreError` → märk ja taasteinfo jäävad.
+- Taasteinfo koopia märgifailis; asenduse ajal üleslaadimise tühistus → 409.
+- Võtmeta `/save` (vana kimp) on lubatud ainult lehel, millel kettal põlvkonda pole.
+
 ## Tagajärjed
 
 - Asendus on aeglasem ja keerukam, aga katkestus ei jäta enam teost poolikusse seisu.

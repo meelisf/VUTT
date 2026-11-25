@@ -36,8 +36,22 @@ def find_replace_commit(repo, old_head: str, slug: str, upload_id: str) -> Optio
     return None
 
 
+class RestoreError(Exception):
+    """Taastamine jäi pooleli — märk ja taasteinfo PEAVAD alles jääma."""
+
+
+def _page_paths(paths, slug: str) -> list[str]:
+    """Teose lehefailid (mitte `_metadata.json`, mitte eksemplaride kaust)."""
+    return sorted(p for p in paths
+                  if p.startswith(f"{slug}/") and "/" not in p[len(slug) + 1:]
+                  and not p.endswith("/_metadata.json"))
+
+
 def restore_replace(work_dir: str, progress: dict, repo) -> None:
-    """Taastab asenduse-eelse seisu. Iga samm eraldi: üks tõrge ei jäta teisi tegemata."""
+    """Taastab asenduse-eelse seisu AINULT vanadel lehefailidel (metaandmeid ei puutu:
+    neid võidi asenduse ajal salvestada). Iga samm proovitakse; kui mõni ebaõnnestub,
+    visatakse lõpus `RestoreError` — kutsuja ei tohi siis märki ega taasteinfot kustutada.
+    """
     from ..git_ops import git_write_lock
 
     slug = os.path.basename(os.path.normpath(work_dir))
@@ -45,39 +59,52 @@ def restore_replace(work_dir: str, progress: dict, repo) -> None:
     trash_dir = progress.get("trash_dir") or ""
     old_jpgs = list(progress.get("old_jpgs") or [])
     new_files = list(progress.get("new_files") or [])
+    vead = []
 
-    # 1. Jälgitavad failid, mida `old_head`-is ei ole (uued, juba stage'itud) — checkout
-    #    neid ei eemaldaks (ADR 0089 p 3).
+    try:
+        with git_write_lock:
+            in_old = set(filter(None, repo.git.ls_tree("-r", "--name-only", old_head, slug).splitlines()))
+    except Exception:
+        logger.exception("Taastamine: old_head lugemine ebaõnnestus (%s)", slug)
+        raise RestoreError("old_head")
+    old_tracked = progress.get("old_tracked")
+    if old_tracked is not None:
+        targets = sorted(f"{slug}/{n}" for n in old_tracked if f"{slug}/{n}" in in_old)
+    else:
+        targets = _page_paths(in_old, slug)
+
+    # 1. Uued jälgitavad lehefailid, mida vanas ei olnud (stage'itud lõpliku commit'i eel).
     try:
         with git_write_lock:
             in_index = set(filter(None, repo.git.ls_files(slug).splitlines()))
-            in_old = set(filter(None, repo.git.ls_tree("-r", "--name-only", old_head, slug).splitlines()))
-            for path in sorted(in_index - in_old):
+            for path in _page_paths(in_index - in_old, slug):
                 repo.git.rm("-f", "--cached", "--", path)
                 full = os.path.join(os.path.dirname(os.path.normpath(work_dir)), path)
                 if os.path.isfile(full):
                     os.remove(full)
     except Exception:
         logger.exception("Taastamine: uute jälgitavate failide eemaldus ebaõnnestus (%s)", slug)
+        vead.append("uued jälgitavad")
 
-    # 2. Jälgimata uued .txt/.json (alla laaditud, veel `git add`-ita), mida vanas ei olnud.
+    # 2. Jälgimata uued .txt/.json, mida vanas ei olnud.
     try:
-        with git_write_lock:
-            in_old = set(filter(None, repo.git.ls_tree("-r", "--name-only", old_head, slug).splitlines()))
         for name in new_files:
             if name.endswith((".txt", ".json")) and f"{slug}/{name}" not in in_old:
-                p = os.path.join(work_dir, name)
-                if os.path.isfile(p):
-                    os.remove(p)
+                pth = os.path.join(work_dir, name)
+                if os.path.isfile(pth):
+                    os.remove(pth)
     except Exception:
         logger.exception("Taastamine: uute jälgimata failide eemaldus ebaõnnestus (%s)", slug)
+        vead.append("uued jälgimata")
 
-    # 3. Vanad jälgitavad failid tagasi.
+    # 3. Vanad lehefailid tagasi (indeks + töökaust) — ainult need, mitte kogu kaust.
     try:
-        with git_write_lock:
-            repo.git.checkout(old_head, "--", slug)
+        if targets:
+            with git_write_lock:
+                repo.git.checkout(old_head, "--", *targets)
     except Exception:
         logger.exception("Taastamine: git checkout ebaõnnestus (%s)", slug)
+        vead.append("checkout")
 
     # 4. JPG-d prügikasti oleku järgi.
     try:
@@ -92,16 +119,21 @@ def restore_replace(work_dir: str, progress: dict, repo) -> None:
         old_set = set(old_jpgs)
         for name in new_files:
             if name.endswith(".jpg") and name not in old_set:
-                p = os.path.join(work_dir, name)
-                if os.path.isfile(p):
-                    os.remove(p)
+                pth = os.path.join(work_dir, name)
+                if os.path.isfile(pth):
+                    os.remove(pth)
     except Exception:
         logger.exception("Taastamine: JPG-de taastamine ebaõnnestus (%s)", slug)
+        vead.append("jpg")
+
+    if vead:
+        raise RestoreError(", ".join(vead))
 
 
 def recover(upload_id: str, slug: str) -> str:
     """Pooleli asendus märgi järgi: `"replaced"` (commit tehtud, järelsammud tehtud),
-    `"restored"` (vana seis taastatud) või `"cleared"` (taastada polnud midagi)."""
+    `"restored"` (vana seis taastatud), `"cleared"` (taastada polnud midagi) või
+    `"restore_failed"` (märk ja taasteinfo jäävad; teos jääb kirjutamiseks lukku)."""
     from .. import upload_ops
     from ..admin_page_ops import work_lock
     from ..git_ops import get_or_init_repo
@@ -111,14 +143,17 @@ def recover(upload_id: str, slug: str) -> str:
         with work_lock(slug, work_dir):
             with upload_ops._get_upload_lock(upload_id):
                 state = upload_ops._read_state(upload_id) or {}
-            progress = state.get("replace_progress")
+            # Märgi koopia on autoriteetne: üleslaadimise kaust võib olla kadunud.
+            progress = (replace_marker.read_marker(slug) or {}).get("progress") \
+                or state.get("replace_progress")
             if progress and progress.get("phase") == "replaced":
                 # Commit tehtud, järelsammud võisid pooleli jääda: korda (korratavad). Nende
                 # tõrge ei tohi teost lukku jätta — lehestik on juba kooskõlaline.
                 try:
                     upload_ops._after_replace_commit(upload_id, state, work_dir, slug,
                                                      state.get("replace_work_id") or "",
-                                                     state.get("username") or "Automaatne")
+                                                     state.get("username") or "Automaatne",
+                                                     progress=progress)
                 except Exception:
                     logger.exception("Asenduse järelsammud ebaõnnestusid taastel (%s)", upload_id)
                 replace_marker.remove_marker(slug)
@@ -129,13 +164,21 @@ def recover(upload_id: str, slug: str) -> str:
                 return "cleared"
             repo = get_or_init_repo()
             if find_replace_commit(repo, progress["old_head"], slug, upload_id):
-                upload_ops._set_replace_phase(upload_id, "replaced")
-                work_id = state.get("replace_work_id") or ""
-                upload_ops._after_replace_commit(upload_id, state, work_dir, slug, work_id,
-                                                 state.get("username") or "Automaatne")
+                upload_ops._set_replace_phase(upload_id, "replaced", slug=slug)
+                try:
+                    upload_ops._after_replace_commit(upload_id, state, work_dir, slug,
+                                                     state.get("replace_work_id") or "",
+                                                     state.get("username") or "Automaatne",
+                                                     progress=progress)
+                except Exception:
+                    logger.exception("Asenduse järelsammud ebaõnnestusid taastel (%s)", upload_id)
                 replace_marker.remove_marker(slug)
                 return "replaced"
-            restore_replace(work_dir, progress, repo)
+            try:
+                restore_replace(work_dir, progress, repo)
+            except RestoreError as e:
+                logger.error("Asenduse taaste ebaõnnestus (%s, %s): %s — märk jääb", slug, upload_id, e)
+                return "restore_failed"
             upload_ops._clear_replace_progress(upload_id)
             replace_marker.remove_marker(slug)
             return "restored"

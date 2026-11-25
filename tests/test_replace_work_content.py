@@ -139,39 +139,21 @@ def test_replace_remote_change_after_preflight_rolls_back_existing_work(tmp_path
     assert not list(trash_root.glob("*/*.jpg"))
 
 
-def test_replace_work_content_git_rm_viga_katkestab_ja_taastab_jpg(tmp_path, monkeypatch):
-    """Kui git rm ebaõnnestub, ei tohi allalaadimisega jätkata ega JPG-sid prügikasti jätta."""
+def test_replace_work_content_eemaldusviga_katkestab_ja_taastab_jpg(tmp_path, monkeypatch):
+    """Vanade lehtede eemaldus kukub → ei laadita alla, JPG-d tagasi, tekst puutumata.
+
+    (Varem `git rm`; ADR 0089 / PR #881: vanad lehed eemaldatakse ainult töökaustast,
+    indeks muutub alles lõpliku commit'iga.)"""
+    import os
     import server.git_ops as git_ops
-    import server.utils as utils
 
-    uploads_dir = tmp_path / "uploads"
-    data_dir = tmp_path / "data"
-    upload_id = "upl123"
-    slug = "vana-teos"
-    work_id = "wid123"
-    upload_dir = uploads_dir / upload_id
-    work_dir = data_dir / slug
-    upload_dir.mkdir(parents=True)
-    work_dir.mkdir(parents=True)
-
-    (upload_dir / "state.json").write_text(json.dumps({
-        "id": upload_id,
-        "status": "reviewing",
-        "remote_work_path": "AUTO-OCR/print/upl123/uus-teos",
-        "files": [{"page": 1, "has_ocr": True, "deleted": False}],
-        "meta": {"title": "Uus", "year": "1700", "slug": "uus-teos"},
-    }), encoding="utf-8")
-    (work_dir / "_metadata.json").write_text(json.dumps({"id": work_id, "title": "Vana"}), encoding="utf-8")
-    (work_dir / "vana-teos_pg_001.jpg").write_bytes(b"jpg")
-    (work_dir / "vana-teos_pg_001.txt").write_text("vana tekst", encoding="utf-8")
-    (work_dir / "vana-teos_pg_001.json").write_text("{}", encoding="utf-8")
-
-    fake_repo = _FakeRepo()
-    monkeypatch.setattr(upload_ops, "UPLOADS_DIR", str(uploads_dir))
-    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(uploads_dir))
-    monkeypatch.setattr(upload_ops, "BASE_DIR", str(data_dir))
-    monkeypatch.setattr(utils, "find_directory_by_id", lambda wid: str(work_dir) if wid == work_id else None)
-    monkeypatch.setattr(git_ops, "get_or_init_repo", lambda: fake_repo)
+    upload_id, work_id, slug, work_dir, data_dir = _setup_replace_files(tmp_path, monkeypatch)
+    repo = Repo.init(str(data_dir))
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "test").set_value("user", "email", "test@example.test")
+    repo.index.add([f"{slug}/_metadata.json", f"{slug}/vana-teos_pg_001.txt", f"{slug}/vana-teos_pg_001.json"])
+    repo.index.commit("Algseis")
+    monkeypatch.setattr(git_ops, "get_or_init_repo", lambda: repo)
 
     preflight_sftp = _ListSftp(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"])
     sftp_calls = []
@@ -180,17 +162,25 @@ def test_replace_work_content_git_rm_viga_katkestab_ja_taastab_jpg(tmp_path, mon
         sftp_calls.append(_upload_id)
         if len(sftp_calls) == 1:
             return preflight_sftp
-        raise AssertionError("Teist SFTP ühendust ei tohi pärast git rm viga avada")
+        raise AssertionError("Teist SFTP ühendust ei tohi pärast eemaldusviga avada")
 
     monkeypatch.setattr(upload_ops, "_sftp_open", sftp_factory)
+    real_remove = os.remove
+
+    def katkine_remove(path, *a, **k):
+        if str(path).endswith("vana-teos_pg_001.txt"):
+            raise PermissionError("ei saa")
+        return real_remove(path, *a, **k)
+
+    monkeypatch.setattr(upload_ops.os, "remove", katkine_remove)
 
     with pytest.raises(HTTPException) as exc:
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
 
     assert exc.value.status_code == 500
     assert "Vana sisu eemaldamine ebaõnnestus" in exc.value.detail
-    assert fake_repo.git.checkout_calls == [("abcdef1234567890", "--", slug)]
-    assert (work_dir / "vana-teos_pg_001.jpg").exists()
+    assert (work_dir / "vana-teos_pg_001.jpg").read_bytes() == b"vana jpg"
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
     trash_root = data_dir / "._trash" / work_id / "replaced_content"
     assert not list(trash_root.glob("*/*.jpg"))
 

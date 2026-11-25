@@ -74,9 +74,13 @@ def test_asendamata_leht_salvestub_nagu_enne(client, login, leht):
     assert r.status_code == 200
 
 
-def test_vana_bundle_ilma_votmeta_nagu_enne(client, login, leht):
-    """Vana JS-kimp ei saada võtit → võrdlust ei tehta."""
-    assert _save(client, login, generation=_PUUDUB).status_code == 200
+def test_vana_bundle_ilma_votmeta_asendatud_lehel_409(client, login, leht):
+    """Enne juurutust avatud redaktor (võtit pole) ei tohi asendatud lehte üle kirjutada."""
+    assert _save(client, login, generation=_PUUDUB).status_code == 409
+
+
+def test_vana_bundle_ilma_votmeta_asendamata_lehel_nagu_enne(client, login, leht):
+    assert _save(client, login, file="pg2.txt", generation=_PUUDUB).status_code == 200
 
 
 def test_klient_ei_saa_polvkonda_kustutada(client, login, leht):

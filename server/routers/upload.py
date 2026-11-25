@@ -502,6 +502,12 @@ async def admin_upload_update_meta(upload_id: str, request: Request, user=Depend
 
 @router.delete("/admin/upload/{upload_id}")
 async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
+    # Pooleli asendus (ADR 0089): tühistus kustutaks state'i; taaste vajab seda → 409.
+    from ..replace_marker import find_by_upload
+    if await run_in_threadpool(find_by_upload, upload_id):
+        raise HTTPException(status_code=409, detail=(
+            "Lehestiku asendus on pooleli — üleslaadimist ei saa praegu kustutada. / "
+            "Page replacement in progress — the upload cannot be deleted now."))
     if await run_in_threadpool(cancel_upload, upload_id):
         return {"status": "success"}
     raise HTTPException(status_code=500)

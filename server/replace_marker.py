@@ -34,10 +34,22 @@ def _path(slug: str) -> str:
     return os.path.join(MARKER_DIR, f"{slug}.json")
 
 
-def write_marker(slug: str, upload_id: str) -> None:
+def write_marker(slug: str, upload_id: str, progress: Optional[dict] = None) -> None:
+    """Märk + taasteinfo koopia (`progress`). Koopia elab üleslaadimise kaustast eraldi:
+    tühistamine või kausta kadumine ei hävita taastamiseks vajalikku (ülevaatus PR #881)."""
     os.makedirs(MARKER_DIR, exist_ok=True)
-    atomic_write_json(_path(slug), {"upload_id": upload_id,
-                                    "at": datetime.now(timezone.utc).isoformat()})
+    data = {"upload_id": upload_id, "at": datetime.now(timezone.utc).isoformat()}
+    if progress is not None:
+        data["progress"] = progress
+    atomic_write_json(_path(slug), data)
+
+
+def find_by_upload(upload_id: str) -> Optional[str]:
+    """Selle üleslaadimise asendusmärgi slug või None."""
+    for slug, m in list_markers():
+        if m.get("upload_id") == upload_id:
+            return slug
+    return None
 
 
 def read_marker(slug: str) -> Optional[dict]:
