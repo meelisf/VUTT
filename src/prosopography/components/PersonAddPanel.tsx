@@ -12,7 +12,7 @@ import { groupCandidates } from '../panel/candidateGroups';
 import { chooseCardName } from '../panel/candidateNames';
 import type { CandidateGroup, CandidateResult, SourceScheme } from '../panel/types';
 import {
-  createPersonChecked, fetchCandidates, getPerson, listPersons, PersonConflictError,
+  createPersonChecked, fetchCandidates, getPerson, fetchSimilarPersons, PersonConflictError,
   type CreatePersonBody, type SimilarPerson,
 } from '../services/prosopographyService';
 
@@ -296,11 +296,9 @@ const PersonAddPanel: React.FC<PersonAddPanelProps> = ({ initialQuery, token, la
     // VUTT-i enda vasted kohe, välisallikaid ootamata (sama päring, millest server
     // `similar_persons` teeb) — kandidaatide vastus kirjutab need hiljem üle samaga.
     if (q.trim().length >= 3) {
-      listPersons({ q: q.trim(), limit: 5 }, token).then(r => {
+      fetchSimilarPersons(q.trim(), { limit: 5 }, token).then(hits => {
         if (id !== searchIdRef.current) return;
-        setSimilarPersons(r.results.filter(e => e.record_status !== 'tombstone').map(e => ({
-          id: e.id, label: e.label, qualifier: e.qualifier, birth_year: e.birth_year, death_year: e.death_year, work_count: e.work_count,
-        })));
+        setSimilarPersons(hits);
       }).catch(() => { /* varu: kandidaatide vastus toob samad */ });
     }
     try {

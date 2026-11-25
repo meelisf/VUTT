@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // (vt vitest.dev/api/vi.html#vi-mock). Lazy closure'i sees (nagu allpool
 // `createPersonChecked`) piisab tavalisest top-level `const`-ist, sest
 // seda loetakse alles hiljem, mitte factory registreerimisel.
-const { create, searchPersonSourcesMock, fetchCandidatesMock, getPersonMock, listPersonsMock, defaultFetchCandidates } = vi.hoisted(() => {
+const { create, searchPersonSourcesMock, fetchCandidatesMock, getPersonMock, fetchSimilarPersonsMock, defaultFetchCandidates } = vi.hoisted(() => {
   const create = vi.fn();
   const defaultFetchCandidates = async () => ({
     similar_persons: [{ id: 'vutt:Pold', label: 'Laurentius Ludenius', birth_year: 1592, death_year: 1654, work_count: 12 }],
@@ -30,7 +30,7 @@ const { create, searchPersonSourcesMock, fetchCandidatesMock, getPersonMock, lis
     })),
     fetchCandidatesMock: vi.fn(defaultFetchCandidates),
     getPersonMock: vi.fn(),
-    listPersonsMock: vi.fn(async () => ({ results: [] as any[], total: 0, offset: 0, limit: 5 })),
+    fetchSimilarPersonsMock: vi.fn(async () => [] as any[]),
   };
 });
 vi.mock('react-i18next', () => ({
@@ -50,7 +50,7 @@ vi.mock('../../services/prosopographyService', async () => {
     createPersonChecked: async (...a: any[]) => { const r = await create(...a); if (r instanceof Error) throw r; return r; },
     fetchCandidates: fetchCandidatesMock,
     getPerson: getPersonMock,
-    listPersons: listPersonsMock,
+    fetchSimilarPersons: fetchSimilarPersonsMock,
   };
 });
 
@@ -268,13 +268,13 @@ describe('PersonAddPanel', () => {
 
   it('VUTT-i vaste tuleb kohe, välisallikaid ootamata', async () => {
     searchPersonSourcesMock.mockImplementationOnce(() => new Promise(() => {}) as any);   // välisallikad ripuvad
-    listPersonsMock.mockResolvedValueOnce({ total: 2, offset: 0, limit: 5, results: [
-      { id: 'vutt:Pold', label: 'Laurentius Ludenius', birth_year: 1592, death_year: 1654, work_count: 12, record_status: 'verified' },
-      { id: 'vutt:Pdead', label: 'Ludenius (liidetud)', birth_year: null, death_year: null, work_count: 0, record_status: 'tombstone' },
-    ] });
+    // Duplikaadikontroll (`/similar`): tombstone'id jätab välja server (test_duplikaadikontroll.py).
+    fetchSimilarPersonsMock.mockResolvedValueOnce([
+      { id: 'vutt:Pold', label: 'Laurentius Ludenius', birth_year: 1592, death_year: 1654, work_count: 12 },
+    ]);
     render(<PersonAddPanel initialQuery="Ludenius" token="t" lang="et" onDone={vi.fn()} onClose={vi.fn()} />);
     expect(await screen.findByText('Laurentius Ludenius')).toBeTruthy();
-    expect(screen.queryByText('Ludenius (liidetud)')).toBeNull();
+    expect(fetchSimilarPersonsMock).toHaveBeenCalledWith('Ludenius', { limit: 5 }, 't');
     expect(screen.getByText('panel.searchingSources')).toBeTruthy();       // välisotsing käib edasi
   });
 });

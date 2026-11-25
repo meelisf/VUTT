@@ -74,6 +74,121 @@ def name_matches(query: str, name: str) -> bool:
     return bool(query_words) and all(any(w.startswith(t) for w in words) for t in query_words)
 
 
+# ── Duplikaadikontroll (uue isiku loomine) ─────────────────────────────
+# `name_matches` on isikuotsingu jaoks range: päringusõna peab olema nimesõna ALGUS.
+# Duplikaadikontrollis on see liiga range — „Scharschmidt" ei leidnud kaarti
+# „Scharschmid" / „Scharschmied" (2026-11-25, vutt:P22mmjb). Siin võrreldakse
+# normaliseeritud kujusid ja lubatakse üks tähe erinevus; tavaline otsing ei muutu.
+
+# Järjekord loeb: „ck" enne „c"-d, „ie" enne „y"-d.
+_DUP_RULES = (("dt", "t"), ("th", "t"), ("ck", "k"), ("ph", "f"), ("tz", "z"),
+              ("ie", "i"), ("y", "i"), ("c", "k"))
+
+
+@lru_cache(maxsize=65536)
+def _dup_token(token: str) -> str:
+    s = token
+    for a, b in _DUP_RULES:
+        s = s.replace(a, b)
+    s = re.sub(r"(.)\1+", r"\1", s)            # Wittenberg = Witenberg
+    if len(s) > 5:
+        s = re.sub(r"(ius|us)$", "", s)          # Ludenius = Luden, Christianus = Christian
+    if len(s) > 3 and s.endswith("d"):
+        s = s[:-1] + "t"                         # Schmid = Schmit (= Schmidt)
+    return s
+
+
+@lru_cache(maxsize=65536)
+def _dup_tokens(name: str) -> tuple[str, ...]:
+    return tuple(_dup_token(t) for t in _name_tokens(fold_name(name)))
+
+
+def _edit_distance_le1(a: str, b: str) -> bool:
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) > len(b):
+        a, b = b, a
+    i = j = diff = 0
+    while i < len(a) and j < len(b):
+        if a[i] == b[j]:
+            i += 1
+            j += 1
+            continue
+        diff += 1
+        if diff > 1:
+            return False
+        if len(a) == len(b):
+            i += 1
+        j += 1
+    return diff + (len(b) - j) + (len(a) - i) <= 1
+
+
+def _dup_token_match(q: str, n: str) -> bool:
+    if q == n:
+        return True
+    if len(q) == 1:                              # initsiaal AINULT päringus: „J." = Justus
+        return n.startswith(q)
+    if len(n) == 1:                              # kandidaadi initsiaal („M. G. A.") sobiks kõigega
+        return False
+    if min(len(q), len(n)) >= 3 and (q.startswith(n) or n.startswith(q)):
+        return True                              # Johann = Johannes
+    return min(len(q), len(n)) >= 6 and _edit_distance_le1(q, n)
+
+
+def dup_name_matches(query: str, name: str) -> bool:
+    """Duplikaadikandidaat: perekonnanimi (viimane sõna) vastab kandidaadi omale,
+    ülejäänud päringusõnad mõnele kandidaadi sõnale (kõik normaliseeritult).
+
+    Viimase sõna nõue hoiab ära ladina isanime vahetuse („Petrus Andreae" ≠
+    „Andreas Petri") ja initsiaalide-aliaste müra (mõõdetud 2130 isiku peal).
+    """
+    qt, nt = _dup_tokens(query or ""), _dup_tokens(name or "")
+    if not qt or not nt or len(qt[-1]) < 2 or len(nt[-1]) < 2:
+        return False
+    if not _dup_token_match(qt[-1], nt[-1]):
+        return False
+    return all(any(_dup_token_match(q, n) for n in nt) for q in qt[:-1])
+
+
+def _dup_names(entry: dict) -> list[str]:
+    names = [entry.get("label") or "", *(a for a in (entry.get("aliases") or []) if isinstance(a, str))]
+    first = (entry.get("first_name") or "").strip()
+    for v in entry.get("family_name_variants") or []:
+        if isinstance(v, str) and v.strip():
+            names.append(f"{first} {v}".strip())
+    return [n for n in names if n]
+
+
+def _year_class(entry: dict, birth_year: Optional[int], death_year: Optional[int]) -> int:
+    """0 = eluaastad klapivad, 1 = teadmata, 2 = vastuolus (järjestamiseks, mitte filtriks)."""
+    pairs = [(a, entry.get(k)) for a, k in ((birth_year, "birth_year"), (death_year, "death_year"))
+             if isinstance(a, int) and isinstance(entry.get(k), int)]
+    if not pairs:
+        return 1
+    if any(abs(a - b) > 5 for a, b in pairs):
+        return 2
+    return 0 if all(abs(a - b) <= 2 for a, b in pairs) else 1
+
+
+def similar_persons(name: str, birth_year: Optional[int] = None,
+                    death_year: Optional[int] = None, limit: int = 5) -> list[dict]:
+    """Võimalikud duplikaadid uue isiku nimele (valiku paneel, vorm, kandidaadid)."""
+    if len((name or "").strip()) < 3:
+        return []
+    found = []
+    for e in _load_index_readonly().get("entries", []):
+        if e.get("record_status") == "tombstone":
+            continue
+        if any(dup_name_matches(name, n) for n in _dup_names(e)):
+            found.append(e)
+    found.sort(key=lambda e: (_year_class(e, birth_year, death_year),
+                              not any(name_matches(name, n) for n in _dup_names(e)),
+                              -(e.get("work_count") or 0)))
+    return [{k: e.get(k) for k in ("id", "label", "qualifier", "birth_year", "death_year",
+                                  "floruit_year_from", "floruit_year_to", "work_count")}
+            for e in found[:limit]]
+
+
 def _extract_occupation_entries(person: dict) -> list[dict]:
     raw_occupations = person.get("occupations") or []
 
@@ -836,6 +951,10 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         **_make_snippets(person),
         "image_url": person.get("image_url"),
         "aliases": aliases,
+        # Duplikaadikontroll (similar_persons): „eesnimi + perekonnanime variant".
+        "first_name": name_obj.get("first_name") or None,
+        "family_name_variants": [v for v in (name_obj.get("family_name_variants") or [])
+                                 if isinstance(v, str) and v.strip()],
         "names": names,
         "possible_name_change": possible_name_change(name_obj),
         "occupations": occupations,

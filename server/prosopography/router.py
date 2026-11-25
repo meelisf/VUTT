@@ -28,7 +28,7 @@ from .person_crud import (
     IdentifierConflict,
     restore_person,
 )
-from .person_search import PersonFilters, list_persons, get_person_map_markers, get_person_facets, _normalize_tag_query
+from .person_search import PersonFilters, list_persons, get_person_map_markers, get_person_facets, _normalize_tag_query, similar_persons
 from .historical_regions import HistoricalRegionsError, get_historical_regions
 from .relations import get_person_with_works, get_relation_type_suggestions
 from .merge_ops import merge_person, delete_person
@@ -152,6 +152,19 @@ def prosopography_list(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/similar")
+def prosopography_similar(name: str = "", birth_year: Optional[int] = None,
+                          death_year: Optional[int] = None, limit: int = 5):
+    """Võimalikud duplikaadid uue isiku nimele (kirjapildi variantidega).
+
+    Sama kontroll, mida kasutab `candidates` (valiku paneel) — vorm ja paneel
+    kutsuvad seda, mitte tavalist nimeotsingut (`name_matches` on liiga range:
+    „Scharschmidt" ei leidnud „Scharschmid"-i, 2026-11-25). Sync `def` (ADR 0002).
+    """
+    return {"results": similar_persons(name, birth_year=birth_year, death_year=death_year,
+                                       limit=max(1, min(limit, 20)))}
 
 
 @router.post("/query")
