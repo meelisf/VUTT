@@ -497,6 +497,18 @@ võti = failinimi; kärbe = `adjust` pööratud raamis, pöörde muutus eemaldab
 sünk üks kord. Poolitus = ÜKS native commit (`commit_add_and_remove`) — GitPythoni
 `index.commit` on /data repos ~2 s. Välistab järjekorra mustandi ja vastupidi.
 
+**Lehestiku asendus (ADR 0089)** — `replace_work_content` on taastatav: URL-i teos PEAB olema
+state'i `replace_work_id`. Enne esimest failimuutust kirjutatakse asendusmärk
+(`state/work_replacing/{slug}.json`, `server/replace_marker.py`) ja taasteinfo (`replace_progress`);
+märgi ajal lükkavad `page_lock` ja `work_lock` tagasi kõik peale omaniku (`marker_owner`) → 409.
+Commit kannab treilerit `Upload: <id>`; katkestuse järel otsustab `replace_recovery.recover`
+(serveri käivitusel) treileri järgi: lõpeta või taasta. Taastamine eemaldab uued jälgitavad failid
+ja taastab JPG-d prügikasti oleku järgi (JPG kustub ainult siis, kui vana vaste on prügikastis).
+Uued lehed kannavad `content_generation`-it (Meili lehedokument → redaktor → `/save` payload);
+`/save` kontrollib lehe olemasolu ja põlvkonda leheluku SEES. Osade `pages` nullitakse
+(`pages_before_replace` vihjeks). Commit'i järgsed sammud elavad `_after_replace_commit`-is ja
+peavad jääma korratavaks. Uus asendustee kasutab neid, ei kirjuta oma.
+
 **Kaugkoristus (ADR 0024)** — katkestamine kustutab OCR-serveris ainult **failid**
 (`ocr_client.cleanup_run_files`), kataloog jääb alles: `rm -rf`/`rmdir` lennusoleva batchi
 alt annab OCR-valvuri veakäsitluseta `.txt`-kirjutusele `FileNotFoundError`, mis kukutab
