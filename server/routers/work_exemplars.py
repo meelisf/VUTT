@@ -81,6 +81,16 @@ def promote_preview(work_id: str, eid: str, user=Depends(require_role("admin")))
     return _promote_call(promote.preview, path, eid)
 
 
+@router.post("/admin/work/{work_id}/exemplars/{eid}/promote")
+def promote_start(work_id: str, eid: str, body: dict = Body(...), user=Depends(require_role("admin"))):
+    """Aluse vahetuse algus (ADR 0089 p 6): asendusrežiimis üleslaadimine eksemplari piltidest."""
+    from .. import promote
+    path = _writable(work_id, user)
+    uid = _promote_call(promote.start, path, work_id, eid, body.get("unknown_target"),
+                        body.get("confirmed_edited") or {}, user["username"])
+    return {"upload_id": uid}
+
+
 @router.get("/works/{work_id}/exemplars")
 def list_exemplars(work_id: str, user=Depends(optional_user)):
     """Eksemplarid, lehtede päritolu ja konvoluudi kaaslased.

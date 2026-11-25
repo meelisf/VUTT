@@ -192,6 +192,19 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
                  collections, languages, tags
     username: kes uploadi lõi (ühtses OCR-vaates kuvamiseks)
     """
+    upload_id, state = build_upload_state(meta, username)
+    # Loo uploads/{id}/thumbs/ kaustad
+    os.makedirs(os.path.join(_upload_dir(upload_id), 'thumbs'), exist_ok=True)
+    lock = _get_upload_lock(upload_id)
+    with lock:
+        _write_state(upload_id, state)
+    logger.info(f"Upload loodud: {upload_id} ({state['meta']['slug']})")
+    return state
+
+
+def build_upload_state(meta: dict, username: Optional[str] = None) -> tuple:
+    """(upload_id, state) ilma midagi kirjutamata — aluse vahetus ehitab kausta
+    `.staging` all ja avaldab selle ühe ümbernimetusega (ADR 0089 p 6)."""
     upload_id = generate_nanoid()
     while os.path.isdir(_upload_dir(upload_id)):
         upload_id = generate_nanoid()
@@ -206,10 +219,6 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
     work_type = meta.get('type') or {}
     ocr_model = 'hand' if work_type.get('id') == 'Q87167' else 'print'
     staging_path, work_path = remote_paths(ocr_model, upload_id, slug)
-
-    # Loo uploads/{id}/thumbs/ kaustad
-    thumbs_dir = os.path.join(_upload_dir(upload_id), 'thumbs')
-    os.makedirs(thumbs_dir, exist_ok=True)
 
     state = {
         "id": upload_id,
@@ -259,13 +268,7 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
         # täidab fetch alles pärast liitmist — siin on ainult nimed ja uuid-d.
         "ada": meta.get('ada') or None,
     }
-
-    lock = _get_upload_lock(upload_id)
-    with lock:
-        _write_state(upload_id, state)
-
-    logger.info(f"Upload loodud: {upload_id} ({year}_{slug})")
-    return state
+    return upload_id, state
 
 
 def update_upload_meta(upload_id: str, updates: dict) -> bool:
@@ -580,6 +583,7 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
 
 from . import work_parts as _work_parts  # noqa: E402  (ADR 0089 p 5)
+from .upload.store_source import write_source_image  # noqa: E402,F401  (ADR 0089 p 6)
 
 
 def _update_replace_state(upload_id: str, fn) -> None:

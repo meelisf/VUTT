@@ -73,6 +73,17 @@ async def admin_uploads(user=Depends(require_role("admin"))):
     return {"status": "success", "uploads": uploads}
 
 
+def _reject_promote_source_write(upload_id: str) -> None:
+    """Aluse vahetuse üleslaadimisel on lähtefailid eksemplari pildid — kliendi
+    lähtefailide teed on suletud (muidu oleks `promote.source_images` seos vale)."""
+    from ..upload import state as _st
+    s = _st.read_state(upload_id) if _valid_upload_id(upload_id) else None
+    if s and s.get("promote"):
+        raise HTTPException(status_code=409, detail=(
+            "Aluse vahetuse üleslaadimise lähtefaile ei saa muuta. / "
+            "Source files of a transcription-base change cannot be modified."))
+
+
 @router.post("/admin/upload/create")
 async def admin_upload_create(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
@@ -140,6 +151,7 @@ def admin_upload_ada_fetch(upload_id: str, user=Depends(require_role("admin"))):
     """
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
+    _reject_promote_source_write(upload_id)
     state = upload_state.read_state(upload_id)
     if not state:
         raise HTTPException(status_code=404, detail="Uploadi ei leitud")
@@ -378,6 +390,7 @@ async def admin_upload_chunk(upload_id: str, request: Request, user=Depends(requ
     X-Upload-Fingerprint, X-Filename. Vale nihe → 409 + serveri tegelik seis."""
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
+    await run_in_threadpool(_reject_promote_source_write, upload_id)
     try:
         offset = int(request.headers.get("X-Upload-Offset", ""))
         total = int(request.headers.get("X-Upload-Total", ""))
@@ -411,6 +424,7 @@ async def admin_upload_chunk(upload_id: str, request: Request, user=Depends(requ
 async def admin_upload_files(upload_id: str, request: Request, user=Depends(require_role("admin"))):
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
+    await run_in_threadpool(_reject_promote_source_write, upload_id)
     x_pg = int(request.headers.get("X-Page-Number", "0"))
     x_total = int(request.headers.get("X-Total-Pages", "0"))
     tmp_path = f"/tmp/vutt-upload-{upload_id}-pg{x_pg}" if x_pg > 0 else f"/tmp/vutt-upload-{upload_id}"

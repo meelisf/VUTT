@@ -56,20 +56,18 @@ def store_pdf(upload_id: str, tmp_path: str) -> int:
     return pages
 
 
-def store_image_page(upload_id: str, tmp_path: str, page_number: int,
-                     total_pages: int) -> int:
-    """Salvestab ühe pildilehe source/ kausta. Rasteriseerimist ei ole."""
+def write_source_image(dest_dir: str, tmp_path: str, page_number: int) -> str:
+    """Valideerib ja kirjutab ühe lähtepildi `dest_dir/pg_NNN.jpg`-ks (PNG/TIFF → JPEG).
+    `tmp_path` LIIGUTATAKSE/kustutatakse — anna ajutine koopia. Olekut ei puuduta: üks
+    loogika tavalisele üleslaadimisele ja aluse vahetusele (ADR 0089 p 6)."""
     try:
         file_detection.validate_upload_image(tmp_path)
     except ValueError:
         file_detection.safe_unlink(tmp_path)
         raise
     file_type = file_detection.detect_file_type(tmp_path)
-
-    directory = source_images_dir(upload_id)
-    os.makedirs(directory, exist_ok=True)
-    dst = os.path.join(directory, "pg_{:03d}.jpg".format(page_number))
-
+    os.makedirs(dest_dir, exist_ok=True)
+    dst = os.path.join(dest_dir, "pg_{:03d}.jpg".format(page_number))
     if file_type in ("png", "tiff"):
         from PIL import Image
         with Image.open(tmp_path) as im:
@@ -78,6 +76,13 @@ def store_image_page(upload_id: str, tmp_path: str, page_number: int,
     else:
         shutil.move(tmp_path, dst)
     os.chmod(dst, 0o644)
+    return dst
+
+
+def store_image_page(upload_id: str, tmp_path: str, page_number: int,
+                     total_pages: int) -> int:
+    """Salvestab ühe pildilehe source/ kausta. Rasteriseerimist ei ole."""
+    write_source_image(source_images_dir(upload_id), tmp_path, page_number)
 
     if page_number >= total_pages:
         upload_state.set_upload_state(

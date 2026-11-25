@@ -86,3 +86,120 @@ def preview(work_dir: str, eid: str) -> dict:
     witness = next((x["id"] for x in exemplars if x.get("text_witness")), None)
     return {"pages": pages, "edited": edited, "unknown": unknown, "unstorable": unstorable,
             "images": len(images), "witness": witness, "parts": len(meta.get("parts") or [])}
+
+
+# ── Vahetuse algus ────────────────────────────────────────────────────────────
+
+def _staging_root() -> str:
+    from . import upload_ops
+    return os.path.join(upload_ops.UPLOADS_DIR, ".staging")
+
+
+def cleanup_staging() -> None:
+    """Serveri käivitusel: pooleli jäänud (avaldamata) vahetuse üleslaadimised ära."""
+    import shutil
+    root = _staging_root()
+    if not os.path.isdir(root):
+        return
+    for name in os.listdir(root):
+        try:
+            shutil.rmtree(os.path.join(root, name))
+            logger.warning("Aluse vahetus: pooleli üleslaadimine koristatud (%s)", name)
+        except OSError:
+            logger.exception("Aluse vahetus: pooleli üleslaadimise koristus ebaõnnestus (%s)", name)
+
+
+def active_replace_upload(work_id: str) -> Optional[str]:
+    """Pooleli asendusega üleslaadimine sellele teosele (mitte imporditud ega veaga)."""
+    from .upload import state as upload_state
+    for s in upload_state.list_upload_states():
+        if s.get("replace_work_id") == work_id and s.get("status") not in ("imported", "error"):
+            return s.get("id")
+    return None
+
+
+def _source_file(work_dir: str, eid: str, img: dict) -> str:
+    """Lähtefail, kui see on kohapeal (`{id}.orig.{ext}`); muidu vaatamiskuju `{id}.jpg`
+    (ADA impordil PDF-i ei hoita — `original_path` annab URL-i)."""
+    d = exemplar_images.exemplar_dir(work_dir, eid)
+    orig = img.get("original")
+    if orig and os.path.isfile(os.path.join(d, orig)):
+        return os.path.join(d, orig)
+    return os.path.join(d, f"{img['id']}.jpg")
+
+
+def start(work_dir: str, work_id: str, eid: str, unknown_target: Optional[str],
+          confirmed_edited: dict, username: str) -> str:
+    """Asendusrežiimis üleslaadimine eksemplari piltidest. Teost EI muudeta.
+
+    Kaust ehitatakse `UPLOADS_DIR/.staging/{id}` alla ja avaldatakse ÜHE ümbernimetusega:
+    pooleli üleslaadimine ei ole kunagi loendis ega avatav (käivitus koristab `.staging`-u).
+    """
+    import shutil
+    import tempfile
+    from datetime import datetime, timezone
+    from . import upload_ops, replace_marker
+    from .admin_page_ops import work_lock
+    from .upload import prepress_plan
+
+    slug = os.path.basename(os.path.normpath(work_dir))
+    if replace_marker.read_marker(slug):
+        raise PromoteError(409, "replace_in_progress")
+    with work_lock(slug, work_dir):
+        pv = preview(work_dir, eid)
+        if pv["unstorable"]:
+            raise PromoteError(400, "old_page_unstorable", pv["unstorable"])
+        if pv["unknown"]:
+            exemplars = {x["id"] for x in (_meta(work_dir).get("exemplars") or [])}
+            if not unknown_target or unknown_target == eid or unknown_target not in exemplars:
+                raise PromoteError(400, "unknown_target_required", pv["unknown"])
+        if (confirmed_edited or {}) != pv["edited"]:
+            raise PromoteError(409, "edited_pages_changed", pv)
+        if replace_marker.read_marker(slug) or active_replace_upload(work_id):
+            raise PromoteError(409, "replace_in_progress")
+
+        meta = _meta(work_dir)
+        target = next(x for x in meta.get("exemplars") or [] if x.get("id") == eid)
+        images = exemplar_images.read_manifest(work_dir, eid)
+        upload_id, state = upload_ops.build_upload_state({
+            "title": meta.get("title") or "", "year": meta.get("year") or "",
+            "slug": slug, "type": meta.get("type"), "replace_work_id": work_id,
+        }, username)
+        root = _staging_root()
+        staging = os.path.join(root, upload_id)
+        try:
+            os.makedirs(os.path.join(staging, "thumbs"))
+            src_dir = os.path.join(staging, "source")
+            source_images = []
+            for n, img in enumerate(images.get("images") or [], 1):
+                # `write_source_image` liigutab/kustutab sisendi → AJUTINE koopia.
+                fd, tmp = tempfile.mkstemp(dir=staging, prefix="src-")
+                os.close(fd)
+                shutil.copy2(_source_file(work_dir, eid, img), tmp)
+                upload_ops.write_source_image(src_dir, tmp, n)
+                source_images.append({"page": n, "image_id": img["id"]})
+            count = len(source_images)
+            origins = {p["stem"]: (p["origin"] or unknown_target) for p in pv["pages"]}
+            state.update({
+                "status": "awaiting_split",
+                "expected_pages": count,
+                "prepress": prepress_plan.default_plan(count),
+                "promote": {
+                    "exemplar_id": eid, "holder": target.get("holder"),
+                    "shelfmark": target.get("shelfmark"),
+                    "source_images": source_images,
+                    "manifest_revision": images.get("revision"),
+                    "origins": origins, "unknown_target": unknown_target,
+                    "confirmed_edited": dict(confirmed_edited or {}),
+                    "requested_by": username,
+                    "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                },
+            })
+            from .utils import atomic_write_json
+            atomic_write_json(os.path.join(staging, "state.json"), state)
+            os.rename(staging, os.path.join(upload_ops.UPLOADS_DIR, upload_id))
+        except BaseException:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
+    logger.info("Aluse vahetus alustatud: %s → teos %s, eksemplar %s", upload_id, work_id, eid)
+    return upload_id
