@@ -110,6 +110,9 @@ async def lifespan(app: FastAPI):
     await run_in_threadpool(start_auth_background)
     warn_if_no_superadmin()
     threading.Thread(target=rebuild_indices, daemon=True).start()
+    # Pooleli lehestiku asendused (ADR 0089 p 3): märkide järgi taaste või lõpetus.
+    from .upload import replace_recovery
+    threading.Thread(target=replace_recovery.recover_all, daemon=True, name="replace-recovery").start()
     from .work_exemplars import check_unmigrated
     threading.Thread(target=check_unmigrated, daemon=True, name="exemplars-check").start()
     # Isikukaartide automaatrikastus (ADR 0048): planeerija + pooleliolevate taaste.
