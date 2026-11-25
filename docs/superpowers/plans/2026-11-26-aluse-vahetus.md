@@ -67,6 +67,10 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
       "unknown": [stem], "images": int, "witness": eid|None, "parts": int}`;
     `origin` = `work_exemplars.page_origins(meta, stems)`; `page` = järjekorranumber (`enumerate_page_images`)
   - `class PromoteError(Exception)` (`status: int`, `code: str`, `detail`)
+  - eelvaade kannab `unstorable: [{stem, reason}]` — vanad lehepildid, mida eksemplaripildina
+    salvestada ei saa (`exemplar_image_files.storable_reason(path) -> str | None`, samad piirid mis
+    `store_image`: suurus, `MAX_SIDE`, loetavus); nt 12 001 × 256 JPEG läbis üleslaadimise, aga mitte
+    `store_image`-i
 - Endpoint: `GET /admin/work/{work_id}/exemplars/{eid}/promote/preview` (sync `def`, admin + `can_write_work`)
 
 - [ ] **Step 1: Failing tests:** `test_sormejalg_muutub_kommentaariga` (sama tekst, lisatud
@@ -74,6 +78,7 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   `test_toores_leht_markusonaga_on_toimetatud` (ainus muudatus märksõna, ka vanas `tags`/`meta_content` kujus); `test_eelvaade_paritolu`
   (erandeksemplari leht → tema id, tunnistaja leht → tunnistaja, teadmata → None ja `unknown`-is);
   `test_eelvaade_tunnistajale_409` (eid on tunnistaja → `PromoteError(409, "is_witness")`);
+  `test_eelvaade_naitab_salvestamatut_vana_lehte` (12 001 × 256 JPEG → `unstorable`);
   `test_eelvaade_piltideta_409`.
 - [ ] **Step 2:** pytest → FAIL. **Step 3:** implementeeri. **Step 4:** PASS.
 - [ ] **Step 5: Commit** `feat(eksemplarid): aluse vahetuse eelvaade (sõrmejäljed, päritolu)`
@@ -101,8 +106,15 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   impordil (`original_path` → URL, PDF-i ei hoita) ja muidu `{id}.jpg` vaatamiskuju.
   **`store_image_page` LIIGUTAB faili (PNG/TIFF kustutab pärast teisendust) → anna talle AJUTINE
   KOOPIA** (`shutil.copy2` üleslaadimise tmp-kausta), mitte eksemplari faili.
-  **Järjekord:** lehed 1…N−1 → `promote` state'i → leht N (alles see seab `awaiting_split` +
-  `init_prepress`), et viisard ei näeks poolitusplaani enne `promote`-i.
+  **Üks avaldamine:** üleslaadimine luuakse olekuga `preparing` (loendis peidetud, kõik kliendi
+  otspunktid → 409); lähtefailid kirjutatakse otse `source/` kausta (mitte `store_image_page` kaudu,
+  mis seab `awaiting_split` eraldi kirjutusega), `promote` + `init_prepress` kirjutatakse, ja
+  **viimane kirjutus** seab ühe korraga `status = "awaiting_split"` + `expected_pages`.
+  **`promote` tööl on kliendi lähtefailide teed suletud:** `/files`, `/chunk`, ADA `ada-fetch` →
+  409, kui state'is on `promote` (muidu saaks lähtefaile üle kirjutada ja `source_images` seos —
+  ning lähtepiltide eemaldus — oleks vale).
+  **Salvestamatu vana leht** (`preview.unstorable` mittetühi) → 400 `old_page_unstorable` enne
+  üleslaadimise loomist.
   **Vea korral** koristatakse pooleli üleslaadimine (`cancel_upload`), eksemplar jääb puutumata.
 - Staatusvastus kannab `promote: {exemplar_id, holder, shelfmark}` ja `replace_phase` (märgist):
   `/status` koostab vastuse `server/upload/thumbs.py` `_payload`-is (`poll_and_sync_thumbs`) → lisa
@@ -115,7 +127,9 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   `test_teadmata_lehed_nouavad_sihti`; `test_teine_pooleli_asendus_409`;
   `test_eksemplari_failid_jaavad_alles` (pärast algust on kõik lähtefailid, ka PNG, eksemplari all);
   `test_vea_korral_uleslaadimine_koristatakse`; `test_awaiting_split_alles_parast_promote_i`;
-  `test_status_ja_loend_kannavad_promote_i` (nii `/status` kui `/admin/uploads`).
+  `test_status_ja_loend_kannavad_promote_i` (nii `/status` kui `/admin/uploads`);
+  `test_preparing_ei_ole_loendis_ega_avatav`; `test_promote_tool_files_ja_chunk_409`;
+  `test_salvestamatu_vana_leht_400`.
 - [ ] **Step 2–4:** FAIL → implementeeri → PASS.
 - [ ] **Step 5: Commit** `feat(eksemplarid): aluse vahetuse algus eksemplari piltidest`
 
@@ -138,7 +152,10 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
     ainult need ID-d prügikasti, `imports` ja muud pildid jäävad; samuti ainult `metadata_lock`.
     Järjekord: manifestikirjed ära + commit → failid prügikasti. Korduskindel: ID, mida manifestis
     enam pole, aga mille failid on eksemplari kaustas alles (katkestus pärast manifesti), viiakse
-    prügikasti.
+    prügikasti. **Range liigutus:** oma abifunktsioon (mitte `_move_to_trash`, mis logib `OSError`-i
+    ja jätkab) — iga liigutuse tõrge → `ExemplarImagesError` → asenduses `AfterStepError` (märk jääb).
+  - `add_internal` kasutab `store_image`-i; selle `ImageFileError` → `ExemplarImagesError` (aga
+    salvestatavus on juba enne asendust kontrollitud, Task 2 ja `recheck_locked`).
   - **Tulemused on kohustuslikud:** mõlemad viskavad `ExemplarImagesError`, kui `write_manifest_locked`
     tagastab `False`. Kordusel commititakse kettal olev, aga commitimata manifest (`commit_manifest_if_dirty`:
     ketas ≠ HEAD → commit; tõrge → viga), enne kui uusi muudatusi tehakse.
@@ -147,7 +164,8 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   `test_remove_images_internal_ainult_valitud` (imports + teised pildid alles);
   `test_klient_ei_saa_former_pages_saata` (`add_uploads` → `ExemplarImagesError`);
   `test_commit_torge_viskab` (`write_manifest_locked` → False → viga);
-  `test_kordus_commitib_kettal_oleva_manifesti`; `test_kordus_viib_orvud_failid_prugikasti`.
+  `test_kordus_commitib_kettal_oleva_manifesti`; `test_kordus_viib_orvud_failid_prugikasti`;
+  `test_prugikasti_viimise_torge_viskab` (liigutus kukub → viga, kordus viib faili prügikasti).
 - [ ] **Step 2–4:** FAIL → implementeeri → PASS (+ `tests/test_exemplar_images*.py`).
 - [ ] **Step 5: Commit** `feat(eksemplarid): former_pages allikas ja serveripoolsed pildiabid`
 
@@ -164,7 +182,9 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   - `promote.recheck_locked(work_dir: str, promote: dict) -> None` — kutsutakse asenduses PÄRAST
     vanade lehtede lukke ja ENNE paaride eemaldust; kontrollib, et **lähteeksemplar ja KÕIK
     `origins` sihid on olemas**, arvutab sõrmejäljed ja päritolu uuesti; erinevus →
-    `PromoteError(409, "edited_pages_changed" | "origins_changed" | "target_missing")`; asendus eemaldab
+    `PromoteError(409, "edited_pages_changed" | "origins_changed" | "target_missing" |
+    "old_page_unstorable")` (vanade lehepiltide salvestatavus kontrollitakse ENNE commit'i — muidu
+    jääks lõpetamine pärast commit'i igal kordusel samasse kohta kinni); asendus eemaldab
     siis märgi, vabastab lukud ja viskab `HTTPException(409, detail={code, preview})` (midagi pole muudetud)
   - **Märk kannab kogu lõpetamiseks vajaliku** (üleslaadimise kaust võib kaduda): `progress["promote"] =
     {exemplar_id, origins, upload_id}`, `progress["committed_outputs"]`, `progress["remove_source_ids"]`
@@ -186,8 +206,14 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
     → `AfterStepError`. `promote` korral on ka `reset_page_origins` kohustuslik (tagastab tulemuse,
     tõrge → `AfterStepError`).
   - `promote` korral jätab `_after_replace_commit` vahele `_apply_replace_metadata` ja töökollektsioonid.
-  - `POST /admin/upload/{upload_id}/promote/finish` → `replace_recovery.recover(upload_id, slug)`;
-    tulemus ∉ `OK_RESULTS` → 409 tulemuse koodiga.
+  - **Lõpetamine märgi järgi, mitte üleslaadimise järgi** (kaust võib olla kadunud):
+    `POST /admin/work/{work_id}/replace/finish` → loeb teose märgi → `recover(marker.upload_id, slug)`.
+    Vastus kannab tulemuse ERALDI: `{"result": "replaced" | "restored" | "cleared" | <tõrge>}` —
+    `restored` tähendab, et vana lehestik taastati (vahetus EI toimunud), klient näitab seda eraldi.
+    Tõrge (`restore_failed`, `commit_unknown`, `after_failed`, `index_failed`) → 409 koodiga.
+  - Jätkamise info tuleb märgist: `GET /works/{id}/exemplars` vastus kannab
+    `replace_pending: {upload_id, phase}` (märk olemas), `/admin/uploads` lisab märgid, millel
+    üleslaadimise kausta pole (`orphan: true`).
   - `POST /admin/upload/{upload_id}/promote/confirm` keha `{unknown_target, confirmed_edited}` —
     lõppkontrolli 409 järel uus kinnitus sama üleslaadimise juures (kontrollid nagu Task 2; kirjutab
     `promote.confirmed_edited`, `origins`, `unknown_target` ümber); siis asenduse kordus.
@@ -207,6 +233,10 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   - `test_tuhistus_ja_algus_sama_luku_all` (tühistus võtab teose luku; märgi korral 409)
   - `test_tunnistaja_commit_torge_jatab_margi`; `test_paritolu_nullimise_torge_jatab_margi`
   - `test_confirm_parast_409_ja_kordus_onnestub`
+  - `test_finish_teose_jargi_ilma_uleslaadimiseta` (kaust kustutatud → `/admin/work/{id}/replace/finish` → `replaced`)
+  - `test_finish_tagastab_restored_eraldi` (märk enne commit'i → `restored`, mitte edu)
+  - `test_exemplars_vastus_kannab_replace_pending`; `test_uploads_loend_naitab_orvu_margi`
+  - `test_salvestamatu_vana_leht_ocr_ajal_409` (recheck → `old_page_unstorable`, midagi ei muutu)
 - [ ] **Step 2–4:** FAIL → implementeeri → PASS (+ kõik `tests/test_asendus*.py`, `test_replace_work_content.py`).
 - [ ] **Step 5: Commit** `feat(eksemplarid): aluse vahetuse konksud ja lõpetamine asenduses`
 
@@ -220,7 +250,10 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
 **Interfaces:**
 - Consumes: Task 1 GET eelvaade, Task 2 POST algus (`{upload_id}`), Task 4 POST finish; staatuse `promote`/`replace_phase`.
 - Produces: `fetchPromotePreview(workId, eid, token)`, `startPromote(workId, eid, body, token) -> string`,
-  `confirmPromote(uploadId, body, token)`, `finishPromote(uploadId, token)`; nupp nähtav adminile, kui eksemplaril on pilte ja ta ei ole tunnistaja.
+  `confirmPromote(uploadId, body, token)`, `finishReplace(workId, token) -> {result}`;
+  „Lõpeta lehestiku asendus" nupp eksemplari lehel `replace_pending` põhjal ja üleslaadimiste loendis
+  (ka `orphan` kirjetel); tulemuse teade eristab `replaced` / `restored` / `cleared`;
+  dialoog näitab `unstorable` lehti ja ei luba alustada; nupp nähtav adminile, kui eksemplaril on pilte ja ta ei ole tunnistaja.
 - Dialoog: lehtede arv + seisundite jaotus; „vanad lehed → {eksemplar}" päritolu kaupa; teadmata
   lehtede sihi valik (kohustuslik, kui neid on); osade hoiatus (`parts > 0`); toimetatud lehtede punane
   hoiatus + kinnitusruut (nupp keelatud ilma); 409 `edited_pages_changed` → värske eelvaade ja uus
@@ -249,3 +282,12 @@ tulemust; `read_page_view`; `thumbs._payload`). Parandused: ajutised koopiad + k
 laiendi järgi), märk kannab kogu lõpetamise info, tühistus teose luku all, tulemuste kontroll (T3–T4);
 viisardi 409 jätkutee (`/promote/confirm`), `read_page_view` sõrmejäljes, märksõnaga toores leht,
 `/status` `_payload`-i kaudu (T1, T2, T5).
+
+## Ülevaatus 2 (2026-11-26, commit `1b30156a` vastu)
+
+Kontrollitud koodist: `create_upload` avaldab kohe, `store_image_page` seab `awaiting_split`
+eraldi `init_prepress`-ist; `/files` kirjutab lähtefaile; `_move_to_trash` logib `OSError`-i ja
+jätkab; `store_image` lükkab `MAX_SIDE`-st suurema pildi tagasi. Parandused: `preparing` + üks
+avaldamine, `promote` tööl kliendi failiteed 409 (T2); lõpetamine teose märgi järgi ja tulemused
+eraldi, `replace_pending`/orvu märgid loendis (T4–T5); range prügikasti viimine (T3); vanade
+lehepiltide salvestatavus eelvaates, algusel ja lõppkontrollis (T1, T2, T4).
