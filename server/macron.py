@@ -100,13 +100,34 @@ def work_languages(work_dir):
     return langs if isinstance(langs, list) else []
 
 
-def convert_ocr_text(text, languages, context=""):
+MANUSCRIPT_TYPE = "Q87167"
+
+
+def work_is_manuscript(work_dir):
+    """Kas teos on käsikiri (`type.id` = Q87167). Lugemata metaandmed → False
+    (siis otsustab keelevalvur nagu varem)."""
+    try:
+        with open(os.path.join(work_dir, "_metadata.json"), encoding="utf-8") as f:
+            t = json.load(f).get("type")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return isinstance(t, dict) and t.get("id") == MANUSCRIPT_TYPE
+
+
+def convert_ocr_text(text, languages, context="", manuscript=False):
     """OCR-väljundi järeltöötlus (ADR 0062 samm b): kuni uue mudelini kirjutab
     OCR tildet, see ei tohi korpusesse uut kuju tuua. Valvuriga keele tildega
     sõnad logitakse — korpuse migratsiooni aruanne (samm 5) leiab nad uuesti.
 
     `languages is None` (keel teadmata) → tekst muutumata: tilde jääb migratsioonile,
-    vale teisendus (eesti õ → ō) oleks hullem."""
+    vale teisendus (eesti õ → ō) oleks hullem.
+
+    `manuscript=True` → tekst muutumata (ADR 0062 täiendus 2026-11-25): Kurrendi mudel
+    kirjutab lühendi makronina ise (GT makroniga alates v4), tilde tema väljundis on
+    päris täht. Mitmekeelsel käsikirjal (EMIL-i kaardid) on `languages` tühi ja
+    valvur ei rakendunud — eesti õ muutus ō-ks."""
+    if manuscript:
+        return text
     if languages is None:
         logger.warning("Makron: teose keeled teadmata, OCR-tekst teisendamata (%s)", context)
         return text
