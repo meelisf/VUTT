@@ -28,8 +28,16 @@ def _key(path: str) -> str:
 
 @contextmanager
 def page_lock(path: str):
-    """Hoia lehe lukku (tee võib olla lehe `.txt` või `.json`)."""
+    """Hoia lehe lukku (tee võib olla lehe `.txt` või `.json`).
+
+    Asendusmärgi ajal (ADR 0089 p 2) lükkab võõra kirjutuse tagasi — enne luku võtmist
+    ja uuesti pärast, sest märk võis tekkida ootamise ajal.
+    """
+    from . import replace_marker
+    slug = replace_marker.slug_for_page_path(path)
+    replace_marker.check_not_replacing(slug)
     with _locks.get(_key(path)):
+        replace_marker.check_not_replacing(slug)
         yield
 
 

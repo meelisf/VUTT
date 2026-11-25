@@ -144,6 +144,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="VUTT API", version="1.0.0", lifespan=lifespan)
 # Käsitlemata erind (500) → admini vealogi (#133); vastus jääb samaks.
 install_http_handler(app)
+
+
+# Asendusmärk (ADR 0089 p 2): lukk lükkas kirjutuse tagasi → 409, mitte 500.
+from fastapi.responses import JSONResponse as _JSONResponse
+from .replace_marker import WorkReplacingError as _WorkReplacingError
+
+
+@app.exception_handler(_WorkReplacingError)
+async def _work_replacing_handler(_request, _exc):
+    return _JSONResponse(status_code=409, content={"detail": (
+        "Teose lehestik on asendamisel, proovi hetke pärast uuesti. / "
+        "The work's pages are being replaced, try again shortly.")})
+
+
 app.include_router(prosopography_router, prefix="/prosopography")
 app.include_router(notifications_router)
 app.include_router(upload_router)
