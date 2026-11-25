@@ -106,10 +106,19 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   impordil (`original_path` → URL, PDF-i ei hoita) ja muidu `{id}.jpg` vaatamiskuju.
   **`store_image_page` LIIGUTAB faili (PNG/TIFF kustutab pärast teisendust) → anna talle AJUTINE
   KOOPIA** (`shutil.copy2` üleslaadimise tmp-kausta), mitte eksemplari faili.
-  **Üks avaldamine:** üleslaadimine luuakse olekuga `preparing` (loendis peidetud, kõik kliendi
-  otspunktid → 409); lähtefailid kirjutatakse otse `source/` kausta (mitte `store_image_page` kaudu,
-  mis seab `awaiting_split` eraldi kirjutusega), `promote` + `init_prepress` kirjutatakse, ja
-  **viimane kirjutus** seab ühe korraga `status = "awaiting_split"` + `expected_pages`.
+  **Üks avaldamine (atomaarne kaust):** `create_upload` jagatakse `build_upload_state(meta, username)
+  -> (upload_id, state)` + kirjutus. Vahetus ehitab kogu üleslaadimise kausta
+  `UPLOADS_DIR/.staging-{upload_id}/` alla (lähtefailid, `state.json` koos `promote`-i, `prepress`-i
+  ja `status = "awaiting_split"`-iga) ja avaldab selle **ühe `os.rename`-iga** `UPLOADS_DIR/{id}`-ks.
+  Pooleli kaust ei ole kunagi loendis ega avatav. `.staging-*` kaustu ignoreerivad loend ja aktiivse
+  asenduse kontroll; **serveri käivitusel** (lifespan, `recover_all` kõrval) kustutatakse need.
+  **Lähtepiltide salvestus on ÜKS loogika:** `store_image_page`-ist eraldatakse
+  `write_source_image(dest_dir, tmp_path, page_number) -> str` (valideerimine + PNG/TIFF → JPEG
+  teisendus + nimi), mida kasutavad nii tavaline üleslaadimine (pärast seda oleku uuendus) kui vahetus
+  (ilma olekuta). Muidu jääks `.tif` leheloendist välja ja `.jpg` nimega PNG läbiks baitkoopia kontrolli.
+  **Numbriline järjestus:** `ImageDirPageSource._list` sorteerib `pg_(\d+)` järgi numbriliselt
+  (mitte tähestikuliselt: `pg_1000.jpg` < `pg_101.jpg`) — sama järjekord, millega `source_images`
+  numbrid antakse. Parandab ka tavalise üle 999 pildiga üleslaadimise.
   **`promote` tööl on kliendi lähtefailide teed suletud:** `/files`, `/chunk`, ADA `ada-fetch` →
   409, kui state'is on `promote` (muidu saaks lähtefaile üle kirjutada ja `source_images` seos —
   ning lähtepiltide eemaldus — oleks vale).
@@ -128,7 +137,11 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   `test_eksemplari_failid_jaavad_alles` (pärast algust on kõik lähtefailid, ka PNG, eksemplari all);
   `test_vea_korral_uleslaadimine_koristatakse`; `test_awaiting_split_alles_parast_promote_i`;
   `test_status_ja_loend_kannavad_promote_i` (nii `/status` kui `/admin/uploads`);
-  `test_preparing_ei_ole_loendis_ega_avatav`; `test_promote_tool_files_ja_chunk_409`;
+  `test_staging_ei_ole_loendis_ega_avatav`; `test_promote_tool_files_ja_chunk_409`;
+  `test_kaivitus_koristab_staging_kausta_ja_uus_algus_onnestub`;
+  `test_png_ja_tiff_teisendatakse_mõlemas_voos`;
+  `test_ule_999_pildi_jarjestus_ja_valjajatmine` (1 001 pilti; pilt 1000 välja jäetud → lõpetamine
+  eemaldab õiged ID-d, pilt 1000 jääb);
   `test_salvestamatu_vana_leht_400`.
 - [ ] **Step 2–4:** FAIL → implementeeri → PASS.
 - [ ] **Step 5: Commit** `feat(eksemplarid): aluse vahetuse algus eksemplari piltidest`
@@ -207,7 +220,9 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
     tõrge → `AfterStepError`).
   - `promote` korral jätab `_after_replace_commit` vahele `_apply_replace_metadata` ja töökollektsioonid.
   - **Lõpetamine märgi järgi, mitte üleslaadimise järgi** (kaust võib olla kadunud):
-    `POST /admin/work/{work_id}/replace/finish` → loeb teose märgi → `recover(marker.upload_id, slug)`.
+    `POST /admin/work/{work_id}/replace/finish` keha `{upload_id}` (vaates näidatud
+    `replace_pending.upload_id`) → teose luku all: aktiivse märgi `upload_id` PEAB võrduma → muidu 409
+    `stale` (aegunud vaade ei käivita järgmise asenduse taastet) → `recover_locked`.
     Vastus kannab tulemuse ERALDI: `{"result": "replaced" | "restored" | "cleared" | <tõrge>}` —
     `restored` tähendab, et vana lehestik taastati (vahetus EI toimunud), klient näitab seda eraldi.
     Tõrge (`restore_failed`, `commit_unknown`, `after_failed`, `index_failed`) → 409 koodiga.
@@ -234,6 +249,7 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
   - `test_tunnistaja_commit_torge_jatab_margi`; `test_paritolu_nullimise_torge_jatab_margi`
   - `test_confirm_parast_409_ja_kordus_onnestub`
   - `test_finish_teose_jargi_ilma_uleslaadimiseta` (kaust kustutatud → `/admin/work/{id}/replace/finish` → `replaced`)
+  - `test_finish_aegunud_upload_id_409` (märk on teise üleslaadimise oma → `stale`, midagi ei tehta)
   - `test_finish_tagastab_restored_eraldi` (märk enne commit'i → `restored`, mitte edu)
   - `test_exemplars_vastus_kannab_replace_pending`; `test_uploads_loend_naitab_orvu_margi`
   - `test_salvestamatu_vana_leht_ocr_ajal_409` (recheck → `old_page_unstorable`, midagi ei muutu)
@@ -250,7 +266,7 @@ täiendused (taastemudel: vanad lehefailid prügikastis, mitte git'is).
 **Interfaces:**
 - Consumes: Task 1 GET eelvaade, Task 2 POST algus (`{upload_id}`), Task 4 POST finish; staatuse `promote`/`replace_phase`.
 - Produces: `fetchPromotePreview(workId, eid, token)`, `startPromote(workId, eid, body, token) -> string`,
-  `confirmPromote(uploadId, body, token)`, `finishReplace(workId, token) -> {result}`;
+  `confirmPromote(uploadId, body, token)`, `finishReplace(workId, uploadId, token) -> {result}`;
   „Lõpeta lehestiku asendus" nupp eksemplari lehel `replace_pending` põhjal ja üleslaadimiste loendis
   (ka `orphan` kirjetel); tulemuse teade eristab `replaced` / `restored` / `cleared`;
   dialoog näitab `unstorable` lehti ja ei luba alustada; nupp nähtav adminile, kui eksemplaril on pilte ja ta ei ole tunnistaja.
@@ -291,3 +307,10 @@ jätkab; `store_image` lükkab `MAX_SIDE`-st suurema pildi tagasi. Parandused: `
 avaldamine, `promote` tööl kliendi failiteed 409 (T2); lõpetamine teose märgi järgi ja tulemused
 eraldi, `replace_pending`/orvu märgid loendis (T4–T5); range prügikasti viimine (T3); vanade
 lehepiltide salvestatavus eelvaates, algusel ja lõppkontrollis (T1, T2, T4).
+
+## Ülevaatus 3 (2026-11-26, commit `f3d35e6e` vastu)
+
+Kontrollitud koodist: `ImageDirPageSource._list` sorteerib tähestikuliselt ja tunneb ainult
+`.jpg/.jpeg/.png`; PNG/TIFF teisendus elab `store_image_page`-is. Parandused: atomaarne
+`.staging-*` kaust + käivitusaegne koristus (mitte `preparing` olek); ühine `write_source_image`;
+numbriline järjestus (ka tavalisele üleslaadimisele); lõpetamine nõuab vaates näidatud `upload_id`-d.
