@@ -95,3 +95,15 @@ statistika. Kümne kirja juures kuus on see hind ja sõltuvus millegi eest, mill
 **Kirjade saatmine taustalõimes.** Postfix võtab kirja järjekorda kohe
 (millisekundid), seega ei ole HTTP-päringu taga midagi oodata; taustalõim
 peidaks vea admini eest, kes on ainus, kes selle peale reageerida saab.
+
+## Täiendus 2026-11-25 — tagasilükkamise kiri
+
+Taotluse tagasilükkamisel (`POST /admin/registrations/reject`) on valikuline
+`reason` (≤ 1000 märki). Põhjusega läheb taotlejale kiri mallist
+`registration_rejected` tema suhtluskeeles (admin võib keele üle kirjutada);
+põhjus on inimese tekst ja läheb kirja muutmata (ADR 0033 p 1). **Tühi põhjus =
+vaikne tagasilükkamine** — spämmile kirja ei saadeta. Saatmisviga ei muuda
+tagasilükkamist 500-ks; varutee on kopeeritav kirjatekst, mitte `mailto:`
+(vaba tekst ei mahu kindlalt `MAILTO_BUDGET`-i). `update_registration_status`
+muudab ainult `pending` kirjet, nii et kordus (teine admin, topeltklõps) annab
+400 ega saada teist kirja ega teist kutset.

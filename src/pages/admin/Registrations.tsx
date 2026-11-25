@@ -26,6 +26,17 @@ interface Registration {
   // Taotleja SOOV (#321), mitte volitus: eeltäidab ulatuse valiku allpool.
   // Puudub vanades taotlustes ja vana backendi vastuses.
   interest_collections?: string[];
+  // Taotlejale kirjaga saadetud tagasilükkamise põhjus (puudub vaiksel tagasilükkamisel).
+  reject_reason?: string;
+}
+
+// Tagasilükkamise tulemus: kiri saadetud / saatmata (tekst kopeerimiseks) / vaikne.
+interface RejectResult {
+  name: string;
+  email: string;
+  mail_sent?: boolean;
+  mail_error?: string | null;
+  mail_body?: string;
 }
 
 interface InviteResult {
@@ -76,6 +87,11 @@ const Registrations: React.FC = () => {
   // Saadetud kirja korral on link peidus (vt allpool) — see avab ta tagasi.
   const [showInviteLink, setShowInviteLink] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  // Avatud tagasilükkamise paneel (taotluse id) ja põhjuse mustand taotluse kaupa.
+  const [rejectOpenId, setRejectOpenId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
+  const [rejectResult, setRejectResult] = useState<RejectResult | null>(null);
+  const [mailTextCopied, setMailTextCopied] = useState(false);
 
   // Rolli ja ulatuse valik on taotluse ID järgi eraldi seisund (mitte üks jagatud
   // muutuja) — taotlusi kuvatakse mitu korraga ning jagatud seisund laseks adminil
@@ -188,13 +204,27 @@ const Registrations: React.FC = () => {
 
   const handleReject = async (regId: string) => {
     setProcessingId(regId);
+    setRejectResult(null);
+    const reason = (rejectReason[regId] || '').trim();
 
     try {
       const data = await apiPost<RegistrationActionResponse>('/admin/registrations/reject', {
-        registration_id: regId
+        registration_id: regId,
+        reason,
+        language: languageFor(regId)
       }, { token: authToken });
 
       if (data.status === 'success') {
+        setRejectResult({
+          name: data.name,
+          email: data.email,
+          mail_sent: data.mail_sent,
+          mail_error: data.mail_error,
+          mail_body: data.mail_body
+        });
+        setMailTextCopied(false);
+        setRejectOpenId(null);
+        setRejectReason((prev) => { const next = { ...prev }; delete next[regId]; return next; });
         await loadRegistrations();
       } else {
         setError(data.message || t('registrations.rejectError'));
@@ -248,6 +278,50 @@ const Registrations: React.FC = () => {
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             {error}
+          </div>
+        )}
+
+        {/* Tagasilükkamise tulemus */}
+        {rejectResult && (
+          <div className={`mb-6 p-4 rounded-lg border flex items-start gap-3 ${
+            rejectResult.mail_sent === false ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'
+          }`}>
+            <div className="flex-1 text-sm">
+              {rejectResult.mail_sent === true && (
+                <p className="text-gray-700 flex items-center gap-1">
+                  <Mail size={14} />
+                  {t('mail.sent', { email: rejectResult.email })}
+                </p>
+              )}
+              {rejectResult.mail_sent === undefined && (
+                <p className="text-gray-700">{t('registrations.rejectedSilently', { name: rejectResult.name })}</p>
+              )}
+              {rejectResult.mail_sent === false && (
+                <>
+                  <p className="text-amber-800">
+                    {t('registrations.rejectMailFailed', { reason: rejectResult.mail_error || '—' })}
+                  </p>
+                  {rejectResult.mail_body && (
+                    <>
+                      <pre className="mt-2 p-2 bg-white border border-amber-200 rounded text-xs whitespace-pre-wrap">{rejectResult.mail_body}</pre>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(rejectResult.mail_body || '');
+                          setMailTextCopied(true);
+                        }}
+                        className="mt-2 px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700 flex items-center gap-1"
+                      >
+                        {mailTextCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
+                        {mailTextCopied ? t('registrations.mailTextCopied') : t('registrations.copyMailText')}
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            <button onClick={() => setRejectResult(null)} className="text-gray-500 hover:text-gray-700">
+              <X size={20} />
+            </button>
           </div>
         )}
 
@@ -463,19 +537,53 @@ const Registrations: React.FC = () => {
                           {t('registrations.approve')}
                         </button>
                         <button
-                          onClick={() => handleReject(reg.id)}
+                          onClick={() => setRejectOpenId(rejectOpenId === reg.id ? null : reg.id)}
                           disabled={processingId === reg.id}
                           className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 transition-colors flex items-center gap-1"
                         >
-                          {processingId === reg.id ? (
-                            <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <X size={16} />
-                          )}
+                          <X size={16} />
                           {t('registrations.reject')}
                         </button>
                       </div>
                     </div>
+                    {/* Tagasilükkamine kahe sammuna: põhjus on valikuline; tühi = vaikne
+                        (spämm), täidetud = kiri taotlejale tema suhtluskeeles. */}
+                    {rejectOpenId === reg.id && (
+                      <div className="mt-4 p-3 border border-red-200 bg-red-50 rounded-lg">
+                        <label htmlFor={`reject-reason-${reg.id}`} className="text-xs font-medium text-gray-600">
+                          {t('registrations.rejectReasonLabel')}
+                        </label>
+                        <textarea
+                          id={`reject-reason-${reg.id}`}
+                          value={rejectReason[reg.id] || ''}
+                          onChange={(e) => setRejectReason((prev) => ({ ...prev, [reg.id]: e.target.value }))}
+                          maxLength={1000}
+                          rows={3}
+                          className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {t('registrations.rejectReasonHint', {
+                            language: languageFor(reg.id) === 'en' ? t('registrations.languageEn') : t('registrations.languageEt')
+                          })}
+                        </p>
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button
+                            onClick={() => setRejectOpenId(null)}
+                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                          >
+                            {t('registrations.rejectCancel')}
+                          </button>
+                          <button
+                            onClick={() => handleReject(reg.id)}
+                            disabled={processingId === reg.id}
+                            className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-red-400 flex items-center gap-1"
+                          >
+                            {processingId === reg.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                            {t('registrations.rejectConfirm')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -511,7 +619,10 @@ const Registrations: React.FC = () => {
                               {t('registrations.approved')}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                            <span
+                              title={reg.reject_reason ? t('registrations.rejectReasonShown', { reason: reg.reject_reason }) : undefined}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium"
+                            >
                               <X size={12} />
                               {t('registrations.rejected')}
                             </span>

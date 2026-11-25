@@ -1,0 +1,12 @@
+VUTT - your access request
+
+Dear $name,
+
+On $submitted_on you requested access to VUTT, the transcription workbench for early modern texts at the University of Tartu Library. Unfortunately we cannot approve your request at this time.
+
+$reason
+
+The public content of VUTT can be read without an account. If you would like to clarify your request, please write to vutt-abi@ut.ee — a person will answer.
+
+University of Tartu Library
+https://vutt.utlib.ut.ee

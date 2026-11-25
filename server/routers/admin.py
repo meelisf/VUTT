@@ -131,7 +131,10 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     reg = await run_in_threadpool(get_registration_by_id, data.get("registration_id"))
     if not reg or reg["status"] != "pending":
         raise HTTPException(status_code=400, detail="Vigane taotlus")
-    await run_in_threadpool(update_registration_status, reg["id"], "approved", user["username"])
+    # CAS: update muudab ainult `pending` kirjet — paralleelne teine admin saab 400,
+    # mitte teist kutset.
+    if not await run_in_threadpool(update_registration_status, reg["id"], "approved", user["username"]):
+        raise HTTPException(status_code=400, detail="Vigane taotlus")
     # Roll ja kirjutamisulatus valitakse SIIN, mitte hiljem kaheastmeliselt —
     # create_invite_token piirab rolli sisemiselt (contributor, editor); admin
     # ei saa kutselingi kaudu tekitada admin- ega superadmin-kontot.
@@ -196,15 +199,46 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     return response
 
 
+# Tagasilükkamise põhjuse lagi: kiri, mitte essee. Varutee on kopeeritav tekst,
+# mitte mailto: (vaba tekst ei mahuks kindlalt MAILTO_BUDGET-i).
+REJECT_REASON_MAX = 1000
+
+
 @router.post("/admin/registrations/reject")
 async def reject_registration(request: Request, user=Depends(require_role("admin"))):
+    """Lükkab taotluse tagasi; põhjuse korral saadab taotlejale kirja.
+
+    Põhjus on valikuline. Tühi põhjus = vaikne tagasilükkamine (spämm — kirja
+    ei saadeta). Põhjus on inimese kirjutatud tekst ja läheb kirja muutmata
+    (ADR 0033 p 1); malli raam on taotleja keeles, admin võib keele üle
+    kirjutada nagu kinnitamisel.
+    """
     data = await get_json_data(request)
+    reason = (data.get("reason") or "").strip()
+    if len(reason) > REJECT_REASON_MAX:
+        raise HTTPException(status_code=400, detail=f"Põhjus on liiga pikk (üle {REJECT_REASON_MAX} märgi)")
     reg = await run_in_threadpool(
-        update_registration_status, data.get("registration_id"), "rejected", user["username"]
+        update_registration_status, data.get("registration_id"), "rejected", user["username"],
+        reason or None,
     )
     if not reg:
         raise HTTPException(status_code=400, detail="Vigane taotlus")
-    return {"status": "success"}
+    response = {"status": "success", "email": reg["email"], "name": reg["name"]}
+    if not reason:
+        return response
+    language = normalize_language(data.get("language") or reg.get("language"))
+    # Taotlus on juba „rejected" — kirja tõrge ei tohi seda 500-ks muuta;
+    # admin saab kirjateksti kopeerimiseks (ADR 0034).
+    response.update(await run_in_threadpool(
+        _render_and_send,
+        "registration_rejected",
+        language,
+        reg["email"],
+        name=reg["name"],
+        reason=reason,
+        submitted_on=format_mail_date(reg.get("submitted_at"), language),
+    ))
+    return response
 
 
 @router.post("/admin/users")
