@@ -1,7 +1,10 @@
 # Eksemplari kiht ja paber.ut.ee vesimärgid — arutelu
 
 **Seis:** arutelu alus, mitte otsus (2026-10-19, tihendatud 2026-10-31). Issue [#696](https://github.com/meelisf/VUTT/issues/696).
-ADR kirjutamata — tuleb enne etappi 2. Koodibaasi vastu kontrollitud:
+**2026-11-25:** etapp 2 (eksemplari kiht) on tehtud — [ADR 0076](../../decisions/0076-eksemplari-kiht.md),
+[ADR 0079](../../decisions/0079-eksemplari-pildid.md), [eksemplari leht](2026-11-10-eksemplari-leht-design.md).
+Uurija vastused on jaotises [Uurija vastused](#uurija-vastused-2026-11); paberi (etapid 3–4) ADR kirjutamata.
+Koodibaasi vastu kontrollitud:
 [ülevaatus 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-koodi-ulevaade.md) (viited allpool „ül. §N")
 ja [järelkontroll 2026-10-31](../../reviews/2026-10-31-eksemplari-kiht-jarelkontroll.md) („jk. §N");
 sõnastus täpsustatud [kavandi täpsustuste](../../reviews/2026-10-31-eksemplari-kiht-kavandi-tapsustused.md) järgi.
@@ -194,16 +197,19 @@ paber.ut.ee välju.
 
 1. **Arhiiv** — ülevõtmine, staatiline koopia, andmestik püsiarhiivi. Sõltumatu, ~paar päeva.
 2. **Eksemplari kiht** — eksemplari kirje teose juures, tekstitunnistaja märge, lehtede seos
-   eksemplariga (reegel 5). Kasulik ka ilma paberiuurimiseta.
+   eksemplariga (reegel 5). Kasulik ka ilma paberiuurimiseta. **Tehtud** (ADR 0076, 0079).
 3. **Vaatlused** — vaatluse vorm, fotod, IPH sõnastik, paneel „Paber" teose lehel; paber.ut.ee
    import. Siit alates uued vaatlused VUTT-i.
-4. **Vormiregister** — vormid, seosed kindlusastmega, korpuseülene vaade. Kuju tuleb uurija praktikast.
+4. **Seotud vesimärgid ja korpuseülene vaade** — uurija vastuse järgi (K6) vormiregistrit ei
+   tehta: piisab vaatlus → vaatlus viitest „seotud vesimärk" + märkmelahtrist; korpuseülene vaade
+   vesimärgi nimetuse/kujundi ja aasta järgi (K10).
 
-Etappide 2–4 maht hindamata.
+Etappide 3–4 maht hindamata.
 
 ## Otsustatud
 
-- Kõik fotod avalikuks.
+- Kõik fotod avalikuks. **Vesimärgid (vaatlused) on samuti kohe avalikud** (uurija, K8):
+  nähtavus = teose nähtavus, peidetud olekut ei ole.
 - 5Dvisioniga tuleb suhelda (leping, ekspordimoodul).
 - **Kuvamine (2026-11-03):** infopaneelil on eksemplaride kaardid AINULT lühiinfoga (hoidja,
   kohaviit, link, erandlehed, koopia liik); transkriptsiooni alus on esimene, rea lõpus pill, raamideta read.
@@ -217,33 +223,52 @@ Etappide 2–4 maht hindamata.
   lehel (`a4`), toores leht on `<sig>`-tägita, eksemplare B/C ei transkribeerita, eeslehel
   tähist pole.
 
+## Uurija vastused (2026-11)
+
+Allikas: doktorandile tehtud lugejaversioon [„Vesimärgid ja eksemplarid VUTT-is"](https://claude.ai/artifact/LnzMS7D2ud6h7FnLBTHZu5)
+(küsimuste tabel, vastused novembris; lühikokkuvõte ka
+[eksemplari lehe disainis](2026-11-10-eksemplari-leht-design.md#uurija-vastustest-paberi-töö-jaoks-ei-kuulu-sellesse-töösse)).
+Uurija vastus on tsitaadina, tagajärg on meie tõlgendus.
+
+| K | Küsimus | Vastus | Tagajärg |
+|---|---|---|---|
+| 1 | Kas plaan tervikuna sobib? | „Ok" | — |
+| 2 | Praeguste märkmete kuju ja maht | „Pole" | Esimene andmestik on paber.ut.ee import (522 eksemplari). Märkmete ülekannet ei ole. |
+| 3 | Üks vaatlus = üks vesimärgitüüp mitme asukohaga? | „OK" | Mudel jääb: üks vaatlus, `locus` loetleb asukohad (7/5: `c2, c3, d, e2, f3`). Fotot/mõõtu iga esinemise kohta eraldi ei nõuta. |
+| 4 | Paberi üldandmed eksemplaril; tühi väli vaatlusel = „sama" või „ei mõõdetud"? | „Oleks vaja lisada trükise formaat. Paberi mõõdud jäävad" | Uus väli: **trükise formaat**. Tühja välja tähendus jäi vastamata — meie otsus (vt Vastuolud p 3). |
+| 5 | Fotode tegemine | „tagantvalgusega, jpg" | Üks fotoliik (läbiv valgus), JPG; valgustuse/skaala välja ei ole vaja. |
+| 6 | „Sama vorm" / „kaksikvorm" / „sama partii"; kindlusastmed | „oleks hea, kui saaks teha viite: seotud vesimärk. Lisaks jääb märkmelahter" | **Vormiregistrit ei tehta.** Vaatlus → vaatlus viide „seotud vesimärk" (ka teise teose vaatlusele) + vaba märkus. Seoseliike ega kindlusastmeid ei ole. Import toob „vrd 502/1" märkusena, uurija teeb viiteks. |
+| 7 | IPH põhiklassid või alamklassid? Bernstein/WZIS? | „Pigem eelistaks puud. Mõtlen veel selle peale!" | IPH **puuna** (alamklassid). Lõplik vastus ootel; Bernsteini/WZIS-i viitele vastust ei ole. |
+| 8 | Kas vesimärgid võivad olla kohe avalikud? | „JAH" | Nähtavus = teose nähtavus. Peidetud olekut, eraldi õigust ega pildiserveri kontrolli ei tule. |
+| 9 | Kes lisab vaatlusi? | „lisada saab ehk ka hiljem, kui on vaja" | Uut rolli/õigust praegu ei tule — kehtib olemasolev `can_write_work`. |
+| 10 | Milliseid võrdlusi teed? | „Vesimärgi nimetuse/kujundi järgi. Aasta ka" | Korpuseülene vaade: vesimärgi nimetus/kujund + aasta. Mitte poogna, trükikoja ega paberitegija järgi. |
+| 11 | Olulised katalooginumbrid | „ESTER" | Sobitus käib ESTERi järgi (`ester_id` teosel olemas). Struktureeritud Jaansoni/VD17 välja ei tehta. |
+| 12 | Mis paber.ut.ee-st peab säilima? | „vesimärgi sõnaline kirjeldus / kommentaari lahter" | Mõlemad on vaatluse väljad ja import toob need üle. |
+| 13 | Kas arhiveerimisel saab teha paber.ut.ee → VUTT edasisuunamise, mis see maksab? | „Mel uurib IT-lt" | Ootel. Mõjutab etapi 1 arhiveerimise kohta. |
+
+Lisaks (eksemplari lehe arutelust): **vaatlus eeldab teost VUTT-is** — eraldi paberilehti ei
+peeta, paber.ut.ee jääb staatiliseks arhiiviks. Impordis lähevad vasteta eksemplarid
+ülevaatusnimekirja ja ootavad teose üleslaadimist. Vaatluste leheviited vajavad sama
+sünkroonireeglit nagu pildipaarid (poolitus, kustutus).
+
 ## Lahtised küsimused
 
-- Praeguste märkmete kuju ja maht; kas katavad paber.ut.ee välju (beta-radiograafia, täpsemad mõõdud)?
-- Fotode tegemine (läbiv valgus, skaala, resolutsioon)?
-- „Sama vorm", „kaksikvorm", „sama paberipartii" — eri seosed? Mitu kindlusastet?
-- IPH: põhiklassid (A…Z) või ka alamklassid? Bernsteini / WZIS-i viited?
-- Vesimärgid avalikud kohe või pärast avaldamist (doktoritöö prioriteet)?
-- Kes lisavad vaatlusi — projekti uurijad või ka teised paberiajaloolased (uus õigus)?
-- Arhiveerimine VUTT-i serveris või ÜR-i veebimajutuses?
-- **Lehtedeta teos** (töövoo p. 1, ül. §3, jk. §5): `build_work_documents` tagastab 0 pildiga
-  teosele `[]` ja sünk kustutab ka vanad lehe- ja kirjadokumendid → teost ei ole Meilis ega
-  töölaual. Sünteetiline „leht 0" üksi EI aita: avalehe otsing ja teosepõhised loendurid
-  filtreerivad `lehekylje_number = 1` (`src/services/searchService.ts`). Terviklik töö: loomine,
-  indekseerimine (kuidas teose kirje lehedokumendist eristub), leidmine, avamine
-  eksemplaride vaates, kaanepildi puudumine, loendurid/statistika. Vajadus selgub sobitusraportist.
-- **Vaatluste korpuseülene indeks:** kas tuletatud JSON read-model või Meili? Mis jõuab MCP-sse?
-- **Nähtavus ja õigused:** kuidas vaatlus enne doktoritöö ilmumist peidetakse ja kes lisab —
-  seosta olemasoleva mudeliga (`can_write_work`, ADR 0031; kogu nähtavus, ADR 0069), mitte uus
-  paralleelne kontroll. **Teose õigus ei piisa** (jk. §6): `can_read_work` ja pildiserver
-  lubavad avaliku teose kõigile, seega avaldamiseelne vaatlus vajab oma nähtavust API-s, indeksis
-  ja MCP-s. **Vastuolu:** „kõik fotod avalikuks" (Otsustatud) ja peidetud vaatlus ei käi kokku —
-  kui fotod peidetakse koos vaatlusega, peab seda kontrollima ka pildiserver, mitte ainult UI.
-- **Katalooginumbrid** (Jaanson, VD17, ESTER, DSpace): struktureeritud väli või mitte? Vastus tuleb
-  kuivkäivitusega sobitusskriptist kohe etapi 1 järel (ül. §7), enne etapi 2 ADR-i. Raport
-  näitab kindlad, mitmetähenduslikud ja vasteta sobitused (jk.).
+Vastatud ja vastuste tõttu ära langenud (vt tabel ülal): märkmete kuju (K2), fotod (K5),
+seoseliigid ja kindlusastmed (K6), nähtavus (K8), kes lisab (K9), katalooginumbrid (K11),
+**lehtedeta teos** (vaatlus eeldab teost; vasteta → ülevaatusnimekiri). Ajaloo jaoks: lehtedeta
+teose probleem oli `build_work_documents` tagastab 0 pildiga teosele `[]` ja avalehe otsing
+filtreerib `lehekylje_number = 1` (ül. §3, jk. §5) — kui seda kunagi siiski vaja läheb, on
+see terviklik töö, mitte „leht 0".
+
+Alles:
+
+- **IPH puu** (K7) — uurija mõtleb; kas ka Bernsteini/WZIS-i viited struktureeritult.
+- **Arhiveerimise koht ja edasisuunamine** (K13) — VUTT-i server või ÜR veebimajutus; IT vastus ootel.
+- **Vaatluste korpuseülene indeks:** tuletatud JSON read-model või Meili? Mis jõuab MCP-sse?
+  Võrdluse kuju on nüüd teada (nimetus/kujund + aasta, K10).
 - **Impordi korduskäivitus** ei tohi tekitada duplikaate: allika nimeruumiga ID (nt
   `paber:7/5`) ja allikast imporditud väärtused eristatavad uurija hilisematest parandustest (jk.).
+- Kolm disainiotsust allpool (Vastuolud p 1–3).
 
 ## Eksemplari lehe arutelust (2026-11-09): paber
 
@@ -283,6 +308,8 @@ vaatluse kaart) ja `korvutus-v3.html` (paberipaneel kõrvutuses).
 
 ### Vastuolud — arutada enne paberi tööd
 
+Punktid 1–3 on disainiotsused (uurija vastustest ei tulene); punkt 4 on lahendatud.
+
 1. **Kus elavad vesimärgifotod?**
    - 09.11: fotod kuuluvad **vaatlusele**, eksemplari pildikogust (`images.json`) eraldi.
    - [ADR 0079](../../decisions/0079-eksemplari-pildid.md) (rida 111): vaatlused viitavad
@@ -303,11 +330,13 @@ vaatluse kaart) ja `korvutus-v3.html` (paberipaneel kõrvutuses).
    - 09.11 ettepanek (kasutaja ei kinnitanud): tase on eksemplar, aga **fail** on paberifail
      (`_watermarks.json` või sarnane), mitte `exemplars[]` väljad — kogu paberiinfo elab koos,
      eksemplari kirje jääb puhtaks ja eraldi toimetamine (vt ülal) vastab eraldi hoidlale.
-4. **Nähtavus kui eraldi toimetamise põhjus.**
+   - Uurija (K4) lisas välja **trükise formaat** ja kinnitas, et paberi mõõdud jäävad; küsimusele,
+     kas vaatluse tühi väli tähendab „sama mis eksemplaril" või „ei mõõdetud", vastust ei tulnud.
+4. **Nähtavus kui eraldi toimetamise põhjus.** — **Lahendatud** (K8).
    - 09.11: üks põhjus paberi eraldi toimetamiseks on „lahtised õigused/nähtavus (doktoritöö)".
    - Uurija vastus (eksemplari lehe disain, „Uurija vastustest"): vesimärgid on **kohe avalikud**,
      nähtavus = teose nähtavus, peidetud olekut ei ole. Siis langeb see põhjus ära (ülejäänud
-     kolm jäävad) ja Lahtiste küsimuste „Nähtavus ja õigused" punkt on suures osas vastatud.
+     kolm jäävad). Lahtiste küsimuste „Nähtavus ja õigused" punkt on sellega suletud.
 
 ## Viited
 
