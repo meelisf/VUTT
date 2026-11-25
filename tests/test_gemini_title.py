@@ -72,3 +72,26 @@ def test_tyhi_sisend_ei_kutsu_apit(monkeypatch):
     monkeypatch.setattr(gemini.requests, "post",
                         lambda *a, **k: pytest.fail("ei tohi kutsuda"))
     assert gemini.translate_title("   ") is None
+
+
+def test_tolke_aegumine_on_lyhike_mitte_ocr_i_oma(monkeypatch):
+    """Tõlge on mugavus ADA lookup'i sees: kasutaja ootab vastust. OCR-i 120 s
+    aegumine (GEMINI_REQUEST_TIMEOUT) hoidis lookup'i kinni kauem, kui frontend
+    ootab (2026-11-25: tõlge 19,8 s → brauser katkestas, 499)."""
+    monkeypatch.setattr(gemini, "GEMINI_API_KEY", "võti")
+    saadetud = {}
+
+    class Vastus:
+        status_code = 200
+
+        def json(self):
+            return {"steps": [{"type": "model_output", "content": "x"}]}
+
+    def spioon(url, json=None, headers=None, timeout=None):
+        saadetud["timeout"] = timeout
+        return Vastus()
+
+    monkeypatch.setattr(gemini.requests, "post", spioon)
+    gemini.translate_title("Pealkiri")
+    assert saadetud["timeout"] == gemini.GEMINI_TITLE_TIMEOUT
+    assert gemini.GEMINI_TITLE_TIMEOUT <= 20

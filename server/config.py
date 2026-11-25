@@ -346,6 +346,10 @@ GEMINI_THINKING_LEVEL = env("GEMINI_THINKING_LEVEL", "low")
 GEMINI_MAX_INFLIGHT_REQUESTS = int(env("GEMINI_MAX_INFLIGHT_REQUESTS", "4"))
 GEMINI_MAX_RETRIES = int(env("GEMINI_MAX_RETRIES", "3"))
 GEMINI_REQUEST_TIMEOUT = int(env("GEMINI_REQUEST_TIMEOUT", "120"))
+# Pealkirja tõlge (ADA lookup) on mugavus, mille järel kasutaja ootab vastust —
+# OCR-i 120 s on liiga pikk. Frontendi `ADA_LOOKUP_TIMEOUT_MS` peab olema suurem
+# kui ADA päringud + see (2026-11-25: esimene tõlge 19,8 s, järgmised ~2 s).
+GEMINI_TITLE_TIMEOUT = int(env("GEMINI_TITLE_TIMEOUT", "15"))
 # Hinnanguline SERIALISEERITUD päringu suurus, mitte pildibaitide summa:
 # API 20 MB lagi katab kogu request'i.
 GEMINI_MAX_REQUEST_BYTES = int(env("GEMINI_MAX_REQUEST_BYTES", str(15 * 1024 * 1024)))

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { adaLookup } from '../adaApi';
+import { adaLookup, ADA_LOOKUP_TIMEOUT_MS } from '../adaApi';
 
 /**
  * `/admin/ada/lookup` nõuab admin-rolli (`require_role("admin")`) ja backend
@@ -63,5 +63,42 @@ describe('adaLookup — autentimine', () => {
     const [, init] = fetchSpy.mock.calls[0] as [unknown, RequestInit];
     const headers = (init.headers ?? {}) as Record<string, string>;
     expect(headers.Authorization).toBeUndefined();
+  });
+});
+
+describe('adaLookup — aegumine', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** Fetch, mis vastab alles `vastaPärast` ms järel või katkeb signaali peale. */
+  function aeglaneFetch(vastaPärast: number) {
+    vi.stubGlobal('fetch', vi.fn((_url: unknown, init: RequestInit) => new Promise((resolve, reject) => {
+      const t = setTimeout(() => resolve({
+        ok: true, status: 200, text: () => Promise.resolve(JSON.stringify(ADA_VASTUS)),
+      }), vastaPärast);
+      init.signal?.addEventListener('abort', () => {
+        clearTimeout(t);
+        reject(new DOMException('Aborted', 'AbortError'));
+      });
+    })));
+  }
+
+  it('ootab üle üldise 10 s piiri: server teeb ADA + pealkirja tõlke (2026-11-25: tõlge 19,8 s)', async () => {
+    vi.useFakeTimers();
+    aeglaneFetch(25_000);
+    const tulemus = adaLookup('10062/11049', 'token');
+    await vi.advanceTimersByTimeAsync(25_000);
+    await expect(tulemus).resolves.toMatchObject({ handle: '10062/7822' });
+  });
+
+  it('katkestab lõpuks: lagi on ADA_LOOKUP_TIMEOUT_MS', async () => {
+    vi.useFakeTimers();
+    aeglaneFetch(ADA_LOOKUP_TIMEOUT_MS + 5_000);
+    const tulemus = adaLookup('10062/11049', 'token');
+    const kontroll = expect(tulemus).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(ADA_LOOKUP_TIMEOUT_MS + 1);
+    await kontroll;
   });
 });

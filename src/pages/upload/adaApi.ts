@@ -18,6 +18,11 @@ export interface AdaCreateExtras {
   title_en?: string;
 }
 
+/** Lookup'i ooteaeg. Server teeb enne vastamist ADA päringud JA Gemini pealkirjatõlke
+ *  (`GEMINI_TITLE_TIMEOUT`, 15 s) — üldine 10 s piir katkestas päringu ja kasutaja nägi
+ *  üldist „ADA päring ebaõnnestus" (2026-11-25, nginx 499). */
+export const ADA_LOOKUP_TIMEOUT_MS = 60_000;
+
 /** Handle → ADA metaandmed + failiplaan. Ei loo uploadi.
  *  Endpoint nõuab admin-rolli (`require_role("admin")`) — token PEAB kaasa minema,
  *  muidu vastab server 401-ga ja vorm ei täitu kunagi (vt uploadApi.ts mustrit). */
@@ -25,7 +30,7 @@ export async function adaLookup(handle: string, token: string | null): Promise<A
   const vastus = await apiPost<{ status: string; ada: AdaLookupResult }>(
     '/admin/ada/lookup',
     { handle },
-    { token },
+    { token, timeout: ADA_LOOKUP_TIMEOUT_MS },
   );
   return vastus.ada;
 }
