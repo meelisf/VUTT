@@ -2,7 +2,8 @@
 
 **Seis:** disain; kasutaja kinnitas otsused 2026-11-25; parandatud kolme ülevaatuse järel (vt
 lõppu). **PR 1 (asenduse karastamine, ADR 0089 p 1–5) teostatud** —
-`docs/superpowers/plans/2026-11-25-asenduse-karastamine.md`; PR 2 (aluse vahetus) ootel. Seotud: [ADR 0076](../../decisions/0076-eksemplari-kiht.md)
+`docs/superpowers/plans/2026-11-25-asenduse-karastamine.md`; **PR 2 (aluse vahetus) teostatud** —
+`docs/superpowers/plans/2026-11-26-aluse-vahetus.md`. Seotud: [ADR 0076](../../decisions/0076-eksemplari-kiht.md)
 (eksemplari kiht, p 3 tekstitunnistaja, p 4 lehtede päritolu),
 [ADR 0079](../../decisions/0079-eksemplari-pildid.md) (eksemplari pildid),
 [ADR 0030](../../decisions/0030-page-map-lahteleht-valjundlehtedeks.md) (`page_map`), [ADR 0054](../../decisions/0054-lehe-salvestus-liidab-baasseisu-vastu.md) (`/save` kolmesuunaline

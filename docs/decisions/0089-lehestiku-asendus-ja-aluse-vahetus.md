@@ -63,8 +63,15 @@ Kogu lehestiku asendusel: iga osa `pages = []`, `needs_review: true`, serverivä
 
 Eksemplari pildid → asendusrežiimis üleslaadimine (`promote`), lõpetamine idempotentselt
 (vanad lehed oma päritolu eksemplari alla allikaliigiga `former_pages`, tunnistaja märge, ainult
-täielikult commit'itud lähtepiltide eemaldus). Täpsus: disainifail. Teostatakse eraldi PR-ina
-p 1–5 peale.
+täielikult commit'itud lähtepiltide eemaldus). Täpsus: disainifail. **Teostatud** (PR 2,
+`docs/superpowers/plans/2026-11-26-aluse-vahetus.md`): `server/promote.py` (eelvaade, algus,
+lõppkontroll `recheck_locked` lehelukkude all, kohustuslik `finish_locked`), `former_pages` on
+serveri sisemine allikaliik (`exemplar_images.add_internal`/`remove_images_internal`, klient ei
+saa seda saata). Märk kannab kogu lõpetamise info (`promote`, `old_pages`, `remove_source_ids`);
+aluse vahetus ei muuda teose metaandmeid ega töökollektsioone. Lõpetamine teose järgi:
+`POST /admin/work/{id}/replace/finish` (`upload_id` peab olema märgi oma, muidu `stale`;
+tulemus `replaced`/`restored`/`cleared` eraldi); 409 järel uus kinnitus
+`POST /admin/upload/{id}/promote/confirm`.
 
 ### Täiendus 2026-11-25 (PR #881 ülevaatus)
 
