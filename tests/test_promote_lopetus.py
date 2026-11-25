@@ -305,3 +305,21 @@ def test_tuhistus_votab_teose_luku(client, login, tmp_path, monkeypatch):
     res = client.delete(f"/admin/upload/{t['upload_id']}", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 409
     assert t["slug"] in lukud
+
+
+def test_confirm_kontrollib_teose_kirjutusoigust(tmp_path, monkeypatch):
+    """ADR 0031: admini roll üksi ei anna kirjutusõigust — confirm kontrollib sihtteost."""
+    from server.routers import work_exemplars as r
+    t = _seadista(tmp_path, monkeypatch)
+    nähtud = []
+
+    def keela(work_id, user):
+        nähtud.append(work_id)
+        raise HTTPException(status_code=403, detail="ei")
+
+    monkeypatch.setattr(r, "_writable", keela)
+    kutsutud = []
+    monkeypatch.setattr(promote, "confirm", lambda *a, **k: kutsutud.append(a))
+    with pytest.raises(HTTPException) as e:
+        r.promote_confirm(t["upload_id"], {"unknown_target": None, "confirmed_edited": {}}, {"role": "admin"})
+    assert e.value.status_code == 403 and nähtud == [t["work_id"]] and kutsutud == []

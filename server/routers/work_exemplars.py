@@ -117,6 +117,13 @@ def replace_finish(work_id: str, body: dict = Body(...), user=Depends(require_ro
 def promote_confirm(upload_id: str, body: dict = Body(...), user=Depends(require_role("admin"))):
     """Lõppkontrolli 409 järel uus kinnitus sama üleslaadimise juures (ADR 0089 p 6)."""
     from .. import promote
+    from ..upload import state as upload_state
+    from ..upload_ops import _valid_upload_id
+    st = upload_state.read_state(upload_id) if _valid_upload_id(upload_id) else None
+    if not st or not st.get("promote") or not st.get("replace_work_id"):
+        raise HTTPException(status_code=404, detail={"code": "no_promote"})
+    # Kirjutusõigus sihtteosele (ADR 0031) — roll üksi ei piisa.
+    _writable(st["replace_work_id"], user)
     _promote_call(promote.confirm, upload_id, body.get("unknown_target"), body.get("confirmed_edited") or {})
     return {"status": "ok"}
 
