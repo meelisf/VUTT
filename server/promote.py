@@ -203,3 +203,102 @@ def start(work_dir: str, work_id: str, eid: str, unknown_target: Optional[str],
             raise
     logger.info("Aluse vahetus alustatud: %s → teos %s, eksemplar %s", upload_id, work_id, eid)
     return upload_id
+
+
+# ── Asenduse konksud ja lõpetamine ─────────────────────────────────────────────
+
+def recheck_locked(work_dir: str, pr: dict) -> None:
+    """Lõppkontroll asenduses (vanade lehtede lukud käes, ENNE ühtki muutust): lähteeksemplar ja
+    kõik sihid olemas, toimetatud lehed ja päritolu nagu kinnitatud, vanad pildid salvestatavad."""
+    exemplars = {x.get("id") for x in (_meta(work_dir).get("exemplars") or [])}
+    targets = {t for t in (pr.get("origins") or {}).values()}
+    if pr.get("exemplar_id") not in exemplars or None in targets or not targets <= exemplars:
+        raise PromoteError(409, "target_missing", {"missing": sorted(t or "?" for t in targets - exemplars)})
+    pv = preview(work_dir, pr["exemplar_id"])
+    if pv["unstorable"]:
+        raise PromoteError(409, "old_page_unstorable", pv)
+    current = {p["stem"]: (p["origin"] or pr.get("unknown_target")) for p in pv["pages"]}
+    if current != (pr.get("origins") or {}):
+        raise PromoteError(409, "origins_changed", pv)
+    if pv["edited"] != (pr.get("confirmed_edited") or {}):
+        raise PromoteError(409, "edited_pages_changed", pv)
+
+
+def progress_extras(work_dir: str, state: dict, importable: list, upload_id: str) -> dict:
+    """Taasteinfo lisad (märki): kogu lõpetamiseks vajalik — üleslaadimise kaust võib kaduda."""
+    pr = state.get("promote") or {}
+    committed = sorted(int(f["page"]) for f in importable)
+    page_map = (state.get("prepress") or {}).get("page_map") or {}
+    remove = []
+    for si in pr.get("source_images") or []:
+        outs = page_map.get(str(si["page"])) or []
+        if outs and set(int(o) for o in outs) <= set(committed):
+            remove.append(si["image_id"])
+    return {
+        "promote": {"exemplar_id": pr.get("exemplar_id"), "origins": pr.get("origins") or {},
+                    "upload_id": upload_id},
+        "committed_outputs": committed,
+        "remove_source_ids": remove,
+        # Eelvaate leheloendist (`_thumb_*` ei ole lehed; kõik pildilaiendid).
+        "old_pages": [{"stem": l["stem"], "page": l["page"], "images": [l["image"]]}
+                      for l in page_list(work_dir)],
+    }
+
+
+def finish_locked(upload_id: str, work_dir: str, progress: dict, username: str) -> None:
+    """Kohustuslik järelsamm (`_after_replace_commit`, kutsuja hoiab `work_lock`-i). Korratav."""
+    pr = progress.get("promote") or {}
+    eid = pr.get("exemplar_id")
+    trash = progress.get("trash_dir") or ""
+    by_target: dict = {}
+    for op in progress.get("old_pages") or []:
+        target = (pr.get("origins") or {}).get(op["stem"])
+        for img in op.get("images") or []:
+            path = os.path.join(trash, img)
+            if os.path.isfile(path):
+                by_target.setdefault(target, []).append((path, {
+                    "kind": "former_pages", "ref": progress.get("old_head"), "page": op["page"],
+                    "stem": op["stem"], "upload_id": pr.get("upload_id") or upload_id}))
+    for target, files in by_target.items():
+        exemplar_images.add_internal(work_dir, target, files, username)
+
+    def mutate(exemplars, unknown, _stems):
+        out = we.make_witness(exemplars, eid)
+        for x in out:
+            if x.get("id") == eid:
+                x.pop("needs_review", None)
+        return out, unknown, None
+
+    we._bulk(work_dir, username, f"Eksemplarid: transkriptsiooni alus → {eid}", mutate,
+             require_commit=True)
+    if progress.get("remove_source_ids"):
+        exemplar_images.remove_images_internal(work_dir, eid, set(progress["remove_source_ids"]), username)
+
+
+def confirm(upload_id: str, unknown_target: Optional[str], confirmed_edited: dict) -> None:
+    """Lõppkontrolli 409 järel uus kinnitus sama üleslaadimise juures (ADR 0089 p 6)."""
+    from . import upload_ops
+    from .utils import find_directory_by_id
+    with upload_ops._get_upload_lock(upload_id):
+        state = upload_ops._read_state(upload_id) or {}
+    pr = state.get("promote")
+    if not pr:
+        raise PromoteError(404, "no_promote")
+    work_dir = find_directory_by_id(state.get("replace_work_id") or "")
+    if not work_dir:
+        raise PromoteError(404, "no_work")
+    pv = preview(work_dir, pr["exemplar_id"])
+    if pv["unknown"]:
+        exemplars = {x["id"] for x in (_meta(work_dir).get("exemplars") or [])}
+        if not unknown_target or unknown_target == pr["exemplar_id"] or unknown_target not in exemplars:
+            raise PromoteError(400, "unknown_target_required", pv["unknown"])
+    if (confirmed_edited or {}) != pv["edited"]:
+        raise PromoteError(409, "edited_pages_changed", pv)
+    if pv["unstorable"]:
+        raise PromoteError(400, "old_page_unstorable", pv["unstorable"])
+
+    def fn(s):
+        s["promote"].update({"unknown_target": unknown_target,
+                             "confirmed_edited": dict(confirmed_edited or {}),
+                             "origins": {p["stem"]: (p["origin"] or unknown_target) for p in pv["pages"]}})
+    upload_ops._update_replace_state(upload_id, fn)

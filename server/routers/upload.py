@@ -514,14 +514,36 @@ async def admin_upload_update_meta(upload_id: str, request: Request, user=Depend
     return {"status": "success"}
 
 
+def _cancel_under_work_lock(upload_id: str, find_by_upload):
+    """Tühistus SAMA teose luku all, mille all asendus märgi kirjutab (ADR 0089 p 6): muidu
+    võiks tühistus läbida kontrolli enne märgi teket ja kustutada kausta pärast seda."""
+    import contextlib
+    from ..admin_page_ops import work_lock
+    from ..utils import find_directory_by_id
+    s = upload_state.read_state(upload_id) if _valid_upload_id(upload_id) else None
+    wd = find_directory_by_id(s["replace_work_id"]) if s and s.get("replace_work_id") else None
+    ctx = work_lock(os.path.basename(wd), wd) if wd else contextlib.nullcontext()
+    try:
+        with ctx:
+            if find_by_upload(upload_id):
+                return "replacing"
+            return cancel_upload(upload_id)
+    except Exception as e:
+        from ..replace_marker import WorkReplacingError
+        if isinstance(e, WorkReplacingError):
+            return "replacing"
+        raise
+
+
 @router.delete("/admin/upload/{upload_id}")
 async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
     # Pooleli asendus (ADR 0089): tühistus kustutaks state'i; taaste vajab seda → 409.
     from ..replace_marker import find_by_upload
-    if await run_in_threadpool(find_by_upload, upload_id):
+    tulemus = await run_in_threadpool(_cancel_under_work_lock, upload_id, find_by_upload)
+    if tulemus == "replacing":
         raise HTTPException(status_code=409, detail=(
             "Lehestiku asendus on pooleli — üleslaadimist ei saa praegu kustutada. / "
             "Page replacement in progress — the upload cannot be deleted now."))
-    if await run_in_threadpool(cancel_upload, upload_id):
+    if tulemus:
         return {"status": "success"}
     raise HTTPException(status_code=500)

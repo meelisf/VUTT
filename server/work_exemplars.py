@@ -737,22 +737,24 @@ def set_page_origin(work_dir: str, stems: list, origin: str, username: str,
     return {"exemplars": meta.get("exemplars") or [], "unknown_pages": meta.get(UNKNOWN_FIELD) or []}
 
 
-def reset_page_origins(work_dir: str, username: str) -> None:
+def reset_page_origins(work_dir: str, username: str) -> bool:
     """Kogu lehestiku asendus (`replace_work_content`, kutsuja hoiab `work_lock`-i)."""
     from .metadata_ops import bulk_update_works
     meta_path = os.path.join(work_dir, "_metadata.json")
     try:
         meta = _read(work_dir)
     except FileNotFoundError:
-        return
+        return True
     if not meta.get("exemplars") and not meta.get(UNKNOWN_FIELD):
-        return
+        return True
 
     def transform(meta: dict) -> dict:
         return {"exemplars": reset_origins(list(meta.get("exemplars") or [])), UNKNOWN_FIELD: []}
 
-    bulk_update_works([(meta_path, transform)], username,
-                      "Eksemplarid: lehestik asendati, päritolu nullitud")
+    res = bulk_update_works([(meta_path, transform)], username,
+                            "Eksemplarid: lehestik asendati, päritolu nullitud")
+    # Tulemus (ADR 0089 p 6): aluse vahetusel on see kohustuslik samm.
+    return not res.get("failed") and res.get("git_committed") is not False
 
 
 def sync_work_exemplars(work_dir: str, work_id: Optional[str] = None, renamed: Optional[dict] = None) -> None:
