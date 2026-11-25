@@ -17,7 +17,7 @@ from .annotation_ops import (
 )
 from .config import get_logger
 from .git_ops import save_with_git
-from .macron import convert_ocr_text, work_languages
+from .macron import convert_ocr_text, work_is_manuscript, work_languages
 from .marginalia_normalize import normalize_marginalia_tags
 from .page_locks import page_lock
 
@@ -104,6 +104,7 @@ def _apply_ocr_results_locked(work_path: str, page_filenames: List[str], usernam
     writes: List[Tuple[str, str]] = []  # [(txt_path, tekst)]
     # Enne ADR 0062 järeltöötlust kirjutatud .ocr võib kanda tildet — teisendus on idempotentne
     languages = work_languages(work_path)
+    manuscript = work_is_manuscript(work_path)      # käsikirja ei teisendata (ADR 0062 täiendus)
 
     for page_filename in page_filenames:
         ocr_path = _ocr_path(work_path, page_filename)
@@ -118,7 +119,7 @@ def _apply_ocr_results_locked(work_path: str, page_filenames: List[str], usernam
             continue
         # Sama normaliseerimine kui /save teel — marginaalia-tägid kanoonilisele kujule.
         text = normalize_marginalia_tags(unicodedata.normalize("NFC", text))
-        text = convert_ocr_text(text, languages, page_filename)
+        text = convert_ocr_text(text, languages, page_filename, manuscript=manuscript)
         # Ankrud ja kirjed lahku ei tohi jääda: uus tekst ei kanna vana teksti
         # `<annN>` tägisid, seega kirjed jääksid ilma lepitust õhku rippuma.
         text, json_write = _reconcile_annotations(work_path, page_filename, text)

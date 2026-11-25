@@ -65,3 +65,21 @@ ja trükimudel 20261006 (LOSS), korpuse migratsioon (PR #557,
 `scripts/migrate_macron_corpus.py`): 1040 teost, 6467 lehte, üks commit teose kohta.
 Meili ignoreerib tildet ja makronit ühtmoodi — otsing ei muutunud (kontrollitud).
 Jääk: 0cxkz3 (OCR-kordusloop, uus OCR) ja neli eesti keelega teost käsitsi (#558).
+
+## Täiendus 2026-11-25 — käsikirja OCR-väljundit ei teisendata
+
+**Kontekst.** Kurrendi v7 tootmises: EMIL-i kaartidel (mitmekeelne eesti/vene/saksa, `languages`
+tühi) ilmus OCR-tekstis eesti õ asemel ō. Mudel kirjutab õ õigesti (v7 holdout: 513 õ, 0 ō) — ō tuli
+järeltöötlusest (samm b): tühi `languages` ei ole valvuriga keel, nii et õ (o + U+0303) → ō.
+
+**Otsus.** Käsikirja (`type.id` = Q87167) OCR-väljund läbib järeltöötluse **ilma** tilde → makron
+teisenduseta (`convert_ocr_text(..., manuscript=True)`, `macron.work_is_manuscript`). Kõik neli teed:
+upload'i import, teose sisu asendus, re-OCR `.ocr` staging (ka Gemini), `.ocr` rakendamine.
+Põhjus: Kurrendi GT on makroniga alates v4-st ja mudel kirjutab lühendi makronina ise; samm b oli
+mõeldud tildet kirjutavale vanale mudelile. Käsikirjas on tilde seega päris täht (XIX saj eesti õ),
+mitte lühend. Trükise tee jääb muutmata (keelevalvur nagu varem).
+
+**Tagajärg.** Gemini käsikirjatee võib harva kirjutada lühendi tildena — see jääb nüüd tildeks
+(redaktoris parandatav); eesti õ kaotamine oli hullem. Juba ō-ga salvestatud lehed tuleb re-OCR-ida
+või käsitsi parandada (teisendust tagasi ei tehta — ō võib olla ka päris lühend).
+Valvur: `tests/test_macron_ocr_postprocess.py` (käsikiri tühja keeleloendiga).

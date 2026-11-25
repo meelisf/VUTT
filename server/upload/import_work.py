@@ -26,13 +26,14 @@ logger = get_logger(__name__)
 def normalize_txt_file(path: str, languages=None, manuscript=None):
     """Normaliseerib alla laetud OCR .txt marginaalia-tägid kanoonilisele kujule.
     OCR-mudel toodab ristuvaid <i><m>...</i></m> — vt server/marginalia_normalize.py.
-    Lühendi tilde → makron teose keelte järgi (ADR 0062); `None` = keel teadmata.
+    Lühendi tilde → makron teose keelte järgi (ADR 0062); `None` = keel teadmata;
+    käsikirja teksti ei teisendata (ADR 0062 täiendus 2026-11-25).
     Üleminekuajal suhteline <cs> → <f> (ADR 0077); käsikirja tekst jääb puutumata."""
     try:
         with open(path, 'r', encoding='utf-8') as f:
             raw = f.read()
         fixed = convert_ocr_text(normalize_marginalia_tags(raw), languages,
-                                 os.path.basename(path))
+                                 os.path.basename(path), manuscript=bool(manuscript))
         fixed = ocr_to_absolute(os.path.basename(os.path.dirname(path)), fixed,
                                 manuscript=manuscript)
         if fixed != raw:

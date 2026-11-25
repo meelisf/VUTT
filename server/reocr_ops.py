@@ -13,7 +13,7 @@ from .config import (
     BASE_DIR, GEMINI_MAX_INFLIGHT_REQUESTS, OCR_SERVER_PATH, REOCR_BACKUPS_DIR,
     REOCR_LOG_FILE, UPLOAD_ENABLED, gemini_enabled, get_logger,
 )
-from .macron import convert_ocr_text, work_languages
+from .macron import convert_ocr_text, work_is_manuscript, work_languages
 from .script_transition import ocr_to_absolute
 from .ocr_prompts import instruction_for
 from .utils import atomic_write_json, generate_nanoid
@@ -84,10 +84,12 @@ def _backup_dir(job_id: str) -> str:
 
 
 def _ocr_postprocess(slug: str, text: str) -> str:
-    """Lühendi tilde → makron teose keelte järgi (ADR 0062) ja üleminekuajal
+    """Lühendi tilde → makron teose keelte järgi, käsikiri v.a (ADR 0062) ja üleminekuajal
     suhteline <cs> → <f> (ADR 0077). Idempotentne — üksiktöö kutsub seda enne
     kliendile andmist JA `_write_ocr_file` uuesti."""
-    text = convert_ocr_text(text, work_languages(os.path.join(BASE_DIR, slug)), slug)
+    work_dir = os.path.join(BASE_DIR, slug)
+    text = convert_ocr_text(text, work_languages(work_dir), slug,
+                            manuscript=work_is_manuscript(work_dir))
     return ocr_to_absolute(slug, text)
 
 
