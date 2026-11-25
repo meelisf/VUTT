@@ -895,7 +895,8 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     # commit-tree → update-ref (CAS vana HEAD-iga). Alles siis sünkroonitakse ühise indeksi
     # teose kaust HEAD-iga; selle akna katab käivitusaegne taaste (indeks esimese sammuna).
     try:
-        from .git_ops import get_or_init_repo, git_write_lock
+        from .git_ops import (get_or_init_repo, git_write_lock, mark_index_sync_pending,
+                              clear_index_sync_pending)
         repo = get_or_init_repo()
         author_name = username if username else "Automaatne"
         author_email = f"{author_name}@vutt.local"
@@ -915,6 +916,10 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                         env={"GIT_AUTHOR_NAME": author_name, "GIT_AUTHOR_EMAIL": author_email,
                              "GIT_COMMITTER_NAME": author_name, "GIT_COMMITTER_EMAIL": author_email},
                     )
+                    # HEAD-i uuendus = avaldamise piir. Ootel sünk ENNE seda: kui protsess sureb
+                    # või sünk kukub, proovib iga järgmine git-kirjutus (ja käivitus) sünki
+                    # ning keeldub, kui see ei õnnestu (vananenud indeks pööraks asenduse tagasi).
+                    mark_index_sync_pending(slug)
                     repo.git.update_ref("HEAD", new_commit, parent)
             finally:
                 for f in (tmp_index, tmp_index + ".lock"):
@@ -922,15 +927,17 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                         os.remove(f)
                     except FileNotFoundError:
                         pass
+                    except OSError as rm_err:
+                        # Pärast update-ref'i EI tohi see viia rollback'ini (asendus on avaldatud).
+                        logger.warning(f"replace {upload_id}: ajutise indeksi eemaldus ebaõnnestus: {rm_err}")
             if dirty:
-                # Ühise indeksi teose kaust → HEAD (muidu oleksid kirjed vananenud ja teise
-                # teose `repo.index.commit` pööraks asenduse tagasi).
+                # Ühise indeksi teose kaust → HEAD. Tõrkel jääb ootel märge alles.
                 try:
                     repo.git.reset("-q", "HEAD", "--", slug)
+                    clear_index_sync_pending(slug)
                 except Exception as sync_err:
-                    logger.critical(f"replace {upload_id}: ühise indeksi sünk pärast commit'i ebaõnnestus: {sync_err}")
-                    from .client_errors import record_server_error
-                    record_server_error("server:thread", sync_err)
+                    logger.critical(f"replace {upload_id}: ühise indeksi sünk pärast commit'i ebaõnnestus "
+                                    f"(jääb ootele, järgmine git-kirjutus proovib uuesti): {sync_err}")
         if dirty:
             logger.info(f"replace {upload_id}: git commit OK ({slug})")
         else:

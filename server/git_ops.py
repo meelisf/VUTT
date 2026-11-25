@@ -40,7 +40,105 @@ _git_failures_lock = threading.Lock()
 # `git add/rm/checkout`) võtavad selle luku: muidu kukub teine kirjutaja
 # `index.lock: File exists` peale — upload'i import katkestas nii 2026-10-12
 # 34. poolituse keset pakki (sy2y27).
-_git_write_lock = threading.RLock()
+class GitIndexSyncError(RuntimeError):
+    """Ootel indeksi sünk ebaõnnestus — git-kirjutus keeldub (ADR 0089)."""
+
+
+def _pending_file() -> str:
+    from .config import STATE_DIR
+    return os.path.join(STATE_DIR, "git_index_sync_pending.json")
+
+
+# Testid patchivad; None = arvuta STATE_DIR-ist.
+_PENDING_FILE = None
+
+
+def _pending_path() -> str:
+    return _PENDING_FILE or _pending_file()
+
+
+def pending_index_syncs() -> list:
+    try:
+        with open(_pending_path(), encoding="utf-8") as f:
+            data = json.load(f)
+        return [s for s in data if isinstance(s, str)] if isinstance(data, list) else []
+    except (FileNotFoundError, ValueError):
+        return []
+
+
+def _write_pending(slugs: list) -> None:
+    from .utils import atomic_write_json
+    path = _pending_path()
+    if slugs:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        atomic_write_json(path, sorted(set(slugs)))
+    else:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+
+def mark_index_sync_pending(slug: str) -> None:
+    """Lehestiku asendus (ADR 0089): ühise indeksi teose kaust tuleb HEAD-iga sünkroonida.
+    Märgitakse ENNE `update-ref`-i; kuni märge on, proovib iga git-kirjutus sünki ja keeldub,
+    kui see ei õnnestu — vananenud indeksit ei tohi keegi commitida (tagasipööramine)."""
+    _write_pending(pending_index_syncs() + [slug])
+
+
+def clear_index_sync_pending(slug: str) -> None:
+    _write_pending([s for s in pending_index_syncs() if s != slug])
+
+
+def run_pending_index_syncs() -> None:
+    """Ootel sünkid: `git reset -q HEAD -- slug` (ainult indeks). Viskab `GitIndexSyncError`."""
+    slugs = pending_index_syncs()
+    if not slugs:
+        return
+    repo = get_or_init_repo()
+    for slug in slugs:
+        try:
+            repo.git.reset("-q", "HEAD", "--", slug)
+        except Exception as e:
+            raise GitIndexSyncError(f"Git-indeksi sünk ebaõnnestus ({slug}): {e}") from e
+        clear_index_sync_pending(slug)
+
+
+class _GitWriteLock:
+    """Protsessi git-kirjutuste lukk (taassisenetav). Välimisel võtmisel tehakse esmalt
+    ootel indeksi sünkid (ADR 0089): ebaõnnestumisel lukk vabaneb ja kirjutus keeldub."""
+
+    def __init__(self):
+        self._lock = threading.RLock()
+        self._local = threading.local()
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        if not self._lock.acquire(blocking, timeout):
+            return False
+        depth = getattr(self._local, "depth", 0)
+        self._local.depth = depth + 1
+        if depth == 0 and os.path.exists(_pending_path()):
+            try:
+                run_pending_index_syncs()
+            except Exception:
+                self.release()
+                raise
+        return True
+
+    def release(self) -> None:
+        self._local.depth = getattr(self._local, "depth", 1) - 1
+        self._lock.release()
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+        return False
+
+
+_git_write_lock = _GitWriteLock()
 git_write_lock = _git_write_lock
 
 # Cache teose ID-de jaoks (kausta nimi -> (work_id, slug))

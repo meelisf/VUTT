@@ -760,3 +760,50 @@ def test_teose_kustutus_asenduse_ajal_409(tmp_path, monkeypatch):
         admin.admin_work_delete(work_id, BackgroundTasks(), {"username": "adm", "role": "admin"})
     assert work_dir.exists()
     assert (work_dir / "vana-teos_pg_001.jpg").exists()
+
+
+# ── PR #881 järelparandus: HEAD-i uuendus on avaldamise piir ─────────────────
+
+def test_indeksi_sunni_torge_jatab_ootele_ja_jargmine_kirjutus_sunkroonib(tmp_path, monkeypatch):
+    """Sünk pärast update-ref'i kukub → teos jääb ootele; järgmine git-kirjutus sünkroonib."""
+    import server.git_ops as git_ops
+    monkeypatch.setattr(git_ops, "_PENDING_FILE", str(tmp_path / "pending.json"))
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    real = repo.git
+    loendur = {"n": 0}
+
+    class G:
+        def __getattr__(self, name):
+            if name == "reset" and loendur["n"] == 0:
+                def boom(*a, **k):
+                    loendur["n"] += 1
+                    raise RuntimeError("index.lock")
+                return boom
+            return getattr(real, name)
+
+    monkeypatch.setattr(repo, "git", G(), raising=False)
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert f"Upload: {upload_id}" in "".join(c.message for c in repo.iter_commits(max_count=5))
+    with git_ops.git_write_lock:
+        pass
+    assert git_ops.pending_index_syncs() == []
+    assert real.diff("--cached", "--name-only", "--", slug).strip() == ""
+
+
+def test_ajutise_indeksi_eemalduse_torge_ei_poora_avaldatud_asendust(tmp_path, monkeypatch):
+    """Pärast update-ref'i ei tohi ajutise indeksi koristuse tõrge vana lehestikku tagasi tuua."""
+    import os
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    real_remove = os.remove
+
+    def katkine(path, *a, **k):
+        if str(path).endswith(".index"):
+            raise PermissionError("ei saa")
+        return real_remove(path, *a, **k)
+
+    monkeypatch.setattr(upload_ops.os, "remove", katkine)
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert f"Upload: {upload_id}" in repo.head.commit.message
+    assert not (work_dir / "vana-teos_pg_001.txt").exists() or \
+        (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") != "vana tekst"
+    assert replace_marker.read_marker(slug) is None
