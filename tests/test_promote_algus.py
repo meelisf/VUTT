@@ -15,7 +15,7 @@ from test_promote_eelvaade import _jpeg, teos  # noqa: F401  (fikstuur)
 @pytest.fixture
 def uploads(tmp_path, monkeypatch):
     d = tmp_path / "uploads"
-    d.mkdir()
+    d.mkdir(exist_ok=True)   # `client` (backend_env) võib selle juba luua
     monkeypatch.setattr(upload_ops, "UPLOADS_DIR", str(d))
     monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(d))
     return d
