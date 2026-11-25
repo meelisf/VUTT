@@ -100,6 +100,11 @@ async def lifespan(app: FastAPI):
         logger.error("places.json konfiguratsiooniviga: %s", e)
         raise SystemExit(1)
     build_work_id_cache()
+    # Pooleli lehestiku asendused (ADR 0089 p 3) ENNE päringute vastuvõtmist: pärast
+    # katkestust võib ühises indeksis olla asenduse `git add` — ükski teine commit ei tohi
+    # seda kaasa võtta enne taastet (PR #881). Tavaliselt märke pole → kohe edasi.
+    from .upload import replace_recovery
+    await run_in_threadpool(replace_recovery.recover_all)
     # Tervikluse kontroll ja ajalooindeksi hooldus ei pea API käivitumist blokeerima.
     threading.Thread(target=run_git_fsck, daemon=True, name="git-fsck").start()
     # Esimene commit pärast buuti maksis 14,7 s (külm dentry-cache, 60k faili
@@ -144,6 +149,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="VUTT API", version="1.0.0", lifespan=lifespan)
 # Käsitlemata erind (500) → admini vealogi (#133); vastus jääb samaks.
 install_http_handler(app)
+
+
+# Asendusmärk (ADR 0089 p 2): lukk lükkas kirjutuse tagasi → 409, mitte 500.
+from fastapi.responses import JSONResponse as _JSONResponse
+from .replace_marker import WorkReplacingError as _WorkReplacingError
+
+
+@app.exception_handler(_WorkReplacingError)
+async def _work_replacing_handler(_request, _exc):
+    return _JSONResponse(status_code=409, content={"detail": (
+        "Teose lehestik on asendamisel, proovi hetke pärast uuesti. / "
+        "The work's pages are being replaced, try again shortly.")})
+
+
 app.include_router(prosopography_router, prefix="/prosopography")
 app.include_router(notifications_router)
 app.include_router(upload_router)

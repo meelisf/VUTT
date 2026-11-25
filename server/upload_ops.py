@@ -9,6 +9,7 @@ from .work_dating import dating_updates
 import json
 import os
 import shutil
+import uuid
 import threading
 from datetime import datetime
 from typing import Optional
@@ -548,17 +549,72 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
     from .admin_page_ops import work_lock
     from .utils import find_directory_by_id
 
+    from contextlib import ExitStack
+    from .replace_marker import marker_owner
+
     work_dir = find_directory_by_id(target_work_id)
-    if not work_dir:
-        return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
-                                            username, background_tasks)
-    with work_lock(os.path.basename(work_dir), work_dir):
-        return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
-                                            username, background_tasks)
+    # Selle lõime kirjutused kuuluvad asendusele: asendusmärk (ADR 0089 p 2) laseb läbi.
+    # `page_locks`: vanade lehtede lukud (ADR 0089 p 4) vabanevad ka ootamatu erindi korral.
+    try:
+        with marker_owner(upload_id), ExitStack() as page_locks:
+            if not work_dir:
+                return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
+                                                    username, background_tasks, page_locks=page_locks)
+            with work_lock(os.path.basename(work_dir), work_dir):
+                return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
+                                                    username, background_tasks, page_locks=page_locks)
+    except Exception:
+        # Ootamatu erind väljaspool taasteteid (nt JPG liigutamine, järelsamm): märk jäi
+        # alles → teos oleks 409-ga lukus kuni serveri käivituseni. Taasta/lõpeta kohe
+        # (lukk on juba vaba; `recover` võtab selle ise).
+        from . import replace_marker
+        from .upload import replace_recovery
+        slug = os.path.basename(work_dir) if work_dir else None
+        m = replace_marker.read_marker(slug) if slug else None
+        if m and m.get("upload_id") == upload_id:
+            try:
+                replace_recovery.recover(upload_id, slug)
+            except Exception:
+                logger.exception(f"replace {upload_id}: kohene taaste ebaõnnestus; märk jääb käivitusaegsele taastele")
+        raise
+
+
+from . import work_parts as _work_parts  # noqa: E402  (ADR 0089 p 5)
+
+
+def _update_replace_state(upload_id: str, fn) -> None:
+    with _get_upload_lock(upload_id):
+        s = _read_state(upload_id)
+        if s is not None:
+            fn(s)
+            _write_state(upload_id, s)
+
+
+def _write_replace_progress(upload_id: str, progress: dict, slug: str) -> None:
+    """Taasteinfo (ADR 0089 p 3) — kirjutatakse ENNE esimest failimuutust. Koopia
+    märgifaili: üleslaadimise kausta kadumine ei tohi taastet hävitada (PR #881)."""
+    from . import replace_marker
+    replace_marker.write_marker(slug, upload_id, progress)
+    _update_replace_state(upload_id, lambda s: s.__setitem__('replace_progress', progress))
+
+
+def _set_replace_phase(upload_id: str, phase: str, slug: str = None) -> None:
+    from . import replace_marker
+    def fn(s):
+        if s.get('replace_progress'):
+            s['replace_progress']['phase'] = phase
+    _update_replace_state(upload_id, fn)
+    m = replace_marker.read_marker(slug) if slug else None
+    if m and m.get("upload_id") == upload_id and isinstance(m.get("progress"), dict):
+        replace_marker.write_marker(slug, upload_id, {**m["progress"], "phase": phase})
+
+
+def _clear_replace_progress(upload_id: str) -> None:
+    _update_replace_state(upload_id, lambda s: s.pop('replace_progress', None))
 
 
 def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_updates: dict,
-                                 username: str, background_tasks) -> dict:
+                                 username: str, background_tasks, page_locks=None) -> dict:
     """
     Asendab olemasoleva teose sisu uue OCR-itud materjaliga.
 
@@ -577,6 +633,23 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     from fastapi import HTTPException
     from .utils import find_directory_by_id
 
+    # 0. Pooleli asendus (ka sama üleslaadimise varasem katse) taastatakse või lõpetatakse
+    # SAMA teose luku all enne uut katset — enne lukku tehtud kontroll laskis lukku ootava
+    # korduskatse märgi ja taasteinfo üle kirjutada (PR #881).
+    from . import replace_marker as _rm
+    from .upload import replace_recovery as _rr
+    _wd = find_directory_by_id(target_work_id)
+    if _wd:
+        _slug = os.path.basename(_wd)
+        _m = _rm.read_marker(_slug)
+        if _m:
+            with _rm.marker_owner(_m.get("upload_id")):
+                tulemus = _rr.recover_locked(_m.get("upload_id"), _slug, _wd)
+            if tulemus not in _rr.OK_RESULTS:
+                raise HTTPException(status_code=409, detail=(
+                    "Teose eelmine lehestiku asendus on pooleli ja seda ei õnnestunud lõpetada. / "
+                    "A previous page replacement is unfinished and could not be completed."))
+
     # 1. Lae upload state
     state_lock = _get_upload_lock(upload_id)
     with state_lock:
@@ -589,6 +662,14 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
         raise HTTPException(
             status_code=400,
             detail=f"Upload peab olema 'done' või 'reviewing' olekus, praegu: '{current_status}'"
+        )
+    # Sidumine (ADR 0089 p 1): URL-i teos peab olema see, mille jaoks üleslaadimine loodi.
+    # Puuduv `replace_work_id` = vana üleslaadimine enne välja tulekut → lase edasi.
+    bound = state.get('replace_work_id')
+    if bound and bound != target_work_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Üleslaadimine on loodud teose {bound} asendamiseks, mitte {target_work_id}",
         )
 
     # 2. Leia sihtteose kaust
@@ -642,11 +723,31 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     # Asendus kasutab tüved uuesti → eksemplaride pildipaarid osutaksid vaikselt uutele
     # lehtedele. Eemalda KÕIK paarid enne ühegi faili liigutamist (sama work_lock);
     # ebaõnnestumisel katkesta (ADR 0079 p 3 täiendus).
+    # Asendusmärk enne esimest failimuutust (ADR 0089 p 2): katkestuse järel ei tohi
+    # keegi teise asendamisel teose lehti kirjutada, kuni taaste on teinud oma töö.
+    from . import replace_marker
+    from .upload import replace_recovery
+    replace_marker.write_marker(slug, upload_id)
+
+    # Vanade lehtede lukud (ADR 0089 p 4) KOHE märgi järel ja ENNE taastepunkti: salvestus,
+    # mis juba hoidis lehelukku, jõuab commit'ini enne `old_head`-i lugemist ega jää
+    # rollback'iga tagasi pööratuks (PR #881 ülevaatus). Lukud vabanevad pärast uute
+    # lehtede JSON-ide kirjutust või vana seisu taastamist (`page_locks` välimises
+    # funktsioonis vabastab ka ootamatu erindi korral).
+    from contextlib import ExitStack
+    from .page_locks import page_lock
+    if page_locks is None:
+        page_locks = ExitStack()
+    for fname in sorted(f for f in os.listdir(work_dir) if f.endswith('.txt')):
+        page_locks.enter_context(page_lock(os.path.join(work_dir, fname)))
+
     try:
         from . import exemplar_images
         exemplar_images.clear_all_pairs(work_dir, username)
     except Exception as e:
         logger.error(f"replace {upload_id}: pildipaaride eemaldamine ebaõnnestus: {e}")
+        replace_marker.remove_marker(slug)
+        page_locks.close()
         raise HTTPException(status_code=500,
                             detail="Eksemplaride pildipaaride eemaldamine ebaõnnestus; teose sisu ei asendatud")
 
@@ -663,48 +764,63 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     # 5. Arhiveeri vanad JPG-d prügikasti
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     # Kanooniline id (mitte päringu parameeter): prügikast on teose id järgi.
-    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_content', timestamp)
-    os.makedirs(trash_dir, exist_ok=True)
+    # Igal katsel OMA tühi kaust (PR #881, 4. voor): sama sekundi teine asendus kasutas
+    # eelmise kausta ja rollback tõi tagasi eelmise asenduse varukoopia.
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_content',
+                             f"{timestamp}-{upload_id}-{uuid.uuid4().hex[:8]}")
+    os.makedirs(trash_dir, exist_ok=False)
+
+    # Taasteinfo enne esimest faili liigutamist (ADR 0089 p 3).
+    new_files = [f"{_page_base_name(slug, work_id, f['page'])}.{ext}"
+                 for f in importable for ext in ("jpg", "txt", "json")]
+    progress = {
+        "phase": "replacing",
+        "old_head": old_head,
+        "trash_dir": trash_dir,
+        # KÕIK vanad lehefailid (txt, json, jpg; mitte `_metadata.json`) liiguvad prügikasti
+        # ja taastamine toob need sealt tagasi — kettal olev seis, mitte git (PR #881:
+        # commitimata salvestatud tekst ei tohi rollback'is kaduda).
+        # Pildid sama reegliga mis leheloend (`meili_doc.page_order_keys`: .jpg/.jpeg/.png
+        # suurtähtedega ja ilma) + `_thumb_`-id — muidu jäid .JPG/.png vanad lehed alles.
+        "old_files": sorted(f for f in os.listdir(work_dir)
+                            if f != '_metadata.json'
+                            and (f.endswith(('.txt', '.json')) or f.lower().endswith(('.jpg', '.jpeg', '.png')))
+                            and os.path.isfile(os.path.join(work_dir, f))),
+        "new_files": new_files,
+        # Osade vihje (ADR 0089 p 5): vana tüvi → lehenumber, enne failide liigutamist.
+        "old_numbers": {stem: i + 1 for i, stem in enumerate(_work_parts.page_stems(work_dir))},
+    }
+    _write_replace_progress(upload_id, progress, slug)
+
+    def _rollback(syy: str):
+        """Taasta vana seis ja viska 500. Taastamise tõrke korral jäävad märk ja
+        taasteinfo alles (teos jääb lukku kuni käivitusaegse taasteni, PR #881)."""
+        try:
+            replace_recovery.restore_replace(work_dir, progress, repo)
+        except replace_recovery.RestoreError as re_err:
+            logger.error(f"replace {upload_id}: taastamine ebaõnnestus ({re_err}); märk jääb")
+            page_locks.close()
+            raise HTTPException(status_code=500, detail=(
+                f"{syy}. Vana sisu taastamine ebaõnnestus — teos on lukus, kuni taaste "
+                f"õnnestub (serveri käivitusel või admin)."))
+        _clear_replace_progress(upload_id)
+        replace_marker.remove_marker(slug)
+        page_locks.close()
+        logger.info(f"replace {upload_id}: vana sisu taastatud (head={old_head[:8]})")
+        raise HTTPException(status_code=500, detail=syy)
 
     destructive_started = True
-    for fname in os.listdir(work_dir):
-        if fname.endswith('.jpg') and os.path.isfile(os.path.join(work_dir, fname)):
-            shutil.move(os.path.join(work_dir, fname), os.path.join(trash_dir, fname))
-
-    logger.info(f"replace {upload_id}: vanad JPG-d arhiveeritud → {trash_dir}")
-
-    # 6. Git rm vanad lehed (txt + json, v.a. _metadata.json) — JPG-d on gitignore all.
-    # Kui see ebaõnnestub, katkesta enne uute failide allalaadimist: muidu võib teosesse
-    # jääda vana ja uus .txt/.json sisu segamini.
+    # 5–6. Vanad lehefailid prügikasti (rename faili kaupa). Ühist git-indeksit EI puudutata
+    # — see muutub alles lõpliku commit'iga (teised commitivad indeksit `repo.index.commit`-iga).
     try:
-        old_tracked = []
-        for fname in os.listdir(work_dir):
-            if fname == '_metadata.json':
-                continue
-            if fname.endswith('.txt') or fname.endswith('.json'):
-                old_tracked.append(fname)
-                fpath = os.path.join(work_dir, fname)
-                if os.path.exists(fpath):
-                    with git_write_lock:
-                        repo.git.rm(os.path.join(slug, fname))
-        if old_tracked:
-            logger.info(f"replace {upload_id}: git rm {len(old_tracked)} vana faili")
+        for fname in progress["old_files"]:
+            fpath = os.path.join(work_dir, fname)
+            if os.path.lexists(fpath):
+                shutil.move(fpath, os.path.join(trash_dir, fname))
+        logger.info(f"replace {upload_id}: {len(progress['old_files'])} vana lehefaili → {trash_dir}")
     except Exception as e:
-        logger.error(f"replace {upload_id}: git rm viga, katkestan ja taastan vana sisu: {e}")
-        try:
-            with git_write_lock:
-                repo.git.checkout(old_head, '--', slug)
-            logger.info(f"replace {upload_id}: rollback git checkout OK (head={old_head[:8]})")
-        except Exception as rb_git_err:
-            logger.error(f"replace {upload_id}: rollback git checkout ebaõnnestus: {rb_git_err}")
-        try:
-            for fname in os.listdir(trash_dir):
-                if fname.endswith('.jpg'):
-                    shutil.move(os.path.join(trash_dir, fname), os.path.join(work_dir, fname))
-            logger.info(f"replace {upload_id}: rollback JPG-d tagasi liigutatud")
-        except Exception as rb_jpg_err:
-            logger.error(f"replace {upload_id}: rollback JPG liigutamine ebaõnnestus: {rb_jpg_err}")
-        raise HTTPException(status_code=500, detail=f"Vana sisu eemaldamine ebaõnnestus: {e}")
+        logger.error(f"replace {upload_id}: vanade lehtede liigutamine ebaõnnestus, taastan: {e}")
+        _rollback(f"Vana sisu eemaldamine ebaõnnestus: {e}")
 
     # 7. Lae alla uued lehed SFTP kaudu. Remote loend valideeritakse uuesti,
     # sest fail võis preflight'i järel kaduda; sellisel juhul käivitub rollback.
@@ -744,7 +860,9 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                 raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); asendus katkestati")
             os.chmod(local_txt, 0o644)
 
-            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
+            # `content_generation` (ADR 0089 p 4): vana lehe pealt avatud redaktor saab 409.
+            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": [],
+                         "content_generation": upload_id}
             with open(local_json, 'w', encoding='utf-8') as fh:
                 json.dump(page_json, fh, ensure_ascii=False, indent=2)
             os.chmod(local_json, 0o644)
@@ -755,26 +873,14 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
 
         if downloaded == 0:
             raise ValueError("Ühtegi lehekülge ei õnnestunud alla laadida")
+        # Uued lehed koos põlvkonnaga kettal → vanade lehtede lukud vabaks.
+        page_locks.close()
 
     except (ValueError, Exception) as e:
         # Rollback: taasta git-jälgitud failid ja JPG-d kui destruktiivsed sammud alustasid
-        if destructive_started:
-            logger.error(f"replace_work_content: rollback after error: {e}")
-            try:
-                with git_write_lock:
-                    repo.git.checkout(old_head, '--', slug)
-                logger.info(f"replace {upload_id}: rollback git checkout OK (head={old_head[:8]})")
-            except Exception as rb_git_err:
-                logger.error(f"replace {upload_id}: rollback git checkout ebaõnnestus: {rb_git_err}")
-            try:
-                for fname in os.listdir(trash_dir):
-                    if fname.endswith('.jpg'):
-                        shutil.move(os.path.join(trash_dir, fname), os.path.join(work_dir, fname))
-                logger.info(f"replace {upload_id}: rollback JPG-d tagasi liigutatud")
-            except Exception as rb_jpg_err:
-                logger.error(f"replace {upload_id}: rollback JPG liigutamine ebaõnnestus: {rb_jpg_err}")
         error_detail = str(e) if isinstance(e, ValueError) else f"Failide allalaadimine ebaõnnestus: {e}"
-        raise HTTPException(status_code=500, detail=error_detail)
+        logger.error(f"replace_work_content: rollback after error: {e}")
+        _rollback(error_detail)
     finally:
         if sftp:
             try:
@@ -782,7 +888,81 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
             except Exception:
                 pass
 
-    # 8. Uuenda metaandmeid upload state['meta'] põhjal (säilita id ja slug originaalist)
+    # 9. Git commit uuendatud sisuga
+    # Commit AJUTISE indeksiga (`GIT_INDEX_FILE`, PR #881 5. voor): ühine indeks ei näe
+    # asenduse ettevalmistust ka tõrke ega katkestuse korral — teised commitivad seda
+    # `repo.index.commit`-iga tervikuna. read-tree HEAD → add slug → write-tree →
+    # commit-tree → update-ref (CAS vana HEAD-iga). Alles siis sünkroonitakse ühise indeksi
+    # teose kaust HEAD-iga; selle akna katab käivitusaegne taaste (indeks esimese sammuna).
+    try:
+        from .git_ops import get_or_init_repo, git_write_lock
+        repo = get_or_init_repo()
+        author_name = username if username else "Automaatne"
+        author_email = f"{author_name}@vutt.local"
+        tmp_index = os.path.join(repo.git_dir, f"vutt-replace-{upload_id}.index")
+        idx_env = {"GIT_INDEX_FILE": tmp_index}
+        with git_write_lock:
+            try:
+                parent = repo.git.rev_parse("HEAD")
+                repo.git.read_tree(parent, env=idx_env)
+                repo.git.add("-A", "--", slug, env=idx_env)
+                tree = repo.git.write_tree(env=idx_env)
+                dirty = tree != repo.git.rev_parse(f"{parent}^{{tree}}")
+                if dirty:
+                    new_commit = repo.git.commit_tree(
+                        tree, "-p", parent,
+                        "-m", f"Asenda sisu: {slug} ({work_id})\n\n{replace_recovery.commit_trailer(upload_id)}",
+                        env={"GIT_AUTHOR_NAME": author_name, "GIT_AUTHOR_EMAIL": author_email,
+                             "GIT_COMMITTER_NAME": author_name, "GIT_COMMITTER_EMAIL": author_email},
+                    )
+                    repo.git.update_ref("HEAD", new_commit, parent)
+            finally:
+                for f in (tmp_index, tmp_index + ".lock"):
+                    try:
+                        os.remove(f)
+                    except FileNotFoundError:
+                        pass
+            if dirty:
+                # Ühise indeksi teose kaust → HEAD (muidu oleksid kirjed vananenud ja teise
+                # teose `repo.index.commit` pööraks asenduse tagasi).
+                try:
+                    repo.git.reset("-q", "HEAD", "--", slug)
+                except Exception as sync_err:
+                    logger.critical(f"replace {upload_id}: ühise indeksi sünk pärast commit'i ebaõnnestus: {sync_err}")
+                    from .client_errors import record_server_error
+                    record_server_error("server:thread", sync_err)
+        if dirty:
+            logger.info(f"replace {upload_id}: git commit OK ({slug})")
+        else:
+            logger.info(f"replace {upload_id}: git — muutusi pole, commit vahele jäetud")
+    except Exception as e:
+        # Commit'i tõrge EI OLE edu (PR #881): kettal uus lehestik, HEAD-is vana →
+        # taasta vana seis (sh juba stage'itud uued failid) ja kuku.
+        logger.error(f"replace {upload_id}: git commit ebaõnnestus, taastan: {e}")
+        _rollback(f"Asenduse commit ebaõnnestus: {e}")
+
+    # Commit tehtud: edasi on asendus „tehtud" (katkestuse järel lõpetatakse, mitte ei taastata).
+    _set_replace_phase(upload_id, "replaced", slug=slug)
+
+    try:
+        work_sets_skipped = _after_replace_commit(upload_id, state, work_dir, slug, target_work_id, username)
+    except replace_recovery.AfterStepError as e:
+        # Lehestik on asendatud, aga osade leheviited mitte: märk jääb (kirjutused 409),
+        # taaste kordab sammu (kohe välimises funktsioonis ja serveri käivitusel).
+        page_locks.close()
+        raise HTTPException(status_code=500, detail=(
+            f"Lehestik asendati, aga {e} ebaõnnestus — teos on lukus, kuni samm õnnestub."))
+    replace_marker.remove_marker(slug)
+
+    logger.info(f"replace {upload_id}: valmis → work_id={target_work_id}, slug={slug}, lehed={downloaded}")
+    result = {"work_id": target_work_id, "slug": slug}
+    if work_sets_skipped is not None:
+        result["work_sets_skipped"] = work_sets_skipped
+    return result
+
+
+def _apply_replace_metadata(upload_id: str, state: dict, meta_path: str, username: str) -> None:
+    """Üleslaadimise vormi metaandmed teosele (id ja slug jäävad originaalist)."""
     try:
         upload_meta = state.get('meta', {})
         OPTIONAL_META_FIELDS = [
@@ -816,7 +996,7 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                 updates,
                 username,
                 "Uuenda metadata asendusel",
-                background_tasks=background_tasks,
+                background_tasks=None,
                 sync_meili=False,
                 call_ptw=False,
             )
@@ -824,29 +1004,37 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     except Exception as e:
         logger.warning(f"replace {upload_id}: metadata uuendamine ebaõnnestus: {e}")
 
-    # 9. Git commit uuendatud sisuga
-    try:
-        from .git_ops import get_or_init_repo, git_write_lock
-        from git import Actor
-        repo = get_or_init_repo()
-        with git_write_lock:
-            repo.git.add(slug)
-            dirty = repo.is_dirty(index=True)
-            if dirty:
-                author_name = username if username else "Automaatne"
-                actor = Actor(author_name, f"{author_name}@vutt.local")
-                repo.index.commit(
-                    f"Asenda sisu: {slug} ({work_id})",
-                    author=actor,
-                    committer=actor,
-                )
-        if dirty:
-            logger.info(f"replace {upload_id}: git commit OK ({slug})")
-        else:
-            logger.info(f"replace {upload_id}: git — muutusi pole, commit vahele jäetud")
-    except Exception as e:
-        logger.warning(f"replace {upload_id}: git commit ebaõnnestus: {e}")
 
+def _after_replace_commit(upload_id: str, state: dict, work_dir: str, slug: str,
+                          target_work_id: str, username: str, progress: dict = None):
+    """Asenduse commit'i järgsed sammud — idempotentsed, sest katkestuse järel kordab
+    neid `replace_recovery.recover` (ADR 0089 p 3). Tagastab `work_sets_skipped`."""
+    meta_path = os.path.join(work_dir, '_metadata.json')
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            work_id = (json.load(f) or {}).get('id', target_work_id)
+    except (OSError, ValueError):
+        work_id = target_work_id
+    state_lock = _get_upload_lock(upload_id)
+    with state_lock:
+        fresh = _read_state(upload_id)
+    if fresh:
+        state = fresh
+    # 8. Üleslaadimise metaandmed (pärast lehestiku commit'i; korratav — muutusteta
+    # salvestus on no-op, ADR 0012). Järelsammus, et ka taaste neid rakendaks (PR #881).
+    _apply_replace_metadata(upload_id, state, meta_path, username)
+    # 9a. Osad (ADR 0089 p 5): leheviited nulli ENNE `refresh_work_mentions`-it, mis
+    # muidu jätaks samanimelised (aga teise sisuga) tüved osadesse alles.
+    # KOHUSTUSLIK (PR #881): tõrge jätab märgi alles, taaste kordab sammu.
+    from .upload.replace_recovery import AfterStepError
+    try:
+        if progress is None:
+            with state_lock:
+                progress = (_read_state(upload_id) or {}).get('replace_progress') or {}
+        _work_parts.reset_parts_for_replace(work_dir, progress.get('old_numbers') or {}, username)
+    except Exception as e:
+        logger.exception(f"replace {upload_id}: osade leheviidete nullimine ebaõnnestus")
+        raise AfterStepError(f"osade leheviited: {e}") from e
     # 9b. Lehehulk vahetus tervikuna (#626, ADR 0055): vanade lehtede `mentioned`-kirjed
     # ja osade lehetüved tuleb uute lehtede järgi ühtlustada. Enne Meili sünki, et
     # sünk kannaks ühtlustatud osi. Viga logitakse funktsiooni sees, ei visata.
@@ -872,8 +1060,10 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
         logger.warning(f"replace {upload_id}: meilisearch sync viga: {e}")
 
     # 11. Koristame OCR serveri (mitte kriitiline)
-    remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+    remote_staging = f"{OCR_SERVER_PATH}/{state.get('remote_staging_path')}"
     try:
+        if not state.get('remote_staging_path'):
+            raise ValueError("remote_staging_path puudub")
         _ssh_rm_rf(upload_id, remote_staging)
         close_ssh(upload_id)
         logger.info(f"replace {upload_id}: OCR serveri kaust koristatud: {remote_staging}")
@@ -896,12 +1086,7 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
             s['status'] = 'imported'
             s['replace_work_id'] = target_work_id
             _write_state(upload_id, s)
-
-    logger.info(f"replace {upload_id}: valmis → work_id={target_work_id}, slug={slug}, lehed={downloaded}")
-    result = {"work_id": target_work_id, "slug": slug}
-    if work_sets_skipped is not None:
-        result["work_sets_skipped"] = work_sets_skipped
-    return result
+    return work_sets_skipped
 
 
 def cancel_upload(upload_id: str) -> bool:

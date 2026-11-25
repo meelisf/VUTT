@@ -6,7 +6,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import type { WorkPart } from '../../../services/workPartsApi';
-import { pageRanges } from '../partsModel';
+import { compactNumbers, pageRanges } from '../partsModel';
 import { KIND_STYLE } from './kindStyle';
 
 interface Props {
@@ -63,8 +63,15 @@ const PartsList: React.FC<Props> = ({ parts, pageNums, activeId, onSelect }) => 
                 <td className="px-3 py-2 tabular-nums text-gray-600">{year ?? ''}</td>
                 <td className="px-3 py-2 tabular-nums text-gray-600">
                   {p.needs_review ? (
-                    <span className="flex items-center gap-1 text-xs text-amber-700">
-                      <AlertTriangle size={12} /> {t('manage.parts.needsReview')}
+                    <span className="flex flex-col text-xs text-amber-700">
+                      <span className="flex items-center gap-1">
+                        <AlertTriangle size={12} /> {t('manage.parts.needsReview')}
+                      </span>
+                      {p.pages_before_replace?.page_numbers.length ? (
+                        <span className="text-gray-500">
+                          {t('manage.parts.pagesBeforeReplace', { pages: compactNumbers(p.pages_before_replace.page_numbers) })}
+                        </span>
+                      ) : null}
                     </span>
                   ) : (
                     <span title={t('manage.parts.pages', { count: p.pages.length })}>{pageRanges(p.pages, pageNums)}</span>

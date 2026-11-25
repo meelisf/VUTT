@@ -21,8 +21,10 @@ export interface WorkPart {
   /** Toimetaja märkus: API annab kõigile, avalik vaade ei näita. */
   notes?: string;
   needs_review: boolean;
+  /** Kogu lehestiku asenduse eelne lehestik (ADR 0089 p 5). Kirjutab AINULT server. */
+  pages_before_replace?: { at: string; page_numbers: number[] };
 }
-export type PartInput = Omit<WorkPart, 'id' | 'needs_review' | 'abstract_en_src'> & {
+export type PartInput = Omit<WorkPart, 'id' | 'needs_review' | 'abstract_en_src' | 'pages_before_replace'> & {
   /** Toimetaja kinnitab, et ingliskeelne kokkuvõte vastab eestikeelsele → server seab ankru. */
   confirm_abstract_translation?: boolean;
 };

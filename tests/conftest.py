@@ -67,6 +67,14 @@ def _agendikoodi_hoidla_tmp(tmp_path, monkeypatch):
     monkeypatch.setattr(agent_handoff, "DB_PATH", str(tmp_path / "agent_handoff.sqlite3"))
 
 
+@pytest.fixture(autouse=True)
+def _asendusmargid_tmp(tmp_path, monkeypatch):
+    """Asendusmärgid (ADR 0089) iga testi oma kausta: sessiooni ühine STATE_DIR jättis
+    eelmise testi märgi järgmisele, mis sama slug'iga teose eel-taastes reageeris."""
+    from server import replace_marker
+    monkeypatch.setattr(replace_marker, "MARKER_DIR", str(tmp_path / "_work_replacing"))
+
+
 @pytest.fixture
 def backend_env(tmp_path, monkeypatch):
     state_dir = tmp_path / "state"

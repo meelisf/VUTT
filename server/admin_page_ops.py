@@ -41,6 +41,10 @@ def work_lock(work_id, work_dir):
     threading.Lock = lõimedevaheline (üks worker); fcntl.flock = protsessidevaheline
     (tuleviku gunicorn mitme workeri jaoks). Lukufail {work_dir}/.vutt-lock.
     """
+    # Asendusmärk (ADR 0089 p 2): võõras mutatsioon asendatava teose peal → 409.
+    from .replace_marker import check_not_replacing
+    slug = os.path.basename(os.path.normpath(work_dir))
+    check_not_replacing(slug)
     tlock = _get_thread_lock(work_id)
     tlock.acquire()
     try:
@@ -48,6 +52,7 @@ def work_lock(work_id, work_dir):
         f = open(lockpath, 'w')
         try:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            check_not_replacing(slug)
             yield
         finally:
             try:

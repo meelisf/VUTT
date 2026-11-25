@@ -497,6 +497,25 @@ võti = failinimi; kärbe = `adjust` pööratud raamis, pöörde muutus eemaldab
 sünk üks kord. Poolitus = ÜKS native commit (`commit_add_and_remove`) — GitPythoni
 `index.commit` on /data repos ~2 s. Välistab järjekorra mustandi ja vastupidi.
 
+**Lehestiku asendus (ADR 0089)** — `replace_work_content` on taastatav: URL-i teos PEAB olema
+state'i `replace_work_id`. Järjekord teoseluku all: pooleli asenduse taaste (`recover_locked`) →
+asendusmärk (`state/work_replacing/{slug}.json`, `server/replace_marker.py`, taasteinfo koopiaga)
+→ vanade lehtede lukud → paarid → `old_head`. Märgi ajal lükkavad `page_lock` ja `work_lock`
+tagasi kõik peale omaniku (`marker_owner`) → 409; üleslaadimise tühistus → 409. **Vana seis on
+kettal, mitte gitis:** kõik vanad lehefailid (txt/json/jpg, mitte `_metadata.json`) liiguvad
+prügikasti ja taastamine toob need tagasi (commitimata salvestatud tekst jääb alles). Lõplik
+commit käib ajutise indeksiga (`GIT_INDEX_FILE` → commit-tree → update-ref, treiler `Upload: <id>`) —
+ühine indeks ei näe asenduse ettevalmistust kunagi; tõrge = taastamine + 500. Teose kustutus võtab
+teose luku (pooleli asendus → 409). Kui käivitusaegne taaste ei saa indeksit sünkroonida, server
+ei käivitu. Käivitusaegne taaste (`replace_recovery.recover_all`) jookseb
+lifespan'is ENNE päringuid ja tegutseb ainult selle asenduse aktiivse märgi olemasolul; esimese
+sammuna viib ta teose kausta indeksi HEAD-ile. Ajaloo lugemisviga ≠ „commit'i pole". Igal katsel
+oma tühi prügikasti kaust. Uued lehed kannavad
+`content_generation`-it (Meili → redaktor → `/save`); `/save` kontrollib olemasolu ja põlvkonda
+leheluku SEES, võtmeta päring ainult põlvkonnata lehel. Osade nullimine on kohustuslik
+järelsamm (`pages_before_replace` vihjeks). Järelsammud elavad `_after_replace_commit`-is ja
+peavad jääma korratavaks. Uus asendustee kasutab neid, ei kirjuta oma.
+
 **Kaugkoristus (ADR 0024)** — katkestamine kustutab OCR-serveris ainult **failid**
 (`ocr_client.cleanup_run_files`), kataloog jääb alles: `rm -rf`/`rmdir` lennusoleva batchi
 alt annab OCR-valvuri veakäsitluseta `.txt`-kirjutusele `FileNotFoundError`, mis kukutab
