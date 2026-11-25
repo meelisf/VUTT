@@ -116,11 +116,16 @@ def recover_locked(upload_id: str, slug: str, work_dir: str) -> str:
     from .. import upload_ops
     from ..git_ops import get_or_init_repo
 
+    # Ainult SELLE asenduse aktiivne märk annab õiguse midagi teha: kui teine päring jõudis
+    # taaste lõpetada ja märgi eemaldada, ei tohi hilinenud taaste (vana state'i faasi
+    # põhjal) pärast seda tehtud muudatusi tagasi pöörata (PR #881, 4. voor).
+    marker = replace_marker.read_marker(slug)
+    if not marker or marker.get("upload_id") != upload_id:
+        return "cleared"
     with upload_ops._get_upload_lock(upload_id):
         state = upload_ops._read_state(upload_id) or {}
     # Märgi koopia on autoriteetne: üleslaadimise kaust võib olla kadunud.
-    progress = (replace_marker.read_marker(slug) or {}).get("progress") \
-        or state.get("replace_progress")
+    progress = marker.get("progress") or state.get("replace_progress")
 
     def _jarelsammud() -> str:
         try:
@@ -145,6 +150,16 @@ def recover_locked(upload_id: str, slug: str, work_dir: str) -> str:
         replace_marker.remove_marker(slug)
         return "cleared"
     repo = get_or_init_repo()
+    # Esimesena: teose kausta indeks HEAD-ile. Katkestus võis jätta lõpliku commit'i
+    # `git add`-i ühisesse indeksisse; see peab kaduma ka siis, kui commit'i olemasolu jääb
+    # ebaselgeks (indeks == HEAD → ükski teine commit ei muuda seda teost). Töökausta ei puuduta.
+    from ..git_ops import git_write_lock
+    try:
+        with git_write_lock:
+            repo.git.reset("-q", "HEAD", "--", slug)
+    except Exception:
+        logger.exception("Asenduse taaste: indeksi lähtestus ebaõnnestus (%s, %s)", slug, upload_id)
+        return "restore_failed"
     try:
         leitud = find_replace_commit(repo, progress["old_head"], slug, upload_id)
     except ReplaceCommitUnknown:

@@ -99,6 +99,11 @@ Kolm parandusvooru näitasid, et vana seisu git'ist tuletamine ei kata kettal ol
 - **Märgi kontroll ja uus katse sama teoseluku all** (`recover_locked`).
 - **Osade nullimine on kohustuslik järelsamm** (`AfterStepError`): tõrkel jääb märk (faas
   `replaced`) ja taaste kordab; muud järelsammud on parimal katsel.
+- (4. voor) Taaste tegutseb AINULT selle asenduse aktiivse märgi olemasolul (hilinenud taaste ei
+  pööra tagasi pärast lõpetamist tehtud muudatusi). `replacing`-faasis viiakse teose kausta indeks
+  esimesena HEAD-ile — ka siis, kui commit'i olemasolu jääb ebaselgeks. Igal katsel oma tühi
+  prügikasti kaust (`{ts}-{upload_id}-{juhuslik}`). Vanad pildid sama reegliga mis leheloend
+  (.jpg/.jpeg/.png, suurtähtedega ja ilma).
 
 ## Tagajärjed
 

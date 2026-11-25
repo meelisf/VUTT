@@ -9,6 +9,7 @@ from .work_dating import dating_updates
 import json
 import os
 import shutil
+import uuid
 import threading
 from datetime import datetime
 from typing import Optional
@@ -763,8 +764,11 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     # 5. Arhiveeri vanad JPG-d prügikasti
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     # Kanooniline id (mitte päringu parameeter): prügikast on teose id järgi.
-    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_content', timestamp)
-    os.makedirs(trash_dir, exist_ok=True)
+    # Igal katsel OMA tühi kaust (PR #881, 4. voor): sama sekundi teine asendus kasutas
+    # eelmise kausta ja rollback tõi tagasi eelmise asenduse varukoopia.
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_content',
+                             f"{timestamp}-{upload_id}-{uuid.uuid4().hex[:8]}")
+    os.makedirs(trash_dir, exist_ok=False)
 
     # Taasteinfo enne esimest faili liigutamist (ADR 0089 p 3).
     new_files = [f"{_page_base_name(slug, work_id, f['page'])}.{ext}"
@@ -776,8 +780,11 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
         # KÕIK vanad lehefailid (txt, json, jpg; mitte `_metadata.json`) liiguvad prügikasti
         # ja taastamine toob need sealt tagasi — kettal olev seis, mitte git (PR #881:
         # commitimata salvestatud tekst ei tohi rollback'is kaduda).
+        # Pildid sama reegliga mis leheloend (`meili_doc.page_order_keys`: .jpg/.jpeg/.png
+        # suurtähtedega ja ilma) + `_thumb_`-id — muidu jäid .JPG/.png vanad lehed alles.
         "old_files": sorted(f for f in os.listdir(work_dir)
-                            if f != '_metadata.json' and f.endswith(('.txt', '.json', '.jpg'))
+                            if f != '_metadata.json'
+                            and (f.endswith(('.txt', '.json')) or f.lower().endswith(('.jpg', '.jpeg', '.png')))
                             and os.path.isfile(os.path.join(work_dir, f))),
         "new_files": new_files,
         # Osade vihje (ADR 0089 p 5): vana tüvi → lehenumber, enne failide liigutamist.

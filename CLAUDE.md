@@ -506,7 +506,9 @@ kettal, mitte gitis:** kõik vanad lehefailid (txt/json/jpg, mitte `_metadata.js
 prügikasti ja taastamine toob need tagasi (commitimata salvestatud tekst jääb alles). Ühist
 git-indeksit puudutab alles lõplik commit (`commit --only -- slug`, treiler `Upload: <id>`);
 tõrge = taastamine + 500. Käivitusaegne taaste (`replace_recovery.recover_all`) jookseb
-lifespan'is ENNE päringuid. Ajaloo lugemisviga ≠ „commit'i pole". Uued lehed kannavad
+lifespan'is ENNE päringuid ja tegutseb ainult selle asenduse aktiivse märgi olemasolul; esimese
+sammuna viib ta teose kausta indeksi HEAD-ile. Ajaloo lugemisviga ≠ „commit'i pole". Igal katsel
+oma tühi prügikasti kaust. Uued lehed kannavad
 `content_generation`-it (Meili → redaktor → `/save`); `/save` kontrollib olemasolu ja põlvkonda
 leheluku SEES, võtmeta päring ainult põlvkonnata lehel. Osade nullimine on kohustuslik
 järelsamm (`pages_before_replace` vihjeks). Järelsammud elavad `_after_replace_commit`-is ja

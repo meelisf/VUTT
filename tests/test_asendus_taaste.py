@@ -617,3 +617,93 @@ def test_lukku_oottav_korduskatse_ei_kirjuta_taasteinfot_ule(tmp_path, monkeypat
     assert m, "märk peab jääma (taaste kukkus)"
     assert m["progress"]["old_files"], "A taasteinfo (vanad failid prügikastis) peab alles olema"
     assert tulemused.get("B") == 409, tulemused
+
+
+# ── Ülevaatus PR #881, 4. voor ────────────────────────────────────────────────
+
+def test_ebaselge_commit_puhastab_ikkagi_indeksi(tmp_path, monkeypatch):
+    """(1) Ajaloo lugemisviga: märk jääb, aga teose kausta indeks viiakse HEAD-ile — ükski
+    teine commit ei tohi stage'itud asenduse faile kaasa võtta."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    (work_dir / "uus_pg_001.txt").write_text("uus", encoding="utf-8")
+    repo.git.add("-A", "--", slug)
+    replace_marker.write_marker(slug, upload_id, {
+        "phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(tmp_path / "t"),
+        "old_files": [], "new_files": ["uus_pg_001.txt"]})
+    monkeypatch.setattr(replace_recovery, "find_replace_commit",
+                        lambda *a: (_ for _ in ()).throw(replace_recovery.ReplaceCommitUnknown("katki")))
+    assert replace_recovery.recover(upload_id, slug) == "commit_unknown"
+    assert replace_marker.read_marker(slug) is not None
+    assert repo.git.diff("--cached", "--name-only", "--", slug).strip() == ""
+
+
+def _teine_upload(tmp_path, upload_id, uus_id):
+    import shutil
+    src = Path(upload_ops.UPLOADS_DIR) / upload_id
+    dst = Path(upload_ops.UPLOADS_DIR) / uus_id
+    shutil.copytree(src, dst)
+    st = json.loads((dst / "state.json").read_text(encoding="utf-8"))
+    st.update({"id": uus_id, "status": "reviewing"})
+    st.pop("replace_progress", None)
+    (dst / "state.json").write_text(json.dumps(st), encoding="utf-8")
+
+
+def test_sama_sekundi_asendused_ei_jaga_taastekausta(tmp_path, monkeypatch):
+    """(2) Teise asenduse rollback ei tohi tuua tagasi eelmise asenduse varukoopiat."""
+    import datetime as _dt
+    import shutil
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    # Tootmises on lehed juba `_page_base_name` järgi: eelmise asenduse varukoopia nimed
+    # langevad kokku praeguse lehestiku nimedega.
+    base = upload_ops._page_base_name(slug, work_id, 1)
+    for ext in ("jpg", "txt", "json"):
+        (work_dir / f"vana-teos_pg_001.{ext}").rename(work_dir / f"{base}.{ext}")
+    repo.git.add("-A", "--", slug)
+    repo.index.commit("Standardnimed")
+
+    class Kell(_dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return _dt.datetime(2026, 11, 25, 12, 0, 0, tzinfo=tz)
+
+    monkeypatch.setattr(upload_ops, "datetime", Kell)
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    def lehestik():
+        return {f.name: f.read_text(encoding="utf-8") for f in sorted(work_dir.glob("*.txt"))}
+
+    kehtiv = lehestik()
+    assert kehtiv
+    _teine_upload(tmp_path, upload_id, "upl999")
+    real_move = shutil.move
+
+    def katkine_move(src, dst, *a, **k):
+        if "._trash" in str(dst):
+            raise OSError("ketas")
+        return real_move(src, dst, *a, **k)
+
+    monkeypatch.setattr(upload_ops.shutil, "move", katkine_move)
+    with pytest.raises(Exception):
+        upload_ops.replace_work_content("upl999", work_id, {}, "admin", background_tasks=None)
+    assert lehestik() == kehtiv
+
+
+def test_hilinenud_taaste_ei_tee_midagi_kui_mark_on_ara(tmp_path, monkeypatch):
+    """(3) Märk eemaldatud (asendus lõpetatud) → hilinenud taaste ei puuduta teost."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert replace_marker.read_marker(slug) is None
+    kutsed = []
+    monkeypatch.setattr(upload_ops, "_after_replace_commit", lambda *a, **k: kutsed.append(a))
+    assert replace_recovery.recover(upload_id, slug) == "cleared"
+    assert kutsed == []
+
+
+def test_asendus_arhiveerib_koik_lehepildid(tmp_path, monkeypatch):
+    """(4) Vanad .JPG/.jpeg/.png lehepildid liiguvad samuti prügikasti (sama reegel mis leheloendil)."""
+    upload_id, work_id, slug, work_dir, data_dir, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    for n in ("vana-teos_pg_002.JPG", "vana-teos_pg_003.jpeg", "vana-teos_pg_004.png"):
+        (work_dir / n).write_bytes(b"vana")
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    for n in ("vana-teos_pg_002.JPG", "vana-teos_pg_003.jpeg", "vana-teos_pg_004.png"):
+        assert not (work_dir / n).exists(), n
+        assert list((data_dir / "._trash").rglob(n)), n
