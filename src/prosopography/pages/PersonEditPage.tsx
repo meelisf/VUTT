@@ -14,7 +14,7 @@ import { useUser } from '../../contexts/UserContext';
 import type { PlaceEntry, ProsopoRecord } from '../types';
 
 import { type FormDraft, type OccupationDraft, type EducationDraft, emptyDraft, emptyDateDraft } from '../components/personForm/types';
-import { recordToDraft, draftToPayload } from '../components/personForm/helpers';
+import { recordToDraft, draftToPayload, rebaseDraft } from '../components/personForm/helpers';
 import DateField from '../components/personForm/DateField';
 import NamesEditor from '../components/personForm/NamesEditor';
 import { legacyBirthNote, personOriginKey } from '../utils/personOrigin';
@@ -284,7 +284,27 @@ const PersonEditPage: React.FC = () => {
         createdIdRef.current = created.id;
       } else {
         const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid, places);
-        await updatePerson(id!, payload, token);
+        try {
+          await updatePerson(id!, payload, token);
+        } catch (e: any) {
+          if (!e?.conflict || !original) throw e;
+          // 409: kaarti muudeti vormi avamise järel (tavaliselt taustarikastus kohe pärast
+          // loomist, vutt:P22mmjb). Varem käskis teade lehe uuesti laadida ja kogu vormi
+          // sisu kadus. Nüüd: värske kaart + kasutaja muudatused väljade kaupa peale.
+          const fresh = await getPerson(id!, token);
+          const { draft: rebased, collisions } = rebaseDraft(
+            recordToDraft(original, places), draft, recordToDraft(fresh, places));
+          setOriginal(fresh);
+          setDraft(rebased);
+          setImageUrl(fresh.image_url ?? null);
+          if (collisions.length) {
+            setError(t('form.conflictCollision', { count: collisions.length }));
+            return false;
+          }
+          // Kokkupõrketa liitmine: kasutaja vajutas juba salvesta — salvestame kohe uuesti.
+          // Teine 409 läheb tavalisse veateesse (`conflictError`, mustand jääb alles).
+          await updatePerson(id!, draftToPayload(rebased, fresh, seisused, konfessioonid, places), token);
+        }
       }
       setIsDirty(false);
       return true;
