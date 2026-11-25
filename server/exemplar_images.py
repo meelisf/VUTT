@@ -35,7 +35,11 @@ UPLOAD_KINDS = frozenset({"url", "photo", "other"})
 EDIT_KINDS = frozenset({"ada", "url", "photo", "other"})
 _MAX = {"label": 500, "page": 200, "ref": 2000, "license": 500}
 _IMAGE_KEYS = ("id", "original", "label", "page", "source")
-_SOURCE_KEYS = ("kind", "ref", "bitstream", "page", "import_id", "license", "added_by", "at")
+_SOURCE_KEYS = ("kind", "ref", "bitstream", "page", "import_id", "license", "added_by", "at",
+                "stem", "upload_id")
+# Serveri allikaliigid (ADR 0089 p 6): endise transkriptsiooni aluse lehed. Klient ei saa neid
+# saata (`UPLOAD_KINDS`/`EDIT_KINDS` ei sisalda) ega muuta (`_merge_image`).
+INTERNAL_KINDS = frozenset({"former_pages"})
 
 
 class ExemplarImagesError(ValueError):
@@ -272,7 +276,7 @@ def _merge_image(stored: dict, incoming: dict) -> dict:
            "label": _text(incoming.get("label"), "label"), "page": _text(incoming.get("page"), "page")}
     old = stored.get("source") or {}
     new = incoming.get("source") if isinstance(incoming.get("source"), dict) else {}
-    if old.get("import_id") and IMPORT_IMMUTABLE_SOURCE:
+    if (old.get("import_id") and IMPORT_IMMUTABLE_SOURCE) or old.get("kind") in INTERNAL_KINDS:
         src = {**old, "license": _text(new.get("license"), "license")}
     else:
         src = {**_client_source(new, EDIT_KINDS), "bitstream": old.get("bitstream")}
@@ -401,6 +405,95 @@ def delete_image(work_dir: str, eid: str, image_id: str, revision, username: str
         d = exemplar_dir(work_dir, eid)
         _move_to_trash(_image_files(work_dir, eid, img), d, trash_root(work_dir, work_id, eid))
         return _with_commit_flag(new, ok)
+
+
+# ── Serveripoolsed abid (aluse vahetus, ADR 0089 p 6) ─────────────────────────
+# Kutsuja (asenduse järelsamm) hoiab `work_lock`-i → siin AINULT `metadata_lock`
+# (`exemplar_locks` võtaks `work_lock`-i uuesti, mis ei ole taassisenetav → ummik).
+# Iga kirjutuse tulemust kontrollitakse: kohustuslik järelsamm ei tohi vaikselt nurjuda.
+
+def _commit_current_locked(work_dir: str, eid: str, current: dict, username: str) -> None:
+    """Kettal olev, aga commitimata manifest (eelmine katse) → commit; muutusteta = no-op."""
+    if os.path.exists(manifest_path(work_dir, eid)) and not write_manifest_locked(
+            work_dir, eid, current, username, f"Eksemplar: manifest (kordus) [{eid}]"):
+        raise ExemplarImagesError("Eksemplari manifesti commit ebaõnnestus", 500)
+
+
+def add_internal(work_dir: str, eid: str, files: list, username: str) -> dict:
+    """Lisab serveri allikaga pildid (`files` = [(failitee, allikas)]). Korduskindel:
+    vahele jäetakse failid, mille `(source.upload_id, source.stem)` on juba manifestis."""
+    today = date.today().isoformat()
+    for _, src in files:
+        if (src or {}).get("kind") not in INTERNAL_KINDS:
+            raise ExemplarImagesError(f"Vigane serveri allikas: {(src or {}).get('kind')}")
+    d = exemplar_dir(work_dir, eid)
+    with metadata_lock:
+        require_exemplar(work_dir, eid)
+        current = read_manifest(work_dir, eid)
+        _commit_current_locked(work_dir, eid, current, username)
+        have = {((i.get("source") or {}).get("upload_id"), (i.get("source") or {}).get("stem"))
+                for i in current["images"]}
+        todo = [(p, src) for p, src in files if (src.get("upload_id"), src.get("stem")) not in have]
+        if not todo:
+            return current
+        taken = {i.get("id") for i in current["images"]}
+        new_images = []
+        for path, src in todo:
+            with open(path, "rb") as f:
+                content = f.read()
+            image_id = _new_image_id(work_dir, eid, taken)
+            taken.add(image_id)
+            try:
+                original = store_image(content, d, image_id)
+            except ImageFileError as e:
+                raise ExemplarImagesError(str(e), e.status)
+            new_images.append({"id": image_id, "original": original,
+                               "source": {**src, "added_by": username, "at": today}})
+        manifest = {**current, "revision": current["revision"] + 1,
+                    "images": current["images"] + new_images}
+        if not write_manifest_locked(work_dir, eid, manifest, username,
+                                     f"Eksemplar: endise aluse lehed {len(new_images)} [{eid}]"):
+            raise ExemplarImagesError("Eksemplari manifesti commit ebaõnnestus", 500)
+        return manifest
+
+
+def _move_strict(paths: list[str], src_root: str, dst_root: str) -> None:
+    """Nagu `_move_to_trash`, aga tõrge on viga (kohustuslik samm)."""
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        dst = os.path.join(dst_root, os.path.relpath(p, src_root))
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.move(p, dst)
+        except OSError as e:
+            raise ExemplarImagesError(f"Eksemplari pilt prügikasti ebaõnnestus ({p}): {e}", 500)
+
+
+def remove_images_internal(work_dir: str, eid: str, image_ids: set, username: str) -> int:
+    """Eemaldab AINULT need ID-d (manifest + commit → failid prügikasti); `imports` ja teised
+    pildid jäävad. Korduskindel: manifestist juba kadunud ID orvud failid viiakse prügikasti."""
+    import glob as _glob
+    ids = set(image_ids or ())
+    d = exemplar_dir(work_dir, eid)
+    with metadata_lock:
+        require_exemplar(work_dir, eid)
+        current = read_manifest(work_dir, eid)
+        _commit_current_locked(work_dir, eid, current, username)
+        removed = [i for i in current["images"] if i.get("id") in ids]
+        if removed:
+            new = {**current, "revision": current["revision"] + 1,
+                   "images": [i for i in current["images"] if i.get("id") not in ids]}
+            if not write_manifest_locked(work_dir, eid, new, username,
+                                         f"Eksemplar: imporditud lähtepildid ära {len(removed)} [{eid}]"):
+                raise ExemplarImagesError("Eksemplari manifesti commit ebaõnnestus", 500)
+        paths = []
+        for iid in ids:
+            paths += _glob.glob(os.path.join(d, f"{_glob.escape(iid)}.*"))
+            paths.append(os.path.join(d, "_thumbs", f"_thumb_{iid}.jpg"))
+        work_id = _read_meta(work_dir).get("id") or os.path.basename(work_dir)
+        _move_strict(paths, d, trash_root(work_dir, work_id, eid))
+        return len(removed)
 
 
 def original_path(work_dir: str, eid: str, image_id: str) -> tuple[Optional[str], Optional[str]]:
