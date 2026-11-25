@@ -85,6 +85,8 @@ hoiatusega edu.
     → tunnistaja → teadmata). Kasutaja valib sihi **ainult teadmata päritoluga lehtedele**
     (üks valik kõigile neile; vaikimisi puudub, kui tunnistajat pole). Teada päritoluga lehti
     ei saa ümber suunata;
+  - kui teosel on osi (ADR 0057): „N osa leheviited tuleb pärast vahetust uuesti määrata"
+    (vt §4 „Teose osad");
   - kui mõni leht on toimetatud (seisund ≠ Toores): punane hoiatus („N lehe toimetatud tekst
     asendub uue OCR-iga; vana tekst jääb ajalukku") ja kinnitusruut.
 - Kinnitus → `POST …/promote` → vastuses `upload_id` → navigeeri `/upload?upload=<upload_id>`
@@ -171,15 +173,34 @@ kirjutust, siis lõpetamine (§5).
 **Commit'i tõrge on `promote` korral viga → taastamine.** Praegune rollback
 (`git checkout old_head -- slug`) jätab alles uued, juba stage'itud failid (kontrollitud
 ajutises repos). Taastamine peab:
-1. eemaldama indeksist ja kettalt failid, mis on `slug` all, aga mitte `old_head`-is
-   (`promote.new_files` + `git diff --name-only old_head -- slug` uued kirjed);
+1. eemaldama indeksist ja kettalt **gitis jälgitavad** failid (`.txt`, `.json`), mis on `slug`
+   all, aga mitte `old_head`-is (`git diff --name-only old_head -- slug` uued kirjed);
 2. `git checkout old_head -- slug`;
-3. tooma vanad JPG-d `promote.trash_dir`-ist tagasi;
+3. **JPG-d eraldi** (need on gitist väljas ja vana ning uus leht kasutavad sama failinime,
+   ülevaatus 3, P1-1): iga vana JPG nime kohta `promote.old_order`-is —
+   - kui fail on `promote.trash_dir`-is → ta jõudis prügikasti; algses asukohas sama nimega
+     fail on **uus** → kustuta see ja too vana prügikastist tagasi;
+   - kui faili `trash_dir`-is ei ole → ta ei jõudnud liikuda; algses asukohas on **vana**
+     original → jäta puutumata;
+   - `promote.new_files`-i JPG, mille nime vanade hulgas pole → kustuta.
+   JPG kustutatakse ainult siis, kui tema vana vaste on kindlasti prügikastis.
+   (`shutil.move` samal failisüsteemil on faili kaupa atomaarne ümbernimetus.)
 4. seadma `promote.phase = "prepared"` (kordus võimalik).
 See parandus kehtib ka tavalise asenduse rollback'ile.
 
-**Katkestuse järel** (protsess suri, `phase == "replacing"`): `finish` / asenduse kordus
-otsustab `work_lock`-i all — kui `git log old_head..HEAD -- slug` sisaldab commit'i treileriga
+**Teose kirjutuste kaitse `replacing` ajal** (ülevaatus 3, P1-2): `work_lock` kaob koos
+protsessiga, aga taastamine peab saama töötada teose seisu peal, mida keegi pole vahepeal
+muutnud. Seepärast kirjutatakse enne esimest failimuutust **püsiv märk**
+`state/work_replacing/{work_id}.json` (`{upload_id, at}`) ja eemaldatakse alles pärast
+`replaced`-faasi jõudmist (lukud vabad, põlvkond kirjas) või taastamise lõppu. Märgi olemasolul
+lükkavad **`page_lock`** ja **`work_lock`** (ainsad teose lehtede kirjutusteede lukud) tagasi
+kõik peale märgi omaniku (asendus/taastamine sama `upload_id`-ga) → 409 „teose lehestik on
+asendamisel". Nii katab kaitse `/save`-i, lehetoimingud, kommentaarid ja asenduse korraga.
+**Serveri käivitusel** (lifespan) leitakse kõik märgid ja käivitatakse nende taastamine/
+tuvastus (allpool) enne, kui märk eemaldatakse. Kehtib kõigile asendustele.
+
+**Katkestuse järel** (protsess suri, `phase == "replacing"`): käivitus / `finish` / asenduse
+kordus otsustab `work_lock`-i all (märgi omanikuna) — kui `git log old_head..HEAD -- slug` sisaldab commit'i treileriga
 `Upload: <upload_id>`, loetakse asendus tehtuks (`phase = "replaced"`, jätka §5); muidu
 tehakse taastamine (ülal) ja `phase = "prepared"`.
 
@@ -190,10 +211,21 @@ iga uue lehe JSON-i serverivälja `content_generation` (uus väärtus asenduse k
 osa kontrolle enne lukku); erinev → 409 „lehestik asendati, laadi leht uuesti" (mitte
 kolmesuunaline liitmine). Kehtib kõigile asendustele.
 
+**Teose osad** (ülevaatus 3, P2): `refresh_work_mentions` → `sync_work_parts` jätab alles
+kõik tüved, mis esinevad ka uues lehestikus — kogu lehestiku vahetusel on need samad
+failinimed teise sisuga, nii et osad viitaksid vaikselt valedele lehtedele. Kogu lehestiku
+asendusel (kõik asendused, mitte ainult `promote`) **nullitakse iga osa `pages`** ja osa saab
+`needs_review: true` (ADR 0057 lubab tühja lehestikuga osa ülevaatuse ootel). Vana seis
+säilib serveriväljas `pages_before_replace: {at, page_numbers: [...]}`, mida osade vaade
+näitab vihjena, kuni toimetaja määrab lehed uuesti (siis väli kustub). Osa muu sisu (pealkiri,
+isikud, kokkuvõte) jääb. Seda tehakse enne `refresh_work_mentions`-it.
+
 **Kaitse pooleli vahetuse ajal:** kuni teosel on `promote` faasis `replacing`/`replaced`,
 lükatakse tagasi (409) seotud eksemplaride (`promote.exemplar_id`, kõik `origins` sihid)
 kustutamine ja selle üleslaadimise kustutamine/tühistamine — muidu ei saaks lõpetamine
-vanu lehti õigesse kohta panna (ülevaatus 2, P1-3).
+vanu lehti õigesse kohta panna (ülevaatus 2, P1-3). Üleslaadimiste nimekiri ja eksemplari
+leht näitavad nuppu „Jätka aluse vahetust" **ka `replacing`-faasis** (mitte ainult
+`replaced`).
 
 ### 5. Lõpetamine ja jätkamine
 
@@ -206,10 +238,15 @@ ja üleslaadimiste nimekirjas nupp „Lõpeta aluse vahetus", kui `phase == "rep
 2. **Vanad lehed eksemplaride piltideks** `promote.trash_dir`-ist `promote.old_order`
    järjekorras, igaüks `promote.origins[stem]` alla. Uus sisemine funktsioon
    `exemplar_images.add_internal(...)` (nagu `add_uploads`, aga serveri allikaliigiga):
-   `source = {kind: "former_pages", ref: old_head, page, stem}`. **Dubleerimise vältimine:**
-   enne lisamist jäetakse vahele tüved, mille kohta sihtmanifestis on juba pilt sama
-   `source.ref` + `source.stem`-iga. `former_pages` on uus serveripoolne liik (ADR 0079),
-   klient seda saata ei saa.
+   `source = {kind: "former_pages", ref: old_head, page, stem, upload_id}`. **Dubleerimise
+   vältimine:** enne iga pildi lisamist loetakse sihtmanifest kettalt uuesti ja jäetakse vahele
+   tüved, mille kohta seal on juba pilt sama `source.upload_id` + `source.stem`-iga.
+   Selleks peab seos olema **püsiv serveriväli** (ülevaatus 3, P1-3): `stem` ja `upload_id`
+   lisatakse `_SOURCE_KEYS`-i (muidu viskab `clean_manifest` need välja) ja `former_pages`
+   allikas on muutumatu nagu impordi oma — `_merge_image` hoiab `kind == "former_pages"`
+   korral salvestatud allika (kliendilt ainult `license`), sest praegu jääb allikas
+   muutumatuks ainult `import_id` olemasolul. `former_pages` on serveripoolne liik (ADR 0079),
+   klient seda saata ei saa (`EDIT_KINDS`, `UPLOAD_KINDS` ei sisalda seda).
 3. **Tunnistaja märge** `promote.exemplar_id`-le olemasoleva eksemplari kirjutusteega (server
    jõustab ühe tunnistaja, ADR 0076 p 3); selle eksemplari `needs_review` eemaldatakse.
 4. **Imporditud lähtepiltide eemaldamine — ainult need, mis said täielikult teose lehtedeks:**
@@ -238,6 +275,8 @@ pooleli"), mitte `imported`. Lõpetamise tõrge salvestab vea state'i ja
   tavalised pildid ilma paarita.
 - Lehenumbreid muutev tee → `refresh_work_mentions` (asendus teeb juba).
 - Lukujärjekord: `work_lock` → `page_lock`-id (tüve järjekorras) → `metadata_lock` → git.
+- `state/work_replacing/{work_id}.json` olemas ⇔ teose lehestik on asendamisel; ainult märgi
+  omanik tohib teose lehti kirjutada.
 - Faasid: `prepared` (teos muutumata, üleslaadimist võib kustutada) → `replacing`
   (failimuutused käivad; kordus tuvastab commit'i treileri järgi) → `replaced` (lehed
   asendatud, lõpetamine pooleli) → `done`.
@@ -252,6 +291,15 @@ pooleli"), mitte `imported`. Lõpetamise tõrge salvestab vea state'i ja
   toimetatud leht → 409; leheluku all toimuv `/save` ootab; metaandmed ja töökollektsioonid
   muutumata; commit'i tõrge → rollback.
 - Aegunud redaktor: vana `content_generation`-iga `/save` → 409.
+- JPG-taastamine: katkestus enne esimese JPG liigutamist (vanad originaalid alles, midagi ei
+  kustutata) ja liigutamise keskel (liikunud tagasi, liikumata puutumata, uued kustutatud).
+- Kirjutuskaitse: `replacing`-märgi ajal `/save`, lehetoiming ja kommentaar → 409; märgi
+  omanik pääseb; serveri käivitus leiab märgi ja taastab/tuvastab.
+- Osad: kogu lehestiku asendus → osade `pages` tühjad, `needs_review`, `pages_before_replace`
+  vana seisuga; lehtede uuesti määramine kustutab vihje (ka tavaline asendus).
+- Dubleerimiskaitse: pärast esimese vana lehe lisamist katkestus → `finish` loeb manifesti
+  kettalt ega lisa sama pilti uuesti; `stem`/`upload_id` püsivad `clean_manifest`-i ja kliendi
+  pildimuudatuse järel.
 - Taastamine: commit'i tõrge → vana seis taastatud, uued stage'itud failid eemaldatud
   (ka tavaline asendus); katkestus `replacing` faasis → kordus tuvastab treileriga commit'i
   või taastab.
@@ -298,8 +346,10 @@ pooleli"), mitte `imported`. Lõpetamise tõrge salvestab vea state'i ja
   teadmata päritoluga lehtedele.
 - Toimetatud lehtede kinnitus on sõrmejäljepõhine ja kontrollitakse asendusel leheluku all
   uuesti.
-- `replace_work_id` sidumine ja aegunud redaktori kaitse tehakse kõigile asendustele, mitte
-  ainult aluse vahetusele (sama viga on olemas ka „Asenda sisu" voos).
+- `replace_work_id` sidumine, aegunud redaktori kaitse, rollback'i parandus, asendusmärk ja
+  osade nullimine tehakse kõigile asendustele, mitte ainult aluse vahetusele (samad vead on
+  olemas ka „Asenda sisu" voos).
+- Osade vana lehestik säilib serveriväljas `pages_before_replace` (mitte toimetaja `notes`-is).
 
 ## Ülevaatus 2026-11-25
 
@@ -327,3 +377,15 @@ kontrolliti koodi vastu:
 | P1 päritolu aegub OCR-i ajal | Kogu vanade lehtede loend + päritolu arvutatakse luku all uuesti → `origins_changed`; seotud eksemplaride ja üleslaadimise kustutuskaitse |
 | P1 lehelukud vabanevad liiga vara | Lukud kuni uue lehestiku + põlvkonna avaldamiseni; `/save` kontrollib olemasolu ja põlvkonda luku sees |
 | P2 sõrmejälg ainult tekstist | Sõrmejälg tekst + `PAGE_FIELDS`; „toimetatud" hõlmab kommentaare/annotatsioone |
+
+## Ülevaatus 3 (2026-11-25, commit `e5680b50` vastu)
+
+Kõik punktid kontrolliti koodi vastu (`_SOURCE_KEYS` ilma `stem`-ita; `_merge_image` hoiab
+allika ainult `import_id` korral; `remap_parts` jätab samad tüved alles):
+
+| Punkt | Parandus |
+|---|---|
+| P1 rollback võib kustutada liikumata vana JPG | JPG-d taastatakse eraldi prügikasti oleku järgi; kustutus ainult siis, kui vana vaste on prügikastis |
+| P1 kirjutused võivad pärast katkestust taastamisega põrkuda | Püsiv märk `state/work_replacing/`; `page_lock`/`work_lock` lükkavad võõrad tagasi; taastamine serveri käivitusel; „Jätka" ka `replacing`-faasis |
+| P1 dubleerimiskaitse võti ei säili | `stem` + `upload_id` `_SOURCE_KEYS`-i; `former_pages` allikas muutumatu; manifest loetakse enne iga lisamist uuesti |
+| P2 osad viitavad valedele lehtedele | Kogu lehestiku asendusel osade `pages` nulli + `needs_review` + `pages_before_replace`; dialoog hoiatab |
