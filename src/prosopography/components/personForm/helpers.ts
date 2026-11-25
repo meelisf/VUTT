@@ -156,6 +156,30 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   return { ...draft, ...patch };
 }
 
+/**
+ * Kolmesuunaline liitmine väljade kaupa: kasutaja mustand (`mine`) värske kaardi
+ * (`theirs`) peale, ühine alus `base` = vormi laadimise seis. Kasutamata väli võtab
+ * serveri väärtuse (nt taustarikastuse täidetud väli), kasutaja muudetud väli jääb.
+ * Kui mõlemad muutsid sama välja eri väärtuseks, jääb kasutaja oma ja väli läheb
+ * `collisions`-i — vorm näitab need enne uut salvestust (409, vutt:P22mmjb).
+ * Võrdlus on tipptaseme välja tervikuna (massiiv/objekt sisu järgi).
+ */
+export function rebaseDraft(base: FormDraft, mine: FormDraft, theirs: FormDraft): {
+  draft: FormDraft;
+  collisions: (keyof FormDraft)[];
+} {
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const draft = { ...theirs } as Record<string, unknown>;
+  const collisions: (keyof FormDraft)[] = [];
+  const keys = new Set([...Object.keys(base), ...Object.keys(mine), ...Object.keys(theirs)]) as Set<keyof FormDraft>;
+  for (const k of keys) {
+    if (same(mine[k], base[k])) continue;           // kasutaja ei puudutanud → serveri oma
+    draft[k] = mine[k];                              // kasutaja muutis → tema oma jääb
+    if (!same(theirs[k], base[k]) && !same(theirs[k], mine[k])) collisions.push(k);
+  }
+  return { draft: draft as unknown as FormDraft, collisions };
+}
+
 export function recordToDraft(p: ProsopoRecord, places: Record<string, PlaceEntry> = {}): FormDraft {
   const ident = (scheme: string) =>
     p.identifiers?.find(i => i.scheme === scheme)?.id ?? '';
