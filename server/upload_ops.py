@@ -590,6 +590,14 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
             status_code=400,
             detail=f"Upload peab olema 'done' või 'reviewing' olekus, praegu: '{current_status}'"
         )
+    # Sidumine (ADR 0089 p 1): URL-i teos peab olema see, mille jaoks üleslaadimine loodi.
+    # Puuduv `replace_work_id` = vana üleslaadimine enne välja tulekut → lase edasi.
+    bound = state.get('replace_work_id')
+    if bound and bound != target_work_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Üleslaadimine on loodud teose {bound} asendamiseks, mitte {target_work_id}",
+        )
 
     # 2. Leia sihtteose kaust
     work_dir = find_directory_by_id(target_work_id)
