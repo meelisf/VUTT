@@ -361,6 +361,7 @@
       "selected_other": "{{count}} pages selected",
       "empty": "No parts yet. Select pages in the grid and create a part.",
       "needsReview": "No pages — review",
+      "pagesBeforeReplace": "Before page replacement: p. {{pages}}",
       "pages_one": "{{count}} page",
       "pages_other": "{{count}} pages",
       "kind": "Kind",

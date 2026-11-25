@@ -563,6 +563,9 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
                                                 username, background_tasks, page_locks=page_locks)
 
 
+from . import work_parts as _work_parts  # noqa: E402  (ADR 0089 p 5)
+
+
 def _update_replace_state(upload_id: str, fn) -> None:
     with _get_upload_lock(upload_id):
         s = _read_state(upload_id)
@@ -720,6 +723,8 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
         "old_jpgs": sorted(f for f in os.listdir(work_dir)
                            if f.endswith('.jpg') and os.path.isfile(os.path.join(work_dir, f))),
         "new_files": new_files,
+        # Osade vihje (ADR 0089 p 5): vana tüvi → lehenumber, enne failide liigutamist.
+        "old_numbers": {stem: i + 1 for i, stem in enumerate(_work_parts.page_stems(work_dir))},
     }
     _write_replace_progress(upload_id, progress)
 
@@ -924,6 +929,14 @@ def _after_replace_commit(upload_id: str, state: dict, work_dir: str, slug: str,
     except (OSError, ValueError):
         work_id = target_work_id
     state_lock = _get_upload_lock(upload_id)
+    # 9a. Osad (ADR 0089 p 5): leheviited nulli ENNE `refresh_work_mentions`-it, mis
+    # muidu jätaks samanimelised (aga teise sisuga) tüved osadesse alles.
+    try:
+        with state_lock:
+            progress = (_read_state(upload_id) or {}).get('replace_progress') or {}
+        _work_parts.reset_parts_for_replace(work_dir, progress.get('old_numbers') or {}, username)
+    except Exception:
+        logger.exception(f"replace {upload_id}: osade leheviidete nullimine ebaõnnestus")
     # 9b. Lehehulk vahetus tervikuna (#626, ADR 0055): vanade lehtede `mentioned`-kirjed
     # ja osade lehetüved tuleb uute lehtede järgi ühtlustada. Enne Meili sünki, et
     # sünk kannaks ühtlustatud osi. Viga logitakse funktsiooni sees, ei visata.

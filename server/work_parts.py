@@ -104,6 +104,15 @@ def _normalize(p: dict, page_stems: set[str]) -> dict:
     langs = p.get("languages")
     if isinstance(langs, list) and langs:
         out["languages"] = [l for l in langs if isinstance(l, str)]
+    # Serveriväli (ADR 0089 p 5): vana lehestik kogu lehestiku asenduse eel — vihje,
+    # kuni lehed määratakse uuesti. Kliendi väärtus eemaldatakse enne (`new_part`,
+    # `_replace_part`), siia jõuab ainult salvestatud kirje oma.
+    pbr = p.get(PAGES_BEFORE_REPLACE)
+    if not out["pages"] and isinstance(pbr, dict):
+        out[PAGES_BEFORE_REPLACE] = {
+            "at": str(pbr.get("at") or ""),
+            "page_numbers": [n for n in pbr.get("page_numbers") or [] if isinstance(n, int)],
+        }
     return out
 
 
@@ -139,12 +148,16 @@ def _with_anchor(data: dict, previous: Optional[dict] = None) -> dict:
     return out
 
 
+PAGES_BEFORE_REPLACE = "pages_before_replace"
+
+
 def new_part(data: dict, existing_ids: set[str]) -> dict:
-    """Uus osa: server annab id; kliendi id ja needs_review ignoreeritakse."""
+    """Uus osa: server annab id; kliendi id, needs_review ja serveriväljad ignoreeritakse."""
     pid = generate_nanoid(6)
     while pid in existing_ids:
         pid = generate_nanoid(6)
-    return {**{k: v for k, v in _with_anchor(data).items() if k not in ("id", "needs_review")},
+    return {**{k: v for k, v in _with_anchor(data).items()
+               if k not in ("id", "needs_review", PAGES_BEFORE_REPLACE)},
             "id": pid, "needs_review": False}
 
 
@@ -289,9 +302,51 @@ def create_part(work_dir: str, data: dict, username: str, background_tasks=None)
 def _replace_part(parts: list, part_id: str, data: dict) -> list:
     i = _find(parts, part_id)
     keep = {"id": part_id, "needs_review": parts[i].get("needs_review", False)}
+    # Asenduse-eelne vihje jääb, kuni lehti pole määratud (ADR 0089 p 5).
+    if parts[i].get(PAGES_BEFORE_REPLACE) and not data.get("pages"):
+        keep[PAGES_BEFORE_REPLACE] = parts[i][PAGES_BEFORE_REPLACE]
     data = _with_anchor(data, parts[i])
-    parts[i] = {**{k: v for k, v in data.items() if k not in ("id", "needs_review")}, **keep}
+    parts[i] = {**{k: v for k, v in data.items()
+                   if k not in ("id", "needs_review", PAGES_BEFORE_REPLACE)}, **keep}
     return parts
+
+
+def reset_parts_for_replace(work_dir: str, old_numbers: dict, username: str) -> bool:
+    """Kogu lehestiku asendus (ADR 0089 p 5): iga osa `pages = []`, `needs_review`,
+    vana seis `pages_before_replace`-is. Uued lehed kasutavad samu tüvesid teise sisuga,
+    nii et `sync_work_parts` jätaks osad vaikselt valedele lehtedele.
+
+    Korratav (taaste kordab asenduse järelsamme): juba nullitud osa jääb puutumata.
+    Kutsuja hoiab `work_lock`-i — seda siin EI võeta (lukk ei ole taassisenetav).
+    Tagastab, kas midagi kirjutati.
+    """
+    import json
+    from datetime import datetime, timezone
+    from .metadata_ops import bulk_update_works
+    meta_path = os.path.join(work_dir, "_metadata.json")
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            parts = (json.load(f) or {}).get("parts") or []
+    except FileNotFoundError:
+        return False
+    if not any(p.get("pages") for p in parts if isinstance(p, dict)):
+        return False
+    at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    def transform(meta: dict) -> dict:
+        out = []
+        for p in meta.get("parts") or []:
+            if not p.get("pages"):
+                out.append(p)
+                continue
+            nums = sorted(old_numbers[s] for s in p["pages"] if s in old_numbers)
+            out.append({**p, "pages": [], "needs_review": True,
+                        PAGES_BEFORE_REPLACE: {"at": at, "page_numbers": nums}})
+        return {"parts": out}
+
+    res = bulk_update_works([(meta_path, transform)], username,
+                            "Osad: lehestik asendati, leheviited vajavad ülevaatust", call_ptw=True)
+    return bool(res.get("updated"))
 
 
 def update_part(work_dir: str, part_id: str, data: dict, username: str, background_tasks=None) -> dict:
