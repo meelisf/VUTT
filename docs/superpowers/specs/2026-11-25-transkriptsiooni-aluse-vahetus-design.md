@@ -1,7 +1,7 @@
 # Transkriptsiooni aluse vahetus teise eksemplari vastu — disain
 
-**Seis:** disain, kinnitamata (2026-11-25; parandatud sama päeva ülevaatuse järel, vt
-[Ülevaatus](#ülevaatus-2026-11-25)). Seotud: [ADR 0076](../../decisions/0076-eksemplari-kiht.md)
+**Seis:** disain; kasutaja kinnitas otsused 2026-11-25; parandatud kahe ülevaatuse järel (vt
+lõppu). Seotud: [ADR 0076](../../decisions/0076-eksemplari-kiht.md)
 (eksemplari kiht, p 3 tekstitunnistaja, p 4 lehtede päritolu),
 [ADR 0079](../../decisions/0079-eksemplari-pildid.md) (eksemplari pildid),
 [ADR 0030](../../decisions/0030-page-map-lahteleht-valjundlehtedeks.md) (`page_map`), [ADR 0054](../../decisions/0054-lehe-salvestus-liidab-baasseisu-vastu.md) (`/save` kolmesuunaline
@@ -96,8 +96,11 @@ hoiatusega edu.
 ### 2. Eelvaade ja loomine (backend)
 
 `GET /admin/work/{work_id}/exemplars/{eid}/promote/preview` → `{pages: [{stem, page, status,
-origin: exemplar_id|null, fingerprint}], edited: [...], images: n}`. `fingerprint` = lehe
-`.txt` sisu räsi (sama, mida `/save` kasutab `base`-i võrdlemiseks, ADR 0054).
+origin: exemplar_id|null, fingerprint}], edited: [...], images: n}`. `fingerprint` = räsi
+lehe **kogu toimetatavast seisust**: tekst + `page_merge.PAGE_FIELDS` (`status`, `page_tags`,
+`comments`, `text_annotations`) kanoonilisel kujul (`page_merge._kanooniline`). Ainult `.txt`
+räsi ei katks kommentaaride, märgendite ega annotatsioonide muutust, mis asendusega samuti
+kaovad (ülevaatus 2, P2). „Toimetatud" = seisund ≠ Toores VÕI kommentaare/annotatsioone on.
 
 `POST /admin/work/{work_id}/exemplars/{eid}/promote`, keha
 `{unknown_target: exemplar_id|null, confirmed_edited: {stem: fingerprint}}`. Sync `def`
@@ -119,9 +122,10 @@ origin: exemplar_id|null, fingerprint}], edited: [...], images: n}`. `fingerprin
    ```
    {exemplar_id, source_images: [{page: N, image_id}], manifest_revision,
     origins: {stem: exemplar_id},          # lahendatud enne nullimist; teadmata → unknown_target
+    unknown_target,
     confirmed_edited: {stem: fingerprint},
     requested_by, at,
-    phase: "prepared"}                     # → "replaced" → "done" (§5)
+    phase: "prepared"}                     # → "replacing" → "replaced" → "done" (§4–5)
    ```
 
 Midagi teoses ei muutu enne asendust: pooleli jäetud vahetus = tavaline kustutatav
@@ -139,26 +143,57 @@ Poolitus/kärbe, apply → OCR LOSSis, ülevaatus — kõik olemasolev (ADR 0028
 1. URL-i `work_id` == state'i `replace_work_id` (kehtib KÕIGILE asendustele, mitte ainult
    `promote`-ile) → muidu 409.
 2. Lähte- ja sihteksemplarid on olemas.
-3. **Toimetatud lehtede kontroll leheluku all:** võetakse kõigi vanade lehtede `page_lock`
-   (järjekord: `work_lock` → lehelukud tüve järjekorras; `/save` võtab ainult lehe luku, seega
-   tsüklit ei teki) ja hoitakse kuni vanade lehtede eemaldamiseni. Luku all arvutatakse
-   toimetatud lehtede sõrmejäljed uuesti; kui need erinevad `promote.confirmed_edited`-ist →
-   409 `edited_pages_changed`, klient küsib uuesti (uus kinnitus kirjutatakse state'i, siis
-   kordus).
+3. **Lehelukud:** võetakse kõigi vanade lehtede `page_lock` (järjekord: `work_lock` →
+   lehelukud tüve järjekorras; `/save` võtab ainult lehe luku, seega tsüklit ei teki). Lukke
+   **hoitakse kuni uue lehestiku ja tema `content_generation`-i avaldamiseni või vana seisu
+   taastamiseni** — mitte ainult vanade failide eemaldamiseni (ülevaatus 2, P1-4).
+4. Luku all arvutatakse uuesti:
+   - toimetatud lehtede sõrmejäljed → erinevad `promote.confirmed_edited`-ist → 409
+     `edited_pages_changed`;
+   - **kogu vanade lehtede loend ja päritolu** (ADR 0076 p 4) → erinevad `promote.origins`-ist
+     (OCR-i ajal lisatud leht, ümber määratud päritolu) → 409 `origins_changed` uue eelvaatega.
+   Klient näitab muutunud lehed, küsib uue kinnituse (ja teadmata lehtedele sihi), kirjutab
+   selle state'i ja kordab asendust (ülevaatus 2, P1-3).
+
+**Taasteinfo enne esimest failimuutust** (ülevaatus 2, P1-1): kontrollide järel, enne paaride
+eemaldamist, kirjutatakse state'i `promote.phase = "replacing"`, `promote.old_head`,
+`promote.trash_dir` (ette määratud tee), `promote.old_order` (vanad tüved lehtede järjekorras,
+`enumerate_page_images`) ja `promote.new_files` (failid, mida asendus kirjutab — teada
+importavate lehtede loendist). Alles siis algavad failimuutused.
 
 Seejärel olemasolev asendus **ilma metaandmete ja töökollektsioonide sammuta** (`promote`
 korral jäetakse `state['meta']`-st kirjutamine ja `work_sets` lisamine vahele): paarid ära,
-vanad JPG-d `._trash/{work_id}/replaced_content/{ts}/`, git rm, uued lehed, commit.
-**Commit'i tõrge on `promote` korral viga** (rollback nagu git rm vea puhul), mitte hoiatus.
-Kui commit õnnestus: `promote.phase = "replaced"`, `promote.trash_dir`,
-`promote.old_head` (asenduse-eelne HEAD), `promote.old_order` (vanad tüved lehtede
-järjekorras, `enumerate_page_images` enne liigutamist) kirjutatakse state'i. Siis lõpetamine (§5).
+vanad JPG-d `promote.trash_dir`-i, git rm, uued lehed, commit. **Commit'i sõnum kannab
+treilerit `Upload: <upload_id>`** — sellest tuvastab kordus, et commit on tehtud.
+Commit õnnestus → `promote.phase = "replaced"`, lukud vabanevad pärast `content_generation`-i
+kirjutust, siis lõpetamine (§5).
+
+**Commit'i tõrge on `promote` korral viga → taastamine.** Praegune rollback
+(`git checkout old_head -- slug`) jätab alles uued, juba stage'itud failid (kontrollitud
+ajutises repos). Taastamine peab:
+1. eemaldama indeksist ja kettalt failid, mis on `slug` all, aga mitte `old_head`-is
+   (`promote.new_files` + `git diff --name-only old_head -- slug` uued kirjed);
+2. `git checkout old_head -- slug`;
+3. tooma vanad JPG-d `promote.trash_dir`-ist tagasi;
+4. seadma `promote.phase = "prepared"` (kordus võimalik).
+See parandus kehtib ka tavalise asenduse rollback'ile.
+
+**Katkestuse järel** (protsess suri, `phase == "replacing"`): `finish` / asenduse kordus
+otsustab `work_lock`-i all — kui `git log old_head..HEAD -- slug` sisaldab commit'i treileriga
+`Upload: <upload_id>`, loetakse asendus tehtuks (`phase = "replaced"`, jätka §5); muidu
+tehakse taastamine (ülal) ja `phase = "prepared"`.
 
 **Uutel lehtedel on sama tüvi kui vanadel** → aegunud redaktori kaitse: asendus kirjutab
 iga uue lehe JSON-i serverivälja `content_generation` (uus väärtus asenduse kohta; lisatakse
-`SERVERIPOOLSED_LEHE_VALJAD`-i). Redaktor saadab laetud lehe põlvkonna `/save`-ga; erinev →
-409 „lehestik asendati, laadi leht uuesti" (mitte kolmesuunaline liitmine). Kehtib kõigile
-asendustele.
+`SERVERIPOOLSED_LEHE_VALJAD`-i). Redaktor saadab laetud lehe põlvkonna `/save`-ga.
+**`/save` kontrollib lehe olemasolu ja põlvkonda leheluku SEES** (praegu lahendatakse tee ja
+osa kontrolle enne lukku); erinev → 409 „lehestik asendati, laadi leht uuesti" (mitte
+kolmesuunaline liitmine). Kehtib kõigile asendustele.
+
+**Kaitse pooleli vahetuse ajal:** kuni teosel on `promote` faasis `replacing`/`replaced`,
+lükatakse tagasi (409) seotud eksemplaride (`promote.exemplar_id`, kõik `origins` sihid)
+kustutamine ja selle üleslaadimise kustutamine/tühistamine — muidu ei saaks lõpetamine
+vanu lehti õigesse kohta panna (ülevaatus 2, P1-3).
 
 ### 5. Lõpetamine ja jätkamine
 
@@ -177,8 +212,13 @@ ja üleslaadimiste nimekirjas nupp „Lõpeta aluse vahetus", kui `phase == "rep
    klient seda saata ei saa.
 3. **Tunnistaja märge** `promote.exemplar_id`-le olemasoleva eksemplari kirjutusteega (server
    jõustab ühe tunnistaja, ADR 0076 p 3); selle eksemplari `needs_review` eemaldatakse.
-4. **Imporditud lähtepiltide eemaldamine — ainult need, mis said teose lehtedeks:** lähteleht
-   N on imporditud, kui `page_map[N]` on mittetühi (ADR 0030); tema `image_id` tuleb
+4. **Imporditud lähtepiltide eemaldamine — ainult need, mis said täielikult teose lehtedeks:**
+   `page_map[N]` (ADR 0030) annab lähtelehe N **loodud** väljundid; asendus jätab ülevaatusel
+   kustutatud (`deleted`) väljundid välja. Seepärast salvestatakse asendusel state'i
+   `promote.committed_outputs` (commit'itud väljundlehed). Lähteleht N eemaldatakse ainult
+   siis, kui **kõik** `page_map[N]` väljundid on commit'itud: kärbitud väljalõige (üks
+   väljund) → eemaldatakse (originaal jääb prügikasti ja ADA-sse); topeltlehe üks pool
+   kustutatud → lähtepilt **jääb alles** (ülevaatus 2, P1-2). Tema `image_id` tuleb
    `promote.source_images`-ist. Eemaldatakse ainult need ID-d (prügikasti, uus
    `exemplar_images.remove_images_internal(ids)`), mitte kogu manifest:
    `remove_exemplar_images_locked` on eksemplari kustutuse jaoks ja viiks ka impordikirjed.
@@ -198,6 +238,9 @@ pooleli"), mitte `imported`. Lõpetamise tõrge salvestab vea state'i ja
   tavalised pildid ilma paarita.
 - Lehenumbreid muutev tee → `refresh_work_mentions` (asendus teeb juba).
 - Lukujärjekord: `work_lock` → `page_lock`-id (tüve järjekorras) → `metadata_lock` → git.
+- Faasid: `prepared` (teos muutumata, üleslaadimist võib kustutada) → `replacing`
+  (failimuutused käivad; kordus tuvastab commit'i treileri järgi) → `replaced` (lehed
+  asendatud, lõpetamine pooleli) → `done`.
 
 ## Testid (ehitajale)
 
@@ -209,9 +252,17 @@ pooleli"), mitte `imported`. Lõpetamise tõrge salvestab vea state'i ja
   toimetatud leht → 409; leheluku all toimuv `/save` ootab; metaandmed ja töökollektsioonid
   muutumata; commit'i tõrge → rollback.
 - Aegunud redaktor: vana `content_generation`-iga `/save` → 409.
+- Taastamine: commit'i tõrge → vana seis taastatud, uued stage'itud failid eemaldatud
+  (ka tavaline asendus); katkestus `replacing` faasis → kordus tuvastab treileriga commit'i
+  või taastab.
+- Lukud: `/save`, mis ootab lehelukku asenduse ajal, saab pärast 409 (põlvkond) — mitte
+  vana teksti liitmist uuele lehele; olemasolu kontroll luku sees.
+- `origins_changed`: OCR-i ajal lisatud leht / muudetud erandleht → 409 + uus kinnitus.
+- Sõrmejälg: ainult kommentaari/annotatsiooni muutus → 409 `edited_pages_changed`.
+- Kustutuskaitse: seotud eksemplari või üleslaadimise kustutus `replacing`/`replaced` ajal → 409.
 - Lõpetamine: vanad lehed õige päritolu eksemplari all õiges järjekorras; korduskäivitus ei
-  dubleeri; tunnistaja vahetunud (täpselt üks); ainult `page_map`-is esinenud lähtepildid
-  eemaldatud, välja jäetud ja hiljem lisatud alles, `imports` alles; katkestus iga sammu järel
+  dubleeri; tunnistaja vahetunud (täpselt üks); ainult täielikult commit'itud lähtepildid
+  eemaldatud (pool topeltlehest kustutatud → alles), välja jäetud ja hiljem lisatud alles, `imports` alles; katkestus iga sammu järel
   → `finish` lõpetab.
 - Frontend: nupu nähtavus; dialoog (päritolu, teadmata sihi valik, kinnitusruut); `?upload=`
   jätkab õiget üleslaadimist; metaandmete vormi pole; „Lõpeta aluse vahetus".
@@ -241,8 +292,8 @@ pooleli"), mitte `imported`. Lõpetamise tõrge salvestab vea state'i ja
 
 ## Minu otsused (kasutaja kinnitab disaini lugedes)
 
-- Lähteeksemplari pildid, mis said teose lehtedeks, eemaldatakse (prügikasti); välja jäetud
-  jäävad.
+- Lähteeksemplari pildid, mis said **täielikult** teose lehtedeks, eemaldatakse (prügikasti);
+  välja jäetud ja osaliselt imporditud (topeltlehe üks pool kustutatud) jäävad.
 - Teada päritoluga vana leht läheb alati oma eksemplari alla; kasutaja valib sihi ainult
   teadmata päritoluga lehtedele.
 - Toimetatud lehtede kinnitus on sõrmejäljepõhine ja kontrollitakse asendusel leheluku all
@@ -263,3 +314,16 @@ leiti paikapidavaks; parandused selles versioonis:
 | P1 metaandmed | `promote` korral metaandmete ja töökollektsioonide samm vahele; vormi ei näidata |
 | P2 vanade lehtede päritolu | Päritolu lahendatakse enne nullimist lehe kaupa; valik ainult teadmata lehtedele |
 | Otspunkti sidumine | URL-i `work_id` == `replace_work_id`, eksemplaride kontroll luku all |
+
+## Ülevaatus 2 (2026-11-25, commit `91fab499` vastu)
+
+Kasutaja kinnitas „Minu otsused" (2026-11-25). Teise agendi teine ülevaatus; kõik punktid
+kontrolliti koodi vastu:
+
+| Punkt | Parandus |
+|---|---|
+| P1 taasteinfo salvestatakse liiga hilja; rollback jätab uued failid | `replacing` faas + taasteinfo enne esimest failimuutust; commit'i treiler `Upload:`; taastamine eemaldab uued failid (kehtib ka tavalisele asendusele) |
+| P1 `page_map` ≠ commit'itud väljundid | `committed_outputs`; eemaldus ainult kui kõik väljundid commit'itud; osaline → alles |
+| P1 päritolu aegub OCR-i ajal | Kogu vanade lehtede loend + päritolu arvutatakse luku all uuesti → `origins_changed`; seotud eksemplaride ja üleslaadimise kustutuskaitse |
+| P1 lehelukud vabanevad liiga vara | Lukud kuni uue lehestiku + põlvkonna avaldamiseni; `/save` kontrollib olemasolu ja põlvkonda luku sees |
+| P2 sõrmejälg ainult tekstist | Sõrmejälg tekst + `PAGE_FIELDS`; „toimetatud" hõlmab kommentaare/annotatsioone |
