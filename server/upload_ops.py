@@ -548,17 +548,19 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
     from .admin_page_ops import work_lock
     from .utils import find_directory_by_id
 
+    from contextlib import ExitStack
     from .replace_marker import marker_owner
 
     work_dir = find_directory_by_id(target_work_id)
     # Selle lõime kirjutused kuuluvad asendusele: asendusmärk (ADR 0089 p 2) laseb läbi.
-    with marker_owner(upload_id):
+    # `page_locks`: vanade lehtede lukud (ADR 0089 p 4) vabanevad ka ootamatu erindi korral.
+    with marker_owner(upload_id), ExitStack() as page_locks:
         if not work_dir:
             return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
-                                                username, background_tasks)
+                                                username, background_tasks, page_locks=page_locks)
         with work_lock(os.path.basename(work_dir), work_dir):
             return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
-                                                username, background_tasks)
+                                                username, background_tasks, page_locks=page_locks)
 
 
 def _update_replace_state(upload_id: str, fn) -> None:
@@ -586,7 +588,7 @@ def _clear_replace_progress(upload_id: str) -> None:
 
 
 def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_updates: dict,
-                                 username: str, background_tasks) -> dict:
+                                 username: str, background_tasks, page_locks=None) -> dict:
     """
     Asendab olemasoleva teose sisu uue OCR-itud materjaliga.
 
@@ -721,10 +723,21 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     }
     _write_replace_progress(upload_id, progress)
 
+    # Vanade lehtede lukud (ADR 0089 p 4): `/save`, mis juba ootab lehe lukku, ei tohi
+    # sattuda hetke, kus vana leht on läinud ja uut põlvkonda pole veel kettal. Lukud
+    # vabanevad alles pärast uute lehtede JSON-ide kirjutust või vana seisu taastamist.
+    from contextlib import ExitStack
+    from .page_locks import page_lock
+    if page_locks is None:
+        page_locks = ExitStack()
+    for fname in sorted(f for f in os.listdir(work_dir) if f.endswith('.txt')):
+        page_locks.enter_context(page_lock(os.path.join(work_dir, fname)))
+
     def _rollback():
         replace_recovery.restore_replace(work_dir, progress, repo)
         _clear_replace_progress(upload_id)
         replace_marker.remove_marker(slug)
+        page_locks.close()
         logger.info(f"replace {upload_id}: vana sisu taastatud (head={old_head[:8]})")
 
     destructive_started = True
@@ -793,7 +806,9 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                 raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); asendus katkestati")
             os.chmod(local_txt, 0o644)
 
-            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
+            # `content_generation` (ADR 0089 p 4): vana lehe pealt avatud redaktor saab 409.
+            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": [],
+                         "content_generation": upload_id}
             with open(local_json, 'w', encoding='utf-8') as fh:
                 json.dump(page_json, fh, ensure_ascii=False, indent=2)
             os.chmod(local_json, 0o644)
@@ -804,6 +819,8 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
 
         if downloaded == 0:
             raise ValueError("Ühtegi lehekülge ei õnnestunud alla laadida")
+        # Uued lehed koos põlvkonnaga kettal → vanade lehtede lukud vabaks.
+        page_locks.close()
 
     except (ValueError, Exception) as e:
         # Rollback: taasta git-jälgitud failid ja JPG-d kui destruktiivsed sammud alustasid

@@ -50,3 +50,16 @@ describe('/save vea teade', () => {
     await expect(savePage(page)).rejects.toThrow('File server error: 500');
   });
 });
+
+// ADR 0089 p 4: lehestiku asenduse põlvkond — vana lehe pealt avatud redaktor saab 409.
+describe('/save saadab lehe põlvkonna', () => {
+  it('Meili lehedokumendi põlvkond läheb payloadi tipptasemele', async () => {
+    await savePage({ ...page, content_generation: 'u2' } as unknown as Page);
+    expect(sentBody().content_generation).toBe('u2');
+  });
+  it('põlvkonnata leht saadab null-i (võti alati olemas)', async () => {
+    await savePage(page);
+    expect('content_generation' in sentBody()).toBe(true);
+    expect(sentBody().content_generation).toBeNull();
+  });
+});

@@ -540,6 +540,8 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "comments": _normalize_comment_texts(page_meta['comments']),
         "text_annotations": page_meta['text_annotations'],
         "history": page_meta['history'],
+        # Lehestiku asenduse põlvkond (ADR 0089 p 4) — KUVA/REDAKTOR, ei otsita ega filtreerita.
+        "content_generation": page_meta.get('content_generation'),
         "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
         "tags": get_primary_labels(tags),
         "tags_et": get_labels_by_lang(tags, 'et', labels_store),
@@ -859,6 +861,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
             'text_annotations': [],
             'status': 'Toores',
             'history': [],
+            'content_generation': None,
         }
         if os.path.exists(json_path):
             try:
@@ -871,6 +874,8 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
                     page_meta['text_annotations'] = source.get('text_annotations', [])
                     page_meta['status'] = source.get('status', 'Toores')
                     page_meta['history'] = source.get('history', [])
+                    # Lehe põlvkond (ADR 0089 p 4): redaktor saadab selle /save-ga tagasi.
+                    page_meta['content_generation'] = file_json.get('content_generation') or source.get('content_generation')
                     # JSON text_content on fallback ainult kui .txt puudub/tühi.
                     if not page_text and 'text_content' in file_json:
                         page_text = file_json['text_content']

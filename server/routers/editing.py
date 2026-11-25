@@ -53,7 +53,7 @@ router = APIRouter()
 # Võtmed, mille SERVER kirjutab ja mida klient ei saada tagasi. Ilma nendeta
 # pühiks iga redaktori salvestus need vaikselt ära — miski ei kuku, andmed
 # lihtsalt kaovad. Uus serveripoolne lehe-väli LISATAKSE SIIA.
-SERVERIPOOLSED_LEHE_VALJAD = ("sequence", "source")
+SERVERIPOOLSED_LEHE_VALJAD = ("sequence", "source", "content_generation")
 
 
 def merge_serveripoolsed_valjad(olemasolev: dict, kliendilt: dict) -> dict:
@@ -155,7 +155,25 @@ def _viimane_muutja(catalog, filename):
     return {"author": ajalugu[0]["author"], "date": ajalugu[0]["date"]}
 
 
-def _save_page_locked(txt_path, text, client_meta, username, base=None, message=None):
+_POLVKOND_PUUDUB = object()
+
+LEHESTIK_ASENDATI = ("Teose lehestik asendati vahepeal — laadi leht uuesti. / "
+                     "The work's pages were replaced in the meantime — please reload.")
+
+
+def _disk_generation(json_path: str):
+    try:
+        j = _read_json_file(json_path)
+    except Exception:
+        return None
+    if not isinstance(j, dict):
+        return None
+    inner = j.get("meta_content") if isinstance(j.get("meta_content"), dict) else {}
+    return j.get("content_generation") or inner.get("content_generation")
+
+
+def _save_page_locked(txt_path, text, client_meta, username, base=None, message=None,
+                      client_generation=_POLVKOND_PUUDUB):
     """Lehe kirjutus lehe luku all (#416): serveripoolsete väljade liitmine,
     muutusteta kontroll ja kirjutus näevad sama seisu.
 
@@ -173,6 +191,15 @@ def _save_page_locked(txt_path, text, client_meta, username, base=None, message=
     additional = []
     isikud_enne = isikud_parast = set()
     with page_lock(txt_path):
+        # Olemasolu ja põlvkond SAMA leheluku all (ADR 0089 p 4): asendus vahetab lehed
+        # luku all; enne lukku tehtud kontroll võis näha vana lehte.
+        work_dir = os.path.dirname(txt_path)
+        require_existing_page(os.path.dirname(work_dir), os.path.basename(work_dir),
+                              os.path.basename(txt_path))
+        if client_generation is not _POLVKOND_PUUDUB:
+            disk_gen = _disk_generation(os.path.splitext(txt_path)[0] + ".json")
+            if (client_generation or None) != (disk_gen or None):
+                raise HTTPException(status_code=409, detail=LEHESTIK_ASENDATI)
         if client_meta:
             json_path = os.path.splitext(txt_path)[0] + ".json"
             meta_content = client_meta
@@ -224,7 +251,8 @@ def _proposal_ref(proposal, catalog, filename, owner=None):
     return proposal["id"], proposal["stem"]
 
 
-def _save_with_proposal(ref, txt_path, text, client_meta, username, base):
+def _save_with_proposal(ref, txt_path, text, client_meta, username, base,
+                        client_generation=_POLVKOND_PUUDUB):
     """Lukujärjekord: ettepaneku lukk → lehe lukk (`_save_page_locked` sees) → git.
     Olek muutub ainult eduka salvestuse järel; 409 jätab ettepaneku ootele."""
     pid, stem = ref
@@ -232,7 +260,8 @@ def _save_with_proposal(ref, txt_path, text, client_meta, username, base):
         with page_lock(txt_path):
             enne = normalize_page_text(page_text_proposals.read_raw(txt_path))
         tulemus = _save_page_locked(txt_path, text, client_meta, username, base,
-                                    message=f"MCP-ettepanek {pid}: {os.path.relpath(txt_path, BASE_DIR)}")
+                                    message=f"MCP-ettepanek {pid}: {os.path.relpath(txt_path, BASE_DIR)}",
+                                    client_generation=client_generation)
         with page_lock(txt_path):
             parast = page_text_proposals.read_raw(txt_path)
         if tulemus[0] is None or parast == enne:
@@ -282,16 +311,18 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
         proposal_ref = await run_in_threadpool(_proposal_ref, data['proposal'], catalog, filename, owner)
         if proposal_ref is None:
             proposal_state = "already_decided"
+    # Lehe põlvkond (ADR 0089 p 4): ainult siis, kui klient võtme saatis (vana kimp ei saada).
+    client_generation = data['content_generation'] if 'content_generation' in data else _POLVKOND_PUUDUB
     try:
         if proposal_ref:
             (git_result, merged_page, isikud_muutusid), proposal_state = await run_in_threadpool(
                 _save_with_proposal, proposal_ref, txt_path, text, data.get('meta_content'),
-                user['username'], data.get('base'),
+                user['username'], data.get('base'), client_generation,
             )
         else:
             git_result, merged_page, isikud_muutusid = await run_in_threadpool(
                 _save_page_locked, txt_path, text, data.get('meta_content'), user['username'],
-                data.get('base'),
+                data.get('base'), None, client_generation,
             )
     except _PageConflict as e:
         # Ketas puutumata; klient näitab konfliktidialoogi (#455).

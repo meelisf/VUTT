@@ -319,6 +319,8 @@ export interface Page {
   text_annotations: TextAnnotation[];
   page_tags: (string | LinkedEntity)[];      // Changed from tags
   history: HistoryEntry[];
+  /** Lehestiku asenduse põlvkond (ADR 0089 p 4); null = lehte pole asendatud. */
+  content_generation?: string | null;
 
   // =========================================================
   // V2 TEOSE ANDMED (denormaliseeritud) - KASUTA NEID

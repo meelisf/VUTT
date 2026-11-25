@@ -134,6 +134,8 @@ export const normalizePage = (hit: any): Page => {
         typeof t === 'string' ? t.toLowerCase() : t
       ))),
     history: hit.history || [],
+    // Lehestiku asenduse põlvkond (ADR 0089 p 4): /save saadab tagasi.
+    content_generation: hit.content_generation ?? null,
     // Denormaliseeritud teose andmed
     title: hit.title,
     title_en: hit.title_en || undefined,

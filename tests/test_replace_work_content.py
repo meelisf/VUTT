@@ -251,7 +251,7 @@ def test_asendus_hoiab_teose_lukku(tmp_path, monkeypatch):
     monkeypatch.setattr(utils, "find_directory_by_id", lambda wid: str(work_dir))
     seen = []
     monkeypatch.setattr(upload_ops, "_replace_work_content_locked",
-                        lambda *a: seen.append(admin_page_ops._get_thread_lock(work_dir.name).locked()) or {})
+                        lambda *a, **k: seen.append(admin_page_ops._get_thread_lock(work_dir.name).locked()) or {})
     upload_ops.replace_work_content("u1", "w1", {}, "admin", None)
     assert seen == [True]
     assert not admin_page_ops._get_thread_lock(work_dir.name).locked()

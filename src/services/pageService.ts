@@ -45,6 +45,8 @@ const saveToFileSystem = async (
       original_path: original_catalog,
       file_name: textFilename,
       work_id: page.work_id,
+      // Lehestiku asenduse põlvkond (ADR 0089 p 4): erinev → 409 „laadi leht uuesti".
+      content_generation: page.content_generation ?? null,
       // Kolmesuunalise liitmise baas (#455, ADR 0054)
       ...(base ? { base } : {}),
       // Agendi tekstiettepaneku kinnitus (#641) — agendi õigusega toimetaja (#869)
