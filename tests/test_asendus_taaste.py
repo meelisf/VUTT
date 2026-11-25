@@ -201,3 +201,51 @@ def test_recover_all_kaivitusel(monkeypatch):
     monkeypatch.setattr(replace_recovery, "recover", lambda uid, slug: kutsed.append((uid, slug)) or "restored")
     replace_recovery.recover_all()
     assert kutsed == [("u1", "a"), ("u2", "b")]
+
+
+def test_ootamatu_erind_ei_jata_teost_lukku(tmp_path, monkeypatch):
+    """JPG liigutamise tõrge (väljaspool taasteteid) → vana seis taastatud, märk ära kohe,
+    mitte alles serveri järgmisel käivitusel."""
+    import shutil
+    upload_id, work_id, slug, work_dir, _dd, _repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    orig_move = shutil.move
+    kord = {"n": 0}
+
+    def katkine_move(src, dst, *a, **k):
+        kord["n"] += 1
+        if kord["n"] == 1 and str(src).endswith(".jpg") and "._trash" in str(dst):
+            raise OSError("ketas täis")
+        return orig_move(src, dst, *a, **k)
+
+    monkeypatch.setattr(upload_ops.shutil, "move", katkine_move)
+    with pytest.raises(OSError):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert replace_marker.read_marker(slug) is None
+    assert "replace_progress" not in _state(upload_id)
+    assert (work_dir / "vana-teos_pg_001.jpg").read_bytes() == b"vana jpg"
+
+
+def test_jarelsammu_torge_ei_jata_teost_lukku(tmp_path, monkeypatch):
+    """Commit tehtud, järelsamm kukub → märk ära, faas `replaced` (teos on uue lehestikuga)."""
+    from server.prosopography import relations
+    upload_id, work_id, slug, _wd, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    monkeypatch.setattr(relations, "refresh_work_mentions",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("katki")))
+    with pytest.raises(RuntimeError):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert replace_marker.read_marker(slug) is None
+    assert _state(upload_id)["replace_progress"]["phase"] == "replaced"
+    assert f"Upload: {upload_id}" in repo.head.commit.message
+
+
+def test_recover_replaced_faasis_kordab_jarelsamme(tmp_path, monkeypatch):
+    upload_id, work_id, slug, _wd, _dd, _repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    s = _state(upload_id)
+    s["replace_progress"] = {"phase": "replaced", "old_head": "x", "trash_dir": "", "old_jpgs": [], "new_files": []}
+    s["replace_work_id"] = work_id
+    (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").write_text(json.dumps(s), encoding="utf-8")
+    replace_marker.write_marker(slug, upload_id)
+    kutsed = []
+    monkeypatch.setattr(upload_ops, "_after_replace_commit", lambda *a: kutsed.append(a) or None)
+    assert replace_recovery.recover(upload_id, slug) == "replaced"
+    assert kutsed and replace_marker.read_marker(slug) is None

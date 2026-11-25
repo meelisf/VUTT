@@ -554,13 +554,28 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
     work_dir = find_directory_by_id(target_work_id)
     # Selle lõime kirjutused kuuluvad asendusele: asendusmärk (ADR 0089 p 2) laseb läbi.
     # `page_locks`: vanade lehtede lukud (ADR 0089 p 4) vabanevad ka ootamatu erindi korral.
-    with marker_owner(upload_id), ExitStack() as page_locks:
-        if not work_dir:
-            return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
-                                                username, background_tasks, page_locks=page_locks)
-        with work_lock(os.path.basename(work_dir), work_dir):
-            return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
-                                                username, background_tasks, page_locks=page_locks)
+    try:
+        with marker_owner(upload_id), ExitStack() as page_locks:
+            if not work_dir:
+                return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
+                                                    username, background_tasks, page_locks=page_locks)
+            with work_lock(os.path.basename(work_dir), work_dir):
+                return _replace_work_content_locked(upload_id, target_work_id, metadata_updates,
+                                                    username, background_tasks, page_locks=page_locks)
+    except Exception:
+        # Ootamatu erind väljaspool taasteteid (nt JPG liigutamine, järelsamm): märk jäi
+        # alles → teos oleks 409-ga lukus kuni serveri käivituseni. Taasta/lõpeta kohe
+        # (lukk on juba vaba; `recover` võtab selle ise).
+        from . import replace_marker
+        from .upload import replace_recovery
+        slug = os.path.basename(work_dir) if work_dir else None
+        m = replace_marker.read_marker(slug) if slug else None
+        if m and m.get("upload_id") == upload_id:
+            try:
+                replace_recovery.recover(upload_id, slug)
+            except Exception:
+                logger.exception(f"replace {upload_id}: kohene taaste ebaõnnestus; märk jääb käivitusaegsele taastele")
+        raise
 
 
 from . import work_parts as _work_parts  # noqa: E402  (ADR 0089 p 5)

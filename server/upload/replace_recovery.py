@@ -112,8 +112,19 @@ def recover(upload_id: str, slug: str) -> str:
             with upload_ops._get_upload_lock(upload_id):
                 state = upload_ops._read_state(upload_id) or {}
             progress = state.get("replace_progress")
+            if progress and progress.get("phase") == "replaced":
+                # Commit tehtud, järelsammud võisid pooleli jääda: korda (korratavad). Nende
+                # tõrge ei tohi teost lukku jätta — lehestik on juba kooskõlaline.
+                try:
+                    upload_ops._after_replace_commit(upload_id, state, work_dir, slug,
+                                                     state.get("replace_work_id") or "",
+                                                     state.get("username") or "Automaatne")
+                except Exception:
+                    logger.exception("Asenduse järelsammud ebaõnnestusid taastel (%s)", upload_id)
+                replace_marker.remove_marker(slug)
+                return "replaced"
             if not progress or progress.get("phase") != "replacing":
-                # Märk kirjutati, aga failimuutused ei alanud (või asendus jõudis lõpuni).
+                # Märk kirjutati, aga failimuutused ei alanud.
                 replace_marker.remove_marker(slug)
                 return "cleared"
             repo = get_or_init_repo()
