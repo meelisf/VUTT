@@ -156,15 +156,25 @@ def get_registration_by_id(reg_id):
     return None
 
 
-def update_registration_status(reg_id, status, reviewed_by):
-    """Uuendab registreerimistaotluse staatust (loe–muuda–kirjuta luku all, #619)."""
+def update_registration_status(reg_id, status, reviewed_by, reject_reason=None):
+    """Uuendab registreerimistaotluse staatust (loe–muuda–kirjuta luku all, #619).
+
+    Muudab ainult `pending` taotlust: kordus (kaks adminit, topeltklõps) annab
+    `None`, et tagasilükkamise kiri ei läheks välja kaks korda.
+    `reject_reason` on taotlejale saadetud põhjus; kirje kustub koos taotlusega
+    säilitusaja järel (REGISTRATION_RETENTION_DAYS).
+    """
     with registrations_lock:
         data = load_pending_registrations()
         for reg in data["registrations"]:
             if reg["id"] == reg_id:
+                if reg.get("status") != "pending":
+                    return None
                 reg["status"] = status
                 reg["reviewed_by"] = reviewed_by
                 reg["reviewed_at"] = datetime.now().isoformat()
+                if reject_reason:
+                    reg["reject_reason"] = reject_reason
                 save_pending_registrations(data)
                 return reg
     return None

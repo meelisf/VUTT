@@ -305,3 +305,29 @@ def test_paragraphs_are_not_hard_wrapped(template, lang):
         assert not (algus.islower() or algus == "("), (
             f"Lõik on käsitsi murtud: {eelmine!r} → {jargmine!r}"
         )
+
+
+# --- Taotluse tagasilükkamine ---------------------------------------------
+
+REJECT_CONTEXT = {
+    "name": "Mari Maasikas",
+    "reason": "Palun lisa taotlusele oma asutus ja uurimisteema.",
+    "submitted_on": "5. septembril 2026",
+}
+
+
+@pytest.mark.parametrize("lang", ["et", "en"])
+def test_registration_rejected_renders_with_reason(lang):
+    subject, body = render_mail("registration_rejected", lang, **REJECT_CONTEXT)
+    assert subject and "$" not in subject and "$" not in body
+    assert REJECT_CONTEXT["reason"] in body
+    assert REJECT_CONTEXT["submitted_on"] in body
+    # Teemareas ainult tähed + ASCII (vt test_subject_has_no_non_ascii_punctuation)
+    assert not [c for c in subject if not c.isascii() and not c.isalpha()]
+
+
+def test_registration_rejected_reason_is_not_template():
+    """Admini tekstis olev `$` ei ole platseholder — väärtusi ei asendata uuesti."""
+    subject, body = render_mail("registration_rejected", "et",
+                                **{**REJECT_CONTEXT, "reason": "Hind $name ja ${x}"})
+    assert "Hind $name ja ${x}" in body

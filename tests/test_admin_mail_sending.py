@@ -165,3 +165,63 @@ def test_taastelink_ilma_e_postita_kannab_ikka_keelt(client, login, backend_env)
     data = _reset(client, login).json()
     assert data["mail_sent"] is False
     assert "lang=et" in data["reset_url"]
+
+
+# --- Tagasilükkamine ------------------------------------------------------
+
+def _reject(client, login, backend_env, monkeypatch, **extra):
+    monkeypatch.setattr(backend_env["registration"], "get_cached_collections", lambda: {})
+    client.post("/register", json={"name": "Spam Sender", "email": "spam@example.test",
+                                   "motivation": "TNK U", "gdpr_consent": True, "language": "en"})
+    headers = {"Authorization": f"Bearer {login('admin', 'adminpass')}"}
+    reg_id = client.post("/admin/registrations", headers=headers).json()["registrations"][0]["id"]
+    res = client.post("/admin/registrations/reject",
+                      json={"registration_id": reg_id, **extra}, headers=headers)
+    return res, reg_id, headers
+
+
+def test_tagasilykkamine_ilma_pohjuseta_on_vaikne(client, login, backend_env, monkeypatch, saadetud):
+    res, _, _ = _reject(client, login, backend_env, monkeypatch)
+    assert res.status_code == 200
+    assert "mail_sent" not in res.json()
+    assert saadetud == []
+
+
+def test_tagasilykkamise_pohjus_laheb_taotleja_keeles_kirja(client, login, backend_env, monkeypatch, saadetud):
+    res, reg_id, headers = _reject(client, login, backend_env, monkeypatch,
+                                   reason="Please tell us your affiliation.")
+    data = res.json()
+    assert res.status_code == 200 and data["mail_sent"] is True
+    assert len(saadetud) == 1 and saadetud[0]["to"] == "spam@example.test"
+    assert "Please tell us your affiliation." in saadetud[0]["body"]
+    assert saadetud[0]["subject"].startswith("VUTT - your access request")
+    reg = next(r for r in client.post("/admin/registrations", headers=headers).json()["registrations"]
+               if r["id"] == reg_id)
+    assert reg["status"] == "rejected" and reg["reject_reason"] == "Please tell us your affiliation."
+
+
+def test_tagasilykkamise_kordus_ei_saada_teist_kirja(client, login, backend_env, monkeypatch, saadetud):
+    res, reg_id, headers = _reject(client, login, backend_env, monkeypatch, reason="Põhjus")
+    assert res.status_code == 200
+    again = client.post("/admin/registrations/reject",
+                        json={"registration_id": reg_id, "reason": "Põhjus"}, headers=headers)
+    assert again.status_code == 400
+    assert len(saadetud) == 1
+
+
+def test_tagasilykkamise_saatmisviga_ei_kaota_teksti(client, login, backend_env, monkeypatch):
+    monkeypatch.setattr(admin_router, "send_mail", lambda *a, **kw: (False, "Connection refused"))
+    res, _, _ = _reject(client, login, backend_env, monkeypatch, reason="Põhjus")
+    data = res.json()
+    assert res.status_code == 200 and data["mail_sent"] is False
+    assert "Põhjus" in data["mail_body"]
+
+
+def test_liiga_pikk_pohjus_lykatakse_tagasi(client, login, backend_env, monkeypatch, saadetud):
+    res, reg_id, headers = _reject(client, login, backend_env, monkeypatch,
+                                   reason="x" * (admin_router.REJECT_REASON_MAX + 1))
+    assert res.status_code == 400
+    assert saadetud == []
+    # taotlus jääb ootele
+    regs = client.post("/admin/registrations", headers=headers).json()["registrations"]
+    assert next(r for r in regs if r["id"] == reg_id)["status"] == "pending"

@@ -1,0 +1,12 @@
+VUTT - juurdepääsutaotlus
+
+Tere $name,
+
+Esitasid $submitted_on Varauusaegsete tekstide transkriptsioonitöölauale (VUTT) juurdepääsutaotluse. Kahjuks ei saa me seda praegu kinnitada.
+
+$reason
+
+VUTT-i avalik sisu on loetav ka ilma kontota. Kui soovid taotlust täpsustada, kirjuta palun vutt-abi@ut.ee — sealt vastab inimene.
+
+Tartu Ülikooli raamatukogu
+https://vutt.utlib.ut.ee
