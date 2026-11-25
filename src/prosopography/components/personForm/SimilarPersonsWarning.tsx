@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Users, ExternalLink } from 'lucide-react';
-import { listPersons } from '../../services/prosopographyService';
-import type { ProsopoIndexEntry } from '../../types';
+import { fetchSimilarPersons, type SimilarPerson } from '../../services/prosopographyService';
 import { distinguishingText } from '../../utils/distinguishing';
 
 /** Nimi peab olema vähemalt nii pikk, enne kui otsime. Kaks tähte annab
@@ -20,6 +19,9 @@ interface Props {
   onDismiss: () => void;
   /** Vastete arv antakse üles, et salvestusvärav saaks teda lugeda. */
   onMatchesChange: (count: number) => void;
+  /** Vormi eluaastad: järjestavad vasteid (klappivad ette), ei filtreeri. */
+  birthYear?: number | null;
+  deathYear?: number | null;
 }
 
 /**
@@ -34,10 +36,10 @@ interface Props {
  * Nime sarnasus EI OLE loomiskeeld: ploki saab kinnitusega kõrvale lükata.
  */
 const SimilarPersonsWarning: React.FC<Props> = ({
-  name, token, dismissed, onDismiss, onMatchesChange,
+  name, token, dismissed, onDismiss, onMatchesChange, birthYear, deathYear,
 }) => {
   const { t } = useTranslation(['prosopography', 'common']);
-  const [matches, setMatches] = useState<ProsopoIndexEntry[]>([]);
+  const [matches, setMatches] = useState<SimilarPerson[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -50,11 +52,11 @@ const SimilarPersonsWarning: React.FC<Props> = ({
     let cancelled = false;
     setLoading(true);
     const timer = setTimeout(() => {
-      // Ei `collection`-it ega `work_set`-i: ulatus on kogu VUTT.
-      listPersons({ q: trimmed, limit: MAX_MATCHES }, token)
-        .then(res => {
+      // Ulatus on kogu VUTT. Duplikaadikontroll, mitte nimeotsing: kirjapildi
+      // variandid („Scharschmidt" = „Scharschmid", 2026-11-25); tombstone'id jätab server välja.
+      fetchSimilarPersons(trimmed, { birthYear, deathYear, limit: MAX_MATCHES }, token)
+        .then(hits => {
           if (cancelled) return;
-          const hits = res.results.filter(p => p.record_status !== 'tombstone');
           setMatches(hits);
           onMatchesChange(hits.length);
         })
@@ -68,11 +70,11 @@ const SimilarPersonsWarning: React.FC<Props> = ({
         .finally(() => { if (!cancelled) setLoading(false); });
     }, DEBOUNCE_MS);
     return () => { cancelled = true; clearTimeout(timer); setLoading(false); };
-  }, [name, token, onMatchesChange]);
+  }, [name, token, onMatchesChange, birthYear, deathYear]);
 
   if (dismissed || loading || matches.length === 0) return null;
 
-  const years = (p: ProsopoIndexEntry) => distinguishingText(p) || null;
+  const years = (p: SimilarPerson) => distinguishingText(p) || null;
 
   return (
     <div className="mt-2 rounded border border-amber-200 bg-amber-50/60 p-3">

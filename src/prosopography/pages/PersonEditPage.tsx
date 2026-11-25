@@ -448,6 +448,8 @@ const PersonEditPage: React.FC = () => {
               dismissed={similarDismissed}
               onDismiss={() => setSimilarDismissed(true)}
               onMatchesChange={setSimilarCount}
+              birthYear={Number(draft.birth.year) || null}
+              deathYear={Number(draft.death.year) || null}
             />
           </div>
         )}

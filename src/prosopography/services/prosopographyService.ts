@@ -568,6 +568,21 @@ export async function fetchSourceDiff(
 
 export interface SimilarPerson { id: string; label: string; qualifier?: string | null; birth_year: number | null; death_year: number | null; floruit_year_from?: number | null; floruit_year_to?: number | null; work_count: number }
 
+/** Võimalikud duplikaadid uue isiku nimele — kirjapildi variantidega („Scharschmidt" leiab
+ *  „Scharschmid"-i). EI OLE tavaline nimeotsing (`listPersons({q})` on range, vt server
+ *  `similar_persons`). Eluaastad ainult järjestavad. */
+export async function fetchSimilarPersons(
+  name: string, opts: { birthYear?: number | null; deathYear?: number | null; limit?: number } = {},
+  token?: string,
+): Promise<SimilarPerson[]> {
+  const params = new URLSearchParams({ name });
+  if (opts.birthYear) params.set('birth_year', String(opts.birthYear));
+  if (opts.deathYear) params.set('death_year', String(opts.deathYear));
+  if (opts.limit) params.set('limit', String(opts.limit));
+  const res = await apiGet<{ results: SimilarPerson[] }>(`${BASE}/similar?${params}`, { token, timeout: 10000 });
+  return res.results;
+}
+
 /** Isikupaneeli kandidaatide kokkuvõtted (spekk §6) + sarnased olemasolevad kaardid. */
 export async function fetchCandidates(
   name: string, refs: { scheme: string; id: string }[], token: string,
