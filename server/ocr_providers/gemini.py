@@ -17,7 +17,8 @@ from PIL import Image
 
 from ..config import (
     GEMINI_API_KEY, GEMINI_MAX_REQUEST_BYTES, GEMINI_MAX_RETRIES,
-    GEMINI_OCR_MODEL, GEMINI_REQUEST_TIMEOUT, GEMINI_THINKING_LEVEL, get_logger,
+    GEMINI_OCR_MODEL, GEMINI_REQUEST_TIMEOUT, GEMINI_THINKING_LEVEL, GEMINI_TITLE_TIMEOUT,
+    get_logger,
 )
 from ..ocr_prompts import strip_model_output
 
@@ -316,7 +317,7 @@ def translate_title(eestikeelne: str) -> Optional[str]:
         vastus = requests.post(
             API_URL, json=payload,
             headers={"x-goog-api-key": _api_key(), "Content-Type": "application/json"},
-            timeout=GEMINI_REQUEST_TIMEOUT,
+            timeout=GEMINI_TITLE_TIMEOUT,  # lühike: kasutaja ootab lookup'i vastust
         )
         if vastus.status_code != 200:
             logger.warning("Pealkirja tõlge: %s", _error_summary(vastus))
