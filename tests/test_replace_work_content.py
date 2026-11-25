@@ -165,14 +165,15 @@ def test_replace_work_content_eemaldusviga_katkestab_ja_taastab_jpg(tmp_path, mo
         raise AssertionError("Teist SFTP ühendust ei tohi pärast eemaldusviga avada")
 
     monkeypatch.setattr(upload_ops, "_sftp_open", sftp_factory)
-    real_remove = os.remove
+    import shutil
+    real_move = shutil.move
 
-    def katkine_remove(path, *a, **k):
-        if str(path).endswith("vana-teos_pg_001.txt"):
+    def katkine_move(src, dst, *a, **k):
+        if str(src).endswith("vana-teos_pg_001.txt") and "._trash" in str(dst):
             raise PermissionError("ei saa")
-        return real_remove(path, *a, **k)
+        return real_move(src, dst, *a, **k)
 
-    monkeypatch.setattr(upload_ops.os, "remove", katkine_remove)
+    monkeypatch.setattr(upload_ops.shutil, "move", katkine_move)
 
     with pytest.raises(HTTPException) as exc:
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)

@@ -346,6 +346,9 @@ def reset_parts_for_replace(work_dir: str, old_numbers: dict, username: str) -> 
 
     res = bulk_update_works([(meta_path, transform)], username,
                             "Osad: lehestik asendati, leheviited vajavad ülevaatust", call_ptw=True)
+    if res.get("failed"):
+        # Tõrge ≠ „muutusteta": asendus peab saama sammu korrata (PR #881).
+        raise PartError("Osade leheviiteid ei saanud nullida", 500)
     return bool(res.get("updated"))
 
 

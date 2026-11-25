@@ -498,22 +498,18 @@ sünk üks kord. Poolitus = ÜKS native commit (`commit_add_and_remove`) — Git
 `index.commit` on /data repos ~2 s. Välistab järjekorra mustandi ja vastupidi.
 
 **Lehestiku asendus (ADR 0089)** — `replace_work_content` on taastatav: URL-i teos PEAB olema
-state'i `replace_work_id`. Enne esimest failimuutust kirjutatakse asendusmärk
-(`state/work_replacing/{slug}.json`, `server/replace_marker.py`) ja taasteinfo (`replace_progress`);
-märgi ajal lükkavad `page_lock` ja `work_lock` tagasi kõik peale omaniku (`marker_owner`) → 409.
-Järjekord: märk → vanade lehtede lukud → paarid → `old_head` (taastepunkt pärast lukke).
-Taasteinfo koopia elab märgifailis (üleslaadimise tühistus asenduse ajal → 409). Vanad lehed
-eemaldatakse AINULT töökaustast — indeks muutub alles lõpliku commit'iga (ühist indeksit
-commitivad teised `repo.index.commit`-iga). Commit kannab treilerit `Upload: <id>` ja on `git commit --only -- slug`
-(ainult selle teose failid; tõrkel indeks puhtaks sama git-luku all); commit'i tõrge = taastamine
-+ 500. Uus katse taastab/lõpetab enne pooleli asenduse; ajaloo lugemisviga ≠ „commit'i pole". Katkestuse järel otsustab `replace_recovery.recover` (serveri
-käivitusel) treileri järgi: lõpeta või taasta. Taastamine puudutab ainult vanu lehefaile (mitte
-`_metadata.json`-i), taastab JPG-d prügikasti oleku järgi ja viskab tõrkel `RestoreError` — siis
-jäävad märk ja taasteinfo alles. Asenduse metaandmete uuendus käib alles pärast lehestiku
-commit'i. Uued lehed kannavad `content_generation`-it (Meili lehedokument → redaktor → `/save`
-payload); `/save` kontrollib lehe olemasolu ja põlvkonda leheluku SEES; võtmeta (vana kimp)
-päring on lubatud ainult põlvkonnata lehel. Osade `pages` nullitakse
-(`pages_before_replace` vihjeks). Commit'i järgsed sammud elavad `_after_replace_commit`-is ja
+state'i `replace_work_id`. Järjekord teoseluku all: pooleli asenduse taaste (`recover_locked`) →
+asendusmärk (`state/work_replacing/{slug}.json`, `server/replace_marker.py`, taasteinfo koopiaga)
+→ vanade lehtede lukud → paarid → `old_head`. Märgi ajal lükkavad `page_lock` ja `work_lock`
+tagasi kõik peale omaniku (`marker_owner`) → 409; üleslaadimise tühistus → 409. **Vana seis on
+kettal, mitte gitis:** kõik vanad lehefailid (txt/json/jpg, mitte `_metadata.json`) liiguvad
+prügikasti ja taastamine toob need tagasi (commitimata salvestatud tekst jääb alles). Ühist
+git-indeksit puudutab alles lõplik commit (`commit --only -- slug`, treiler `Upload: <id>`);
+tõrge = taastamine + 500. Käivitusaegne taaste (`replace_recovery.recover_all`) jookseb
+lifespan'is ENNE päringuid. Ajaloo lugemisviga ≠ „commit'i pole". Uued lehed kannavad
+`content_generation`-it (Meili → redaktor → `/save`); `/save` kontrollib olemasolu ja põlvkonda
+leheluku SEES, võtmeta päring ainult põlvkonnata lehel. Osade nullimine on kohustuslik
+järelsamm (`pages_before_replace` vihjeks). Järelsammud elavad `_after_replace_commit`-is ja
 peavad jääma korratavaks. Uus asendustee kasutab neid, ei kirjuta oma.
 
 **Kaugkoristus (ADR 0024)** — katkestamine kustutab OCR-serveris ainult **failid**

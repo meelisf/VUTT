@@ -1,10 +1,9 @@
-"""Taastatav asendus (ADR 0089 p 3): taasteinfo, commit'i treiler, taastamine, käivitusaegne tuvastus.
+"""Taastatav asendus (ADR 0089 p 3, täiendus 2026-11-25).
 
-- Praegune rollback (`git checkout old_head -- slug`) jättis alles uued, juba stage'itud
-  failid.
-- JPG-d on gitist väljas ning vana ja uus leht kasutavad sama failinime: taastamine
-  tohib JPG kustutada ainult siis, kui tema vana vaste on prügikastis.
-- Katkestuse järel otsustab kordus commit'i treileri `Upload: <id>` järgi.
+Mudel: vanad lehefailid liiguvad prügikasti (rename) ja taastamine toob need sealt
+tagasi — kettal olev seis, mitte git. Ühist indeksit puudutatakse alles lõplikus
+commit'is; taastamine viib teose kausta indeksi HEAD-ile. Katkestuse järel otsustab
+kordus commit'i treileri `Upload: <id>` järgi; käivitusaegne taaste jookseb enne päringuid.
 """
 import json
 from pathlib import Path
@@ -17,6 +16,7 @@ from server.upload import replace_recovery
 from test_replace_work_content import _KirjutavSftp, _setup_replace_files
 
 SLUG = "teos"
+OLD = [f"teos_pg_00{n}.{e}" for n in (1, 2) for e in ("jpg", "json", "txt")]
 
 
 def _repo_kahe_lehega(tmp_path):
@@ -43,64 +43,73 @@ def _progress(repo, trash, new_pages):
         "phase": "replacing",
         "old_head": repo.head.commit.hexsha,
         "trash_dir": str(trash),
-        "old_jpgs": ["teos_pg_001.jpg", "teos_pg_002.jpg"],
+        "old_files": list(OLD),
         "new_files": [f"teos_pg_00{n}.{ext}" for n in new_pages for ext in ("jpg", "txt", "json")],
     }
 
 
+def _vii_prugikasti(work, trash, names=OLD):
+    for n in names:
+        (work / n).rename(trash / n)
+
+
 def test_rollback_eemaldab_uued_stagetud_failid(tmp_path):
+    """Asendus jõudis lõpliku commit'i `git add`-ini: uued stage'itud → indeks HEAD-ile, vanad tagasi."""
     repo, work, trash = _repo_kahe_lehega(tmp_path)
     progress = _progress(repo, trash, [1, 2, 3])
-    # Asendus jõudis kuni `git add`-ini: vanad git rm, uued kirjutatud ja stage'itud.
-    for n in (1, 2):
-        (work / f"teos_pg_00{n}.jpg").rename(trash / f"teos_pg_00{n}.jpg")
-    repo.index.remove([f"{SLUG}/teos_pg_00{n}.{e}" for n in (1, 2) for e in ("txt", "json")], working_tree=True)
+    _vii_prugikasti(work, trash)
     for n in (1, 2, 3):
         (work / f"teos_pg_00{n}.txt").write_text(f"uus {n}", encoding="utf-8")
         (work / f"teos_pg_00{n}.json").write_text('{"new": 1}', encoding="utf-8")
         (work / f"teos_pg_00{n}.jpg").write_bytes(b"uus jpg")
-    repo.git.add(SLUG)
+    repo.git.add("-A", "--", SLUG)
 
     replace_recovery.restore_replace(str(work), progress, repo)
 
     assert (work / "teos_pg_001.txt").read_text(encoding="utf-8") == "vana 1"
     assert not (work / "teos_pg_003.txt").exists()
-    assert not (work / "teos_pg_003.json").exists()
     assert not (work / "teos_pg_003.jpg").exists()
     assert (work / "teos_pg_002.jpg").read_bytes() == b"vana jpg 2"
-    # JPG-d on tootmises gitist väljas (`data/.gitignore`); jälgitavad failid on puhtad.
+    assert repo.git.diff("--cached", "--name-only", "--", SLUG).strip() == ""
     assert not repo.is_dirty(index=True, working_tree=True, untracked_files=False, path=SLUG)
-    assert not [f for f in repo.untracked_files if not f.endswith(".jpg")]
 
 
-def test_jpg_katkestus_enne_liigutamist(tmp_path):
+def test_katkestus_enne_liigutamist(tmp_path):
     repo, work, trash = _repo_kahe_lehega(tmp_path)
     replace_recovery.restore_replace(str(work), _progress(repo, trash, [1, 2]), repo)
     assert (work / "teos_pg_001.jpg").read_bytes() == b"vana jpg 1"
-    assert (work / "teos_pg_002.jpg").read_bytes() == b"vana jpg 2"
+    assert (work / "teos_pg_002.txt").read_text(encoding="utf-8") == "vana 2"
 
 
-def test_jpg_katkestus_liigutamise_keskel(tmp_path):
+def test_katkestus_liigutamise_keskel(tmp_path):
     repo, work, trash = _repo_kahe_lehega(tmp_path)
-    (work / "teos_pg_001.jpg").rename(trash / "teos_pg_001.jpg")   # 1 liikus, 2 mitte
+    _vii_prugikasti(work, trash, ["teos_pg_001.jpg", "teos_pg_001.txt"])   # osa liikus
     replace_recovery.restore_replace(str(work), _progress(repo, trash, [1, 2]), repo)
     assert (work / "teos_pg_001.jpg").read_bytes() == b"vana jpg 1"
+    assert (work / "teos_pg_001.txt").read_text(encoding="utf-8") == "vana 1"
     assert (work / "teos_pg_002.jpg").read_bytes() == b"vana jpg 2"
     assert not (trash / "teos_pg_001.jpg").exists()
 
 
 def test_taastamine_pikema_uue_lehestikuga(tmp_path):
     repo, work, trash = _repo_kahe_lehega(tmp_path)
-    for n in (1, 2):
-        (work / f"teos_pg_00{n}.jpg").rename(trash / f"teos_pg_00{n}.jpg")
+    _vii_prugikasti(work, trash)
     for n in (1, 2, 3):
         (work / f"teos_pg_00{n}.jpg").write_bytes(b"uus jpg")
         (work / f"teos_pg_00{n}.txt").write_text("uus", encoding="utf-8")
     replace_recovery.restore_replace(str(work), _progress(repo, trash, [1, 2, 3]), repo)
     assert sorted(p.name for p in work.glob("*.jpg")) == ["teos_pg_001.jpg", "teos_pg_002.jpg"]
-    assert (work / "teos_pg_001.jpg").read_bytes() == b"vana jpg 1"
     assert not (work / "teos_pg_003.txt").exists()
     assert (work / "teos_pg_002.txt").read_text(encoding="utf-8") == "vana 2"
+
+
+def test_taaste_hoiab_commitimata_teksti(tmp_path):
+    """(3. voor, 3) Kettal salvestatud, aga commitimata tekst jääb rollback'is alles."""
+    repo, work, trash = _repo_kahe_lehega(tmp_path)
+    (work / "teos_pg_001.txt").write_text("salvestatud, commit ebaõnnestus", encoding="utf-8")
+    _vii_prugikasti(work, trash)
+    replace_recovery.restore_replace(str(work), _progress(repo, trash, [1, 2]), repo)
+    assert (work / "teos_pg_001.txt").read_text(encoding="utf-8") == "salvestatud, commit ebaõnnestus"
 
 
 def _edukas_asendus_seadistus(tmp_path, monkeypatch):
@@ -164,7 +173,7 @@ def test_katkestus_parast_commiti_tuvastatakse(tmp_path, monkeypatch):
     repo.index.commit(f"Asenda sisu: {slug} ({work_id})\n\nUpload: {upload_id}")
     s = _state(upload_id)
     s["replace_progress"] = {"phase": "replacing", "old_head": old_head, "trash_dir": str(tmp_path / "t"),
-                             "old_jpgs": [], "new_files": []}
+                             "old_files": [], "new_files": []}
     (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").write_text(json.dumps(s), encoding="utf-8")
     replace_marker.write_marker(slug, upload_id)
 
@@ -184,7 +193,7 @@ def test_katkestus_enne_committi_taastatakse(tmp_path, monkeypatch):
     (work_dir / "vana-teos_pg_001.jpg").write_bytes(b"uus")
     s = _state(upload_id)
     s["replace_progress"] = {"phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(trash),
-                             "old_jpgs": ["vana-teos_pg_001.jpg"], "new_files": ["vana-teos_pg_001.jpg"]}
+                             "old_files": ["vana-teos_pg_001.jpg"], "new_files": ["vana-teos_pg_001.jpg"]}
     (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").write_text(json.dumps(s), encoding="utf-8")
     replace_marker.write_marker(slug, upload_id)
 
@@ -218,7 +227,7 @@ def test_ootamatu_erind_ei_jata_teost_lukku(tmp_path, monkeypatch):
         return orig_move(src, dst, *a, **k)
 
     monkeypatch.setattr(upload_ops.shutil, "move", katkine_move)
-    with pytest.raises(OSError):
+    with pytest.raises(Exception):
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
     assert replace_marker.read_marker(slug) is None
     assert "replace_progress" not in _state(upload_id)
@@ -241,7 +250,7 @@ def test_jarelsammu_torge_ei_jata_teost_lukku(tmp_path, monkeypatch):
 def test_recover_replaced_faasis_kordab_jarelsamme(tmp_path, monkeypatch):
     upload_id, work_id, slug, _wd, _dd, _repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
     s = _state(upload_id)
-    s["replace_progress"] = {"phase": "replaced", "old_head": "x", "trash_dir": "", "old_jpgs": [], "new_files": []}
+    s["replace_progress"] = {"phase": "replaced", "old_head": "x", "trash_dir": "", "old_files": [], "new_files": []}
     s["replace_work_id"] = work_id
     (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").write_text(json.dumps(s), encoding="utf-8")
     replace_marker.write_marker(slug, upload_id)
@@ -278,15 +287,7 @@ def test_ebaonnestunud_taaste_jatab_margi_ja_taasteinfo(tmp_path, monkeypatch):
             super().get(remote, local)
 
     monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Katkine(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
-    real_git = repo.git
-
-    class KatkineGit:
-        def __getattr__(self, name):
-            if name == "checkout":
-                return lambda *a, **k: (_ for _ in ()).throw(RuntimeError("checkout katki"))
-            return getattr(real_git, name)
-
-    monkeypatch.setattr(repo, "git", KatkineGit(), raising=False)
+    _katkine_git_kasklus(monkeypatch, repo, "reset")
     with pytest.raises(Exception):
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
     assert replace_marker.read_marker(slug) is not None
@@ -296,7 +297,7 @@ def test_ebaonnestunud_taaste_jatab_margi_ja_taasteinfo(tmp_path, monkeypatch):
 def test_recover_ebaonnestunud_taastega_jatab_margi(tmp_path, monkeypatch):
     upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
     progress = {"phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(tmp_path / "t"),
-                "old_jpgs": [], "new_files": [], "old_tracked": ["vana-teos_pg_001.txt"]}
+                "old_files": [], "new_files": []}
     replace_marker.write_marker(slug, upload_id, progress)
     monkeypatch.setattr(replace_recovery, "restore_replace",
                         lambda *a, **k: (_ for _ in ()).throw(replace_recovery.RestoreError("katki")))
@@ -310,11 +311,11 @@ def test_taasteinfo_elab_margis_ka_ilma_state_ita(tmp_path, monkeypatch):
     upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
     trash = tmp_path / "t"
     trash.mkdir()
-    (work_dir / "vana-teos_pg_001.jpg").rename(trash / "vana-teos_pg_001.jpg")
-    (work_dir / "vana-teos_pg_001.txt").unlink()
+    for n in ("vana-teos_pg_001.jpg", "vana-teos_pg_001.txt", "vana-teos_pg_001.json"):
+        (work_dir / n).rename(trash / n)
     progress = {"phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(trash),
-                "old_jpgs": ["vana-teos_pg_001.jpg"], "new_files": [],
-                "old_tracked": ["vana-teos_pg_001.txt", "vana-teos_pg_001.json"]}
+                "old_files": ["vana-teos_pg_001.jpg", "vana-teos_pg_001.json", "vana-teos_pg_001.txt"],
+                "new_files": []}
     replace_marker.write_marker(slug, upload_id, progress)
     shutil.rmtree(Path(upload_ops.UPLOADS_DIR) / upload_id)
     assert replace_recovery.recover(upload_id, slug) == "restored"
@@ -443,13 +444,12 @@ def test_korduskatse_taastab_enne_poolelioleva_asenduse(tmp_path, monkeypatch):
     trash = tmp_path / "t"
     trash.mkdir()
     # Esimene katse suri pärast vanade failide eemaldamist.
-    (work_dir / "vana-teos_pg_001.jpg").rename(trash / "vana-teos_pg_001.jpg")
-    (work_dir / "vana-teos_pg_001.txt").unlink()
-    (work_dir / "vana-teos_pg_001.json").unlink()
+    for n in ("vana-teos_pg_001.jpg", "vana-teos_pg_001.txt", "vana-teos_pg_001.json"):
+        (work_dir / n).rename(trash / n)
     replace_marker.write_marker(slug, upload_id, {
         "phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(trash),
-        "old_jpgs": ["vana-teos_pg_001.jpg"], "new_files": [],
-        "old_tracked": ["vana-teos_pg_001.json", "vana-teos_pg_001.txt"]})
+        "old_files": ["vana-teos_pg_001.jpg", "vana-teos_pg_001.json", "vana-teos_pg_001.txt"],
+        "new_files": []})
 
     class Katkine(_KirjutavSftp):
         def get(self, remote, local):
@@ -468,7 +468,7 @@ def test_ajaloo_lugemisviga_ei_kaivita_rollbacki(tmp_path, monkeypatch):
     upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
     replace_marker.write_marker(slug, upload_id, {
         "phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(tmp_path / "t"),
-        "old_jpgs": [], "new_files": [], "old_tracked": ["vana-teos_pg_001.txt"]})
+        "old_files": [], "new_files": []})
     (work_dir / "vana-teos_pg_001.txt").write_text("uus, juba commititud", encoding="utf-8")
     monkeypatch.setattr(type(repo), "iter_commits", lambda *a, **k: (_ for _ in ()).throw(OSError("pack katki")))
     assert replace_recovery.recover(upload_id, slug) == "commit_unknown"
@@ -487,6 +487,133 @@ def test_taaste_rakendab_uleslaadimise_metaandmed(tmp_path, monkeypatch):
     s["replace_work_id"] = work_id
     (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").write_text(json.dumps(s), encoding="utf-8")
     replace_marker.write_marker(slug, upload_id, {
-        "phase": "replacing", "old_head": old_head, "trash_dir": "", "old_jpgs": [], "new_files": []})
+        "phase": "replacing", "old_head": old_head, "trash_dir": "", "old_files": [], "new_files": []})
     assert replace_recovery.recover(upload_id, slug) == "replaced"
     assert json.loads((work_dir / "_metadata.json").read_text(encoding="utf-8"))["title"] == "Uus"
+
+
+# ── Ülevaatus PR #881, 3. voor ────────────────────────────────────────────────
+
+def test_katkestus_parast_git_addi_puhastab_indeksi(tmp_path, monkeypatch):
+    """(1) Protsess suri pärast lõpliku commit'i `git add`-i: taaste viib indeksi HEAD-ile."""
+    upload_id, work_id, slug, work_dir, data_dir, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    trash = tmp_path / "t"
+    trash.mkdir()
+    old = ["vana-teos_pg_001.jpg", "vana-teos_pg_001.json", "vana-teos_pg_001.txt"]
+    for n in old:
+        (work_dir / n).rename(trash / n)
+    (work_dir / "uus_pg_001.txt").write_text("uus", encoding="utf-8")
+    repo.git.add("-A", "--", slug)
+    replace_marker.write_marker(slug, upload_id, {
+        "phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(trash),
+        "old_files": old, "new_files": ["uus_pg_001.txt"]})
+    assert replace_recovery.recover(upload_id, slug) == "restored"
+    assert repo.git.diff("--cached", "--name-only", "--", slug).strip() == ""
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
+    assert not (work_dir / "uus_pg_001.txt").exists()
+
+
+def test_kaivitusaegne_taaste_on_enne_paringuid():
+    """(1) recover_all jookseb lifespan'is sünkroonselt (enne yield'i), mitte taustalõimes."""
+    import inspect
+    from server import main
+    src = inspect.getsource(main.lifespan)
+    assert "await run_in_threadpool(replace_recovery.recover_all)" in src
+    assert src.index("recover_all") < src.index("yield")
+    assert "target=replace_recovery.recover_all" not in src
+
+
+def test_luku_all_ebaonnestunud_eeltaaste_annab_409_ja_hoiab_taasteinfo(tmp_path, monkeypatch):
+    """(2) Märgi kontroll ja uus katse on sama teoseluku all: taaste tõrkel uus katse ei alga."""
+    from fastapi import HTTPException
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    progress = {"phase": "replacing", "old_head": "vana-head-123", "trash_dir": str(tmp_path / "t"),
+                "old_files": [], "new_files": []}
+    replace_marker.write_marker(slug, upload_id, progress)
+    monkeypatch.setattr(replace_recovery, "find_replace_commit", lambda *a: None)
+    monkeypatch.setattr(replace_recovery, "restore_replace",
+                        lambda *a, **k: (_ for _ in ()).throw(replace_recovery.RestoreError("katki")))
+    with pytest.raises(HTTPException) as exc:
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert exc.value.status_code == 409
+    assert replace_marker.read_marker(slug)["progress"]["old_head"] == "vana-head-123"
+
+
+def test_asenduse_rollback_hoiab_commitimata_teksti(tmp_path, monkeypatch):
+    """(3) /save jättis teksti kettale (commit ebaõnnestus); asenduse rollback ei kaota seda."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    (work_dir / "vana-teos_pg_001.txt").write_text("viimati salvestatud", encoding="utf-8")
+
+    class Katkine(_KirjutavSftp):
+        def get(self, remote, local):
+            raise FileNotFoundError(remote)
+
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Katkine(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    with pytest.raises(Exception):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "viimati salvestatud"
+
+
+def test_osade_nullimise_torge_jatab_margi_ja_taaste_kordab(tmp_path, monkeypatch):
+    """(4) Kohustuslik järelsamm: tõrge jätab märgi (faas replaced); taaste kordab ja lõpetab."""
+    from fastapi import HTTPException
+    from server import work_parts
+    upload_id, work_id, slug, *_ = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    katki = {"jah": True}
+
+    def reset(*a, **k):
+        if katki["jah"]:
+            raise work_parts.PartError("metaandmeid ei saanud kirjutada", 500)
+        return True
+
+    monkeypatch.setattr(work_parts, "reset_parts_for_replace", reset)
+    with pytest.raises(HTTPException):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    m = replace_marker.read_marker(slug)
+    assert m and m["progress"]["phase"] == "replaced"
+    assert _state(upload_id).get("status") != "imported"
+    katki["jah"] = False
+    assert replace_recovery.recover(upload_id, slug) == "replaced"
+    assert replace_marker.read_marker(slug) is None
+    assert _state(upload_id)["status"] == "imported"
+
+
+def test_lukku_oottav_korduskatse_ei_kirjuta_taasteinfot_ule(tmp_path, monkeypatch):
+    """(2) Kaks sama üleslaadimise päringut: B ootab lukku, A jätab märgi (taaste kukub).
+    B ei tohi A taasteinfot üle kirjutada — A liigutas vanad failid prügikasti."""
+    import threading
+    import time
+    from fastapi import HTTPException
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    _katkine_git_kasklus(monkeypatch, repo, "reset")
+    a_lukus = threading.Event()
+
+    class Katkine(_KirjutavSftp):
+        def get(self, remote, local):
+            if threading.current_thread().name == "A":
+                a_lukus.set()
+                time.sleep(0.4)          # B jõuab lukku ootama
+            raise FileNotFoundError(remote)
+
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Katkine(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    tulemused = {}
+
+    def jooks(nimi):
+        try:
+            upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+        except HTTPException as e:
+            tulemused[nimi] = e.status_code
+        except Exception as e:
+            tulemused[nimi] = type(e).__name__
+
+    a = threading.Thread(target=jooks, args=("A",), name="A")
+    a.start()
+    assert a_lukus.wait(5)
+    b = threading.Thread(target=jooks, args=("B",), name="B")
+    b.start()
+    a.join(10)
+    b.join(10)
+    m = replace_marker.read_marker(slug)
+    assert m, "märk peab jääma (taaste kukkus)"
+    assert m["progress"]["old_files"], "A taasteinfo (vanad failid prügikastis) peab alles olema"
+    assert tulemused.get("B") == 409, tulemused

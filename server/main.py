@@ -100,6 +100,11 @@ async def lifespan(app: FastAPI):
         logger.error("places.json konfiguratsiooniviga: %s", e)
         raise SystemExit(1)
     build_work_id_cache()
+    # Pooleli lehestiku asendused (ADR 0089 p 3) ENNE päringute vastuvõtmist: pärast
+    # katkestust võib ühises indeksis olla asenduse `git add` — ükski teine commit ei tohi
+    # seda kaasa võtta enne taastet (PR #881). Tavaliselt märke pole → kohe edasi.
+    from .upload import replace_recovery
+    await run_in_threadpool(replace_recovery.recover_all)
     # Tervikluse kontroll ja ajalooindeksi hooldus ei pea API käivitumist blokeerima.
     threading.Thread(target=run_git_fsck, daemon=True, name="git-fsck").start()
     # Esimene commit pärast buuti maksis 14,7 s (külm dentry-cache, 60k faili
@@ -110,9 +115,6 @@ async def lifespan(app: FastAPI):
     await run_in_threadpool(start_auth_background)
     warn_if_no_superadmin()
     threading.Thread(target=rebuild_indices, daemon=True).start()
-    # Pooleli lehestiku asendused (ADR 0089 p 3): märkide järgi taaste või lõpetus.
-    from .upload import replace_recovery
-    threading.Thread(target=replace_recovery.recover_all, daemon=True, name="replace-recovery").start()
     from .work_exemplars import check_unmigrated
     threading.Thread(target=check_unmigrated, daemon=True, name="exemplars-check").start()
     # Isikukaartide automaatrikastus (ADR 0048): planeerija + pooleliolevate taaste.

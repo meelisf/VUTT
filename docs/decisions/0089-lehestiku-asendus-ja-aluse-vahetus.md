@@ -84,6 +84,22 @@ p 1–5 peale.
 - Git-ajaloo lugemisviga ≠ „commit'i pole": `commit_unknown`, märk ja taasteinfo jäävad.
 - Üleslaadimise metaandmed rakendatakse järelsammus (`_after_replace_commit`), mida kordab ka taaste.
 
+### Täiendus 2026-11-25, 3. voor — taastemudel
+
+Kolm parandusvooru näitasid, et vana seisu git'ist tuletamine ei kata kettal olevat seisu
+(nt `/save`-i commitimata tekst). Uus mudel:
+
+- **Vana seis on kettal:** KÕIK vanad lehefailid (`.txt`, `.json`, `.jpg`, mitte `_metadata.json`)
+  liiguvad prügikasti (`rename`); taastamine toob need tagasi ja kustutab uued. `git checkout`-i
+  ei ole.
+- **Git on avaldamise samm:** ühist indeksit puudutatakse alles lõplikus commit'is
+  (`add -A -- slug` + `commit --only -- slug`); taastamine teeb `git reset HEAD -- slug`.
+- **Käivitusaegne taaste jookseb lifespan'is sünkroonselt enne päringuid** (katkestuse järel võib
+  indeksis olla asenduse `git add`).
+- **Märgi kontroll ja uus katse sama teoseluku all** (`recover_locked`).
+- **Osade nullimine on kohustuslik järelsamm** (`AfterStepError`): tõrkel jääb märk (faas
+  `replaced`) ja taaste kordab; muud järelsammud on parimal katsel.
+
 ## Tagajärjed
 
 - Asendus on aeglasem ja keerukam, aga katkestus ei jäta enam teost poolikusse seisu.
