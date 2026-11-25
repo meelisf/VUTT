@@ -5,6 +5,9 @@
  * ühte hooki. `Upload.tsx` jääb õhukeseks orkestreerijaks, mis ainult renderdab.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { reconfirmPreview, type PromoteExemplar } from '../../components/exemplars/PromoteDialog';
+import type { PromotePreview } from '../../services/promoteApi';
+import { getWorkExemplars } from '../../services/workApi';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
@@ -63,6 +66,8 @@ export function useUploadWizard() {
   // --- Samm ja upload olek ---
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [uploadId, setUploadId] = useState<string | null>(null);
+  const [promoteConflict, setPromoteConflict] = useState<PromotePreview | null>(null);
+  const [promoteExemplars, setPromoteExemplars] = useState<PromoteExemplar[]>([]);
   const [pollResult, setPollResult] = useState<PollResult | null>(null);
 
   // --- Pooleliolevad üleslaadimised ---
@@ -573,6 +578,16 @@ export function useUploadWizard() {
       const uploadWarning = workSetsSkippedWarning(d.work_sets_skipped);
       navigate(`/work/${d.work_id}/1`, uploadWarning ? { state: { uploadWarning } } : undefined);
     } catch (e) {
+      // Aluse vahetuse lõppkontroll (ADR 0089 p 6): muutunud seisule saab vastata uue
+      // kinnitusega sama üleslaadimise juures — mitte ainult veateade.
+      const uus = reconfirmPreview(e);
+      if (uus) {
+        setPromoteConflict(uus);
+        getWorkExemplars(replaceWorkId, authToken)
+          .then(r => setPromoteExemplars(r.exemplars))
+          .catch(() => setPromoteExemplars([]));
+        return;
+      }
       setImportError(e instanceof Error ? e.message : t('step3.importError'));
     } finally {
       setImportLoading(false);
@@ -707,6 +722,9 @@ export function useUploadWizard() {
   const sendEta = sendEtaSeconds === null ? null : formatEta(sendEtaSeconds);
 
   return {
+    // Aluse vahetus (ADR 0089 p 6)
+    promoteConflict, promoteExemplars,
+    clearPromoteConflict: () => setPromoteConflict(null),
     // Olek
     step, setStep,
     uploadId,

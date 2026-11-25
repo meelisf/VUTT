@@ -24,6 +24,8 @@ export interface FileEntry {
 export interface PollResult {
   status: string;
   ready: number;
+  /** Aluse vahetus (ADR 0089 p 6): lähteeksemplar viisardi bänneri jaoks. */
+  promote?: { exemplar_id: string; holder?: string | null; shelfmark?: string | null } | null;
   /** Lehed, mille OCR lõplikult ebaõnnestus (#250). */
   failed?: number[];
   /** Mitu lehte OCR-i LÄHEB (poolitusplaani järgi) — kohatäidete arv viisardis. */
@@ -67,6 +69,11 @@ export interface PartialUpload {
 export interface SavedUpload {
   id: string;
   status: string;
+  /** Asendusmärk, mille üleslaadimise kausta pole (ADR 0089 p 6): ainult lõpetamine teose järgi. */
+  orphan?: boolean;
+  work_id?: string | null;
+  title?: string;
+  replace_phase?: string | null;
   meta: { title: string; year: string | number; slug: string; type?: UploadType };
   created_at: string;
   expected_pages: number | null;

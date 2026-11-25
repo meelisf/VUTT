@@ -977,7 +977,32 @@
     "copyLinkHint": "Permanent link to this view (e.g. for a page comment)",
     "linkCopied": "Link copied",
     "copyLinkFailed": "Could not copy the link",
-    "adaImport": "ADA import…"
+    "adaImport": "ADA import…",
+    "promote": {
+      "open": "Make transcription base",
+      "title": "Make transcription base",
+      "summary": "This exemplar's {{images}} images ({{target}}) are sent to OCR and replace the work's current {{pages}} pages.",
+      "oldPagesTo": "The current pages are kept as images under their exemplar:",
+      "unknownOrigin": "unknown origin",
+      "unknownTarget": "Where should pages of unknown origin go?",
+      "partsWarning": "The work has {{count}} part(s) — their page ranges must be reviewed after the swap.",
+      "unstorable": "Some current pages cannot be stored as exemplar images:",
+      "editedWarning": "{{count}} pages have been edited (status, tags, comments or annotations). Their transcription is replaced by new OCR; the old text remains only in git history.",
+      "editedAck": "I understand the edited text will be replaced",
+      "start": "Start",
+      "confirm": "Confirm",
+      "changed": "The work's pages changed meanwhile — review the new state and confirm again.",
+      "failed": "The action failed."
+    },
+    "replacePending": {
+      "text": "A page replacement of this work is unfinished. The work is locked until it is finished.",
+      "finish": "Finish page replacement",
+      "result": {
+        "replaced": "Page replacement finished.",
+        "restored": "The replacement could not be completed — the old pages were restored, no swap happened.",
+        "cleared": "There is no unfinished replacement any more."
+      }
+    }
   },
   "compare": {
     "title": "Compare",

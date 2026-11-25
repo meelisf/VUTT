@@ -26,6 +26,7 @@ import UploadStepReview from './components/UploadStepReview';
 import UploadStepSplit from './components/UploadStepSplit';
 import { TYPE_HAND, TYPE_PRINT, RESUMABLE_STATUSES } from './constants';
 import { useUploadWizard } from './useUploadWizard';
+import PromoteDialog from '../../components/exemplars/PromoteDialog';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getLangCode } from '../../utils/getLangCode';
@@ -84,6 +85,24 @@ const UploadPage: React.FC = () => {
                 <h2 className="font-semibold text-gray-800 mb-3 text-sm">{t('pending.title')}</h2>
                 <div className="space-y-2">
                   {wizard.pendingUploads.map((u) => {
+                    // Orb asendusmärk (ADR 0089 p 6): kausta pole, lõpetamine käib teose
+                    // eksemplari lehelt („Lõpeta lehestiku asendus").
+                    if (u.orphan) {
+                      return (
+                        <div key={u.id} className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200">
+                          <div>
+                            <p className="font-medium text-gray-900 text-sm">{u.title}</p>
+                            <p className="text-xs text-amber-800">{t('pending.orphanReplace')}</p>
+                          </div>
+                          {u.work_id && (
+                            <Link to={`/work/${u.work_id}/exemplar`}
+                              className="text-sm font-medium text-primary-600 hover:text-primary-800 px-3 py-1.5 rounded-md hover:bg-primary-50">
+                              {t('pending.orphanOpen')}
+                            </Link>
+                          )}
+                        </div>
+                      );
+                    }
                     // Loend elab `constants.ts`-is: backend võib lisada staatuse,
                     // mille klassifitseerimata jätmine peidaks „Jätka" nupu vaikselt.
                     const canResume = RESUMABLE_STATUSES.includes(u.status)
@@ -252,6 +271,23 @@ const UploadPage: React.FC = () => {
         {/* ------------------------------------------------------------------ */}
         {/* SAMM 4: Ülevaatus                                                   */}
         {/* ------------------------------------------------------------------ */}
+        {/* Aluse vahetus (ADR 0089 p 6): lähteeksemplar on nähtav kogu viisardi vältel. */}
+        {wizard.pollResult?.promote && wizard.step > 1 && (
+          <div className="mb-4 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-900">
+            {t('promoteBanner', {
+              source: [wizard.pollResult.promote.holder, wizard.pollResult.promote.shelfmark].filter(Boolean).join(' · ')
+                || wizard.pollResult.promote.exemplar_id,
+            })}
+          </div>
+        )}
+        {wizard.promoteConflict && wizard.uploadId && wizard.replaceWorkId && wizard.pollResult?.promote && (
+          <PromoteDialog workId={wizard.replaceWorkId} exemplarId={wizard.pollResult.promote.exemplar_id}
+            exemplars={wizard.promoteExemplars} authToken={authToken} mode="confirm"
+            uploadId={wizard.uploadId} initialPreview={wizard.promoteConflict}
+            onClose={wizard.clearPromoteConflict}
+            onConfirmed={() => { wizard.clearPromoteConflict(); void wizard.handleReplaceImport(); }} />
+        )}
+
         {wizard.step === 4 && (
           <UploadStepReview
             status={wizard.status}

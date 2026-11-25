@@ -13,7 +13,9 @@
     "empty": "No pending uploads",
     "stalled": "OCR stalled",
     "stalledHint": "No new pages from OCR for over 30 minutes — the job may have stalled. Check the OCR server if needed.",
-    "partial": "{{pct}}% uploaded"
+    "partial": "{{pct}}% uploaded",
+    "orphanReplace": "A page replacement is unfinished and its upload folder is missing.",
+    "orphanOpen": "Open exemplars and finish"
   },
   "step1": {
     "title": "Work metadata",
@@ -206,5 +208,6 @@
     "applying": "Processing and sending",
     "ada_fetching": "Downloading from ADA",
     "ada_error": "ADA download error"
-  }
+  },
+  "promoteBanner": "Transcription base swap: the new pages come from exemplar {{source}}. The work's metadata is not changed; the current pages are kept as images of their own exemplar."
 }

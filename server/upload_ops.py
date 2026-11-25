@@ -311,7 +311,13 @@ def list_uploads() -> list:
     have = {s.get("id") for s in states}
     for slug, m in replace_marker.list_markers():
         if m.get("upload_id") not in have:
+            try:
+                with open(os.path.join(BASE_DIR, slug, "_metadata.json"), encoding="utf-8") as f:
+                    wmeta = json.load(f) or {}
+            except (OSError, ValueError):
+                wmeta = {}
             states.append({"id": m.get("upload_id"), "orphan": True, "slug": slug,
+                           "work_id": wmeta.get("id"), "title": wmeta.get("title") or slug,
                            "replace_phase": (m.get("progress") or {}).get("phase"),
                            "status": "replace_pending"})
     return states

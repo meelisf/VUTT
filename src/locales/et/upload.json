@@ -13,7 +13,9 @@
     "empty": "Pooleliolevaid üleslaadimisi pole",
     "stalled": "OCR seisab",
     "stalledHint": "OCR pole üle 30 minuti uusi lehti tootnud — töö võib olla pooleli jäänud. Kontrolli vajadusel OCR-serverit.",
-    "partial": "pooleli {{pct}}%"
+    "partial": "pooleli {{pct}}%",
+    "orphanReplace": "Lehestiku asendus on pooleli, üleslaadimise kaust on kadunud.",
+    "orphanOpen": "Ava eksemplarid ja lõpeta"
   },
   "step1": {
     "title": "Teose metaandmed",
@@ -206,5 +208,6 @@
     "applying": "Töötleb ja saadab",
     "ada_fetching": "Laen ADA-st",
     "ada_error": "ADA allalaadimise viga"
-  }
+  },
+  "promoteBanner": "Transkriptsiooni aluse vahetus: uued lehed tulevad eksemplarist {{source}}. Teose metaandmeid ei muudeta; praegused lehed jäävad oma eksemplari piltideks."
 }
