@@ -503,9 +503,11 @@ asendusmärk (`state/work_replacing/{slug}.json`, `server/replace_marker.py`, ta
 → vanade lehtede lukud → paarid → `old_head`. Märgi ajal lükkavad `page_lock` ja `work_lock`
 tagasi kõik peale omaniku (`marker_owner`) → 409; üleslaadimise tühistus → 409. **Vana seis on
 kettal, mitte gitis:** kõik vanad lehefailid (txt/json/jpg, mitte `_metadata.json`) liiguvad
-prügikasti ja taastamine toob need tagasi (commitimata salvestatud tekst jääb alles). Ühist
-git-indeksit puudutab alles lõplik commit (`commit --only -- slug`, treiler `Upload: <id>`);
-tõrge = taastamine + 500. Käivitusaegne taaste (`replace_recovery.recover_all`) jookseb
+prügikasti ja taastamine toob need tagasi (commitimata salvestatud tekst jääb alles). Lõplik
+commit käib ajutise indeksiga (`GIT_INDEX_FILE` → commit-tree → update-ref, treiler `Upload: <id>`) —
+ühine indeks ei näe asenduse ettevalmistust kunagi; tõrge = taastamine + 500. Teose kustutus võtab
+teose luku (pooleli asendus → 409). Kui käivitusaegne taaste ei saa indeksit sünkroonida, server
+ei käivitu. Käivitusaegne taaste (`replace_recovery.recover_all`) jookseb
 lifespan'is ENNE päringuid ja tegutseb ainult selle asenduse aktiivse märgi olemasolul; esimese
 sammuna viib ta teose kausta indeksi HEAD-ile. Ajaloo lugemisviga ≠ „commit'i pole". Igal katsel
 oma tühi prügikasti kaust. Uued lehed kannavad

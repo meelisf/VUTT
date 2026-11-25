@@ -889,32 +889,48 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                 pass
 
     # 9. Git commit uuendatud sisuga
-    # Commit AINULT selle teose failidega (`git commit --only -- slug`): `repo.index.commit`
-    # commitis kogu ühise indeksi ja võttis kaasa teise teose pooleli muudatused (PR #881).
-    # Tõrke korral puhastatakse asenduse indeksimuudatused SAMA git-luku all.
+    # Commit AJUTISE indeksiga (`GIT_INDEX_FILE`, PR #881 5. voor): ühine indeks ei näe
+    # asenduse ettevalmistust ka tõrke ega katkestuse korral — teised commitivad seda
+    # `repo.index.commit`-iga tervikuna. read-tree HEAD → add slug → write-tree →
+    # commit-tree → update-ref (CAS vana HEAD-iga). Alles siis sünkroonitakse ühise indeksi
+    # teose kaust HEAD-iga; selle akna katab käivitusaegne taaste (indeks esimese sammuna).
     try:
         from .git_ops import get_or_init_repo, git_write_lock
         repo = get_or_init_repo()
         author_name = username if username else "Automaatne"
         author_email = f"{author_name}@vutt.local"
+        tmp_index = os.path.join(repo.git_dir, f"vutt-replace-{upload_id}.index")
+        idx_env = {"GIT_INDEX_FILE": tmp_index}
         with git_write_lock:
             try:
-                repo.git.add("-A", "--", slug)
-                dirty = bool(repo.git.diff("--cached", "--name-only", "--", slug).strip())
+                parent = repo.git.rev_parse("HEAD")
+                repo.git.read_tree(parent, env=idx_env)
+                repo.git.add("-A", "--", slug, env=idx_env)
+                tree = repo.git.write_tree(env=idx_env)
+                dirty = tree != repo.git.rev_parse(f"{parent}^{{tree}}")
                 if dirty:
-                    repo.git.commit(
-                        "--only", "--no-verify", "--no-gpg-sign",
+                    new_commit = repo.git.commit_tree(
+                        tree, "-p", parent,
                         "-m", f"Asenda sisu: {slug} ({work_id})\n\n{replace_recovery.commit_trailer(upload_id)}",
-                        "--author", f"{author_name} <{author_email}>",
-                        "--", slug,
-                        env={"GIT_COMMITTER_NAME": author_name, "GIT_COMMITTER_EMAIL": author_email},
+                        env={"GIT_AUTHOR_NAME": author_name, "GIT_AUTHOR_EMAIL": author_email,
+                             "GIT_COMMITTER_NAME": author_name, "GIT_COMMITTER_EMAIL": author_email},
                     )
-            except Exception:
+                    repo.git.update_ref("HEAD", new_commit, parent)
+            finally:
+                for f in (tmp_index, tmp_index + ".lock"):
+                    try:
+                        os.remove(f)
+                    except FileNotFoundError:
+                        pass
+            if dirty:
+                # Ühise indeksi teose kaust → HEAD (muidu oleksid kirjed vananenud ja teise
+                # teose `repo.index.commit` pööraks asenduse tagasi).
                 try:
                     repo.git.reset("-q", "HEAD", "--", slug)
-                except Exception:
-                    logger.exception(f"replace {upload_id}: indeksi puhastus commit'i tõrke järel ebaõnnestus")
-                raise
+                except Exception as sync_err:
+                    logger.critical(f"replace {upload_id}: ühise indeksi sünk pärast commit'i ebaõnnestus: {sync_err}")
+                    from .client_errors import record_server_error
+                    record_server_error("server:thread", sync_err)
         if dirty:
             logger.info(f"replace {upload_id}: git commit OK ({slug})")
         else:

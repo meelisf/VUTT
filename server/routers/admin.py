@@ -491,7 +491,13 @@ def admin_work_delete(work_id: str, background_tasks: BackgroundTasks, user=Depe
     # Seoste lugemine, koristus ja kausta eemaldamine ÜHE metadata_lock-i all
     # (ADR 0075): muidu jõuaks samaaegne PUT lisada seose, mida keegi ei koristaks.
     # Meili sünk käib background_tasks-iga, väljaspool lukku.
-    with metadata_lock:
+    # Teose lukk ENNE metadata_lock-i (ADR 0089): pooleli lehestiku asendus annab 409
+    # (asendusmärk) — muidu kustutataks teos koos prügikastis ootava taastekoopiaga.
+    from ..admin_page_ops import work_lock
+    first = find_directory_by_id(work_id)
+    if not first:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    with work_lock(os.path.basename(first), first), metadata_lock:
         path = find_directory_by_id(work_id)
         if not path:
             raise HTTPException(status_code=404, detail="Teost ei leitud")

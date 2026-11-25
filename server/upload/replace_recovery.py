@@ -110,8 +110,9 @@ def recover_locked(upload_id: str, slug: str, work_dir: str) -> str:
     """Pooleli asendus märgi järgi — kutsuja hoiab teose `work_lock`-i (ja on märgi omanik).
 
     `"replaced"` (commit tehtud, järelsammud tehtud), `"restored"` (vana seis taastatud),
-    `"cleared"` (taastada polnud midagi), `"restore_failed"`, `"commit_unknown"` või
-    `"after_failed"` (märk ja taasteinfo jäävad; teos jääb kirjutamiseks lukku).
+    `"cleared"` (taastada polnud midagi), `"restore_failed"`, `"commit_unknown"`,
+    `"after_failed"` (märk ja taasteinfo jäävad; teos jääb kirjutamiseks lukku) või
+    `"index_failed"` (ühist indeksit ei saanud HEAD-iga sünkroonida — ohtlik kõigile teostele).
     """
     from .. import upload_ops
     from ..git_ops import get_or_init_repo
@@ -159,7 +160,7 @@ def recover_locked(upload_id: str, slug: str, work_dir: str) -> str:
             repo.git.reset("-q", "HEAD", "--", slug)
     except Exception:
         logger.exception("Asenduse taaste: indeksi lähtestus ebaõnnestus (%s, %s)", slug, upload_id)
-        return "restore_failed"
+        return "index_failed"
     try:
         leitud = find_replace_commit(repo, progress["old_head"], slug, upload_id)
     except ReplaceCommitUnknown:
@@ -197,11 +198,14 @@ def recover_all() -> None:
     ükski teine commit ei tohi seda kaasa võtta enne, kui taaste on indeksi puhastanud.
     Ei kuku — taastamata teos jääb märgi tõttu kirjutamiseks lukku.
     """
+    indeks_katki = []
     for slug, m in replace_marker.list_markers():
         uid = m.get("upload_id")
         try:
             tulemus = recover(uid, slug)
             logger.warning("Asenduse taaste käivitusel: %s (%s) → %s", slug, uid, tulemus)
+            if tulemus == "index_failed":
+                indeks_katki.append(slug)
         except Exception as e:
             logger.exception("Asenduse taaste käivitusel ebaõnnestus: %s (%s)", slug, uid)
             try:
@@ -209,3 +213,9 @@ def recover_all() -> None:
                 record_server_error("server:thread", e)
             except Exception:
                 pass
+    if indeks_katki:
+        # Fail-fast (PR #881 5. voor): ühises indeksis võib olla asendusega seotud vananenud
+        # või stage'itud seis — ükski päring ei tohi enne commit'ida. Server ei käivitu.
+        raise RuntimeError(
+            f"Lehestiku asenduse taaste: git-indeksit ei saanud sünkroonida ({', '.join(indeks_katki)}). "
+            "Server ei käivitu, et ükski commit ei võtaks asenduse seisu kaasa. Kontrolli /data git-repot.")

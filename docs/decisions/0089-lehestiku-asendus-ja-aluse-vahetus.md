@@ -104,6 +104,12 @@ Kolm parandusvooru näitasid, et vana seisu git'ist tuletamine ei kata kettal ol
   esimesena HEAD-ile — ka siis, kui commit'i olemasolu jääb ebaselgeks. Igal katsel oma tühi
   prügikasti kaust (`{ts}-{upload_id}-{juhuslik}`). Vanad pildid sama reegliga mis leheloend
   (.jpg/.jpeg/.png, suurtähtedega ja ilma).
+- (5. voor) Lõplik commit käib **ajutise indeksiga** (`GIT_INDEX_FILE`: read-tree HEAD → add slug →
+  write-tree → commit-tree → update-ref CAS-iga); ühine indeks ei näe asenduse ettevalmistust
+  kunagi. Pärast update-ref'i sünkroonitakse ühise indeksi teose kaust HEAD-iga; selle akna
+  katab käivitusaegne taaste. Kui käivitusaegne taaste ei saa indeksit sünkroonida
+  (`index_failed`), **server ei käivitu**. Teose kustutus võtab teose luku enne `metadata_lock`-i
+  (pooleli asendus → 409).
 
 ## Tagajärjed
 

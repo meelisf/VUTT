@@ -266,7 +266,7 @@ def test_commit_torge_taastab_ja_kukub(tmp_path, monkeypatch):
     """(1) Commit'i erind ei ole edu: vana seis tagasi, 500, märk ja taasteinfo ära."""
     from fastapi import HTTPException
     upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
-    _katkine_git_kasklus(monkeypatch, repo, "commit")
+    _katkine_git_kasklus(monkeypatch, repo, "commit_tree")
     with pytest.raises(HTTPException) as exc:
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
     assert exc.value.status_code == 500
@@ -418,7 +418,7 @@ def test_commit_torge_puhastab_indeksi_luku_all(tmp_path, monkeypatch):
     from fastapi import HTTPException
     upload_id, work_id, slug, work_dir, data_dir, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
     real_git = repo.git
-    _katkine_git_kasklus(monkeypatch, repo, "commit")
+    _katkine_git_kasklus(monkeypatch, repo, "commit_tree")
     with pytest.raises(HTTPException):
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
     assert real_git.diff("--cached", "--name-only", "--", slug).strip() == ""
@@ -707,3 +707,56 @@ def test_asendus_arhiveerib_koik_lehepildid(tmp_path, monkeypatch):
     for n in ("vana-teos_pg_002.JPG", "vana-teos_pg_003.jpeg", "vana-teos_pg_004.png"):
         assert not (work_dir / n).exists(), n
         assert list((data_dir / "._trash").rglob(n)), n
+
+
+# ── Ülevaatus PR #881, 5. voor ────────────────────────────────────────────────
+
+def test_commit_ei_kasuta_uhist_indeksit_ka_torke_korral(tmp_path, monkeypatch):
+    """(1) Lõplik commit käib ajutise indeksiga: commit'i JA indeksi puhastuse tõrge ei jäta
+    ühisesse indeksisse asenduse muudatusi (teine import commitiks need muidu kaasa)."""
+    from fastapi import HTTPException
+    upload_id, work_id, slug, work_dir, data_dir, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    real_git = repo.git
+
+    class KatkineGit:
+        def __getattr__(self, name):
+            if name in ("commit_tree", "commit", "reset"):
+                return lambda *a, **k: (_ for _ in ()).throw(RuntimeError(f"{name} katki"))
+            return getattr(real_git, name)
+
+    monkeypatch.setattr(repo, "git", KatkineGit(), raising=False)
+    with pytest.raises(HTTPException):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert real_git.diff("--cached", "--name-only", "--", slug).strip() == ""
+
+
+def test_kaivitusaegne_indeksi_torge_peatab_serveri(monkeypatch):
+    """(1) Kui käivitusaegne taaste ei saa indeksit sünkroonida, server ei käivitu."""
+    monkeypatch.setattr(replace_marker, "list_markers", lambda: [("a", {"upload_id": "u1"})])
+    monkeypatch.setattr(replace_recovery, "recover", lambda uid, slug: "index_failed")
+    with pytest.raises(RuntimeError):
+        replace_recovery.recover_all()
+
+
+def test_recover_indeksi_torkel_index_failed(tmp_path, monkeypatch):
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    replace_marker.write_marker(slug, upload_id, {
+        "phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": "", "old_files": [], "new_files": []})
+    _katkine_git_kasklus(monkeypatch, repo, "reset")
+    assert replace_recovery.recover(upload_id, slug) == "index_failed"
+    assert replace_marker.read_marker(slug) is not None
+
+
+def test_teose_kustutus_asenduse_ajal_409(tmp_path, monkeypatch):
+    """(2) Teose kustutus võtab teose luku → pooleli asendus annab 409, pildid jäävad."""
+    from fastapi import BackgroundTasks
+    from server.routers import admin
+    upload_id, work_id, slug, work_dir, data_dir, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    monkeypatch.setattr(admin, "find_directory_by_id", lambda wid: str(work_dir) if wid == work_id else None)
+    monkeypatch.setattr(admin, "BASE_DIR", str(data_dir))
+    replace_marker.write_marker(slug, upload_id, {"phase": "replacing"})
+    monkeypatch.setattr(replace_marker, "BASE_DIR", str(data_dir))
+    with pytest.raises(replace_marker.WorkReplacingError):
+        admin.admin_work_delete(work_id, BackgroundTasks(), {"username": "adm", "role": "admin"})
+    assert work_dir.exists()
+    assert (work_dir / "vana-teos_pg_001.jpg").exists()
