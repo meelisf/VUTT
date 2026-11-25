@@ -65,6 +65,22 @@ def _exemplars_view(work_id: str, path: str, meta: dict, user) -> dict:
     }
 
 
+def _promote_call(fn, *args, **kwargs):
+    from .. import promote
+    try:
+        return fn(*args, **kwargs)
+    except promote.PromoteError as e:
+        raise HTTPException(status_code=e.status, detail={"code": e.code, "detail": e.detail})
+
+
+@router.get("/admin/work/{work_id}/exemplars/{eid}/promote/preview")
+def promote_preview(work_id: str, eid: str, user=Depends(require_role("admin"))):
+    """Aluse vahetuse eelvaade (ADR 0089 p 6): lehtede päritolu, toimetatud lehed, salvestatavus."""
+    from .. import promote
+    path = _writable(work_id, user)
+    return _promote_call(promote.preview, path, eid)
+
+
 @router.get("/works/{work_id}/exemplars")
 def list_exemplars(work_id: str, user=Depends(optional_user)):
     """Eksemplarid, lehtede päritolu ja konvoluudi kaaslased.

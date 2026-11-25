@@ -70,6 +70,20 @@ def _view_image(img: Image.Image) -> Image.Image:
     return img
 
 
+def storable_reason(path: str) -> Optional[str]:
+    """Põhjus, miks faili ei saa eksemplaripildina salvestada (samad piirid mis `store_image`),
+    või None. Ei dekodeeri: mõõt päisest (aluse vahetus kontrollib vanu lehti ENNE commit'i)."""
+    try:
+        if os.path.getsize(path) > MAX_UPLOAD_BYTES:
+            return "liiga suur fail (üle 100 MB)"
+        with Image.open(path) as img:
+            if max(img.size) > MAX_SIDE:
+                return f"pikim külg üle {MAX_SIDE} px"
+    except Exception as e:
+        return f"loetamatu pilt: {e}"
+    return None
+
+
 def store_image(content: bytes, dest_dir: str, image_id: str) -> Optional[str]:
     """Kirjutab `{id}.jpg` ja vajadusel `{id}.orig.{ext}`. Tagastab lähtefaili nime
     või `None`, kui `{id}.jpg` on ise lähtefail. Viga → midagi ei kirjutata."""
