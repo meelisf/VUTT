@@ -504,8 +504,9 @@ märgi ajal lükkavad `page_lock` ja `work_lock` tagasi kõik peale omaniku (`ma
 Järjekord: märk → vanade lehtede lukud → paarid → `old_head` (taastepunkt pärast lukke).
 Taasteinfo koopia elab märgifailis (üleslaadimise tühistus asenduse ajal → 409). Vanad lehed
 eemaldatakse AINULT töökaustast — indeks muutub alles lõpliku commit'iga (ühist indeksit
-commitivad teised `repo.index.commit`-iga). Commit kannab treilerit `Upload: <id>`; commit'i
-tõrge = taastamine + 500. Katkestuse järel otsustab `replace_recovery.recover` (serveri
+commitivad teised `repo.index.commit`-iga). Commit kannab treilerit `Upload: <id>` ja on `git commit --only -- slug`
+(ainult selle teose failid; tõrkel indeks puhtaks sama git-luku all); commit'i tõrge = taastamine
++ 500. Uus katse taastab/lõpetab enne pooleli asenduse; ajaloo lugemisviga ≠ „commit'i pole". Katkestuse järel otsustab `replace_recovery.recover` (serveri
 käivitusel) treileri järgi: lõpeta või taasta. Taastamine puudutab ainult vanu lehefaile (mitte
 `_metadata.json`-i), taastab JPG-d prügikasti oleku järgi ja viskab tõrkel `RestoreError` — siis
 jäävad märk ja taasteinfo alles. Asenduse metaandmete uuendus käib alles pärast lehestiku

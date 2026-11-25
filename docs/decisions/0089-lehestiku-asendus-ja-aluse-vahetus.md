@@ -77,6 +77,12 @@ p 1–5 peale.
   `RestoreError` → märk ja taasteinfo jäävad.
 - Taasteinfo koopia märgifailis; asenduse ajal üleslaadimise tühistus → 409.
 - Võtmeta `/save` (vana kimp) on lubatud ainult lehel, millel kettal põlvkonda pole.
+- Asenduse commit on `git commit --only -- slug` (mitte `repo.index.commit`): ainult selle teose
+  failid; tõrkel `git reset HEAD -- slug` sama git-luku all.
+- Uus asenduskatse (ka sama üleslaadimise oma) taastab/lõpetab enne pooleli asenduse; kui see ei
+  õnnestu → 409.
+- Git-ajaloo lugemisviga ≠ „commit'i pole": `commit_unknown`, märk ja taasteinfo jäävad.
+- Üleslaadimise metaandmed rakendatakse järelsammus (`_after_replace_commit`), mida kordab ka taaste.
 
 ## Tagajärjed
 

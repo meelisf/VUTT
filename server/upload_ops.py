@@ -552,6 +552,20 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
     from .replace_marker import marker_owner
 
     work_dir = find_directory_by_id(target_work_id)
+    if work_dir:
+        # Pooleli asendus (ka sama üleslaadimise varasem katse) tuleb enne uut katset taastada
+        # või lõpetada — muidu kirjutaks uus katse märgi ja taasteinfo üle (PR #881).
+        from fastapi import HTTPException
+        from . import replace_marker as _rm
+        from .upload import replace_recovery as _rr
+        _slug = os.path.basename(work_dir)
+        _m = _rm.read_marker(_slug)
+        if _m:
+            tulemus = _rr.recover(_m.get("upload_id"), _slug)
+            if tulemus in ("restore_failed", "commit_unknown"):
+                raise HTTPException(status_code=409, detail=(
+                    "Teose eelmine lehestiku asendus on pooleli ja seda ei õnnestunud taastada. / "
+                    "A previous page replacement is unfinished and could not be recovered."))
     # Selle lõime kirjutused kuuluvad asendusele: asendusmärk (ADR 0089 p 2) laseb läbi.
     # `page_locks`: vanade lehtede lukud (ADR 0089 p 4) vabanevad ka ootamatu erindi korral.
     try:
@@ -873,21 +887,32 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                 pass
 
     # 9. Git commit uuendatud sisuga
+    # Commit AINULT selle teose failidega (`git commit --only -- slug`): `repo.index.commit`
+    # commitis kogu ühise indeksi ja võttis kaasa teise teose pooleli muudatused (PR #881).
+    # Tõrke korral puhastatakse asenduse indeksimuudatused SAMA git-luku all.
     try:
         from .git_ops import get_or_init_repo, git_write_lock
-        from git import Actor
         repo = get_or_init_repo()
+        author_name = username if username else "Automaatne"
+        author_email = f"{author_name}@vutt.local"
         with git_write_lock:
-            repo.git.add(slug)
-            dirty = repo.is_dirty(index=True)
-            if dirty:
-                author_name = username if username else "Automaatne"
-                actor = Actor(author_name, f"{author_name}@vutt.local")
-                repo.index.commit(
-                    f"Asenda sisu: {slug} ({work_id})\n\n{replace_recovery.commit_trailer(upload_id)}",
-                    author=actor,
-                    committer=actor,
-                )
+            try:
+                repo.git.add("-A", "--", slug)
+                dirty = bool(repo.git.diff("--cached", "--name-only", "--", slug).strip())
+                if dirty:
+                    repo.git.commit(
+                        "--only", "--no-verify", "--no-gpg-sign",
+                        "-m", f"Asenda sisu: {slug} ({work_id})\n\n{replace_recovery.commit_trailer(upload_id)}",
+                        "--author", f"{author_name} <{author_email}>",
+                        "--", slug,
+                        env={"GIT_COMMITTER_NAME": author_name, "GIT_COMMITTER_EMAIL": author_email},
+                    )
+            except Exception:
+                try:
+                    repo.git.reset("-q", "HEAD", "--", slug)
+                except Exception:
+                    logger.exception(f"replace {upload_id}: indeksi puhastus commit'i tõrke järel ebaõnnestus")
+                raise
         if dirty:
             logger.info(f"replace {upload_id}: git commit OK ({slug})")
         else:
@@ -901,9 +926,18 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     # Commit tehtud: edasi on asendus „tehtud" (katkestuse järel lõpetatakse, mitte ei taastata).
     _set_replace_phase(upload_id, "replaced", slug=slug)
 
-    # 8. Uuenda metaandmeid upload state['meta'] põhjal — alles PÄRAST lehestiku commit'i:
-    # taastamine ei puutu `_metadata.json`-i, nii et ebaõnnestunud asendus ei tohi seda muuta.
-    # Säilita id ja slug originaalist.
+    work_sets_skipped = _after_replace_commit(upload_id, state, work_dir, slug, target_work_id, username)
+    replace_marker.remove_marker(slug)
+
+    logger.info(f"replace {upload_id}: valmis → work_id={target_work_id}, slug={slug}, lehed={downloaded}")
+    result = {"work_id": target_work_id, "slug": slug}
+    if work_sets_skipped is not None:
+        result["work_sets_skipped"] = work_sets_skipped
+    return result
+
+
+def _apply_replace_metadata(upload_id: str, state: dict, meta_path: str, username: str) -> None:
+    """Üleslaadimise vormi metaandmed teosele (id ja slug jäävad originaalist)."""
     try:
         upload_meta = state.get('meta', {})
         OPTIONAL_META_FIELDS = [
@@ -937,23 +971,13 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
                 updates,
                 username,
                 "Uuenda metadata asendusel",
-                background_tasks=background_tasks,
+                background_tasks=None,
                 sync_meili=False,
                 call_ptw=False,
             )
             logger.info(f"replace {upload_id}: metadata uuendatud ({len(updates)} välja)")
     except Exception as e:
         logger.warning(f"replace {upload_id}: metadata uuendamine ebaõnnestus: {e}")
-
-
-    work_sets_skipped = _after_replace_commit(upload_id, state, work_dir, slug, target_work_id, username)
-    replace_marker.remove_marker(slug)
-
-    logger.info(f"replace {upload_id}: valmis → work_id={target_work_id}, slug={slug}, lehed={downloaded}")
-    result = {"work_id": target_work_id, "slug": slug}
-    if work_sets_skipped is not None:
-        result["work_sets_skipped"] = work_sets_skipped
-    return result
 
 
 def _after_replace_commit(upload_id: str, state: dict, work_dir: str, slug: str,
@@ -967,6 +991,13 @@ def _after_replace_commit(upload_id: str, state: dict, work_dir: str, slug: str,
     except (OSError, ValueError):
         work_id = target_work_id
     state_lock = _get_upload_lock(upload_id)
+    with state_lock:
+        fresh = _read_state(upload_id)
+    if fresh:
+        state = fresh
+    # 8. Üleslaadimise metaandmed (pärast lehestiku commit'i; korratav — muutusteta
+    # salvestus on no-op, ADR 0012). Järelsammus, et ka taaste neid rakendaks (PR #881).
+    _apply_replace_metadata(upload_id, state, meta_path, username)
     # 9a. Osad (ADR 0089 p 5): leheviited nulli ENNE `refresh_work_mentions`-it, mis
     # muidu jätaks samanimelised (aga teise sisuga) tüved osadesse alles.
     try:

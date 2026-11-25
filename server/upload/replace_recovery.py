@@ -25,14 +25,23 @@ def commit_trailer(upload_id: str) -> str:
     return f"Upload: {upload_id}"
 
 
+class ReplaceCommitUnknown(Exception):
+    """Git-ajalugu ei saanud lugeda — commit'i olemasolu on ebaselge."""
+
+
 def find_replace_commit(repo, old_head: str, slug: str, upload_id: str) -> Optional[str]:
-    """Treileriga asenduse commit `old_head..HEAD` vahemikus (teose kaustas) või None."""
+    """Treileriga asenduse commit `old_head..HEAD` vahemikus (teose kaustas) või None.
+
+    Lugemisviga ei ole „commit'i pole": viskab `ReplaceCommitUnknown`, sest valesti
+    otsustatud rollback taastaks vanad failid juba commititud asenduse peale (PR #881).
+    """
     try:
         for c in repo.iter_commits(f"{old_head}..HEAD", paths=slug):
             if commit_trailer(upload_id) in (c.message or ""):
                 return c.hexsha
-    except Exception:
+    except Exception as e:
         logger.exception("Asenduse commit'i otsing ebaõnnestus (%s)", upload_id)
+        raise ReplaceCommitUnknown(str(e)) from e
     return None
 
 
@@ -163,7 +172,12 @@ def recover(upload_id: str, slug: str) -> str:
                 replace_marker.remove_marker(slug)
                 return "cleared"
             repo = get_or_init_repo()
-            if find_replace_commit(repo, progress["old_head"], slug, upload_id):
+            try:
+                leitud = find_replace_commit(repo, progress["old_head"], slug, upload_id)
+            except ReplaceCommitUnknown:
+                logger.error("Asenduse commit ebaselge (%s, %s) — märk ja taasteinfo jäävad", slug, upload_id)
+                return "commit_unknown"
+            if leitud:
                 upload_ops._set_replace_phase(upload_id, "replaced", slug=slug)
                 try:
                     upload_ops._after_replace_commit(upload_id, state, work_dir, slug,

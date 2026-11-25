@@ -257,7 +257,7 @@ def test_commit_torge_taastab_ja_kukub(tmp_path, monkeypatch):
     """(1) Commit'i erind ei ole edu: vana seis tagasi, 500, märk ja taasteinfo ära."""
     from fastapi import HTTPException
     upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
-    monkeypatch.setattr(type(repo.index), "commit", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("lock")))
+    _katkine_git_kasklus(monkeypatch, repo, "commit")
     with pytest.raises(HTTPException) as exc:
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
     assert exc.value.status_code == 500
@@ -396,3 +396,97 @@ def test_taaste_ei_puutu_vahepeal_salvestatud_metaandmeid(tmp_path, monkeypatch)
         upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
     assert json.loads(meta.read_text(encoding="utf-8"))["title"] == "Uus pealkiri"
     assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
+
+
+# ── Ülevaatus PR #881, 2. voor ────────────────────────────────────────────────
+
+def _katkine_git_kasklus(monkeypatch, repo, kasklus):
+    real_git = repo.git
+
+    class KatkineGit:
+        def __getattr__(self, name):
+            if name == kasklus:
+                return lambda *a, **k: (_ for _ in ()).throw(RuntimeError(f"{kasklus} katki"))
+            return getattr(real_git, name)
+
+    monkeypatch.setattr(repo, "git", KatkineGit(), raising=False)
+
+
+def test_commit_torge_puhastab_indeksi_luku_all(tmp_path, monkeypatch):
+    """(2) Commit'i tõrke järel ei tohi asenduse muudatusi ühisesse indeksisse jääda."""
+    from fastapi import HTTPException
+    upload_id, work_id, slug, work_dir, data_dir, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    real_git = repo.git
+    _katkine_git_kasklus(monkeypatch, repo, "commit")
+    with pytest.raises(HTTPException):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert real_git.diff("--cached", "--name-only", "--", slug).strip() == ""
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
+
+
+def test_commit_ei_vota_teise_teose_indeksit_kaasa(tmp_path, monkeypatch):
+    """(2) Asenduse commit sisaldab ainult asendatava teose faile."""
+    upload_id, work_id, slug, work_dir, data_dir, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    teine = data_dir / "teine-teos"
+    teine.mkdir()
+    (teine / "x.txt").write_text("teise teose pooleli muudatus", encoding="utf-8")
+    repo.index.add(["teine-teos/x.txt"])
+    upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    commit = next(c for c in repo.iter_commits() if f"Upload: {upload_id}" in c.message)
+    assert all(f.startswith(f"{slug}/") for f in commit.stats.files), list(commit.stats.files)
+    assert "teine-teos/x.txt" in repo.git.diff("--cached", "--name-only")
+
+
+def test_korduskatse_taastab_enne_poolelioleva_asenduse(tmp_path, monkeypatch):
+    """(1) Sama üleslaadimise korduskatse ei tohi poolelioleva asenduse taasteinfot üle kirjutada."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    trash = tmp_path / "t"
+    trash.mkdir()
+    # Esimene katse suri pärast vanade failide eemaldamist.
+    (work_dir / "vana-teos_pg_001.jpg").rename(trash / "vana-teos_pg_001.jpg")
+    (work_dir / "vana-teos_pg_001.txt").unlink()
+    (work_dir / "vana-teos_pg_001.json").unlink()
+    replace_marker.write_marker(slug, upload_id, {
+        "phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(trash),
+        "old_jpgs": ["vana-teos_pg_001.jpg"], "new_files": [],
+        "old_tracked": ["vana-teos_pg_001.json", "vana-teos_pg_001.txt"]})
+
+    class Katkine(_KirjutavSftp):
+        def get(self, remote, local):
+            raise FileNotFoundError(remote)
+
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda _u: Katkine(["uus-teos_pg_001.jpg", "uus-teos_pg_001.txt"]))
+    with pytest.raises(Exception):
+        upload_ops.replace_work_content(upload_id, work_id, {}, "admin", background_tasks=None)
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "vana tekst"
+    assert (work_dir / "vana-teos_pg_001.jpg").read_bytes() == b"vana jpg"
+    assert replace_marker.read_marker(slug) is None
+
+
+def test_ajaloo_lugemisviga_ei_kaivita_rollbacki(tmp_path, monkeypatch):
+    """(3) Kui commit'i olemasolu jääb ebaselgeks, jäävad märk ja taasteinfo; faile ei puudutata."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    replace_marker.write_marker(slug, upload_id, {
+        "phase": "replacing", "old_head": repo.head.commit.hexsha, "trash_dir": str(tmp_path / "t"),
+        "old_jpgs": [], "new_files": [], "old_tracked": ["vana-teos_pg_001.txt"]})
+    (work_dir / "vana-teos_pg_001.txt").write_text("uus, juba commititud", encoding="utf-8")
+    monkeypatch.setattr(type(repo), "iter_commits", lambda *a, **k: (_ for _ in ()).throw(OSError("pack katki")))
+    assert replace_recovery.recover(upload_id, slug) == "commit_unknown"
+    assert replace_marker.read_marker(slug) is not None
+    assert (work_dir / "vana-teos_pg_001.txt").read_text(encoding="utf-8") == "uus, juba commititud"
+
+
+def test_taaste_rakendab_uleslaadimise_metaandmed(tmp_path, monkeypatch):
+    """(4) Pärast lehestiku commit'i katkenud asendus: taaste rakendab ka metaandmed."""
+    upload_id, work_id, slug, work_dir, _dd, repo = _edukas_asendus_seadistus(tmp_path, monkeypatch)
+    old_head = repo.head.commit.hexsha
+    (work_dir / "vana-teos_pg_001.txt").write_text("uus OCR", encoding="utf-8")
+    repo.git.add(slug)
+    repo.index.commit(f"Asenda sisu: {slug} ({work_id})\n\nUpload: {upload_id}")
+    s = _state(upload_id)
+    s["replace_work_id"] = work_id
+    (Path(upload_ops.UPLOADS_DIR) / upload_id / "state.json").write_text(json.dumps(s), encoding="utf-8")
+    replace_marker.write_marker(slug, upload_id, {
+        "phase": "replacing", "old_head": old_head, "trash_dir": "", "old_jpgs": [], "new_files": []})
+    assert replace_recovery.recover(upload_id, slug) == "replaced"
+    assert json.loads((work_dir / "_metadata.json").read_text(encoding="utf-8"))["title"] == "Uus"
