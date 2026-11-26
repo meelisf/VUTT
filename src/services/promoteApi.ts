@@ -34,21 +34,24 @@ export interface PromoteConfirmBody {
 export type ReplaceFinishResult = 'replaced' | 'restored' | 'cleared';
 
 const opts = (token: string | null) => ({ token, timeout: 60_000 });
+// Eelvaade, algus ja kinnitus kontrollivad iga vana lehe pildi salvestatavust (suur
+// mitte-JPEG / üle 4000 px leht dekodeeritakse, ~0,1 s) — suurel teosel rohkem aega.
+const slowOpts = (token: string | null) => ({ token, timeout: 180_000 });
 
 export function fetchPromotePreview(workId: string, eid: string, token: string | null): Promise<PromotePreview> {
   return apiGet<PromotePreview>(
-    `/admin/work/${encodeURIComponent(workId)}/exemplars/${encodeURIComponent(eid)}/promote/preview`, opts(token));
+    `/admin/work/${encodeURIComponent(workId)}/exemplars/${encodeURIComponent(eid)}/promote/preview`, slowOpts(token));
 }
 
 export async function startPromote(workId: string, eid: string, body: PromoteConfirmBody,
   token: string | null): Promise<string> {
   const r = await apiPost<{ upload_id: string }>(
-    `/admin/work/${encodeURIComponent(workId)}/exemplars/${encodeURIComponent(eid)}/promote`, body, opts(token));
+    `/admin/work/${encodeURIComponent(workId)}/exemplars/${encodeURIComponent(eid)}/promote`, body, slowOpts(token));
   return r.upload_id;
 }
 
 export async function confirmPromote(uploadId: string, body: PromoteConfirmBody, token: string | null): Promise<void> {
-  await apiPost(`/admin/upload/${encodeURIComponent(uploadId)}/promote/confirm`, body, opts(token));
+  await apiPost(`/admin/upload/${encodeURIComponent(uploadId)}/promote/confirm`, body, slowOpts(token));
 }
 
 export async function finishReplace(workId: string, uploadId: string, token: string | null): Promise<ReplaceFinishResult> {

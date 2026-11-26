@@ -240,3 +240,14 @@ def test_paris_viga_jaab_veaks():
                 "error": "Gemini päring ebaõnnestus"}]
     e = normalize_ocr_jobs([], singles, [], _title_of)[0]
     assert e["status_key"] == "error"
+
+
+def test_normalize_orb_asendusmark_suunab_eksemplarilehele():
+    """PR #883 ülevaatus: orvul märgil (ADR 0089 p 6) pole `meta`-t ega `files`-i —
+    viisard ei saa seda jätkata; lõpetamine käib teose eksemplarilehelt."""
+    uploads = [{"id": "u9", "orphan": True, "slug": "s", "work_id": "wid",
+                "title": "Teos", "replace_phase": "replaced", "status": "replace_pending"}]
+    e = normalize_ocr_jobs(uploads, [], [], _title_of)[0]
+    assert e["link"] == "/work/wid/exemplar"
+    assert e["title"] == "Teos"
+    assert e["work_id"] == "wid"

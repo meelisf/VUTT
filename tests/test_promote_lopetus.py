@@ -142,6 +142,38 @@ def test_salvestamatu_vana_leht_ocr_ajal_409(tmp_path, monkeypatch):
     assert e.value.detail["code"] == "old_page_unstorable"
 
 
+def test_dekodeerimatu_vana_leht_409_enne_commiti(tmp_path, monkeypatch):
+    """PR #883 ülevaatus: kärbitud PNG läbis päisekontrolli, commit tehti ja lõpetamine
+    andis 500 — märk jäi `replaced`-olekusse. Kontroll peab dekodeerima ENNE commit'i."""
+    t = _seadista(tmp_path, monkeypatch)
+    (t["work_dir"] / f"{STEM}.jpg").unlink()
+    b = io.BytesIO()
+    Image.effect_noise((400, 400), 64).save(b, "PNG")
+    (t["work_dir"] / f"{STEM}.png").write_bytes(b.getvalue()[: len(b.getvalue()) // 2])
+    head = t["repo"].head.commit.hexsha
+    with pytest.raises(HTTPException) as e:
+        _asenda(t)
+    assert e.value.detail["code"] == "old_page_unstorable"
+    assert t["repo"].head.commit.hexsha == head
+    assert replace_marker.read_marker(t["slug"]) is None
+
+
+def test_kustutatud_siht_annab_eelvaate_uueks_kinnituseks(tmp_path, monkeypatch):
+    """PR #883 ülevaatus: `target_missing` peab kandma värsket eelvaadet, et viisard saaks
+    sama üleslaadimise juures uue sihi valida; kinnitus + kordus õnnestub."""
+    t = _seadista(tmp_path, monkeypatch, origins={STEM: "xxxxxx"}, lisa_meta={"exemplar_unknown_pages": [STEM]})
+    with pytest.raises(HTTPException) as e:
+        _asenda(t)
+    d = e.value.detail
+    assert d["code"] == "target_missing"
+    assert d["detail"]["missing"] == ["xxxxxx"]
+    assert [p["stem"] for p in d["detail"]["pages"]] == [STEM]
+    assert d["detail"]["unknown"] == [STEM]
+    promote.confirm(t["upload_id"], unknown_target="tttttt", confirmed_edited=d["detail"]["edited"])
+    _asenda(t)
+    assert len(_images(t, "tttttt")) == 1
+
+
 def test_lopetamise_kordus_ei_dubleeri(tmp_path, monkeypatch):
     t = _seadista(tmp_path, monkeypatch)
     real = ei.remove_images_internal

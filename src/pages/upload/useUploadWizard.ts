@@ -646,6 +646,10 @@ export function useUploadWizard() {
       total: saved.files.length,
       expected_pages: saved.expected_pages,
       files: saved.files,
+      // Aluse vahetus (ADR 0089 p 6): bänner kohe ka poolitamise sammus, kus staatust ei päri.
+      promote: saved.promote
+        ? { exemplar_id: saved.promote.exemplar_id, holder: saved.promote.holder, shelfmark: saved.promote.shelfmark }
+        : null,
     };
     setPollResult(poll);
     setLocalDeleted(new Set(saved.files.filter((f) => f.deleted).map((f) => f.page)));
@@ -693,6 +697,11 @@ export function useUploadWizard() {
     const match = pendingUploads.find((u) => u.id === targetId);
     if (!match) return;
     resumeHandledRef.current = true;
+    if (match.orphan) {
+      // Orb asendusmärk (ADR 0089 p 6): meta/files puuduvad, viisard ei saa jätkata.
+      navigate(match.work_id ? `/work/${match.work_id}/exemplar` : window.location.pathname, { replace: true });
+      return;
+    }
     handleResume(match);
     navigate(window.location.pathname, { replace: true });
   }, [pendingUploads, searchParams, navigate]);

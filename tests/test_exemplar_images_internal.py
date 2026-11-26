@@ -123,3 +123,49 @@ def test_prugikasti_viimise_torge_viskab(exemplar_work, tmp_path, monkeypatch):
     monkeypatch.setattr(ei.shutil, "move", real)
     ei.remove_images_internal(w["work_dir"], w["eid"], {iid}, "t")
     assert not os.path.exists(os.path.join(ei.exemplar_dir(w["work_dir"], w["eid"]), f"{iid}.jpg"))
+
+
+def _pildifailid(w):
+    d = ei.exemplar_dir(w["work_dir"], w["eid"])
+    return sorted(f for f in os.listdir(d) if f.endswith((".jpg", ".png", ".tif"))) if os.path.isdir(d) else []
+
+
+def test_add_internal_tõrge_partii_keskel_ei_jata_orbe(exemplar_work, tmp_path, monkeypatch):
+    """PR #883 ülevaatus: teise pildi kirjutustõrge jättis esimese faili kettale; kordus
+    lisas uue ID-ga → manifestis 2 pilti, kettal 3 faili."""
+    w = exemplar_work
+    f = [(_jpeg_file(tmp_path / "a.jpg"), _src("s1")), (_jpeg_file(tmp_path / "b.jpg"), _src("s2", 2))]
+    real = ei.store_image
+    kutsed = []
+
+    def katkeb_teisel(content, d, image_id):
+        kutsed.append(image_id)
+        if len(kutsed) == 2:
+            raise OSError("ketas täis")
+        return real(content, d, image_id)
+
+    monkeypatch.setattr(ei, "store_image", katkeb_teisel)
+    with pytest.raises(OSError):
+        ei.add_internal(w["work_dir"], w["eid"], f, "t")
+    assert _pildifailid(w) == []
+    monkeypatch.setattr(ei, "store_image", real)
+    ei.add_internal(w["work_dir"], w["eid"], f, "t")
+    ids = [i["id"] for i in _manifest(w)["images"]]
+    assert len(ids) == 2 and _pildifailid(w) == sorted(f"{i}.jpg" for i in ids)
+
+
+def test_add_internal_commiti_torge_jatab_viidatud_failid(exemplar_work, tmp_path, monkeypatch):
+    """Manifest jõudis kettale, ainult commit ebaõnnestus: failid on viidatud, neid ei kustutata."""
+    w = exemplar_work
+    def kirjuta_ilma_commitita(wd, eid, manifest, _u, _msg):
+        path = ei.manifest_path(wd, eid)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(ei.manifest_json(manifest))
+        return False
+
+    monkeypatch.setattr(ei, "write_manifest_locked", kirjuta_ilma_commitita)
+    with pytest.raises(ei.ExemplarImagesError):
+        ei.add_internal(w["work_dir"], w["eid"], [(_jpeg_file(tmp_path / "a.jpg"), _src("s1"))], "t")
+    ids = [i["id"] for i in _manifest(w)["images"]]
+    assert _pildifailid(w) == sorted(f"{i}.jpg" for i in ids)

@@ -104,3 +104,29 @@ def test_liiga_suur_moode_keeldutakse_enne_dekodeerimist(tmp_path, monkeypatch):
         eif.store_image(src, str(tmp_path), "x")
     assert loaded == []
     assert not list(tmp_path.iterdir())
+
+
+def test_salvestatavus_dekodeerib_nagu_store_image(tmp_path):
+    """Aluse vahetuse eelkontroll (PR #883 ülevaatus): kärbitud PNG-l on terve päis ja
+    mõõt, aga `store_image` ei saa seda dekodeerida — eelkontroll peab sama ütlema."""
+    full = _bytes(Image.effect_noise((400, 400), 64), "PNG")
+    p = tmp_path / "leht.png"
+    p.write_bytes(full[: len(full) // 2])
+    with pytest.raises(eif.ImageFileError):
+        eif.store_image(p.read_bytes(), str(tmp_path / "out"), "x")
+    assert eif.storable_reason(str(p))
+
+
+def test_salvestatavus_tundmatu_formaat(tmp_path):
+    p = tmp_path / "leht.webp"
+    Image.new("RGB", (20, 20)).save(p, "WEBP")
+    assert eif.storable_reason(str(p))
+
+
+def test_salvestatavus_terve_pilt_none(tmp_path):
+    p = tmp_path / "leht.jpg"
+    p.write_bytes(_jpeg(800, 600))
+    assert eif.storable_reason(str(p)) is None
+    p2 = tmp_path / "leht.png"
+    p2.write_bytes(_bytes(Image.new("L", (50, 50)), "PNG"))
+    assert eif.storable_reason(str(p2)) is None

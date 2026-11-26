@@ -70,23 +70,11 @@ def _view_image(img: Image.Image) -> Image.Image:
     return img
 
 
-def storable_reason(path: str) -> Optional[str]:
-    """Põhjus, miks faili ei saa eksemplaripildina salvestada (samad piirid mis `store_image`),
-    või None. Ei dekodeeri: mõõt päisest (aluse vahetus kontrollib vanu lehti ENNE commit'i)."""
-    try:
-        if os.path.getsize(path) > MAX_UPLOAD_BYTES:
-            return "liiga suur fail (üle 100 MB)"
-        with Image.open(path) as img:
-            if max(img.size) > MAX_SIDE:
-                return f"pikim külg üle {MAX_SIDE} px"
-    except Exception as e:
-        return f"loetamatu pilt: {e}"
-    return None
-
-
-def store_image(content: bytes, dest_dir: str, image_id: str) -> Optional[str]:
-    """Kirjutab `{id}.jpg` ja vajadusel `{id}.orig.{ext}`. Tagastab lähtefaili nime
-    või `None`, kui `{id}.jpg` on ise lähtefail. Viga → midagi ei kirjutata."""
+def _prepare(content: bytes, encode: bool = True) -> tuple[str, Optional[bytes]]:
+    """Kogu valideerimine ja teisendus ilma kirjutamiseta: (tüüp, vaatamiskuju baidid) või
+    (tüüp, None), kui sisend on ise vaatamiskuju. Viga → `ImageFileError`.
+    `encode=False`: ainult kontroll (päis, mõõt, täielik dekodeerimine) — vaatamiskuju
+    vähendamine ja JPEG-kodeerimine on kallid ja jäävad salvestusele (PR #883 ülevaatus)."""
     if len(content) > MAX_UPLOAD_BYTES:
         raise ImageFileError("Fail on liiga suur (üle 100 MB)", 413)
     kind = detect_kind(content)
@@ -98,10 +86,11 @@ def store_image(content: bytes, dest_dir: str, image_id: str) -> Optional[str]:
         orientation = img.getexif().get(_ORIENTATION, 1) if kind == "jpeg" else 1
         if kind == "jpeg" and orientation in (1, None) and max(img.size) <= VIEW_MAX_SIDE:
             img.close()
-            os.makedirs(dest_dir, exist_ok=True)
-            _write_atomic(os.path.join(dest_dir, f"{image_id}.jpg"), content)
-            return None
+            return kind, None
         img.load()
+        if not encode:
+            img.close()
+            return kind, None
         view = _view_image(img)
         buf = io.BytesIO()
         view.save(buf, "JPEG", quality=VIEW_QUALITY)
@@ -109,9 +98,35 @@ def store_image(content: bytes, dest_dir: str, image_id: str) -> Optional[str]:
         raise
     except Exception as e:  # katkine või loetamatu pilt
         raise ImageFileError(f"Pilti ei saa lugeda: {e}")
+    return kind, buf.getvalue()
 
-    original = f"{image_id}.orig.{_EXT[kind]}"
+
+def storable_reason(path: str) -> Optional[str]:
+    """Põhjus, miks faili ei saa eksemplaripildina salvestada, või None. SAMA kontroll
+    mis `store_image` (ka dekodeerimine): aluse vahetus kontrollib vanu lehti ENNE commit'i
+    ja lõpetamine ei tohi pärast commit'i pildi taha jääda (PR #883 ülevaatus). Muutmata
+    baitidega JPEG-lehte (tavaline OCR-leht) ei dekodeerita ka siin."""
+    try:
+        if os.path.getsize(path) > MAX_UPLOAD_BYTES:
+            return "liiga suur fail (üle 100 MB)"
+        with open(path, "rb") as f:
+            _prepare(f.read(), encode=False)
+    except ImageFileError as e:
+        return str(e)
+    except OSError as e:
+        return f"loetamatu fail: {e}"
+    return None
+
+
+def store_image(content: bytes, dest_dir: str, image_id: str) -> Optional[str]:
+    """Kirjutab `{id}.jpg` ja vajadusel `{id}.orig.{ext}`. Tagastab lähtefaili nime
+    või `None`, kui `{id}.jpg` on ise lähtefail. Viga → midagi ei kirjutata."""
+    kind, view = _prepare(content)
     os.makedirs(dest_dir, exist_ok=True)
+    if view is None:
+        _write_atomic(os.path.join(dest_dir, f"{image_id}.jpg"), content)
+        return None
+    original = f"{image_id}.orig.{_EXT[kind]}"
     _write_atomic(os.path.join(dest_dir, original), content)
-    _write_atomic(os.path.join(dest_dir, f"{image_id}.jpg"), buf.getvalue())
+    _write_atomic(os.path.join(dest_dir, f"{image_id}.jpg"), view)
     return original

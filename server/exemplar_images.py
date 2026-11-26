@@ -438,22 +438,42 @@ def add_internal(work_dir: str, eid: str, files: list, username: str) -> dict:
             return current
         taken = {i.get("id") for i in current["images"]}
         new_images = []
-        for path, src in todo:
-            with open(path, "rb") as f:
-                content = f.read()
-            image_id = _new_image_id(work_dir, eid, taken)
-            taken.add(image_id)
-            try:
-                original = store_image(content, d, image_id)
-            except ImageFileError as e:
-                raise ExemplarImagesError(str(e), e.status)
-            new_images.append({"id": image_id, "original": original,
-                               "source": {**src, "added_by": username, "at": today}})
-        manifest = {**current, "revision": current["revision"] + 1,
-                    "images": current["images"] + new_images}
-        if not write_manifest_locked(work_dir, eid, manifest, username,
-                                     f"Eksemplar: endise aluse lehed {len(new_images)} [{eid}]"):
-            raise ExemplarImagesError("Eksemplari manifesti commit ebaõnnestus", 500)
+        written: list[str] = []
+        try:
+            for path, src in todo:
+                with open(path, "rb") as f:
+                    content = f.read()
+                image_id = _new_image_id(work_dir, eid, taken)
+                taken.add(image_id)
+                try:
+                    original = store_image(content, d, image_id)
+                except ImageFileError as e:
+                    raise ExemplarImagesError(str(e), e.status)
+                written.append(os.path.join(d, f"{image_id}.jpg"))
+                if original:
+                    written.append(os.path.join(d, original))
+                new_images.append({"id": image_id, "original": original,
+                                   "source": {**src, "added_by": username, "at": today}})
+            manifest = {**current, "revision": current["revision"] + 1,
+                        "images": current["images"] + new_images}
+            if not write_manifest_locked(work_dir, eid, manifest, username,
+                                         f"Eksemplar: endise aluse lehed {len(new_images)} [{eid}]"):
+                raise ExemplarImagesError("Eksemplari manifesti commit ebaõnnestus", 500)
+        except BaseException:
+            # Kordus annab uued ID-d → selle katse failid ära (PR #883 ülevaatus), v.a need,
+            # millele kettal olev manifest juba viitab (kirjutus õnnestus, commit mitte):
+            # kordus jätab need `have`-kontrolliga vahele ja commit'ib järgmise kirjutusega.
+            referenced = set()
+            with contextlib.suppress(Exception):
+                for i in read_manifest(work_dir, eid)["images"]:
+                    referenced.add(f"{i.get('id')}.jpg")
+                    if i.get("original"):
+                        referenced.add(i["original"])
+            for p in written:
+                if os.path.basename(p) not in referenced:
+                    with contextlib.suppress(OSError):
+                        os.remove(p)
+            raise
         return manifest
 
 

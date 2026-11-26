@@ -212,9 +212,15 @@ def recheck_locked(work_dir: str, pr: dict) -> None:
     kõik sihid olemas, toimetatud lehed ja päritolu nagu kinnitatud, vanad pildid salvestatavad."""
     exemplars = {x.get("id") for x in (_meta(work_dir).get("exemplars") or [])}
     targets = {t for t in (pr.get("origins") or {}).values()}
-    if pr.get("exemplar_id") not in exemplars or None in targets or not targets <= exemplars:
-        raise PromoteError(409, "target_missing", {"missing": sorted(t or "?" for t in targets - exemplars)})
+    missing = {"missing": sorted(t or "?" for t in targets - exemplars)}
+    if pr.get("exemplar_id") not in exemplars:
+        # Lähteeksemplar ise kadunud: uut kinnitust ei saa anda (eelvaade puudub).
+        raise PromoteError(409, "target_missing", missing)
     pv = preview(work_dir, pr["exemplar_id"])
+    if None in targets or not targets <= exemplars:
+        # Värske eelvaade kaasa: viisard pakub sama üleslaadimise juures uue sihi valikut
+        # (PR #883 ülevaatus) — ilma selleta jäi ainus väljapääs üleslaadimise tühistus.
+        raise PromoteError(409, "target_missing", {**pv, **missing})
     if pv["unstorable"]:
         raise PromoteError(409, "old_page_unstorable", pv)
     current = {p["stem"]: (p["origin"] or pr.get("unknown_target")) for p in pv["pages"]}

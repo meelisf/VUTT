@@ -74,6 +74,8 @@ export interface SavedUpload {
   work_id?: string | null;
   title?: string;
   replace_phase?: string | null;
+  /** Aluse vahetus (ADR 0089 p 6): lähteeksemplar (server annab terve `promote` objekti). */
+  promote?: { exemplar_id: string; holder?: string | null; shelfmark?: string | null } | null;
   meta: { title: string; year: string | number; slug: string; type?: UploadType };
   created_at: string;
   expected_pages: number | null;
