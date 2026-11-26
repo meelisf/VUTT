@@ -117,7 +117,9 @@ Tekstitunnistajal oleks `"text_witness": true` ja `pages`-i võtit ei oleks (p 3
   märgistamata lehed liiguvad vaikimisi uue tunnistaja alla. UI eristab selle selgelt uuest
   transkriptsioonist eksemplari piltidest (ADR 0089 p 6): rea tagasihoidlik tegevuslink
   „Märgi praeguse skaneeringu allikaks" + kinnitus „see on parandus" (piltidega eksemplaril
-  viide aluse vahetusele) vs. piltide all omaette kast „Tee transkriptsiooni aluseks".
+  viide aluse vahetusele) vs. piltide all kokkupandav plokk „Tee transkriptsiooni aluseks".
+  Kui alus on märgitud, teistel ridadel märke linki ei ole: vale märke parandus = eemalda
+  märge aluse realt, siis pakub rida „Teose lehed" uue valiku.
   Põhjus: tootmistestis tõlgendati märke vahetust aluse vahetusena ja lehed paistsid
   „kolivat" valele eksemplarile.
 - **Teose kogu lehestiku asendus** (`replace_work_content`, upload „asenda sisu") nullib

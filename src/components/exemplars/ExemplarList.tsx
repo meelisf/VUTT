@@ -370,9 +370,13 @@ const ExemplarList: React.FC<ExemplarListProps> = ({
               className={`${actionLink} inline-flex items-center gap-1`}>
               <EditIcon size={12} />{t('exemplars.edit')}
             </button>
-            <button type="button" onClick={() => void toggleWitness(x)} disabled={busy || editorOpen} className={actionLink}>
-              {x.text_witness ? t('exemplars.unmarkWitness') : t('exemplars.markWitness')}
-            </button>
+            {/* Alus märgitud → teistel ridadel linki ei ole: vale märke parandus = eemalda see
+                aluse realt, siis pakub rida „Teose lehed" uue valiku (kaks teadlikku sammu). */}
+            {(x.text_witness || !saved.some(e => e.text_witness)) && (
+              <button type="button" onClick={() => void toggleWitness(x)} disabled={busy || editorOpen} className={actionLink}>
+                {x.text_witness ? t('exemplars.unmarkWitness') : t('exemplars.markWitness')}
+              </button>
+            )}
             {x.needs_review && (
               <button type="button" onClick={() => void clearReview(x)} disabled={busy || editorOpen}
                 className="text-xs text-amber-700 hover:text-amber-900 underline-offset-2 hover:underline disabled:opacity-50">

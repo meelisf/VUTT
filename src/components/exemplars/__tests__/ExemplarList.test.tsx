@@ -114,6 +114,22 @@ describe('ExemplarList — kirje täisvaade', () => {
     expect(within(open).getByText('Tartu Ülikooli raamatukogu')).toBeTruthy();
   });
 
+  it('alus märgitud: teisel real märke linki pole, aluse real on eemaldus', async () => {
+    server.exemplars[0].text_witness = true;
+    renderList({ userRole: 'admin', initialSelected: 'b2' });
+    const open = await screen.findByTestId('exemplar-detail');
+    expect(within(open).getByText('exemplars.edit')).toBeTruthy();
+    expect(within(open).queryByText('exemplars.markWitness')).toBeNull();
+    cleanup();
+    renderList({ userRole: 'admin', initialSelected: 'a1' });
+    expect(within(await screen.findByTestId('exemplar-detail')).getByText('exemplars.unmarkWitness')).toBeTruthy();
+  });
+
+  it('alus märkimata: igal real märke link', async () => {
+    renderList({ userRole: 'admin', initialSelected: 'b2' });
+    expect(within(await screen.findByTestId('exemplar-detail')).getByText('exemplars.markWitness')).toBeTruthy();
+  });
+
   it('2. avalik lugeja: toiminguid, märki ega tehnilist allikat ei ole; viiteallikas on', async () => {
     renderList({ initialSelected: 'a1' });
     await screen.findByTestId('exemplar-detail');
