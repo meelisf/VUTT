@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { CompareIcon } from '../icons';
 import ExemplarImageEditor from './ExemplarImageEditor';
 import AdaImportDialog from './AdaImportDialog';
@@ -50,6 +51,7 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
   const [editing, setEditing] = useState(false);
   const [adaOpen, setAdaOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [promoteExpanded, setPromoteExpanded] = useState(false);
   const navigate = useNavigate();
   // Aluse vahetus (ADR 0089 p 6): ainult piltidega eksemplar, mis ei ole juba alus.
   const isWitness = !!data.exemplars.find(x => x.id === selected)?.text_witness;
@@ -156,19 +158,27 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
             )}
           </div>
           {hasImages && grid(images!)}
-          {/* Aluse vahetus on SUUR toiming (uus lehestik, OCR, asendus) — omaette kast, mitte
-              piltide nupurea üks nupp; eristub eksemplari rea märke parandusest (ADR 0076 §3). */}
+          {/* Aluse vahetus on harv ja suur toiming (uus lehestik, OCR, asendus): kokkupandav plokk
+              nagu upload'i ADA import — võimalik, aga mitte esimene valik. Eristub eksemplari rea
+              märke parandusest (ADR 0076 §3). */}
           {canEdit && manifest && hasImages && !isWitness && !data.replace_pending && (
-            <div data-testid="promote-callout"
-              className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-primary-900">{t('exemplarPage.promote.open')}</p>
-                <p className="text-xs text-primary-800 mt-0.5">{t('exemplarPage.promote.callout')}</p>
-              </div>
-              <button type="button" onClick={() => setPromoteOpen(true)}
-                className="shrink-0 px-3 py-1.5 text-sm rounded bg-primary-600 text-white hover:bg-primary-700">
-                {t('exemplarPage.promote.openButton')}
+            <div data-testid="promote-callout" className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => setPromoteExpanded(v => !v)} aria-expanded={promoteExpanded}
+                className="w-full px-4 py-2 bg-gray-50 flex items-center gap-1.5 text-left hover:bg-gray-100">
+                {promoteExpanded
+                  ? <ChevronDown size={13} className="text-gray-500 shrink-0" />
+                  : <ChevronRight size={13} className="text-gray-500 shrink-0" />}
+                <span className="text-xs font-semibold text-gray-700">{t('exemplarPage.promote.open')}</span>
               </button>
+              {promoteExpanded && (
+                <div className="px-4 py-3 border-t border-gray-200 flex flex-wrap items-center gap-3">
+                  <p className="min-w-0 flex-1 text-xs text-gray-700">{t('exemplarPage.promote.callout')}</p>
+                  <button type="button" onClick={() => setPromoteOpen(true)}
+                    className="shrink-0 px-3 py-1.5 text-sm rounded bg-primary-600 text-white hover:bg-primary-700">
+                    {t('exemplarPage.promote.openButton')}
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {editing && canEdit && manifest && (
