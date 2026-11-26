@@ -8,6 +8,15 @@ Järjestikku, üks säilik korraga. Olek `progress.json`-is — korduskäivitus
 jätkab poolelijäänud uploadist, juba imporditud jäetakse vahele.
 
 Token: VUTT_TOKEN keskkonnamuutuja või fail --token-file (admini sessioon).
+
+Trükised (`--trukis --json`): sisend on JSON-list {shelfmark, handle, collection,
+overrides}; `overrides` kirjutab ADA metaandmete üle. ADA `dc.description.uri`
+ESTERi number on vanemates TÜR-i trükistes VANA Tartu kataloogi number
+(tartu.ester.ee, sama mis ESTERi 035 „(Tartu)") ja avab praeguses ESTERis vale
+kirje või mitte midagi — anna kontrollitud number (ESTERi 907, ilma
+kontrollmärgita) `overrides.ester_id`-s. Näide: ada_paber_trukised/items.json
+(paber.ut.ee vesimärgiga eksemplarid, mida VUTT-is polnud; ESTER Z39.50 kirje
+856 viitab samale ADA handle'ile).
 """
 import argparse
 import json
@@ -22,6 +31,12 @@ import urllib.request
 BASE = "http://127.0.0.1:8002"
 TYPE_HAND = {"id": "Q87167", "label": "käsikiri", "source": "wikidata",
              "labels": {"et": "käsikiri", "en": "manuscript"}}
+TYPE_PRINT = {"id": "Q1261026", "label": "trükis", "source": "wikidata",
+              "labels": {"et": "trükis", "en": "printed matter"}}
+
+# Profiil = tüüp + OCR-mudel + kas pealkiri on koostatud. Vaikimisi käsikiri (algne kasutus).
+KASIKIRI = {"type": TYPE_HAND, "ocr_model": "hand", "title_devised": True}
+TRUKIS = {"type": TYPE_PRINT, "ocr_model": "print", "title_devised": False}
 
 
 def log(*a):
@@ -73,7 +88,10 @@ def wait_status(api, uid, ok, bad=("error", "ada_error"), interval=20, label="")
         time.sleep(interval)
 
 
-def run_one(api, sm, handle, coll, prog):
+def run_one(api, sm, handle, coll, prog, profile=KASIKIRI, overrides=None):
+    """`overrides` kirjutab ADA metaandmete peale (nt kontrollitud ESTERi number,
+    täpne kohaviit, rollidega isikud) — ADA kirje annab konvoluudi tasemel kohaviida
+    ja kõigile isikutele rolli `auctor`."""
     rec = prog.setdefault(handle, {"shelfmark": sm})
     if rec.get("stage") == "imported":
         log(f"{sm} juba imporditud → {rec['work_id']}")
@@ -98,8 +116,8 @@ def run_one(api, sm, handle, coll, prog):
             "collections": [coll],
             "work_sets": [],
             "replace_work_id": None,
-            "type": TYPE_HAND,
-            "title_devised": True,
+            "type": profile["type"],
+            "title_devised": profile["title_devised"],
             "ada": {
                 "handle": ada["handle"],
                 "item_uuid": ada["item_uuid"],
@@ -113,6 +131,11 @@ def run_one(api, sm, handle, coll, prog):
             "archive_refs": meta.get("archive_refs"),
             "external_url": meta.get("external_url"),
         }
+        for k, v in (overrides or {}).items():
+            payload[k] = v
+        if overrides and "title" in overrides:
+            payload["slug"] = slugify((year + "-" if year else "") + overrides["title"])
+            title = overrides["title"]
         if ada.get("title_en_suggestion"):
             payload["title_en"] = ada["title_en_suggestion"]
         code, r = api.call("POST", "/admin/upload/create", payload)
@@ -145,8 +168,8 @@ def run_one(api, sm, handle, coll, prog):
                 break
             time.sleep(5)
         modes = {p.get("mode") for p in pp.get("pages", [])}
-        if pp.get("ocr_model") != "hand":
-            api.call("POST", f"/admin/upload/{uid}/ocr-model", {"model": "hand"})
+        if pp.get("ocr_model") != profile["ocr_model"]:
+            api.call("POST", f"/admin/upload/{uid}/ocr-model", {"model": profile["ocr_model"]})
         log(f"  plaan: {pp.get('page_count')} lk, režiimid {modes}, väljund {pp.get('output_page_count')}")
         code, r = api.call("POST", f"/admin/upload/{uid}/prepress/apply")
         if code not in (200, 409):
@@ -184,7 +207,10 @@ def save(prog):
 def main():
     global PROG_PATH
     ap = argparse.ArgumentParser()
-    ap.add_argument("items")
+    ap.add_argument("items", help="read `<säilik> <handle> <kogu-id>` või --json korral JSON-list")
+    ap.add_argument("--json", action="store_true",
+                    help="items on JSON-list: {shelfmark, handle, collection, overrides}")
+    ap.add_argument("--trukis", action="store_true", help="trükise profiil (tüüp + OCR-mudel print)")
     ap.add_argument("--progress", default="progress.json")
     ap.add_argument("--token-file")
     ap.add_argument("--only", help="ainult see säilik (nt F_7,s.23)")
@@ -193,15 +219,18 @@ def main():
     api = Api(token)
     PROG_PATH = a.progress
     prog = json.load(open(PROG_PATH)) if os.path.exists(PROG_PATH) else {}
+    profile = TRUKIS if a.trukis else KASIKIRI
+    if a.json:
+        read = [(r["shelfmark"], r["handle"], r["collection"], r.get("overrides"))
+                for r in json.load(open(a.items))]
+    else:
+        read = [tuple(line.split()[:3]) + (None,) for line in open(a.items) if line.strip()]
     vead = []
-    for line in open(a.items):
-        if not line.strip():
-            continue
-        sm, handle, coll = line.split()[:3]
+    for sm, handle, coll, overrides in read:
         if a.only and sm != a.only:
             continue
         try:
-            run_one(api, sm, handle, coll, prog)
+            run_one(api, sm, handle, coll, prog, profile, overrides)
         except SystemExit:
             raise
         except Exception as e:

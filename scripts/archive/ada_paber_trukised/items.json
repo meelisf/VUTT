@@ -1,0 +1,508 @@
+[
+ {
+  "paber": 475,
+  "shelfmark": "R Est.B-953",
+  "handle": "10062/25337",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Memoriale mathematicum seu problematum mathematicorum syllabus, quem ex variis authoribus congessit cujusque ad tenorem ... Georgi Stiernhielmi, haeredit. in Wasula et Stiernlund, R. Sveo-Gothici archivi custodis ... filios natalibus et ... Gustavum [et] ...Ottonem Stiernhielmios informavit Johannes Megalinus, phil. candid. LL. et antiq. studiosus",
+   "ester_id": "b2068583",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Johannes Megalinus",
+     "role": "auctor"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.B-953"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 478,
+  "shelfmark": "R Est.A-5065(8)",
+  "handle": "10062/17816",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Dissertatio de studio honoris, quam ... in Regia Academia … Livoniae, sub praesidio ... Olai Hermelini, publico ... examini … submittit Carolus Unden, ... anno MDCXCI. d. [ ] Aprilis.",
+   "ester_id": "b1709816",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Carolus Undeen",
+     "role": "respondens"
+    },
+    {
+     "name": "Olaus Hermelin",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5065(8)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 480,
+  "shelfmark": "R Est.A-5074(10)",
+  "handle": "10062/10520",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Disputatio theologica in Psalmum decimum octavum Davidis selectissimas notas exhibens publicae censurae subjicietur in Regia Academia Gustaviana, quae Dorpati … est …praeside Andrea Virginio, ... respondente Magno Westadio, ... d. [ ] ..",
+   "ester_id": "b1712499",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Magnus Westadius",
+     "role": "respondens"
+    },
+    {
+     "name": "Andreas Virginius",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5074(10)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 487,
+  "shelfmark": "R Est.A-5064(4)",
+  "handle": "10062/10525",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Dissertationem philosophicam de genio Socratis, ... in Regia Livonorum Academia praeside ... Andrea Palmroot, ... examini submittit ... Christianus Brehmer, … die 1. Augusti ao. MDCCVI. ...",
+   "ester_id": "b1707182",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Christian Brehmer",
+     "role": "respondens"
+    },
+    {
+     "name": "Andreas Palmroot",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5064(4)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 493,
+  "shelfmark": "R Est.A-5064(3)",
+  "handle": "10062/10524",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Disputatio theologica inauguralis, legis moralis, evangelii, et utriusque discriminis, brevem Diskeyin exhibens, quam ... in ... Musarum Parnaviensium[!] Emporio, pro consequendo gradu in theologia summo, examinandam, publice ... d. 1. Sept. a. M. DC. XCIX. proponit Olaus Moberg, ... responsurus stabit Andreas Erichsohn ...",
+   "ester_id": "b1710123",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Andreas Erichsson",
+     "role": "respondens"
+    },
+    {
+     "name": "Olaus Moberg",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5064(3)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 495,
+  "shelfmark": "R Est.A-5065(10)",
+  "handle": "10062/17824",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Purpura principis. ex Verbis Jobi capit. 29. v. v. 14. 15. 16. 17. contexta. a Johanne Forsenio, ...",
+   "ester_id": "b1710068",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Johannes Forsenius",
+     "role": "auctor"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5065(10)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 496,
+  "shelfmark": "R Alxd. 1691(1)",
+  "handle": "10062/2021",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Agesilaus De Spartaners Konung, Med sijne sex wijse swar på åthskilliges til honom stälte frågor, Hans Kongl. Höghet Sweriges arff Printz til måhlroo rijmwijs författat korteligen",
+   "ester_id": "b1792027",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Johannes Forsenius",
+     "role": "auctor"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Alxd. 1691(1)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 502,
+  "shelfmark": "R Est.A-5074(4)",
+  "handle": "10062/10512",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Diskeyij theologica de natura cordis humani, super Jerem. C.XVII. vers. IX. quam, ... in Regia Gustavianao-Carolina Academia apud Dorpatenses, sub praesidio ... Olai Mobergii, ... publice ventilandam offert Johannes Oldekop, ... auctor et respondens. ... ad [3.] Septembr. Ao. 1692.",
+   "ester_id": "b1579512",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Johannes Oldekop",
+     "role": "auctor"
+    },
+    {
+     "name": "Johannes Oldekop",
+     "role": "respondens"
+    },
+    {
+     "name": "Olaus Moberg",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5074(4)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 504,
+  "shelfmark": "R Est.A-5065(5)",
+  "handle": "10062/17806",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "De ludis circensibus Romanorum dissertatio, quam ... in Regia … Academia, praeside Olao Hermelin, ... pro solitis philosophia honoribus, publico examini subjicit Magnus Gabriel Edenius ... anno MDCXCII. d. XI. Junii.",
+   "ester_id": "b1709803",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Magnus Gabriel Edenius",
+     "role": "respondens"
+    },
+    {
+     "name": "Olaus Hermelin",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5065(5)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 507,
+  "shelfmark": "R Est.A-5074(9)",
+  "handle": "10062/10519",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Disputatio theologica in Psalmum decimum septimum Davidis selectissimas notas exhibens publicae censurae ... subjicietur in Regia Academia Gustaviana, quae Dorpati … est ... praeside Andrea Virginio, ... respondente Johanne Magni Wintrosio, ... d. [ ] ..",
+   "ester_id": "b1712680",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Johannes Wintrosius",
+     "role": "respondens"
+    },
+    {
+     "name": "Andreas Virginius",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5074(9)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 509,
+  "shelfmark": "R Est.C-181",
+  "handle": "10062/18722",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Illustrissimi et celsissimi principis ac domini ... Friderici, haeredis Norwegiae, ducis Schleswici, Holsatiae, Stormariae, ac Dithmarsiae, comitis Oldenburgae et Delmenhorsti, etc. consiliariis ... et per Moschoviam in Persiam legatis magnis, ... Philippo Crusio, J. U. licentiato, ... Otthoni Bruggemanno, jam, ... e Persia reducibus. ... Adamus Schafferus, Hervorda Guestphalus, in comitatu quondam alumnus.",
+   "ester_id": "b2179635",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Adam Schafferus",
+     "role": "auctor"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.C-181"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 524,
+  "shelfmark": "R Est.A-5085(13)",
+  "handle": "10062/14334",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Oratio de artium liberalium natura et studio: quam, ... in Regia Academia Gustaviana, quae Dorpati est ... die 27. Januarij, anno 1641. publice memoriterque ... enarrabat ... Martinus Nicolai Faxelius, ...",
+   "ester_id": "b1693047",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Martinus Faxelius",
+     "role": "auctor"
+    },
+    {
+     "name": "Laurentius Ludenius",
+     "role": "aui"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5085(13)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 526,
+  "shelfmark": "R Est.A-5074(7)",
+  "handle": "10062/10517",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Oratio funebris, in ... obitum ... Nicolai Ionae, ... Johannis Ionae, ... Danielis Ionae, Rödingiorum, fratrum; ... Jonae Nicolai Oriensulani, Wermelandensium, Wasboensium, atque Walhaerensium superintendentis ... ecclesiae Christi, quae Mariaestadij, nec non in Ulerffwa colligitur pastoris ... filiorum ... 13. die Aprilis, anno 1639. in lacu Wäner, ... vitam cum morte commutantium; ... conscripta; et in Regia Academia Gustaviana, quae Dorpati est ... 19. Decemb. anno 1639. publice ... recitata ab Amberno Andreae Storch, Mariaestadio, W-Gothia S.",
+   "ester_id": "b1712431",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Ambernus Storch",
+     "role": "auctor"
+    },
+    {
+     "name": "Laurentius Ludenius",
+     "role": "aui"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5074(7)"
+    }
+   ]
+  }
+ },
+ {
+  "paber": 527,
+  "shelfmark": "R Est.A-5074(8)",
+  "handle": "10062/10518",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Disputatio politica prima, de natura et constitutione politices in genere. Quam ... in Regia Academia Dorpatensi … exhibet ... Johannes Erici Stregnensis ... respondente Petro Trottonio, ... ad diem 4. Aprilis ..",
+   "ester_id": "b1712304",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Petrus Trottonius",
+     "role": "respondens"
+    },
+    {
+     "name": "Johannes Erici Stregnensis",
+     "role": "praeses"
+    }
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5074(8)"
+    }
+   ]
+  }
+ }
+]
