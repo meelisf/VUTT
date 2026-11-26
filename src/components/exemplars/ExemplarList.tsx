@@ -147,13 +147,21 @@ const ExemplarList: React.FC<ExemplarListProps> = ({
   const setField = (f: keyof Draft, v: string) =>
     setEditing(prev => (prev ? { ...prev, draft: { ...prev.draft, [f]: v } } : prev));
 
+  // Märke vahetus on METAANDMETE PARANDUS (ADR 0076 §3): praegused lehed loetakse selle
+  // eksemplari skaneeringuks, pilte ega teksti ei vahetata. Uus transkriptsioon eksemplari
+  // piltidest on eraldi toiming („Tee transkriptsiooni aluseks", ADR 0089 p 6).
   const toggleWitness = async (x: Exemplar) => {
     if (!x.text_witness) {
       const other = saved.find(e => e.text_witness && e.id !== x.id);
-      if (other || x.pages?.length) {
+      const images = imageCount(x.id);
+      if (other || x.pages?.length || images) {
         const ok = await askConfirm({
           title: t('exemplars.witnessConfirmTitle'),
-          message: t('exemplars.witnessConfirm'),
+          message: [
+            t('exemplars.witnessConfirm'),
+            images ? t('exemplars.witnessConfirmImages', { count: images }) : null,
+          ].filter(Boolean).join('\n\n'),
+          confirmText: t('exemplars.witnessConfirmButton'),
           variant: 'warning',
         });
         if (!ok) return;

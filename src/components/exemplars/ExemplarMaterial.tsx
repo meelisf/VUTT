@@ -152,15 +152,25 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
                     {t('exemplarPage.editImages')}
                   </button>
                 )}
-                {hasImages && !isWitness && !data.replace_pending && (
-                  <button type="button" className={btn} onClick={() => setPromoteOpen(true)}>
-                    {t('exemplarPage.promote.open')}
-                  </button>
-                )}
               </span>
             )}
           </div>
           {hasImages && grid(images!)}
+          {/* Aluse vahetus on SUUR toiming (uus lehestik, OCR, asendus) — omaette kast, mitte
+              piltide nupurea üks nupp; eristub eksemplari rea märke parandusest (ADR 0076 §3). */}
+          {canEdit && manifest && hasImages && !isWitness && !data.replace_pending && (
+            <div data-testid="promote-callout"
+              className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-primary-900">{t('exemplarPage.promote.open')}</p>
+                <p className="text-xs text-primary-800 mt-0.5">{t('exemplarPage.promote.callout')}</p>
+              </div>
+              <button type="button" onClick={() => setPromoteOpen(true)}
+                className="shrink-0 px-3 py-1.5 text-sm rounded bg-primary-600 text-white hover:bg-primary-700">
+                {t('exemplarPage.promote.openButton')}
+              </button>
+            </div>
+          )}
           {editing && canEdit && manifest && (
             <div className="mt-3">
               <ExemplarImageEditor workId={workId} exemplarId={selected} manifest={manifest}

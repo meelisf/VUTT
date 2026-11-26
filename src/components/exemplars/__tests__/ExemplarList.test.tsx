@@ -22,7 +22,7 @@ vi.mock('../../ArchiveSelect', () => ({
 }));
 
 /** Võltsserver: eksemplaride seis + valikuline sundvastus PUT-ile. */
-let server: { exemplars: Exemplar[]; pageCount: number; putStatus?: number };
+let server: { exemplars: Exemplar[]; pageCount: number; putStatus?: number; images?: Record<string, { count: number; preview: string[] }> };
 const calls: { method: string; url: string; body: any }[] = [];
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 
@@ -35,7 +35,7 @@ const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
   const sub = m[1];
   if (method === 'GET') {
     return json({ exemplars: server.exemplars, unknown_pages: [], page_numbers: {}, page_files: [],
-      page_count: server.pageCount, convolutes: [], images: {} });
+      page_count: server.pageCount, convolutes: [], images: server.images ?? {} });
   }
   if (method === 'PUT') {
     if (server.putStatus) return json({ detail: 'Eksemplari ei leitud' }, server.putStatus);
@@ -154,6 +154,18 @@ describe('ExemplarList — rida „Teose lehed"', () => {
     await waitFor(() => expect(writes()[0]?.body).toEqual({ text_witness: true }));
     expect(writes()[0].url).toMatch(/\/exemplars\/b2$/);
     await waitFor(() => expect(screen.queryByTestId('pages-row')).toBeNull());
+  });
+
+  it('piltidega eksemplar: kinnitus ütleb, et see on parandus, ja viitab aluse vahetusele', async () => {
+    server.images = { b2: { count: 3, preview: [] } };
+    renderList({ userRole: 'admin' });
+    const row = await screen.findByTestId('pages-row');
+    fireEvent.click(within(row).getByText('exemplarPage.markWitness'));
+    fireEvent.change(screen.getByLabelText('exemplarPage.markWitness'), { target: { value: 'b2' } });
+    expect(await screen.findByText(/exemplars\.witnessConfirm\s+exemplars\.witnessConfirmImages/)).toBeTruthy();
+    expect(writes()).toHaveLength(0);
+    fireEvent.click(screen.getByText('exemplars.witnessConfirmButton'));
+    await waitFor(() => expect(writes()[0]?.body).toEqual({ text_witness: true }));
   });
 
   it('4. alus märgitud: rida puudub', async () => {

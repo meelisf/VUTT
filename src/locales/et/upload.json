@@ -169,7 +169,11 @@
     "label": "Asenda olemasolevat teost",
     "warning": "Asendamine kustutab kõik olemasolevad leheküljed ja asendab need uutega.",
     "selected": "Asendatav teos:",
-    "replaceBtn": "Asenda: {{title}}",
+    "metaUnchanged": "Asendus vahetab ainult lehed — teose metaandmed jäävad muutmata. Neid saab muuta teose lehel.",
+    "openWork": "Ava teos",
+    "replaceBtn": "Asenda teose lehed",
+    "consequence": "Teose praegused lehed asendatakse uutega. Vana tekst jääb git-ajalukku.",
+    "consequencePromote": "Teose praegused lehed asendatakse uutega. Vanad lehed jäävad piltidena alles oma eksemplari juures, vana tekst git-ajalukku.",
     "remove": "Eemalda asendus"
   },
   "ada": {
