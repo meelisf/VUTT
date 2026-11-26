@@ -37,6 +37,10 @@ TYPE_PRINT = {"id": "Q1261026", "label": "trükis", "source": "wikidata",
 # Profiil = tüüp + OCR-mudel + kas pealkiri on koostatud. Vaikimisi käsikiri (algne kasutus).
 KASIKIRI = {"type": TYPE_HAND, "ocr_model": "hand", "title_devised": True}
 TRUKIS = {"type": TYPE_PRINT, "ocr_model": "print", "title_devised": False}
+# Ingliskeelne pealkirjatõlge (Gemini) on mõeldud koostatud pealkirjale (käsikiri);
+# trükise pealkiri on allika oma ja tõlget ei lisata.
+KASIKIRI["translate_title"] = True
+TRUKIS["translate_title"] = False
 
 
 def log(*a):
@@ -136,7 +140,7 @@ def run_one(api, sm, handle, coll, prog, profile=KASIKIRI, overrides=None):
         if overrides and "title" in overrides:
             payload["slug"] = slugify((year + "-" if year else "") + overrides["title"])
             title = overrides["title"]
-        if ada.get("title_en_suggestion"):
+        if profile.get("translate_title") and ada.get("title_en_suggestion"):
             payload["title_en"] = ada["title_en_suggestion"]
         code, r = api.call("POST", "/admin/upload/create", payload)
         if code != 200:
