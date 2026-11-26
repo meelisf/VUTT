@@ -144,6 +144,7 @@ def test_admin_upload_status_returns_staged_state(client, login, make_upload):
         # Impordi taaste loeb tulemuse siit, kui /import päring katkes (#327).
         "work_id": None,
         "import_progress": None,
+        "promote": None,  # aluse vahetus (ADR 0089 p 6)
         "files": state["files"],
         "ready": 0,
         "total": 0,

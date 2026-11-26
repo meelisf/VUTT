@@ -361,7 +361,9 @@ Rida „Teose lehed" (alus märkimata) EI OLE eksemplar. Leheloend ja paari keht
 kettalt), MITTE Meilist. Paar, mille tüve loendis pole, on paari puudumine. Paaride koristus
 (`exemplar_images.prune_dangling_pairs`, kutsub `refresh_work_mentions`) võtab AINULT
 `metadata_lock`-i — `work_lock` ei ole taassisenetav ja kutsuja hoiab seda. Poolitus paari ei
-jaota; lehestiku asendus eemaldab kõik paarid enne sisu asendamist. `ImageViewer` ilma `view`
+jaota; lehestiku asendus eemaldab kõik paarid enne sisu asendamist. Transkriptsiooni aluse vahetus
+(ADR 0089 p 6) käib `server/promote.py` + lehestiku asenduse kaudu; `former_pages` on serveri
+sisemine pildiallika liik (klient ei saa seda saata). `ImageViewer` ilma `view`
 propita käitub nagu alati (töölaud); kõrvutus kasutab juhitud režiimi.
 
 **Kirjaindeks (ADR 0065)** — `kirjad`: üks dokument kirja-osa kohta, tuletatakse

@@ -10,6 +10,8 @@ import { Link } from 'react-router-dom';
 import { CompareIcon } from '../icons';
 import ExemplarImageEditor from './ExemplarImageEditor';
 import AdaImportDialog from './AdaImportDialog';
+import PromoteDialog from './PromoteDialog';
+import { useNavigate } from 'react-router-dom';
 import type { ExemplarManifest } from '../../services/exemplarImagesService';
 import type { WorkExemplarsResponse } from '../../services/workApi';
 import { withImageToken, type ImageToken } from '../../utils/imageTokenUrl';
@@ -47,6 +49,10 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState(false);
   const [adaOpen, setAdaOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const navigate = useNavigate();
+  // Aluse vahetus (ADR 0089 p 6): ainult piltidega eksemplar, mis ei ole juba alus.
+  const isWitness = !!data.exemplars.find(x => x.id === selected)?.text_witness;
 
   const { pages, images } = materialParts(workId, data, selected, manifest?.images ?? null);
   const isExemplar = selected !== PAGES_KEY;
@@ -146,6 +152,11 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
                     {t('exemplarPage.editImages')}
                   </button>
                 )}
+                {hasImages && !isWitness && !data.replace_pending && (
+                  <button type="button" className={btn} onClick={() => setPromoteOpen(true)}>
+                    {t('exemplarPage.promote.open')}
+                  </button>
+                )}
               </span>
             )}
           </div>
@@ -157,6 +168,12 @@ const ExemplarMaterial: React.FC<ExemplarMaterialProps> = ({
             </div>
           )}
         </section>
+      )}
+
+      {promoteOpen && (
+        <PromoteDialog workId={workId} exemplarId={selected} exemplars={data.exemplars} authToken={authToken}
+          mode="start" onClose={() => setPromoteOpen(false)}
+          onStarted={id => navigate(`/upload?resumeUpload=${encodeURIComponent(id)}`)} />
       )}
 
       {adaOpen && (

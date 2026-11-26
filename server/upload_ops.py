@@ -192,6 +192,19 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
                  collections, languages, tags
     username: kes uploadi lõi (ühtses OCR-vaates kuvamiseks)
     """
+    upload_id, state = build_upload_state(meta, username)
+    # Loo uploads/{id}/thumbs/ kaustad
+    os.makedirs(os.path.join(_upload_dir(upload_id), 'thumbs'), exist_ok=True)
+    lock = _get_upload_lock(upload_id)
+    with lock:
+        _write_state(upload_id, state)
+    logger.info(f"Upload loodud: {upload_id} ({state['meta']['slug']})")
+    return state
+
+
+def build_upload_state(meta: dict, username: Optional[str] = None) -> tuple:
+    """(upload_id, state) ilma midagi kirjutamata — aluse vahetus ehitab kausta
+    `.staging` all ja avaldab selle ühe ümbernimetusega (ADR 0089 p 6)."""
     upload_id = generate_nanoid()
     while os.path.isdir(_upload_dir(upload_id)):
         upload_id = generate_nanoid()
@@ -206,10 +219,6 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
     work_type = meta.get('type') or {}
     ocr_model = 'hand' if work_type.get('id') == 'Q87167' else 'print'
     staging_path, work_path = remote_paths(ocr_model, upload_id, slug)
-
-    # Loo uploads/{id}/thumbs/ kaustad
-    thumbs_dir = os.path.join(_upload_dir(upload_id), 'thumbs')
-    os.makedirs(thumbs_dir, exist_ok=True)
 
     state = {
         "id": upload_id,
@@ -259,13 +268,7 @@ def create_upload(meta: dict, username: Optional[str] = None) -> dict:
         # täidab fetch alles pärast liitmist — siin on ainult nimed ja uuid-d.
         "ada": meta.get('ada') or None,
     }
-
-    lock = _get_upload_lock(upload_id)
-    with lock:
-        _write_state(upload_id, state)
-
-    logger.info(f"Upload loodud: {upload_id} ({year}_{slug})")
-    return state
+    return upload_id, state
 
 
 def update_upload_meta(upload_id: str, updates: dict) -> bool:
@@ -300,8 +303,24 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
 
 
 def list_uploads() -> list:
-    """Tagastab kõik aktiivsed (mitte-imporditud) üleslaadimised, uuemad ees."""
-    return _upload_state.list_upload_states()
+    """Tagastab kõik aktiivsed (mitte-imporditud) üleslaadimised, uuemad ees. Lisaks
+    asendusmärgid, mille üleslaadimise kausta pole (`orphan`, ADR 0089 p 6) — et
+    pooleli asenduse saaks lõpetada ka kadunud kausta korral."""
+    from . import replace_marker
+    states = _upload_state.list_upload_states()
+    have = {s.get("id") for s in states}
+    for slug, m in replace_marker.list_markers():
+        if m.get("upload_id") not in have:
+            try:
+                with open(os.path.join(BASE_DIR, slug, "_metadata.json"), encoding="utf-8") as f:
+                    wmeta = json.load(f) or {}
+            except (OSError, ValueError):
+                wmeta = {}
+            states.append({"id": m.get("upload_id"), "orphan": True, "slug": slug,
+                           "work_id": wmeta.get("id"), "title": wmeta.get("title") or slug,
+                           "replace_phase": (m.get("progress") or {}).get("phase"),
+                           "status": "replace_pending"})
+    return states
 
 
 def get_upload(upload_id: str):
@@ -580,6 +599,7 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
 
 from . import work_parts as _work_parts  # noqa: E402  (ADR 0089 p 5)
+from .upload.store_source import write_source_image  # noqa: E402,F401  (ADR 0089 p 6)
 
 
 def _update_replace_state(upload_id: str, fn) -> None:
@@ -741,6 +761,16 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
     for fname in sorted(f for f in os.listdir(work_dir) if f.endswith('.txt')):
         page_locks.enter_context(page_lock(os.path.join(work_dir, fname)))
 
+    # Aluse vahetus (ADR 0089 p 6): lõppkontroll lukkude all, ENNE ühtki muutust.
+    if state.get('promote'):
+        from . import promote as _promote
+        try:
+            _promote.recheck_locked(work_dir, state['promote'])
+        except _promote.PromoteError as pe:
+            replace_marker.remove_marker(slug)
+            page_locks.close()
+            raise HTTPException(status_code=pe.status, detail={"code": pe.code, "detail": pe.detail})
+
     try:
         from . import exemplar_images
         exemplar_images.clear_all_pairs(work_dir, username)
@@ -790,6 +820,9 @@ def _replace_work_content_locked(upload_id: str, target_work_id: str, metadata_u
         # Osade vihje (ADR 0089 p 5): vana tüvi → lehenumber, enne failide liigutamist.
         "old_numbers": {stem: i + 1 for i, stem in enumerate(_work_parts.page_stems(work_dir))},
     }
+    if state.get('promote'):
+        from . import promote as _promote
+        progress.update(_promote.progress_extras(work_dir, state, importable, upload_id))
     _write_replace_progress(upload_id, progress, slug)
 
     def _rollback(syy: str):
@@ -1027,9 +1060,15 @@ def _after_replace_commit(upload_id: str, state: dict, work_dir: str, slug: str,
         fresh = _read_state(upload_id)
     if fresh:
         state = fresh
+    if progress is None:
+        with state_lock:
+            progress = (_read_state(upload_id) or {}).get('replace_progress') or {}
+    is_promote = bool(progress.get('promote'))
     # 8. Üleslaadimise metaandmed (pärast lehestiku commit'i; korratav — muutusteta
     # salvestus on no-op, ADR 0012). Järelsammus, et ka taaste neid rakendaks (PR #881).
-    _apply_replace_metadata(upload_id, state, meta_path, username)
+    # Aluse vahetus EI muuda teose metaandmeid (ADR 0089 p 6).
+    if not is_promote:
+        _apply_replace_metadata(upload_id, state, meta_path, username)
     # 9a. Osad (ADR 0089 p 5): leheviited nulli ENNE `refresh_work_mentions`-it, mis
     # muidu jätaks samanimelised (aga teise sisuga) tüved osadesse alles.
     # KOHUSTUSLIK (PR #881): tõrge jätab märgi alles, taaste kordab sammu.
@@ -1048,10 +1087,24 @@ def _after_replace_commit(upload_id: str, state: dict, work_dir: str, slug: str,
     # Uus skaneering võib olla teisest eksemplarist ja failinimed korduvad: vana
     # päritolu ei tohi pärida (ADR 0076 p 3). Enne sünki, mis tüvede järgi remapiks.
     try:
-        from .work_exemplars import reset_page_origins
-        reset_page_origins(work_dir, username)
-    except Exception:
+        from . import work_exemplars as _we
+        ok_origins = _we.reset_page_origins(work_dir, username)
+    except Exception as e:
         logger.exception(f"replace {upload_id}: eksemplaride päritolu nullimine ebaõnnestus")
+        if is_promote:
+            raise AfterStepError(f"lehtede päritolu: {e}") from e
+        ok_origins = True
+    if is_promote:
+        # Kohustuslik (ADR 0089 p 6): päritolu → vanad lehed eksemplaride alla → tunnistaja →
+        # imporditud lähtepildid ära. Tõrge → märk jääb, taaste kordab (korratavad sammud).
+        if not ok_origins:
+            raise AfterStepError("lehtede päritolu nullimine ebaõnnestus")
+        from . import promote as _promote
+        try:
+            _promote.finish_locked(upload_id, work_dir, progress, username)
+        except Exception as e:
+            logger.exception(f"replace {upload_id}: aluse vahetuse lõpetamine ebaõnnestus")
+            raise AfterStepError(f"aluse vahetuse lõpetamine: {e}") from e
     from .prosopography import relations as _relations
     _relations.refresh_work_mentions(work_dir, work_id)
 
@@ -1079,7 +1132,7 @@ def _after_replace_commit(upload_id: str, state: dict, work_dir: str, slug: str,
 
     # 12. Töökollektsioonid — sama leping nagu uue teose impordil: ei kukuta.
     work_sets_skipped = None
-    valitud_kogud = (state.get('meta') or {}).get('work_sets')
+    valitud_kogud = None if is_promote else (state.get('meta') or {}).get('work_sets')
     if valitud_kogud:
         from .work_sets_ops import add_work_to_sets
         work_sets_skipped = add_work_to_sets(target_work_id, valitud_kogud, username or "Automaatne")

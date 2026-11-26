@@ -11,6 +11,7 @@ ppi (ADR 0073).
 """
 import glob
 import os
+import re
 import subprocess
 from typing import List, Optional
 
@@ -229,9 +230,15 @@ class ImageDirPageSource(PageSource):
 
     def _list(self) -> List[str]:
         if self._files is None:
+            # Numbriline järjestus (`pg_1000` > `pg_999`), mitte tähestikuline: üle 999 lehe
+            # oleks poolitus ja `promote.source_images` muidu eri järjekorras (ADR 0089 p 6).
+            def _key(f):
+                m = re.match(r"pg_(\d+)\.", f)
+                return (0, int(m.group(1)), f) if m else (1, 0, f)
             self._files = sorted(
-                f for f in os.listdir(self.dir_path)
-                if f.lower().endswith((".jpg", ".jpeg", ".png"))
+                (f for f in os.listdir(self.dir_path)
+                 if f.lower().endswith((".jpg", ".jpeg", ".png"))),
+                key=_key,
             )
         return self._files
 

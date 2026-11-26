@@ -977,7 +977,32 @@
     "copyLinkHint": "Püsiv link sellele vaatele (nt lehe kommentaari)",
     "linkCopied": "Link kopeeritud",
     "copyLinkFailed": "Linki ei õnnestunud kopeerida",
-    "adaImport": "ADA import…"
+    "adaImport": "ADA import…",
+    "promote": {
+      "open": "Tee transkriptsiooni aluseks",
+      "title": "Tee transkriptsiooni aluseks",
+      "summary": "Selle eksemplari {{images}} pilti ({{target}}) saadetakse OCR-i ja asendavad teose praegused {{pages}} lehte.",
+      "oldPagesTo": "Praegused lehed jäävad piltidena alles eksemplari juures:",
+      "unknownOrigin": "teadmata päritoluga",
+      "unknownTarget": "Kuhu panna teadmata päritoluga lehed?",
+      "partsWarning": "Teosel on {{count}} osa(t) — nende lehepiirid tuleb pärast vahetust üle vaadata.",
+      "unstorable": "Mõnda praegust lehte ei saa eksemplari pildina salvestada:",
+      "editedWarning": "{{count}} lehte on toimetatud (seisund, märgendid, kommentaarid või annotatsioonid). Nende transkriptsioon asendatakse uue OCR-iga; vana tekst jääb ainult git-ajalukku.",
+      "editedAck": "Saan aru, toimetatud tekst asendatakse",
+      "start": "Alusta",
+      "confirm": "Kinnita",
+      "changed": "Teose lehed muutusid vahepeal — vaata uus seis üle ja kinnita uuesti.",
+      "failed": "Toiming ebaõnnestus."
+    },
+    "replacePending": {
+      "text": "Selle teose lehestiku asendus jäi pooleli. Teos on lukus, kuni asendus lõpetatakse.",
+      "finish": "Lõpeta lehestiku asendus",
+      "result": {
+        "replaced": "Lehestiku asendus lõpetati.",
+        "restored": "Asendust ei saanud lõpule viia — vana lehestik taastati, vahetust ei toimunud.",
+        "cleared": "Pooleli asendust enam ei ole."
+      }
+    }
   },
   "compare": {
     "title": "Kõrvutus",

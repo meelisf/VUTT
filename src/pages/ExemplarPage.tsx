@@ -18,6 +18,7 @@ import { useImageToken, withImageToken } from '../contexts/ImageTokenContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { getWorkExemplars, type WorkExemplarsResponse } from '../services/workApi';
+import { finishReplace } from '../services/promoteApi';
 import {
   ManifestConflictError, fetchExemplarImages, patchExemplarImages, sourceLabel, type ExemplarManifest,
 } from '../services/exemplarImagesService';
@@ -123,6 +124,24 @@ const ExemplarPage: React.FC = () => {
       if (seq === dataSeq.current) setLoadError(true);
     }
   }, [workId, authToken]);
+
+  // Pooleli lehestiku asenduse lõpetamine märgi järgi (ADR 0089 p 6). Tulemus eristatakse:
+  // `restored` = vana lehestik taastati, vahetust EI toimunud.
+  const [finishing, setFinishing] = useState(false);
+  const finishPending = useCallback(async () => {
+    const pending = data?.replace_pending;
+    if (!pending) return;
+    setFinishing(true);
+    try {
+      const r = await finishReplace(workId, pending.upload_id, authToken);
+      notify(t(`exemplarPage.replacePending.result.${r}`), r === 'replaced' ? 'success' : 'warning');
+    } catch (e) {
+      notify(apiErrorMessage(e, t('exemplarPage.promote.failed')), 'error');
+    } finally {
+      setFinishing(false);
+      void loadData();
+    }
+  }, [data, workId, authToken, notify, t, loadData]);
 
   useEffect(() => { void loadData(); }, [loadData]);
 
@@ -373,6 +392,15 @@ const ExemplarPage: React.FC = () => {
 
         {data && (
           <div className="space-y-6">
+            {canEdit && data.replace_pending && (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <span>{t('exemplarPage.replacePending.text')}</span>
+                <button type="button" onClick={finishPending} disabled={finishing}
+                  className="ml-auto px-3 py-1.5 rounded bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
+                  {t('exemplarPage.replacePending.finish')}
+                </button>
+              </div>
+            )}
             <ExemplarList ref={listRef} workId={workId} authToken={authToken} userRole={user?.role}
               isManuscript={isManuscript} data={data} archives={archives}
               onArchiveAdded={(id, info) => setArchives(prev => ({ ...prev, [id]: info }))}

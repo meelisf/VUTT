@@ -180,6 +180,25 @@ def recover_locked(upload_id: str, slug: str, work_dir: str) -> str:
     return "restored"
 
 
+def finish_for_work(work_dir: str, upload_id: str) -> str:
+    """Lõpetamine teose järgi (kasutaja nupp, ADR 0089 p 6): märk PEAB kuuluma vaates näidatud
+    üleslaadimisele (`stale` muidu — aegunud vaade ei käivita järgmise asenduse taastet)."""
+    from ..admin_page_ops import work_lock
+    slug = os.path.basename(os.path.normpath(work_dir))
+    enne = replace_marker.read_marker(slug)
+    if not enne:
+        return "cleared"
+    # Lukk märgi omanikuna (muidu lükkaks asendusmärk luku tagasi); võrdlus luku all.
+    with replace_marker.marker_owner(enne.get("upload_id")):
+        with work_lock(slug, work_dir):
+            m = replace_marker.read_marker(slug)
+            if not m:
+                return "cleared"
+            if m.get("upload_id") != upload_id:
+                return "stale"
+            return recover_locked(upload_id, slug, work_dir)
+
+
 def recover(upload_id: str, slug: str) -> str:
     """`recover_locked` teose luku all (käivitusaegne taaste, kohene taaste erindi järel)."""
     from .. import upload_ops

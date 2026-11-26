@@ -105,6 +105,8 @@ async def lifespan(app: FastAPI):
     # seda kaasa võtta enne taastet (PR #881). Tavaliselt märke pole → kohe edasi.
     from .upload import replace_recovery
     await run_in_threadpool(replace_recovery.recover_all)
+    from . import promote as _promote
+    await run_in_threadpool(_promote.cleanup_staging)
     # Tervikluse kontroll ja ajalooindeksi hooldus ei pea API käivitumist blokeerima.
     threading.Thread(target=run_git_fsck, daemon=True, name="git-fsck").start()
     # Esimene commit pärast buuti maksis 14,7 s (külm dentry-cache, 60k faili

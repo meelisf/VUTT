@@ -134,6 +134,9 @@ def _payload(state: dict, upload_id: str, status: str, expected_pages, **lisa) -
         # Impordi faas ja loendur (`importing` ajal). Poll on siis LUGEJA ega
         # tee SFTP-d, seega on see edenemise ainus tee kasutajani.
         "import_progress": state.get("import_progress"),
+        # Aluse vahetus (ADR 0089 p 6): viisardi bänner.
+        "promote": ({k: (state.get("promote") or {}).get(k) for k in ("exemplar_id", "holder", "shelfmark")}
+                    if state.get("promote") else None),
     }
     payload.update(lisa)
     return payload

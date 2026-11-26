@@ -39,6 +39,11 @@ def _upload_status_key(status: str) -> str:
 
 
 def _upload_link(state: dict, status_key: str) -> str:
+    if state.get("orphan"):
+        # Orb asendusmärk (ADR 0089 p 6): kausta pole, viisard ei saa jätkata —
+        # lõpetamine käib teose eksemplarilehelt.
+        wid = state.get("work_id")
+        return f"/work/{wid}/exemplar" if wid else "/upload"
     if status_key == "imported":
         wid = state.get("meta", {}).get("work_id")
         return f"/work/{wid}" if wid else "/upload"
@@ -54,13 +59,13 @@ def _normalize_upload(state: dict, title_of) -> dict:
     # kustutatud leht ei ole kasutaja jaoks tehtud töö (#261).
     ready = page_status.count(files, page_status.is_ready, skip_deleted=True)
     total = state.get("expected_pages") or len(files)
-    title = meta.get("title") or meta.get("slug", "")
+    title = meta.get("title") or meta.get("slug", "") or state.get("title") or ""
     return {
         "id": state.get("id"),
         "type": "upload",
         "title": title,
-        "slug": meta.get("slug", ""),
-        "work_id": meta.get("work_id"),
+        "slug": meta.get("slug", "") or state.get("slug", ""),
+        "work_id": meta.get("work_id") or state.get("work_id"),
         "page_number": None,
         "status_key": status_key,
         "slow": False,

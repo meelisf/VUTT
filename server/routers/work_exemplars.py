@@ -62,7 +62,70 @@ def _exemplars_view(work_id: str, path: str, meta: dict, user) -> dict:
         "convolutes": we.resolve_convolutes(work_id, meta, user),
         # Eksemplari pildid (ADR 0079): kaardi pildiriba ilma eksemplari kohta eraldi päringuta.
         "images": image_previews(path, [x.get("id") for x in exemplars]),
+        # Pooleli lehestiku asendus (ADR 0089 p 6): „Lõpeta" nupp märgi põhjal.
+        "replace_pending": _replace_pending(path),
     }
+
+
+def _replace_pending(path: str):
+    from ..replace_marker import read_marker
+    m = read_marker(os.path.basename(os.path.normpath(path)))
+    if not m:
+        return None
+    return {"upload_id": m.get("upload_id"), "phase": (m.get("progress") or {}).get("phase")}
+
+
+def _promote_call(fn, *args, **kwargs):
+    from .. import promote
+    try:
+        return fn(*args, **kwargs)
+    except promote.PromoteError as e:
+        raise HTTPException(status_code=e.status, detail={"code": e.code, "detail": e.detail})
+
+
+@router.get("/admin/work/{work_id}/exemplars/{eid}/promote/preview")
+def promote_preview(work_id: str, eid: str, user=Depends(require_role("admin"))):
+    """Aluse vahetuse eelvaade (ADR 0089 p 6): lehtede päritolu, toimetatud lehed, salvestatavus."""
+    from .. import promote
+    path = _writable(work_id, user)
+    return _promote_call(promote.preview, path, eid)
+
+
+@router.post("/admin/work/{work_id}/exemplars/{eid}/promote")
+def promote_start(work_id: str, eid: str, body: dict = Body(...), user=Depends(require_role("admin"))):
+    """Aluse vahetuse algus (ADR 0089 p 6): asendusrežiimis üleslaadimine eksemplari piltidest."""
+    from .. import promote
+    path = _writable(work_id, user)
+    uid = _promote_call(promote.start, path, work_id, eid, body.get("unknown_target"),
+                        body.get("confirmed_edited") or {}, user["username"])
+    return {"upload_id": uid}
+
+
+@router.post("/admin/work/{work_id}/replace/finish")
+def replace_finish(work_id: str, body: dict = Body(...), user=Depends(require_role("admin"))):
+    """Pooleli lehestiku asenduse lõpetamine teose märgi järgi (ADR 0089 p 6). `upload_id`
+    peab olema vaates näidatud oma; tulemus eraldi (`replaced` / `restored` / `cleared`)."""
+    from ..upload import replace_recovery
+    path = _writable(work_id, user)
+    tulemus = replace_recovery.finish_for_work(path, str(body.get("upload_id") or ""))
+    if tulemus not in replace_recovery.OK_RESULTS:
+        raise HTTPException(status_code=409, detail={"code": tulemus})
+    return {"result": tulemus}
+
+
+@router.post("/admin/upload/{upload_id}/promote/confirm")
+def promote_confirm(upload_id: str, body: dict = Body(...), user=Depends(require_role("admin"))):
+    """Lõppkontrolli 409 järel uus kinnitus sama üleslaadimise juures (ADR 0089 p 6)."""
+    from .. import promote
+    from ..upload import state as upload_state
+    from ..upload_ops import _valid_upload_id
+    st = upload_state.read_state(upload_id) if _valid_upload_id(upload_id) else None
+    if not st or not st.get("promote") or not st.get("replace_work_id"):
+        raise HTTPException(status_code=404, detail={"code": "no_promote"})
+    # Kirjutusõigus sihtteosele (ADR 0031) — roll üksi ei piisa.
+    _writable(st["replace_work_id"], user)
+    _promote_call(promote.confirm, upload_id, body.get("unknown_target"), body.get("confirmed_edited") or {})
+    return {"status": "ok"}
 
 
 @router.get("/works/{work_id}/exemplars")

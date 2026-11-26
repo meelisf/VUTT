@@ -334,6 +334,8 @@ export interface WorkExemplarsResponse {
   convolutes: ConvoluteBlock[];
   /** Eksemplari pildid (ADR 0079): ainult piltidega eksemplarid, kuni 6 eelvaate ID-d. */
   images?: Record<string, { count: number; preview: string[] }>;
+  /** Pooleli lehestiku asendus (ADR 0089 p 6): „Lõpeta" nupu jaoks. */
+  replace_pending?: { upload_id: string; phase: string | null } | null;
 }
 
 export function getWorkExemplars(workId: string, token?: string | null): Promise<WorkExemplarsResponse> {

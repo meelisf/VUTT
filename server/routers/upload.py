@@ -73,6 +73,17 @@ async def admin_uploads(user=Depends(require_role("admin"))):
     return {"status": "success", "uploads": uploads}
 
 
+def _reject_promote_source_write(upload_id: str) -> None:
+    """Aluse vahetuse üleslaadimisel on lähtefailid eksemplari pildid — kliendi
+    lähtefailide teed on suletud (muidu oleks `promote.source_images` seos vale)."""
+    from ..upload import state as _st
+    s = _st.read_state(upload_id) if _valid_upload_id(upload_id) else None
+    if s and s.get("promote"):
+        raise HTTPException(status_code=409, detail=(
+            "Aluse vahetuse üleslaadimise lähtefaile ei saa muuta. / "
+            "Source files of a transcription-base change cannot be modified."))
+
+
 @router.post("/admin/upload/create")
 async def admin_upload_create(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
@@ -140,6 +151,7 @@ def admin_upload_ada_fetch(upload_id: str, user=Depends(require_role("admin"))):
     """
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
+    _reject_promote_source_write(upload_id)
     state = upload_state.read_state(upload_id)
     if not state:
         raise HTTPException(status_code=404, detail="Uploadi ei leitud")
@@ -378,6 +390,7 @@ async def admin_upload_chunk(upload_id: str, request: Request, user=Depends(requ
     X-Upload-Fingerprint, X-Filename. Vale nihe → 409 + serveri tegelik seis."""
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
+    await run_in_threadpool(_reject_promote_source_write, upload_id)
     try:
         offset = int(request.headers.get("X-Upload-Offset", ""))
         total = int(request.headers.get("X-Upload-Total", ""))
@@ -411,6 +424,7 @@ async def admin_upload_chunk(upload_id: str, request: Request, user=Depends(requ
 async def admin_upload_files(upload_id: str, request: Request, user=Depends(require_role("admin"))):
     if not _valid_upload_id(upload_id):
         raise HTTPException(status_code=400, detail="Vigane upload_id")
+    await run_in_threadpool(_reject_promote_source_write, upload_id)
     x_pg = int(request.headers.get("X-Page-Number", "0"))
     x_total = int(request.headers.get("X-Total-Pages", "0"))
     tmp_path = f"/tmp/vutt-upload-{upload_id}-pg{x_pg}" if x_pg > 0 else f"/tmp/vutt-upload-{upload_id}"
@@ -500,14 +514,36 @@ async def admin_upload_update_meta(upload_id: str, request: Request, user=Depend
     return {"status": "success"}
 
 
+def _cancel_under_work_lock(upload_id: str, find_by_upload):
+    """Tühistus SAMA teose luku all, mille all asendus märgi kirjutab (ADR 0089 p 6): muidu
+    võiks tühistus läbida kontrolli enne märgi teket ja kustutada kausta pärast seda."""
+    import contextlib
+    from ..admin_page_ops import work_lock
+    from ..utils import find_directory_by_id
+    s = upload_state.read_state(upload_id) if _valid_upload_id(upload_id) else None
+    wd = find_directory_by_id(s["replace_work_id"]) if s and s.get("replace_work_id") else None
+    ctx = work_lock(os.path.basename(wd), wd) if wd else contextlib.nullcontext()
+    try:
+        with ctx:
+            if find_by_upload(upload_id):
+                return "replacing"
+            return cancel_upload(upload_id)
+    except Exception as e:
+        from ..replace_marker import WorkReplacingError
+        if isinstance(e, WorkReplacingError):
+            return "replacing"
+        raise
+
+
 @router.delete("/admin/upload/{upload_id}")
 async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
     # Pooleli asendus (ADR 0089): tühistus kustutaks state'i; taaste vajab seda → 409.
     from ..replace_marker import find_by_upload
-    if await run_in_threadpool(find_by_upload, upload_id):
+    tulemus = await run_in_threadpool(_cancel_under_work_lock, upload_id, find_by_upload)
+    if tulemus == "replacing":
         raise HTTPException(status_code=409, detail=(
             "Lehestiku asendus on pooleli — üleslaadimist ei saa praegu kustutada. / "
             "Page replacement in progress — the upload cannot be deleted now."))
-    if await run_in_threadpool(cancel_upload, upload_id):
+    if tulemus:
         return {"status": "success"}
     raise HTTPException(status_code=500)
