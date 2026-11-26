@@ -112,6 +112,16 @@ Tekstitunnistajal oleks `"text_witness": true` ja `pages`-i võtit ei oleks (p 3
     lehte. See on tahtlik: vahetus tähendab, et skaneering on teise eksemplari oma.
 - Märke paneb ainult inimene (vorm või ettepaneku kinnitus). Migratsioon ja agent seda
   automaatselt ei pane. Kontrollimata seos jääb määramata.
+- **Täiendus 2026-11-26:** märke panek/vahetus on METAANDMETE PARANDUS („praegune skaneering
+  on tehtud sellest eksemplarist"), mitte aluse vahetus: pilte ega teksti ei vahetata, aga
+  märgistamata lehed liiguvad vaikimisi uue tunnistaja alla. UI eristab selle selgelt uuest
+  transkriptsioonist eksemplari piltidest (ADR 0089 p 6): rea tagasihoidlik tegevuslink
+  „Märgi praeguse skaneeringu allikaks" + kinnitus „see on parandus" (piltidega eksemplaril
+  viide aluse vahetusele) vs. piltide all kokkupandav plokk „Tee transkriptsiooni aluseks".
+  Kui alus on märgitud, teistel ridadel märke linki ei ole: vale märke parandus = eemalda
+  märge aluse realt, siis pakub rida „Teose lehed" uue valiku.
+  Põhjus: tootmistestis tõlgendati märke vahetust aluse vahetusena ja lehed paistsid
+  „kolivat" valele eksemplarile.
 - **Teose kogu lehestiku asendus** (`replace_work_content`, upload „asenda sisu") nullib
   kogu lehtede päritolu. Tunnistaja kaotab märke, kõigi eksemplaride `pages` ja
   `exemplar_unknown_pages` (p 4) eemaldatakse ning iga mõjutatud eksemplar saab

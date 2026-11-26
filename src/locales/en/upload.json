@@ -169,7 +169,11 @@
     "label": "Replace existing work",
     "warning": "Replacement will delete all existing pages and replace them with new ones.",
     "selected": "Work to replace:",
-    "replaceBtn": "Replace: {{title}}",
+    "metaUnchanged": "Replacement only swaps the pages — the work's metadata stays unchanged. Edit it on the work's page.",
+    "openWork": "Open work",
+    "replaceBtn": "Replace the work's pages",
+    "consequence": "The work's current pages are replaced with the new ones. The old text stays in the git history.",
+    "consequencePromote": "The work's current pages are replaced with the new ones. The old pages are kept as images under their own copy, the old text in the git history.",
     "remove": "Remove replacement"
   },
   "ada": {

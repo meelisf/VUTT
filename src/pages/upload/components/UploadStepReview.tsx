@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAdminImageTicket } from '../../../hooks/useAdminImageTicket';
 import { uploadThumbUrl } from '../uploadApi';
 import { AlertTriangle, CheckCircle, Clock, Info, Loader2 } from 'lucide-react';
@@ -204,8 +205,21 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
       )}
     </div>
 
-    {/* Metaandmete muutmine OCR ootamise ajal ja pärast */}
-    {uploadId && authToken && (
+    {/* Asendus vahetab ainult lehed: server ei rakenda üleslaadimise metaandmeid
+        (`metadata_updates` on tühi) — vorm näitaks tühja/vale seisu ja muudatused kaoksid. */}
+    {replaceWorkId && (
+      <div data-testid="replace-meta-note"
+        className="mb-5 flex flex-wrap items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700">
+        <Info size={16} className="shrink-0 text-gray-500" />
+        <span className="flex-1 min-w-0">{t('replaceWork.metaUnchanged')}</span>
+        <Link to={`/work/${replaceWorkId}`} className="text-primary-700 hover:text-primary-900 font-medium">
+          {t('replaceWork.openWork')}
+        </Link>
+      </div>
+    )}
+
+    {/* Metaandmete muutmine OCR ootamise ajal ja pärast (ainult uue teose import) */}
+    {uploadId && authToken && !replaceWorkId && (
       <UploadMetaForm
         uploadId={uploadId}
         authToken={authToken}
@@ -321,19 +335,26 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
       </div>
     )}
     {replaceWorkId && replaceWorkTitle ? (
-      <button
-        onClick={onReplaceImport}
-        disabled={!canImport}
-        title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
-        className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-      >
-        {importLoading || status === 'importing' ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <AlertTriangle size={16} />
-        )}
-        {t('replaceWork.replaceBtn', { title: replaceWorkTitle ?? '' })}
-      </button>
+      // Asendus on raske, aga mitte hävitav (vana tekst gitis, aluse vahetusel vanad lehed
+      // eksemplari piltidena): kaalu annab selgitus, mitte punane täislaiusega nupp.
+      <div data-testid="replace-panel" className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+        <p className="text-xs font-bold text-amber-900 uppercase">{t('replaceWork.selected')}</p>
+        <p className="mt-1 text-sm text-gray-900 line-clamp-2" title={replaceWorkTitle}>{replaceWorkTitle}</p>
+        <p className="mt-2 text-xs text-amber-900">
+          {pollResult?.promote ? t('replaceWork.consequencePromote') : t('replaceWork.consequence')}
+        </p>
+        <div className="mt-3 flex justify-end">
+          <button
+            onClick={onReplaceImport}
+            disabled={!canImport}
+            title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
+            className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-1.5 px-3 rounded-lg transition-colors text-sm"
+          >
+            {(importLoading || status === 'importing') && <Loader2 size={16} className="animate-spin" />}
+            {t('replaceWork.replaceBtn')}
+          </button>
+        </div>
+      </div>
     ) : (
       <button
         onClick={onImport}

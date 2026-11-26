@@ -124,6 +124,26 @@ describe('ExemplarPage', () => {
     expect(badges[0].textContent).toContain('"n":3');
   });
 
+  it('aluse vahetus on kokkupandav plokk (vaikimisi kinni); alusel puudub', async () => {
+    state.role = 'admin';
+    getWorkExemplars.mockResolvedValue(resp({
+      exemplars: [{ id: 'a1', holder: 'TÜR', text_witness: true }, { id: 'b2', holder: 'UUB' }],
+      images: { a1: { count: 6, preview: [] }, b2: { count: 6, preview: [] } },
+    }));
+    fetchExemplarImages.mockResolvedValue(manifest);
+    renderAt('/work/w1/exemplar/b2');
+    const callout = await screen.findByTestId('promote-callout');
+    // Vaikimisi kokku pandud: ainult päis, selgitust ega nuppu ei ole.
+    expect(within(callout).queryByText('exemplarPage.promote.openButton')).toBeNull();
+    fireEvent.click(within(callout).getByText('exemplarPage.promote.open'));
+    expect(within(callout).getByText('exemplarPage.promote.callout')).toBeTruthy();
+    expect(within(callout).getByText('exemplarPage.promote.openButton')).toBeTruthy();
+    cleanup();
+    renderAt('/work/w1/exemplar/a1');
+    await screen.findByTestId('exemplar-material');
+    expect(screen.queryByTestId('promote-callout')).toBeNull();
+  });
+
   it('4. avalik + pildita eksemplar: „Pilte ei ole" puudub, kaarti pole', async () => {
     getWorkExemplars.mockResolvedValue(resp({
       exemplars: [{ id: 'a1', holder: 'TÜR', text_witness: true }, { id: 'b2', holder: 'LUAB' }],
