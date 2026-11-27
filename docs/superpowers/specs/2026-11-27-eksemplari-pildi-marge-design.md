@@ -97,6 +97,12 @@ kustutab.** (`label` jääb senise semantika juurde.) Klient: järjestuse mustan
 pildi-ID-sid; salvestamisel võetakse ülejäänud väljad VÄRSKEST manifestist, mitte mustandi
 ajal laetud koopiast. Märke salvestus saadab värske manifesti + ühe muudetud `note`-i.
 
+**Samaaegne märke muutmine (ülevaatus 2, p 2).** Värske manifest üksi ei kaitse: kui A avab
+märke, B salvestab vahepeal oma paranduse ja A salvestab värskelt laetud revisjoniga, asendaks
+A B paranduse vaikselt. Seepärast seob mustand **avamisel nähtud märke väärtuse** (`base`).
+Salvestamisel laeb klient värske manifesti; kui selle pildi `note` ≠ `base`, ei kirjutata,
+vaid näidatakse sama võrdlust mis 409 korral (sisestatud tekst + serveri värske märge).
+
 **Pildivaade (`ExemplarImageModal`) ja kõrvutus (`ExemplarCompareModal`).**
 - Tööriistaribal lehe sildi järel nupp „Lisa märge" / kollane „Märge" (ikoon `icons.ts`-ist,
   ADR 0086 — vajadusel uus mõiste + valvuri sõnastik).
@@ -114,12 +120,17 @@ ajal laetud koopiast. Märke salvestus saadab värske manifesti + ühe muudetud 
 
 **Teose lehtede pool kõrvutuses (ülevaatus p 2).** Sama nupp, aga sisu = lehe kommentaarid
 (olemasolev mudel): kommentaaride olemasolul kollane „Märkmed (N)", hüpikaken näitab
-kommentaare **lugemiseks** ja lingi „Lisa märge töölaual" (`/work/<id>/<lk>`, märkmete
-plokk lahti). Uut lehe kommentaari ei salvestata kõrvutusest: töölaud lisab kommentaari
+kommentaare **lugemiseks** ja lingi „Lisa märge töölaual". **Lingi sihtkoht (ülevaatus 2,
+p 3):** paljas `/work/<id>/<lk>` avaks kasutaja eelistatud vahekaardi (`initialEditorTab`).
+Uus lingiparameeter (nt `?notes=add`) avab „Info ja annotatsioonid" vahekaardi ja viib
+kommentaarikasti juurde (sama tee mis juhise `addNote`, `AnnotationsTab.tsx:91`). Linki
+näidatakse ainult kasutajale, kellel on teose muutmisõigus (`canEditWork(user, work)`,
+sama mis töölaua `readOnly`) — sisselogimisest üksi ei piisa. Uut lehe kommentaari ei
+salvestata kõrvutusest: töölaud lisab kommentaari
 üldise `/save` kaudu (tekst, metaandmed, `base`, `content_generation`), eraldi
 kommentaaripõhist lisamisteed ei ole ja uut lehe JSON-i kirjutajat ei tehta. Nii järgib
 lisamisõigus automaatselt töölaua reeglit; eksemplari pildi märke muutmine nõuab admini.
-Kommentaarideta lehel näidatakse ainult linki (sisselogitule). Pisipiltide ribal kollane
+Kommentaarideta lehel näidatakse ainult linki (muutmisõigusega kasutajale). Pisipiltide ribal kollane
 täpp kommentaaridega lehel.
 
 **Täpp.** Eksemplari lehe ruudustikus ja mõlema modaali pisipiltide ribal: märkusega pildil
@@ -165,6 +176,14 @@ lõpetamine peab jääma korratavaks (ADR 0089) ja seda ei tehta keerulisemaks. 
 vahetuse eelvaade (`promote.preview`) loendab märkusega lähtepildid ja dialoog hoiatab
 („N pildil on märge; need jäävad ainult ajalukku"). Märge on gitis manifesti ajaloos alles.
 
+**Lõppkontroll (ülevaatus 2, p 1).** Eelvaate ja asenduse vahel võib keegi lähtepildile märke
+lisada; praegune `recheck_locked` võrdleb ainult päritolu (`origins_changed`) ja toimetatud
+lehti (`edited_pages_changed`). Seepärast: kinnitus kannab nende **märkusega piltide ID-de
+hulka, mille asendus tegelikult eemaldab** (`remove_source_ids` ∩ märkusega pildid;
+`promote.confirmed_noted`), ja lõppkontroll arvutab selle uuesti. Hulga muutumisel 409
+`noted_images_changed` → dialoog näitab uut hulka ja küsib uue kinnituse (sama tee mis
+`edited_pages_changed`, `POST /admin/upload/{id}/promote/confirm`).
+
 ## Piirangud ja invariandid
 
 - Õigused: kirjutus `can_write_work` + admin (olemasolev `_writable`), lugemine
@@ -172,8 +191,8 @@ vahetuse eelvaade (`promote.preview`) loendab märkusega lähtepildid ja dialoog
 - i18n: iga uus võti et + en korraga (ADR 0011, kaks valvurit).
 - Natiivseid dialooge ei kasutata; kinnitus `useConfirm`, teated `useNotify`.
 - Ikoonid `icons.ts`-ist (ADR 0086).
-- Lehe kommentaari lisamine kõrvutusest käib olemasoleva kommentaaritee ja lehe luku kaudu
-  (ADR 0053) — uut lehe JSON-i kirjutajat ei tehta.
+- Lehe kommentaari ei lisata kõrvutusest — link viib töölauale (`/save`); uut lehe JSON-i
+  kirjutajat ei tehta.
 - Muutusteta salvestus on no-op (ADR 0012) — `write_manifest_locked` juba järgib seda.
 
 ## Ehitaja otsustada
