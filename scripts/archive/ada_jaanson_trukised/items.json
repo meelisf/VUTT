@@ -1,0 +1,456 @@
+[
+ {
+  "jaanson": 162,
+  "shelfmark": "R Est.A-5074(11)",
+  "handle": "10062/10521",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Encomion Regiae Academiae Gvstavianae, quae Dorpati est ab Embeccam, a ... Dn. Gustavo Adolpho, Svecorum, Gothorum, Vandalorumque rege ... duce Esthoniae & Careliae, domino Ingriae, &c. ... fundatae; et 15. die Octob. anno 1632. solennissime sanctos introductionis natales celebrantis, quod ipsum, ... in ... Dorpati ... 12. die Junij, anno 1638. decantabat Bothvidus Jonae, Hellenius, Südermannus.",
+   "ester_id": "b1712273",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Bothvidus Hellenius",
+     "role": "auctor",
+     "id": "vutt:Pwdich6u",
+     "source": "local"
+    },
+    {
+     "name": "Lorenz Luden",
+     "role": "aui",
+     "id": "vutt:Pfxxxsc",
+     "source": "local"
+    },
+    {
+     "name": "Lorenz Luden",
+     "role": "gratulator",
+     "id": "vutt:Pfxxxsc",
+     "source": "local"
+    },
+    {
+     "name": "Johannes Erici Stregnensis Stiernstråle",
+     "role": "gratulator",
+     "id": "vutt:Pu9zz79",
+     "source": "local"
+    }
+   ],
+   "languages": [
+    "lat"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5074(11)"
+    }
+   ]
+  }
+ },
+ {
+  "jaanson": 615,
+  "shelfmark": "R Est.A-753",
+  "handle": "10062/18454",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Historia Lettica Das ist Beschreibung der Lettischen Nation. In welcher Von der Letten als alten Einwohner und Besitzer des Lieflandes, Curlandes und Semgallen Namen, Uhrsprung oder Ankunfft, ihrem Gottes-Dienst, ihrer Republica oder Regimente so sie in der Heydenschafft gehabt, auch ihren Sitten, Geberden, Gewonheiten, Natur und Eigenschafften etc. gründlich und ümbständig Meldung geschicht[!]. Der Teutschen Nation und allen der Historischen Warheit Liebhabern, zu einem nöthigen Unterricht zusammen getragen und in dem Druck verfertiget Durch Paulum Einhorn, Fürstlichen Curländischen Superintendenten P. M.",
+   "ester_id": "b2265966",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Paul Einhorn",
+     "role": "auctor",
+     "id": "vutt:P6s698x",
+     "source": "local"
+    }
+   ],
+   "languages": [
+    "deu"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-753"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:P82rja6",
+    "label": "Johann Vogel",
+    "source": "local",
+    "labels": {
+     "et": "Johann Vogel"
+    }
+   }
+  }
+ },
+ {
+  "jaanson": 746,
+  "shelfmark": "R Est.B-1622",
+  "handle": "10062/25363",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Ehren-Gedichte, Dem WolEhrenvesten, GrossAchtbahren und Hochgelahrten Hn. Philippo Tinctorio, wolbestalten Königl. Ober-[Advoc]ato Fisci über Lieff- und Ingermanland, als derselbe seinen Namens-Tag begienge, Zu Ehren auffgesetzet von guten Freunden.",
+   "ester_id": "b2503234",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Friedrich Wilhelm Lado",
+     "role": "auctor"
+    }
+   ],
+   "languages": [
+    "deu"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.B-1622"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:P82rja6",
+    "label": "Johann Vogel",
+    "source": "local",
+    "labels": {
+     "et": "Johann Vogel"
+    }
+   }
+  }
+ },
+ {
+  "jaanson": 759,
+  "shelfmark": "R Est.A-5084(1)",
+  "handle": "10062/25379",
+  "collection": "academia-gustaviana",
+  "overrides": {
+   "title": "Rhabdologia sive computatio per virgulas in gratiam studiosae juventutis, mathesin in Regia ad Embeccam Acad. Gustaviana colentis, delineata & typis commissa a M. Joachimo Schelenio, mathem. infer. prof. ord. qui cum generosissimo hujus compendij primo inventore, praefationis loco, benevolum lectorem hisce salutat ...",
+   "ester_id": "b1535695",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Joachim Schelenius",
+     "role": "auctor",
+     "id": "vutt:P75zojz",
+     "source": "local"
+    }
+   ],
+   "languages": [
+    "lat"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5084(1)"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:P82rja6",
+    "label": "Johann Vogel",
+    "source": "local",
+    "labels": {
+     "et": "Johann Vogel"
+    }
+   }
+  }
+ },
+ {
+  "jaanson": 915,
+  "shelfmark": "R Est.A-5067",
+  "handle": "10062/11048",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Compendiosa nuper adinventa semita, transmittens in plenam convenientiae et dusconvenientiae generum in linguis Svecica et Germanica, cognitionem; simulque accuratissimam rationem brevissimis praeceptis addiscendi Germanicam linguam ostendens; directa in usum praecipue adultorum Germanicam non callentium, nec non Teutonum eorum, qui Svecicam novisse desiderent. Dhet är: En rätt och nyligen upfunnen Geenstijg, Wijsandes huru man behändigst kan Genera i Tyskan fatta, jämwel alla nödige Regler, som en Swensk hafwer at achta, den Tyskan lära wil. Såsom ock det förnämbsta en Tysk i Swenska Språkets lärande nödigt hafwer. Upsökt och upsatt aff Swen Tiliander Ingemars-Son.",
+   "ester_id": "b1710807",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Sueno Tiliander",
+     "role": "auctor"
+    }
+   ],
+   "languages": [
+    "swe"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5067"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:Pevxm91",
+    "label": "Johann Brendeken",
+    "source": "local",
+    "labels": {
+     "et": "Johann Brendeken"
+    }
+   }
+  }
+ },
+ {
+  "jaanson": 926,
+  "shelfmark": "R Est.A-5065(1)",
+  "handle": "10062/17802",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "De columnis Herculis dissertatio, quam ... in Regia Livonorum Academia, praeside ... Olao Hermelino, prof. eloq. et poes. publicae ventilationi exponit Kenicius Kenicii, Angermannia Svedus, ... ad d. [4.] Martii [Maji].",
+   "ester_id": "b1709772",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Kenicius Kenicius",
+     "role": "respondens",
+     "id": "vutt:Pppwfmdt",
+     "source": "local"
+    },
+    {
+     "name": "Olof Hermelin",
+     "role": "praeses",
+     "id": "vutt:Pe2xqtv",
+     "source": "local"
+    },
+    {
+     "name": "Petrus Wagner",
+     "role": "gratulator",
+     "id": "vutt:Pdy4rtr",
+     "source": "local"
+    },
+    {
+     "name": "Gabriel Skragge",
+     "role": "gratulator",
+     "id": "vutt:Pigd6w1",
+     "source": "local"
+    }
+   ],
+   "languages": [
+    "lat"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5065(1)"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:Pevxm91",
+    "label": "Johann Brendeken",
+    "source": "local",
+    "labels": {
+     "et": "Johann Brendeken"
+    }
+   }
+  }
+ },
+ {
+  "jaanson": 983,
+  "shelfmark": "R Est.A-5074(1)",
+  "handle": "10062/10510",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Spicilegia ex opimâ theologiae messe, consiliô venerandae facultatis theologicae, in Regia ad Emmam Academia Gustaviano-Carolina, sub praesidio ... M. Olai Mobergii, S.S. theol. prof. publ. examinanda proponit Jacobus Concius, Regiom. Pruss. auctor. ... ad d. 21. Jan. A. C. 1693.",
+   "ester_id": "b1712483",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Jacobus Concius",
+     "role": "respondens",
+     "id": "vutt:Pvqwp91",
+     "source": "local"
+    },
+    {
+     "name": "Olaus Moberg",
+     "role": "praeses",
+     "id": "vutt:Pueg1cm",
+     "source": "local"
+    }
+   ],
+   "languages": [
+    "lat"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-5074(1)"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:Pevxm91",
+    "label": "Johann Brendeken",
+    "source": "local",
+    "labels": {
+     "et": "Johann Brendeken"
+    }
+   }
+  }
+ },
+ {
+  "jaanson": 1029,
+  "shelfmark": "R VI 340",
+  "handle": "10062/25367",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Schediasma historicum, quo, occasione definitionis vetustae, qua philosophia dicitur γνωσις των όντων, varia discutiuntur ad historiam tum philosophicam, tum ecclesiasticam pertinentia: inprimis autem inquiritur in ultimas origines philosophiae gentilis, & quatuor in ea sectarum apud Graecos praecipuarum; haereseos item Simonis Magi, Gnosticorum, Massalianorum & Pelagianorum; denique theologiae mysticae pariter ac scholasticae. Autore M. Jacobo Thomasio, in Acad. Lips. oratoriae prof. P.",
+   "ester_id": "b2271140",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Jacob Thomasius",
+     "role": "auctor"
+    },
+    {
+     "name": "Michael Dau",
+     "role": "aui",
+     "id": "vutt:P2nqvxq",
+     "source": "local"
+    }
+   ],
+   "languages": [
+    "lat"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R VI 340"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:Pevxm91",
+    "label": "Johann Brendeken",
+    "source": "local",
+    "labels": {
+     "et": "Johann Brendeken"
+    }
+   }
+  }
+ },
+ {
+  "jaanson": 1205,
+  "shelfmark": "R Est.A-6123",
+  "handle": "10062/26682",
+  "collection": "academia-gustavo-carolina",
+  "overrides": {
+   "title": "Kurtze Anweysung zu der sehr nöthigen und schweren Kunst nehmlich Der Erkäntnüs sein selbst, wie solche Der (Tit.) Herr Christian Thomas, Churfürstl. Brandenburgischer Rath und Professor auff der hochlöbl. Academie zu Hall in einem Programmate Anno 93. im April. der studierenden Jugend zum besten entworffen hat. Welches Wegen seines Grossen Nutzens aufs neue zum Druck befordert worden.",
+   "ester_id": "b1585235",
+   "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+     "en": "Tartu",
+     "de": "Tartu",
+     "et": "Tartu",
+     "la": "Tarbatum"
+    }
+   },
+   "creators": [
+    {
+     "name": "Christian Thomasius",
+     "role": "auctor",
+     "id": "vutt:Pzstogz",
+     "source": "local"
+    },
+    {
+     "name": "Michael Dau",
+     "role": "aui",
+     "id": "vutt:P2nqvxq",
+     "source": "local"
+    }
+   ],
+   "languages": [
+    "deu"
+   ],
+   "archive_refs": [
+    {
+     "archive_id": "Tartu TÜR",
+     "reference": "R Est.A-6123"
+    }
+   ],
+   "publisher": {
+    "id": "vutt:Pevxm91",
+    "label": "Johann Brendeken",
+    "source": "local",
+    "labels": {
+     "et": "Johann Brendeken"
+    }
+   }
+  }
+ }
+]
