@@ -103,6 +103,13 @@ A B paranduse vaikselt. Seepärast seob mustand **avamisel nähtud märke väär
 Salvestamisel laeb klient värske manifesti; kui selle pildi `note` ≠ `base`, ei kirjutata,
 vaid näidatakse sama võrdlust mis 409 korral (sisestatud tekst + serveri värske märge).
 
+**Väljapõhine võrdlus (ülevaatus 3).** Baasväärtus seotakse IGA hüpikaknas muudetava välja
+kohta eraldi (`note` ja `label`). Salvestus saadab ainult kasutaja muudetud väljad; muutmata
+väli võetakse värskest manifestist. Seega: kui kasutaja muudab ainult märget, jääb teise
+kasutaja vahepeal salvestatud värske silt alles. Konflikt (võrdlusvaade) tekib ainult siis,
+kui kasutaja muudetud välja värske väärtus erineb tema baasist — sildi puhul samamoodi nagu
+märke puhul.
+
 **Pildivaade (`ExemplarImageModal`) ja kõrvutus (`ExemplarCompareModal`).**
 - Tööriistaribal lehe sildi järel nupp „Lisa märge" / kollane „Märge" (ikoon `icons.ts`-ist,
   ADR 0086 — vajadusel uus mõiste + valvuri sõnastik).
@@ -184,6 +191,11 @@ hulka, mille asendus tegelikult eemaldab** (`remove_source_ids` ∩ märkusega p
 `noted_images_changed` → dialoog näitab uut hulka ja küsib uue kinnituse (sama tee mis
 `edited_pages_changed`, `POST /admin/upload/{id}/promote/confirm`).
 
+**Üks loend (ülevaatus 3).** Lõppkontroll ja eemaldamine kasutavad SAMA eemaldatavate
+lähtepiltide loendit (üks funktsioon, mis arvutab `remove_source_ids`-i) — mitte kahte eraldi
+arvutust. Poolitatud lähtepilt, mille üks väljundleht jäi impordist välja, säilib (ADR 0089
+p 6: eemaldatakse ainult täielikult commit'itud lähtepildid) ja tema märge ei kuulu hulka.
+
 ## Piirangud ja invariandid
 
 - Õigused: kirjutus `can_write_work` + admin (olemasolev `_writable`), lugemine
@@ -211,6 +223,13 @@ hulka, mille asendus tegelikult eemaldab** (`remove_source_ids` ∩ märkusega p
 
 - Server: `note` salvestub, kärbitakse, tühi eemaldab võtme; impordi allikas jääb muutumatuks;
   õiguseta 403; sillaotspunkt annab ainult paaris piltide märkmed ja austab lugemisõigust.
+- Server, aluse vahetus (regressioon, ülevaatus 3): (a) poolitatud lähtepildi üks väljundleht
+  jääb impordist välja → lähtepilt säilib ega ole märkuste hulgas; (b) eemaldatavale pildile
+  pärast eelvaadet lisatud märge → lõppkontroll 409 `noted_images_changed`, uus kinnitus
+  laseb läbi; lõppkontroll ja eemaldus kasutavad sama loendit.
+- Frontend, samaaegne muutmine (regressioon, ülevaatus 3): A muudab ainult märget, B on
+  vahepeal muutnud silti → salvestus õnnestub ja B silt säilib; A ja B muudavad sama silti
+  (või sama märget) → võrdlusvaade, kirjutust ei toimu.
 - Frontend: nupp kollane märke olemasolul; lugejale ilma märketa nuppu pole; toimetaja
   salvestab märke; täpp ruudustikus; töölaua paneel näitab paaris pildi märget;
   valikurežiim + liiguta + salvesta järjekord; kustuta valitud.
