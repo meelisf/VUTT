@@ -9,6 +9,7 @@ vi.mock('../../config', () => ({
 vi.mock('../workImageService', () => ({
   getFullImageUrl: (path: string) => `http://localhost:8001/${path}`,
   getThumbUrl: (id: string) => `http://localhost:8001/thumbs/${id}.jpg`,
+  getPageThumbUrl: (id: string, path: string) => `http://localhost:8001/${id}/_thumbs/_thumb_${path.split('/').pop()}`,
 }));
 
 // checkMixedContent kasutab window.location — ei tööta node keskkonnas.
@@ -203,6 +204,21 @@ describe('normalizeWork', () => {
     it('derives work_id from id when work_id absent', () => {
       const { work_id, ...hit } = baseWorkHit as any;
       expect(normalizeWork(hit).work_id).toBe('abc123');
+    });
+  });
+
+  describe('page_thumbnail_url', () => {
+    it('kasutab esimese lehe pilti', () => {
+      const w = normalizeWork({ ...baseWorkHit, lehekylje_number: 1, lehekylje_pilt: 'kaust/p001.jpg' });
+      expect(w.page_thumbnail_url).toContain('/abc123/_thumbs/_thumb_p001.jpg');
+    });
+    it('ei kasuta muu lehe pilti (sort=recent annab viimati muudetud lehe)', () => {
+      const w = normalizeWork({ ...baseWorkHit, lehekylje_number: 42, lehekylje_pilt: 'kaust/p042.jpg' });
+      expect(w.page_thumbnail_url).toBeUndefined();
+    });
+    it('eelistab first_page_image-t tabamuse lehe pildile', () => {
+      const w = normalizeWork({ ...baseWorkHit, lehekylje_number: 42, lehekylje_pilt: 'kaust/p042.jpg', first_page_image: 'kaust/p001.jpg' });
+      expect(w.page_thumbnail_url).toContain('/abc123/_thumbs/_thumb_p001.jpg');
     });
   });
 });

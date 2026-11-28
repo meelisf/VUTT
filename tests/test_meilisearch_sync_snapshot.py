@@ -186,6 +186,8 @@ def test_fikseeritud_väljad_igal_dokumendil(synced):
         assert d["lehekylje_pilt"].startswith(f"{SLUG}/{SLUG}-{WORK_ID}-")
         # NB: koodibaas kasutab vana õigekirja 'lehekylgede' (y, mitte 'l')
         assert d["teose_lehekylgede_arv"] == 2
+        # Igas lehedokumendis esimese lehe pilt (loendivaate pisipilt, #587)
+        assert d["first_page_image"] == docs[0]["lehekylje_pilt"]
         # ADR 0064: pealkirja lisaväljad on igas dokumendis, ka tühjana —
         # dashboardi attributesToSearchOn nimetab neid.
         assert d["title_en"] == ""

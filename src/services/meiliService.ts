@@ -102,8 +102,16 @@ export const normalizeWork = (hit: any): Work => {
     archive_refs: hit.archive_refs || null,
     page_count: hit.page_count || hit.teose_lehekylgede_arv || 0,
     thumbnail_url: getThumbUrl(workId),
-    // Esimese lehe täispisipilt (sama, mida haldus kasutab); loendivaade, #587
-    page_thumbnail_url: hit.lehekylje_pilt ? getPageThumbUrl(workId, hit.lehekylje_pilt) : undefined,
+    // Esimese lehe täispisipilt (sama, mida haldus kasutab); loendivaade, #587.
+    // `first_page_image` on igas lehedokumendis: kõigilt lehtedelt otsiv päring
+    // (sort=recent → distinct + last_modified:desc, sisuotsing) annab teose
+    // viimati muudetud / sobivaima lehe, mille `lehekylje_pilt` ei ole esimene.
+    // Varu (reindeksita dokument): `lehekylje_pilt` ainult 1. lehe tabamusest,
+    // muidu kaanepilt (_thumb).
+    page_thumbnail_url: hit.first_page_image
+      ? getPageThumbUrl(workId, hit.first_page_image)
+      : hit.lehekylje_pilt && Number(hit.lehekylje_number) === 1
+        ? getPageThumbUrl(workId, hit.lehekylje_pilt) : undefined,
     work_status: hit.work_status || hit.teose_staatus,
     page_tags: hit.page_tags || [],
     shareable: hit.shareable ?? false,

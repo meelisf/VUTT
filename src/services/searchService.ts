@@ -492,7 +492,8 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
         'creators', 'authors_text', 'part_persons_text', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url', 'archive_refs', 'relations', 'convolute_count',
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus',
-        'lehekylje_pilt' // loendivaate täispisipilt (#587)
+        // loendivaate täispisipilt (#587): first_page_image; varu reindeksita dokumendile
+        'first_page_image', 'lehekylje_pilt', 'lehekylje_number'
       ],
       attributesToSearchOn, // DASHBOARD_SEARCH_ATTRIBUTES (#605: üks allikas)
       matchingStrategy,
