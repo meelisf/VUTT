@@ -521,6 +521,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "text_content": page_text,                             # REDAKTOR: algne tekst koos kõigi märkidega
         "page_marks": page_mark_entries(page_text),            # KUVA (ei otsita): lehe tähistus [{kind,text,seg}], ADR 0070
         "lehekylje_pilt": os.path.join(dir_name, img_name),
+        "first_page_image": work_ctx['first_page_image'],      # KUVA: loendivaate pisipilt (#587)
         "originaal_kataloog": dir_name,
         "status": page_meta['status'],
         "page_tags": get_primary_labels(page_tags_data),                          # Eesti label, capitalize_first (teose tags-iga ühtlane)
@@ -809,6 +810,10 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         'year_end': doc_metadata.get('year_end', 0),
         **{key: doc_metadata.get(key) for key in ('dating', 'date_start', 'date_end', 'date_sort')},
         'teose_lehekylgede_arv': len(jpg_files),
+        # Esimese lehe pilt igas lehedokumendis: kõigilt lehtedelt otsiv päring
+        # (distinct + last_modified:desc) annab teose suvalise lehe, aga
+        # loendivaate pisipilt peab olema esimene leht (#587).
+        'first_page_image': os.path.join(dir_name, jpg_files[0]),
         'tags': tags,
         'notes': doc_metadata.get('notes'),
         'tag_aliases': tag_aliases,
